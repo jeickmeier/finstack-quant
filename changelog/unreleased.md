@@ -2,6 +2,13 @@
 
 ## Itemized changes
 
+### Statements: covenant templates and metric-unit headroom
+
+Build a covenant engine directly from a standard package. Evaluate and
+forecast statement covenants using explicit metric-to-node aliases. Reports
+and forecasts carry the signed distance to the threshold in metric units
+alongside normalized headroom.
+
 ### Margin: dated posted-IM funding
 
 Initial-margin projections include the opening date and amount, reporting

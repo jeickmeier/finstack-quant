@@ -103,6 +103,12 @@ impl PyCovenantReport {
         self.inner.headroom
     }
 
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._report", "CovenantReport.headroom_raw")]
+    fn headroom_raw(&self) -> Option<f64> {
+        self.inner.headroom_raw
+    }
+
     /// Audit stamp as a dict: numeric mode, rounding context, and FX policy in
     /// force for this evaluation.
     #[getter]
@@ -113,7 +119,7 @@ impl PyCovenantReport {
     /// Export the report as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``covenant_type``, ``covenant_id``, ``passed``,
-    /// ``actual_value``, ``threshold``, ``headroom``, ``details``.
+    /// ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
     ///
     /// The optional columns are ``None`` for a covenant that was not evaluated
     /// numerically (inactive, waived, springing condition unmet); pandas then
@@ -127,6 +133,7 @@ impl PyCovenantReport {
             "actual_value": self.inner.actual_value,
             "threshold": self.inner.threshold,
             "headroom": self.inner.headroom,
+            "headroom_raw": self.inner.headroom_raw,
             "details": self.inner.details,
         });
         serde_object_to_single_row_dataframe_with_schema(
@@ -139,6 +146,7 @@ impl PyCovenantReport {
                 "actual_value",
                 "threshold",
                 "headroom",
+                "headroom_raw",
                 "details",
             ],
         )

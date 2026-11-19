@@ -204,6 +204,7 @@ impl Pricer for RichBondPricer {
             threshold: Some(1.0),
             details: Some("preserved".to_string()),
             headroom: Some(0.5),
+            headroom_raw: Some(0.5),
             meta: finstack_quant_core::config::ResultsMeta::default(),
         };
         let mut result = finstack_quant_valuations::results::ValuationResult::stamped(

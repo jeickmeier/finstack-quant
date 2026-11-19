@@ -24,8 +24,8 @@ mod types;
 pub use covenant_engine::CovenantEngine;
 pub use helpers::InstrumentMutator;
 pub(crate) use helpers::{
-    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met, validate_metric,
-    validated_ratio_value,
+    headroom_for, headroom_raw_for, is_covenant_breached, spec_metric_name,
+    springing_condition_met, validate_metric, validated_ratio_value,
 };
 pub use types::{
     BoundKind, ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence,

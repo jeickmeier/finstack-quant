@@ -11,6 +11,7 @@ from finstack_quant.statements import StatementResult
 def evaluate_covenants(
     covenants: CovenantEngine,
     results: StatementResult | str,
+    node_mapping: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     Evaluate covenant compliance at the end of every statement result period.
@@ -34,6 +35,9 @@ def evaluate_covenants(
     covenants : CovenantEngine
         Covenant engine whose specifications, windows, waivers and threshold
         schedules are evaluated.
+    node_mapping : dict of str to str or None
+        Covenant metric IDs mapped to exact result node IDs. Unlisted
+        metrics use their own identifiers; use None to map all by identity.
 
     Returns
     -------
@@ -42,7 +46,7 @@ def evaluate_covenants(
         timeline order and covenants in engine order, with the columns
         of ``CovenantEngine.evaluate_series``: ``as_of`` (ISO string),
         ``covenant`` (instance key), ``covenant_type``, ``passed``,
-        ``actual_value``, ``threshold``, ``headroom``, ``details``. WASM
+        ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``. WASM
         returns the same reports as ``DatedCovenantReports`` rows.
 
     Raises
@@ -55,7 +59,7 @@ def evaluate_covenants(
 
     Examples
     --------
-    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate
     >>> from finstack_quant.statements import Evaluator, ModelBuilder
     >>> from finstack_quant.statements_analytics import evaluate_covenants
     >>> builder = ModelBuilder("borrower")
@@ -63,7 +67,7 @@ def evaluate_covenants(
     >>> _ = builder.value("total_leverage", [("2025Q1", 6.0), ("2025Q2", 7.5)])
     >>> _ = builder.value("senior_leverage", [("2025Q1", 3.0), ("2025Q2", 3.5)])
     >>> model = builder.build()
-    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
+    >>> engine = CovenantEngine.from_template(CovenantTemplate.cov_lite(7.0, 4.5))
     >>> frame = evaluate_covenants(engine, Evaluator().evaluate(model))
     >>> frame.loc[frame["covenant"] == "max_total_leverage", ["as_of", "passed"]].values.tolist()
     [['2025-03-31', True], ['2025-06-30', False]]
@@ -75,6 +79,7 @@ def forecast_breaches(
     covenants: CovenantEngine,
     results: StatementResult | str,
     config: CovenantForecastConfig | None = None,
+    node_mapping: dict[str, str] | None = None,
 ) -> list[FutureBreach]:
     """
     Forecast covenant breaches over every statement result period.
@@ -97,6 +102,9 @@ def forecast_breaches(
     config : CovenantForecastConfig or None, optional
         Forecast policy; ``None`` means the deterministic, maintenance-scope
         default.
+    node_mapping : dict of str to str or None
+        Covenant metric IDs mapped to exact result node IDs. Unlisted
+        metrics use their own identifiers; use None to map all by identity.
 
     Returns
     -------
@@ -122,7 +130,7 @@ def forecast_breaches(
     >>> _ = builder.value("total_leverage", [("2025Q1", 6.0), ("2025Q2", 7.5)])
     >>> _ = builder.value("senior_leverage", [("2025Q1", 3.0), ("2025Q2", 3.5)])
     >>> model = builder.build()
-    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
+    >>> engine = CovenantEngine.from_template(CovenantTemplate.cov_lite(7.0, 4.5))
     >>> config = CovenantForecastConfig().with_scope("incurrence")  # cov-lite tests are incurrence tests
     >>> breaches = forecast_breaches(engine, Evaluator().evaluate(model), config)
     >>> [(b.covenant_id, b.breach_date.isoformat()) for b in breaches]

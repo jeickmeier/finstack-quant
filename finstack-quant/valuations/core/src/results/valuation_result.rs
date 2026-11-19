@@ -234,6 +234,7 @@ pub struct MonteCarloValuationDetails {
 ///     threshold: Some(1.25),
 ///     details: Some("DSCR: 1.50x >= 1.25x".to_string()),
 ///     headroom: Some(0.25),
+///     headroom_raw: None,
 ///     meta: Default::default(),
 /// };
 ///
@@ -672,6 +673,7 @@ impl ValuationResult {
     ///     threshold: Some(1.25),
     ///     details: None,
     ///     headroom: Some(0.25),
+    ///     headroom_raw: None,
     ///     meta: Default::default(),
     /// };
     /// result.covenants = Some([("dscr".to_string(), dscr)].into_iter().collect());
@@ -718,6 +720,7 @@ impl ValuationResult {
     ///     threshold: Some(1.25),
     ///     details: Some("DSCR below threshold".to_string()),
     ///     headroom: Some(-0.15),
+    ///     headroom_raw: None,
     ///     meta: Default::default(),
     /// };
     /// result.covenants = Some([("dscr".to_string(), dscr)].into_iter().collect());
@@ -907,6 +910,7 @@ mod tests {
                 threshold: Some(1.2),
                 details: None,
                 headroom: None,
+                headroom_raw: None,
                 meta: finstack_quant_core::config::ResultsMeta::default(),
             },
         );

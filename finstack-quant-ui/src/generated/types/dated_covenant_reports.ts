@@ -57,6 +57,10 @@ export interface DCb941D84Bacd00Bfbc0F {
    * Cushion relative to threshold (positive => passing buffer)
    */
   headroom?: number | null;
+  /**
+   * Signed cushion in the covenant metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
   meta?: D_67F9D1D7A161Ba6Df54F;
   /**
    * Whether the covenant passed

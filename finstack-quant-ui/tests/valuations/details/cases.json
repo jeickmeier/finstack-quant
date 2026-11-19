@@ -109,5 +109,5 @@
     "metricsJson": "{\"debt_to_ebitda\":6}",
     "asOf": "2026-03-31"
   },
-  "covenantReportsJson": "{\"max_debt_ebitda\":{\"covenant_type\":\"Debt/EBITDA <= 5.00x\",\"covenant_id\":\"max_debt_ebitda\",\"passed\":false,\"actual_value\":6,\"threshold\":5,\"details\":null,\"headroom\":-0.2,\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"version\":\"0.11.0\"}}}"
+  "covenantReportsJson": "{\"max_debt_ebitda\":{\"covenant_type\":\"Debt/EBITDA <= 5.00x\",\"covenant_id\":\"max_debt_ebitda\",\"passed\":false,\"actual_value\":6,\"threshold\":5,\"details\":null,\"headroom\":-0.2,\"headroom_raw\":-1,\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"version\":\"0.11.0\"}}}"
 }

@@ -5,8 +5,8 @@
 
 use crate::engine::{
     BoundKind, CovenantScope, CovenantSpec, CovenantType, SpringingCondition, headroom_for,
-    is_covenant_breached, spec_metric_name, springing_condition_met, validate_metric,
-    validated_ratio_value,
+    headroom_raw_for, is_covenant_breached, spec_metric_name, springing_condition_met,
+    validate_metric, validated_ratio_value,
 };
 use finstack_quant_core::Error;
 use finstack_quant_core::InputError;
@@ -138,6 +138,8 @@ pub struct CovenantForecast {
     /// `None` means the covenant is inactive for the period or the headroom is
     /// not meaningful under the applicable covenant convention.
     pub headroom: Vec<Option<f64>>,
+    /// Signed cushion in the metric's own units, aligned with the test dates.
+    pub headroom_raw: Vec<Option<f64>>,
     /// Marginal breach probability at each test date; not a first-passage probability.
     pub breach_probability: Vec<f64>,
     /// Standard error of the breach probability estimate.
@@ -182,6 +184,9 @@ pub struct FutureBreach {
     pub threshold: f64,
     /// Headroom (negative means breach), if meaningful and finite.
     pub headroom: Option<f64>,
+    /// Signed cushion in the metric's own units when numerically meaningful.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headroom_raw: Option<f64>,
     /// Probability of breach (if stochastic)
     pub breach_probability: f64,
 }
@@ -354,6 +359,18 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
         })
         .collect();
 
+    let headroom_raw = values
+        .iter()
+        .zip(&thresholds)
+        .map(|(&value, &threshold)| {
+            headroom_raw_for(
+                covenant.covenant.covenant_type.bound_kind(),
+                value,
+                threshold,
+            )
+        })
+        .collect();
+
     let mut deterministic_breach_prob: Vec<f64> = values
         .iter()
         .zip(thresholds.iter())
@@ -493,6 +510,7 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
             projected_values,
             thresholds,
             headroom,
+            headroom_raw,
             breach_probability,
             breach_probability_stderr,
             first_breach_date,
@@ -588,6 +606,7 @@ pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
                     projected_value: forecast.projected_values[i],
                     threshold: forecast.thresholds[i],
                     headroom: forecast.headroom[i],
+                    headroom_raw: forecast.headroom_raw[i],
                     breach_probability: probability,
                 });
             }

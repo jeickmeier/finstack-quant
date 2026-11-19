@@ -26,6 +26,10 @@ export interface FutureBreachWire {
    */
   headroom?: number | null;
   /**
+   * Signed cushion in the metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
+  /**
    * Projected value, if finite.
    */
   projected_value?: number | null;

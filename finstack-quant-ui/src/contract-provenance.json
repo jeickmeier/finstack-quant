@@ -915,18 +915,23 @@
             "name": "results",
             "type": "StatementResult | string",
             "optional": false
+          },
+          {
+            "name": "nodeMapping",
+            "type": "Record<string, string> | string | null",
+            "optional": true
           }
         ],
         "returns": "generated.covenants.DatedCovenantReports[]",
-        "declaration": "/**\n * Evaluate covenant compliance at the end of every statement result period.\n *\n * Each period of `results.periods` is tested on its last calendar day with\n * the covenants applicable on that date: a covenant window covering the date replaces the engine's\n * top-level specifications, and waivers and threshold schedules apply. A\n * node is read only when an applicable covenant needs it, so a node that is\n * missing or non-finite in a period where no applicable covenant reads it\n * (for example a trailing ratio before four quarters of history, outside the\n * window that tests it) does not throw. The engine's breach history is not\n * updated.\n *\n * @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.\n * @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.\n * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in timeline order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)\n * @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).\n */\nexport function evaluateCovenants(covenants: CovenantEngine, results: StatementResult | string): generated.covenants.DatedCovenantReports[];",
-        "sha256": "8c0ab03c7c5798ebb0c85e5999f4a7aa2a6d5b45c2fabaeadb30daba928daae2"
+        "declaration": "/**\n * Evaluate covenant compliance at the end of every statement result period.\n *\n * Each period of `results.periods` is tested on its last calendar day with\n * the covenants applicable on that date: a covenant window covering the date replaces the engine's\n * top-level specifications, and waivers and threshold schedules apply. A\n * node is read only when an applicable covenant needs it, so a node that is\n * missing or non-finite in a period where no applicable covenant reads it\n * (for example a trailing ratio before four quarters of history, outside the\n * window that tests it) does not throw. The engine's breach history is not\n * updated.\n *\n * @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.\n * @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.\n * @param nodeMapping - Optional exact metric-ID to statement-node aliases. Unlisted metrics use their own identifiers.\n * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in timeline order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)\n * @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).\n */\nexport function evaluateCovenants(covenants: CovenantEngine, results: StatementResult | string, nodeMapping?: Record<string, string> | string | null): generated.covenants.DatedCovenantReports[];",
+        "sha256": "6a212b18bff5e01246a8c2d19a64c2d2e2133d85e385357912d064eba9918e6b"
       },
       "schemas": [
         {
           "uri": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
           "pointer": "#",
           "source": "finstack-quant/covenants/schemas/covenants/1/dated_covenant_reports.schema.json",
-          "sha256": "452f9d0773cd63b66959d4d1546a5ef72ca5aa49d41bcdb0a7d3f3e3b38d90af",
+          "sha256": "3aec61a0e3a4491606064963bc2b6faaa5900fec813d2dc3f9d33d3a9480d062",
           "description": "Covenant reports produced for one test date of a series evaluation."
         }
       ]
@@ -969,18 +974,23 @@
             "name": "config",
             "type": "generated.covenants.CovenantForecastConfig | string | null",
             "optional": true
+          },
+          {
+            "name": "nodeMapping",
+            "type": "Record<string, string> | string | null",
+            "optional": true
           }
         ],
         "returns": "generated.covenants.FutureBreach[]",
-        "declaration": "/**\n * Forecast covenant breaches over every statement result period.\n *\n * Published as `statements_analytics.forecastBreaches` (raw export\n * `statementsAnalyticsForecastBreaches`; `covenants.forecastBreaches` over\n * dated metric rows owns the bare raw name).\n *\n * Every period of `results.periods` is a test date (its last calendar day). Effective windows, waivers and threshold schedules are\n * honored and non-numeric covenants are skipped. Deterministic breaches are\n * always listed; in stochastic mode dates whose breach probability reaches\n * `config.breach_probability_threshold` are listed too. Without\n * `config.reference_date` the horizon starts the day before the first result\n * period begins.\n *\n * @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).\n * @param covenants - `CovenantEngine` handle whose effective specifications are forecast.\n * @param config - Optional `CovenantForecastConfig` object or JSON text (JSON text keeps a uint64 `random_seed` exact); omitted means deterministic maintenance-scope forecasting.\n * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.\n * @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).\n */\nexport function statementsAnalyticsForecastBreaches(covenants: CovenantEngine, results: StatementResult | string, config?: generated.covenants.CovenantForecastConfig | string | null): generated.covenants.FutureBreach[];",
-        "sha256": "430a9d68c5bfd7440dbc1554ecd073320c0c60c83944077d805c49276a59cbd1"
+        "declaration": "/**\n * Forecast covenant breaches over every statement result period.\n *\n * Published as `statements_analytics.forecastBreaches` (raw export\n * `statementsAnalyticsForecastBreaches`; `covenants.forecastBreaches` over\n * dated metric rows owns the bare raw name).\n *\n * Every period of `results.periods` is a test date (its last calendar day). Effective windows, waivers and threshold schedules are\n * honored and non-numeric covenants are skipped. Deterministic breaches are\n * always listed; in stochastic mode dates whose breach probability reaches\n * `config.breach_probability_threshold` are listed too. Without\n * `config.reference_date` the horizon starts the day before the first result\n * period begins.\n *\n * @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).\n * @param covenants - `CovenantEngine` handle whose effective specifications are forecast.\n * @param config - Optional `CovenantForecastConfig` object or JSON text (JSON text keeps a uint64 `random_seed` exact); omitted means deterministic maintenance-scope forecasting.\n * @param nodeMapping - Optional exact metric-ID to statement-node aliases. Unlisted metrics use their own identifiers.\n * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.\n * @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).\n */\nexport function statementsAnalyticsForecastBreaches(covenants: CovenantEngine, results: StatementResult | string, config?: generated.covenants.CovenantForecastConfig | string | null, nodeMapping?: Record<string, string> | string | null): generated.covenants.FutureBreach[];",
+        "sha256": "0a6e1234a6bd57cc44647433c1dd3df829e0d8a1895dcb2cb569b3d744d86442"
       },
       "schemas": [
         {
           "uri": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
           "pointer": "#",
           "source": "finstack-quant/covenants/schemas/covenants/1/future_breach.schema.json",
-          "sha256": "9f118736120e54c2b1767630386b387046dcb48bc3a569bbe0379fb412e256ff",
+          "sha256": "379aeb72fc48251e4f672edb437620bcac6263f3c5c7a117b6768f3a92de5d6f",
           "description": "A projected covenant breach."
         }
       ]
@@ -2849,7 +2859,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "30e31471a55dddca2669158cf351cc16062417e9e6bb473e3a1d9c4af94e35e3"
+    "sha256": "4d5f7e6fee69d34db6f3330300222a5f1d4679913a704da5eda67db988b90d21"
   },
   "details": [
     {

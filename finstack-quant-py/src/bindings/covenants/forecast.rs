@@ -172,11 +172,12 @@ impl PyCovenantForecastConfig {
 }
 
 /// Columns of `CovenantForecast.to_dataframe`.
-const FORECAST_COLUMNS: [ColumnSchema<'static>; 6] = [
+const FORECAST_COLUMNS: [ColumnSchema<'static>; 7] = [
     ("test_date", "str"),
     ("projected_value", "float64"),
     ("threshold", "float64"),
     ("headroom", "float64"),
+    ("headroom_raw", "float64"),
     ("breach_probability", "float64"),
     ("breach_probability_stderr", "float64"),
 ];
@@ -273,6 +274,12 @@ impl PyCovenantForecast {
         self.inner.headroom.clone()
     }
 
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._forecast", "CovenantForecast.headroom_raw")]
+    fn headroom_raw(&self) -> Vec<Option<f64>> {
+        self.inner.headroom_raw.clone()
+    }
+
     /// Breach probability per test date.
     #[getter]
     fn breach_probability(&self) -> Vec<f64> {
@@ -311,7 +318,7 @@ impl PyCovenantForecast {
     }
 
     /// One row per test date with columns ``test_date`` (ISO string),
-    /// ``projected_value``, ``threshold``, ``headroom``,
+    /// ``projected_value``, ``threshold``, ``headroom``, ``headroom_raw``,
     /// ``breach_probability``, ``breach_probability_stderr``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = (0..self.inner.test_dates.len())
@@ -321,6 +328,7 @@ impl PyCovenantForecast {
                     "projected_value": self.inner.projected_values.get(i).copied().flatten(),
                     "threshold": self.inner.thresholds.get(i).copied(),
                     "headroom": self.inner.headroom.get(i).copied().flatten(),
+                    "headroom_raw": self.inner.headroom_raw.get(i).copied().flatten(),
                     "breach_probability": self.inner.breach_probability.get(i).copied(),
                     "breach_probability_stderr": self.inner.breach_probability_stderr.get(i).copied(),
                 })
@@ -433,6 +441,12 @@ impl PyFutureBreach {
         self.inner.headroom
     }
 
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._forecast", "FutureBreach.headroom_raw")]
+    fn headroom_raw(&self) -> Option<f64> {
+        self.inner.headroom_raw
+    }
+
     /// Breach probability (``1.0`` in deterministic mode).
     #[getter]
     fn breach_probability(&self) -> f64 {
@@ -509,7 +523,7 @@ pub(crate) fn forecast_breaches(
 /// Flatten a list of ``FutureBreach`` into one frame row per breach.
 ///
 /// Columns: ``covenant_id``, ``covenant_description``, ``breach_date`` (ISO
-/// string), ``projected_value``, ``threshold``, ``headroom``,
+/// string), ``projected_value``, ``threshold``, ``headroom``, ``headroom_raw``,
 /// ``breach_probability``.
 #[pyfunction]
 #[pyo3(text_signature = "(breaches)")]
@@ -527,6 +541,7 @@ pub(crate) fn breaches_to_dataframe<'py>(
                 "projected_value": b.inner.projected_value,
                 "threshold": b.inner.threshold,
                 "headroom": b.inner.headroom,
+                "headroom_raw": b.inner.headroom_raw,
                 "breach_probability": b.inner.breach_probability,
             })
         })
@@ -541,6 +556,7 @@ pub(crate) fn breaches_to_dataframe<'py>(
             ("projected_value", "float64"),
             ("threshold", "float64"),
             ("headroom", "float64"),
+            ("headroom_raw", "float64"),
             ("breach_probability", "float64"),
         ],
     )

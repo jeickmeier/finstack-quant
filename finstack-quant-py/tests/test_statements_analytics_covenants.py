@@ -101,3 +101,18 @@ def test_forecast_breaches_reads_the_same_periods() -> None:
         ("min_interest_coverage", "2024-12-31", 1.0)
     ]
     assert breaches == forecast_breaches(_engine("2024-10-01"), results, CovenantForecastConfig())
+
+
+def test_aliases_apply_to_assessment_and_forecast() -> None:
+    results = _results()
+    engine = _engine("2024-07-01")
+    aliases = {"leverage": "interest_coverage"}
+    frame = evaluate_covenants(engine, results, aliases)
+    leverage = frame[frame["covenant"] == "max_debt_to_ebitda"]
+    assert leverage[["actual_value", "headroom_raw"]].values.tolist() == [[5.0, -1.5], [2.5, 1.0]]
+
+    breaches = forecast_breaches(engine, results, node_mapping=aliases)
+    assert [(b.covenant_id, b.headroom_raw) for b in breaches] == [
+        ("max_debt_to_ebitda", -1.5),
+        ("min_interest_coverage", -0.5),
+    ]

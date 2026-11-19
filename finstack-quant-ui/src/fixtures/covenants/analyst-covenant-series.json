@@ -10,6 +10,7 @@
         "threshold": 3,
         "details": null,
         "headroom": 0.5003268889511535,
+        "headroom_raw": 1.5009806668534607,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -37,6 +38,7 @@
         "threshold": 3,
         "details": null,
         "headroom": 0.6415868673050614,
+        "headroom_raw": 1.9247606019151844,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -64,6 +66,7 @@
         "threshold": 3,
         "details": null,
         "headroom": 0.7025750690546199,
+        "headroom_raw": 2.1077252071638597,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -91,6 +94,7 @@
         "threshold": 3.5,
         "details": null,
         "headroom": 0.3669437876592175,
+        "headroom_raw": 1.2843032568072612,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -113,6 +117,7 @@
         "threshold": 3,
         "details": null,
         "headroom": 0.9951378377138663,
+        "headroom_raw": 2.985413513141599,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -140,6 +145,7 @@
         "threshold": 3.5,
         "details": null,
         "headroom": 0.38113468236377773,
+        "headroom_raw": 1.333971388273222,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -162,6 +168,7 @@
         "threshold": 3,
         "details": null,
         "headroom": 0.885418100087152,
+        "headroom_raw": 2.6562543002614563,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -189,6 +196,7 @@
         "threshold": 3.5,
         "details": null,
         "headroom": 0.4221448886217379,
+        "headroom_raw": 1.4775071101760826,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -211,6 +219,7 @@
         "threshold": 3,
         "details": null,
         "headroom": 0.9751760145918832,
+        "headroom_raw": 2.9255280437756497,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -238,6 +247,7 @@
         "threshold": 3.5,
         "details": null,
         "headroom": 0.46036515411345463,
+        "headroom_raw": 1.6112780393970911,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -260,6 +270,7 @@
         "threshold": 3,
         "details": null,
         "headroom": 1.136303167553936,
+        "headroom_raw": 3.4089095026618077,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -287,6 +298,7 @@
         "threshold": 3.5,
         "details": null,
         "headroom": 0.4517553211312967,
+        "headroom_raw": 1.5811436239595384,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -309,6 +321,7 @@
         "threshold": 3,
         "details": null,
         "headroom": 1.265921125030453,
+        "headroom_raw": 3.7977633750913586,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {

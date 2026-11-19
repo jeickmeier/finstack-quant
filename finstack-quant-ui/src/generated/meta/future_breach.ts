@@ -42,6 +42,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/properties/headroom_raw",
+    "source": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json#/properties/headroom_raw",
+    "description": "Signed cushion in the metric's own units when numerically meaningful.",
+    "format": "double"
+  },
+  {
     "path": "#/properties/projected_value",
     "source": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json#/properties/projected_value",
     "description": "Projected value, if finite.",

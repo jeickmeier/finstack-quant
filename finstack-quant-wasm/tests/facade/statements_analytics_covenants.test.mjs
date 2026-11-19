@@ -154,3 +154,20 @@ test('forecastBreaches reads every result period and defaults to a deterministic
   // It is a different export from covenants.forecastBreaches over dated rows.
   assert.notEqual(statements_analytics.forecastBreaches, covenants.forecastBreaches);
 });
+
+test('one explicit node alias is shared by assessment and forecast', () => {
+  withEngine('2024-07-01', (engine) => {
+    const aliases = { leverage: 'interest_coverage' };
+    const reports = statements_analytics.evaluateCovenants(engine, RESULTS, aliases);
+    assert.equal(reports[2].reports.max_debt_to_ebitda.headroom_raw, -1.5);
+    assert.equal(reports[3].reports.max_debt_to_ebitda.headroom_raw, 1);
+    const breaches = statements_analytics.forecastBreaches(engine, RESULTS, undefined, aliases);
+    assert.deepEqual(
+      breaches.map((breach) => [breach.covenant_id, breach.headroom_raw]),
+      [
+        ['max_debt_to_ebitda', -1.5],
+        ['min_interest_coverage', -0.5],
+      ]
+    );
+  });
+});

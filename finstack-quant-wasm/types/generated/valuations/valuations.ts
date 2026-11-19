@@ -18797,6 +18797,10 @@ export interface CovenantReport {
    */
   headroom?: number | null;
   /**
+   * Signed cushion in the covenant metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
+  /**
    * Audit stamp: numeric mode, rounding context, and FX policy in force.
    */
   meta?: ResultsMeta;

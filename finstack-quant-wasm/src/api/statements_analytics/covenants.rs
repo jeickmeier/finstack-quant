@@ -6,6 +6,7 @@ use crate::utils::wire::js_opt_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_covenants::CovenantForecastConfig;
 use finstack_quant_statements::evaluator::StatementResult;
+use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
 
 /// Evaluate covenant compliance at the end of every statement result period.
@@ -21,18 +22,27 @@ use wasm_bindgen::prelude::*;
 ///
 /// @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.
 /// @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.
+/// @param nodeMapping - Optional exact metric-ID to statement-node aliases. Unlisted metrics use their own identifiers.
 /// @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in timeline order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)
 /// @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
 #[wasm_bindgen(js_name = evaluateCovenants, unchecked_return_type = "generated.covenants.DatedCovenantReports[]")]
 pub fn evaluate_covenants(
     covenants: &JsCovenantEngine,
     #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        js_name = "nodeMapping",
+        unchecked_optional_param_type = "Record<string, string> | string | null"
+    )]
+    node_mapping: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;
+    let node_mapping =
+        js_opt_wire::<BTreeMap<String, String>>(node_mapping.as_ref(), "nodeMapping")?;
     to_js_value(
         &finstack_quant_statements_analytics::analysis::evaluate_covenants(
             &covenants.inner,
             &results,
+            node_mapping.as_ref(),
         )
         .map_err(to_js_err)?,
     )
@@ -54,6 +64,7 @@ pub fn evaluate_covenants(
 /// @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).
 /// @param covenants - `CovenantEngine` handle whose effective specifications are forecast.
 /// @param config - Optional `CovenantForecastConfig` object or JSON text (JSON text keeps a uint64 `random_seed` exact); omitted means deterministic maintenance-scope forecasting.
+/// @param nodeMapping - Optional exact metric-ID to statement-node aliases. Unlisted metrics use their own identifiers.
 /// @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
 /// @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).
 #[wasm_bindgen(js_name = statementsAnalyticsForecastBreaches, unchecked_return_type = "generated.covenants.FutureBreach[]")]
@@ -64,8 +75,15 @@ pub fn forecast_breaches(
         unchecked_optional_param_type = "generated.covenants.CovenantForecastConfig | string | null"
     )]
     config: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "nodeMapping",
+        unchecked_optional_param_type = "Record<string, string> | string | null"
+    )]
+    node_mapping: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;
+    let node_mapping =
+        js_opt_wire::<BTreeMap<String, String>>(node_mapping.as_ref(), "nodeMapping")?;
     let config =
         js_opt_wire::<CovenantForecastConfig>(config.as_ref(), "config")?.unwrap_or_default();
     to_js_value(
@@ -73,6 +91,7 @@ pub fn forecast_breaches(
             &covenants.inner,
             &results,
             config,
+            node_mapping.as_ref(),
         )
         .map_err(to_js_err)?,
     )

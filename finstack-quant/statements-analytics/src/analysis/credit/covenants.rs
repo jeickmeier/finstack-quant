@@ -11,6 +11,7 @@ use finstack_quant_covenants::{
     evaluate_series_from_model, forecast_breaches_generic,
 };
 use finstack_quant_statements::evaluator::StatementResult;
+use std::collections::BTreeMap;
 
 /// Adapter to use Statements StatementResult as a ModelTimeSeries.
 ///
@@ -20,6 +21,7 @@ use finstack_quant_statements::evaluator::StatementResult;
 /// boundaries are the evaluated model's.
 pub struct StatementsAdapter<'a> {
     results: &'a StatementResult,
+    node_mapping: Option<&'a BTreeMap<String, String>>,
 }
 
 impl<'a> StatementsAdapter<'a> {
@@ -28,14 +30,26 @@ impl<'a> StatementsAdapter<'a> {
     /// # Arguments
     /// * `results` - Evaluated metric observations keyed by period, with the
     ///   periods' dates in [`StatementResult::periods`].
-    pub fn new(results: &'a StatementResult) -> Self {
-        Self { results }
+    /// * `node_mapping` - Explicit aliases from engine metric IDs to model nodes.
+    ///   Metric IDs absent from the mapping read the identically named node.
+    pub fn new(
+        results: &'a StatementResult,
+        node_mapping: Option<&'a BTreeMap<String, String>>,
+    ) -> Self {
+        Self {
+            results,
+            node_mapping,
+        }
     }
 }
 
 impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
     fn get_scalar(&self, node_id: &str, period: &PeriodId) -> Option<f64> {
-        crate::cell_float(self.results, node_id, period)
+        let source = self
+            .node_mapping
+            .and_then(|rows| rows.get(node_id))
+            .map_or(node_id, String::as_str);
+        crate::cell_float(self.results, source, period)
     }
 
     fn period_end_date(&self, period: &PeriodId) -> Result<Date> {
@@ -87,6 +101,8 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 ///   Each period in `periods` is tested on the day before its exclusive end.
 /// * `covenants` - Valid covenant engine whose specifications, windows,
 ///   waivers and threshold schedules are evaluated.
+/// * `node_mapping` - Explicit engine-metric to statement-node aliases.
+///   An unlisted metric uses the identically named node.
 ///
 /// # Returns
 ///
@@ -137,7 +153,7 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 ///     "leverage",
 /// ));
 ///
-/// let series = evaluate_covenants(&engine, &results)?;
+/// let series = evaluate_covenants(&engine, &results, None)?;
 /// assert_eq!(series[0].as_of.to_string(), "2025-03-31");
 /// assert!(series[0].reports["max_leverage"].passed);
 /// assert!(!series[1].reports["max_leverage"].passed);
@@ -147,10 +163,11 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 pub fn evaluate_covenants(
     covenants: &CovenantEngine,
     results: &StatementResult,
+    node_mapping: Option<&BTreeMap<String, String>>,
 ) -> Result<Vec<DatedCovenantReports>> {
     evaluate_series_from_model(
         covenants,
-        &StatementsAdapter::new(results),
+        &StatementsAdapter::new(results, node_mapping),
         &period_ids(results),
     )
 }
@@ -173,6 +190,8 @@ fn period_ids(results: &StatementResult) -> Vec<PeriodId> {
 ///   exclusive end
 /// * `covenants` - The covenant engine containing covenant specifications
 /// * `config` - Forecasting configuration
+/// * `node_mapping` - Explicit engine-metric to statement-node aliases.
+///   An unlisted metric uses the identically named node.
 ///
 /// # Returns
 ///
@@ -190,10 +209,11 @@ pub fn forecast_breaches(
     covenants: &CovenantEngine,
     results: &StatementResult,
     config: CovenantForecastConfig,
+    node_mapping: Option<&BTreeMap<String, String>>,
 ) -> Result<Vec<FutureBreach>> {
     forecast_breaches_generic(
         covenants,
-        &StatementsAdapter::new(results),
+        &StatementsAdapter::new(results, node_mapping),
         &period_ids(results),
         config,
     )
@@ -261,14 +281,14 @@ mod tests {
         };
         let automatic = forecast_covenant_generic(
             &spec,
-            &StatementsAdapter::new(&results),
+            &StatementsAdapter::new(&results, None),
             &[id],
             config.clone(),
         )
         .unwrap();
         let explicit = forecast_covenant_generic(
             &spec,
-            &StatementsAdapter::new(&results),
+            &StatementsAdapter::new(&results, None),
             &[id],
             CovenantForecastConfig {
                 reference_date: Some(date!(2024 - 06 - 30)),
@@ -283,7 +303,7 @@ mod tests {
         assert!(
             forecast_covenant_generic(
                 &spec,
-                &StatementsAdapter::new(&results),
+                &StatementsAdapter::new(&results, None),
                 &[missing],
                 CovenantForecastConfig::default()
             )
@@ -335,7 +355,7 @@ mod tests {
         assert!(
             forecast_covenant_generic(
                 &covenant,
-                &StatementsAdapter::new(&results),
+                &StatementsAdapter::new(&results, None),
                 &periods,
                 config.clone()
             )
@@ -343,7 +363,7 @@ mod tests {
         );
         let forecast = forecast_covenant_generic(
             &covenant,
-            &StatementsAdapter::new(&results),
+            &StatementsAdapter::new(&results, None),
             &periods,
             CovenantForecastConfig {
                 volatility: Some(0.2),
@@ -385,7 +405,9 @@ mod tests {
             .set_series("revenue", IndexMap::from([(p1, 100.0), (p2, 110.0)]))
             .expect("finite fixture values");
 
-        assert!(forecast_breaches(&engine, &results, CovenantForecastConfig::default()).is_err());
+        assert!(
+            forecast_breaches(&engine, &results, CovenantForecastConfig::default(), None).is_err()
+        );
     }
 
     #[test]
@@ -420,7 +442,7 @@ mod tests {
 
         let config = CovenantForecastConfig::default();
         let breaches =
-            forecast_breaches(&engine, &results, config).expect("Forecast should succeed");
+            forecast_breaches(&engine, &results, config, None).expect("Forecast should succeed");
 
         assert_eq!(breaches.len(), 1);
         assert_eq!(breaches[0].covenant_id, "max_debt_ebitda");

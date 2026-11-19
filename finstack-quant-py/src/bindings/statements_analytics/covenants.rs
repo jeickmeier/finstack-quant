@@ -13,19 +13,22 @@ use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_covenants::CovenantForecastConfig;
 use pyo3::prelude::*;
+use std::collections::BTreeMap;
 
 #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "evaluate_covenants")]
 #[pyfunction]
-#[pyo3(text_signature = "(covenants, results)")]
+#[pyo3(signature = (covenants, results, node_mapping=None))]
 fn evaluate_covenants<'py>(
     py: Python<'py>,
     covenants: PyRef<'py, PyCovenantEngine>,
     results: &Bound<'py, PyAny>,
+    node_mapping: Option<BTreeMap<String, String>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let results = extract_results_ref(results)?;
     let series = finstack_quant_statements_analytics::analysis::evaluate_covenants(
         &covenants.inner,
         &results,
+        node_mapping.as_ref(),
     )
     .map_err(core_to_py)?;
     dated_reports_frame(py, series)
@@ -34,13 +37,13 @@ fn evaluate_covenants<'py>(
 #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "forecast_breaches")]
 #[pyfunction]
 #[pyo3(
-    signature = (covenants, results, config=None),
-    text_signature = "(covenants, results, config=None)"
+    signature = (covenants, results, config=None, node_mapping=None)
 )]
 fn forecast_breaches(
     covenants: PyRef<'_, PyCovenantEngine>,
     results: &Bound<'_, PyAny>,
     config: Option<PyRef<'_, PyCovenantForecastConfig>>,
+    node_mapping: Option<BTreeMap<String, String>>,
 ) -> PyResult<Vec<PyFutureBreach>> {
     let results = extract_results_ref(results)?;
     let config = config.map_or_else(CovenantForecastConfig::default, |c| c.inner.clone());
@@ -48,6 +51,7 @@ fn forecast_breaches(
         &covenants.inner,
         &results,
         config,
+        node_mapping.as_ref(),
     )
     .map(|breaches| {
         breaches

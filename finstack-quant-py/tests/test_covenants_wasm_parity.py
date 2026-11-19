@@ -154,7 +154,7 @@ def _spec_modifiers() -> Any:
 
 
 def _engine_evaluate() -> Any:
-    engine = CovenantEngine.from_specs(covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5)))
+    engine = CovenantEngine.from_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5))
     return {
         "pass": wire(engine.evaluate({"total_leverage": 5.0, "senior_leverage": 3.0}, "2026-03-31")),
         "breach": wire(engine.evaluate(json.dumps({"total_leverage": 7.5, "senior_leverage": 3.0}), "2026-03-31")),
@@ -193,7 +193,8 @@ def _engine_evaluate_series() -> Any:
         if not rows or rows[-1]["as_of"] != record["as_of"]:
             rows.append({"as_of": record["as_of"], "reports": {}})
         rows[-1]["reports"][record["covenant"]] = {
-            key: record[key] for key in ("covenant_type", "passed", "actual_value", "threshold", "headroom", "details")
+            key: record[key]
+            for key in ("covenant_type", "passed", "actual_value", "threshold", "headroom", "headroom_raw", "details")
         }
     return rows
 
@@ -270,7 +271,15 @@ def test_evaluate_series_frame_holds_the_rust_reports() -> None:
             "reports": {
                 key: {
                     field: report.get(field)
-                    for field in ("covenant_type", "passed", "actual_value", "threshold", "headroom", "details")
+                    for field in (
+                        "covenant_type",
+                        "passed",
+                        "actual_value",
+                        "threshold",
+                        "headroom",
+                        "headroom_raw",
+                        "details",
+                    )
                 }
                 for key, report in row["reports"].items()
             },
@@ -296,3 +305,10 @@ def test_forecast_config_json_fields_default_in_rust() -> None:
     assert partial == CovenantForecastConfig(stochastic=True, volatility=0.2)
     with pytest.raises(ValueError, match="unknown field"):
         CovenantForecastConfig.from_json('{"paths": 10}')
+
+
+def test_headroom_raw_retains_metric_units() -> None:
+    engine = CovenantEngine.from_specs([leverage_spec()])
+    report = engine.evaluate({"debt_to_ebitda": 5.0}, "2026-03-31")["max_leverage"]
+    assert report.headroom_raw == -0.5
+    assert report.headroom == pytest.approx(-0.5 / 4.5)

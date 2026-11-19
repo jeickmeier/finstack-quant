@@ -186,6 +186,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/properties/headroom_raw",
+    "source": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json#/properties/headroom_raw",
+    "description": "Signed cushion in the covenant metric's own units when numerically meaningful.",
+    "format": "double"
+  },
+  {
     "path": "#/properties/meta",
     "source": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json#/properties/meta",
     "default": {

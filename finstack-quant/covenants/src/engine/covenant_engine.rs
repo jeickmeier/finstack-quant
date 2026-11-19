@@ -1,6 +1,6 @@
 use super::helpers::{
-    InstrumentMutator, SpecEvaluation, headroom_for, is_covenant_breached, spec_metric_name,
-    springing_condition_met, validate_metric, validated_ratio_value,
+    InstrumentMutator, SpecEvaluation, headroom_for, headroom_raw_for, is_covenant_breached,
+    spec_metric_name, springing_condition_met, validate_metric, validated_ratio_value,
 };
 use super::types::{
     ConsequenceApplication, CovenantBreach, CovenantConsequence, CovenantScope, CovenantSpec,
@@ -50,6 +50,25 @@ impl CovenantEngine {
             windows: Vec::new(),
             waivers: Vec::new(),
         }
+    }
+
+    /// Build a covenant engine from the specifications of a validated template.
+    ///
+    /// # Arguments
+    /// * `template` - Standard template with its authored leverage, coverage
+    ///   and optional tests expressed in the selected metric conventions.
+    ///
+    /// # Errors
+    /// Returns a validation error when a template field or resulting covenant is invalid.
+    pub fn from_template(
+        template: &crate::templates::CovenantTemplate,
+    ) -> finstack_quant_core::Result<Self> {
+        let engine = Self {
+            specs: crate::templates::covenant_template(template)?,
+            ..Self::new()
+        };
+        engine.validate()?;
+        Ok(engine)
     }
 
     /// Validate the engine configuration before evaluation or JSON canonicalization.
@@ -281,6 +300,7 @@ impl CovenantEngine {
             if let Some(hr) = evaluation.headroom {
                 report = report.with_headroom(hr);
             }
+            report.headroom_raw = evaluation.headroom_raw;
 
             if !evaluation.passed {
                 tracing::warn!(
@@ -522,6 +542,7 @@ impl CovenantEngine {
                     actual_value: None,
                     threshold: None,
                     headroom: None,
+                    headroom_raw: None,
                     detail: Some("Springing condition not met".to_string()),
                 });
             }
@@ -535,6 +556,7 @@ impl CovenantEngine {
                 actual_value: None,
                 threshold: None,
                 headroom: None,
+                headroom_raw: None,
                 detail: None,
             });
         };
@@ -565,14 +587,16 @@ impl CovenantEngine {
             "Non-positive earnings denominator or invalid gross leverage ratio; not meaningful, treated as breach".to_string());
         let passed = !is_covenant_breached(covenant_type, metric_value, threshold);
 
-        let raw_headroom = headroom_for(covenant_type.bound_kind(), metric_value, threshold);
-        let headroom = raw_headroom.is_finite().then_some(raw_headroom);
+        let normalized = headroom_for(covenant_type.bound_kind(), metric_value, threshold);
+        let headroom = normalized.is_finite().then_some(normalized);
+        let headroom_raw = headroom_raw_for(covenant_type.bound_kind(), metric_value, threshold);
 
         Ok(SpecEvaluation {
             passed,
             actual_value: metric_value.is_finite().then_some(metric_value),
             threshold: Some(threshold),
             headroom,
+            headroom_raw,
             detail,
         })
     }

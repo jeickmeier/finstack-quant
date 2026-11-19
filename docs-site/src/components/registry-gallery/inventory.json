@@ -1860,7 +1860,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "ae6fe1f7f63db1de7a1c0eec7cea80c854792385f437a59b4c3645553a19c018"
+      "sha256": "ca6e9c58f6949e5a2b6cfc513f61f86164f28fbf8b8f05efe38214eac0eb2637"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -1992,7 +1992,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",
-      "sha256": "51d3d016972955976dc76cae6f4e53cacabb3a18e3e29e91e6e641e76adc1d64"
+      "sha256": "ff7b123ae1a960725f0faf1c4675b903f32199aacc1204d66f3c9e3de077d466"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenants.json",
@@ -2004,7 +2004,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-breach-forecast.json",
-      "sha256": "51fb5b6c669d2022a85df79d8f004abc62e9711390cc75b9d0e9673a5a5ab1b6"
+      "sha256": "1c9c9a527284ee713c18c71486edc4a01f10b80a47df0111616c0908afd9f7f3"
     }
   ]
 }

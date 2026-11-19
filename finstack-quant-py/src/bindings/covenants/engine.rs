@@ -72,7 +72,7 @@ pub(crate) fn reports_to_pydict<'py>(
 }
 
 /// Columns of the frame produced by `CovenantEngine.evaluate_series`.
-const SERIES_COLUMNS: [ColumnSchema<'static>; 8] = [
+const SERIES_COLUMNS: [ColumnSchema<'static>; 9] = [
     ("as_of", "str"),
     ("covenant", "str"),
     ("covenant_type", "str"),
@@ -80,6 +80,7 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 8] = [
     ("actual_value", "float64"),
     ("threshold", "float64"),
     ("headroom", "float64"),
+    ("headroom_raw", "float64"),
     ("details", "str"),
 ];
 
@@ -104,6 +105,7 @@ pub(crate) fn dated_reports_frame(
                     "actual_value": report.actual_value,
                     "threshold": report.threshold,
                     "headroom": report.headroom,
+                    "headroom_raw": report.headroom_raw,
                     "details": report.details,
                 })
             })
@@ -187,6 +189,15 @@ impl PyCovenantEngine {
     #[pyo3(text_signature = "()")]
     fn new() -> Self {
         Self::from_inner(CovenantEngine::new())
+    }
+
+    #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._engine", "CovenantEngine.from_template")]
+    fn from_template(template: &PyCovenantTemplate) -> PyResult<Self> {
+        Ok(Self {
+            inner: finstack_quant_covenants::CovenantEngine::from_template(&template.inner)
+                .map_err(crate::errors::core_to_py)?,
+        })
     }
 
     /// Create an engine holding ``specs`` (for example a template package).
@@ -287,7 +298,7 @@ impl PyCovenantEngine {
     /// and whose columns are unique metric ids; required cells must be finite.
     /// Returns a long frame with one row per (date, covenant) and columns
     /// ``as_of`` (ISO string), ``covenant`` (label), ``covenant_type``,
-    /// ``passed``, ``actual_value``, ``threshold``, ``headroom``, ``details``.
+    /// ``passed``, ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
     ///
     /// Raises ``KeyError`` when a required metric is missing on any date and
     /// ``ValueError`` for an invalid engine or non-numeric frame.
@@ -620,7 +631,7 @@ pub(crate) fn covenant_template(template: PyCovenantTemplate) -> PyResult<Vec<Py
 /// ``reports`` is the ``dict[str, CovenantReport]`` returned by
 /// ``CovenantEngine.evaluate`` or ``evaluate_engine``. Columns:
 /// ``covenant`` (dict key), ``covenant_type``, ``passed``, ``actual_value``,
-/// ``threshold``, ``headroom``, ``details``.
+/// ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
 ///
 /// Raises ``TypeError`` when a value is not a ``CovenantReport``.
 #[pyfunction]
@@ -640,6 +651,7 @@ pub(crate) fn reports_to_dataframe<'py>(
             "actual_value": report.inner.actual_value,
             "threshold": report.inner.threshold,
             "headroom": report.inner.headroom,
+            "headroom_raw": report.inner.headroom_raw,
             "details": report.inner.details,
         }));
     }
@@ -653,6 +665,7 @@ pub(crate) fn reports_to_dataframe<'py>(
             ("actual_value", "float64"),
             ("threshold", "float64"),
             ("headroom", "float64"),
+            ("headroom_raw", "float64"),
             ("details", "str"),
         ],
     )

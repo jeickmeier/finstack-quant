@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast.schema.json",
-      "bytes": 3854,
+      "bytes": 4139,
       "kind": "output",
       "path": "schemas/covenants/1/covenant_forecast.schema.json",
       "summary": "Forecast output with headroom analytics.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
-      "bytes": 8162,
+      "bytes": 8377,
       "kind": "output",
       "path": "schemas/covenants/1/covenant_report.schema.json",
       "summary": "Covenant check result.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
-      "bytes": 9201,
+      "bytes": 9448,
       "kind": "output",
       "path": "schemas/covenants/1/dated_covenant_reports.schema.json",
       "summary": "Covenant reports produced for one test date of a series evaluation.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
-      "bytes": 1561,
+      "bytes": 1767,
       "kind": "output",
       "path": "schemas/covenants/1/future_breach.schema.json",
       "summary": "A projected covenant breach.",

@@ -223,6 +223,34 @@ class CovenantEngine:
         """
 
     @staticmethod
+    def from_template(template: CovenantTemplate) -> CovenantEngine:
+        """Build an engine from an authored standard covenant package.
+
+        Parameters
+        ----------
+        template : CovenantTemplate
+            Standard terms expressed in their declared ratio or currency units.
+
+        Returns
+        -------
+        CovenantEngine
+            Validated and ready to evaluate the template's specifications.
+
+        Raises
+        ------
+        ValueError
+            If a required threshold or generated covenant is invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate
+        >>> engine = CovenantEngine.from_template(CovenantTemplate.cov_lite(7, 4.5))
+        >>> len(engine.specs)
+        3
+        """
+        ...
+
+    @staticmethod
     def from_specs(specs: list[CovenantSpec]) -> CovenantEngine:
         """
         Create an engine holding ``specs``.
@@ -795,7 +823,7 @@ def reports_to_dataframe(reports: dict[str, CovenantReport]) -> pd.DataFrame:
     -------
     pd.DataFrame
         Columns ``covenant`` (dict key), ``covenant_type``, ``passed``,
-        ``actual_value``, ``threshold``, ``headroom``, ``details``, in dict
+        ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``, in dict
         order.
 
     Raises

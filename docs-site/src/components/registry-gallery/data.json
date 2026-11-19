@@ -88064,7 +88064,7 @@
       "metricsJson": "{\"debt_to_ebitda\":6}",
       "asOf": "2026-03-31"
     },
-    "covenantReportsJson": "{\"max_debt_ebitda\":{\"covenant_type\":\"Debt/EBITDA <= 5.00x\",\"covenant_id\":\"max_debt_ebitda\",\"passed\":false,\"actual_value\":6,\"threshold\":5,\"details\":null,\"headroom\":-0.2,\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"version\":\"0.11.0\"}}}"
+    "covenantReportsJson": "{\"max_debt_ebitda\":{\"covenant_type\":\"Debt/EBITDA <= 5.00x\",\"covenant_id\":\"max_debt_ebitda\",\"passed\":false,\"actual_value\":6,\"threshold\":5,\"details\":null,\"headroom\":-0.2,\"headroom_raw\":-1,\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"version\":\"0.11.0\"}}}"
   },
   "irsInstrument": {
     "instrument": {
@@ -135316,6 +135316,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.5003268889511535,
+          "headroom_raw": 1.5009806668534607,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135343,6 +135344,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.6415868673050614,
+          "headroom_raw": 1.9247606019151844,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135370,6 +135372,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.7025750690546199,
+          "headroom_raw": 2.1077252071638597,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135397,6 +135400,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.3669437876592175,
+          "headroom_raw": 1.2843032568072612,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135419,6 +135423,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.9951378377138663,
+          "headroom_raw": 2.985413513141599,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135446,6 +135451,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.38113468236377773,
+          "headroom_raw": 1.333971388273222,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135468,6 +135474,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.885418100087152,
+          "headroom_raw": 2.6562543002614563,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135495,6 +135502,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.4221448886217379,
+          "headroom_raw": 1.4775071101760826,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135517,6 +135525,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.9751760145918832,
+          "headroom_raw": 2.9255280437756497,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135544,6 +135553,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.46036515411345463,
+          "headroom_raw": 1.6112780393970911,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135566,6 +135576,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 1.136303167553936,
+          "headroom_raw": 3.4089095026618077,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135593,6 +135604,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.4517553211312967,
+          "headroom_raw": 1.5811436239595384,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135615,6 +135627,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 1.265921125030453,
+          "headroom_raw": 3.7977633750913586,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135715,6 +135728,7 @@
         "projected_value": 4.500980666853461,
         "threshold": 5.5,
         "headroom": -0.18163987875391624,
+        "headroom_raw": -0.9990193331465393,
         "breach_probability": 1
       },
       {
@@ -135724,6 +135738,7 @@
         "projected_value": 4.924760601915184,
         "threshold": 5.5,
         "headroom": -0.10458898146996648,
+        "headroom_raw": -0.5752393980848156,
         "breach_probability": 1
       },
       {
@@ -135733,6 +135748,7 @@
         "projected_value": 5.10772520716386,
         "threshold": 5.5,
         "headroom": -0.07132268960657097,
+        "headroom_raw": -0.3922747928361403,
         "breach_probability": 1
       },
       {
@@ -135742,6 +135758,7 @@
         "projected_value": 2.215696743192739,
         "threshold": 2.1,
         "headroom": -0.05509368723463748,
+        "headroom_raw": -0.1156967431927387,
         "breach_probability": 1
       },
       {
@@ -135751,6 +135768,7 @@
         "projected_value": 2.166028611726778,
         "threshold": 2.1,
         "headroom": -0.031442196060370416,
+        "headroom_raw": -0.06602861172677787,
         "breach_probability": 1
       }
     ],
@@ -135762,6 +135780,7 @@
         "projected_value": 4.500980666853461,
         "threshold": 5.5,
         "headroom": -0.18163987875391624,
+        "headroom_raw": -0.9990193331465393,
         "breach_probability": 0.953
       },
       {
@@ -135771,6 +135790,7 @@
         "projected_value": 4.924760601915184,
         "threshold": 5.5,
         "headroom": -0.10458898146996648,
+        "headroom_raw": -0.5752393980848156,
         "breach_probability": 0.763
       },
       {
@@ -135780,6 +135800,7 @@
         "projected_value": 5.10772520716386,
         "threshold": 5.5,
         "headroom": -0.07132268960657097,
+        "headroom_raw": -0.3922747928361403,
         "breach_probability": 0.6705
       },
       {
@@ -135789,6 +135810,7 @@
         "projected_value": 2.215696743192739,
         "threshold": 2.1,
         "headroom": -0.05509368723463748,
+        "headroom_raw": -0.1156967431927387,
         "breach_probability": 0.532
       },
       {
@@ -135798,6 +135820,7 @@
         "projected_value": 5.985413513141599,
         "threshold": 5.5,
         "headroom": 0.08825700238938161,
+        "headroom_raw": 0.48541351314159886,
         "breach_probability": 0.414
       },
       {
@@ -135807,6 +135830,7 @@
         "projected_value": 2.166028611726778,
         "threshold": 2.1,
         "headroom": -0.031442196060370416,
+        "headroom_raw": -0.06602861172677787,
         "breach_probability": 0.487
       },
       {
@@ -135816,6 +135840,7 @@
         "projected_value": 5.656254300261456,
         "threshold": 5.5,
         "headroom": 0.02840987277481023,
+        "headroom_raw": 0.15625430026145626,
         "breach_probability": 0.5185
       },
       {
@@ -135825,6 +135850,7 @@
         "projected_value": 2.0224928898239174,
         "threshold": 2.1,
         "headroom": 0.03690814770289652,
+        "headroom_raw": 0.0775071101760827,
         "breach_probability": 0.4025
       },
       {
@@ -135834,6 +135860,7 @@
         "projected_value": 5.92552804377565,
         "threshold": 5.5,
         "headroom": 0.07736873523193631,
+        "headroom_raw": 0.4255280437756497,
         "breach_probability": 0.465
       },
       {
@@ -135843,6 +135870,7 @@
         "projected_value": 1.8887219606029089,
         "threshold": 2.1,
         "headroom": 0.10060859018909106,
+        "headroom_raw": 0.21127803939709122,
         "breach_probability": 0.316
       },
       {
@@ -135852,6 +135880,7 @@
         "projected_value": 6.408909502661808,
         "threshold": 5.5,
         "headroom": 0.16525627321123776,
+        "headroom_raw": 0.9089095026618077,
         "breach_probability": 0.3865
       },
       {
@@ -135861,6 +135890,7 @@
         "projected_value": 1.9188563760404616,
         "threshold": 2.1,
         "headroom": 0.08625886855216121,
+        "headroom_raw": 0.18114362395953854,
         "breach_probability": 0.336
       },
       {
@@ -135870,6 +135900,7 @@
         "projected_value": 6.797763375091359,
         "threshold": 5.5,
         "headroom": 0.23595697728933793,
+        "headroom_raw": 1.2977633750913586,
         "breach_probability": 0.34
       }
     ]

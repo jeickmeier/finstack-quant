@@ -42,6 +42,10 @@ export interface CovenantReportWire {
    * Cushion relative to threshold (positive => passing buffer)
    */
   headroom?: number | null;
+  /**
+   * Signed cushion in the covenant metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
   meta?: D_36A91E8Dd1Df9Abcb19C;
   /**
    * Whether the covenant passed

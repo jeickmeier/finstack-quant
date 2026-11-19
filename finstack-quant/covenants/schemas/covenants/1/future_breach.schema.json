@@ -36,6 +36,14 @@
         "null"
       ]
     },
+    "headroom_raw": {
+      "description": "Signed cushion in the metric's own units when numerically meaningful.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
     "projected_value": {
       "description": "Projected value, if finite.",
       "format": "double",

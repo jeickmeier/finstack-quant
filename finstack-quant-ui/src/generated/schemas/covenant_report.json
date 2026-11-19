@@ -37,6 +37,14 @@
         "null"
       ]
     },
+    "headroom_raw": {
+      "description": "Signed cushion in the covenant metric's own units when numerically meaningful.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
     "meta": {
       "$ref": "#/$defs/d_36a91e8dd1df9abcb19c",
       "default": {

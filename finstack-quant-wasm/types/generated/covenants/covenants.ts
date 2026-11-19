@@ -569,6 +569,10 @@ export interface CovenantForecast {
    */
   headroom: (number | null)[];
   /**
+   * Signed cushion in the metric's own units, aligned with the test dates.
+   */
+  headroom_raw: (number | null)[];
+  /**
    * Date with minimum finite headroom.
    */
   min_headroom_date?: DateWire | null;
@@ -677,6 +681,10 @@ export interface CovenantReport {
    * Cushion relative to threshold (positive => passing buffer)
    */
   headroom?: number | null;
+  /**
+   * Signed cushion in the covenant metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
   /**
    * Audit stamp: numeric mode, rounding context, and FX policy in force.
    */
@@ -834,6 +842,10 @@ export interface FutureBreach {
    * Headroom (negative means breach), if meaningful and finite.
    */
   headroom?: number | null;
+  /**
+   * Signed cushion in the metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
   /**
    * Projected value, if finite.
    */

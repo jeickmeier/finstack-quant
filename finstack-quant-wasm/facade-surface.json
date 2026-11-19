@@ -1872,7 +1872,7 @@
   "covenants.CovenantEngine": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromJson", "fromSpecs"],
+    "statics": ["fromJson", "fromSpecs", "fromTemplate"],
     "methods": [
       "addSpec",
       "addWaiver",

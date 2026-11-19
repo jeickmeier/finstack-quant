@@ -10893,6 +10893,7 @@ export interface StatementsAnalyticsNamespace {
    *
    * @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.
    * @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.
+   * @param nodeMapping - Optional exact metric-ID to statement-node aliases. Unlisted metrics use their own identifiers.
    * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in timeline order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)
    * @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
    */
@@ -10914,6 +10915,7 @@ export interface StatementsAnalyticsNamespace {
    * @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).
    * @param covenants - `CovenantEngine` handle whose effective specifications are forecast.
    * @param config - Optional `CovenantForecastConfig` object or JSON text (JSON text keeps a uint64 `random_seed` exact); omitted means deterministic maintenance-scope forecasting.
+   * @param nodeMapping - Optional exact metric-ID to statement-node aliases. Unlisted metrics use their own identifiers.
    * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
    * @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).
    */
