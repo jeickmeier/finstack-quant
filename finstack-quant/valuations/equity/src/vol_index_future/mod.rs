@@ -55,4 +55,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::VolatilityIndexFuture;
+pub use types::{VolatilityIndexFuture, VolatilityIndexFutureBuilder};

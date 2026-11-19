@@ -8910,6 +8910,14 @@ export interface ValuationsInstrumentsNamespace {
   readonly VolatilityIndexFutureOption: typeof wasm.VolatilityIndexFutureOption;
   readonly VolatilityIndexFutureOptionBuilder: typeof wasm.VolatilityIndexFutureOptionBuilder;
   readonly BondFutureBuilder: typeof wasm.BondFutureBuilder;
+  readonly InterestRateFuture: typeof wasm.InterestRateFuture;
+  readonly InterestRateFutureBuilder: typeof wasm.InterestRateFutureBuilder;
+  readonly EquityFuture: typeof wasm.EquityFuture;
+  readonly EquityFutureBuilder: typeof wasm.EquityFutureBuilder;
+  readonly FxFuture: typeof wasm.FxFuture;
+  readonly FxFutureBuilder: typeof wasm.FxFutureBuilder;
+  readonly VolatilityIndexFuture: typeof wasm.VolatilityIndexFuture;
+  readonly VolatilityIndexFutureBuilder: typeof wasm.VolatilityIndexFutureBuilder;
   readonly InflationLinkedBond: typeof wasm.InflationLinkedBond;
   readonly InflationLinkedBondBuilder: typeof wasm.InflationLinkedBondBuilder;
   /**

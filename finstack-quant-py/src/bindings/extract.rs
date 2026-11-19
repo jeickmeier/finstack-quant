@@ -31,15 +31,19 @@ use crate::bindings::valuations::typed_credit::{
 };
 use crate::bindings::valuations::typed_deposit::PyDeposit;
 use crate::bindings::valuations::typed_equity::PyEquityOption;
+use crate::bindings::valuations::typed_equity_future::PyEquityFuture;
 use crate::bindings::valuations::typed_equity_future_option::PyEquityFutureOption;
 use crate::bindings::valuations::typed_fra::PyForwardRateAgreement;
 use crate::bindings::valuations::typed_fx::{PyFxForward, PyFxOption};
+use crate::bindings::valuations::typed_fx_future::PyFxFuture;
 use crate::bindings::valuations::typed_fx_future_option::PyFxFutureOption;
 use crate::bindings::valuations::typed_inflation_bond::PyInflationLinkedBond;
+use crate::bindings::valuations::typed_interest_rate_future::PyInterestRateFuture;
 use crate::bindings::valuations::typed_interest_rate_future_option::PyInterestRateFutureOption;
 use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, PySwaption};
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::bindings::valuations::typed_structured_credit::PyStructuredCredit;
+use crate::bindings::valuations::typed_volatility_index_future::PyVolatilityIndexFuture;
 use crate::bindings::valuations::typed_volatility_index_future_option::PyVolatilityIndexFutureOption;
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
@@ -140,6 +144,10 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyDeposit,
         PyInflationLinkedBond,
         PyBondFuture,
+        PyInterestRateFuture,
+        PyEquityFuture,
+        PyFxFuture,
+        PyVolatilityIndexFuture,
         PyInterestRateFutureOption,
         PyEquityFutureOption,
         PyFxFutureOption,

@@ -66,4 +66,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::{FutureContractSpecs, InterestRateFuture};
+pub use types::{FutureContractSpecs, InterestRateFuture, InterestRateFutureBuilder};

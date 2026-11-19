@@ -76,6 +76,22 @@ from finstack_quant.valuations.instruments._typed_volatility_index_future_option
     VolatilityIndexFutureOption as VolatilityIndexFutureOption,
     VolatilityIndexFutureOptionBuilder as VolatilityIndexFutureOptionBuilder,
 )
+from finstack_quant.valuations.instruments._typed_interest_rate_future import (
+    InterestRateFuture as InterestRateFuture,
+    InterestRateFutureBuilder as InterestRateFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_future import (
+    EquityFuture as EquityFuture,
+    EquityFutureBuilder as EquityFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_future import (
+    FxFuture as FxFuture,
+    FxFutureBuilder as FxFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_volatility_index_future import (
+    VolatilityIndexFuture as VolatilityIndexFuture,
+    VolatilityIndexFutureBuilder as VolatilityIndexFutureBuilder,
+)
 from finstack_quant.valuations.instruments._typed_bond_future import (
     BondFuture as BondFuture,
     BondFutureBuilder as BondFutureBuilder,
@@ -270,6 +286,14 @@ __all__ = [
     "VolatilityIndexFutureOptionBuilder",
     "FutureOptionTerms",
     "BondFutureBuilder",
+    "InterestRateFuture",
+    "InterestRateFutureBuilder",
+    "EquityFuture",
+    "EquityFutureBuilder",
+    "FxFuture",
+    "FxFutureBuilder",
+    "VolatilityIndexFuture",
+    "VolatilityIndexFutureBuilder",
     "ListedFutureTerms",
     "EligibilityRule",
     "EnhancedMonteCarloResult",

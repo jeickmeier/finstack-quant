@@ -18,9 +18,13 @@
 pub(crate) mod macros;
 
 pub mod bond_future;
+pub mod equity_future;
 pub mod equity_future_option;
+pub mod fx_future;
 pub mod fx_future_option;
+pub mod interest_rate_future;
 pub mod interest_rate_future_option;
+pub mod volatility_index_future;
 pub mod volatility_index_future_option;
 
 pub mod cds_option;

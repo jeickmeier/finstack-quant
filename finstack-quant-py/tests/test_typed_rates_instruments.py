@@ -416,3 +416,23 @@ def test_listed_options_use_native_typed_terms_and_preserve_price() -> None:
         price = edited.price(market, as_of).value
         wire_price = price_instrument(edited.to_json(), market, as_of).value
         assert price == wire_price == option.price(market, as_of).value
+
+
+def test_other_listed_futures_roundtrip_typed_terms_at_exchange_marks() -> None:
+    from finstack_quant.core.market_data import MarketContext
+    from finstack_quant.valuations.instruments import (
+        EquityFuture,
+        FxFuture,
+        InterestRateFuture,
+        VolatilityIndexFuture,
+    )
+
+    for cls in (EquityFuture, FxFuture, InterestRateFuture, VolatilityIndexFuture):
+        original = cls.example()
+        terms = original.terms.with_marks(99.0, None)
+        edited = original.to_builder().id("EDITED").terms(terms).build()
+        assert original.id != edited.id
+        assert edited.terms.to_json() == terms.to_json()
+        as_of = datetime.date(2025, 1, 2)
+        market = MarketContext()
+        assert edited.price(market, as_of).value == price_instrument(edited.to_json(), market, as_of).value

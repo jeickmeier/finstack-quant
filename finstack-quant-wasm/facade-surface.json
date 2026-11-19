@@ -4654,6 +4654,8 @@
       "CreditDefaultSwapBuilder",
       "Deposit",
       "DepositBuilder",
+      "EquityFuture",
+      "EquityFutureBuilder",
       "EquityFutureOption",
       "EquityFutureOptionBuilder",
       "EquityOption",
@@ -4664,6 +4666,8 @@
       "FxDigitalOption",
       "FxForward",
       "FxForwardBuilder",
+      "FxFuture",
+      "FxFutureBuilder",
       "FxFutureOption",
       "FxFutureOptionBuilder",
       "FxOption",
@@ -4674,6 +4678,8 @@
       "FxVarianceSwap",
       "InflationLinkedBond",
       "InflationLinkedBondBuilder",
+      "InterestRateFuture",
+      "InterestRateFutureBuilder",
       "InterestRateFutureOption",
       "InterestRateFutureOptionBuilder",
       "InterestRateSwap",
@@ -4690,6 +4696,8 @@
       "TermLoan",
       "TermLoanBuilder",
       "TrancheBuilder",
+      "VolatilityIndexFuture",
+      "VolatilityIndexFutureBuilder",
       "VolatilityIndexFutureOption",
       "VolatilityIndexFutureOptionBuilder",
       "amortizationEventCumulativeLoss",
@@ -5256,6 +5264,158 @@
       "repoCurveId",
       "scenarioPricingOverrides",
       "terms"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.InterestRateFuture": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "defaultModel",
+      "expiry",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "scenarioPricingOverrides",
+      "terms"
+    ]
+  },
+  "valuations.instruments.InterestRateFutureBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "compounding",
+      "contractSpecs",
+      "dayCount",
+      "discountCurveId",
+      "fixingCalendarId",
+      "fixingDate",
+      "forwardCurveId",
+      "free",
+      "id",
+      "indexId",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "periodEnd",
+      "periodStart",
+      "scenarioPricingOverrides",
+      "terms",
+      "volSurfaceId"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.EquityFuture": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "defaultModel",
+      "expiry",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "scenarioPricingOverrides",
+      "terms"
+    ]
+  },
+  "valuations.instruments.EquityFutureBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "discountCurveId",
+      "discreteDividends",
+      "divYieldId",
+      "free",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "quanto",
+      "scenarioPricingOverrides",
+      "spotId",
+      "terms",
+      "underlyingCurrency",
+      "underlyingTicker",
+      "volSurfaceId"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.FxFuture": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "defaultModel",
+      "expiry",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "scenarioPricingOverrides",
+      "terms"
+    ]
+  },
+  "valuations.instruments.FxFutureBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "baseCurrency",
+      "build",
+      "domesticDiscountCurveId",
+      "foreignDiscountCurveId",
+      "free",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "quotedSpot",
+      "scenarioPricingOverrides",
+      "terms"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.VolatilityIndexFuture": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "defaultModel",
+      "expiry",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "scenarioPricingOverrides",
+      "terms"
+    ]
+  },
+  "valuations.instruments.VolatilityIndexFutureBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "free",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "scenarioPricingOverrides",
+      "terms",
+      "volIndexCurveId"
     ],
     "getters": []
   },
