@@ -132,8 +132,8 @@ def test_arbitrage_grid_checks_default_to_the_rust_tolerance() -> None:
     # calendar-spread arbitrage that a 1e-6 tolerance would hide.
     rows = [[0.30, 0.25, 0.20, 0.25, 0.30], [0.29, 0.245, math.sqrt(0.02 - 5e-8), 0.245, 0.29]]
     forwards = [100.0, 100.0]
-    default = volatility.check_calendar_spread_grid(strikes, expiries, rows, forwards)
-    explicit = volatility.check_calendar_spread_grid(strikes, expiries, rows, forwards, tolerance=1e-10)
+    default = volatility.check_calendar_spread_grid(expiries, strikes, rows, forwards)
+    explicit = volatility.check_calendar_spread_grid(expiries, strikes, rows, forwards, tolerance=1e-10)
     assert len(default) == len(explicit) == 1
 
 

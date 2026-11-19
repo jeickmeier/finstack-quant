@@ -126,18 +126,18 @@ wire_methods!(
 
 #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_butterfly_grid")]
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
+#[pyo3(signature = (expiries, strikes, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_butterfly_grid<'py>(
     py: Python<'py>,
-    strikes: Vec<f64>,
     expiries: Vec<f64>,
+    strikes: Vec<f64>,
     vols: Vec<Vec<f64>>,
     forward_prices: Vec<f64>,
     tolerance: f64,
 ) -> PyResult<Bound<'py, PyAny>> {
     let violations = model_arbitrage::check_butterfly_grid(
-        &strikes,
         &expiries,
+        &strikes,
         &vols,
         forward_prices,
         tolerance,
@@ -148,18 +148,18 @@ fn check_butterfly_grid<'py>(
 
 #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_calendar_spread_grid")]
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
+#[pyo3(signature = (expiries, strikes, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_calendar_spread_grid<'py>(
     py: Python<'py>,
-    strikes: Vec<f64>,
     expiries: Vec<f64>,
+    strikes: Vec<f64>,
     vols: Vec<Vec<f64>>,
     forward_prices: Vec<f64>,
     tolerance: f64,
 ) -> PyResult<Bound<'py, PyAny>> {
     let violations = model_arbitrage::check_calendar_spread_grid(
-        &strikes,
         &expiries,
+        &strikes,
         &vols,
         forward_prices,
         tolerance,
@@ -170,31 +170,31 @@ fn check_calendar_spread_grid<'py>(
 
 #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_local_vol_density_grid")]
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices))]
+#[pyo3(signature = (expiries, strikes, vols, forward_prices))]
 fn check_local_vol_density_grid<'py>(
     py: Python<'py>,
-    strikes: Vec<f64>,
     expiries: Vec<f64>,
+    strikes: Vec<f64>,
     vols: Vec<Vec<f64>>,
     forward_prices: Vec<f64>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let violations =
-        model_arbitrage::check_local_vol_density_grid(&strikes, &expiries, &vols, forward_prices)
+        model_arbitrage::check_local_vol_density_grid(&expiries, &strikes, &vols, forward_prices)
             .map_err(core_to_py)?;
     serde_to_py(py, &violations)
 }
 
 #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_surface_grid")]
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
+#[pyo3(signature = (expiries, strikes, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_surface_grid(
-    strikes: Vec<f64>,
     expiries: Vec<f64>,
+    strikes: Vec<f64>,
     vols: Vec<Vec<f64>>,
     forward_prices: Vec<f64>,
     tolerance: f64,
 ) -> PyResult<PyArbitrageReport> {
-    model_arbitrage::check_surface_grid(&strikes, &expiries, &vols, forward_prices, tolerance)
+    model_arbitrage::check_surface_grid(&expiries, &strikes, &vols, forward_prices, tolerance)
         .map(|inner| PyArbitrageReport { inner })
         .map_err(core_to_py)
 }

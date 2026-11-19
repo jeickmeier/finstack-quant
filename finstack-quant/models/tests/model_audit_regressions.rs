@@ -138,8 +138,8 @@ fn local_density_uses_log_moneyness_derivatives_and_is_price_scale_invariant() {
     let mut magnitudes = Vec::new();
     for scale in [1.0, 0.01, 100.0] {
         let violations = check_local_vol_density_grid(
-            &[98.0 * scale, 100.0 * scale, 102.0 * scale],
             &[1.0, 2.0],
+            &[98.0 * scale, 100.0 * scale, 102.0 * scale],
             &vols,
             vec![100.0 * scale; 2],
         )
@@ -179,20 +179,20 @@ fn arbitrage_checks_reject_missing_or_invalid_forwards_and_tolerance() {
         .unwrap();
     assert!(check_surface(&surface, &ArbitrageCheckConfig::default()).is_err());
     for forward in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-        assert!(check_surface_grid(&strikes, &expiries, &vols, vec![forward], 1e-10).is_err());
+        assert!(check_surface_grid(&expiries, &strikes, &vols, vec![forward], 1e-10).is_err());
         assert!(
-            check_local_vol_density_grid(&strikes, &expiries, &vols, vec![forward; 2]).is_err()
+            check_local_vol_density_grid(&expiries, &strikes, &vols, vec![forward; 2]).is_err()
         );
     }
     for tolerance in [-1.0, f64::NAN, f64::INFINITY] {
-        assert!(check_surface_grid(&strikes, &expiries, &vols, vec![100.0], tolerance).is_err());
+        assert!(check_surface_grid(&expiries, &strikes, &vols, vec![100.0], tolerance).is_err());
     }
     assert!(
-        !check_surface_grid(&strikes, &expiries, &vols, vec![100.0], 1e-10)
+        !check_surface_grid(&expiries, &strikes, &vols, vec![100.0], 1e-10)
             .unwrap()
             .passed
     );
-    assert!(check_local_vol_density_grid(&strikes, &expiries, &vols, vec![100.0]).is_err());
+    assert!(check_local_vol_density_grid(&expiries, &strikes, &vols, vec![100.0]).is_err());
 }
 
 #[test]

@@ -850,10 +850,10 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
             svi().implied_vol(0.1, 1.0),
         ],
         "volatility.arbitrage": lambda: [
-            _json(volatility.check_surface_grid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0])),
-            len(volatility.check_butterfly_grid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0])),
-            len(volatility.check_calendar_spread_grid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0])),
-            len(volatility.check_local_vol_density_grid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0])),
+            _json(volatility.check_surface_grid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0])),
+            len(volatility.check_butterfly_grid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0])),
+            len(volatility.check_calendar_spread_grid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0])),
+            len(volatility.check_local_vol_density_grid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0])),
         ],
         "volatility.cube_slices": lambda: [
             _surface_vols(tenor_slice()),

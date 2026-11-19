@@ -124,16 +124,16 @@ def test_sabr_diagnostics_accept_uneven_strike_spacing() -> None:
 @pytest.mark.parametrize("forward", [0.0, -100.0, math.nan, math.inf])
 def test_arbitrage_check_rejects_invalid_forwards(forward: float) -> None:
     with pytest.raises(ValueError, match="forward"):
-        check_surface_grid([90.0, 100.0, 110.0], [1.0, 2.0], [[0.3] * 3, [0.1] * 3], [forward])
+        check_surface_grid([1.0, 2.0], [90.0, 100.0, 110.0], [[0.3] * 3, [0.1] * 3], [forward])
 
 
 def test_density_check_requires_one_forward_per_expiry() -> None:
     with pytest.raises(ValueError, match="entries"):
-        check_local_vol_density_grid([90.0, 100.0, 110.0], [1.0, 2.0], [[0.2] * 3] * 2, [100.0])
+        check_local_vol_density_grid([1.0, 2.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2, [100.0])
     assert (
         check_local_vol_density_grid(
-            [90.0, 100.0, 110.0],
             [1.0, 2.0],
+            [90.0, 100.0, 110.0],
             [[0.2] * 3] * 2,
             [100.0, 100.0],
         )

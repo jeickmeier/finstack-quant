@@ -855,10 +855,10 @@ const CASES = {
     volatility.sviImpliedVol(SVI, 0.1, 1.0),
   ],
   'volatility.arbitrage': () => [
-    volatility.checkSurfaceGrid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0]),
-    volatility.checkButterflyGrid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0]).length,
-    volatility.checkCalendarSpreadGrid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0]).length,
-    volatility.checkLocalVolDensityGrid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0]).length,
+    volatility.checkSurfaceGrid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0]),
+    volatility.checkButterflyGrid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0]).length,
+    volatility.checkCalendarSpreadGrid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0]).length,
+    volatility.checkLocalVolDensityGrid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0]).length,
   ],
   'volatility.cube_slices': () => {
     const strikes = [0.02, 0.03, 0.04];

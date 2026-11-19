@@ -6510,8 +6510,8 @@ export interface ModelsVolatilityNamespace {
   readonly sviDurrlemanG: typeof wasm.sviDurrlemanG;
   /**
    * Butterfly-arbitrage check on a strike by expiry volatility grid.
-   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
    * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
@@ -6525,8 +6525,8 @@ export interface ModelsVolatilityNamespace {
   readonly checkButterflyGrid: typeof wasm.checkButterflyGrid;
   /**
    * Calendar-spread arbitrage check on a strike by expiry volatility grid.
-   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
    * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
@@ -6540,8 +6540,8 @@ export interface ModelsVolatilityNamespace {
   readonly checkCalendarSpreadGrid: typeof wasm.checkCalendarSpreadGrid;
   /**
    * Local-volatility density check (Dupire denominator positivity) on a volatility grid.
-   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price per expiry.
    * @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
@@ -6569,8 +6569,8 @@ export interface ModelsVolatilityNamespace {
   readonly checkSurface: typeof wasm.checkSurface;
   /**
    * Run every static-arbitrage check on a strike by expiry volatility grid.
-   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
    * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
