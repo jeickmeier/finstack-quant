@@ -281,7 +281,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
-      "bytes": 10300,
+      "bytes": 10786,
       "kind": "input",
       "path": "schemas/common/1/price_extras.schema.json",
       "summary": "Metric-pricing override patch, market history and step-trace flag of one price call.",

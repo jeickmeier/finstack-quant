@@ -667,6 +667,9 @@ class Bond:
             require; omitted prices without history. ``explain`` (bool, default
             ``False``) attaches a step trace as ``result.explanation`` when
             ``True``. ``None`` (the default) means no extras.
+            ``instrument_pricing_overrides`` optionally patches stored quote or model
+            fields for this call. Absent fields keep stored values, and an explicit
+            ``None`` clears a nullable field.
 
         Returns
         -------

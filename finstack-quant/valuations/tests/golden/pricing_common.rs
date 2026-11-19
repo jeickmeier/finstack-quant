@@ -22,7 +22,7 @@ fn price_instrument_from_json(
     market_history: Option<&finstack_quant_valuations::metrics::risk::MarketHistory>,
 ) -> finstack_quant_core::Result<finstack_quant_valuations::results::ValuationResult> {
     let instrument =
-        parse_boxed_instrument_from_json(instrument_json, metric_pricing_overrides_json)?;
+        parse_boxed_instrument_from_json(instrument_json, metric_pricing_overrides_json, None)?;
     price_instrument(
         &instrument,
         market,
@@ -322,7 +322,7 @@ mod tests {
         let instrument_json =
             serde_json::to_string(&pricing.instrument).expect("serialize instrument");
         let instrument =
-            parse_boxed_instrument_from_json(&instrument_json, None).expect("parse swap");
+            parse_boxed_instrument_from_json(&instrument_json, None, None).expect("parse swap");
         let as_of = finstack_quant_core::dates::parse_iso_date(&fixture.metadata.valuation_date)
             .expect("fixture valuation date");
 
@@ -514,7 +514,7 @@ mod tests {
             let fixture: GoldenFixture = serde_json::from_str(raw).unwrap();
             let pricing = fixture.pricing().unwrap();
             let instrument_json = serde_json::to_string(&pricing.instrument).unwrap();
-            let instrument = parse_boxed_instrument_from_json(&instrument_json, None)
+            let instrument = parse_boxed_instrument_from_json(&instrument_json, None, None)
                 .expect("default claim and tranche state must be valid");
             let deal = instrument
                 .as_instrument()

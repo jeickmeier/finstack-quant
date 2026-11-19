@@ -52,6 +52,7 @@ pub(super) fn parse_pricing_instrument_json(
     finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
         instrument_json,
         metric_pricing_overrides,
+        None,
     )
     .map_err(to_js_err)
 }
@@ -162,6 +163,9 @@ pub fn validate_instrument_json(
 /// (`{}` preserves them), supplied `bump_config` fields merge into the stored
 /// object, and an explicit `null` clears a nullable field to its Rust fallback.
 /// Omitted keeps the envelope configuration.
+/// `instrument_pricing_overrides` - a patch for instrument-owned market quotes
+/// and model parameters. Omitted fields keep their stored values, and an
+/// explicit `null` clears a nullable parameter for this pricing request.
 /// `market_history` - a `MarketHistory` object (base date, window and daily
 /// risk-factor shifts) required by historical risk metrics such as `"hvar"` and
 /// `"expected_shortfall"`. Omitted prices without history.
@@ -215,6 +219,8 @@ pub(super) struct PriceRequest {
     /// Metric-pricing override patch (`extras.metric_pricing_overrides`) as
     /// JSON text, merged into the envelope when the instrument is parsed.
     pub(super) metric_pricing_overrides: Option<String>,
+    /// Call-time patch for stored instrument market quotes and model settings.
+    instrument_pricing_overrides: Option<serde_json::Value>,
     /// Market history (`extras.market_history`) for historical risk metrics.
     pub(super) market_history: Option<MarketHistory>,
     /// Whether to attach the per-flow step trace as `result.explanation`
@@ -242,6 +248,7 @@ impl PriceRequest {
             model,
             metrics,
             metric_pricing_overrides: extras.metric_pricing_overrides_json(),
+            instrument_pricing_overrides: extras.instrument_pricing_overrides,
             market_history: extras.market_history,
             explain: extras.explain,
         })
@@ -252,7 +259,12 @@ impl PriceRequest {
         &self,
         instrument_json: &str,
     ) -> Result<finstack_quant_valuations::pricer::ParsedInstrument, JsValue> {
-        parse_pricing_instrument_json(instrument_json, self.metric_pricing_overrides.as_deref())
+        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
+            instrument_json,
+            self.metric_pricing_overrides.as_deref(),
+            self.instrument_pricing_overrides.as_ref(),
+        )
+        .map_err(to_js_err)
     }
 
     /// Prepare a native Rust instrument with this request's metric-pricing overrides.
@@ -263,6 +275,7 @@ impl PriceRequest {
         finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
             instrument,
             self.metric_pricing_overrides.as_deref(),
+            self.instrument_pricing_overrides.as_ref(),
         )
         .map_err(to_js_err)
     }
@@ -639,6 +652,9 @@ pub fn list_models_grouped() -> Result<JsValue, JsValue> {
 /// (`{}` preserves them), supplied `bump_config` fields merge into the stored
 /// object, and an explicit `null` clears a nullable field to its Rust fallback.
 /// Omitted keeps the envelope configuration.
+/// `instrument_pricing_overrides` - a patch for instrument-owned market quotes
+/// and model parameters. Omitted fields keep their stored values, and an
+/// explicit `null` clears a nullable parameter for this pricing request.
 /// `market_history` - a `MarketHistory` object (base date, window and daily
 /// risk-factor shifts) required by historical risk metrics such as `"hvar"` and
 /// `"expected_shortfall"`. Omitted prices without history.
@@ -777,6 +793,7 @@ pub(super) mod tests {
             model: Some("not-a-model".to_string()),
             metrics: Vec::new(),
             metric_pricing_overrides: None,
+            instrument_pricing_overrides: None,
             market_history: None,
             explain: false,
         }

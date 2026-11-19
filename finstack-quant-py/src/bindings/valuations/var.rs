@@ -51,7 +51,7 @@ fn calculate_var(
     py.detach(move || {
         let parsed = instruments
             .into_iter()
-            .map(|instrument| instrument.into_parsed(None))
+            .map(|instrument| instrument.into_parsed(None, None))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
         let refs: Vec<_> = parsed.iter().map(|p| p.as_instrument()).collect();
         rust_calculate_var(

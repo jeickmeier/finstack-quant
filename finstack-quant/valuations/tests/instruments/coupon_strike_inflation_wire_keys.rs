@@ -303,7 +303,7 @@ fn price_case(
                 .expect("ratio vol"),
         );
     }
-    let parsed = parse_boxed_instrument_from_json(&instrument.to_string(), None)
+    let parsed = parse_boxed_instrument_from_json(&instrument.to_string(), None, None)
         .unwrap_or_else(|e| panic!("{ty}: {e}"));
     let request = &case["request"];
     let result = price_instrument(
@@ -340,7 +340,7 @@ fn price_case(
                     instrument_json_of(parsed.as_instrument()).expect("registered instrument"),
                 );
             instrument = serde_json::to_value(canonical_json).expect("canonical contract JSON");
-            let canonical = parse_boxed_instrument_from_json(&instrument.to_string(), None)
+            let canonical = parse_boxed_instrument_from_json(&instrument.to_string(), None, None)
                 .expect("roundtripped instrument");
             let roundtripped = price_instrument(
                 &canonical,

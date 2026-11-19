@@ -3104,7 +3104,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
             "type_name": "PriceExtras",
             "kind": "input",
-            "bytes": 10300
+            "bytes": 10786
           },
           {
             "path": "schemas/common/1/rate_index_conventions.schema.json",
@@ -5529,7 +5529,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
             "type_name": "PriceExtras",
             "kind": "input",
-            "bytes": 10300
+            "bytes": 10786
           },
           {
             "domain": "valuations",

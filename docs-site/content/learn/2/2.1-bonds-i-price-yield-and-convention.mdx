@@ -258,7 +258,7 @@ print(settlement_rows)
 
 <Exercise id="exercise-step-up-coupon" title="B. Increase future coupons" question={"Build the native step-up bond, then compare its yield with the bullet at the same 100 clean quote."}>
 
-The exercise creates fresh serialized copies of the displayed native schedule and foundation bond. Both have the same clean currency price. The extra future coupon cash must be offset by a higher discounting yield to reproduce that price; comparing their curve-driven yields would answer a different question.
+The exercise applies the same observed quote to the displayed step-up bond and the foundation bond. Both have the same clean currency price. The extra future coupon cash must be offset by a higher discounting yield to reproduce that price; comparing their curve-driven yields would answer a different question.
 
 {/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="exercise-step-up-coupon" role="exercise" */}
 ```python exec id=exercise-step-up-coupon role=exercise
@@ -267,14 +267,12 @@ import copy,json
 from finstack_quant.valuations.instruments import price_instrument
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
-# Reuse the displayed native schedule, while creating independent instrument and market values.
-from _shared.instrument_fixtures import instrument_envelope
-step = instrument_envelope({'type': 'bond', 'spec': step_bond.to_dict()})
+# Price both contracts at the same observed quote without changing their terms.
 bullet = instruments('foundations')['USD-CORP']
+extras = {'instrument_pricing_overrides': {'market_quotes': {'quoted_clean_price_pct': 100.0}}}
 yields={}
-for name,contract in [('bullet',bullet),('stepup',step)]:
- contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':100.0}}
- result=price_instrument(json.dumps(contract),build_market('foundations'),AS_OF,metrics=['ytm','clean_price'])
+for name,contract in [('bullet',bullet),('stepup',step_bond)]:
+ result=price_instrument(contract,build_market('foundations'),AS_OF,metrics=['ytm','clean_price'],extras=extras)
  yields[name]=result.get_metric('ytm')
 print({'same_clean_price_pct':100.0,'street_yields_decimal':yields})
 ```

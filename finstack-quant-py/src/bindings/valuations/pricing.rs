@@ -389,7 +389,12 @@ fn price_instrument(
     let overrides = extras.metric_pricing_overrides_json();
     let instrument = extract_instrument(instrument)?;
     let prepared = py
-        .detach(move || instrument.into_parsed(overrides.as_deref()))
+        .detach(|| {
+            instrument.into_parsed(
+                overrides.as_deref(),
+                extras.instrument_pricing_overrides.as_ref(),
+            )
+        })
         .map_err(core_to_py)?;
     price_prepared(py, prepared, market, as_of, model, metrics, extras)
 }
@@ -557,7 +562,7 @@ fn instrument_cashflows(
     // Parse the instrument before the market so instrument errors surface first.
     let instrument = extract_instrument(instrument)?;
     let instrument = py
-        .detach(move || instrument.into_parsed(None))
+        .detach(move || instrument.into_parsed(None, None))
         .map_err(core_to_py)?;
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
@@ -804,10 +809,11 @@ pub(crate) fn price_typed(
     extras: PriceExtras,
 ) -> PyResult<PyValuationResult> {
     let overrides = extras.metric_pricing_overrides_json();
-    let instrument = py.detach(move || {
+    let instrument = py.detach(|| {
         finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
             instrument,
             overrides.as_deref(),
+            extras.instrument_pricing_overrides.as_ref(),
         )
         .map_err(core_to_py)
     })?;
@@ -871,8 +877,9 @@ pub(crate) fn metric_typed(
     let model = model.to_owned();
     let metric_id = metric_id.to_owned();
     py.detach(move || {
-        let instrument =
-            finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)?;
+        let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+            instrument, None, None,
+        )?;
         finstack_quant_valuations::pricer::metric_value(
             &instrument,
             &market,
@@ -911,7 +918,7 @@ pub(crate) fn typed_option_greeks<'py>(
     let pairs = py
         .detach(move || {
             let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-                instrument, None,
+                instrument, None, None,
             )?;
             finstack_quant_valuations::pricer::present_standard_option_greeks(
                 &instrument,

@@ -46,7 +46,7 @@ pub(crate) fn extract_instruments(
     objs.iter()
         .map(|obj| {
             extract_instrument(obj)?
-                .into_parsed(None)
+                .into_parsed(None, None)
                 .map(|parsed| parsed.into_boxed())
                 .map_err(core_to_py)
         })

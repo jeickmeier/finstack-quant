@@ -60,18 +60,24 @@ impl InstrumentArg {
     ///
     /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON
     ///   patch merged before validation; `None` keeps stored controls.
+    /// * `instrument_pricing_overrides` - Optional patch for instrument-owned
+    ///   quotes and models, applied to the owned pricing copy.
     pub fn into_parsed(
         self,
         metric_pricing_overrides: Option<&str>,
+        instrument_pricing_overrides: Option<&serde_json::Value>,
     ) -> finstack_quant_core::Result<ParsedInstrument> {
         match self {
-            Self::Typed(instrument) => {
-                ParsedInstrument::from_instrument_json(*instrument, metric_pricing_overrides)
-            }
+            Self::Typed(instrument) => ParsedInstrument::from_instrument_json(
+                *instrument,
+                metric_pricing_overrides,
+                instrument_pricing_overrides,
+            ),
             Self::Envelope(json) => {
                 finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
                     &json,
                     metric_pricing_overrides,
+                    instrument_pricing_overrides,
                 )
             }
         }

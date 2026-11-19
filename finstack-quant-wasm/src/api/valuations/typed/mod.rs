@@ -201,9 +201,10 @@ pub(super) fn metric_value(
     model: Option<&JsValue>,
     metric_id: &str,
 ) -> Result<f64, JsValue> {
-    let instrument =
-        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
-            .map_err(to_js_err)?;
+    let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+        instrument, None, None,
+    )
+    .map_err(to_js_err)?;
     let market = super::pricing::parse_market(market_json)?;
     let as_of = js_string(as_of, "asOf")?;
     let model = crate::utils::input::js_opt_string(model, "model")?;
@@ -229,9 +230,10 @@ pub(super) fn option_greeks(
     as_of: &str,
     model: Option<&str>,
 ) -> Js {
-    let instrument =
-        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
-            .map_err(to_js_err)?;
+    let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+        instrument, None, None,
+    )
+    .map_err(to_js_err)?;
     let market: MarketContext = serde_json::from_str(market_json).map_err(to_js_err)?;
     let pairs = finstack_quant_valuations::pricer::present_standard_option_greeks(
         &instrument,

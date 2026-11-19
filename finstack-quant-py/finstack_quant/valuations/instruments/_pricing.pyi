@@ -119,6 +119,9 @@ def price_instrument(
         entries. Other models get one ``computation_step`` entry saying no
         per-flow decomposition exists.
         ``None`` (the default) means no extras.
+        ``instrument_pricing_overrides`` optionally patches stored quote or model
+        fields for this call. Absent fields keep stored values, and an explicit
+        ``None`` clears a nullable field.
 
     Returns
     -------

@@ -8349,6 +8349,9 @@ export interface ValuationsInstrumentsNamespace {
    * (`{}` preserves them), supplied `bump_config` fields merge into the stored
    * object, and an explicit `null` clears a nullable field to its Rust fallback.
    * Omitted keeps the envelope configuration.
+   * `instrument_pricing_overrides` - a patch for instrument-owned market quotes
+   * and model parameters. Omitted fields keep their stored values, and an
+   * explicit `null` clears a nullable parameter for this pricing request.
    * `market_history` - a `MarketHistory` object (base date, window and daily
    * risk-factor shifts) required by historical risk metrics such as `"hvar"` and
    * `"expected_shortfall"`. Omitted prices without history.
@@ -8397,6 +8400,9 @@ export interface ValuationsInstrumentsNamespace {
    * (`{}` preserves them), supplied `bump_config` fields merge into the stored
    * object, and an explicit `null` clears a nullable field to its Rust fallback.
    * Omitted keeps the envelope configuration.
+   * `instrument_pricing_overrides` - a patch for instrument-owned market quotes
+   * and model parameters. Omitted fields keep their stored values, and an
+   * explicit `null` clears a nullable parameter for this pricing request.
    * `market_history` - a `MarketHistory` object (base date, window and daily
    * risk-factor shifts) required by historical risk metrics such as `"hvar"` and
    * `"expected_shortfall"`. Omitted prices without history.

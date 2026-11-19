@@ -21462,6 +21462,12 @@ export interface PriceExtras {
    */
   explain?: boolean;
   /**
+   * Call-time JSON object patch for instrument-owned market quotes and model
+   * controls. Only supplied fields replace stored values. Setting a nullable
+   * leaf to null clears it, while omitted leaves keep their original values.
+   */
+  instrument_pricing_overrides?: InstrumentPricingOverrides | null;
+  /**
    * Historical market scenarios for the historical risk metrics (`hvar`,
    * `expected_shortfall`). `None` prices without history; requesting
    * those metrics then fails.

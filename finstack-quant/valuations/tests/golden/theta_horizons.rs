@@ -185,7 +185,7 @@ fn registry_cases() -> Vec<Case> {
 }
 
 fn price(case: &Case, metrics: &[String], overrides: Option<&str>) -> Result<Option<f64>, String> {
-    let instrument = parse_boxed_instrument_from_json(&case.instrument, overrides)
+    let instrument = parse_boxed_instrument_from_json(&case.instrument, overrides, None)
         .map_err(|e| format!("parse: {e}"))?;
     let result = price_instrument(
         &instrument,
