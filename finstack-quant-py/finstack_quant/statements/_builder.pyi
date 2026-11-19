@@ -370,6 +370,35 @@ class ModelBuilder:
         """
         ...
 
+    def currency(self, currency: Currency | str) -> ModelBuilder:
+        """Set the statement model currency used by statement analytics.
+
+        Parameters
+        ----------
+        currency : Currency | str
+            Currency handle or ISO 4217 code for the model's amounts.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder, for fluent construction.
+
+        Raises
+        ------
+        ValueError
+            If the currency code is invalid or the builder has been consumed.
+        TypeError
+            If the value is neither a currency handle nor a string.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> builder = ModelBuilder("income").currency("USD")
+        >>> builder is builder.currency("EUR")
+        True
+        """
+        ...
+
     def with_meta(self, key: str, value: Any) -> ModelBuilder:
         """
         Add model-level metadata from a Python value.

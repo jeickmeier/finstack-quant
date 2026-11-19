@@ -376,6 +376,17 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.currency")]
+    #[pyo3(text_signature = "($self, currency)")]
+    fn currency<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        currency: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let currency = extract_currency(currency)?;
+        slf.builder_mut()?.currency(currency);
+        Ok(slf)
+    }
+
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.with_meta")]
     #[pyo3(text_signature = "($self, key, value)")]
     fn with_meta<'py>(

@@ -955,6 +955,16 @@ impl ModelBuilder {
         self
     }
 
+    /// Set the authored currency of the statement model.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency used by statement analytics when interpreting
+    ///   model amounts. Separate from the capital structure reporting currency.
+    pub fn currency(&mut self, currency: finstack_quant_core::currency::Currency) -> &mut Self {
+        self.with_meta("currency", serde_json::Value::String(currency.to_string()))
+    }
+
     /// Attach a where clause to a named node.
     ///
     /// The where clause is a scalar predicate evaluated before the node's

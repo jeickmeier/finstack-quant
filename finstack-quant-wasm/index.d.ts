@@ -11853,6 +11853,7 @@ export interface PortfolioNamespace {
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Scenario specification JSON.
    * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
+   * @param options - Optional portfolio valuation options as an object or JSON. Omit for strict risk with standard metrics.
    *
    * Each position's `valuation_result` matches what `priceInstrument` returns:
    * the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain

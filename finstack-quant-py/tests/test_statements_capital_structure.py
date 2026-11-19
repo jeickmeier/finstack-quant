@@ -242,12 +242,14 @@ class TestModelBuilderCapitalStructure:
 
     def test_reporting_currency_and_fx_policy(self) -> None:
         b = statements.ModelBuilder("deal")
+        assert b.currency("EUR") is b
         b.reporting_currency("USD")
         b.fx_policy("period_end")
         b.periods("2025Q1..Q1", None)
         b.value("x", [("2025Q1", 1.0)])
         b.add_debt("T", _debt_envelope_json("T"))
         js = b.build().to_json()
+        assert json.loads(js)["meta"]["currency"] == "EUR"
         assert '"reporting_currency":"USD"' in js
         assert '"fx_policy":"period_end"' in js
 

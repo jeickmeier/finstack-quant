@@ -453,6 +453,19 @@ impl JsModelBuilder {
         Ok(())
     }
 
+    /// Set the authored statement model currency used by statement analytics.
+    ///
+    /// @param currency - ISO 4217 currency code for the model's amounts.
+    /// @throws Error with kind `validation` for an invalid currency code or if the builder was consumed.
+    pub fn currency(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    ) -> Result<(), JsValue> {
+        let currency = crate::utils::input::js_currency(&currency, "currency")?;
+        self.builder_mut()?.currency(currency);
+        Ok(())
+    }
+
     /// Add model-level metadata.
     ///
     /// Twin of Python `ModelBuilder.with_meta` (Rust `ModelBuilder::with_meta`).

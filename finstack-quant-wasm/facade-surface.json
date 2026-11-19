@@ -4005,6 +4005,7 @@
       "availabilityDates",
       "build",
       "compute",
+      "currency",
       "forecast",
       "free",
       "fxPolicy",
