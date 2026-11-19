@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 import json
 import pickle
 
@@ -16,11 +17,13 @@ from finstack_quant.statements_analytics import (
     SensitivityConfig,
     Stage,
     StagingConfig,
+    WaccInputs,
     backtest_forecast,
     classify_stage,
     evaluate_dcf,
     generate_tornado_entries,
     run_sensitivity,
+    wacc,
 )
 
 
@@ -265,3 +268,20 @@ def test_failed_rent_roll_does_not_publish_partial_lease_nodes() -> None:
     assert model.has_node("existing")
     assert model.has_node("first.effective_rent")
     assert not model.has_node("missing.effective_rent")
+
+
+def test_wacc_requires_exact_complementary_weights() -> None:
+    equity = Decimal("0.6000000000000000000000000001")
+    debt = "0.3999999999999999999999999999"
+    inputs = WaccInputs(equity_weight=equity, cost_of_equity=0.115, debt_weight=debt, cost_of_debt=0.06, tax_rate=0.25)
+    assert inputs.equity_weight == equity
+    assert inputs.debt_weight == Decimal(debt)
+    assert WaccInputs.from_json(inputs.to_json()) == inputs
+    assert wacc(inputs) == pytest.approx(0.087)
+
+    with pytest.raises(TypeError, match="exact decimal"):
+        WaccInputs(equity_weight=0.6, cost_of_equity=0.115, debt_weight=debt, cost_of_debt=0.06, tax_rate=0.25)
+    with pytest.raises(ValueError, match="summing exactly"):
+        wacc(
+            WaccInputs(equity_weight=equity, cost_of_equity=0.115, debt_weight="0.4", cost_of_debt=0.06, tax_rate=0.25)
+        )

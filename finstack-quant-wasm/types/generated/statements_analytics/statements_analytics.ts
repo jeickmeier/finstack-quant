@@ -5113,12 +5113,12 @@ export interface WaccInputs {
    * Debt share of total capital as a decimal fraction (`0.4` means 40%
    * debt-funded); non-negative, and sums with `equity_weight` to `1.0`.
    */
-  debt_weight: number;
+  debt_weight: DecimalWire;
   /**
    * Equity share of total capital as a decimal fraction (`0.6` means 60%
    * equity-funded); non-negative.
    */
-  equity_weight: number;
+  equity_weight: DecimalWire;
   /**
    * Marginal corporate tax rate as a decimal fraction in `[0, 1]` (`0.25`
    * means `25%`).

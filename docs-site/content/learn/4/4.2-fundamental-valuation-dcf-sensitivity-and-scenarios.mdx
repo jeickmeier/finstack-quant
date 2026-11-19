@@ -100,7 +100,7 @@ valuation_builder.compute("ebitda_usd","ebitda * usd_unit")
 valuation_builder.compute("total_debt","debt_end * usd_unit").compute("cash","cash_end * usd_unit")
 valuation_model = valuation_builder.build()
 valuation_results = Evaluator().evaluate(valuation_model)
-cost_of_capital = wacc(WaccInputs(equity_weight=0.65,cost_of_equity=0.12,debt_weight=0.35,cost_of_debt=0.075,tax_rate=0.25))
+cost_of_capital = wacc(WaccInputs(equity_weight="0.65",cost_of_equity=0.12,debt_weight="0.35",cost_of_debt=0.075,tax_rate=0.25))
 terminal_growth = 0.025
 terminal = TerminalValueSpec.gordon_growth(terminal_growth)
 base_dcf = evaluate_dcf(

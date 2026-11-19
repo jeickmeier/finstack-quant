@@ -2373,8 +2373,8 @@
           }
         ],
         "returns": "number",
-        "declaration": "/**\n * Weighted-average cost of capital (WACC).\n *\n * `WACC = w_E * r_E + w_D * r_D * (1 - T)`.\n *\n * # Errors\n *\n * Rejects malformed inputs, any non-finite value, negative capital weights,\n * weights that do not sum to one within tolerance, or a `tax_rate` outside\n * `[0, 1]`.\n * @param inputs - `WaccInputs` object or JSON text: `equity_weight` and `debt_weight` (decimal fractions of total capital summing to 1.0), `cost_of_equity` and pre-tax `cost_of_debt` (decimals, `0.06` = 6%) and `tax_rate` (decimal in [0, 1]).\n * @returns The blended discount rate as a decimal fraction.\n */\nexport function wacc(inputs: generated.statements_analytics.WaccInputs | string): number;",
-        "sha256": "1ab93a531b3ee128d17bf8fca72055e4c4a62a9cc280983dcbd8ffb1cf2f4ca7"
+        "declaration": "/**\n * Compute weighted-average cost of capital (WACC) using exact capital weights.\n *\n * The costs of equity and debt are annual effective rates above -100%. The\n * debt cost is multiplied by `1 - tax_rate` before weighting.\n * @param inputs - Capital weights as exact decimal strings summing to one, annual effective equity and pre-tax debt costs as decimal numbers, and a marginal tax rate in [0, 1].\n * @returns The finite blended annual effective rate as a decimal.\n * @throws TypeError if the object contains a non-JSON value. FinstackError for malformed structured inputs, inexact capital allocation, invalid effective rates or tax domain, or unrepresentable output.\n */\nexport function wacc(inputs: generated.statements_analytics.WaccInputs | string): number;",
+        "sha256": "9acfe5f18ab2ee6857af67b7f025b2b43eb531d164e69e42b12c097b118cb58d"
       }
     },
     {

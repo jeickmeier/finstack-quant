@@ -301,7 +301,7 @@ export interface PlSummaryReportRequest {
 /** Rust TerminalValueSpec as the facade takes it: Gordon growth, exit multiple or H-model. */
 export type TerminalValueSpec =
   statementsAnalyticsWire.DcfInputs["terminal_value"];
-/** Rust WaccInputs: both capital weights, both costs and the tax rate, each a decimal; Rust rejects weights that do not sum to one. */
+/** Rust WaccInputs: exact decimal text for capital weights and decimal numbers for annual effective costs and the tax rate. Rust checks that the weights sum exactly to one. */
 export type WaccRequest = statementsAnalyticsWire.WaccInputs;
 /** DCF assumptions for one statement model; an omitted optional argument stays unset so Rust applies its default. */
 export interface DcfSensitivityRequest {

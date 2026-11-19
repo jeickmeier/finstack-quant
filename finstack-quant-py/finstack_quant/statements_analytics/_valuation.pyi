@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/statements_analytics/valuation.rs``."""
 
 from __future__ import annotations
+from decimal import Decimal
 
 from collections.abc import Mapping
 from typing import Any
@@ -1663,12 +1664,14 @@ def run_corporate_analysis(
     """
 
 class WaccInputs:
-    """Capital-structure inputs of a WACC calculation, all decimals.
+    """Capital-structure inputs with exact capital weights and annual effective costs.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import WaccInputs
-    >>> inputs = WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25)
+    >>> inputs = WaccInputs(
+    ...     equity_weight="0.6", cost_of_equity=0.10, debt_weight="0.4", cost_of_debt=0.05, tax_rate=0.25
+    ... )
     >>> WaccInputs.from_json(inputs.to_json()) == inputs
     True
     """
@@ -1676,9 +1679,9 @@ class WaccInputs:
     def __init__(
         self,
         *,
-        equity_weight: float,
+        equity_weight: Decimal | str | int,
         cost_of_equity: float,
-        debt_weight: float,
+        debt_weight: Decimal | str | int,
         cost_of_debt: float,
         tax_rate: float,
     ) -> None:
@@ -1686,11 +1689,11 @@ class WaccInputs:
 
         Parameters
         ----------
-        equity_weight : float
+        equity_weight : Decimal or str or int
             Equity share of total capital as a decimal fraction; non-negative.
         cost_of_equity : float
             Required return on equity in decimal form (``0.115`` = 11.5%).
-        debt_weight : float
+        debt_weight : Decimal or str or int
             Debt share of total capital as a decimal fraction; non-negative and
             summing with ``equity_weight`` to ``1.0``.
         cost_of_debt : float
@@ -1698,21 +1701,24 @@ class WaccInputs:
         tax_rate : float
             Marginal corporate tax rate as a decimal in ``[0, 1]``.
 
-        Notes
-        -----
-        This constructor does not raise; :func:`wacc` validates the inputs.
+        Raises
+        ------
+        TypeError
+            If either capital weight is not supplied as an exact decimal.
+        ValueError
+            If either weight cannot be represented exactly.
         """
 
     @property
-    def equity_weight(self) -> float:
+    def equity_weight(self) -> Decimal:
         """Equity share of total capital as a decimal fraction.
 
         This property does not raise.
 
         Returns
         -------
-        float
-            The equity weight.
+        Decimal
+            The exact equity weight.
         """
 
     @property
@@ -1728,15 +1734,15 @@ class WaccInputs:
         """
 
     @property
-    def debt_weight(self) -> float:
+    def debt_weight(self) -> Decimal:
         """Debt share of total capital as a decimal fraction.
 
         This property does not raise.
 
         Returns
         -------
-        float
-            The debt weight.
+        Decimal
+            The exact debt weight.
         """
 
     @property
@@ -1785,9 +1791,9 @@ class WaccInputs:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import WaccInputs
-        >>> text = '{"equity_weight": 1.0, "cost_of_equity": 0.1, "debt_weight": 0.0, "cost_of_debt": 0.05, "tax_rate": 0.25}'
-        >>> WaccInputs.from_json(text).equity_weight
-        1.0
+        >>> text = '{"equity_weight": "1", "cost_of_equity": 0.1, "debt_weight": "0", "cost_of_debt": 0.05, "tax_rate": 0.25}'
+        >>> str(WaccInputs.from_json(text).equity_weight)
+        '1'
         """
 
     def to_json(self) -> str:
@@ -1812,7 +1818,8 @@ def wacc(inputs: WaccInputs) -> float:
     Parameters
     ----------
     inputs : WaccInputs
-        Capital weights, cost of equity, pre-tax cost of debt and tax rate.
+        Exact nonnegative market-value weights summing to one, annual effective
+        equity and pre-tax debt costs above -100%, and a tax rate in [0, 1].
 
     Returns
     -------
@@ -1822,13 +1829,16 @@ def wacc(inputs: WaccInputs) -> float:
     Raises
     ------
     ValueError
-        If an input is not finite, a weight is negative, the weights do not
-        sum to ``1.0``, or the tax rate is outside ``[0, 1]``.
+        If weights are negative or fail to sum exactly to one, an annual
+        effective cost or the result is nonfinite or at or below -100%,
+        or the tax rate falls outside ``[0, 1]``.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import WaccInputs, wacc
-    >>> inputs = WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25)
+    >>> inputs = WaccInputs(
+    ...     equity_weight="0.6", cost_of_equity=0.10, debt_weight="0.4", cost_of_debt=0.05, tax_rate=0.25
+    ... )
     >>> round(wacc(inputs), 4)
     0.075
     """

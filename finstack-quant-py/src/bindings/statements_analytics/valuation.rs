@@ -1187,27 +1187,7 @@ fn evaluate_lbo<'py>(
     Ok(PyLboResult { inner })
 }
 
-/// Capital-structure inputs of a WACC calculation, all decimals.
-///
-/// Parameters
-/// ----------
-/// equity_weight : float
-///     Equity share of total capital as a decimal fraction; non-negative.
-/// cost_of_equity : float
-///     Required return on equity in decimal form (``0.115`` = 11.5%).
-/// debt_weight : float
-///     Debt share of total capital as a decimal fraction; non-negative and
-///     summing with ``equity_weight`` to ``1.0``.
-/// cost_of_debt : float
-///     Pre-tax marginal borrowing yield in decimal form.
-/// tax_rate : float
-///     Marginal corporate tax rate as a decimal in ``[0, 1]``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements_analytics import WaccInputs
-/// >>> WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25).tax_rate
-/// 0.25
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs")]
 #[pyclass(
     name = "WaccInputs",
     module = "finstack_quant.statements_analytics",
@@ -1222,51 +1202,62 @@ pub struct PyWaccInputs {
 
 #[pymethods]
 impl PyWaccInputs {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.__init__")]
     #[new]
     #[pyo3(signature = (*, equity_weight, cost_of_equity, debt_weight, cost_of_debt, tax_rate))]
     fn new(
-        equity_weight: f64,
+        equity_weight: &Bound<'_, PyAny>,
         cost_of_equity: f64,
-        debt_weight: f64,
+        debt_weight: &Bound<'_, PyAny>,
         cost_of_debt: f64,
         tax_rate: f64,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        Ok(Self {
             inner: WaccInputs {
-                equity_weight,
+                equity_weight: finstack_quant_core::wire::DecimalWire(
+                    crate::bindings::core::money::extract_exact_decimal(
+                        equity_weight,
+                        "equity_weight must be an exact decimal",
+                    )?,
+                ),
                 cost_of_equity,
-                debt_weight,
+                debt_weight: finstack_quant_core::wire::DecimalWire(
+                    crate::bindings::core::money::extract_exact_decimal(
+                        debt_weight,
+                        "debt_weight must be an exact decimal",
+                    )?,
+                ),
                 cost_of_debt,
                 tax_rate,
             },
-        }
+        })
     }
 
-    /// Equity share of total capital as a decimal fraction.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.equity_weight")]
     #[getter]
-    fn equity_weight(&self) -> f64 {
-        self.inner.equity_weight
+    fn equity_weight<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::core::money::decimal_to_py(py, self.inner.equity_weight.0)
     }
 
-    /// Required return on equity as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.cost_of_equity")]
     #[getter]
     fn cost_of_equity(&self) -> f64 {
         self.inner.cost_of_equity
     }
 
-    /// Debt share of total capital as a decimal fraction.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.debt_weight")]
     #[getter]
-    fn debt_weight(&self) -> f64 {
-        self.inner.debt_weight
+    fn debt_weight<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::core::money::decimal_to_py(py, self.inner.debt_weight.0)
     }
 
-    /// Pre-tax cost of debt as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.cost_of_debt")]
     #[getter]
     fn cost_of_debt(&self) -> f64 {
         self.inner.cost_of_debt
     }
 
-    /// Marginal corporate tax rate as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.tax_rate")]
     #[getter]
     fn tax_rate(&self) -> f64 {
         self.inner.tax_rate
@@ -1279,32 +1270,7 @@ impl PyWaccInputs {
 
 wire_methods!(PyWaccInputs, WaccInputs, "WaccInputs");
 
-/// Weighted-average cost of capital (WACC).
-///
-/// ``WACC = w_E * r_E + w_D * r_D * (1 - T)``.
-///
-/// Parameters
-/// ----------
-/// inputs : WaccInputs
-///     Capital weights, cost of equity, pre-tax cost of debt and tax rate.
-///
-/// Returns
-/// -------
-/// float
-///     Blended discount rate as a decimal fraction.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If an input is not finite, a weight is negative, the weights do not
-///     sum to ``1.0``, or the tax rate is outside ``[0, 1]``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements_analytics import WaccInputs, wacc
-/// >>> inputs = WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25)
-/// >>> round(wacc(inputs), 4)
-/// 0.075
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "wacc")]
 #[pyfunction]
 #[pyo3(signature = (inputs))]
 fn wacc(inputs: PyWaccInputs) -> PyResult<f64> {

@@ -479,7 +479,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/wacc_inputs.schema.json",
-      "bytes": 1505,
+      "bytes": 2039,
       "kind": "input",
       "path": "schemas/statements_analytics/1/wacc_inputs.schema.json",
       "summary": "Capital-structure inputs of a weighted-average cost of capital calculation.",

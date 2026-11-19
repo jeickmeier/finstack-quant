@@ -12,6 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_core::wire::DecimalWire;
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{FinancialModelSpec, NodeValueType};
 use finstack_quant_statements::{Error, Result};
@@ -19,6 +20,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     DiscountedCashFlow, EquityBridge, TerminalValueSpec, ValuationDiscounts,
 };
+use rust_decimal::{Decimal, prelude::ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 /// Corporate valuation result containing DCF outputs.
@@ -720,13 +722,6 @@ pub fn dcf_sensitivity(
     })
 }
 
-/// Tolerance applied when checking that the capital weights sum to one.
-///
-/// Weights normally arrive from a division of market values, so exact
-/// summation to `1.0` cannot be assumed; 1e-6 is tight enough to reject a
-/// genuine mis-specification (a stray 1% weight) while absorbing rounding.
-const WACC_WEIGHT_SUM_TOLERANCE: f64 = 1e-6;
-
 /// Capital-structure inputs of a [`wacc`] calculation.
 ///
 /// All rates follow the crate-wide decimal convention (`0.10` means `10%`);
@@ -737,13 +732,13 @@ const WACC_WEIGHT_SUM_TOLERANCE: f64 = 1e-6;
 pub struct WaccInputs {
     /// Equity share of total capital as a decimal fraction (`0.6` means 60%
     /// equity-funded); non-negative.
-    pub equity_weight: f64,
+    pub equity_weight: DecimalWire,
     /// Required return on equity in decimal form, typically from CAPM
     /// (`0.115` means `11.5%`).
     pub cost_of_equity: f64,
     /// Debt share of total capital as a decimal fraction (`0.4` means 40%
     /// debt-funded); non-negative, and sums with `equity_weight` to `1.0`.
-    pub debt_weight: f64,
+    pub debt_weight: DecimalWire,
     /// **Pre-tax** cost of debt in decimal form: the marginal borrowing yield
     /// before the tax shield (`0.06` means `6%`).
     pub cost_of_debt: f64,
@@ -779,21 +774,23 @@ pub struct WaccInputs {
 ///
 /// # Errors
 ///
-/// Returns an error if any input is not finite, if either weight is
-/// negative, if the weights do not sum to `1.0` within `1e-6`, or if
-/// `tax_rate` falls outside `[0, 1]`.
+/// Returns an error if a cost is nonfinite or at or below -100%, if either weight is
+/// negative, if the weights do not sum exactly to one, if
+/// `tax_rate` falls outside `[0, 1]`, or if the annual effective result
+/// is non-finite or at or below -100%.
 ///
 /// # Examples
 ///
 /// ```rust
+/// use finstack_quant_core::wire::DecimalWire;
 /// use finstack_quant_statements_analytics::analysis::{wacc, WaccInputs};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// // 60% equity at 11.5%, 40% debt at 6% pre-tax, 25% tax rate.
 /// let rate = wacc(&WaccInputs {
-///     equity_weight: 0.6,
+///     equity_weight: DecimalWire("0.6".parse()?),
 ///     cost_of_equity: 0.115,
-///     debt_weight: 0.4,
+///     debt_weight: DecimalWire("0.4".parse()?),
 ///     cost_of_debt: 0.06,
 ///     tax_rate: 0.25,
 /// })?;
@@ -814,49 +811,47 @@ pub struct WaccInputs {
 ///   Managing the Value of Companies* (7th ed.). Wiley. Ch. 13. `docs/REFERENCES.md#koller-valuation`
 pub fn wacc(inputs: &WaccInputs) -> Result<f64> {
     let WaccInputs {
-        equity_weight,
+        equity_weight: DecimalWire(equity),
         cost_of_equity,
-        debt_weight,
+        debt_weight: DecimalWire(debt),
         cost_of_debt,
         tax_rate,
     } = *inputs;
-    for (name, value) in [
-        ("equity_weight", equity_weight),
-        ("cost_of_equity", cost_of_equity),
-        ("debt_weight", debt_weight),
-        ("cost_of_debt", cost_of_debt),
-        ("tax_rate", tax_rate),
-    ] {
-        if !value.is_finite() {
-            return Err(finstack_quant_statements::Error::Eval(format!(
-                "WACC requires a finite '{name}', got {value}"
-            )));
-        }
+    let invalid = |message: &str| finstack_quant_statements::Error::Eval(message.into());
+    if equity < Decimal::ZERO || debt < Decimal::ZERO {
+        return Err(invalid("WACC requires non-negative capital weights"));
     }
-
-    if equity_weight < 0.0 || debt_weight < 0.0 {
-        return Err(finstack_quant_statements::Error::Eval(format!(
-            "WACC requires non-negative capital weights, got equity_weight={equity_weight:.6} \
-             and debt_weight={debt_weight:.6}"
-        )));
+    // With equity held between zero and one, the complement is exact within
+    // Decimal's complete scale. Addition could round a sum back to one.
+    if equity > Decimal::ONE || debt != Decimal::ONE - equity {
+        return Err(invalid(
+            "WACC requires capital weights summing exactly to one",
+        ));
     }
-
-    let weight_sum = equity_weight + debt_weight;
-    if (weight_sum - 1.0).abs() > WACC_WEIGHT_SUM_TOLERANCE {
-        return Err(finstack_quant_statements::Error::Eval(format!(
-            "WACC requires capital weights summing to 1.0 within {WACC_WEIGHT_SUM_TOLERANCE:e}, \
-             got equity_weight={equity_weight:.6} + debt_weight={debt_weight:.6} = \
-             {weight_sum:.6}"
-        )));
+    if [cost_of_equity, cost_of_debt]
+        .into_iter()
+        .any(|rate| !rate.is_finite() || rate <= -1.0)
+    {
+        return Err(invalid(
+            "WACC component costs must be finite annual effective rates above -100%",
+        ));
     }
-
     if !(0.0..=1.0).contains(&tax_rate) {
-        return Err(finstack_quant_statements::Error::Eval(format!(
-            "WACC requires a tax_rate in [0, 1] (decimal form), got {tax_rate:.6}"
-        )));
+        return Err(invalid("WACC requires a finite tax_rate in [0, 1]"));
     }
-
-    Ok(equity_weight * cost_of_equity + debt_weight * cost_of_debt * (1.0 - tax_rate))
+    let equity = equity
+        .to_f64()
+        .ok_or_else(|| invalid("WACC equity weight cannot be represented"))?;
+    let debt = debt
+        .to_f64()
+        .ok_or_else(|| invalid("WACC debt weight cannot be represented"))?;
+    let rate = equity * cost_of_equity + (debt * (1.0 - tax_rate)) * cost_of_debt;
+    if !rate.is_finite() || rate <= -1.0 {
+        return Err(invalid(
+            "WACC result cannot be represented as a finite effective rate above -100%",
+        ));
+    }
+    Ok(rate)
 }
 
 pub(crate) fn evaluate_dcf_from_results_impl(
@@ -1717,16 +1712,16 @@ mod tests {
     }
 
     fn inputs(
-        equity_weight: f64,
+        equity_weight: &str,
         cost_of_equity: f64,
-        debt_weight: f64,
+        debt_weight: &str,
         cost_of_debt: f64,
         tax_rate: f64,
     ) -> WaccInputs {
         WaccInputs {
-            equity_weight,
+            equity_weight: DecimalWire(equity_weight.parse().expect("equity fraction")),
             cost_of_equity,
-            debt_weight,
+            debt_weight: DecimalWire(debt_weight.parse().expect("debt fraction")),
             cost_of_debt,
             tax_rate,
         }
@@ -1735,36 +1730,61 @@ mod tests {
     #[test]
     fn wacc_blends_equity_and_after_tax_debt() {
         // 0.6 * 0.115 + 0.4 * 0.06 * 0.75 = 0.069 + 0.018 = 0.087
-        let rate = wacc(&inputs(0.6, 0.115, 0.4, 0.06, 0.25)).expect("valid inputs");
+        let rate = wacc(&inputs("0.6", 0.115, "0.4", 0.06, 0.25)).expect("valid inputs");
         assert!((rate - 0.087).abs() < 1e-12, "{rate}");
 
         // An all-equity firm prices at the cost of equity.
-        let unlevered = wacc(&inputs(1.0, 0.115, 0.0, 0.06, 0.25)).expect("valid inputs");
+        let unlevered = wacc(&inputs("1.0", 0.115, "0.0", 0.06, 0.25)).expect("valid inputs");
         assert!((unlevered - 0.115).abs() < 1e-12, "{unlevered}");
 
         // A zero tax rate removes the shield.
-        let untaxed = wacc(&inputs(0.6, 0.115, 0.4, 0.06, 0.0)).expect("valid inputs");
+        let untaxed = wacc(&inputs("0.6", 0.115, "0.4", 0.06, 0.0)).expect("valid inputs");
         assert!((untaxed - 0.093).abs() < 1e-12, "{untaxed}");
     }
 
     #[test]
     fn wacc_rejects_invalid_weights_and_rates() {
         assert!(
-            wacc(&inputs(0.6, 0.115, 0.3, 0.06, 0.25)).is_err(),
+            wacc(&inputs("0.6", 0.115, "0.3", 0.06, 0.25)).is_err(),
             "weights must sum to 1"
         );
         assert!(
-            wacc(&inputs(1.2, 0.115, -0.2, 0.06, 0.25)).is_err(),
+            wacc(&inputs("1.2", 0.115, "-0.2", 0.06, 0.25)).is_err(),
             "weights must be non-negative"
         );
         assert!(
-            wacc(&inputs(0.6, 0.115, 0.4, 0.06, 1.5)).is_err(),
+            wacc(&inputs("0.6", 0.115, "0.4", 0.06, 1.5)).is_err(),
             "tax rate must be in [0, 1]"
         );
         assert!(
-            wacc(&inputs(f64::NAN, 0.115, 0.4, 0.06, 0.25)).is_err(),
+            wacc(&inputs("0.6", f64::NAN, "0.4", 0.06, 0.25)).is_err(),
             "inputs must be finite"
         );
+    }
+
+    #[test]
+    fn wacc_checks_exact_complements_and_component_cost_domains() {
+        assert!(
+            wacc(&inputs(
+                "0.6000000000000000000000000001",
+                0.115,
+                "0.4",
+                0.06,
+                0.25
+            ))
+            .is_err()
+        );
+        assert!(
+            wacc(&inputs(
+                "0.6000000000000000000000000001",
+                0.115,
+                "0.3999999999999999999999999999",
+                0.06,
+                0.25
+            ))
+            .is_ok()
+        );
+        assert!(wacc(&inputs("1", 0.1, "0", -1.0, 0.25)).is_err());
     }
 
     fn exit_multiple_model() -> FinancialModelSpec {

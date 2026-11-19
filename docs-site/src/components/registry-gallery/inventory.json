@@ -1972,7 +1972,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/wacc/cases.json",
-      "sha256": "bbafcdd8be7910fbfa1677cfe92bf5cabdcb33b36abe11c105706ee9b45d1986"
+      "sha256": "dc2376a53a53fdf7f266eff3efbdb2b9101c0a4a214f3ffd9e866378665b22a4"
     },
     {
       "path": "finstack-quant-ui/tests/statements/normalization/cases.json",

@@ -1231,7 +1231,7 @@
       "type": "registry:hook",
       "title": "useWacc",
       "description": "Blends capital weights, costs and a tax rate into a WACC through the WASM worker.",
-      "docs": "Native statements_analytics.wacc of a Rust WaccInputs wire value (five decimals). Keyed by the complete immutable request and worker session, with a NaN from an empty field kept distinct from null; null disables the query. A rejection (weights that do not sum to one, a tax rate out of range, a non-finite input) is the hook error, unchanged.",
+      "docs": "Native statements_analytics.wacc of a Rust WaccInputs wire value (two exact decimal weights and three numeric rates). Keyed by the complete immutable request and worker session, with a NaN from an empty field kept distinct from null; null disables the query. A rejection (weights that do not sum to one, a tax rate out of range, a non-finite input) is the hook error, unchanged.",
       "files": [
         {
           "path": "hooks/use-wacc/use-wacc.ts",

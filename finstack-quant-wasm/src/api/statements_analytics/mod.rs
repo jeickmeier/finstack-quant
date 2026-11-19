@@ -407,17 +407,13 @@ pub fn evaluate_lbo(
     to_js_value(&result)
 }
 
-/// Weighted-average cost of capital (WACC).
+/// Compute weighted-average cost of capital (WACC) using exact capital weights.
 ///
-/// `WACC = w_E * r_E + w_D * r_D * (1 - T)`.
-///
-/// # Errors
-///
-/// Rejects malformed inputs, any non-finite value, negative capital weights,
-/// weights that do not sum to one within tolerance, or a `tax_rate` outside
-/// `[0, 1]`.
-/// @param inputs - `WaccInputs` object or JSON text: `equity_weight` and `debt_weight` (decimal fractions of total capital summing to 1.0), `cost_of_equity` and pre-tax `cost_of_debt` (decimals, `0.06` = 6%) and `tax_rate` (decimal in [0, 1]).
-/// @returns The blended discount rate as a decimal fraction.
+/// The costs of equity and debt are annual effective rates above -100%. The
+/// debt cost is multiplied by `1 - tax_rate` before weighting.
+/// @param inputs - Capital weights as exact decimal strings summing to one, annual effective equity and pre-tax debt costs as decimal numbers, and a marginal tax rate in [0, 1].
+/// @returns The finite blended annual effective rate as a decimal.
+/// @throws TypeError if the object contains a non-JSON value. FinstackError for malformed structured inputs, inexact capital allocation, invalid effective rates or tax domain, or unrepresentable output.
 #[wasm_bindgen(js_name = wacc)]
 pub fn wacc(
     #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.WaccInputs | string")]

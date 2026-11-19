@@ -2447,6 +2447,7 @@ types = { Adjustment = "Adjustment", AppliedAdjustment = "AppliedAdjustment", Ca
 [parity.modules."finstack_quant.statements.schema"]
 js = "statements.schema"
 
+# WACC capital weights use DecimalWire in WASM and exact decimals in Python.
 [parity.modules."finstack_quant.statements_analytics"]
 js = "statements_analytics"
 renames = { PLSummaryReport = { js = "statements_analytics.plSummaryReport", reason = "the Rust PLSummaryReport borrows the statement result, so it is not a WASM handle; plSummaryReport returns its to_table TableEnvelope and plSummaryReportText its text rendering" } }

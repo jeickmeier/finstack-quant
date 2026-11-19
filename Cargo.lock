@@ -1024,6 +1024,7 @@ dependencies = [
  "finstack-quant-valuations",
  "indexmap",
  "jsonschema",
+ "rust_decimal",
  "schemars",
  "serde",
  "serde_json",

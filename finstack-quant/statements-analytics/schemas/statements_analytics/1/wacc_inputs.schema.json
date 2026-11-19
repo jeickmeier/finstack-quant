@@ -1,4 +1,11 @@
 {
+  "$defs": {
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    }
+  },
   "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/wacc_inputs.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -15,14 +22,12 @@
       "type": "number"
     },
     "debt_weight": {
-      "description": "Debt share of total capital as a decimal fraction (`0.4` means 40%\ndebt-funded); non-negative, and sums with `equity_weight` to `1.0`.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/DecimalWire",
+      "description": "Debt share of total capital as a decimal fraction (`0.4` means 40%\ndebt-funded); non-negative, and sums with `equity_weight` to `1.0`."
     },
     "equity_weight": {
-      "description": "Equity share of total capital as a decimal fraction (`0.6` means 60%\nequity-funded); non-negative.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/DecimalWire",
+      "description": "Equity share of total capital as a decimal fraction (`0.6` means 60%\nequity-funded); non-negative."
     },
     "tax_rate": {
       "description": "Marginal corporate tax rate as a decimal fraction in `[0, 1]` (`0.25`\nmeans `25%`).",
