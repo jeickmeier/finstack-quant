@@ -531,3 +531,29 @@ test('IRS accrual flags use typed independent fields', () => {
   assert.equal(built.adjustFixedAccrualDates, false);
   assert.equal(built.adjustFloatAccrualDates, true);
 });
+
+test('Deposit builds and reprices with an exact contractual rate', () => {
+  const { Deposit, priceInstrument } = valuations.instruments;
+  const usd = new core.Currency('USD');
+  const market = new core.MarketContext();
+  market.insert(core.DiscountCurve.flat('USD-OIS', '2025-01-15', 0.05, 'act_365f'));
+  const deposit = Deposit.builder()
+    .id('DEP')
+    .notional(new core.Money(1_000_000, usd))
+    .startDate('2025-01-15')
+    .maturity('2025-04-15')
+    .dayCount('act_360')
+    .fixedRate('0.050500123456789123')
+    .discountCurveId('USD-OIS')
+    .build();
+  assert.equal(deposit.fixedRate, '0.050500123456789123');
+  const serialized = deposit.toJson();
+  assert.equal(Deposit.fromJson(serialized).fixedRate, deposit.fixedRate);
+  assert.deepEqual(
+    deposit.price(market.toJson(), '2025-01-15'),
+    priceInstrument(serialized, market.toJson(), '2025-01-15')
+  );
+  const moved = deposit.toBuilder().maturity('2025-07-15').build();
+  assert.equal(moved.maturity, '2025-07-15');
+  assert.equal(deposit.maturity, '2025-04-15');
+});

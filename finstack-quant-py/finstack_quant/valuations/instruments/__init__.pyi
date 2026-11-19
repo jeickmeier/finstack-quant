@@ -55,6 +55,7 @@ from finstack_quant.valuations.instruments._typed_legs import (
     PremiumLegSpec as PremiumLegSpec,
     ProtectionLegSpec as ProtectionLegSpec,
 )
+from finstack_quant.valuations.instruments._typed_deposit import Deposit as Deposit, DepositBuilder as DepositBuilder
 from finstack_quant.valuations.instruments._typed_rates import (
     CapFloor as CapFloor,
     CapFloorBuilder as CapFloorBuilder,
@@ -216,6 +217,8 @@ __all__ = [
     "BalloonSpec",
     "BorrowingBaseRules",
     "ConcentrationLimit",
+    "Deposit",
+    "DepositBuilder",
     "EligibilityRule",
     "EnhancedMonteCarloResult",
     "FacilityProjection",

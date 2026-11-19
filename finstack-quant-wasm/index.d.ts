@@ -8827,6 +8827,8 @@ export interface ValuationsInstrumentsNamespace {
    * @returns Typed `TrancheMetrics` object (PV, clean/dirty price, accrued, WAL, yield, z-spread, CS01, effective duration and convexity, requested registry metrics).
    */
   readonly trancheMetrics: typeof wasm.trancheMetrics;
+  readonly Deposit: typeof wasm.Deposit;
+  readonly DepositBuilder: typeof wasm.DepositBuilder;
   readonly InterestRateSwap: typeof wasm.InterestRateSwap;
   readonly Swaption: typeof wasm.Swaption;
   readonly CapFloor: typeof wasm.CapFloor;

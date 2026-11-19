@@ -4554,6 +4554,8 @@
       "ConvertibleBondBuilder",
       "CreditDefaultSwap",
       "CreditDefaultSwapBuilder",
+      "Deposit",
+      "DepositBuilder",
       "EquityOption",
       "EquityOptionBuilder",
       "FxBarrierOption",
@@ -4925,6 +4927,52 @@
   },
   "valuations.instruments.trancheMetrics": {
     "kind": "function"
+  },
+  "valuations.instruments.Deposit": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "businessDayConvention",
+      "calendarId",
+      "dayCount",
+      "defaultModel",
+      "discountCurveId",
+      "expiry",
+      "fixedRate",
+      "id",
+      "instrumentPricingOverrides",
+      "maturity",
+      "metricPricingOverrides",
+      "notional",
+      "scenarioPricingOverrides",
+      "startDate"
+    ]
+  },
+  "valuations.instruments.DepositBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "businessDayConvention",
+      "calendarId",
+      "dayCount",
+      "discountCurveId",
+      "fixedRate",
+      "free",
+      "id",
+      "instrumentPricingOverrides",
+      "maturity",
+      "metricPricingOverrides",
+      "notional",
+      "scenarioPricingOverrides",
+      "startDate"
+    ],
+    "getters": []
   },
   "valuations.instruments.InterestRateSwap": {
     "kind": "class",

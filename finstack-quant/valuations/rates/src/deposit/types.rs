@@ -129,6 +129,24 @@ pub struct Deposit {
 }
 
 impl Deposit {
+    /// Create a new builder retaining all terms, attributes and pricing overrides.
+    pub fn to_builder(&self) -> DepositBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .notional(self.notional)
+            .start_date(self.start_date)
+            .maturity(self.maturity)
+            .day_count(self.day_count)
+            .fixed_rate_opt(self.fixed_rate)
+            .discount_curve_id(self.discount_curve_id.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+            .attributes(self.attributes.clone())
+            .business_day_convention(self.business_day_convention)
+            .calendar_id_opt(self.calendar_id.clone())
+    }
+
     /// Create a canonical example deposit for testing and documentation.
     ///
     /// Returns a 6-month USD deposit with 4.5% quoted rate accruing from its

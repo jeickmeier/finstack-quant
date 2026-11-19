@@ -7,6 +7,163 @@ use crate::utils::to_js_err;
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
+use finstack_quant_valuations::instruments::rates::deposit::{Deposit, DepositBuilder};
+
+instrument_class!(
+    /// Fixed-rate deposit with explicit contractual accrual dates.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const deposit = valuations.instruments.Deposit.example();
+    /// console.log(deposit.fixedRate);
+    /// deposit.free();
+    /// ```
+    JsDeposit, "Deposit", Deposit
+);
+instrument_surface!(
+    JsDeposit,
+    "Deposit",
+    JsDepositBuilder,
+    "generated.valuations.Deposit"
+);
+
+factories!(JsDeposit, "Deposit", Deposit, {
+    /// Construct the canonical six-month USD deposit fixture.
+    /// @returns A USD 100,000 deposit at a 4.5 percent simple rate.
+    /// @throws Error - Throws if the crate's fixture does not validate.
+    example as example,
+});
+
+getters!(JsDeposit, "Deposit", |i| {
+    /// Contractual principal.
+    /// @returns Currency-tagged principal.
+    notional as notional: "Money" => money(i.notional),
+    /// Contractual interest accrual start.
+    /// @returns ISO-8601 date before any calendar adjustment.
+    start_date as startDate: "string" => date(i.start_date),
+    /// Effective maturity under the deposit's business-day convention.
+    /// @returns Adjusted maturity as an ISO-8601 date, or null if it cannot be resolved.
+    expiry as expiry: "string | null" => opt_date(Instrument::expiry(i)),
+    /// Contractual maturity.
+    /// @returns ISO-8601 date before any calendar adjustment.
+    maturity as maturity: "string" => date(i.maturity),
+    /// Interest accrual day-count convention.
+    /// @returns Day-count handle governing the interest year fraction.
+    day_count as dayCount: "DayCount" => day_count(i.day_count),
+    /// Business-day adjustment convention.
+    /// @returns Wire label such as modified_following.
+    business_day_convention as businessDayConvention: "NonNullable<generated.valuations.Deposit['business_day_convention']>" => json(i.business_day_convention),
+    /// Calendar used for business-day adjustment.
+    /// @returns The registered calendar identifier, or null for unadjusted dates.
+    calendar_id as calendarId: "string | null" => opt_text(i.calendar_id),
+    /// Annualized simple contractual rate.
+    /// @returns Exact decimal text (0.045 corresponds to 4.5 percent), or null when unset.
+    fixed_rate as fixedRate: "string | null" => opt_text(i.fixed_rate),
+    /// Discount curve identifier.
+    /// @returns Market identifier used for discounting and par-rate retrieval.
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
+    /// Canonical pricing model key used by the deposit.
+    /// @returns Registered model identifier.
+    default_model as defaultModel: "string" => text(Instrument::default_model(i)),
+});
+common_getters!(JsDeposit, "Deposit");
+
+#[wasm_bindgen(js_class = Deposit)]
+impl JsDeposit {
+    /// Copy the deposit into a new editable builder.
+    /// @returns A builder retaining exact rates, dates, conventions, attributes and pricing overrides.
+    #[wasm_bindgen(js_name = toBuilder)]
+    pub fn to_builder(&self) -> JsDepositBuilder {
+        JsDepositBuilder {
+            inner: super::Staged::new(self.inner.to_builder()),
+        }
+    }
+}
+
+builder_class!(
+    /// Fluent authoring of money-market deposit terms.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core, valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const builder = valuations.instruments.Deposit.builder().id("DEP");
+    /// const usd = new core.Currency("USD");
+    /// const notional = new core.Money(100_000, usd);
+    /// const configured = builder.notional(notional);
+    /// configured.free();
+    /// notional.free();
+    /// usd.free();
+    /// builder.free();
+    /// ```
+    JsDepositBuilder, "DepositBuilder", DepositBuilder, JsDeposit, |b| b.build()
+);
+
+setters!(JsDepositBuilder, "DepositBuilder", {
+    /// Set the deposit id.
+    /// @param value - Unique deposit identifier.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    id as id: "string" => id,
+    /// Set the deposit start date.
+    /// @param value - Interest accrual start as an ISO-8601 date.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    start_date as startDate: "string" => js_date,
+    /// Set the deposit maturity.
+    /// @param value - Contractual maturity as an ISO-8601 date.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    maturity as maturity: "string" => js_date,
+    /// Set the deposit day count.
+    /// @param value - Explicit day-count convention as its wire label.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    day_count as dayCount: "generated.valuations.Deposit['day_count']" => js_wire,
+    /// Set the deposit discount curve id.
+    /// @param value - Discount curve identifier looked up at pricing time.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    discount_curve_id as discountCurveId: "string" => id,
+    /// Set the deposit business day convention.
+    /// @param value - Business-day adjustment convention. Omit the setter for modified following.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    business_day_convention as businessDayConvention: "NonNullable<generated.valuations.Deposit['business_day_convention']>" => js_wire,
+    /// Set the deposit calendar id.
+    /// @param value - Registered holiday calendar identifier.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    calendar_id as calendarId: "string" => id,
+});
+common_setters!(JsDepositBuilder, "DepositBuilder");
+handle_setters!(JsDepositBuilder, "DepositBuilder", {
+    /// Set the deposit principal.
+    /// @param value - Positive, currency-tagged principal.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws if the builder has already been consumed.
+    notional as notional => JsMoney,
+});
+
+#[wasm_bindgen(js_class = DepositBuilder)]
+impl JsDepositBuilder {
+    /// Set the exact annualized simple rate.
+    /// @param value - Decimal string, such as "0.045" for 4.5 percent. Cash flow generation requires a rate.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped or invalid decimal or a consumed builder.
+    #[wasm_bindgen(js_name = fixedRate)]
+    pub fn fixed_rate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
+    ) -> Result<JsDepositBuilder, JsValue> {
+        let rate = crate::utils::wire::js_decimal(&value, "value")?.0;
+        let inner = self.inner.apply(|builder| builder.fixed_rate(rate))?;
+        Ok(Self { inner })
+    }
+}
+
 instrument_class!(
     /// Typed wrapper for the Rust `InterestRateSwap` instrument (fixed-for-floating swap).
     ///

@@ -42,6 +42,8 @@ export const instruments = {
   trancheOas: wasm.trancheOas,
   trancheScenarioTable: wasm.trancheScenarioTable,
   trancheMetrics: wasm.trancheMetrics,
+  Deposit: wasm.Deposit,
+  DepositBuilder: wasm.DepositBuilder,
   InterestRateSwap: wasm.InterestRateSwap,
   Swaption: wasm.Swaption,
   CapFloor: wasm.CapFloor,

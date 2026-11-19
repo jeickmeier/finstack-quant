@@ -33,6 +33,7 @@ from finstack_quant.valuations.instruments import (
     BondBuilder,
     CapFloor,
     CapFloorBuilder,
+    Deposit,
     FixedLegSpec,
     FloatLegSpec,
     InterestRateSwap,
@@ -809,3 +810,31 @@ def test_bond_builder_quoted_price_drives_ytm_like_the_wire_field() -> None:
     ytm_plain = plain.price(market, AS_OF, metrics=["ytm"]).metrics["ytm"]
     assert ytm_quoted == ytm_wire
     assert abs(ytm_quoted - ytm_plain) > 1e-4
+
+
+def test_deposit_builder_retains_exact_rate_and_matches_wire_pricing() -> None:
+    rate = Decimal("0.050500123456789123")
+    deposit = (
+        Deposit
+        .builder()
+        .id("DEP")
+        .notional(Money(1_000_000, "USD"))
+        .start_date("2025-01-15")
+        .maturity("2025-04-15")
+        .day_count("act_360")
+        .fixed_rate(rate)
+        .discount_curve_id("USD-OIS")
+        .build()
+    )
+    assert deposit.fixed_rate == rate
+    assert Deposit.from_json(deposit.to_json()).fixed_rate == rate
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-15", 0.05, day_count="act_365f"))
+    direct = deposit.price(market, "2025-01-15", metrics=["dv01"])
+    wire = price_instrument(deposit.to_json(), market, "2025-01-15", metrics=["dv01"])
+    assert direct.value == wire.value
+    assert direct.metrics == wire.metrics
+
+    moved = deposit.to_builder().maturity("2025-07-15").build()
+    assert moved.maturity.isoformat() == "2025-07-15"
+    assert moved.fixed_rate == rate
+    assert deposit.maturity.isoformat() == "2025-04-15"
