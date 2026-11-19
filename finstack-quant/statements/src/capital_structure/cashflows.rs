@@ -397,8 +397,12 @@ pub struct PrepaymentOutcome {
     /// Cash paid at par: the request limited by the cash the earlier
     /// priorities left and by the eligible principal net of reserves.
     pub paid: Money,
-    /// `requested - paid`. It is reported, not carried as arrears.
+    /// `requested - paid`.
     pub unpaid: Money,
+    /// The part of `unpaid` carried as arrears into the next period: all of
+    /// it for a sweep with a dated payment obligation, zero otherwise (an
+    /// unpaid amount without one is reported, not carried).
+    pub carried: Money,
 }
 
 /// Field names of [`CashflowBreakdown::audit_detail`], in the same order.

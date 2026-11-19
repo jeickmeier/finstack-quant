@@ -338,6 +338,7 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
                     instrument_id,
                     pik_fraction: rust_decimal::Decimal::ONE,
                     min_coupon_periods: 0,
+                    notice_days: 0,
                 })
                 .collect(),
         }),
@@ -497,6 +498,7 @@ fn ecf_sweep() -> EcfSweepSpec {
         credits: Vec::new(),
         sweep_percentage: 0.5,
         facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL".into()]),
+        payment_lag_days: None,
     }
 }
 

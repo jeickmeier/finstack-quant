@@ -39,6 +39,11 @@ pub(crate) struct CapitalStructureState {
     /// period evaluated again changes nothing.
     pub(crate) coupon_elections: IndexMap<String, Vec<CouponElection>>,
 
+    /// Dated sweep obligations not yet paid in full, oldest first: the due
+    /// date of each and what remains of it. An obligation whose due date has
+    /// passed is arrears.
+    pub(crate) sweep_obligations: Vec<(finstack_quant_core::dates::Date, Money)>,
+
     /// Unpaid interest/fee shortfall per instrument from the prior period's
     /// available-cash cap. Carried forward as a claim in the next period's
     /// interest category and re-recorded if it remains unpaid.

@@ -1317,6 +1317,18 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: dated sweeps with arrears, PIK notice periods
+
+- `EcfSweepSpec.payment_lag_days` (optional) makes the measured sweep a dated
+  obligation due that many days after the close of the measured period. It
+  is paid in the period that contains its due date, oldest first, and what
+  cannot be paid is carried as arrears. `PrepaymentOutcome` gains `carried`:
+  the part of `unpaid` carried forward (zero without a lag, as before)
+  (STATEMENTS-CAPITAL-007).
+- `PikElectionSpec.notice_days` (default 0): an election takes effect at the
+  first coupon period starting at least that many days after the close of
+  the period that observed the metric (STATEMENTS-CAPITAL-008).
+
 ### Statements capital: contractual PIK toggles count in the forecast exercise
 
 - A PIK toggle recorded on a term loan (`covenants.pik_toggles`) that is in

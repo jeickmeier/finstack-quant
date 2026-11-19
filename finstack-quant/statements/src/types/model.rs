@@ -1454,6 +1454,7 @@ mod period_timeline_tests {
                 credits: Vec::new(),
                 sweep_percentage: 0.5,
                 facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                payment_lag_days: None,
             }),
             ..default_waterfall
         });
@@ -1575,6 +1576,7 @@ mod period_timeline_tests {
                         instrument_id: target.into(),
                         pik_fraction: rust_decimal::Decimal::ONE,
                         min_coupon_periods: 0,
+                        notice_days: 0,
                     }],
                 }),
                 ..WaterfallSpec::default()

@@ -5191,6 +5191,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FacilitySelection"
   },
   {
+    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/payment_lag_days",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/payment_lag_days",
+    "description": "Days from the close of the measured period to the date the sweep is\ndue. When set, the amount measured in a period is a dated obligation:\nit is paid in the period that contains its due date, and what cash or\neligible principal cannot pay is carried as arrears and paid first at\nthe next sweep. `0` is due at the close of the measured period. When\nomitted the sweep is paid in the period it is measured and an unpaid\namount is reported, not carried.",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/sweep_percentage",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/sweep_percentage",
     "description": "Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).",
@@ -7532,6 +7539,14 @@ export default [
     "default": 0,
     "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. With `0` a request for cash before\nthe election starts withdraws it; with `1` an election, once made,\ncovers its first coupon period.",
     "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_b19f3a94967e48a6e9b7/properties/notice_days",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikElectionSpec/properties/notice_days",
+    "default": 0,
+    "description": "Days of notice an election needs: it takes effect at the first coupon\nperiod that starts at least this many days after the close of the\nperiod that observed the metric. `0` is the next coupon period.",
+    "format": "uint32",
     "minimum": 0
   },
   {

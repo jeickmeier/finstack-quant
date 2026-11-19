@@ -125,6 +125,7 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
                     facilities: crate::capital_structure::FacilitySelection::Named(vec![
                         INSTRUMENT.into(),
                     ]),
+                    payment_lag_days: None,
                 }),
                 ..Default::default()
             });
@@ -649,6 +650,7 @@ fn pik_toggle(fraction: Decimal, min_coupon_periods: usize) -> WaterfallSpec {
                 instrument_id: INSTRUMENT.into(),
                 pik_fraction: fraction,
                 min_coupon_periods,
+                notice_days: 0,
             }],
         }),
         ..Default::default()
@@ -1108,6 +1110,91 @@ fn a_contractual_toggle_in_force_is_ended_by_a_recovered_metric() {
     assert_close(two[0], 2.0);
     assert_close(two[1], 2.04);
     assert_close(two[2], 0.0);
+}
+
+/// An election needs its notice: with 60 days, a request observed at the
+/// 31 March close cannot start the 1 April coupon period and starts the
+/// 1 July one.
+#[test]
+fn a_pik_election_waits_for_its_notice_period() {
+    let run = |notice_days: u32| {
+        let mut waterfall = pik_toggle(Decimal::ONE, 0);
+        waterfall.pik_toggle.as_mut().expect("toggle").elections[0].notice_days = notice_days;
+        let result = evaluate_2025(
+            "2025Q1..2025Q4",
+            FinancialStatementInstrument::TermLoan(quarterly_loan()),
+            waterfall,
+            0.0,
+            &[("liquidity", 10.0)],
+        )
+        .expect("evaluation");
+        ["2025Q3", "2025Q4"]
+            .map(|period| component(&result, "interest_expense_pik", INSTRUMENT, period))
+    };
+    // No notice: the April to June coupon capitalizes on 1 July.
+    let none = run(0);
+    assert_close(none[0], 2.0);
+    // Sixty days: that coupon stays cash and the next one capitalizes.
+    let sixty = run(60);
+    assert_close(sixty[0], 0.0);
+    assert_close(sixty[1], 2.0);
+}
+
+/// A sweep with a payment lag is a dated obligation: 20 measured in the
+/// first quarter is due 45 days after its close, in the second quarter,
+/// where 10 of cash is left after interest. 10 is paid, 10 is carried as
+/// arrears and paid first in the third quarter.
+#[test]
+fn a_lagged_sweep_is_paid_when_due_and_its_arrears_are_carried() {
+    let waterfall = WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+            PaymentPriority::Equity,
+        ],
+        ecf_sweep: Some(EcfSweepSpec {
+            cash_measure: "request".into(),
+            deductions: Vec::new(),
+            credits: Vec::new(),
+            sweep_percentage: 0.5,
+            facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            payment_lag_days: Some(45),
+        }),
+        ..Default::default()
+    };
+    let result = evaluate_2025_with(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(quarterly_loan()),
+        waterfall,
+        // The second quarter has 12 of cash: 2 of interest and 10 for the
+        // sweep.
+        &|index| if index == 1 { 12.0 } else { 1_000.0 },
+        &|index| if index == 0 { 40.0 } else { 0.0 },
+        &[],
+        &MarketContext::new(),
+    )
+    .expect("evaluation");
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    let sweep = |period: &str| {
+        let id: PeriodId = period.parse().expect("period");
+        let outcome = &cashflows.prepayments[&id][0];
+        [
+            outcome.requested.amount(),
+            outcome.paid.amount(),
+            outcome.unpaid.amount(),
+            outcome.carried.amount(),
+        ]
+    };
+    assert_eq!(sweep("2025Q1"), [0.0, 0.0, 0.0, 0.0]);
+    assert_eq!(sweep("2025Q2"), [20.0, 10.0, 10.0, 10.0]);
+    assert_eq!(sweep("2025Q3"), [10.0, 10.0, 0.0, 0.0]);
+    assert_eq!(sweep("2025Q4"), [0.0, 0.0, 0.0, 0.0]);
+    let balance = |period: &str| component(&result, "debt_balance", INSTRUMENT, period);
+    assert_close(balance("2025Q1"), 100.0);
+    assert_close(balance("2025Q2"), 90.0);
+    assert_close(balance("2025Q3"), 80.0);
 }
 
 // Capital-state orchestration and period snapshots (STATEMENTS-EVALUATION-012)

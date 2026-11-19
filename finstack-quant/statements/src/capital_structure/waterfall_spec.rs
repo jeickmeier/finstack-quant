@@ -541,6 +541,16 @@ pub struct EcfSweepSpec {
 
     /// The facilities the sweep may repay.
     pub facilities: FacilitySelection,
+
+    /// Days from the close of the measured period to the date the sweep is
+    /// due. When set, the amount measured in a period is a dated obligation:
+    /// it is paid in the period that contains its due date, and what cash or
+    /// eligible principal cannot pay is carried as arrears and paid first at
+    /// the next sweep. `0` is due at the close of the measured period. When
+    /// omitted the sweep is paid in the period it is measured and an unpaid
+    /// amount is reported, not carried.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_lag_days: Option<u32>,
 }
 
 impl EcfSweepSpec {
@@ -689,6 +699,12 @@ pub struct PikElectionSpec {
     )]
     pub pik_fraction: rust_decimal::Decimal,
 
+    /// Days of notice an election needs: it takes effect at the first coupon
+    /// period that starts at least this many days after the close of the
+    /// period that observed the metric. `0` is the next coupon period.
+    #[serde(default)]
+    pub notice_days: u32,
+
     /// Minimum number of consecutive coupon periods a PIK election lasts,
     /// counting the first elected period. With `0` a request for cash before
     /// the election starts withdraws it; with `1` an election, once made,
@@ -785,6 +801,7 @@ mod tests {
             credits: Vec::new(),
             sweep_percentage: percentage,
             facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            payment_lag_days: None,
         }
     }
 
@@ -877,6 +894,7 @@ mod tests {
             instrument_id: id.into(),
             pik_fraction: fraction,
             min_coupon_periods: 0,
+            notice_days: 0,
         }
     }
 

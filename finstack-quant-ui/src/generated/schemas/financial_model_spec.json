@@ -4917,6 +4917,15 @@
           "$ref": "#/$defs/d_14e07e1641eb164f0229",
           "description": "The facilities the sweep may repay."
         },
+        "payment_lag_days": {
+          "description": "Days from the close of the measured period to the date the sweep is\ndue. When set, the amount measured in a period is a dated obligation:\nit is paid in the period that contains its due date, and what cash or\neligible principal cannot pay is carried as arrears and paid first at\nthe next sweep. `0` is due at the close of the measured period. When\nomitted the sweep is paid in the period it is measured and an unpaid\namount is reported, not carried.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "sweep_percentage": {
           "description": "Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).",
           "format": "double",
@@ -7204,6 +7213,13 @@
           "default": 0,
           "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. With `0` a request for cash before\nthe election starts withdraws it; with `1` an election, once made,\ncovers its first coupon period.",
           "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "notice_days": {
+          "default": 0,
+          "description": "Days of notice an election needs: it takes effect at the first coupon\nperiod that starts at least this many days after the close of the\nperiod that observed the metric. `0` is the next coupon period.",
+          "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },

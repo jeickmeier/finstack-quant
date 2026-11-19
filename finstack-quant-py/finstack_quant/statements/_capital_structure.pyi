@@ -44,6 +44,7 @@ class EcfSweepSpec:
         facilities: str | Mapping[str, list[str]],
         deductions: list[Mapping[str, str]] = ...,
         credits: list[Mapping[str, str]] = ...,
+        payment_lag_days: int | None = None,
     ) -> None:
         """
         Configure an excess-cash-flow debt sweep from its canonical fields.
@@ -72,6 +73,14 @@ class EcfSweepSpec:
         credits : list[Mapping[str, str]], default []
             Terms added to the cash measure, in the same form. No expression
             may depend on a same-period ``cs`` component.
+        payment_lag_days : int or None, default None
+            Days from the close of the measured period to the date the sweep
+            is due. When set, the measured amount is a dated obligation: it
+            is paid in the period that contains its due date, and what cannot
+            be paid is carried as arrears and paid first at the next sweep.
+            ``0`` is due at the close of the measured period. ``None`` pays
+            the sweep in the period it is measured and reports, without
+            carrying, an unpaid amount.
 
         Raises
         ------
@@ -195,6 +204,23 @@ class EcfSweepSpec:
         ...
 
     @property
+    def payment_lag_days(self) -> int | None:
+        """
+        Days from the close of the measured period to the sweep's due date.
+
+        Returns
+        -------
+        int | None
+            The lag in calendar days, or ``None`` when the sweep is paid in
+            the period it is measured and an unpaid amount is not carried.
+
+        Notes
+        -----
+        This property does not raise.
+        """
+        ...
+
+    @property
     def facilities(self) -> str | dict[str, list[str]]:
         """
         The facilities the sweep may repay.
@@ -279,10 +305,15 @@ class PikToggleSpec:
             PIK, a metric at or above it requests the base coupon terms.
         elections : list[Mapping[str, Any]]
             One entry per term loan authorized to elect PIK:
-            ``{"instrument_id": str, "pik_fraction": str, "min_coupon_periods": int}``.
+            ``{"instrument_id": str, "pik_fraction": str, "notice_days": int,
+            "min_coupon_periods": int}``.
             ``pik_fraction`` is the share of each elected coupon that
             capitalizes, an exact decimal string in ``(0, 1]`` (``"0.4"`` is
-            40% PIK and 60% cash, ``"1"`` is full PIK). ``min_coupon_periods``
+            40% PIK and 60% cash, ``"1"`` is full PIK). ``notice_days``
+            (default 0) is the notice an election needs: it takes effect at
+            the first coupon period starting at least that many days after
+            the close of the period that observed the metric.
+            ``min_coupon_periods``
             (default 0) is the minimum number of consecutive coupon periods an
             election lasts, counting the first, measured in the loan's coupon
             periods and not in reporting periods.
@@ -408,8 +439,8 @@ class PikToggleSpec:
         -------
         list[dict[str, Any]]
             ``instrument_id``, ``pik_fraction`` (an exact decimal string in
-            ``(0, 1]``) and ``min_coupon_periods`` (a count of the loan's
-            coupon periods) for each authorized term loan.
+            ``(0, 1]``), ``notice_days`` and ``min_coupon_periods`` (a count
+            of the loan's coupon periods) for each authorized term loan.
 
         Notes
         -----
@@ -964,10 +995,12 @@ class CapitalStructureCashflows:
         dict[str, list[dict[str, Any]]]
             Period id to the period's prepayments in priority order, each
             ``{"kind": "mandatory_prepayment" | "voluntary_prepayment" |
-            "sweep", "requested": money, "paid": money, "unpaid": money}``
-            with money as ``{"amount": ..., "currency": ...}``. ``paid`` is
-            the request limited by the cash left and the eligible principal
-            net of reserves; ``unpaid`` is reported and not carried forward.
+            "sweep", "requested": money, "paid": money, "unpaid": money,
+            "carried": money}`` with money as ``{"amount": ..., "currency":
+            ...}``. ``paid`` is the request limited by the cash left and the
+            eligible principal net of reserves; ``carried`` is the part of
+            ``unpaid`` carried as arrears: all of it for a sweep with
+            ``payment_lag_days``, zero otherwise.
             Empty unless a waterfall with a prepayment priority ran.
 
         Raises

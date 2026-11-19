@@ -61,12 +61,14 @@ payment quantum.
 
 The prepayment and ECF sweep contract governs agreement elections, eligible
 facilities, dated sizing and payment caps. The same-period contract is
-implemented and qualified; separately elected ECF dates remain open.
+implemented and qualified, with a dated payment lag and carried arrears; a
+separately elected principal-effective date remains open.
 [Accepted prepayment and ECF decision](07-prepayments-and-ecf.md#accepted-decision-for-agreement-defined-prepayments-and-ecf-sweeps).
 
 The PIK contract governs dated coupon elections, coupon-period duration,
 capitalization and separate arrears. The modeled forecast exercise is
-implemented and qualified; notice dates and amendments remain open.
+implemented and qualified, with notice periods; amendments, authorized
+capitalization of arrears and payoff terms remain open.
 [Accepted PIK decision](08-pik-and-carry-state.md#accepted-decision-for-contractual-pik-elections-and-carried-claims).
 
 The reporting contract covers native and consolidated views, explicit

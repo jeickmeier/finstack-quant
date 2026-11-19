@@ -128,6 +128,7 @@ fn test_ecf_sweep_basic() {
                 credits: Vec::new(),
                 sweep_percentage: 0.5,
                 facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                payment_lag_days: None,
             }),
             priority_of_payments: vec![
                 finstack_quant_statements::capital_structure::PaymentPriority::Fees,

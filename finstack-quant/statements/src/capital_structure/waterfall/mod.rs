@@ -480,15 +480,19 @@ pub(crate) fn execute_waterfall(
             .collect();
         let planned_fees: Vec<Money> = staged.iter().map(|s| s.breakdown.fees).collect();
         let mut paid = PaidAhead::zero(cash_currency);
-        let mut record = |kind: PaymentPriority, requested: Money, paid: Money| -> Result<()> {
-            prepayments.push(crate::capital_structure::PrepaymentOutcome {
-                kind,
-                requested,
-                paid,
-                unpaid: requested.checked_sub(paid)?,
-            });
-            Ok(())
-        };
+        let zero_cash = Money::from((0_i64, cash_currency));
+        let mut record =
+            |kind: PaymentPriority, requested: Money, paid: Money, carried: bool| -> Result<()> {
+                let unpaid = requested.checked_sub(paid)?;
+                prepayments.push(crate::capital_structure::PrepaymentOutcome {
+                    kind,
+                    requested,
+                    paid,
+                    unpaid,
+                    carried: if carried { unpaid } else { zero_cash },
+                });
+                Ok(())
+            };
         for priority in &waterfall_spec.priority_of_payments {
             match priority {
                 PaymentPriority::Fees => {
@@ -550,26 +554,78 @@ pub(crate) fn execute_waterfall(
                             &mut warnings,
                             |b| &mut b.mandatory_prepayment,
                         )?;
-                        record(*priority, requested, paid)?;
+                        record(*priority, requested, paid, false)?;
                     }
                 }
                 PaymentPriority::Sweep => {
                     if let Some(spec) = &waterfall_spec.ecf_sweep {
-                        let requested = calculate_ecf_sweep(
+                        let measured = calculate_ecf_sweep(
                             context,
                             spec,
                             &paid,
                             cash_currency,
                             &mut warnings,
                         )?;
+                        let Some(lag) = spec.payment_lag_days else {
+                            // Paid in the period it is measured; an unpaid
+                            // amount is reported, not carried.
+                            let swept = apply_prepayment(
+                                &mut staged,
+                                &mut remaining_cash,
+                                measured,
+                                &spec.facilities,
+                                |b| &mut b.sweep_prepayment,
+                            )?;
+                            record(*priority, measured, swept, false)?;
+                            continue;
+                        };
+                        // A dated obligation: due `lag` days after this
+                        // period's close, paid in the period that holds its
+                        // due date, oldest first, with arrears carried.
+                        let (_, period_end) = context
+                            .history
+                            .period_bounds(&context.period_id)
+                            .ok_or_else(|| {
+                                crate::error::Error::capital_structure(format!(
+                                    "a sweep with `payment_lag_days` needs the dates of period {}",
+                                    context.period_id
+                                ))
+                            })?;
+                        let close = period_end - time::Duration::days(1);
+                        if measured.amount_decimal() > rust_decimal::Decimal::ZERO {
+                            state
+                                .sweep_obligations
+                                .push((close + time::Duration::days(i64::from(lag)), measured));
+                        }
+                        let mut due = zero_cash;
+                        for (date, amount) in &state.sweep_obligations {
+                            if *date <= close {
+                                due = due.checked_add(*amount)?;
+                            }
+                        }
                         let swept = apply_prepayment(
                             &mut staged,
                             &mut remaining_cash,
-                            requested,
+                            due,
                             &spec.facilities,
                             |b| &mut b.sweep_prepayment,
                         )?;
-                        record(*priority, requested, swept)?;
+                        let mut left = swept;
+                        for (date, amount) in &mut state.sweep_obligations {
+                            if *date <= close {
+                                let settled = if left.amount_decimal() < amount.amount_decimal() {
+                                    left
+                                } else {
+                                    *amount
+                                };
+                                *amount = amount.checked_sub(settled)?;
+                                left = left.checked_sub(settled)?;
+                            }
+                        }
+                        state.sweep_obligations.retain(|(_, amount)| {
+                            amount.amount_decimal() > rust_decimal::Decimal::ZERO
+                        });
+                        record(*priority, due, swept, true)?;
                     }
                 }
                 PaymentPriority::VoluntaryPrepayment => {
@@ -582,7 +638,7 @@ pub(crate) fn execute_waterfall(
                             &mut warnings,
                             |b| &mut b.voluntary_prepayment,
                         )?;
-                        record(*priority, requested, paid)?;
+                        record(*priority, requested, paid, false)?;
                     }
                 }
                 PaymentPriority::Equity => {}
@@ -902,6 +958,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 0.5,
                 facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1294,6 +1351,7 @@ mod tests {
                     instrument_id: "TL-1".to_string(),
                     pik_fraction: rust_decimal::Decimal::ONE,
                     min_coupon_periods: 0,
+                    notice_days: 0,
                 }],
             }),
             ..Default::default()
@@ -1341,6 +1399,7 @@ mod tests {
                     instrument_id: "TL-1".to_string(),
                     pik_fraction: rust_decimal::Decimal::ONE,
                     min_coupon_periods: 0,
+                    notice_days: 0,
                 }],
             }),
             ..Default::default()
@@ -1389,6 +1448,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 0.5,
                 facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1436,6 +1496,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 0.5,
                 facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1504,6 +1565,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 0.5,
                 facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1694,6 +1756,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 1.0,
                 facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1754,6 +1817,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 0.5,
                 facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1810,6 +1874,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 0.5,
                 facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -2181,6 +2246,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 1.0,
                 facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -2256,6 +2322,7 @@ mod tests {
                 credits: Vec::new(),
                 sweep_percentage: 1.0,
                 facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+                payment_lag_days: None,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -2362,6 +2429,7 @@ mod tests {
                     instrument_id: "TL-1".into(),
                     pik_fraction: rust_decimal::Decimal::ONE,
                     min_coupon_periods: 3,
+                    notice_days: 0,
                 }],
             }),
             mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
@@ -2450,6 +2518,7 @@ mod tests {
                     instrument_id: "TL-1".into(),
                     pik_fraction: rust_decimal::Decimal::ONE,
                     min_coupon_periods: 0,
+                    notice_days: 0,
                 }],
             }),
             mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {

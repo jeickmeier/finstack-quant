@@ -5104,6 +5104,12 @@ export interface FxConversionRecord {
  */
 export interface PrepaymentOutcome {
   /**
+   * The part of `unpaid` carried as arrears into the next period: all of
+   * it for a sweep with a dated payment obligation, zero otherwise (an
+   * unpaid amount without one is reported, not carried).
+   */
+  carried: Money;
+  /**
    * The prepayment priority: mandatory prepayment, voluntary prepayment
    * or sweep.
    */
@@ -5119,7 +5125,7 @@ export interface PrepaymentOutcome {
    */
   requested: Money;
   /**
-   * `requested - paid`. It is reported, not carried as arrears.
+   * `requested - paid`.
    */
   unpaid: Money;
 }
@@ -7128,6 +7134,16 @@ export interface EcfSweepSpec {
    */
   facilities: FacilitySelection;
   /**
+   * Days from the close of the measured period to the date the sweep is
+   * due. When set, the amount measured in a period is a dated obligation:
+   * it is paid in the period that contains its due date, and what cash or
+   * eligible principal cannot pay is carried as arrears and paid first at
+   * the next sweep. `0` is due at the close of the measured period. When
+   * omitted the sweep is paid in the period it is measured and an unpaid
+   * amount is reported, not carried.
+   */
+  payment_lag_days?: number | null;
+  /**
    * Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).
    */
   sweep_percentage: number;
@@ -7217,6 +7233,12 @@ export interface PikElectionSpec {
    * covers its first coupon period.
    */
   min_coupon_periods?: number;
+  /**
+   * Days of notice an election needs: it takes effect at the first coupon
+   * period that starts at least this many days after the close of the
+   * period that observed the metric. `0` is the next coupon period.
+   */
+  notice_days?: number;
   /**
    * Share of each elected coupon that capitalizes, a decimal in `(0, 1]`
    * (`0.4` capitalizes 40% and pays 60% in cash; `1` is full PIK).

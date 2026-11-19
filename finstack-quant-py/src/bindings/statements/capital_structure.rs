@@ -40,7 +40,7 @@ impl PyEcfSweepSpec {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, cash_measure, sweep_percentage, facilities, deductions=[], credits=[])"
+        text_signature = "(*, cash_measure, sweep_percentage, facilities, deductions=[], credits=[], payment_lag_days=None)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         Ok(Self {
@@ -91,6 +91,12 @@ impl PyEcfSweepSpec {
     #[getter]
     fn sweep_percentage(&self) -> f64 {
         self.inner.sweep_percentage
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.payment_lag_days")]
+    #[getter]
+    fn payment_lag_days(&self) -> Option<u32> {
+        self.inner.payment_lag_days
     }
 
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.facilities")]

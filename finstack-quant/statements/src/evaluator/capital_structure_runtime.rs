@@ -309,7 +309,10 @@ fn settle_postings(
             // The election takes effect at the start of the next coupon
             // period; a loan with none left has nothing to elect.
             let starts = loan.coupon_period_starts()?;
-            let Some(effective) = starts.iter().copied().find(|start| *start >= period.end) else {
+            // Notice runs from the close of the period that observed the
+            // metric.
+            let earliest = period.end + time::Duration::days(i64::from(election.notice_days));
+            let Some(effective) = starts.iter().copied().find(|start| *start >= earliest) else {
                 continue;
             };
             let current = state
@@ -977,6 +980,7 @@ mod election_tests {
                 instrument_id: "TL".into(),
                 pik_fraction: rust_decimal::Decimal::ONE,
                 min_coupon_periods: 2,
+                notice_days: 0,
             }],
         };
         let market = MarketContext::new();

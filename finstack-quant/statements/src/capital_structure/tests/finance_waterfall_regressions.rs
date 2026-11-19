@@ -92,6 +92,7 @@ fn sweep(percentage: f64, target: Option<&str>) -> EcfSweepSpec {
             crate::capital_structure::FacilitySelection::AllEligible,
             |id| crate::capital_structure::FacilitySelection::Named(vec![id]),
         ),
+        payment_lag_days: None,
     }
 }
 
@@ -319,6 +320,7 @@ fn a_pik_request_leaves_the_current_coupon_and_its_arrears_in_cash() {
                     instrument_id: "loan".into(),
                     pik_fraction: rust_decimal::Decimal::ONE,
                     min_coupon_periods: 0,
+                    notice_days: 0,
                 }],
             }),
             ..Default::default()
@@ -1159,6 +1161,7 @@ fn elected_sweep(facilities: FacilitySelection) -> WaterfallSpec {
             credits: Vec::new(),
             sweep_percentage: 0.5,
             facilities,
+            payment_lag_days: None,
         }),
         ..Default::default()
     }
@@ -1208,6 +1211,7 @@ fn the_sweep_pays_the_least_of_its_request_the_cash_and_eligible_principal() {
             requested: usd(30),
             paid: usd(18),
             unpaid: usd(12),
+            carried: Money::from((0_i64, Currency::USD)),
         }]
     );
     assert_eq!(result.flows["loan"].sweep_prepayment, Some(usd(18)));
@@ -1307,6 +1311,7 @@ fn a_prepayment_repays_only_its_elected_facilities() {
             requested: usd(160),
             paid: usd(100),
             unpaid: usd(60),
+            carried: Money::from((0_i64, Currency::USD)),
         }
     );
     assert_eq!(capped.flows["term_loan"].debt_balance, usd(100));

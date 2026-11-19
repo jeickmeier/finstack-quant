@@ -117,6 +117,7 @@ fn levered_model(
             sweep_percentage: 0.5,
             facilities:
                 finstack_quant_statements::capital_structure::FacilitySelection::AllEligible,
+            payment_lag_days: None,
         }),
         available_cash_node: "cash".into(),
         ..Default::default()

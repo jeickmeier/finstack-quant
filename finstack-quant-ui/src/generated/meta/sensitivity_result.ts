@@ -73,6 +73,13 @@ export default [
     "description": "What one prepayment priority requested and paid in a period."
   },
   {
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/carried",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/carried",
+    "description": "The part of `unpaid` carried as arrears into the next period: all of\nit for a sweep with a dated payment obligation, zero otherwise (an\nunpaid amount without one is reported, not carried).",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
     "path": "#/$defs/d_048108bf9dc923c7b537/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/kind",
     "description": "The prepayment priority: mandatory prepayment, voluntary prepayment\nor sweep.",
@@ -96,7 +103,7 @@ export default [
   {
     "path": "#/$defs/d_048108bf9dc923c7b537/properties/unpaid",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/unpaid",
-    "description": "`requested - paid`. It is reported, not carried as arrears.",
+    "description": "`requested - paid`.",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },

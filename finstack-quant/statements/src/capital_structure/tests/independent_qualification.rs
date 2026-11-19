@@ -286,6 +286,7 @@ impl Agreement {
                 credits: vec![input("asset_sale")],
                 sweep_percentage: 0.5,
                 facilities: FacilitySelection::AllEligible,
+                payment_lag_days: None,
             }),
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
@@ -294,6 +295,7 @@ impl Agreement {
                     instrument_id: "TL-B".into(),
                     pik_fraction: Decimal::new(5, 1),
                     min_coupon_periods: 1,
+                    notice_days: 0,
                 }],
             }),
             ..Default::default()
