@@ -369,6 +369,14 @@ fn realized_variance_ohlc(
     .map_err(core_to_py)
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.math.stats", "expected_shortfall")]
+#[pyfunction]
+fn expected_shortfall(py: Python<'_>, data: &Bound<'_, PyAny>, confidence: f64) -> PyResult<f64> {
+    let data = extract_series(data)?;
+    py.detach(|| stats::expected_shortfall(&data, confidence))
+        .map_err(core_to_py)
+}
+
 /// Build the `finstack_quant.core.math.stats` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "stats")?;
@@ -379,6 +387,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(correlation, &m)?)?;
     m.add_function(wrap_pyfunction!(covariance, &m)?)?;
+    m.add_function(wrap_pyfunction!(expected_shortfall, &m)?)?;
     m.add_function(wrap_pyfunction!(finite_count, &m)?)?;
     m.add_function(wrap_pyfunction!(finite_max, &m)?)?;
     m.add_function(wrap_pyfunction!(finite_min, &m)?)?;
@@ -398,6 +407,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         [
             "correlation",
             "covariance",
+            "expected_shortfall",
             "finite_count",
             "finite_max",
             "finite_min",

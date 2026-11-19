@@ -1407,6 +1407,14 @@ export interface CoreNamespace {
    */
   readonly quantile: typeof wasm.quantile;
   /**
+   * Compute the signed mean of the worst fractional tail of a sample.
+   * @param data - Nonempty finite observations in any order, such as signed simple returns.
+   * @param confidence - Probability strictly between zero and one. The lower tail has mass `1 - confidence`.
+   * @returns Signed lower-tail mean in the observations' units.
+   * @throws `TypeError` for a mistyped argument or `FinstackError` for invalid confidence, empty or nonfinite data, or an unrepresentable result.
+   */
+  readonly expectedShortfall: typeof wasm.expectedShortfall;
+  /**
    * Annualized realized variance of a close price series (Rust
    * `stats::realized_variance`): the mean of squared log returns times the
    * annualization factor, with no mean subtraction.

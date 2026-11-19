@@ -315,6 +315,21 @@ pub fn quantile(
     stats::quantile(&mut data, q).map_err(to_js_err)
 }
 
+/// Compute the signed mean of the worst fractional tail of a sample.
+/// @param data - Nonempty finite observations in any order, such as signed simple returns.
+/// @param confidence - Probability strictly between zero and one. The lower tail has mass `1 - confidence`.
+/// @returns Signed lower-tail mean in the observations' units.
+/// @throws `TypeError` for a mistyped argument or `FinstackError` for invalid confidence, empty or nonfinite data, or an unrepresentable result.
+#[wasm_bindgen(js_name = expectedShortfall)]
+pub fn expected_shortfall(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
+) -> Result<f64, JsValue> {
+    let data = js_f64_seq(&data, "data")?;
+    let confidence = js_f64(&confidence, "confidence")?;
+    stats::expected_shortfall(&data, confidence).map_err(to_js_err)
+}
+
 /// Standard normal CDF Φ(x).
 /// @param x - Real-valued point at which to evaluate Φ; any finite or infinite `x` is accepted.
 /// @returns Cumulative probability in `[0, 1]`; the two infinities map to zero and one.

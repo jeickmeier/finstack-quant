@@ -962,3 +962,11 @@ test('hazard market restoration rejects a 10Y risk quote attached to the 5Y sour
   risk.pillar_time = 10;
   assert.throws(() => core.MarketContext.fromJson(JSON.stringify(state)));
 });
+
+test('expected shortfall weights the fractional boundary and leaves its sample unchanged', () => {
+  const data = new Float64Array([1.0, -4.0, -1.0, 2.0]);
+  assert.equal(core.expectedShortfall(data, 0.625), -3.0);
+  assert.deepEqual(Array.from(data), [1.0, -4.0, -1.0, 2.0]);
+  assert.throws(() => core.expectedShortfall([], 0.625), /nonempty/);
+  assert.throws(() => core.expectedShortfall(data, 1.0), /confidence/);
+});

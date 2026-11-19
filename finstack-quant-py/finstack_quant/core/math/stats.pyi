@@ -26,6 +26,7 @@ import numpy.typing as npt
 __all__ = [
     "correlation",
     "covariance",
+    "expected_shortfall",
     "finite_count",
     "finite_max",
     "finite_min",
@@ -559,6 +560,40 @@ def covariance(
     >>> from finstack_quant.core.math import stats
     >>> round(stats.covariance([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]) or 0.0, 10)
     2.0
+    """
+    ...
+
+def expected_shortfall(data: Sequence[float] | npt.NDArray[np.float64], confidence: float) -> float:
+    """Compute the signed mean of the worst fractional tail of a sample.
+
+    Parameters
+    ----------
+    data : Sequence[float] or numpy.ndarray
+        Nonempty one-dimensional finite observations, such as simple decimal
+        returns. Observations may be supplied in any order.
+    confidence : float
+        Confidence level strictly between zero and one. The lower tail has
+        exactly ``1 - confidence`` of the empirical probability mass.
+
+    Returns
+    -------
+    float
+        Signed lower-tail mean in the same units as the observations.
+
+    Raises
+    ------
+    TypeError
+        If the observations cannot be read as a one-dimensional numeric series.
+    ValueError
+        If the confidence is out of range, or the sample is empty or non-finite.
+    RuntimeError
+        If the result cannot be represented.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.math.stats import expected_shortfall
+    >>> round(expected_shortfall([1.0, -4.0, -1.0, 2.0], 0.625), 3)
+    -3.0
     """
     ...
 

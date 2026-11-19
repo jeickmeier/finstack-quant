@@ -206,6 +206,7 @@ print(risk_table.pivot(index="position",columns="metric",values="value").iloc[:,
 # differently weighted statistical portfolio from lesson 3.2.
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.analytics import Performance
+from finstack_quant.core.math.stats import expected_shortfall
 
 factor_names=["USD_zero_and_forward_decimal","EUR_zero_decimal","hazard_log_change",
               "equity_log_return","absolute_volatility_change","EURUSD_log_return",
@@ -284,7 +285,7 @@ bootstrap_risk=[]
 for _ in range(500):
     sample=bootstrap_rng.choice(scenario_returns,size=len(scenario_returns),replace=True)
     cutoff=np.quantile(sample,1-confidence,method="linear")
-    bootstrap_risk.append([-cutoff*combined_base,-sample[sample<=cutoff].mean()*combined_base])
+    bootstrap_risk.append([-cutoff*combined_base,-expected_shortfall(sample,confidence)*combined_base])
 bootstrap_interval=np.quantile(np.array(bootstrap_risk),[.025,.975],axis=0)
 tail_risk_table=pd.DataFrame([{"confidence":confidence,"scenario_count":504,
     "VaR_loss_USD":-q*combined_base,"ES_loss_USD":-tail*combined_base,
@@ -309,7 +310,7 @@ factor_risk_table.loc[len(factor_risk_table)]={"factor":"nonlinear_residual",
     "daily_return_variance_contribution":residual_variance}
 print(tail_risk_table.to_string(index=False));print(factor_risk_table.to_string(index=False))
 print({"factor_R_squared":fit.r_squared,"variance_reconciliation_error":contributions.sum()+residual_variance-total_variance})
-print("These are 504 invented one-day market shocks with no time roll, flows or carry; date labels only satisfy the time-series API. Full native repricing preserves option nonlinearity and reprices credit BBB once per scenario. The selected parallel/co-moving factors omit tenor shape, subcurve and issuer basis, volatility smile changes, correlation jumps, liquidity and default jumps. VaR/ES describe this scenario model, not a complete regulatory or empirically calibrated risk estimate. ES follows the library's closed lower-tail sample convention; loss signs are displayed as positive USD. The 500-resample percentile intervals diagnose finite-sample uncertainty under this empirical scenario distribution, not model uncertainty or a guaranteed coverage bound. Factor coefficients are fitted conditional loadings, not exact instrument Greeks; small irrelevant-factor estimates and negative covariance contributions can occur.")
+print("These are 504 invented one-day market shocks with no time roll, flows or carry; date labels only satisfy the time-series API. Full native repricing preserves option nonlinearity and reprices credit BBB once per scenario. The selected parallel/co-moving factors omit tenor shape, subcurve and issuer basis, volatility smile changes, correlation jumps, liquidity and default jumps. VaR/ES describe this scenario model, not a complete regulatory or empirically calibrated risk estimate. ES follows the same fractional empirical lower-tail convention in the estimate and bootstrap; loss signs are displayed as positive USD. The 500-resample percentile intervals diagnose finite-sample uncertainty under this empirical scenario distribution, not model uncertainty or a guaranteed coverage bound. Factor coefficients are fitted conditional loadings, not exact instrument Greeks; small irrelevant-factor estimates and negative covariance contributions can occur.")
 ```
 {/* /notebook-block */}
 
@@ -836,6 +837,7 @@ print(risk_table.pivot(index="position",columns="metric",values="value").iloc[:,
 # differently weighted statistical portfolio from lesson 3.2.
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.analytics import Performance
+from finstack_quant.core.math.stats import expected_shortfall
 
 factor_names=["USD_zero_and_forward_decimal","EUR_zero_decimal","hazard_log_change",
               "equity_log_return","absolute_volatility_change","EURUSD_log_return",
@@ -899,7 +901,7 @@ bootstrap_risk=[]
 for _ in range(500):
     sample=bootstrap_rng.choice(scenario_returns,size=len(scenario_returns),replace=True)
     cutoff=np.quantile(sample,1-confidence,method="linear")
-    bootstrap_risk.append([-cutoff*combined_base,-sample[sample<=cutoff].mean()*combined_base])
+    bootstrap_risk.append([-cutoff*combined_base,-expected_shortfall(sample,confidence)*combined_base])
 bootstrap_interval=np.quantile(np.array(bootstrap_risk),[.025,.975],axis=0)
 tail_risk_table=pd.DataFrame([{"confidence":confidence,"scenario_count":504,
     "VaR_loss_USD":-q*combined_base,"ES_loss_USD":-tail*combined_base,
@@ -924,7 +926,7 @@ factor_risk_table.loc[len(factor_risk_table)]={"factor":"nonlinear_residual",
     "daily_return_variance_contribution":residual_variance}
 print(tail_risk_table.to_string(index=False));print(factor_risk_table.to_string(index=False))
 print({"factor_R_squared":fit.r_squared,"variance_reconciliation_error":contributions.sum()+residual_variance-total_variance})
-print("These are 504 invented one-day market shocks with no time roll, flows or carry; date labels only satisfy the time-series API. Full native repricing preserves option and commodity nonlinearity. The selected parallel/co-moving factors omit tenor shape, subcurve and issuer basis, volatility smile changes, correlation jumps, liquidity and default jumps. VaR/ES describe this scenario model, not a complete regulatory or empirically calibrated risk estimate. ES follows the library's closed lower-tail sample convention; loss signs are displayed as positive USD. The 500-resample percentile intervals diagnose finite-sample uncertainty under this empirical scenario distribution, not model uncertainty or a guaranteed coverage bound. Factor coefficients are fitted conditional loadings, not exact instrument Greeks; small irrelevant-factor estimates and negative covariance contributions can occur.")
+print("These are 504 invented one-day market shocks with no time roll, flows or carry; date labels only satisfy the time-series API. Full native repricing preserves option and commodity nonlinearity. The selected parallel/co-moving factors omit tenor shape, subcurve and issuer basis, volatility smile changes, correlation jumps, liquidity and default jumps. VaR/ES describe this scenario model, not a complete regulatory or empirically calibrated risk estimate. ES follows the same fractional empirical lower-tail convention in the estimate and bootstrap; loss signs are displayed as positive USD. The 500-resample percentile intervals diagnose finite-sample uncertainty under this empirical scenario distribution, not model uncertainty or a guaranteed coverage bound. Factor coefficients are fitted conditional loadings, not exact instrument Greeks; small irrelevant-factor estimates and negative covariance contributions can occur.")
 ```
 {/* /notebook-block */}
 

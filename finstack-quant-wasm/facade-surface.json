@@ -749,6 +749,7 @@
       "daysSinceEpoch",
       "endOfMonth",
       "erf",
+      "expectedShortfall",
       "finiteCount",
       "finiteMax",
       "finiteMin",
@@ -1712,6 +1713,9 @@
     "kind": "function"
   },
   "core.quantile": {
+    "kind": "function"
+  },
+  "core.expectedShortfall": {
     "kind": "function"
   },
   "core.realizedVariance": {
