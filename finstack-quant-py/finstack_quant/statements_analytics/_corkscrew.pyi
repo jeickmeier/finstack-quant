@@ -15,7 +15,7 @@ class AccountType:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import AccountType
-    >>> AccountType.Asset.value()
+    >>> AccountType.Asset.value
     'asset'
 
     """
@@ -47,11 +47,12 @@ class AccountType:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import AccountType
-        >>> AccountType.from_str("liability").value()
+        >>> AccountType.from_str("liability").value
         'liability'
 
         """
         ...
+    @property
     def value(self) -> str:
         """
         Return the canonical snake-case identifier for this variant.
@@ -253,7 +254,7 @@ class CorkscrewAccount:
         --------
         >>> from finstack_quant.statements_analytics import AccountType, CorkscrewAccount
         >>> account = CorkscrewAccount("cash", AccountType.Asset, ["cash_change"])
-        >>> CorkscrewAccount.from_json(account.to_json()).account_type.value()
+        >>> CorkscrewAccount.from_json(account.to_json()).account_type.value
         'asset'
 
         """

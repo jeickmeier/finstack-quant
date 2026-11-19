@@ -251,6 +251,7 @@ impl PyLeaseGrowthConvention {
     }
 
     /// String identifier used in JSON (``"per_period"`` or ``"annual_escalator"``).
+    #[getter]
     fn value(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_label(self).map_err(crate::errors::core_to_py)
     }
@@ -538,6 +539,7 @@ impl PyManagementFeeBase {
     }
 
     /// String identifier used in JSON (``"egi"`` or ``"effective_rent"``).
+    #[getter]
     fn value(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_label(self).map_err(crate::errors::core_to_py)
     }

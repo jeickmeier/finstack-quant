@@ -460,7 +460,7 @@ class LeaseGrowthConvention:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import LeaseGrowthConvention
-    >>> LeaseGrowthConvention.PerPeriod.value()
+    >>> LeaseGrowthConvention.PerPeriod.value
     'per_period'
 
     """
@@ -491,11 +491,12 @@ class LeaseGrowthConvention:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import LeaseGrowthConvention
-        >>> LeaseGrowthConvention.from_str("annual_escalator").value()
+        >>> LeaseGrowthConvention.from_str("annual_escalator").value
         'annual_escalator'
 
         """
         ...
+    @property
     def value(self) -> str:
         """
         Return the canonical snake-case identifier for this variant.
@@ -552,7 +553,7 @@ class LeaseSpec:
     --------
     >>> from finstack_quant.statements_analytics import LeaseSpec
     >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0, end="2025Q4")
-    >>> (lease.node_id, lease.base_rent, lease.growth_convention.value())
+    >>> (lease.node_id, lease.base_rent, lease.growth_convention.value)
     ('lease_a', 100.0, 'annual_escalator')
 
     """
@@ -1028,7 +1029,7 @@ class ManagementFeeBase:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import ManagementFeeBase
-    >>> ManagementFeeBase.Egi.value()
+    >>> ManagementFeeBase.Egi.value
     'egi'
 
     """
@@ -1059,11 +1060,12 @@ class ManagementFeeBase:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import ManagementFeeBase
-        >>> ManagementFeeBase.from_str("effective_rent").value()
+        >>> ManagementFeeBase.from_str("effective_rent").value
         'effective_rent'
 
         """
         ...
+    @property
     def value(self) -> str:
         """
         Return the canonical snake-case identifier for this variant.
@@ -1095,7 +1097,7 @@ class ManagementFeeSpec:
     --------
     >>> from finstack_quant.statements_analytics import ManagementFeeBase, ManagementFeeSpec
     >>> fee = ManagementFeeSpec(0.03, ManagementFeeBase.Egi)
-    >>> (fee.rate, fee.base.value())
+    >>> (fee.rate, fee.base.value)
     (0.03, 'egi')
 
     """
