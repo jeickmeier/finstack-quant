@@ -221,6 +221,24 @@ pub struct BondFuture {
 }
 
 impl BondFuture {
+    /// Copy the listed terms, selected deliverable and pricing settings into a new builder.
+    pub fn to_builder(&self) -> BondFutureBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .terms(self.terms.clone())
+            .delivery_start(self.delivery_start)
+            .contract_specs(self.contract_specs.clone())
+            .deliverable_basket(self.deliverable_basket.clone())
+            .ctd_bond_id_opt(self.ctd_bond_id.clone())
+            .ctd_bond_opt(self.ctd_bond.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .repo_curve_id_opt(self.repo_curve_id.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+            .attributes(self.attributes.clone())
+    }
+
     /// Create a representative UST 10Y bond future example.
     ///
     /// Long position, 10 contracts ($1M face), 2 deliverable bonds

@@ -55,6 +55,11 @@ from finstack_quant.valuations.instruments._typed_legs import (
     PremiumLegSpec as PremiumLegSpec,
     ProtectionLegSpec as ProtectionLegSpec,
 )
+from finstack_quant.valuations.instruments._typed_bond_future import (
+    BondFuture as BondFuture,
+    BondFutureBuilder as BondFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_listed import ListedFutureTerms as ListedFutureTerms
 from finstack_quant.valuations.instruments._typed_inflation_bond import (
     InflationLinkedBond as InflationLinkedBond,
     InflationLinkedBondBuilder as InflationLinkedBondBuilder,
@@ -230,6 +235,9 @@ __all__ = [
     "DepositBuilder",
     "InflationLinkedBond",
     "InflationLinkedBondBuilder",
+    "BondFuture",
+    "BondFutureBuilder",
+    "ListedFutureTerms",
     "EligibilityRule",
     "EnhancedMonteCarloResult",
     "FacilityProjection",

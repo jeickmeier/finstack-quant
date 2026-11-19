@@ -15,6 +15,7 @@ mod merton_mc;
 mod pricing;
 mod schema;
 pub(crate) mod typed_asset_backed_facility;
+pub(crate) mod typed_bond_future;
 pub(crate) mod typed_convertible;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_deposit;
@@ -23,6 +24,7 @@ pub(crate) mod typed_fra;
 pub(crate) mod typed_fx;
 pub(crate) mod typed_inflation_bond;
 mod typed_legs;
+pub(crate) mod typed_listed;
 pub(crate) mod typed_macros;
 pub(crate) mod typed_rates;
 pub(crate) mod typed_revolving_credit;
@@ -401,6 +403,8 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_deposit::register(&m)?;
     typed_fra::register(&m)?;
     typed_inflation_bond::register(&m)?;
+    typed_bond_future::register(&m)?;
+    m.add_class::<typed_listed::PyListedFutureTerms>()?;
     typed_credit::register(py, &m)?;
     typed_convertible::register(py, &m)?;
     convertible_spot_ladder::register(&m)?;
@@ -430,6 +434,9 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "DepositBuilder",
         "InflationLinkedBond",
         "InflationLinkedBondBuilder",
+        "BondFuture",
+        "BondFutureBuilder",
+        "ListedFutureTerms",
         "ForwardRateAgreement",
         "ForwardRateAgreementBuilder",
     ]);

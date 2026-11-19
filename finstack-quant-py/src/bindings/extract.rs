@@ -24,6 +24,7 @@ use crate::bindings::valuations::composite::PyCompositeInstrument;
 use crate::bindings::valuations::convert::serialize_typed_instrument_json;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
+use crate::bindings::valuations::typed_bond_future::PyBondFuture;
 use crate::bindings::valuations::typed_convertible::PyConvertibleBond;
 use crate::bindings::valuations::typed_credit::{
     PyCdsIndex, PyCdsOption, PyCdsTranche, PyCreditDefaultSwap,
@@ -134,6 +135,7 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyInterestRateSwap,
         PyDeposit,
         PyInflationLinkedBond,
+        PyBondFuture,
         PyForwardRateAgreement,
         PySwaption,
         PyCapFloor,

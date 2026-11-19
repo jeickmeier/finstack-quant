@@ -17,6 +17,7 @@
 #[macro_use]
 pub(crate) mod macros;
 
+pub mod bond_future;
 pub mod cds_option;
 pub mod credit;
 pub mod data;
@@ -24,6 +25,7 @@ pub mod equity;
 pub mod fixed_income;
 pub mod fx;
 pub mod inflation_bond;
+pub mod listed;
 pub mod rates;
 pub mod structured;
 

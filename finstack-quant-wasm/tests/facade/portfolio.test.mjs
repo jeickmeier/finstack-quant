@@ -1438,3 +1438,25 @@ test('typed inflation-linked bond edits preserve decimal coupons and the source'
     restored.free();
   }
 });
+
+test('typed bond futures distinguish live and final settlement marks', () => {
+  const instruments = facade.valuations.instruments;
+  const initial = instruments.BondFuture.example();
+  const terms = instruments.listedFutureTermsWithMarks(
+    instruments.listedFutureTermsWithContracts(initial.terms, 2),
+    112.75,
+    112.5
+  );
+  const edited = initial.toBuilder().terms(terms).build();
+  const market = new core.MarketContext();
+  try {
+    assert.equal(Number(edited.price(market.toJson(), '2025-09-01').value.amount), 1000);
+    assert.equal(Number(edited.price(market.toJson(), '2025-09-23').value.amount), 500);
+    assert.equal(initial.terms.contracts, 10);
+    assert.equal(edited.terms.contracts, 2);
+  } finally {
+    market.free();
+    edited.free();
+    initial.free();
+  }
+});

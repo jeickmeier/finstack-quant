@@ -8891,8 +8891,42 @@ export interface ValuationsInstrumentsNamespace {
   readonly trancheMetrics: typeof wasm.trancheMetrics;
   readonly Deposit: typeof wasm.Deposit;
   readonly DepositBuilder: typeof wasm.DepositBuilder;
+  readonly BondFuture: typeof wasm.BondFuture;
+  readonly BondFutureBuilder: typeof wasm.BondFutureBuilder;
   readonly InflationLinkedBond: typeof wasm.InflationLinkedBond;
   readonly InflationLinkedBondBuilder: typeof wasm.InflationLinkedBondBuilder;
+  /**
+   * Validate listed position and lifecycle terms and emit their standard wire form.
+   * @param terms - Listed terms with quantity in contracts, multiplier in settlement currency per point, and marks in contract price points.
+   * @returns Validated independent position and settlement terms.
+   * @throws `TypeError` for malformed terms or `FinstackError` for invalid quantities, dates, marks or delivery terms.
+   */
+  readonly listedFutureTerms: typeof wasm.listedFutureTerms;
+  /**
+   * Set the number of exchange contracts in a derived position.
+   * @param terms - Source listed position and lifecycle terms.
+   * @param contracts - Positive finite number of contracts. Fractional values are permitted.
+   * @returns Independent listed terms with the new contract count.
+   * @throws `TypeError` for mistyped input or `FinstackError` for invalid terms or quantities.
+   */
+  readonly listedFutureTermsWithContracts: typeof wasm.listedFutureTermsWithContracts;
+  /**
+   * Derive listed-future terms with a new pair of exchange marks.
+   * @param terms - Source listed position and lifecycle terms.
+   * @param quotedPrice - Live mark in contract price points, or null to clear it.
+   * @param settlementPrice - Official final settlement mark, or null to clear it.
+   * @returns Independent terms with both marks replaced.
+   * @throws `TypeError` for an invalid input shape or `FinstackError` for invalid terms or nonfinite marks.
+   */
+  readonly listedFutureTermsWithMarks: typeof wasm.listedFutureTermsWithMarks;
+  /**
+   * Derive listed-future terms with a different final settlement policy.
+   * @param terms - Source listed position and lifecycle terms.
+   * @param settlement - Cash settlement or physical delivery of a specified asset and quantity per contract.
+   * @returns Independent terms with the replacement settlement policy.
+   * @throws `TypeError` for an invalid input shape or `FinstackError` for invalid terms or physical delivery details.
+   */
+  readonly listedFutureTermsWithSettlement: typeof wasm.listedFutureTermsWithSettlement;
   readonly ForwardRateAgreement: typeof wasm.ForwardRateAgreement;
   readonly ForwardRateAgreementBuilder: typeof wasm.ForwardRateAgreementBuilder;
   readonly InterestRateSwap: typeof wasm.InterestRateSwap;

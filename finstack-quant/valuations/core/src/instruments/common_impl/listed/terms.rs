@@ -97,6 +97,63 @@ impl ListedFutureTerms {
         Ok(terms)
     }
 
+    /// Return an independent position with an updated quantity.
+    ///
+    /// # Arguments
+    /// * `contracts` - Positive finite contract count. Fractional values are allowed.
+    ///
+    /// # Errors
+    /// Rejects nonpositive or nonfinite counts and invalid lifecycle terms.
+    pub fn with_contracts(&self, contracts: f64) -> finstack_quant_core::Result<Self> {
+        let terms = Self {
+            contracts,
+            ..self.clone()
+        };
+        terms.validate()?;
+        Ok(terms)
+    }
+
+    /// Return a copy with the supplied live and official exchange marks.
+    ///
+    /// # Arguments
+    /// * `quoted_price` - Optional live mark in the contract's price-point units.
+    /// * `settlement_price` - Optional official final mark in the same units.
+    ///
+    /// # Errors
+    /// Rejects nonfinite marks and invalid underlying lifecycle terms.
+    pub fn with_marks(
+        &self,
+        quoted_price: Option<f64>,
+        settlement_price: Option<f64>,
+    ) -> finstack_quant_core::Result<Self> {
+        let terms = Self {
+            quoted_price,
+            settlement_price,
+            ..self.clone()
+        };
+        terms.validate()?;
+        Ok(terms)
+    }
+
+    /// Return a copy with an explicitly selected final settlement convention.
+    ///
+    /// # Arguments
+    /// * `settlement` - Cash or physical delivery terms and quantity per contract.
+    ///
+    /// # Errors
+    /// Rejects invalid physical delivery terms and invalid underlying lifecycle terms.
+    pub fn with_settlement(
+        &self,
+        settlement: ListedFutureSettlement,
+    ) -> finstack_quant_core::Result<Self> {
+        let terms = Self {
+            settlement,
+            ..self.clone()
+        };
+        terms.validate()?;
+        Ok(terms)
+    }
+
     /// Validate position, price, and lifecycle invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if !self.contracts.is_finite() || self.contracts <= 0.0 {

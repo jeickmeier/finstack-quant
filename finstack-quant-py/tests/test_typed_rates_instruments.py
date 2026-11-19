@@ -362,3 +362,22 @@ def test_inflation_linked_bond_preserves_exact_contract_during_edits() -> None:
     restored = InflationLinkedBond.from_json(changed.to_json())
     assert restored.real_coupon == coupon
     assert restored.to_json() == changed.to_json()
+
+
+def test_bond_future_uses_typed_terms_and_live_and_final_marks() -> None:
+    import json
+    import pickle
+
+    from finstack_quant.core.market_data import MarketContext
+    from finstack_quant.valuations.instruments import BondFuture, ListedFutureTerms
+
+    initial = BondFuture.example()
+    terms = ListedFutureTerms(2, 1000, "USD", 112.25, "2025-09-19", "2025-09-30", "long")
+    edited = initial.to_builder().terms(terms.with_marks(112.75, 112.50)).build()
+    assert edited.price(MarketContext(), "2025-09-01").value.amount == 1000.0
+    assert edited.price(MarketContext(), "2025-09-23").value.amount == 500.0
+    assert json.loads(initial.terms.to_json())["contracts"] == 10.0
+    assert BondFuture.from_json(edited.to_json()).to_json() == edited.to_json()
+    assert pickle.loads(pickle.dumps(edited.terms)).to_json() == edited.terms.to_json()  # noqa: S301
+    with pytest.raises(ValueError, match="must be finite"):
+        terms.with_marks(float("nan"), None)

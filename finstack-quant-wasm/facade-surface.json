@@ -4630,6 +4630,8 @@
       "AssetBackedFacilityBuilder",
       "Bond",
       "BondBuilder",
+      "BondFuture",
+      "BondFutureBuilder",
       "CapFloor",
       "CapFloorBuilder",
       "CdsIndex",
@@ -4711,6 +4713,10 @@
       "listModelsGrouped",
       "listStandardMetrics",
       "listStandardMetricsGrouped",
+      "listedFutureTerms",
+      "listedFutureTermsWithContracts",
+      "listedFutureTermsWithMarks",
+      "listedFutureTermsWithSettlement",
       "metricMetadata",
       "metricsForInstrument",
       "pikScheduleModeAt",
@@ -5066,6 +5072,45 @@
     ],
     "getters": []
   },
+  "valuations.instruments.BondFuture": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "defaultModel",
+      "expiry",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "scenarioPricingOverrides",
+      "terms"
+    ]
+  },
+  "valuations.instruments.BondFutureBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "contractSpecs",
+      "ctdBond",
+      "ctdBondId",
+      "deliverableBasket",
+      "deliveryStart",
+      "discountCurveId",
+      "free",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "repoCurveId",
+      "scenarioPricingOverrides",
+      "terms"
+    ],
+    "getters": []
+  },
   "valuations.instruments.InflationLinkedBond": {
     "kind": "class",
     "constructor": false,
@@ -5129,6 +5174,18 @@
       "stub"
     ],
     "getters": []
+  },
+  "valuations.instruments.listedFutureTerms": {
+    "kind": "function"
+  },
+  "valuations.instruments.listedFutureTermsWithContracts": {
+    "kind": "function"
+  },
+  "valuations.instruments.listedFutureTermsWithMarks": {
+    "kind": "function"
+  },
+  "valuations.instruments.listedFutureTermsWithSettlement": {
+    "kind": "function"
   },
   "valuations.instruments.ForwardRateAgreement": {
     "kind": "class",

@@ -985,6 +985,8 @@ public = [
     "BarrierCrossing",
     "Bond",
     "BondBuilder",
+    "BondFuture",
+    "BondFutureBuilder",
     "BondQuoteSet",
     "BondWorkoutLadder",
     "BondWorkoutRow",
@@ -1034,6 +1036,7 @@ public = [
     "InterestRateSwap",
     "InterestRateSwapBuilder",
     "LiquidationSpec",
+    "ListedFutureTerms",
     "MarketHistory",
     "MertonMcCalibrationSpec",
     "MertonMcConfig",
@@ -2313,7 +2316,7 @@ types = { CompositeExposureReport = "CompositeExposureReport", CompositeHistoryR
 
 [parity.modules."finstack_quant.valuations.instruments"]
 js = "valuations.instruments"
-types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", BondQuoteSet = "BondQuoteSet", BondWorkoutLadder = "BondWorkoutLadder", BondWorkoutRow = "BondWorkoutRow", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", ConvertibleSpotLadder = "ConvertibleSpotLadder", ConvertibleSpotRow = "ConvertibleSpotRow", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", PriceExtras = "PriceExtras", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolConcentrationEntry = "PoolConcentrationEntry", PoolReport = "PoolReport", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
+types = { ListedFutureTerms = "ListedFutureTerms", AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", BondQuoteSet = "BondQuoteSet", BondWorkoutLadder = "BondWorkoutLadder", BondWorkoutRow = "BondWorkoutRow", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", ConvertibleSpotLadder = "ConvertibleSpotLadder", ConvertibleSpotRow = "ConvertibleSpotRow", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", PriceExtras = "PriceExtras", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolConcentrationEntry = "PoolConcentrationEntry", PoolReport = "PoolReport", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
 
 [parity.modules."finstack_quant.valuations.market"]
 js = "valuations.market"
@@ -2356,6 +2359,7 @@ validateCapitalStructureSpecJson = "JSON wire validation through Rust CapitalStr
 valuationResultToJson = "twin of Python ValuationResult.to_json (WASM results are plain objects)"
 
 [parity.js."valuations.instruments".wasm_only]
+listedFutureTerms = "Validated constructor twin of Python ListedFutureTerms; the native terms are plain objects in WASM"
 trancheCashflowsTable = "twin of Python TrancheCashflows.to_dataframe (WASM cashflows are a plain object, so Rust TrancheCashflows::to_table is a function taking it)"
 bondWorkoutLadderTable = "twin of Python BondWorkoutLadder.to_dataframe (WASM ladders are plain objects, so Rust BondWorkoutLadder::to_table is a function taking it)"
 convertibleSpotLadderTable = "twin of Python ConvertibleSpotLadder.to_dataframe (WASM ladders are plain objects, so Rust ConvertibleSpotLadder::to_table is a function taking it)"
@@ -3027,3 +3031,6 @@ excluded = { to_numpy = "numpy", terminal_values = "numpy" }
 
 [parity.members."finstack_quant.models.credit.SimulatedPaths"]
 excluded = { to_numpy = "numpy", terminal_values = "numpy" }
+
+[parity.members."finstack_quant.valuations.instruments.ListedFutureTerms"]
+renames = { with_contracts = { js = "valuations.instruments.listedFutureTermsWithContracts", reason = "The native method applies to a plain WASM terms object" }, with_marks = { js = "valuations.instruments.listedFutureTermsWithMarks", reason = "The native method applies to a plain WASM terms object" }, with_settlement = { js = "valuations.instruments.listedFutureTermsWithSettlement", reason = "The native method applies to a plain WASM terms object" } }
