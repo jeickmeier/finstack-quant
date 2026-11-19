@@ -35,6 +35,11 @@ from finstack_quant.valuations.instruments._bond_quotes import (
     BondQuoteSet as BondQuoteSet,
     compute_quotes as compute_quotes,
 )
+from finstack_quant.valuations.instruments._bond_breakeven import (
+    BondBreakevenLadder as BondBreakevenLadder,
+    BondBreakevenRow as BondBreakevenRow,
+    bond_breakeven_ladder as bond_breakeven_ladder,
+)
 from finstack_quant.valuations.instruments._bond_workout import (
     BondWorkoutLadder as BondWorkoutLadder,
     BondWorkoutRow as BondWorkoutRow,
@@ -254,6 +259,8 @@ __all__ = [
     "Bond",
     "BondBuilder",
     "BondQuoteSet",
+    "BondBreakevenLadder",
+    "BondBreakevenRow",
     "BondWorkoutLadder",
     "BondWorkoutRow",
     "CallAssumption",
@@ -326,6 +333,7 @@ __all__ = [
     "VarResult",
     "Waterfall",
     "bond_quote_set_field_units",
+    "bond_breakeven_ladder",
     "bond_workout_ladder",
     "calculate_pool_stats",
     "calculate_var",

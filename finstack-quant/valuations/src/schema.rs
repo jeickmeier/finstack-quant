@@ -730,7 +730,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::fixed_income::bond::FloatingBondParams;
     use crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult;
     use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-        BondQuoteSet, BondWorkoutLadder,
+        BondBreakevenLadder, BondQuoteSet, BondWorkoutLadder,
     };
     use crate::instruments::fixed_income::convertible::{ConvertibleGreeks, ConvertibleSpotLadder};
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
@@ -1150,6 +1150,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::bond_quote_set),
+        finstack_quant_core::schema_artifact!(
+            BondBreakevenLadder,
+            "results",
+            "bond_breakeven_ladder",
+            Component,
+            "Carry, sensitivity, and signed breakeven across the requested bond horizons."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_breakeven_ladder),
         finstack_quant_core::schema_artifact!(
             BondWorkoutLadder,
             "results",

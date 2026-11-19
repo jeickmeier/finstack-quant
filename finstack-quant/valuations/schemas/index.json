@@ -1072,6 +1072,15 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/bond_breakeven_ladder.schema.json",
+      "bytes": 6790,
+      "kind": "output",
+      "path": "schemas/results/1/bond_breakeven_ladder.schema.json",
+      "summary": "Carry, sensitivity, and signed breakeven across the requested bond horizons.",
+      "title": "BondBreakevenLadder",
+      "type_name": "BondBreakevenLadder"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/bond_quote_set.schema.json",
       "bytes": 3895,
       "kind": "output",

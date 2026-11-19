@@ -108,6 +108,8 @@ export const instruments = {
   assetPoolAssetsByIndustry: wasm.assetPoolAssetsByIndustry,
   poolReport: wasm.poolReport,
   poolReportTable: wasm.poolReportTable,
+  bondBreakevenLadder: wasm.bondBreakevenLadder,
+  bondBreakevenLadderTable: wasm.bondBreakevenLadderTable,
   bondWorkoutLadder: wasm.bondWorkoutLadder,
   bondWorkoutLadderTable: wasm.bondWorkoutLadderTable,
   convertibleSpotLadder: wasm.convertibleSpotLadder,

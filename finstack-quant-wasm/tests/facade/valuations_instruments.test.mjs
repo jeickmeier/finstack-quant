@@ -569,3 +569,43 @@ test('typed FRA retains fixing and exact strike rate through a builder copy', ()
   fra.free();
   contract.free();
 });
+
+test('bond breakeven ladder retains horizon order and its signed spread units', () => {
+  const instruments = valuations.instruments;
+  const bond = instruments.Bond.example();
+  const spec = JSON.parse(bond.toJson()).instrument.spec;
+  const market = new core.MarketContext();
+  const curve = new core.DiscountCurve({
+    id: spec.discount_curve_id,
+    baseDate: spec.issue_date,
+    knots: [0.0, 1.0, 10.0, 0.7],
+    interp: 'log_linear',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
+  });
+  try {
+    market.insert(curve);
+    const options = { target: 'z_spread', mode: 'linear' };
+    const ladder = instruments.bondBreakevenLadder(
+      bond,
+      market,
+      spec.issue_date,
+      ['6M', '3M'],
+      options
+    );
+    assert.deepEqual(
+      ladder.rows.map(({ horizon }) => horizon.count),
+      [6, 3]
+    );
+    for (const row of ladder.rows) {
+      assert.ok(Math.abs(row.breakeven_bp + row.carry / row.sensitivity) < 1e-10);
+    }
+    const table = instruments.bondBreakevenLadderTable(ladder);
+    assert.equal(table.row_count, 2);
+    assert.equal(table.columns[0].name, 'horizon');
+  } finally {
+    curve.free();
+    market.free();
+    bond.free();
+  }
+});

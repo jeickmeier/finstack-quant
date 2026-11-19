@@ -9107,6 +9107,24 @@ export interface ValuationsInstrumentsNamespace {
    */
   readonly poolReportTable: typeof wasm.poolReportTable;
   /**
+   * Measure carry and signed basis-point breakeven across the supplied horizons.
+   * @param bond - Typed bond whose native terms and price settings govern every row.
+   * @param market - Market context supplying the required prices, curves and risk inputs.
+   * @param asOf - ISO valuation date from which calendar horizons are measured.
+   * @param horizons - Nonempty list of positive calendar tenors in the desired row order, such as ["1M", "1Y"].
+   * @param config - Yield or spread target and solve mode. Iterative OAS is unsupported.
+   * @returns Ordered rows with native currency amounts and signed breakeven shifts in basis points.
+   * @throws TypeError for invalid input types or FinstackError for missing pricing or risk inputs, invalid horizons, or unsupported targets or modes.
+   */
+  readonly bondBreakevenLadder: typeof wasm.bondBreakevenLadder;
+  /**
+   * Export a breakeven ladder to ordered columns.
+   * @param ladder - Native ladder returned by bondBreakevenLadder.
+   * @returns Horizon, carry, signed sensitivity, signed basis-point breakeven and currency columns.
+   * @throws FinstackError for invalid ladder data.
+   */
+  readonly bondBreakevenLadderTable: typeof wasm.bondBreakevenLadderTable;
+  /**
    * Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).
    *
    * The exits are the ones the `ytw` metric walks, a return floor lowered into calls first, and the row marked worst holds that metric's yield and the `i_spread` metric's spread.

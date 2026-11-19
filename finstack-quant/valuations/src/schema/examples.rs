@@ -309,6 +309,18 @@ pub(super) fn pool_stats() -> Result<Vec<Value>> {
     )?)
 }
 
+/// One reported quarterly horizon on the vanilla bond Z-spread basis.
+pub(super) fn bond_breakeven_ladder() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions::BondBreakevenLadder;
+    example_from_json::<BondBreakevenLadder>(json!({
+        "instrument_id": "USD-BOND",
+        "as_of": "2025-01-15",
+        "currency": "USD",
+        "config": {"target": "z_spread", "mode": "linear"},
+        "rows": [{"horizon":{"count": 3, "unit": "months"}, "carry": 10.0, "sensitivity": -2.0, "breakeven_bp": 5.0}]
+    }))
+}
+
 /// The workout ladder of the example callable bond at 108 clean on a flat curve.
 pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
     use crate::instruments::fixed_income::bond::Bond;

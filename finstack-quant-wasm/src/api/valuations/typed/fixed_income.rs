@@ -1519,6 +1519,55 @@ handle_setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {
         day_count as dayCount => JsDayCount,
 });
 
+/// Measure carry and signed basis-point breakeven across the supplied horizons.
+/// @param bond - Typed bond whose native terms and price settings govern every row.
+/// @param market - Market context supplying the required prices, curves and risk inputs.
+/// @param asOf - ISO valuation date from which calendar horizons are measured.
+/// @param horizons - Nonempty list of positive calendar tenors in the desired row order, such as ["1M", "1Y"].
+/// @param config - Yield or spread target and solve mode. Iterative OAS is unsupported.
+/// @returns Ordered rows with native currency amounts and signed breakeven shifts in basis points.
+/// @throws TypeError for invalid input types or FinstackError for missing pricing or risk inputs, invalid horizons, or unsupported targets or modes.
+#[wasm_bindgen(js_name = bondBreakevenLadder, unchecked_return_type = "generated.valuations.BondBreakevenLadder")]
+pub fn bond_breakeven_ladder(
+    bond: &JsBond,
+    market: &crate::api::core::market_context::JsMarketContext,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly string[]")] horizons: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.BreakevenConfig")] config: JsValue,
+) -> Result<JsValue, JsValue> {
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions;
+    let as_of = js_date(&as_of, "asOf")?;
+    let horizons = crate::utils::input::js_string_seq(&horizons, "horizons")?
+        .iter()
+        .map(|tenor| tenor.parse().map_err(to_js_err))
+        .collect::<Result<Vec<_>, _>>()?;
+    let config = crate::utils::input::from_js_json(&config, "config")?;
+    let result = quote_conversions::bond_breakeven_ladder(
+        &bond.inner,
+        market.inner(),
+        as_of,
+        &horizons,
+        config,
+        finstack_quant_calibration::recalibration::pricing_options(),
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
+/// Export a breakeven ladder to ordered columns.
+/// @param ladder - Native ladder returned by bondBreakevenLadder.
+/// @returns Horizon, carry, signed sensitivity, signed basis-point breakeven and currency columns.
+/// @throws FinstackError for invalid ladder data.
+#[wasm_bindgen(js_name = bondBreakevenLadderTable, unchecked_return_type = "TableEnvelope")]
+pub fn bond_breakeven_ladder_table(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.BondBreakevenLadder")]
+    ladder: JsValue,
+) -> Result<JsValue, JsValue> {
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondBreakevenLadder;
+    let ladder: BondBreakevenLadder = crate::utils::input::from_js_json(&ladder, "ladder")?;
+    to_js_value(&ladder.to_table())
+}
+
 /// Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).
 ///
 /// The exits are the ones the `ytw` metric walks, a return floor lowered into calls first, and the row marked worst holds that metric's yield and the `i_spread` metric's spread.

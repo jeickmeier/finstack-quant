@@ -4692,6 +4692,8 @@
       "assetPoolWeightedAvgMaturity",
       "assetPoolWeightedAvgSpreadBp",
       "assetPoolWithReserve",
+      "bondBreakevenLadder",
+      "bondBreakevenLadderTable",
       "bondQuoteSetFieldUnits",
       "bondQuoteSetTable",
       "bondWorkoutLadder",
@@ -6409,6 +6411,12 @@
     "kind": "function"
   },
   "valuations.instruments.poolReportTable": {
+    "kind": "function"
+  },
+  "valuations.instruments.bondBreakevenLadder": {
+    "kind": "function"
+  },
+  "valuations.instruments.bondBreakevenLadderTable": {
     "kind": "function"
   },
   "valuations.instruments.bondWorkoutLadder": {

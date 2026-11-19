@@ -17865,6 +17865,52 @@ export interface BermudanSwaptionParams {
   vol_surface_id: Id;
 }
 /**
+ * Carry, sensitivity, and signed breakeven across the requested bond horizons.
+ */
+export interface BondBreakevenLadder {
+  /**
+   * Valuation date anchoring the horizons.
+   */
+  as_of: DateWire;
+  /**
+   * Target and solve mode used for each row.
+   */
+  config: BreakevenConfig;
+  /**
+   * Native currency of carry and sensitivity.
+   */
+  currency: Currency;
+  /**
+   * Identifier of the priced bond.
+   */
+  instrument_id: string;
+  /**
+   * Rows in the requested horizon order.
+   */
+  rows: BondBreakevenRow[];
+}
+/**
+ * One carry horizon with its sensitivity and solved signed shift.
+ */
+export interface BondBreakevenRow {
+  /**
+   * Signed basis points of movement that offset carry under the selected calculation.
+   */
+  breakeven_bp: number;
+  /**
+   * Net carry and roll-down in the bond currency over the allowed horizon.
+   */
+  carry: number;
+  /**
+   * Requested calendar tenor measured from the valuation date.
+   */
+  horizon: Tenor;
+  /**
+   * Signed starting-date price change per basis point of the selected risk factor.
+   */
+  sensitivity: number;
+}
+/**
  * Every price, yield and spread quote of a bond, solved from any one of them.
  */
 export interface BondQuoteSet {
