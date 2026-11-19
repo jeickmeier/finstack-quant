@@ -103,8 +103,16 @@ fn validate_heston_controls() {
         .expect("valid near-deterministic Heston control parameters");
     let heston = heston_call_price_fourier(100.0, 100.0, 1.0, &params, None)
         .expect("converged near-deterministic Heston control");
-    let reference = bs_price(100.0, 100.0, 0.03, 0.01, 0.2, 1.0, OptionType::Call)
-        .expect("valid Black-Scholes limit control");
+    let reference = bs_price(&finstack_quant_models::types::OptionMarketParams {
+        spot: 100.0,
+        strike: 100.0,
+        rate: 0.03,
+        dividend_yield: 0.01,
+        volatility: 0.2,
+        time_to_expiry: 1.0,
+        option_type: OptionType::Call,
+    })
+    .expect("valid Black-Scholes limit control");
     // This is an independent closed-form control, with the O(sigma_v)
     // correction bound used by the model's deterministic-limit regression.
     assert!(
@@ -129,8 +137,16 @@ fn bench_cos_strip(c: &mut Criterion) {
                 .expect("valid COS preflight prices");
             validate_call_prices(spot, &strikes, &prices, r, q, t);
             for (&strike, &price) in strikes.iter().zip(&prices) {
-                let reference = bs_price(spot, strike, r, q, sigma, t, OptionType::Call)
-                    .expect("valid Black-Scholes reference");
+                let reference = bs_price(&finstack_quant_models::types::OptionMarketParams {
+                    spot,
+                    strike,
+                    rate: r,
+                    dividend_yield: q,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    option_type: OptionType::Call,
+                })
+                .expect("valid Black-Scholes reference");
                 assert!(
                     reference.is_finite() && (price - reference).abs() < 1e-6,
                     "COS disagrees with Black-Scholes at K={strike}: {price} vs {reference}"

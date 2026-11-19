@@ -298,30 +298,20 @@ pub fn bs_price_unchecked(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate carry as a
-///   decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-/// * `expiry` - Remaining time to expiry in years.
-/// * `option_type` - Call or put payoff convention for the returned price.
-pub fn bs_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    option_type: OptionType,
-) -> Result<f64> {
-    const MODEL: &str = "Black-Scholes";
-    require_finite_positive(MODEL, "spot", spot)?;
-    require_finite_positive(MODEL, "strike", strike)?;
-    require_finite(MODEL, "rate", rate)?;
-    require_finite(MODEL, "div_yield", div_yield)?;
-    require_finite_non_negative(MODEL, "expiry", expiry)?;
-    require_finite_non_negative(MODEL, "volatility", vol)?;
+/// * `market` - Positive spot and strike in matching price units, decimal
+///   continuously compounded rate and dividend yield (foreign rate for FX),
+///   annualized decimal volatility, expiry in years and call/put direction.
+pub fn bs_price(market: &OptionMarketParams) -> Result<f64> {
+    market.validate_allow_zero_vol()?;
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate,
+        dividend_yield: div_yield,
+        volatility: vol,
+        time_to_expiry: expiry,
+        option_type,
+    } = market;
     // Validate discounted legs before the zero-volatility payoff clamp can
     // hide overflow or an indeterminate infinity-minus-infinity result.
     checked_closed_form_value(spot * (-div_yield * expiry).exp(), "discounted spot")?;
@@ -569,7 +559,16 @@ mod tests {
     fn put_tail_price_and_greeks_retain_small_normal_probabilities() {
         // Evaluating N(-d) retains the tail that 1 - N(d) rounds away. The
         // independent erfc-form BSM reference is well within the f64 range.
-        let price = bs_price(100.0, 20.0, 0.0, 0.0, 0.2, 1.0, OptionType::Put).unwrap();
+        let price = bs_price(&crate::types::OptionMarketParams {
+            spot: 100.0,
+            strike: 20.0,
+            rate: 0.0,
+            dividend_yield: 0.0,
+            volatility: 0.2,
+            time_to_expiry: 1.0,
+            option_type: OptionType::Put,
+        })
+        .unwrap();
         let expected = 4.550_576_920_194_906e-16;
         assert!((price / expected - 1.0).abs() < 1e-6, "tail price={price}");
         let greeks = bs_greeks(
@@ -657,8 +656,16 @@ mod tests {
 
     #[test]
     fn checked_price_rejects_negative_volatility() {
-        let error = bs_price(100.0, 102.0, 0.05, 0.0, -0.2, 1.0, OptionType::Call)
-            .expect_err("negative volatility must be rejected");
+        let error = bs_price(&crate::types::OptionMarketParams {
+            spot: 100.0,
+            strike: 102.0,
+            rate: 0.05,
+            dividend_yield: 0.0,
+            volatility: -0.2,
+            time_to_expiry: 1.0,
+            option_type: OptionType::Call,
+        })
+        .expect_err("negative volatility must be rejected");
         assert!(error.to_string().contains("non-negative"));
     }
 

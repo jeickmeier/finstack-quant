@@ -176,26 +176,31 @@ class SensitivityMatrix:
         """
         ...
 
-    def delta(self, position_idx: int, factor_idx: int) -> float:
-        """
-        Read a single sensitivity element.
+    def delta(self, position_idx: int | str, factor_idx: int | str) -> float:
+        """Read the sensitivity of a position to a factor.
 
         Parameters
         ----------
-        position_idx : int
-            Zero-based row index into ``position_ids`` for the requested position.
-        factor_idx : int
-            Column index.
+        position_idx : int | str
+            Zero-based row index or exact position identifier from ``position_ids``.
+        factor_idx : int | str
+            Zero-based column index or exact factor identifier from ``factor_ids``.
 
         Returns
         -------
         float
-            Sensitivity value.
+            Sensitivity in reporting currency per unit of the factor's bump.
 
         Raises
         ------
+        KeyError
+            If a supplied position or factor identifier is unknown.
         ValueError
-            If ``position_idx`` or ``factor_idx`` is outside the matrix bounds.
+            If an unsigned integer index is outside the matrix bounds.
+        OverflowError
+            If an integer index is negative or too large for a platform index.
+        TypeError
+            If a coordinate is neither an integer nor a string.
         """
         ...
 

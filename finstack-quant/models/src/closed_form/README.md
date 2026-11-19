@@ -340,7 +340,10 @@ use finstack_quant_models::closed_form::{
 let (spot, strike, r, q, vol, t) = (100.0, 100.0, 0.05, 0.02, 0.20, 1.0);
 
 // Vanilla price and Greeks on a 365-day theta basis.
-let price = bs_price(spot, strike, r, q, vol, t, OptionType::Call);
+let price = bs_price(&finstack_quant_models::types::OptionMarketParams {
+    spot, strike, rate: r, dividend_yield: q, volatility: vol,
+    time_to_expiry: t, option_type: OptionType::Call,
+})?;
 let market = OptionMarketParams {
     spot,
     strike,

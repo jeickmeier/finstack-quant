@@ -90,8 +90,16 @@ fn bench_european_pricer(c: &mut Criterion) {
         let checked = price();
         check_estimate(&checked, n, n);
         check_repeat(&checked, &price());
-        let reference = bs_price(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call)
-            .expect("valid Black-Scholes reference");
+        let reference = bs_price(&finstack_quant_models::types::OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            dividend_yield: 0.02,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            option_type: OptionType::Call,
+        })
+        .expect("valid Black-Scholes reference");
         check_against_reference(&checked, reference, 1e-8);
         b.iter(price);
     });

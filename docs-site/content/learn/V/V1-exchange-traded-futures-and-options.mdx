@@ -230,7 +230,7 @@ df=market.get_discount("USD-OIS").df(T);r=-math.log(df)/T
 forward,strike,sigma=5300.,5300.,.20
 # Choose a synthetic spot whose zero-dividend forward is the option's F.
 matched_spot=forward*df
-matched_value=2*50*bs_price(matched_spot,strike,r,0.,sigma,T,True)
+matched_value=2*50*bs_price(dict(spot=matched_spot, strike=strike, rate=r, dividend_yield=0., volatility=sigma, time_to_expiry=T, option_type="call"))
 print({"native_future_option":european,"matched_spot_option":matched_value,"forward":forward,"synthetic_spot":matched_spot})
 ```
 {/* /notebook-block */}

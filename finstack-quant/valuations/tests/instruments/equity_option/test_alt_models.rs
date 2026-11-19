@@ -28,13 +28,15 @@ fn bs_call_reference(spot: f64, strike: f64, rate: f64, vol: f64) -> f64 {
     // 2024 is a leap year; the pricers day-count the 1Y expiry on Act365F.
     let t = 366.0 / 365.0;
     finstack_quant_models::closed_form::bs_price(
-        spot,
-        strike,
-        rate,
-        0.0,
-        vol,
-        t,
-        finstack_quant_models::types::OptionType::Call,
+        &finstack_quant_models::types::OptionMarketParams {
+            spot,
+            strike,
+            rate,
+            dividend_yield: 0.0,
+            volatility: vol,
+            time_to_expiry: t,
+            option_type: finstack_quant_models::types::OptionType::Call,
+        },
     )
     .expect("valid Black-Scholes inputs")
         * 100.0

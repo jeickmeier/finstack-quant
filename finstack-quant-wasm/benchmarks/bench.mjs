@@ -1156,13 +1156,31 @@ async function main() {
       run(
         'models/bs_call',
         { ...bsParameters, option_type: 'call' },
-        () => w.bsPrice(100, 100, 0.05, 0, 0.2, 1, true),
+        () =>
+          w.bsPrice({
+            spot: 100,
+            strike: 100,
+            rate: 0.05,
+            dividend_yield: 0,
+            volatility: 0.2,
+            time_to_expiry: 1,
+            option_type: 'call',
+          }),
         (value) => near(value, CCM_NUMERICS.black_scholes_call, CCM_NUMERICS.black_scholes_absolute)
       );
       run(
         'models/bs_put',
         { ...bsParameters, option_type: 'put' },
-        () => w.bsPrice(100, 100, 0.05, 0, 0.2, 1, false),
+        () =>
+          w.bsPrice({
+            spot: 100,
+            strike: 100,
+            rate: 0.05,
+            dividend_yield: 0,
+            volatility: 0.2,
+            time_to_expiry: 1,
+            option_type: 'put',
+          }),
         (value) => near(value, CCM_NUMERICS.black_scholes_put, CCM_NUMERICS.black_scholes_absolute)
       );
     } catch (error) {

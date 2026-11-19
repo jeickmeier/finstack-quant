@@ -154,10 +154,23 @@ impl OptionMarketParams {
     /// Returns a core validation error for non-positive prices or volatility,
     /// negative expiry time, or non-finite rate/carry inputs.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.validate_allow_zero_vol()?;
+        finstack_quant_core::validation::validate_f64_positive(
+            self.volatility,
+            "OptionMarketParams.volatility",
+        )
+    }
+
+    /// Validate the market inputs for models that admit zero volatility.
+    ///
+    /// # Errors
+    /// Rejects nonfinite values, nonpositive spot or strike, and negative
+    /// expiry or volatility.
+    pub fn validate_allow_zero_vol(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation::{
             validate_f64_finite, validate_f64_non_negative, validate_f64_positive,
         };
-        validate_f64_positive(self.volatility, "OptionMarketParams.volatility")?;
+        validate_f64_non_negative(self.volatility, "OptionMarketParams.volatility")?;
         validate_f64_positive(self.spot, "OptionMarketParams.spot")?;
         validate_f64_positive(self.strike, "OptionMarketParams.strike")?;
         validate_f64_finite(self.time_to_expiry, "OptionMarketParams.time_to_expiry")?;

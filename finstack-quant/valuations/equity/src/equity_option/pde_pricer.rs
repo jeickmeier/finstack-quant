@@ -277,13 +277,15 @@ mod tests {
                 .instrument_pricing_overrides
                 .with_implied_volatility(volatility);
             let reference = finstack_quant_models::closed_form::bs_price(
-                100.0,
-                100.0,
-                0.05,
-                0.0,
-                volatility,
-                1.0,
-                OptionType::Call,
+                &finstack_quant_models::types::OptionMarketParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: 0.05,
+                    dividend_yield: 0.0,
+                    volatility,
+                    time_to_expiry: 1.0,
+                    option_type: OptionType::Call,
+                },
             )
             .unwrap();
             let coarse = EquityOptionPdePricer {

@@ -10,16 +10,16 @@ use wasm_bindgen_test::*;
 #[wasm_bindgen_test]
 fn implied_vol_adapters_reprice_calls_and_puts_with_carry() {
     for is_call in [true, false] {
-        let price = bs_price(
-            JsValue::from(100.0),
-            JsValue::from(105.0),
-            JsValue::from(-0.02),
-            JsValue::from(0.01),
-            JsValue::from(0.35),
-            JsValue::from(0.5),
-            JsValue::from(is_call),
-        )
-        .expect("price");
+        let market = serde_json::json!({
+            "spot": 100.0,
+            "strike": 105.0,
+            "rate": -0.02,
+            "dividend_yield": 0.01,
+            "volatility": 0.35,
+            "time_to_expiry": 0.5,
+            "option_type": if is_call { "call" } else { "put" },
+        });
+        let price = bs_price(JsValue::from_str(&market.to_string())).expect("price");
         let bs = bs_implied_vol(
             JsValue::from(100.0),
             JsValue::from(105.0),

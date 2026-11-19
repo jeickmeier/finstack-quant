@@ -40,7 +40,18 @@ from finstack_quant.models.volatility import SabrCalibrator, SabrParameters, Sab
 
 
 def test_bs_price_call_atm_is_positive() -> None:
-    assert bs_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, True) > 0.0
+    assert (
+        bs_price({
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.02,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
+        > 0.0
+    )
 
 
 def test_vanilla_expiry_payoff_matches_intrinsic() -> None:
@@ -127,7 +138,15 @@ def test_new_closed_form_bindings_run() -> None:
 
 def test_bs_implied_vol_round_trip() -> None:
     sigma = 0.25
-    price = bs_price(100.0, 110.0, 0.03, 0.01, sigma, 0.75, True)
+    price = bs_price({
+        "spot": 100.0,
+        "strike": 110.0,
+        "rate": 0.03,
+        "dividend_yield": 0.01,
+        "volatility": sigma,
+        "time_to_expiry": 0.75,
+        "option_type": "call",
+    })
     iv = bs_implied_vol(100.0, 110.0, 0.03, 0.01, 0.75, price, True)
     assert abs(iv - sigma) < 1e-6
 
@@ -272,7 +291,15 @@ def test_barrier_knock_in_plus_knock_out_equals_vanilla() -> None:
         "up",
         "out",
     )
-    vanilla = bs_price(spot, strike, r, q, sigma, t, True)
+    vanilla = bs_price({
+        "spot": spot,
+        "strike": strike,
+        "rate": r,
+        "dividend_yield": q,
+        "volatility": sigma,
+        "time_to_expiry": t,
+        "option_type": "call",
+    })
     assert abs(up_in + up_out - vanilla) < 1e-6
 
 

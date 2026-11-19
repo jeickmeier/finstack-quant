@@ -28,8 +28,16 @@ from finstack_quant.models.volatility import (
 
 @pytest.mark.parametrize("spot", [math.nan, math.inf, -100.0, 0.0])
 def test_checked_black_scholes_raises_for_invalid_spot(spot: float) -> None:
-    with pytest.raises(ValueError, match="spot"):
-        bs_price(spot, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    with pytest.raises(ValueError, match="spot" if math.isfinite(spot) else "finite"):
+        bs_price({
+            "spot": spot,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
 
 
 def test_cos_rejects_zero_terms() -> None:

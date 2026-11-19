@@ -2446,6 +2446,7 @@
       "mertonJumpCosPrice",
       "monteCarlo",
       "optionCalculation",
+      "optionMarketParams",
       "quantoOptionPrice",
       "rates",
       "vanillaExpiryPayoff",
@@ -3483,6 +3484,9 @@
     "kind": "function"
   },
   "models.bsPrice": {
+    "kind": "function"
+  },
+  "models.optionMarketParams": {
     "kind": "function"
   },
   "models.vanillaExpiryPayoff": {

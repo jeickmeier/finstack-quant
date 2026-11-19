@@ -15,6 +15,7 @@ from finstack_quant.models import (
 BsGreeks = _models.BsGreeks
 ForwardGreeks = _models.ForwardGreeks
 OptionCalculationResult = _models.OptionCalculationResult
+OptionMarketParams = _models.OptionMarketParams
 asian_option_price = _models.asian_option_price
 bachelier_greeks = _models.bachelier_greeks
 bachelier_price = _models.bachelier_price
@@ -40,6 +41,7 @@ __all__: list[str] = [
     "BsGreeks",
     "ForwardGreeks",
     "OptionCalculationResult",
+    "OptionMarketParams",
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",

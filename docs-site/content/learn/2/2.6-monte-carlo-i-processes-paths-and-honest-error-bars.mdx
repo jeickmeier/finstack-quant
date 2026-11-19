@@ -82,8 +82,8 @@ from finstack_quant.models import bs_price
 from finstack_quant.models.monte_carlo import EuropeanPricer
 
 S, K, r, q, vol, T = 100.0, 100.0, 0.05, 0.02, 0.25, 1.0
-c = bs_price(S, K, r, q, vol, T, True)
-p = bs_price(S, K, r, q, vol, T, False)
+c = bs_price(dict(spot=S, strike=K, rate=r, dividend_yield=q, volatility=vol, time_to_expiry=T, option_type="call"))
+p = bs_price(dict(spot=S, strike=K, rate=r, dividend_yield=q, volatility=vol, time_to_expiry=T, option_type="put"))
 print(f"BS call: {c:.8f}")
 print(f"BS put:  {p:.8f}")
 
@@ -104,7 +104,7 @@ from finstack_quant.models import bs_price
 from finstack_quant.models.monte_carlo import EuropeanPricer
 
 S, K, r, q, vol, T = 100.0, 100.0, 0.05, 0.0, 0.20, 1.0
-analytical = bs_price(S, K, r, q, vol, T, True)
+analytical = bs_price(dict(spot=S, strike=K, rate=r, dividend_yield=q, volatility=vol, time_to_expiry=T, option_type="call"))
 print(f"Analytical ATM call: {analytical:.8f}")
 counts = [1_000, 5_000, 10_000, 50_000, 100_000]
 print("paths | mean | standard error | realized absolute error | SE * sqrt(N)")
@@ -171,7 +171,7 @@ mc_call = pr.price_gbm(
     },
     num_steps=1,
 )
-bs = bs_price(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True)
+bs = bs_price(dict(spot=100.0, strike=100.0, rate=0.05, dividend_yield=0.0, volatility=0.20, time_to_expiry=1.0, option_type="call"))
 print(f"EuropeanPricer ATM call: {mc_call.mean.amount:.6f} (stderr={mc_call.stderr:.6f})")
 print(f"Black–Scholes call:      {bs:.6f}")
 
@@ -411,7 +411,7 @@ For the same payoff variance, SE scales as $N^{-1/2}$, so its population ratio i
 import math
 import statistics
 
-reference = bs_price(100, 100, 0.05, 0.0, 0.2, 1.0, True)
+reference = bs_price(dict(spot=100, strike=100, rate=0.05, dividend_yield=0.0, volatility=0.2, time_to_expiry=1.0, option_type="call"))
 scaling = []
 for count in (1024, 4096):
     runs = [EuropeanPricer(count, seed, False).price_gbm(

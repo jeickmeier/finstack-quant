@@ -109,7 +109,15 @@ BLACK_SCHOLES = {
 
 def test_option_calculation_price_solve_matches_the_kernels() -> None:
     result = option_calculation({"model": BLACK_SCHOLES, "solve": {"kind": "price", "vol": 0.25}})
-    assert result.price == bs_price(100.0, 105.0, 0.03, 0.01, 0.25, 0.75, False)
+    assert result.price == bs_price({
+        "spot": 100.0,
+        "strike": 105.0,
+        "rate": 0.03,
+        "dividend_yield": 0.01,
+        "volatility": 0.25,
+        "time_to_expiry": 0.75,
+        "option_type": "put",
+    })
     assert result.implied_vol == 0.25
     assert isinstance(result.greeks, BsGreeks)
     assert result.greeks == bs_greeks({

@@ -881,7 +881,15 @@ class TestMonteCarloBenchmarks:
     def test_black_scholes_call(self, benchmark) -> None:
         _ccm_bench(
             benchmark,
-            lambda: bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True),
+            lambda: bs_price({
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+            }),
             _ccm._scalar(_ccm._bs_reference(), abs_tol=_ccm._BS_ABS_TOL),
             parameters={
                 "spot": 100.0,
@@ -1070,7 +1078,15 @@ class TestMonteCarloBenchmarks:
     def test_black_scholes_put(self, benchmark) -> None:
         _ccm_bench(
             benchmark,
-            lambda: bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, False),
+            lambda: bs_price({
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "put",
+            }),
             _ccm._scalar(_ccm._bs_reference(is_call=False), abs_tol=_ccm._BS_ABS_TOL),
             parameters={
                 "spot": 100.0,

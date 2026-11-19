@@ -479,11 +479,11 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # is_call` (Rust parameter names == Python kwargs; WASM camelCase). The
 # functions whose Rust signature takes `&OptionMarketParams` (`bs_greeks`, the
 # barrier / Asian / lookback / quanto dispatchers) take its serde form as one
-# `market` argument (a dict / JSON text in Python, the schema-generated object /
+# `market` argument (OptionMarketParams, dict or JSON in Python, the schema-generated object /
 # JSON text in WASM: `spot, strike, rate, dividend_yield, volatility,
 # time_to_expiry, option_type`), the COS pricers take `CosMarketParams` the same
 # way, and `heston_price` takes `HestonPricingParams` as `params`, so those
-# types have no host class. `bs_greeks`
+# two wire parameter types have no host class. `bs_greeks`
 # returns the typed `BsGreeks` (`rho_r`, not `rho`); `black76_greeks` /
 # `bachelier_greeks` return the typed `ForwardGreeks`. Each host function makes
 # one call into the same-named checked Rust entry point in `closed_form`
@@ -509,6 +509,7 @@ public = [
     "BsGreeks",
     "ForwardGreeks",
     "OptionCalculationResult",
+    "OptionMarketParams",
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
@@ -2166,7 +2167,8 @@ js = "margin.schema"
 
 [parity.modules."finstack_quant.models"]
 js = "models"
-types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks", OptionCalculationResult = "OptionCalculationResult" }
+types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks", OptionCalculationResult = "OptionCalculationResult", OptionMarketParams = "OptionMarketParams" }
+constructors = { OptionMarketParams = "models.optionMarketParams" }
 
 [parity.modules."finstack_quant.models.correlation"]
 js = "models.correlation"
@@ -2865,7 +2867,7 @@ excluded = { mappings_json = "literal" }
 excluded = { all = "literal", and_ = "literal", by_attribute = "literal", by_entity_id = "literal", by_position_ids = "literal", not_ = "literal", or_ = "literal" }
 
 [parity.members."finstack_quant.portfolio.SensitivityMatrix"]
-renames = { delta = { js = "portfolio.sensitivityMatrixDelta", reason = "WASM results are plain objects; the Rust SensitivityMatrix::delta method is a free function taking the object" }, factor_deltas = { js = "portfolio.sensitivityMatrixFactorDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::factor_deltas method is a free function taking the object" }, position_deltas = { js = "portfolio.sensitivityMatrixPositionDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::position_deltas method is a free function taking the object" } }
+renames = { delta = { js = "portfolio.sensitivityMatrixDelta", reason = "WASM results are plain objects; the Rust SensitivityMatrix::delta method is a free function taking the object and numeric indices; Python also resolves exact axis identifiers" }, factor_deltas = { js = "portfolio.sensitivityMatrixFactorDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::factor_deltas method is a free function taking the object" }, position_deltas = { js = "portfolio.sensitivityMatrixPositionDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::position_deltas method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.TradeDirection"]
 excluded = { buy = "literal", hold = "literal", sell = "literal" }

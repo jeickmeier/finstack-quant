@@ -108,15 +108,7 @@ fn black76_price_rejects_non_positive_df() {
 
 #[wasm_bindgen_test]
 fn bs_price_call_atm_is_positive() {
-    let p = bs_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(0.05),
-        JsValue::from(0.02),
-        JsValue::from(0.2),
-        JsValue::from(1.0),
-        JsValue::from(true),
-    )
+    let p = bs_price(JsValue::from_str(&serde_json::json!({"spot": 100.0, "strike": 100.0, "rate": 0.05, "dividend_yield": 0.02, "volatility": 0.2, "time_to_expiry": 1.0, "option_type": "call"}).to_string()))
     .expect("finite price");
     assert!(p > 0.0);
 }
@@ -154,15 +146,7 @@ fn vanilla_expiry_payoff_rejects_negative_spot() {
 #[wasm_bindgen_test]
 fn bs_implied_vol_recovers_sigma() {
     let sigma = 0.25;
-    let price = bs_price(
-        JsValue::from(100.0),
-        JsValue::from(110.0),
-        JsValue::from(0.03),
-        JsValue::from(0.01),
-        JsValue::from(sigma),
-        JsValue::from(0.75),
-        JsValue::from(true),
-    )
+    let price = bs_price(JsValue::from_str(&serde_json::json!({"spot": 100.0, "strike": 110.0, "rate": 0.03, "dividend_yield": 0.01, "volatility": sigma, "time_to_expiry": 0.75, "option_type": "call"}).to_string()))
     .expect("finite price");
     let iv = bs_implied_vol(
         JsValue::from(100.0),
@@ -183,30 +167,14 @@ fn bs_price_rejects_non_finite_result() {
     // `exp(-r*t)` to `+inf`, which escapes the core's `.max(0.0)` clamp.
     // The binding guard must surface that as a thrown error rather than a
     // silent non-finite value crossing the wasm boundary.
-    let result = bs_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(-1.0),
-        JsValue::from(0.0),
-        JsValue::from(0.2),
-        JsValue::from(1.0e6),
-        JsValue::from(false),
-    );
+    let result = bs_price(JsValue::from_str(&serde_json::json!({"spot": 100.0, "strike": 100.0, "rate": -1.0, "dividend_yield": 0.0, "volatility": 0.2, "time_to_expiry": 1.0e6, "option_type": "put"}).to_string()));
     assert!(
         result.is_err(),
         "a non-finite Black-Scholes price must produce an error"
     );
     // A well-posed input still returns a finite price unchanged.
     assert!(
-        bs_price(
-            JsValue::from(100.0),
-            JsValue::from(100.0),
-            JsValue::from(0.05),
-            JsValue::from(0.02),
-            JsValue::from(0.2),
-            JsValue::from(1.0),
-            JsValue::from(true)
-        )
+        bs_price(JsValue::from_str(&serde_json::json!({"spot": 100.0, "strike": 100.0, "rate": 0.05, "dividend_yield": 0.02, "volatility": 0.2, "time_to_expiry": 1.0, "option_type": "call"}).to_string()))
         .is_ok()
     );
 }

@@ -115,7 +115,7 @@ print(pd.Series({"matched_bond_floor_usd":floor_value,"native_convert_floor_usd"
 from finstack_quant.models import bs_price
 reference=tracks.convertible_limit()
 tree=price_instrument(json.dumps(reference),credit_market,AS_OF,model="tree").value.amount
-analytical=1000*math.exp(-.04)+10*bs_price(100.,100.,.04,0.,.25,1.,True)
+analytical=1000*math.exp(-.04)+10*bs_price(dict(spot=100., strike=100., rate=.04, dividend_yield=0., volatility=.25, time_to_expiry=1., option_type="call"))
 print(pd.Series({"tree_usd":tree,"analytical_usd":analytical,"residual_usd":tree-analytical,
            "absolute_tolerance_usd":.20}))
 ```

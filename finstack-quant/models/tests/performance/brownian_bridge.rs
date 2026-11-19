@@ -512,8 +512,16 @@ fn european_accuracy_record() -> Value {
         )
         .expect("existing European QMC control");
     check_result(&result, case, 42, false);
-    let reference = bs_price(100.0, 100.0, RATE, 0.0, VOLATILITY, 1.0, OptionType::Call)
-        .expect("Black-Scholes reference");
+    let reference = bs_price(&finstack_quant_models::types::OptionMarketParams {
+        spot: 100.0,
+        strike: 100.0,
+        rate: RATE,
+        dividend_yield: 0.0,
+        volatility: VOLATILITY,
+        time_to_expiry: 1.0,
+        option_type: OptionType::Call,
+    })
+    .expect("Black-Scholes reference");
     let error = (result.estimate.mean.amount() - reference).abs();
     assert!(error < 6.0 * result.estimate.stderr);
     assert!(result.estimate.stderr < 0.05);

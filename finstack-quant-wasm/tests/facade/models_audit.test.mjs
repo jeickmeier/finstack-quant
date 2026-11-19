@@ -9,7 +9,17 @@ await facade.default({
 
 test('checked Black-Scholes rejects invalid spot inputs', () => {
   for (const spot of [NaN, Infinity, -100, 0]) {
-    assert.throws(() => facade.models.bsPrice(spot, 100, 0.05, 0, 0.2, 1, true));
+    assert.throws(() =>
+      facade.models.bsPrice({
+        spot,
+        strike: 100,
+        rate: 0.05,
+        dividend_yield: 0,
+        volatility: 0.2,
+        time_to_expiry: 1,
+        option_type: 'call',
+      })
+    );
   }
 });
 

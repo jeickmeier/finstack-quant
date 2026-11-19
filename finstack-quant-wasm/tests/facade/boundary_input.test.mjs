@@ -163,11 +163,11 @@ test('narrow integers reject out-of-range values instead of wrapping', () => {
 });
 
 test('booleans are not coerced by truthiness', () => {
-  const args = [100, 100, 0.05, 0, 0.2, 1];
-  assert.ok(models.bsPrice(...args, true) > models.bsPrice(...args, false));
-  assert.throws(() => models.bsPrice(...args), invalidType('isCall'));
-  assert.throws(() => models.bsPrice(...args, 'true'), invalidType('isCall'));
-  assert.throws(() => models.bsPrice(...args, 1), invalidType('isCall'));
+  assert.equal(models.vanillaExpiryPayoff(110, 100, true), 10);
+  assert.equal(models.vanillaExpiryPayoff(110, 100, false), 0);
+  assert.throws(() => models.vanillaExpiryPayoff(110, 100), invalidType('isCall'));
+  assert.throws(() => models.vanillaExpiryPayoff(110, 100, 'true'), invalidType('isCall'));
+  assert.throws(() => models.vanillaExpiryPayoff(110, 100, 1), invalidType('isCall'));
 });
 
 test('counts reject negatives, fractions and oversized values before Rust sizes anything', () => {
@@ -329,24 +329,28 @@ test('capacities reject negative and fractional values instead of wrapping', () 
 });
 
 test('numbers are not coerced by ToNumber (F372)', () => {
-  const price = models.bsPrice(100, 100, 0.05, 0, 0.2, 1, true);
-  assert.ok(Math.abs(price - 10.4506) < 1e-4, `bsPrice = ${price}`);
-  assert.throws(() => models.bsPrice(100, 100, null, 0, 0.2, 1, true), invalidType('rate'));
-  assert.throws(
-    () => models.bsPrice('100', '100', '0.05', '0', '0.2', '1', true),
-    invalidType('spot')
-  );
-  assert.throws(() => models.bsPrice(100, 100, 0.05, 0, [0.2], 1, true), invalidType('vol'));
-  assert.throws(() => models.bsPrice(100, 100, 0.05, 0, 0.2, 1n, true), invalidType('expiry'));
-  assert.throws(
-    () => models.bsPrice(100, 100, 0.05, 0, 0.2, undefined, true),
-    invalidType('expiry')
-  );
-  // NaN is a number: it reaches Rust, which owns finiteness validation.
-  assert.throws(
-    () => models.bsPrice(100, 100, 0.05, 0, 0.2, Number.NaN, true),
-    (error) => !(error instanceof TypeError) && error.kind === 'validation'
-  );
+  const market = {
+    spot: 100,
+    strike: 100,
+    rate: 0.05,
+    dividend_yield: 0,
+    volatility: 0.2,
+    time_to_expiry: 1,
+    option_type: 'call',
+  };
+  assert.ok(Math.abs(models.bsPrice(market) - 10.4506) < 1e-4);
+  for (const invalid of [
+    { ...market, rate: null },
+    { ...market, spot: '100' },
+    { ...market, volatility: [0.2] },
+    { ...market, time_to_expiry: 1n },
+    { ...market, time_to_expiry: undefined },
+    { ...market, time_to_expiry: Number.NaN },
+    { ...market, option_type: true },
+  ]) {
+    assert.throws(() => models.bsPrice(invalid));
+  }
+  assert.throws(() => models.bsPrice(100), invalidType('market'));
 });
 
 test('number arrays must be arrays of numbers or Float64Array', () => {

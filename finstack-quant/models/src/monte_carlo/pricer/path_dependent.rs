@@ -1983,9 +1983,16 @@ mod tests {
             )
             .expect("sobol pricing should succeed");
 
-        let bs =
-            crate::closed_form::bs_price(s0, k, r, q, sigma, t, crate::types::OptionType::Call)
-                .expect("valid Black-Scholes inputs");
+        let bs = crate::closed_form::bs_price(&crate::types::OptionMarketParams {
+            spot: s0,
+            strike: k,
+            rate: r,
+            dividend_yield: q,
+            volatility: sigma,
+            time_to_expiry: t,
+            option_type: crate::types::OptionType::Call,
+        })
+        .expect("valid Black-Scholes inputs");
         let mean = result.estimate.mean.amount();
         let stderr = result.estimate.stderr;
 

@@ -1138,3 +1138,21 @@ for (const [name, compute] of Object.entries(CASES)) {
     assertClose(plain(compute()), GOLDEN[name], name);
   });
 }
+
+test('option market construction shares the validated greeks inputs', () => {
+  const wire = {
+    spot: 101.0,
+    strike: 94.0,
+    rate: 0.037,
+    dividend_yield: 0.011,
+    volatility: 0.24,
+    time_to_expiry: 0.65,
+    option_type: 'put',
+  };
+  const market = models.optionMarketParams(wire);
+  assert.deepEqual(market, wire);
+  assert.deepEqual(models.bsGreeks(market), models.bsGreeks(wire));
+  const zeroVol = models.optionMarketParams({ ...wire, volatility: 0.0 });
+  assert.throws(() => models.bsGreeks(zeroVol), /positive vol/);
+  assert.throws(() => models.optionMarketParams({ ...wire, volatility: Number.NaN }), /volatility/);
+});

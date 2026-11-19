@@ -114,8 +114,8 @@ widths[0], widths[-1] = (strikes[1]-strikes[0])/2, (strikes[-1]-strikes[-2])/2
 widths[1:-1] = (strikes[2:]-strikes[:-2])/2
 option_prices = []
 for i, strike in enumerate(strikes):
-    call = bs_price(spot, float(strike), r, dividend_yield, 0.20, T, True)
-    put = bs_price(spot, float(strike), r, dividend_yield, 0.20, T, False)
+    call = bs_price(dict(spot=spot, strike=float(strike), rate=r, dividend_yield=dividend_yield, volatility=0.20, time_to_expiry=T, option_type="call"))
+    put = bs_price(dict(spot=spot, strike=float(strike), rate=r, dividend_yield=dividend_yield, volatility=0.20, time_to_expiry=T, option_type="put"))
     option_prices.append(put if i < k0_index else call if i > k0_index else (put+call)/2)
 strip_variance = 2/(T*df)*np.sum(widths*np.array(option_prices)/strikes**2)
 strip_variance -= 2/T*((forward/k0-1)-math.log(forward/k0))

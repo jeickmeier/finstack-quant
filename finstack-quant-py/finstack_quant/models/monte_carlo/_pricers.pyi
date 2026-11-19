@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import Any
+from finstack_quant.models._closed_form import OptionMarketParams
 from finstack_quant.models.monte_carlo._results import LrmGreeks, MoneyEstimate
 
 class EuropeanPricer:
@@ -117,7 +118,7 @@ class EuropeanPricer:
 
     def price_gbm(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
@@ -259,7 +260,7 @@ class PathDependentPricer:
 
     def price_asian(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
@@ -334,7 +335,7 @@ class PathDependentPricer:
 
     def price_with_lrm_greeks(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> LrmGreeks:
@@ -678,7 +679,7 @@ class LsmcPricer:
 
     def price_american(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         currency: str | None = None,
         num_steps: int | None = None,
         basis: str | None = None,
@@ -751,7 +752,7 @@ class LsmcPricer:
 
     def price_american_unbiased(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         pricing_seed: int,
         currency: str | None = None,
         num_steps: int | None = None,

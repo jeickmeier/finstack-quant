@@ -380,15 +380,15 @@ mod tests {
     }
 
     fn bs_call(spot: f64) -> f64 {
-        crate::closed_form::bs_price(
+        crate::closed_form::bs_price(&crate::types::OptionMarketParams {
             spot,
-            STRIKE,
-            RATE,
-            DIVIDEND_YIELD,
-            VOLATILITY,
-            EXPIRY,
-            crate::types::OptionType::Call,
-        )
+            strike: STRIKE,
+            rate: RATE,
+            dividend_yield: DIVIDEND_YIELD,
+            volatility: VOLATILITY,
+            time_to_expiry: EXPIRY,
+            option_type: crate::types::OptionType::Call,
+        })
         .expect("valid Black-Scholes inputs")
     }
 

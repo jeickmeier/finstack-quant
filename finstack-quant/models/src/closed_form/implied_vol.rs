@@ -17,7 +17,7 @@ const NON_FINITE_MSG: &str = "Implied volatility solver received non-finite inpu
 
 /// Solve for Black–Scholes / Garman–Kohlhagen implied volatility.
 ///
-/// Finds \(\sigma\) such that `bs_price(spot, strike, rate, div_yield, vol, expiry, option_type) == price`.
+/// Finds \(\sigma\) such that `bs_price(&market_with_volatility) == price`.
 ///
 /// - `price` is the **per-unit** option price (not contract-scaled).
 /// - Returns `Err` for non-finite inputs, non-positive `expiry` (an expired
@@ -99,7 +99,7 @@ pub fn bs_implied_vol(
 /// Solve for Black-76 implied volatility (forward-based).
 ///
 /// Finds \(\sigma\) such that:
-/// `df * bs_price(forward, strike, 0, 0, sigma, expiry, option_type) == price`.
+/// `df * bs_price(&market_with_zero_rates) == price`.
 ///
 /// - `price` is the **per-unit** option price (not contract-scaled).
 /// - Returns `Err` for non-finite inputs, non-positive `expiry` (an expired

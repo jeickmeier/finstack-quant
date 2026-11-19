@@ -40,12 +40,83 @@ use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use pyo3::prelude::*;
 
-/// Parse a `market` argument (dict or JSON text) as an [`OptionMarketParams`].
+/// Extract a typed market, or parse it from a dictionary or canonical JSON.
 ///
 /// Shared by the closed-form and Monte Carlo option bindings.
 pub(crate) fn option_market(market: &Bound<'_, PyAny>) -> PyResult<OptionMarketParams> {
+    if let Ok(typed) = market.cast::<PyOptionMarketParams>() {
+        return Ok(typed.borrow().inner.clone());
+    }
     spec_from_py(market.py(), market, "OptionMarketParams")
 }
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams")]
+#[pyclass(
+    name = "OptionMarketParams",
+    module = "finstack_quant.models",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+struct PyOptionMarketParams {
+    inner: OptionMarketParams,
+}
+
+#[pymethods]
+impl PyOptionMarketParams {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.__init__")]
+    #[new]
+    #[pyo3(signature = (*, spot, strike, rate, dividend_yield, volatility, time_to_expiry, option_type))]
+    fn new(
+        spot: f64,
+        strike: f64,
+        rate: f64,
+        dividend_yield: f64,
+        volatility: f64,
+        time_to_expiry: f64,
+        option_type: &str,
+    ) -> PyResult<Self> {
+        let inner = OptionMarketParams {
+            spot,
+            strike,
+            rate,
+            volatility,
+            time_to_expiry,
+            dividend_yield,
+            option_type: serde_parse(option_type).map_err(core_to_py)?,
+        };
+        inner.validate_allow_zero_vol().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.option_type")]
+    #[getter]
+    fn option_type(&self) -> String {
+        self.inner.option_type.to_string()
+    }
+}
+
+crate::bindings::macros::py_getters!(PyOptionMarketParams |market| {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.spot")]
+    spot -> f64 = market.inner.spot;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.strike")]
+    strike -> f64 = market.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.rate")]
+    rate -> f64 = market.inner.rate;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.dividend_yield")]
+    dividend_yield -> f64 = market.inner.dividend_yield;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.volatility")]
+    volatility -> f64 = market.inner.volatility;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.time_to_expiry")]
+    time_to_expiry -> f64 = market.inner.time_to_expiry;
+
+});
 
 const BS_GREEK_LABELS: [&str; 6] = ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"];
 
@@ -280,26 +351,8 @@ fn option_calculation_wrapper(request: &Bound<'_, PyAny>) -> PyResult<PyOptionCa
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "bs_price")]
 #[pyfunction(name = "bs_price")]
-#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call))]
-fn bs_price_wrapper(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    is_call: bool,
-) -> PyResult<f64> {
-    bs_price(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        OptionType::from(is_call),
-    )
-    .map_err(core_to_py)
+fn bs_price_wrapper(market: &Bound<'_, PyAny>) -> PyResult<f64> {
+    bs_price(&option_market(market)?).map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "vanilla_expiry_payoff")]
@@ -562,6 +615,7 @@ fn heston_price_wrapper(
 /// Register the analytic option primitives on the models submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBsGreeks>()?;
+    m.add_class::<PyOptionMarketParams>()?;
     m.add_class::<PyForwardGreeks>()?;
     m.add_class::<PyOptionCalculationResult>()?;
     m.add_function(wrap_pyfunction!(option_calculation_wrapper, m)?)?;

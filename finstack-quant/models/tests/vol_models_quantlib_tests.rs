@@ -316,23 +316,27 @@ fn test_vol_models_quantlib_parity() {
                 }
                 *counts.entry("bsm").or_default() += 1;
                 let call = finstack_quant_models::closed_form::bs_price(
-                    *spot,
-                    *strike,
-                    *rate,
-                    *dividend_yield,
-                    *sigma,
-                    *t,
-                    finstack_quant_models::types::OptionType::Call,
+                    &finstack_quant_models::types::OptionMarketParams {
+                        spot: *spot,
+                        strike: *strike,
+                        rate: *rate,
+                        dividend_yield: *dividend_yield,
+                        volatility: *sigma,
+                        time_to_expiry: *t,
+                        option_type: finstack_quant_models::types::OptionType::Call,
+                    },
                 )
                 .expect("valid Black-Scholes inputs");
                 let put = finstack_quant_models::closed_form::bs_price(
-                    *spot,
-                    *strike,
-                    *rate,
-                    *dividend_yield,
-                    *sigma,
-                    *t,
-                    finstack_quant_models::types::OptionType::Put,
+                    &finstack_quant_models::types::OptionMarketParams {
+                        spot: *spot,
+                        strike: *strike,
+                        rate: *rate,
+                        dividend_yield: *dividend_yield,
+                        volatility: *sigma,
+                        time_to_expiry: *t,
+                        option_type: finstack_quant_models::types::OptionType::Put,
+                    },
                 )
                 .expect("valid Black-Scholes inputs");
                 let tol = expected.tolerance_rel;

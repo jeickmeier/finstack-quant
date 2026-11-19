@@ -1,7 +1,171 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/models/closed_form.rs``."""
 
-from typing import Any
+from typing import Any, Literal
 import pandas as pd
+
+class OptionMarketParams:
+    """Immutable market inputs for a vanilla option or option model.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import OptionMarketParams, bs_greeks
+    >>> market = OptionMarketParams(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.05,
+    ...     dividend_yield=0.0,
+    ...     volatility=0.2,
+    ...     time_to_expiry=1.0,
+    ...     option_type="call",
+    ... )
+    >>> round(bs_greeks(market).delta, 4)
+    0.6368
+    """
+
+    def __init__(
+        self,
+        *,
+        spot: float,
+        strike: float,
+        rate: float,
+        dividend_yield: float,
+        volatility: float,
+        time_to_expiry: float,
+        option_type: Literal["call", "put"],
+    ) -> None:
+        """Validate and store the market inputs.
+
+        Parameters
+        ----------
+        spot : float
+            Underlying spot price, in the same units as strike.
+        strike : float
+            Exercise price in the same units as spot.
+        rate : float
+            Continuously compounded annual risk-free rate as a decimal.
+        dividend_yield : float
+            Continuous annual dividend yield or foreign-rate carry as a decimal.
+        volatility : float
+            Annualized volatility as a decimal. Zero is permitted by this input container.
+        time_to_expiry : float
+            Time remaining until expiry, in years.
+        option_type : {"call", "put"}
+            Direction of the option payoff.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type.
+        ValueError
+            If a number is non-finite, spot or strike is nonpositive,
+            volatility or expiry is negative, or the option type is unknown.
+        """
+        ...
+
+    @property
+    def spot(self) -> float:
+        """Read the option's spot.
+
+        Returns
+        -------
+        float
+            Underlying spot price, in the same units as strike.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def strike(self) -> float:
+        """Read the option's strike.
+
+        Returns
+        -------
+        float
+            Exercise price in the same units as spot.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def rate(self) -> float:
+        """Read the option's rate.
+
+        Returns
+        -------
+        float
+            Continuously compounded annual risk-free rate as a decimal.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def dividend_yield(self) -> float:
+        """Read the option's dividend yield.
+
+        Returns
+        -------
+        float
+            Continuous annual dividend yield or foreign-rate carry as a decimal.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def volatility(self) -> float:
+        """Read the option's volatility.
+
+        Returns
+        -------
+        float
+            Annualized volatility as a decimal. Zero is permitted by this input container.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def time_to_expiry(self) -> float:
+        """Read the option's time to expiry.
+
+        Returns
+        -------
+        float
+            Time remaining until expiry, in years.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def option_type(self) -> str:
+        """Read the option's option type.
+
+        Returns
+        -------
+        str
+            Payoff direction, call or put.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
 
 class BsGreeks:
     """
@@ -553,68 +717,64 @@ def option_calculation(request: str | dict[str, Any]) -> OptionCalculationResult
     ...     "expiry": 1.0,
     ...     "is_call": True,
     ... }
-    >>> price = bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    >>> price = bs_price(
+    ...     dict(
+    ...         spot=100.0,
+    ...         strike=100.0,
+    ...         rate=0.05,
+    ...         dividend_yield=0.0,
+    ...         volatility=0.2,
+    ...         time_to_expiry=1.0,
+    ...         option_type="call",
+    ...     )
+    ... )
     >>> solved = option_calculation({"model": model, "solve": {"kind": "implied_vol", "price": price}})
     >>> round(solved.implied_vol, 8)
     0.2
     """
     ...
 
-def bs_price(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    is_call: bool,
-) -> float:
-    """
-    Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
-
-    All rates are continuously compounded decimals; ``vol`` is annualized
-    vol; ``expiry`` is years to expiry. Pass ``is_call=False`` for puts.
+def bs_price(market: OptionMarketParams | dict[str, Any] | str) -> float:
+    """Price a vanilla European option with Black-Scholes or Garman-Kohlhagen.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend/borrow yield (decimal).
-    vol : float
-        Annualized volatility (decimal); must be non-negative.
-    expiry : float
-        Time to expiry in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
+    market : OptionMarketParams | dict[str, Any] | str
+        Typed market inputs or their canonical dictionary or JSON. Spot and
+        strike share units; the domestic risk-free rate and dividend yield or
+        foreign rate use continuous annual decimal rates. Volatility is an
+        annualized decimal and expiry is in years. The payoff direction is
+        ``"call"`` or ``"put"``.
 
     Returns
     -------
     float
-        Per-unit option price.
+        Price per unit of underlying, in the same units as spot. Zero expiry
+        gives the intrinsic value, and zero volatility gives the discounted
+        deterministic payoff.
 
     Raises
     ------
+    TypeError
+        If market has an incompatible Python type.
     ValueError
-        If spot or strike is non-positive, volatility or expiry is negative,
-        any numerical input is non-finite, or discounted legs or price overflow.
+        If fields are missing or invalid, or a discounted leg or price is
+        non-finite.
 
     Examples
     --------
-    >>> from finstack_quant.models import bs_price
-    >>> round(bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True), 4)
+    >>> from finstack_quant.models import OptionMarketParams, bs_price
+    >>> market = OptionMarketParams(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.05,
+    ...     dividend_yield=0.0,
+    ...     volatility=0.20,
+    ...     time_to_expiry=1.0,
+    ...     option_type="call",
+    ... )
+    >>> round(bs_price(market), 4)
     10.4506
-
-    Sources
-    -------
-    - Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973
-    - Merton (1973): see docs/REFERENCES.md#merton-1973
-    - Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983
-
     """
     ...
 
@@ -653,7 +813,7 @@ def vanilla_expiry_payoff(spot: float, strike: float, is_call: bool) -> float:
     ...
 
 def bs_greeks(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     theta_days_per_year: float = 365.0,
 ) -> BsGreeks:
     """
@@ -665,7 +825,7 @@ def bs_greeks(
     Parameters
     ----------
     market : dict or str
-        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Typed option market, dictionary, or canonical JSON text.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -758,7 +918,17 @@ def bs_implied_vol(
     Examples
     --------
     >>> from finstack_quant.models import bs_implied_vol, bs_price
-    >>> price = bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    >>> price = bs_price(
+    ...     dict(
+    ...         spot=100.0,
+    ...         strike=100.0,
+    ...         rate=0.05,
+    ...         dividend_yield=0.0,
+    ...         volatility=0.2,
+    ...         time_to_expiry=1.0,
+    ...         option_type="call",
+    ...     )
+    ... )
     >>> round(bs_implied_vol(100.0, 100.0, 0.05, 0.0, 1.0, price, True), 6)
     0.2
 
@@ -1178,7 +1348,7 @@ def heston_price(
 # Closed-form exotics
 
 def barrier_option_price(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     barrier: float,
     direction: str,
     knock: str,
@@ -1191,7 +1361,7 @@ def barrier_option_price(
     Parameters
     ----------
     market : dict or str
-        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Typed option market, dictionary, or canonical JSON text.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -1241,7 +1411,7 @@ def barrier_option_price(
     ...
 
 def asian_option_price(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     num_fixings: int,
     averaging: str | None = None,
 ) -> float:
@@ -1251,7 +1421,7 @@ def asian_option_price(
     Parameters
     ----------
     market : dict or str
-        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Typed option market, dictionary, or canonical JSON text.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -1299,7 +1469,7 @@ def asian_option_price(
     ...
 
 def lookback_option_price(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     extremum: float,
     strike_type: str = "fixed",
 ) -> float:
@@ -1312,7 +1482,7 @@ def lookback_option_price(
     Parameters
     ----------
     market : dict or str
-        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Typed option market, dictionary, or canonical JSON text.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -1358,7 +1528,7 @@ def lookback_option_price(
     ...
 
 def quanto_option_price(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     rate_foreign: float,
     vol_fx: float,
     correlation: float,

@@ -1024,7 +1024,7 @@ for label,m,s,vol in [("base",market,5200.,.20),("joint_stress",stress,4160.,.30
     discount=m.get_discount("USD-OIS").df(1.);rate=-math.log(discount);forward=s/discount*math.exp(-.015)
     options=[]
     for i,k in enumerate(strike_grid):
-        call=bs_price(s,float(k),rate,.015,vol,1.,True);put=bs_price(s,float(k),rate,.015,vol,1.,False)
+        call=bs_price(dict(spot=s, strike=float(k), rate=rate, dividend_yield=.015, volatility=vol, time_to_expiry=1., option_type="call"));put=bs_price(dict(spot=s, strike=float(k), rate=rate, dividend_yield=.015, volatility=vol, time_to_expiry=1., option_type="put"))
         options.append(put if i<cut else call if i>cut else .5*(put+call))
     option_strip_pv=2*1_000_000*float(np.sum(width*np.array(options)/strike_grid**2))
     forward_cash_correction=-1_000_000*discount*(2*((forward/k0-1)-math.log(forward/k0))+.04)

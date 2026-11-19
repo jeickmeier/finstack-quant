@@ -25,20 +25,71 @@ fn checked_black_scholes_rejects_invalid_inputs_without_masking_nan() {
         for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             let mut p = valid;
             p[i] = invalid;
-            assert!(bs_price(p[0], p[1], p[2], p[3], p[4], p[5], OptionType::Call).is_err());
+            assert!(
+                bs_price(&finstack_quant_models::types::OptionMarketParams {
+                    spot: p[0],
+                    strike: p[1],
+                    rate: p[2],
+                    dividend_yield: p[3],
+                    volatility: p[4],
+                    time_to_expiry: p[5],
+                    option_type: OptionType::Call
+                })
+                .is_err()
+            );
         }
     }
     for i in [0, 1, 4, 5] {
         let mut p = valid;
         p[i] = -1.0;
-        assert!(bs_price(p[0], p[1], p[2], p[3], p[4], p[5], OptionType::Call).is_err());
+        assert!(
+            bs_price(&finstack_quant_models::types::OptionMarketParams {
+                spot: p[0],
+                strike: p[1],
+                rate: p[2],
+                dividend_yield: p[3],
+                volatility: p[4],
+                time_to_expiry: p[5],
+                option_type: OptionType::Call
+            })
+            .is_err()
+        );
     }
-    assert!(bs_price(100.0, 100.0, -1000.0, -1000.0, 0.0, 1.0, OptionType::Call).is_err());
+    assert!(
+        bs_price(&finstack_quant_models::types::OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: -1000.0,
+            dividend_yield: -1000.0,
+            volatility: 0.0,
+            time_to_expiry: 1.0,
+            option_type: OptionType::Call
+        })
+        .is_err()
+    );
     assert_eq!(
-        bs_price(120.0, 100.0, 0.05, 0.0, 0.2, 0.0, OptionType::Call).unwrap(),
+        bs_price(&finstack_quant_models::types::OptionMarketParams {
+            spot: 120.0,
+            strike: 100.0,
+            rate: 0.05,
+            dividend_yield: 0.0,
+            volatility: 0.2,
+            time_to_expiry: 0.0,
+            option_type: OptionType::Call
+        })
+        .unwrap(),
         20.0
     );
-    let deterministic = bs_price(50.0, 100.0, 0.2, 0.0, 0.0, 1.0, OptionType::Put).unwrap();
+    let deterministic = bs_price(&finstack_quant_models::types::OptionMarketParams {
+        spot: 50.0,
+        strike: 100.0,
+        rate: 0.2,
+        dividend_yield: 0.0,
+        volatility: 0.0,
+        time_to_expiry: 1.0,
+        option_type: OptionType::Put,
+    })
+    .unwrap();
     assert!((deterministic - (100.0 * (-0.2_f64).exp() - 50.0)).abs() < 1e-12);
 }
 
@@ -55,7 +106,16 @@ fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
     };
     assert!(bs_cos_price(market, 0.2).is_err());
     market.n_terms = Some(128);
-    let exact = bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, OptionType::Call).unwrap();
+    let exact = bs_price(&finstack_quant_models::types::OptionMarketParams {
+        spot: 100.0,
+        strike: 100.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        volatility: 0.2,
+        time_to_expiry: 1.0,
+        option_type: OptionType::Call,
+    })
+    .unwrap();
     assert!((bs_cos_price(market, 0.2).unwrap() - exact).abs() < 1e-8);
 }
 

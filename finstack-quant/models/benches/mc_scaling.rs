@@ -47,8 +47,16 @@ use validity::{
 };
 
 fn call_reference() -> f64 {
-    bs_price(SPOT, STRIKE, RATE, DIV, VOL, 1.0, OptionType::Call)
-        .expect("Black-Scholes fixture reference")
+    bs_price(&finstack_quant_models::types::OptionMarketParams {
+        spot: SPOT,
+        strike: STRIKE,
+        rate: RATE,
+        dividend_yield: DIV,
+        volatility: VOL,
+        time_to_expiry: 1.0,
+        option_type: OptionType::Call,
+    })
+    .expect("Black-Scholes fixture reference")
 }
 
 fn scaling_european_paths(c: &mut Criterion) {
@@ -543,8 +551,16 @@ fn bench_lmm_caplet(c: &mut Criterion) {
         let reference = 1_000_000.0
             * params.accrual_factors[2]
             * discount_payment
-            * bs_price(0.035, 0.035, 0.0, 0.0, volatility, 2.0, OptionType::Call)
-                .expect("displaced-Black caplet reference");
+            * bs_price(&finstack_quant_models::types::OptionMarketParams {
+                spot: 0.035,
+                strike: 0.035,
+                rate: 0.0,
+                dividend_yield: 0.0,
+                volatility,
+                time_to_expiry: 2.0,
+                option_type: OptionType::Call,
+            })
+            .expect("displaced-Black caplet reference");
         // The nonterminal predictor/corrector discretization is approximate.
         // This smoke check is distinct from the tighter original-drift panel.
         check_against_reference(&checked, reference, 5.0);

@@ -6,6 +6,7 @@
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref, extract_records_json};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -112,20 +113,31 @@ impl PySensitivityMatrix {
         self.inner.n_factors()
     }
 
-    /// Read a single sensitivity element.
-    ///
-    /// Parameters
-    /// ----------
-    /// position_idx : int
-    ///     Row index.
-    /// factor_idx : int
-    ///     Column index.
-    ///
-    /// Returns
-    /// -------
-    /// float
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._sensitivity", "SensitivityMatrix.delta")]
     #[pyo3(text_signature = "(self, position_idx, factor_idx)")]
-    fn delta(&self, position_idx: usize, factor_idx: usize) -> PyResult<f64> {
+    fn delta(
+        &self,
+        position_idx: &Bound<'_, PyAny>,
+        factor_idx: &Bound<'_, PyAny>,
+    ) -> PyResult<f64> {
+        let position_idx = if let Ok(id) = position_idx.extract::<String>() {
+            self.inner
+                .position_ids()
+                .iter()
+                .position(|position| *position == id)
+                .ok_or_else(|| PyKeyError::new_err(id))?
+        } else {
+            position_idx.extract::<usize>()?
+        };
+        let factor_idx = if let Ok(id) = factor_idx.extract::<String>() {
+            self.inner
+                .factor_ids()
+                .iter()
+                .position(|factor| factor.as_str() == id)
+                .ok_or_else(|| PyKeyError::new_err(id))?
+        } else {
+            factor_idx.extract::<usize>()?
+        };
         self.inner
             .delta(position_idx, factor_idx)
             .map_err(core_to_py)

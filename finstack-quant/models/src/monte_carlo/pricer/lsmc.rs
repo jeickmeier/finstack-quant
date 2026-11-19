@@ -1939,15 +1939,15 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european = crate::closed_form::bs_price(
+        let european = crate::closed_form::bs_price(&crate::types::OptionMarketParams {
             spot,
             strike,
             rate,
-            div_yield,
-            vol,
-            expiry,
-            crate::types::OptionType::Put,
-        )
+            dividend_yield: div_yield,
+            volatility: vol,
+            time_to_expiry: expiry,
+            option_type: crate::types::OptionType::Put,
+        })
         .expect("valid Black-Scholes inputs");
         let pricer = LsmcPricer::new(
             Some(8_000),
@@ -1993,15 +1993,15 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european = crate::closed_form::bs_price(
+        let european = crate::closed_form::bs_price(&crate::types::OptionMarketParams {
             spot,
             strike,
             rate,
-            div_yield,
-            vol,
-            expiry,
-            crate::types::OptionType::Call,
-        )
+            dividend_yield: div_yield,
+            volatility: vol,
+            time_to_expiry: expiry,
+            option_type: crate::types::OptionType::Call,
+        })
         .expect("valid Black-Scholes inputs");
         let pricer = LsmcPricer::new(
             Some(8_000),

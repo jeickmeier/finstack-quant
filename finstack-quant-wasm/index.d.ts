@@ -6693,7 +6693,7 @@ export interface ModelsVolatilityNamespace {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * console.log(models.bsPrice(100, 100, 0.03, 0, 0.2, 1, true));
+ * console.log(models.bsPrice({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, volatility: 0.2, time_to_expiry: 1, option_type: 'call' }));
  * ```
  */
 export interface ModelsNamespace {
@@ -6744,43 +6744,28 @@ export interface ModelsNamespace {
    */
   readonly optionCalculation: typeof wasm.optionCalculation;
   /**
-   * Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
-   *
-   * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-   * Merton (1973): see docs/REFERENCES.md#merton-1973.
-   * Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.
-   *
-   * @param spot - Spot price of the underlying.
-   * @param strike - Strike of the option.
-   * @param rate - Risk-free rate, **decimal** continuously compounded
-   * (e.g. `0.05` for 5%).
-   * @param divYield - Continuous dividend yield (or foreign rate for FX),
-   * **decimal** continuously compounded.
-   * @param vol - Annualized volatility, **decimal**
-   * (e.g. `0.20` for 20%).
-   * @param expiry - Time to expiry in **years**.
-   * @param isCall - `true` for a call, `false` for a put.
-   * @returns Per-unit option price.
-   *
+   * Per-unit Black-Scholes or Garman-Kohlhagen price of a European option.
+   * @param market - Canonical option inputs as an object or JSON text. Spot and strike share units; rate and dividend yield are continuously compounded decimal rates (foreign rate for FX); volatility is annualized decimal; time to expiry is in years; option type is call or put.
+   * @returns Price per unit. At zero expiry this is the intrinsic value; at zero volatility it is the discounted deterministic payoff.
+   * @throws `TypeError` if the market input is mistyped, or `FinstackError` when the contract is malformed, inputs fail validation or the discounted legs or price are non-finite.
    * @example
-   * ```javascript
+   * ```typescript
    * import init, { models } from "finstack-quant-wasm";
    * await init();
-   * const price = models.bsPrice(
-   *   100,    // spot
-   *   100,    // strike (ATM)
-   *   0.05,   // rate = 5%
-   *   0.0,    // divYield = 0
-   *   0.20,   // vol = 20%
-   *   1.0,    // expiry = 1 year
-   *   true,   // call
-   * );
-   * // price ≈ 10.45
+   * const price = models.bsPrice({
+   *   spot: 100, strike: 100, rate: 0.05, dividend_yield: 0,
+   *   volatility: 0.2, time_to_expiry: 1, option_type: "call",
+   * });
    * ```
-   *
-   * @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.
    */
   readonly bsPrice: typeof wasm.bsPrice;
+  /**
+   * Validate an option's market inputs and return the canonical object.
+   * @param market - Positive spot and strike in matching units; continuous annual decimal rate and carry; nonnegative annualized decimal volatility and expiry in years; and call or put payoff direction.
+   * @returns Validated option market object. Individual pricers may require strictly positive volatility or expiry.
+   * @throws `TypeError` if market has the wrong host type, or `FinstackError` for invalid or non-finite parameters.
+   */
+  readonly optionMarketParams: typeof wasm.optionMarketParams;
   /**
    * Vanilla option payoff at expiry: `max(±(spot - strike), 0)`.
    *

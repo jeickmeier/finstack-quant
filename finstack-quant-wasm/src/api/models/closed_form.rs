@@ -18,7 +18,8 @@
 //! `docs/REFERENCES.md#black-1976`.
 
 use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string, js_uint,
+    from_js_json, from_js_json_exact, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string,
+    js_string, js_uint,
 };
 use crate::utils::to_js_err;
 use finstack_quant_core::wire::serde_parse;
@@ -84,68 +85,38 @@ pub fn option_calculation(
     crate::utils::to_js_value(&result)
 }
 
-/// Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
-///
-/// Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-/// Merton (1973): see docs/REFERENCES.md#merton-1973.
-/// Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.
-///
-/// @param spot - Spot price of the underlying.
-/// @param strike - Strike of the option.
-/// @param rate - Risk-free rate, **decimal** continuously compounded
-/// (e.g. `0.05` for 5%).
-/// @param divYield - Continuous dividend yield (or foreign rate for FX),
-/// **decimal** continuously compounded.
-/// @param vol - Annualized volatility, **decimal**
-/// (e.g. `0.20` for 20%).
-/// @param expiry - Time to expiry in **years**.
-/// @param isCall - `true` for a call, `false` for a put.
-/// @returns Per-unit option price.
-///
+/// Validate an option's market inputs and return the canonical object.
+/// @param market - Positive spot and strike in matching units; continuous annual decimal rate and carry; nonnegative annualized decimal volatility and expiry in years; and call or put payoff direction.
+/// @returns Validated option market object. Individual pricers may require strictly positive volatility or expiry.
+/// @throws `TypeError` if market has the wrong host type, or `FinstackError` for invalid or non-finite parameters.
+#[wasm_bindgen(js_name = optionMarketParams, unchecked_return_type = "generated.models.OptionMarketParams")]
+pub fn option_market_params(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams")] market: JsValue,
+) -> Result<JsValue, JsValue> {
+    let market: OptionMarketParams = from_js_json_exact(&market, "market")?;
+    market.validate_allow_zero_vol().map_err(to_js_err)?;
+    crate::utils::to_js_value(&market)
+}
+
+/// Per-unit Black-Scholes or Garman-Kohlhagen price of a European option.
+/// @param market - Canonical option inputs as an object or JSON text. Spot and strike share units; rate and dividend yield are continuously compounded decimal rates (foreign rate for FX); volatility is annualized decimal; time to expiry is in years; option type is call or put.
+/// @returns Price per unit. At zero expiry this is the intrinsic value; at zero volatility it is the discounted deterministic payoff.
+/// @throws `TypeError` if the market input is mistyped, or `FinstackError` when the contract is malformed, inputs fail validation or the discounted legs or price are non-finite.
 /// @example
-/// ```javascript
+/// ```typescript
 /// import init, { models } from "finstack-quant-wasm";
 /// await init();
-/// const price = models.bsPrice(
-///   100,    // spot
-///   100,    // strike (ATM)
-///   0.05,   // rate = 5%
-///   0.0,    // divYield = 0
-///   0.20,   // vol = 20%
-///   1.0,    // expiry = 1 year
-///   true,   // call
-/// );
-/// // price ≈ 10.45
+/// const price = models.bsPrice({
+///   spot: 100, strike: 100, rate: 0.05, dividend_yield: 0,
+///   volatility: 0.2, time_to_expiry: 1, option_type: "call",
+/// });
 /// ```
-///
-/// @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.
 #[wasm_bindgen(js_name = bsPrice)]
 pub fn bs_price(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
-    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
-    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
 ) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let rate = js_f64(&rate, "rate")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let vol = js_f64(&vol, "vol")?;
-    let expiry = js_f64(&expiry, "expiry")?;
-    let is_call = js_bool(&is_call, "isCall")?;
-    bs_price_core(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        OptionType::from(is_call),
-    )
-    .map_err(to_js_err)
+    bs_price_core(&from_js_json_exact(&market, "market")?).map_err(to_js_err)
 }
 
 /// Vanilla option payoff at expiry: `max(±(spot - strike), 0)`.

@@ -67,7 +67,21 @@ def test_european_serial_parallel_and_seed_replay_are_identical() -> None:
         for item in estimates
     ]
     assert signatures[0] == signatures[1] == signatures[2]
-    assert abs(estimates[0].mean.amount - bs_price(100, 100, 0.05, 0, 0.2, 1, True)) < 4 * estimates[0].stderr
+    assert (
+        abs(
+            estimates[0].mean.amount
+            - bs_price({
+                "spot": 100,
+                "strike": 100,
+                "rate": 0.05,
+                "dividend_yield": 0,
+                "volatility": 0.2,
+                "time_to_expiry": 1,
+                "option_type": "call",
+            })
+        )
+        < 4 * estimates[0].stderr
+    )
 
 
 def test_maturity_only_lsmc_counts_pairs_and_uses_pair_mean_standard_error() -> None:
@@ -171,7 +185,19 @@ def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> No
         "up",
         "out",
     )
-    assert 0 < continuous < bs_price(100, 100, 0.05, 0.0, 0.2, 1.0, True)
+    assert (
+        0
+        < continuous
+        < bs_price({
+            "spot": 100,
+            "strike": 100,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
+    )
     fine_se = monitored[-1].std(ddof=1) / math.sqrt(len(paths))
     # Continuous <= discrete is an expectation ordering; allow sampling error.
     assert monitored[-1].mean() + 4 * fine_se >= continuous
@@ -179,7 +205,6 @@ def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> No
 
 def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
     """Arithmetic TW is approximate; one terminal fixing reduces exactly to BS."""
-    args = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0)
     call = {
         "spot": 100.0,
         "strike": 100.0,
@@ -189,7 +214,7 @@ def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
         "time_to_expiry": 1.0,
         "option_type": "call",
     }
-    vanilla = bs_price(*args, True)
+    vanilla = bs_price(call)
     for convention in ("arithmetic", "geometric"):
         assert asian_option_price(call, 1, convention) == pytest.approx(vanilla, abs=1e-12)
     european = EuropeanPricer(4096, 17, False).price_gbm(call, num_steps=1)

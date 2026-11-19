@@ -140,7 +140,18 @@ test('optionCalculation prices, inverts and returns the model Greeks in one call
     model: blackScholes,
     solve: { kind: 'price', vol: 0.25 },
   });
-  assert.equal(priced.price, models.bsPrice(100, 105, 0.03, 0.01, 0.25, 0.75, false));
+  assert.equal(
+    priced.price,
+    models.bsPrice({
+      spot: 100,
+      strike: 105,
+      rate: 0.03,
+      dividend_yield: 0.01,
+      volatility: 0.25,
+      time_to_expiry: 0.75,
+      option_type: 'put',
+    })
+  );
   assert.equal(priced.implied_vol, 0.25);
   assert.deepEqual(priced.greeks, {
     kind: 'black_scholes',

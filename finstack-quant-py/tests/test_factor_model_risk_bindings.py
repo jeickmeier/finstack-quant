@@ -174,6 +174,15 @@ def test_canonical_nested_sensitivity_json_roundtrips_and_reconciles_risk() -> N
     assert json.loads(matrix.to_json()) == payload
     assert (matrix.n_positions, matrix.n_factors) == (2, 1)
     assert matrix.delta(1, 0) == 3.0
+    assert matrix.delta(position_idx="B", factor_idx="F") == 3.0
+    assert matrix.delta("A", 0) == 2.0
+    assert matrix.delta(1, "F") == 3.0
+    with pytest.raises(KeyError, match="unknown"):
+        matrix.delta("unknown", "F")
+    with pytest.raises(KeyError, match="unknown"):
+        matrix.delta("B", "unknown")
+    with pytest.raises(ValueError, match="out of bounds"):
+        matrix.delta(2, "F")
     assert matrix.position_deltas(0) == [2.0]
     assert matrix.factor_deltas(0) == [2.0, 3.0]
     assert json.loads(pickle.loads(pickle.dumps(matrix)).to_json()) == payload  # noqa: S301
