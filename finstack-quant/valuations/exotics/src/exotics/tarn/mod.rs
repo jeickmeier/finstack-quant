@@ -22,4 +22,4 @@ pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use pricer::TarnPricer;
-pub use types::Tarn;
+pub use types::{Tarn, TarnBuilder};

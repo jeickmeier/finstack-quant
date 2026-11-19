@@ -27,7 +27,13 @@ use finstack_quant_valuations_core::instruments::BermudanCallProvision;
 ///   continuation value.
 /// - **HW Tree**: Build trinomial tree, attach range accrual cashflows
 ///   at each node, apply backward induction with call decision.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    finstack_quant_valuations_macros::FinancialBuilder,
+    Clone,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CallableRangeAccrual {
@@ -42,6 +48,7 @@ pub struct CallableRangeAccrual {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub instrument_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
@@ -49,6 +56,7 @@ pub struct CallableRangeAccrual {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub metric_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
@@ -56,6 +64,7 @@ pub struct CallableRangeAccrual {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes.
@@ -63,6 +72,18 @@ pub struct CallableRangeAccrual {
 }
 
 impl CallableRangeAccrual {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> CallableRangeAccrualBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .range_accrual(self.range_accrual.clone())
+            .call_provision(self.call_provision.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate the callable range accrual parameters.
     ///
     /// Validates both the underlying range accrual spec and the call provision.

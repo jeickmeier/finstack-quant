@@ -353,6 +353,25 @@ pub struct AgencyCmo {
 }
 
 impl AgencyCmo {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> AgencyCmoBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .deal_name(self.deal_name.clone())
+            .agency(self.agency)
+            .issue_date(self.issue_date)
+            .waterfall(self.waterfall.clone())
+            .reference_tranche_id(self.reference_tranche_id.clone())
+            .collateral_opt(self.collateral.clone())
+            .collateral_wac_opt(self.collateral_wac)
+            .collateral_wam_months_opt(self.collateral_wam_months)
+            .discount_curve_id(self.discount_curve_id.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate the tranche waterfall, collateral, and interest conservation.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let context = format!("Agency CMO '{}'", self.id.as_str());

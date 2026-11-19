@@ -106,7 +106,7 @@ pub(crate) mod pricer;
 mod types;
 pub mod waterfall;
 
-pub use types::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall, PacCollar};
+pub use types::{AgencyCmo, AgencyCmoBuilder, CmoTranche, CmoTrancheType, CmoWaterfall, PacCollar};
 
 // Dated contract data shared by JSON hosts and Rust constructors.
 pub use pac_support::{PacPayment, PacSchedule};

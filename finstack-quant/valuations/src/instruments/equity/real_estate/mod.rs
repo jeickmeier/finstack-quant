@@ -9,5 +9,7 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use levered::{LeveredRealEstateEquity, RealEstateFinancing};
-pub use types::{RealEstateAsset, RealEstatePropertyType, RealEstateValuationMethod};
+pub use levered::{LeveredRealEstateEquity, LeveredRealEstateEquityBuilder, RealEstateFinancing};
+pub use types::{
+    RealEstateAsset, RealEstateAssetBuilder, RealEstatePropertyType, RealEstateValuationMethod,
+};

@@ -382,6 +382,33 @@ pub struct AgencyMbsPassthrough {
 }
 
 impl AgencyMbsPassthrough {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> AgencyMbsPassthroughBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .pool_id(self.pool_id.clone())
+            .agency(self.agency)
+            .pool_type(self.pool_type)
+            .original_face(self.original_face)
+            .current_face(self.current_face)
+            .wac(self.wac)
+            .coupon(self.coupon)
+            .servicing_fee_bp(self.servicing_fee_bp)
+            .guarantee_fee_bp(self.guarantee_fee_bp)
+            .wam_months(self.wam_months)
+            .issue_date(self.issue_date)
+            .last_paid_accrual_end_opt(self.last_paid_accrual_end)
+            .maturity(self.maturity)
+            .stated_delay_days_opt(self.stated_delay_days)
+            .prepayment_spec(self.prepayment_spec.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .day_count(self.day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a canonical example MBS for testing and documentation.
     ///
     /// Returns a FNMA 30-year pool with realistic parameters.

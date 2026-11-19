@@ -96,6 +96,21 @@ pub struct PrivateMarketsFund {
 }
 
 impl PrivateMarketsFund {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> PrivateMarketsFundBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .currency(self.currency)
+            .waterfall_spec(self.waterfall_spec.clone())
+            .events(self.events.clone())
+            .discount_curve_id_opt(self.discount_curve_id.clone())
+            .unrealized_nav_opt(self.unrealized_nav)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a validated private markets fund instrument.
     ///
     /// # Arguments

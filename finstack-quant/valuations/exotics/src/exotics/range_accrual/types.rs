@@ -184,6 +184,17 @@ pub struct RangeAccrualTerms {
 }
 
 impl RangeAccrual {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> RangeAccrualBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .terms(self.terms.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a canonical example range accrual (monthly observations).
     ///
     /// This example uses relative bounds (95%-105% of initial spot) which is

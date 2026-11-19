@@ -23,10 +23,19 @@ use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
 use crate::bindings::valuations::convert::serialize_typed_instrument_json;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
+use crate::bindings::valuations::typed_agency_cmo::PyAgencyCmo;
+use crate::bindings::valuations::typed_agency_mbs_passthrough::PyAgencyMbsPassthrough;
+use crate::bindings::valuations::typed_agency_tba::PyAgencyTba;
+use crate::bindings::valuations::typed_asian_option::PyAsianOption;
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
+use crate::bindings::valuations::typed_autocallable::PyAutocallable;
+use crate::bindings::valuations::typed_barrier_option::PyBarrierOption;
 use crate::bindings::valuations::typed_basis_swap::PyBasisSwap;
+use crate::bindings::valuations::typed_basket::PyBasket;
 use crate::bindings::valuations::typed_bermudan_swaption::PyBermudanSwaption;
 use crate::bindings::valuations::typed_bond_future::PyBondFuture;
+use crate::bindings::valuations::typed_callable_range_accrual::PyCallableRangeAccrual;
+use crate::bindings::valuations::typed_cliquet_option::PyCliquetOption;
 use crate::bindings::valuations::typed_cms_option::PyCmsOption;
 use crate::bindings::valuations::typed_cms_spread_option::PyCmsSpreadOption;
 use crate::bindings::valuations::typed_cms_swap::PyCmsSwap;
@@ -43,6 +52,7 @@ use crate::bindings::valuations::typed_credit::{
     PyCdsIndex, PyCdsOption, PyCdsTranche, PyCreditDefaultSwap,
 };
 use crate::bindings::valuations::typed_deposit::PyDeposit;
+use crate::bindings::valuations::typed_dollar_roll::PyDollarRoll;
 use crate::bindings::valuations::typed_equity::PyEquityOption;
 use crate::bindings::valuations::typed_equity_future::PyEquityFuture;
 use crate::bindings::valuations::typed_equity_future_option::PyEquityFutureOption;
@@ -65,14 +75,21 @@ use crate::bindings::valuations::typed_inflation_cap_floor::PyInflationCapFloor;
 use crate::bindings::valuations::typed_inflation_swap::PyInflationSwap;
 use crate::bindings::valuations::typed_interest_rate_future::PyInterestRateFuture;
 use crate::bindings::valuations::typed_interest_rate_future_option::PyInterestRateFutureOption;
+use crate::bindings::valuations::typed_levered_real_estate_equity::PyLeveredRealEstateEquity;
+use crate::bindings::valuations::typed_lookback_option::PyLookbackOption;
 use crate::bindings::valuations::typed_ndf::PyNdf;
+use crate::bindings::valuations::typed_private_markets_fund::PyPrivateMarketsFund;
 use crate::bindings::valuations::typed_quanto_option::PyQuantoOption;
+use crate::bindings::valuations::typed_range_accrual::PyRangeAccrual;
 use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, PySwaption};
+use crate::bindings::valuations::typed_real_estate_asset::PyRealEstateAsset;
 use crate::bindings::valuations::typed_repo::PyRepo;
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
+use crate::bindings::valuations::typed_snowball::PySnowball;
 use crate::bindings::valuations::typed_structured_credit::{
     PyStructuredCredit, PyStructuredCreditTranche,
 };
+use crate::bindings::valuations::typed_tarn::PyTarn;
 use crate::bindings::valuations::typed_variance_swap::PyVarianceSwap;
 use crate::bindings::valuations::typed_volatility_index_future::PyVolatilityIndexFuture;
 use crate::bindings::valuations::typed_volatility_index_future_option::PyVolatilityIndexFutureOption;
@@ -197,6 +214,23 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyConvertibleBond,
         PyEquity,
         PyEquityOption,
+        PyAutocallable,
+        PyCliquetOption,
+        PyPrivateMarketsFund,
+        PyAsianOption,
+        PyBarrierOption,
+        PyLookbackOption,
+        PyRangeAccrual,
+        PyTarn,
+        PySnowball,
+        PyCallableRangeAccrual,
+        PyAgencyTba,
+        PyAgencyMbsPassthrough,
+        PyDollarRoll,
+        PyAgencyCmo,
+        PyBasket,
+        PyRealEstateAsset,
+        PyLeveredRealEstateEquity,
         PyBasisSwap,
         PyXccySwap,
         PyCmsSwap,

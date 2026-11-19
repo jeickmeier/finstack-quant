@@ -44,7 +44,7 @@ pub(crate) mod metrics;
 mod types;
 mod waterfall;
 
-pub use types::PrivateMarketsFund;
+pub use types::{PrivateMarketsFund, PrivateMarketsFundBuilder};
 pub use waterfall::{
     AllocationLedger, AllocationRow, CatchUpMode, ClawbackSpec, EquityWaterfallEngine, FundEvent,
     FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche, WaterfallSpecBuilder,

@@ -26,8 +26,17 @@ pub(crate) mod typed_interest_rate_future_option;
 pub(crate) mod typed_volatility_index_future;
 pub(crate) mod typed_volatility_index_future_option;
 
+pub(crate) mod typed_agency_cmo;
+pub(crate) mod typed_agency_mbs_passthrough;
+pub(crate) mod typed_agency_tba;
+pub(crate) mod typed_asian_option;
+pub(crate) mod typed_autocallable;
+pub(crate) mod typed_barrier_option;
 pub(crate) mod typed_basis_swap;
+pub(crate) mod typed_basket;
 pub(crate) mod typed_bermudan_swaption;
+pub(crate) mod typed_callable_range_accrual;
+pub(crate) mod typed_cliquet_option;
 pub(crate) mod typed_cms_option;
 pub(crate) mod typed_cms_spread_option;
 pub(crate) mod typed_cms_swap;
@@ -42,6 +51,7 @@ pub(crate) mod typed_commodity_swaption;
 pub(crate) mod typed_convertible;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_deposit;
+pub(crate) mod typed_dollar_roll;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_equity_spot;
 pub(crate) mod typed_equity_total_return_future;
@@ -59,14 +69,21 @@ pub(crate) mod typed_inflation_bond;
 pub(crate) mod typed_inflation_cap_floor;
 pub(crate) mod typed_inflation_swap;
 mod typed_legs;
+pub(crate) mod typed_levered_real_estate_equity;
 pub(crate) mod typed_listed;
+pub(crate) mod typed_lookback_option;
 pub(crate) mod typed_macros;
 pub(crate) mod typed_ndf;
+pub(crate) mod typed_private_markets_fund;
 pub(crate) mod typed_quanto_option;
+pub(crate) mod typed_range_accrual;
 pub(crate) mod typed_rates;
+pub(crate) mod typed_real_estate_asset;
 pub(crate) mod typed_repo;
 pub(crate) mod typed_revolving_credit;
+pub(crate) mod typed_snowball;
 pub(crate) mod typed_structured_credit;
+pub(crate) mod typed_tarn;
 pub(crate) mod typed_variance_swap;
 pub(crate) mod typed_xccy_swap;
 pub(crate) mod typed_yoy_inflation_swap;
@@ -461,6 +478,23 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_convertible::register(py, &m)?;
     convertible_spot_ladder::register(&m)?;
     typed_equity::register(py, &m)?;
+    typed_autocallable::register(&m)?;
+    typed_cliquet_option::register(&m)?;
+    typed_private_markets_fund::register(&m)?;
+    typed_asian_option::register(&m)?;
+    typed_barrier_option::register(&m)?;
+    typed_lookback_option::register(&m)?;
+    typed_range_accrual::register(&m)?;
+    typed_tarn::register(&m)?;
+    typed_snowball::register(&m)?;
+    typed_callable_range_accrual::register(&m)?;
+    typed_agency_tba::register(&m)?;
+    typed_agency_mbs_passthrough::register(&m)?;
+    typed_dollar_roll::register(&m)?;
+    typed_agency_cmo::register(&m)?;
+    typed_basket::register(&m)?;
+    typed_real_estate_asset::register(&m)?;
+    typed_levered_real_estate_equity::register(&m)?;
     typed_basis_swap::register(&m)?;
     typed_xccy_swap::register(&m)?;
     typed_cms_swap::register(&m)?;
@@ -545,6 +579,42 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_convertible::EXPORTS);
     exports.extend_from_slice(convertible_spot_ladder::EXPORTS);
     exports.extend_from_slice(typed_equity::EXPORTS);
+    exports.extend_from_slice(&[
+        "Autocallable",
+        "AutocallableBuilder",
+        "CliquetOption",
+        "CliquetOptionBuilder",
+        "PrivateMarketsFund",
+        "PrivateMarketsFundBuilder",
+        "AsianOption",
+        "AsianOptionBuilder",
+        "BarrierOption",
+        "BarrierOptionBuilder",
+        "LookbackOption",
+        "LookbackOptionBuilder",
+        "RangeAccrual",
+        "RangeAccrualBuilder",
+        "Tarn",
+        "TarnBuilder",
+        "Snowball",
+        "SnowballBuilder",
+        "CallableRangeAccrual",
+        "CallableRangeAccrualBuilder",
+        "AgencyTba",
+        "AgencyTbaBuilder",
+        "AgencyMbsPassthrough",
+        "AgencyMbsPassthroughBuilder",
+        "DollarRoll",
+        "DollarRollBuilder",
+        "AgencyCmo",
+        "AgencyCmoBuilder",
+        "Basket",
+        "BasketBuilder",
+        "RealEstateAsset",
+        "RealEstateAssetBuilder",
+        "LeveredRealEstateEquity",
+        "LeveredRealEstateEquityBuilder",
+    ]);
     exports.extend_from_slice(&[
         "BasisSwap",
         "BasisSwapBuilder",

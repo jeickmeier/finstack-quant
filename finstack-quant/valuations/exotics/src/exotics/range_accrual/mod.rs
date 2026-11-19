@@ -37,4 +37,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::{BoundsType, RangeAccrual, RangeAccrualTerms};
+pub use types::{BoundsType, RangeAccrual, RangeAccrualBuilder, RangeAccrualTerms};

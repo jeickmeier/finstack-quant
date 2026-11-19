@@ -34,7 +34,14 @@ use rust_decimal::Decimal;
 ///
 /// - Brigo, D., & Mercurio, F. (2006). *Interest Rate Models - Theory and
 ///   Practice* (2nd ed.). Springer. Chapter 14: Exotic Derivatives. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
-#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    finstack_quant_valuations_macros::FinancialBuilder,
+    PartialEq,
+    Clone,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Tarn {
@@ -87,6 +94,7 @@ pub struct Tarn {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub instrument_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
@@ -94,6 +102,7 @@ pub struct Tarn {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub metric_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
@@ -101,6 +110,7 @@ pub struct Tarn {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection.
@@ -108,6 +118,27 @@ pub struct Tarn {
 }
 
 impl Tarn {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> TarnBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .fixed_rate(self.fixed_rate)
+            .coupon_floor(self.coupon_floor)
+            .target_coupon(self.target_coupon)
+            .notional(self.notional)
+            .start_date(self.start_date)
+            .payment_dates(self.payment_dates.clone())
+            .index_tenor(self.index_tenor)
+            .forward_curve_id(self.forward_curve_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .vol_surface_id_opt(self.vol_surface_id.clone())
+            .day_count(self.day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate the TARN parameters.
     ///
     /// Checks:

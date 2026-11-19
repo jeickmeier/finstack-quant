@@ -155,6 +155,22 @@ pub struct Basket {
 }
 
 impl Basket {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> BasketBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .constituents(self.constituents.clone())
+            .expense_ratio(self.expense_ratio)
+            .reporting_currency(self.reporting_currency)
+            .notional(self.notional)
+            .discount_curve_id(self.discount_curve_id.clone())
+            .pricing_config(self.pricing_config.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a canonical example basket with two market data constituents.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;

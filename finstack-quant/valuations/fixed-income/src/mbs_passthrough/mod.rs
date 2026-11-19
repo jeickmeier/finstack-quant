@@ -69,4 +69,4 @@ pub mod metrics;
 pub mod pricer;
 mod types;
 
-pub use types::{AgencyMbsPassthrough, AgencyProgram, PoolType};
+pub use types::{AgencyMbsPassthrough, AgencyMbsPassthroughBuilder, AgencyProgram, PoolType};

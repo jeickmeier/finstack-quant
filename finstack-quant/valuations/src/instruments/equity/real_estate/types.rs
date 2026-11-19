@@ -177,6 +177,34 @@ pub struct RealEstateAsset {
 crate::validate_on_deserialize!(RealEstateAsset);
 
 impl RealEstateAsset {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> RealEstateAssetBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .currency(self.currency)
+            .valuation_method(self.valuation_method)
+            .property_type_opt(self.property_type)
+            .noi_schedule(self.noi_schedule.clone())
+            .capex_schedule_opt(self.capex_schedule.clone())
+            .discount_rate_opt(self.discount_rate)
+            .cap_rate_opt(self.cap_rate)
+            .stabilized_noi_opt(self.stabilized_noi)
+            .terminal_cap_rate_opt(self.terminal_cap_rate)
+            .terminal_growth_rate_opt(self.terminal_growth_rate)
+            .sale_date_opt(self.sale_date)
+            .sale_price_opt(self.sale_price)
+            .purchase_price_opt(self.purchase_price)
+            .acquisition_costs(self.acquisition_costs.clone())
+            .disposition_cost_decimal_opt(self.disposition_cost_decimal)
+            .disposition_costs(self.disposition_costs.clone())
+            .appraisal_value_opt(self.appraisal_value)
+            .day_count(self.day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate structural invariants required by both DCF and DirectCap pricers.
     ///
     /// # Errors

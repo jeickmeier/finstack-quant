@@ -277,6 +277,74 @@ from finstack_quant.valuations.instruments._typed_bermudan_swaption import (
     BermudanSwaption as BermudanSwaption,
     BermudanSwaptionBuilder as BermudanSwaptionBuilder,
 )
+from finstack_quant.valuations.instruments._typed_autocallable import (
+    Autocallable as Autocallable,
+    AutocallableBuilder as AutocallableBuilder,
+)
+from finstack_quant.valuations.instruments._typed_cliquet_option import (
+    CliquetOption as CliquetOption,
+    CliquetOptionBuilder as CliquetOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_private_markets_fund import (
+    PrivateMarketsFund as PrivateMarketsFund,
+    PrivateMarketsFundBuilder as PrivateMarketsFundBuilder,
+)
+from finstack_quant.valuations.instruments._typed_asian_option import (
+    AsianOption as AsianOption,
+    AsianOptionBuilder as AsianOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_barrier_option import (
+    BarrierOption as BarrierOption,
+    BarrierOptionBuilder as BarrierOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_lookback_option import (
+    LookbackOption as LookbackOption,
+    LookbackOptionBuilder as LookbackOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_range_accrual import (
+    RangeAccrual as RangeAccrual,
+    RangeAccrualBuilder as RangeAccrualBuilder,
+)
+from finstack_quant.valuations.instruments._typed_tarn import (
+    Tarn as Tarn,
+    TarnBuilder as TarnBuilder,
+)
+from finstack_quant.valuations.instruments._typed_snowball import (
+    Snowball as Snowball,
+    SnowballBuilder as SnowballBuilder,
+)
+from finstack_quant.valuations.instruments._typed_callable_range_accrual import (
+    CallableRangeAccrual as CallableRangeAccrual,
+    CallableRangeAccrualBuilder as CallableRangeAccrualBuilder,
+)
+from finstack_quant.valuations.instruments._typed_agency_tba import (
+    AgencyTba as AgencyTba,
+    AgencyTbaBuilder as AgencyTbaBuilder,
+)
+from finstack_quant.valuations.instruments._typed_agency_mbs_passthrough import (
+    AgencyMbsPassthrough as AgencyMbsPassthrough,
+    AgencyMbsPassthroughBuilder as AgencyMbsPassthroughBuilder,
+)
+from finstack_quant.valuations.instruments._typed_dollar_roll import (
+    DollarRoll as DollarRoll,
+    DollarRollBuilder as DollarRollBuilder,
+)
+from finstack_quant.valuations.instruments._typed_agency_cmo import (
+    AgencyCmo as AgencyCmo,
+    AgencyCmoBuilder as AgencyCmoBuilder,
+)
+from finstack_quant.valuations.instruments._typed_basket import (
+    Basket as Basket,
+    BasketBuilder as BasketBuilder,
+)
+from finstack_quant.valuations.instruments._typed_real_estate_asset import (
+    RealEstateAsset as RealEstateAsset,
+    RealEstateAssetBuilder as RealEstateAssetBuilder,
+)
+from finstack_quant.valuations.instruments._typed_levered_real_estate_equity import (
+    LeveredRealEstateEquity as LeveredRealEstateEquity,
+    LeveredRealEstateEquityBuilder as LeveredRealEstateEquityBuilder,
+)
 from finstack_quant.valuations.instruments._typed_equity import (
     EquityOption as EquityOption,
     EquityOptionBuilder as EquityOptionBuilder,
@@ -467,6 +535,40 @@ __all__ = [
     "Equity",
     "EquityBuilder",
     "EquityOption",
+    "Autocallable",
+    "AutocallableBuilder",
+    "CliquetOption",
+    "CliquetOptionBuilder",
+    "PrivateMarketsFund",
+    "PrivateMarketsFundBuilder",
+    "AsianOption",
+    "AsianOptionBuilder",
+    "BarrierOption",
+    "BarrierOptionBuilder",
+    "LookbackOption",
+    "LookbackOptionBuilder",
+    "RangeAccrual",
+    "RangeAccrualBuilder",
+    "Tarn",
+    "TarnBuilder",
+    "Snowball",
+    "SnowballBuilder",
+    "CallableRangeAccrual",
+    "CallableRangeAccrualBuilder",
+    "AgencyTba",
+    "AgencyTbaBuilder",
+    "AgencyMbsPassthrough",
+    "AgencyMbsPassthroughBuilder",
+    "DollarRoll",
+    "DollarRollBuilder",
+    "AgencyCmo",
+    "AgencyCmoBuilder",
+    "Basket",
+    "BasketBuilder",
+    "RealEstateAsset",
+    "RealEstateAssetBuilder",
+    "LeveredRealEstateEquity",
+    "LeveredRealEstateEquityBuilder",
     "BasisSwap",
     "BasisSwapBuilder",
     "XccySwap",
