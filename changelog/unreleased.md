@@ -2,6 +2,13 @@
 
 ## Itemized changes
 
+### DCF: dated receipts and terminal horizon
+
+DCF instruments carry signed cash flows in their own currency, an authored
+receipt-date or midpoint timing election, a separately discounted terminal
+date, and a normalized annual cash-flow amount for growth terminals.
+Statement reports distinguish net debt, other claims, and valuation discounts.
+
 ### Statements: covenant templates and metric-unit headroom
 
 Build a covenant engine directly from a standard package. Evaluate and

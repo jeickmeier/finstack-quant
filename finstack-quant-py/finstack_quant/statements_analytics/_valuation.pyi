@@ -147,7 +147,7 @@ class CorporateValuationResult:
     >>> from finstack_quant.statements_analytics import CorporateValuationResult
     >>> r = CorporateValuationResult.from_json(
     ...     '{"equity_value":{"amount":"90","currency":"USD"},"enterprise_value":{"amount":"100","currency":"USD"},'
-    ...     '"net_debt":{"amount":"10","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
+    ...     '"net_debt":{"amount":"10","currency":"USD"},"other_equity_claims":{"amount":"0","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
     ...     '"terminal_value_pv":{"amount":"60","currency":"USD"},'
     ...     '"equity_value_per_share":null,"diluted_shares":null}'
     ... )
@@ -181,21 +181,34 @@ class CorporateValuationResult:
     @property
     def net_debt(self) -> Money:
         """
-        Net debt (or effective bridge amount) subtracted from EV.
+        Interest-bearing debt less cash in model currency.
 
         This property does not raise.
 
         Returns
         -------
         Money
-            Net debt (or effective bridge amount) subtracted from EV.
+            Interest-bearing debt less cash in model currency.
+        """
+    @property
+    def other_equity_claims(self) -> Money:
+        """Return net non-debt claims deducted from enterprise value.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Money
+            Net preferred, minority and other claims after non-operating
+            assets and named adjustments in model currency. A negative
+            amount increases common equity.
         """
     @property
     def valuation_discount(self) -> Money:
         """
         Total valuation discount (DLOM, DLOC, other) deducted after the
         EV-to-equity bridge; zero without ``valuation_discounts``.
-        ``enterprise_value - net_debt - valuation_discount`` equals
+        ``enterprise_value - net_debt - other_equity_claims - valuation_discount`` equals
         ``equity_value``.
 
         This property does not raise.
@@ -346,7 +359,7 @@ class CorporateValuationResult:
         Export as a single-row pandas ``DataFrame``.
 
         Columns: ``currency``, ``equity_value``, ``enterprise_value``,
-        ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float
+        ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv`` (float
         amounts in ``currency``), ``equity_value_per_share``,
         ``diluted_shares`` (``None`` when absent), then the DCF working:
         ``wacc`` (decimal), ``pv_explicit``, ``terminal_value``,
@@ -357,7 +370,7 @@ class CorporateValuationResult:
         Returns
         -------
         pd.DataFrame
-            One row with columns ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``valuation_discount``, ``terminal_value_pv``, ``equity_value_per_share``, ``diluted_shares``, ``wacc``, ``pv_explicit``, ``terminal_value``, ``total_debt``, ``cash``, ``terminal_discount_years``.
+            One row with columns ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv``, ``equity_value_per_share``, ``diluted_shares``, ``wacc``, ``pv_explicit``, ``terminal_value``, ``total_debt``, ``cash``, ``terminal_discount_years``.
 
         Raises
         ------

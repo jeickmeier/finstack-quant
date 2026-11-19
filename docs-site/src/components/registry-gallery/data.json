@@ -72882,7 +72882,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-        "sha256": "2a1555d3aa619a6547cfc0e329d29ef671f568bd30bdbef54f2fc5d61f8e7ccf"
+        "sha256": "aa1c8af3f33873b10e350d50cb104c747a175b7a818930d9b1c247fae434e43f"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -73304,7 +73304,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-        "sha256": "149ae2d75f3ee7c255003387eeaabceb156e911553cebdf4ef48f289b15e153b"
+        "sha256": "116b0e9ecd47cd920dfb34294cbf97a0113ed7ebf4acb99e4e2bf249c63ad1af"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -74792,7 +74792,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "18738c2ee83fc47de8296fcd24e48e376d17ce7e6595d4c99ebf11804a711504"
+        "sha256": "1ee8f1a1cacc426f446eb7cdc8c021072bc761dbbefa803ecffd6a7005453b4b"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -75061,7 +75061,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "18738c2ee83fc47de8296fcd24e48e376d17ce7e6595d4c99ebf11804a711504"
+        "sha256": "1ee8f1a1cacc426f446eb7cdc8c021072bc761dbbefa803ecffd6a7005453b4b"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -95380,6 +95380,10 @@
     },
     "net_debt": {
       "amount": "316400000",
+      "currency": "USD"
+    },
+    "other_equity_claims": {
+      "amount": "0",
       "currency": "USD"
     },
     "valuation_discount": {

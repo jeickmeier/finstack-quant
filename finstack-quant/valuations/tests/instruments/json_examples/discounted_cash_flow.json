@@ -13,28 +13,57 @@
       "flows": [
         [
           "2026-01-01",
-          5000000.0
+          {
+            "amount": "5000000",
+            "currency": "USD"
+          }
         ],
         [
           "2027-01-01",
-          5750000.0
+          {
+            "amount": "5750000",
+            "currency": "USD"
+          }
         ],
         [
           "2028-01-01",
-          6500000.0
+          {
+            "amount": "6500000",
+            "currency": "USD"
+          }
         ],
         [
           "2029-01-01",
-          7250000.0
+          {
+            "amount": "7250000",
+            "currency": "USD"
+          }
         ],
         [
           "2030-01-01",
-          8000000.0
+          {
+            "amount": "8000000",
+            "currency": "USD"
+          }
         ]
       ],
+      "forecast_timing": {
+        "kind": "midpoints",
+        "period_starts": [
+          "2025-01-01",
+          "2026-01-01",
+          "2027-01-01",
+          "2028-01-01",
+          "2029-01-01"
+        ]
+      },
       "id": "DCF-TECH-CO",
-      "mid_year_convention": true,
+      "normalized_annual_fcff": {
+        "amount": "8000000",
+        "currency": "USD"
+      },
       "shares_outstanding": 10000000.0,
+      "terminal_date": "2030-01-01",
       "terminal_value": {
         "stable_growth_rate": 0.02,
         "type": "gordon_growth"

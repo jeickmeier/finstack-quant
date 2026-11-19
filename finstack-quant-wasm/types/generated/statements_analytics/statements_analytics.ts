@@ -2135,18 +2135,9 @@ export interface CorporateValuationResult {
    */
   enterprise_value: Money;
   /**
-   * EV-to-equity bridge whose net adjustment is
-   * [`net_debt`](Self::net_debt): gross debt (`total_debt`) and `cash`
-   * separately, plus preferred equity, minority interest, non-operating
-   * assets and other adjustments, all in the model currency.
-   *
-   * `net_debt = total_debt - cash + preferred_equity + minority_interest -
-   * non_operating_assets - Σ other_adjustments`, so `total_debt - cash`
-   * equals `net_debt` whenever the remaining components are zero (always
-   * the case unless `DcfOptions::equity_bridge` supplies them). Under a
-   * flat `net_debt_override` the override is reported as `total_debt` with
-   * `cash` zero. `None` only for a result deserialized from JSON written
-   * before this field existed.
+   * Gross debt, cash, preferred equity, minority interest, non-operating
+   * assets and named adjustments, in model currency.
+   * An authored flat net debt amount is recorded as debt with zero cash.
    */
   equity_bridge?: EquityBridge | null;
   /**
@@ -2158,9 +2149,14 @@ export interface CorporateValuationResult {
    */
   equity_value_per_share?: number | null;
   /**
-   * Net debt (or effective bridge amount) used in calculation
+   * Interest-bearing debt less cash in model currency.
    */
   net_debt: Money;
+  /**
+   * Net non-debt claims to deduct from enterprise value in model currency.
+   * A negative balance increases common equity.
+   */
+  other_equity_claims: Money;
   /**
    * One row per explicit forecast period that was discounted, in date
    * order: the free cash flow, its discounting tenor and factor, and its
@@ -2210,7 +2206,7 @@ export interface CorporateValuationResult {
    * Total valuation discount (DLOM, DLOC, other) deducted after the
    * EV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.
    *
-   * `enterprise_value - net_debt - valuation_discount` equals
+   * `enterprise_value - net_debt - other_equity_claims - valuation_discount` equals
    * `equity_value`, so a bridge built from these three steps reconciles to
    * the reported equity value.
    */

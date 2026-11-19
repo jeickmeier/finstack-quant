@@ -33,7 +33,7 @@ impl MetricCalculator for EnterpriseValueCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let dcf: &DiscountedCashFlow = context.instrument_as()?;
         let (pv_explicit, pv_terminal) = pricer::pv_components_with_rf_bump(dcf, &|_| 0.0)?;
-        Ok(pv_explicit + pv_terminal)
+        pricer::enterprise_value(pv_explicit, pv_terminal)
     }
 }
 

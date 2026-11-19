@@ -448,6 +448,10 @@ export type DB556Bbeb1Ecf96C44C5A =
  */
 export type Date1 = string;
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date2 = string;
+/**
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type DA38745Fab6D6C4B3A533 = "finstack_quant.instrument/1";
@@ -474,14 +478,9 @@ export interface DB7951C6B1F5A9B193F7A {
  * [`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a
  * flat net-debt deduction sets only its `total_debt` and `cash`.
  *
- * # Mid-Year Convention
- *
- * When [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are
- * discounted at `t` minus half the average flow spacing instead of `t` years,
- * reflecting the assumption that cash flows arrive mid-period (standard IB/PE
- * practice). For annual grids this is the classic `(t - 0.5)`; for sub-annual
- * grids the shift is half a period. `ExitMultiple` terminal values always
- * discount at the full horizon (a point-in-time sale price).
+ * # Discounting dates
+ * Forecast receipts use their authored dates or exact period midpoints.
+ * Terminal value uses its own date on the same ACT/365.25 clock.
  *
  * # Valuation Discounts
  *
@@ -502,40 +501,36 @@ export interface D_05Fc0451Dee1E185F517 {
   /**
    * Explicit period free cash flows (date, amount pairs).
    */
-  flows: [Date, number][];
+  flows: [Date, Money][];
+  /**
+   * Authored receipt or actual midpoint timing for the explicit projection.
+   */
+  forecast_timing:
+    | {
+        kind: "dated_receipts";
+      }
+    | {
+        kind: "midpoints";
+        /**
+         * Actual start date for each forecast period, aligned to its authored
+         * flow end date. A forward stub begins on the valuation date.
+         */
+        period_starts: Date[];
+      };
   id: Id;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Mid-year discounting convention (default: `false` = end-of-period).
-   *
-   * When `true`, each flow is discounted at `t` minus half the average
-   * flow spacing instead of `t` (the classic `t - 0.5` for annual
-   * grids; half a period for sub-annual grids), reflecting the
-   * assumption that cash flows arrive mid-period. This is the standard
-   * convention in IB/PE practice (Koller et al.). Exit-multiple
-   * terminal values are not shifted (point-in-time sale at the horizon).
+   * Normalized signed annual FCFF at the terminal date, in instrument currency.
+   * Required for Gordon and H-model, and absent for exit-multiple valuation.
    */
-  mid_year_convention?: boolean;
+  normalized_annual_fcff?: Money | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Basic shares outstanding for per-share value calculation.
    */
   shares_outstanding?: number | null;
-  /**
-   * Annualized terminal flow used by growth-perpetuity terminal values.
-   *
-   * Gordon Growth and H-Model capitalize an *annual* flow with annual
-   * WACC and growth rates. When the explicit `flows` grid is sub-annual
-   * (e.g. quarterly), the last flow is a period flow, not an annual one;
-   * set this to the trailing-twelve-month aggregate of the final
-   * explicit year so the terminal value is computed on a consistent
-   * annual basis (Koller et al., Damodaran). When `None`, the last
-   * explicit flow is used directly (correct for annual grids).
-   *
-   * Ignored by `ExitMultiple` terminal values.
-   */
-  terminal_flow_override?: number | null;
+  terminal_date: Date1;
   /**
    * Terminal value specification.
    */
@@ -578,7 +573,7 @@ export interface D_05Fc0451Dee1E185F517 {
         type: "h_model";
         [k: string]: unknown;
       };
-  valuation_date: Date1;
+  valuation_date: Date2;
   /**
    * Private company valuation discounts (DLOM, DLOC).
    */
@@ -654,6 +649,183 @@ export interface DE3Fba31E59Ae8C9A690E {
    * Total interest-bearing debt.
    */
   total_debt?: number;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
 }
 /**
  * Instrument-owned pricing inputs.

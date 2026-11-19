@@ -3072,6 +3072,21 @@ export type RealEstatePropertyType =
  */
 export type RealEstateValuationMethod = "dcf" | "direct_cap";
 /**
+ * Timing election for the dates of the explicit FCFF projection.
+ */
+export type ForecastTiming =
+  | {
+      kind: "dated_receipts";
+    }
+  | {
+      kind: "midpoints";
+      /**
+       * Actual start date for each forecast period, aligned to its authored
+       * flow end date. A forward stub begins on the valuation date.
+       */
+      period_starts: DateWire[];
+    };
+/**
  * Terminal value calculation method for DCF.
  */
 export type TerminalValueSpec =
@@ -16204,14 +16219,9 @@ export interface RealEstateAsset {
  * [`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a
  * flat net-debt deduction sets only its `total_debt` and `cash`.
  *
- * # Mid-Year Convention
- *
- * When [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are
- * discounted at `t` minus half the average flow spacing instead of `t` years,
- * reflecting the assumption that cash flows arrive mid-period (standard IB/PE
- * practice). For annual grids this is the classic `(t - 0.5)`; for sub-annual
- * grids the shift is half a period. `ExitMultiple` terminal values always
- * discount at the full horizon (a point-in-time sale price).
+ * # Discounting dates
+ * Forecast receipts use their authored dates or exact period midpoints.
+ * Terminal value uses its own date on the same ACT/365.25 clock.
  *
  * # Valuation Discounts
  *
@@ -16243,7 +16253,11 @@ export interface DiscountedCashFlow {
   /**
    * Explicit period free cash flows (date, amount pairs).
    */
-  flows: [DateWire, number][];
+  flows: [DateWire, Money][];
+  /**
+   * Authored receipt or actual midpoint timing for the explicit projection.
+   */
+  forecast_timing: ForecastTiming;
   /**
    * Unique identifier for the DCF.
    */
@@ -16257,16 +16271,10 @@ export interface DiscountedCashFlow {
    */
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Mid-year discounting convention (default: `false` = end-of-period).
-   *
-   * When `true`, each flow is discounted at `t` minus half the average
-   * flow spacing instead of `t` (the classic `t - 0.5` for annual
-   * grids; half a period for sub-annual grids), reflecting the
-   * assumption that cash flows arrive mid-period. This is the standard
-   * convention in IB/PE practice (Koller et al.). Exit-multiple
-   * terminal values are not shifted (point-in-time sale at the horizon).
+   * Normalized signed annual FCFF at the terminal date, in instrument currency.
+   * Required for Gordon and H-model, and absent for exit-multiple valuation.
    */
-  mid_year_convention?: boolean;
+  normalized_annual_fcff?: Money | null;
   /**
    * Scenario-only pricing adjustments.
    */
@@ -16276,19 +16284,9 @@ export interface DiscountedCashFlow {
    */
   shares_outstanding?: number | null;
   /**
-   * Annualized terminal flow used by growth-perpetuity terminal values.
-   *
-   * Gordon Growth and H-Model capitalize an *annual* flow with annual
-   * WACC and growth rates. When the explicit `flows` grid is sub-annual
-   * (e.g. quarterly), the last flow is a period flow, not an annual one;
-   * set this to the trailing-twelve-month aggregate of the final
-   * explicit year so the terminal value is computed on a consistent
-   * annual basis (Koller et al., Damodaran). When `None`, the last
-   * explicit flow is used directly (correct for annual grids).
-   *
-   * Ignored by `ExitMultiple` terminal values.
+   * Terminal horizon on or after the final forecast end, independently discounted.
    */
-  terminal_flow_override?: number | null;
+  terminal_date: DateWire;
   /**
    * Terminal value specification.
    */

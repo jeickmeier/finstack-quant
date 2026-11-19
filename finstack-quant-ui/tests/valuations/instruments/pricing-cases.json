@@ -1107,8 +1107,8 @@
         "description": "Change wacc from 0.1 to 0.11; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "76708462.6603578", "currency": "USD" },
-        "edited": { "amount": "66398388.4064043", "currency": "USD" }
+        "baseline": { "amount": "73616855.72387479", "currency": "USD" },
+        "edited": { "amount": "63515866.83549547", "currency": "USD" }
       }
     },
     {

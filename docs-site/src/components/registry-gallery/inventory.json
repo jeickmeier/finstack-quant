@@ -1836,19 +1836,19 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-      "sha256": "149ae2d75f3ee7c255003387eeaabceb156e911553cebdf4ef48f289b15e153b"
+      "sha256": "116b0e9ecd47cd920dfb34294cbf97a0113ed7ebf4acb99e4e2bf249c63ad1af"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "18738c2ee83fc47de8296fcd24e48e376d17ce7e6595d4c99ebf11804a711504"
+      "sha256": "1ee8f1a1cacc426f446eb7cdc8c021072bc761dbbefa803ecffd6a7005453b4b"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/exposures/cases.json",
-      "sha256": "6e2f796ec6a1e6858862e18ef5bd6c22cfdf00014eba31c61d14dfc5fdc533e1"
+      "sha256": "487f6cd6fa12d5d960f30842f27432d82f57af6d73bdec593d20940f0819781b"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "6a95d601c8f7dc2433d9f125198e5528459f92cfb574bf10b4ff30b2e0ebb29d"
+      "sha256": "7706413d5858ea666a6bb015d1c5d8380a59db2777014503639d14d37d10fc55"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
@@ -1900,7 +1900,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf.json",
-      "sha256": "aee5dff3d999d6147eae9a7501784115a0fcf9feb52433b21a60832f63216b0b"
+      "sha256": "3c682b8d6b57c745ee2628eb7b365779550dba3cf1e6c47c748696b3a58ecc18"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf-sensitivity.json",

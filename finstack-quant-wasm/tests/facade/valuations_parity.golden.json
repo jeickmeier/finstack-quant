@@ -9191,6 +9191,7 @@
         "FloatingLegCompounding",
         "FloatingRateFallback",
         "FloatingRateSpec",
+        "ForecastTiming",
         "ForwardRateAgreement",
         "Function",
         "FundEvent",

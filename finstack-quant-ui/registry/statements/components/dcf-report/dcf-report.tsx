@@ -131,6 +131,7 @@ export function DcfReport({
               rows={[
                 [labelFor("enterprise_value"), money(result.enterprise_value)],
                 [labelFor("net_debt"), money(result.net_debt)],
+                ["Other equity claims", money(result.other_equity_claims)],
                 [
                   labelFor("valuation_discount"),
                   money(result.valuation_discount),

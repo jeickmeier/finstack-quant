@@ -58,17 +58,18 @@ def _section_bridge(val: dict[str, Any], theme: Theme) -> Section | None:
     eq, _ = _money_parts(val.get("equity_value"))
     if ev is None or nd is None:
         return None
+    claims, _ = _money_parts(val.get("other_equity_claims"))
     discount, _ = _money_parts(val.get("valuation_discount"))
     labels, deltas = ["Enterprise Value", "− Net Debt"], [ev, -nd]  # noqa: RUF001
-    subtitle = "Enterprise value less net debt equals equity value."
+    if claims:
+        labels.append("− Other Equity Claims")  # noqa: RUF001
+        deltas.append(-claims)
     if discount:
         labels.append("− Valuation Discounts")  # noqa: RUF001
         deltas.append(-discount)
-        subtitle = "Enterprise value less net debt and valuation discounts (DLOM, DLOC) equals equity value."
     return Section(
         "EV → Equity Bridge",
         charts.waterfall_chart(labels, deltas, theme=theme, total_label="Equity Value", total=eq),
-        subtitle=subtitle,
     )
 
 

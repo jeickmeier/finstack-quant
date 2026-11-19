@@ -8698,7 +8698,7 @@
     },
     "DiscountedCashFlow": {
       "additionalProperties": false,
-      "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\n[`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a\nflat net-debt deduction sets only its `total_debt` and `cash`.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt.",
+      "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\n[`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a\nflat net-debt deduction sets only its `total_debt` and `cash`.\n\n# Discounting dates\nForecast receipts use their authored dates or exact period midpoints.\nTerminal value uses its own date on the same ACT/365.25 clock.\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -8729,13 +8729,16 @@
                 "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
               },
               {
-                "format": "double",
-                "type": "number"
+                "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
               }
             ],
             "type": "array"
           },
           "type": "array"
+        },
+        "forecast_timing": {
+          "$ref": "#/$defs/ForecastTiming",
+          "description": "Authored receipt or actual midpoint timing for the explicit projection."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -8749,10 +8752,16 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "mid_year_convention": {
-          "default": false,
-          "description": "Mid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon).",
-          "type": "boolean"
+        "normalized_annual_fcff": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Normalized signed annual FCFF at the terminal date, in instrument currency.\nRequired for Gordon and H-model, and absent for exit-multiple valuation."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -8766,13 +8775,9 @@
             "null"
           ]
         },
-        "terminal_flow_override": {
-          "description": "Annualized terminal flow used by growth-perpetuity terminal values.\n\nGordon Growth and H-Model capitalize an *annual* flow with annual\nWACC and growth rates. When the explicit `flows` grid is sub-annual\n(e.g. quarterly), the last flow is a period flow, not an annual one;\nset this to the trailing-twelve-month aggregate of the final\nexplicit year so the terminal value is computed on a consistent\nannual basis (Koller et al., Damodaran). When `None`, the last\nexplicit flow is used directly (correct for annual grids).\n\nIgnored by `ExitMultiple` terminal values.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "terminal_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Terminal horizon on or after the final forecast end, independently discounted."
         },
         "terminal_value": {
           "$ref": "#/$defs/TerminalValueSpec",
@@ -8806,6 +8811,8 @@
         "wacc",
         "terminal_value",
         "valuation_date",
+        "forecast_timing",
+        "terminal_date",
         "equity_bridge",
         "attributes"
       ],
@@ -10879,6 +10886,47 @@
         "reset_frequency"
       ],
       "type": "object"
+    },
+    "ForecastTiming": {
+      "description": "Timing election for the dates of the explicit FCFF projection.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Discount every cash flow on its individually authored receipt date.",
+          "properties": {
+            "kind": {
+              "const": "dated_receipts",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Discount each signed FCFF observation on the exact elapsed midpoint\nof its authored period on ACT/365.25.",
+          "properties": {
+            "kind": {
+              "const": "midpoints",
+              "type": "string"
+            },
+            "period_starts": {
+              "description": "Actual start date for each forecast period, aligned to its authored\nflow end date. A forward stub begins on the valuation date.",
+              "items": {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "period_starts"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "ForwardRateAgreement": {
       "additionalProperties": false,

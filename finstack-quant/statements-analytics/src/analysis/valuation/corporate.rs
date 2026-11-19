@@ -18,7 +18,7 @@ use finstack_quant_statements::types::{FinancialModelSpec, NodeValueType};
 use finstack_quant_statements::{Error, Result};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
-    DiscountedCashFlow, EquityBridge, TerminalValueSpec, ValuationDiscounts,
+    DiscountedCashFlow, EquityBridge, ForecastTiming, TerminalValueSpec, ValuationDiscounts,
 };
 use rust_decimal::{Decimal, prelude::ToPrimitive};
 use serde::{Deserialize, Serialize};
@@ -35,12 +35,15 @@ pub struct CorporateValuationResult {
     pub equity_value: Money,
     /// Enterprise value (PV of all cash flows + terminal value)
     pub enterprise_value: Money,
-    /// Net debt (or effective bridge amount) used in calculation
+    /// Interest-bearing debt less cash in model currency.
     pub net_debt: Money,
+    /// Net non-debt claims to deduct from enterprise value in model currency.
+    /// A negative balance increases common equity.
+    pub other_equity_claims: Money,
     /// Total valuation discount (DLOM, DLOC, other) deducted after the
     /// EV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.
     ///
-    /// `enterprise_value - net_debt - valuation_discount` equals
+    /// `enterprise_value - net_debt - other_equity_claims - valuation_discount` equals
     /// `equity_value`, so a bridge built from these three steps reconciles to
     /// the reported equity value.
     pub valuation_discount: Money,
@@ -94,18 +97,9 @@ pub struct CorporateValuationResult {
     /// deserialized from JSON written before this field existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminal_discount_years: Option<f64>,
-    /// EV-to-equity bridge whose net adjustment is
-    /// [`net_debt`](Self::net_debt): gross debt (`total_debt`) and `cash`
-    /// separately, plus preferred equity, minority interest, non-operating
-    /// assets and other adjustments, all in the model currency.
-    ///
-    /// `net_debt = total_debt - cash + preferred_equity + minority_interest -
-    /// non_operating_assets - Σ other_adjustments`, so `total_debt - cash`
-    /// equals `net_debt` whenever the remaining components are zero (always
-    /// the case unless `DcfOptions::equity_bridge` supplies them). Under a
-    /// flat `net_debt_override` the override is reported as `total_debt` with
-    /// `cash` zero. `None` only for a result deserialized from JSON written
-    /// before this field existed.
+    /// Gross debt, cash, preferred equity, minority interest, non-operating
+    /// assets and named adjustments, in model currency.
+    /// An authored flat net debt amount is recorded as debt with zero cash.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub equity_bridge: Option<EquityBridge>,
     /// The underlying DCF instrument (for further analysis).
@@ -893,6 +887,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
 
     let mut flows = Vec::new();
     let mut flow_periods = Vec::new();
+    let mut starts = Vec::new();
     for period in &model.periods {
         if period.is_actual {
             continue;
@@ -903,9 +898,10 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         }
         flows.push((
             date,
-            monetary_node_value(results, ufcf_node, &period.id, currency)?,
+            monetary_node_money(results, ufcf_node, &period.id, currency)?,
         ));
         flow_periods.push(period.id);
+        starts.push(period.start);
     }
 
     if flows.is_empty() {
@@ -993,7 +989,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     // calendar year, including for explicitly dated annual stub periods.
     // Sparse observations or partial years cannot be substituted for that
     // history without changing the terminal-flow basis.
-    let terminal_flow_override = match &terminal_value {
+    let annual_terminal_fcff = match &terminal_value {
         TerminalValueSpec::GordonGrowth { .. } | TerminalValueSpec::HModel { .. } => {
             let last_forecast = model
                 .periods
@@ -1033,6 +1029,16 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         equity_bridge_from_model(model, results, net_debt_period)?
     };
 
+    let terminal_date = flows.last().map(|(end, _)| *end).ok_or_else(|| {
+        Error::eval("DCF requires a terminal horizon after at least one forecast receipt")
+    })?;
+    let forecast_timing = if context.options.mid_year_convention {
+        ForecastTiming::Midpoints {
+            period_starts: starts,
+        }
+    } else {
+        ForecastTiming::DatedReceipts
+    };
     // The DCF pricer discounts every component (explicit flows, terminal
     // value, equity) at the WACC; it reads no market curve.
     let mut builder = DiscountedCashFlow::builder()
@@ -1043,8 +1049,9 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .terminal_value(terminal_value)
         .equity_bridge(equity_bridge)
         .valuation_date(valuation_date)
-        .mid_year_convention(context.options.mid_year_convention)
-        .terminal_flow_override_opt(terminal_flow_override)
+        .forecast_timing(forecast_timing)
+        .terminal_date(terminal_date)
+        .normalized_annual_fcff_opt(annual_terminal_fcff)
         .attributes(Attributes::new());
 
     if let Some(shares) = context.options.shares_outstanding {
@@ -1062,7 +1069,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .value(&MarketContext::default(), valuation_date)
         .map_err(|e| finstack_quant_statements::Error::Eval(e.to_string()))?;
 
-    let pv_explicit = dcf.calculate_pv_explicit_flows();
+    let pv_explicit = dcf.calculate_pv_explicit_flows()?;
     let tv = dcf
         .calculate_terminal_value()
         .map_err(|e| finstack_quant_statements::Error::Eval(e.to_string()))?;
@@ -1079,25 +1086,34 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .iter()
         .zip(&dcf.flows)
         .map(|(period_id, (date, amount))| {
-            let discount_years = dcf.explicit_flow_discount_years(*date);
+            let discount_years = dcf.explicit_flow_discount_years(*date)?;
             let compounding = (1.0 + dcf.wacc).powf(discount_years);
-            DcfPeriodRow {
+            Ok(DcfPeriodRow {
                 period_id: *period_id,
                 date: *date,
-                free_cash_flow: *amount,
+                free_cash_flow: amount.amount(),
                 discount_years,
                 discount_factor: 1.0 / compounding,
-                present_value: amount / compounding,
-            }
+                present_value: amount.amount() / compounding,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>>>()?;
 
     let equity_val = equity_value.amount();
     let equity_value_per_share = dcf.equity_value_per_share(equity_val);
     let diluted_shares = dcf.diluted_shares(equity_val);
-    let net_debt = dcf.effective_net_debt();
+    let net_debt = dcf.equity_bridge.total_debt - dcf.equity_bridge.cash;
+    let other_equity_claims = dcf.equity_bridge.preferred_equity
+        + dcf.equity_bridge.minority_interest
+        - dcf.equity_bridge.non_operating_assets
+        - dcf
+            .equity_bridge
+            .other_adjustments
+            .iter()
+            .map(|(_, value)| value)
+            .sum::<f64>();
     let valuation_discount = if context.options.valuation_discounts.is_some() {
-        enterprise_value - net_debt - equity_val
+        enterprise_value - net_debt - other_equity_claims - equity_val
     } else {
         0.0
     };
@@ -1106,6 +1122,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         equity_value,
         enterprise_value: Money::new(enterprise_value, currency)?,
         net_debt: Money::new(net_debt, currency)?,
+        other_equity_claims: Money::new(other_equity_claims, currency)?,
         valuation_discount: Money::new(valuation_discount, currency)?,
         terminal_value_pv: Money::new(pv_terminal, currency)?,
         equity_value_per_share,
@@ -1221,7 +1238,7 @@ fn resolve_exit_multiple_metric(
     let currency = extract_currency_from_model(model)?;
     let metric = trailing_year_metric(model, results, node, last_forecast.end, currency)?;
     Ok(TerminalValueSpec::ExitMultiple {
-        terminal_metric: Some(metric),
+        terminal_metric: Some(metric.amount()),
         multiple,
     })
 }
@@ -1232,7 +1249,7 @@ fn trailing_year_metric(
     node: &str,
     end: Date,
     currency: Currency,
-) -> Result<f64> {
+) -> Result<Money> {
     let year = end.year() - 1;
     let start = Date::from_calendar_date(year, end.month(), end.day())
         .or_else(|_| Date::from_calendar_date(year, end.month(), 28))
@@ -1245,7 +1262,7 @@ fn trailing_year_metric(
         ))
     };
     let mut cursor = end;
-    let mut metric = 0.0;
+    let mut metric = Money::zero(currency);
     for period in model
         .periods
         .iter()
@@ -1258,10 +1275,10 @@ fn trailing_year_metric(
         if period.end != cursor || period.start < start || period.start >= period.end {
             return Err(incomplete());
         }
-        metric += monetary_node_value(results, node, &period.id, currency)?;
+        metric = metric.checked_add(monetary_node_money(results, node, &period.id, currency)?)?;
         cursor = period.start;
     }
-    if cursor != start || !metric.is_finite() {
+    if cursor != start {
         return Err(incomplete());
     }
     Ok(metric)
@@ -1274,6 +1291,15 @@ pub(super) fn monetary_node_value(
     period: &finstack_quant_core::dates::PeriodId,
     currency: Currency,
 ) -> Result<f64> {
+    monetary_node_money(results, node, period, currency).map(|amount| amount.amount())
+}
+
+fn monetary_node_money(
+    results: &StatementResult,
+    node: &str,
+    period: &PeriodId,
+    currency: Currency,
+) -> Result<Money> {
     let amount = results.get_money(node, period).ok_or_else(|| {
         finstack_quant_statements::Error::Eval(format!(
             "Node '{node}' at {period} must be monetary in {currency}"
@@ -1285,7 +1311,7 @@ pub(super) fn monetary_node_value(
             amount.currency()
         )));
     }
-    Ok(amount.amount())
+    Ok(amount)
 }
 
 #[cfg(test)]
@@ -1498,7 +1524,7 @@ mod tests {
             assert_eq!(result.periods.len(), dcf.flows.len());
             for (row, (date, amount)) in result.periods.iter().zip(&dcf.flows) {
                 assert_eq!(row.date, *date);
-                assert_eq!(row.free_cash_flow, *amount);
+                assert_eq!(row.free_cash_flow, amount.amount());
                 let factor = (1.0 + wacc).powf(-row.discount_years);
                 assert!((row.discount_factor - factor).abs() < 1e-15);
                 assert!(
@@ -1506,8 +1532,9 @@ mod tests {
                 );
             }
             let rows_pv: f64 = result.periods.iter().map(|row| row.present_value).sum();
-            // Bit-identical to the instrument's own explicit-period PV.
-            assert_eq!(rows_pv, dcf.calculate_pv_explicit_flows());
+            // The owner sums the same rows with compensation.
+            let owner_pv = dcf.calculate_pv_explicit_flows().expect("valid PV");
+            assert!((rows_pv - owner_pv).abs() < 1e-12);
             let pv_explicit = result.pv_explicit.expect("pv_explicit").amount();
             assert!((rows_pv - pv_explicit).abs() < 0.01);
             assert!(
@@ -1555,6 +1582,7 @@ mod tests {
         let legacy = r#"{"equity_value":{"amount":"90","currency":"USD"},
             "enterprise_value":{"amount":"100","currency":"USD"},
             "net_debt":{"amount":"10","currency":"USD"},
+            "other_equity_claims":{"amount":"0","currency":"USD"},
             "valuation_discount":{"amount":"0","currency":"USD"},
             "terminal_value_pv":{"amount":"60","currency":"USD"},
             "equity_value_per_share":null,"diluted_shares":null}"#;

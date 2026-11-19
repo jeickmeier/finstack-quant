@@ -378,7 +378,7 @@ fn extract_dcf_options(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResu
 /// >>> from finstack_quant.statements_analytics import CorporateValuationResult
 /// >>> r = CorporateValuationResult.from_json(
 /// ...     '{"equity_value":{"amount":"90","currency":"USD"},"enterprise_value":{"amount":"100","currency":"USD"},'
-/// ...     '"net_debt":{"amount":"10","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
+/// ...     '"net_debt":{"amount":"10","currency":"USD"},"other_equity_claims":{"amount":"0","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
 /// ...     '"terminal_value_pv":{"amount":"60","currency":"USD"},'
 /// ...     '"equity_value_per_share":null,"diluted_shares":null}')
 /// >>> r.equity_value.amount
@@ -407,15 +407,21 @@ impl PyCorporateValuationResult {
         PyMoney::from_inner(self.inner.enterprise_value)
     }
 
-    /// Net debt (or effective bridge amount) subtracted from EV.
+    /// Interest-bearing debt less cash in model currency.
     #[getter]
     fn net_debt(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.net_debt)
     }
 
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "CorporateValuationResult.other_equity_claims")]
+    fn other_equity_claims(&self) -> PyMoney {
+        PyMoney::from_inner(self.inner.other_equity_claims)
+    }
+
     /// Total valuation discount (DLOM, DLOC, other) deducted after the
     /// EV-to-equity bridge; zero without ``valuation_discounts``.
-    /// ``enterprise_value - net_debt - valuation_discount`` equals
+    /// ``enterprise_value - net_debt - other_equity_claims - valuation_discount`` equals
     /// ``equity_value``.
     #[getter]
     fn valuation_discount(&self) -> PyMoney {
@@ -488,7 +494,7 @@ impl PyCorporateValuationResult {
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``currency``, ``equity_value``, ``enterprise_value``,
-    /// ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float
+    /// ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv`` (float
     /// amounts in ``currency``),
     /// ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent),
     /// then the DCF working: ``wacc`` (decimal), ``pv_explicit``,
@@ -502,6 +508,7 @@ impl PyCorporateValuationResult {
             "equity_value": self.inner.equity_value.amount(),
             "enterprise_value": self.inner.enterprise_value.amount(),
             "net_debt": self.inner.net_debt.amount(),
+            "other_equity_claims": self.inner.other_equity_claims.amount(),
             "valuation_discount": self.inner.valuation_discount.amount(),
             "terminal_value_pv": self.inner.terminal_value_pv.amount(),
             "equity_value_per_share": self.inner.equity_value_per_share,
@@ -521,6 +528,7 @@ impl PyCorporateValuationResult {
                 "equity_value",
                 "enterprise_value",
                 "net_debt",
+                "other_equity_claims",
                 "valuation_discount",
                 "terminal_value_pv",
                 "equity_value_per_share",

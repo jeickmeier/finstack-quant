@@ -264,7 +264,11 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
     )
     .unwrap();
     assert_eq!(
-        valid.dcf_instrument.unwrap().terminal_flow_override,
+        valid
+            .dcf_instrument
+            .unwrap()
+            .normalized_annual_fcff
+            .map(|flow| flow.amount()),
         Some(100.0)
     );
     let missing_period = PeriodId::quarter(2026, 1).unwrap();
@@ -393,7 +397,10 @@ fn growth_terminal_flow_uses_complete_year_across_half_year_periods() {
     )
     .unwrap();
     let dcf = result.dcf_instrument.unwrap();
-    assert_eq!(dcf.terminal_flow_override, Some(200.0));
+    assert_eq!(
+        dcf.normalized_annual_fcff.map(|flow| flow.amount()),
+        Some(200.0)
+    );
     let terminal_value = dcf.calculate_terminal_value().unwrap();
     assert!((terminal_value - 200.0 * 1.02 / (0.10 - 0.02)).abs() < 1e-10);
 }

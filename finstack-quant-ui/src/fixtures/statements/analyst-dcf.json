@@ -11,6 +11,10 @@
     "amount": "316400000",
     "currency": "USD"
   },
+  "other_equity_claims": {
+    "amount": "0",
+    "currency": "USD"
+  },
   "valuation_discount": {
     "amount": "0",
     "currency": "USD"

@@ -1,7 +1,10 @@
 //! DCF pricer implementation.
 
 use super::DiscountedCashFlow;
-use finstack_quant_core::{dates::Date, market_data::context::MarketContext, money::Money};
+use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::{
+    Error, Result, dates::Date, market_data::context::MarketContext, money::Money,
+};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
@@ -52,8 +55,10 @@ pub(crate) fn pv_with_rf_bump(
     bump_at: &dyn Fn(f64) -> f64,
 ) -> finstack_quant_core::Result<f64> {
     let (pv_explicit, pv_terminal) = pv_components_with_rf_bump(dcf, bump_at)?;
-    let equity_value = pv_explicit + pv_terminal - dcf.effective_net_debt();
-    dcf.apply_valuation_discounts(equity_value)
+    let mut equity = NeumaierAccumulator::new();
+    equity.add(enterprise_value(pv_explicit, pv_terminal)?)?;
+    equity.add(-dcf.effective_net_debt())?;
+    dcf.apply_valuation_discounts(equity.get_total()?)
 }
 
 /// Enterprise-value components `(pv_explicit, pv_terminal)` at the WACC with
@@ -63,26 +68,47 @@ pub(crate) fn pv_components_with_rf_bump(
     dcf: &DiscountedCashFlow,
     bump_at: &dyn Fn(f64) -> f64,
 ) -> finstack_quant_core::Result<(f64, f64)> {
-    // Terminal tenor: ExitMultiple discounts at the full horizon t_n (a
-    // point-in-time sale price); Gordon/H-model keep the mid-year-adjusted
-    // tenor (flow-stream proxies). See `terminal_discount_years`.
     let t_term = dcf.terminal_discount_years()?;
-    let bump_term = bump_at(t_term);
+    let terminal_wacc = dcf.wacc + bump_at(t_term);
+    let terminal_value = dcf.terminal_value_at_wacc(terminal_wacc)?;
+    let pv_terminal = discount_cashflow(terminal_value, terminal_wacc, t_term)?;
 
-    // Terminal value capitalized at the bumped WACC (validates WACC > g).
-    let terminal_value = dcf.terminal_value_at_wacc(dcf.wacc + bump_term)?;
-    let pv_terminal = terminal_value / (1.0 + dcf.wacc + bump_term).powf(t_term);
+    let mut explicit = NeumaierAccumulator::new();
+    for &(date, amount) in &dcf.flows {
+        let years = dcf.explicit_flow_discount_years(date)?;
+        explicit.add(discount_cashflow(
+            amount.amount(),
+            dcf.wacc + bump_at(years),
+            years,
+        )?)?;
+    }
+    Ok((explicit.get_total()?, pv_terminal))
+}
 
-    let pv_explicit: f64 = dcf
-        .flows
-        .iter()
-        .map(|(date, amount)| {
-            let t = dcf.discount_years(dcf.valuation_date, *date);
-            amount / (1.0 + dcf.wacc + bump_at(t)).powf(t)
-        })
-        .sum();
+pub(super) fn enterprise_value(pv_explicit: f64, pv_terminal: f64) -> Result<f64> {
+    let value = pv_explicit + pv_terminal;
+    if !value.is_finite() {
+        return Err(Error::Validation(
+            "DCF enterprise value is non-finite".into(),
+        ));
+    }
+    Ok(value)
+}
 
-    Ok((pv_explicit, pv_terminal))
+pub(super) fn discount_cashflow(amount: f64, wacc: f64, years: f64) -> Result<f64> {
+    if !wacc.is_finite() || wacc <= -1.0 {
+        return Err(Error::Validation(
+            "DCF discount rate must be a finite annual effective rate above -100%".into(),
+        ));
+    }
+    let denominator = (1.0 + wacc).powf(years);
+    let present_value = amount / denominator;
+    if !(denominator.is_finite() && denominator > 0.0 && present_value.is_finite()) {
+        return Err(Error::Validation(
+            "DCF discount factor or present value cannot be represented".into(),
+        ));
+    }
+    Ok(present_value)
 }
 
 impl Pricer for DcfPricer {
@@ -119,7 +145,9 @@ impl Pricer for DcfPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dcf_equity::types::{DiscountedCashFlow, EquityBridge, TerminalValueSpec};
+    use crate::dcf_equity::types::{
+        DiscountedCashFlow, EquityBridge, ForecastTiming, TerminalValueSpec,
+    };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -136,14 +164,15 @@ mod tests {
         DiscountedCashFlow {
             id: InstrumentId::new("TEST-DCF-PRICER"),
             currency: Currency::USD,
-            flows: vec![(flow_date, 100.0)],
+            flows: vec![(flow_date, Money::from((100_i64, Currency::USD)))],
             wacc: 0.10,
             terminal_value: TerminalValueSpec::GordonGrowth {
                 stable_growth_rate: 0.02,
             },
             valuation_date,
-            mid_year_convention: false,
-            terminal_flow_override: None,
+            forecast_timing: ForecastTiming::DatedReceipts,
+            terminal_date: flow_date,
+            normalized_annual_fcff: Some(Money::from((100_i64, Currency::USD))),
             equity_bridge: EquityBridge::default(),
             shares_outstanding: None,
             dilution_securities: Vec::new(),
@@ -182,5 +211,23 @@ mod tests {
             .expect("canonical DCF pricing");
 
         assert_eq!(result.as_of, dcf.valuation_date);
+    }
+}
+
+#[cfg(test)]
+mod checked_wacc_tests {
+    use super::*;
+
+    #[test]
+    fn out_of_domain_wacc_and_denominators_are_not_silently_accepted() {
+        assert!(discount_cashflow(100.0, -1.0, 0.0).is_err());
+        assert!(discount_cashflow(100.0, f64::NAN, 1.0).is_err());
+        assert!(discount_cashflow(100.0, 1.0, 2000.0).is_err());
+        assert!(discount_cashflow(100.0, -0.5, 2000.0).is_err());
+        assert!(enterprise_value(f64::MAX, f64::MAX).is_err());
+        assert_eq!(
+            discount_cashflow(100.0, 0.25, 1.0).expect("finite PV"),
+            80.0
+        );
     }
 }
