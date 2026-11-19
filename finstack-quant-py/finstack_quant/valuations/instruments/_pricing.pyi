@@ -11,9 +11,11 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.composite import CompositeInstrument
 from finstack_quant.valuations.instruments._instruments import Bond, TermLoan
+from finstack_quant.valuations.instruments._typed_asset_backed_facility.facility import AssetBackedFacility
 from finstack_quant.valuations.instruments._typed_convertible import ConvertibleBond
 from finstack_quant.valuations.instruments._typed_credit.cds import CreditDefaultSwap
 from finstack_quant.valuations.instruments._typed_credit.cds_index import CdsIndex
+from finstack_quant.valuations.instruments._typed_credit.cds_option import CdsOption
 from finstack_quant.valuations.instruments._typed_credit.cds_tranche import CdsTranche
 from finstack_quant.valuations.instruments._typed_equity import EquityOption
 from finstack_quant.valuations.instruments._typed_fx import FxForward, FxOption
@@ -21,8 +23,8 @@ from finstack_quant.valuations.instruments._typed_rates import CapFloor, Interes
 from finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit import RevolvingCredit
 from finstack_quant.valuations.instruments._typed_structured_credit.structured_credit import StructuredCredit
 
-def price_instrument(
-    instrument: str
+_InstrumentInput = (
+    str
     | dict[str, Any]
     | Bond
     | TermLoan
@@ -38,7 +40,13 @@ def price_instrument(
     | EquityOption
     | StructuredCredit
     | RevolvingCredit
-    | CompositeInstrument,
+    | AssetBackedFacility
+    | CdsOption
+    | CompositeInstrument
+)
+
+def price_instrument(
+    instrument: _InstrumentInput,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str = "default",
@@ -50,12 +58,13 @@ def price_instrument(
 
     Parameters
     ----------
-    instrument : str or dict[str, Any] or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CdsIndex or FxForward or FxOption or CdsTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
+    instrument : typed instrument, dict or str
         Typed instrument instance (:class:`Bond`, :class:`TermLoan`,
         :class:`InterestRateSwap`, :class:`Swaption`, :class:`CapFloor`,
         :class:`CreditDefaultSwap`, :class:`CdsIndex`, :class:`FxForward`,
         :class:`FxOption`, :class:`CdsTranche`, :class:`ConvertibleBond`,
-        :class:`EquityOption`, :class:`StructuredCredit`,
+        :class:`EquityOption`, :class:`StructuredCredit`, :class:`RevolvingCredit`,
+        :class:`AssetBackedFacility`, :class:`CdsOption`,
         :class:`~finstack_quant.valuations.composite.CompositeInstrument`) or a
         canonical ``finstack_quant.instrument/1`` envelope, as the dict
         :func:`instrument_envelope_from_spec` returns or as JSON text.
@@ -1235,7 +1244,7 @@ class MarketHistory:
         ...
 
 def instrument_cashflows(
-    instrument: Any,
+    instrument: _InstrumentInput,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str,
@@ -1252,8 +1261,8 @@ def instrument_cashflows(
 
     Parameters
     ----------
-    instrument : Bond | TermLoan | InterestRateSwap | CdsOption | ... | dict | str
-        Typed instrument instance or a canonical
+    instrument : typed instrument, dict or str
+        Typed instrument supported by :func:`price_instrument` or a canonical
         ``finstack_quant.instrument/1`` envelope, as the dict
         :func:`instrument_envelope_from_spec` returns or as JSON text.
     market : MarketContext | str

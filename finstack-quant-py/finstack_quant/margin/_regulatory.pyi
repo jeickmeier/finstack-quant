@@ -1278,7 +1278,7 @@ class FrtbSbaResult:
         """
         ...
 
-    def to_dataframe(self) -> Any:
+    def to_dataframe(self) -> pd.DataFrame:
         """
         Export the headline charge as a single-row pandas ``DataFrame``.
 
@@ -1294,7 +1294,7 @@ class FrtbSbaResult:
         """
         ...
 
-    def to_breakdown_dataframe(self) -> Any:
+    def to_breakdown_dataframe(self) -> pd.DataFrame:
         """
         Export the per-risk-class breakdown as a long-format ``DataFrame``.
 

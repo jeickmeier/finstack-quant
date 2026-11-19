@@ -11,9 +11,9 @@ class CheckSuiteSpec:
     A serializable suite specification describing which checks to run.
 
     Load from JSON (e.g. a team-wide check policy file) and inspect its
-    composition (``builtin_check_count`` / ``formula_check_count``). Note:
-    running a suite is not yet exposed through the Python bindings; this type is
-    currently for loading and inspecting a policy definition only.
+    composition (``builtin_check_count`` / ``formula_check_count``). Pass the
+    suite to :meth:`Evaluator.with_checks` during evaluation or to
+    :func:`finstack_quant.statements_analytics.run_checks` to obtain a check report.
 
     Examples
     --------

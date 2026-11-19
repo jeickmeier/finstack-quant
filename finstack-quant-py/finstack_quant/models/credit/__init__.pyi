@@ -966,6 +966,10 @@ class SimulatedPaths:
 
     """
 
+    def __repr__(self) -> str:
+        """Return a single-line diagnostic representation of the simulation results."""
+        ...
+
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """
         Support ``pickle`` via the canonical JSON round-trip.

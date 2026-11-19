@@ -990,7 +990,8 @@ class StructuredCredit:
         Returns
         -------
         dict[str, Any]
-            Same content as the ``instrument`` payload of ``to_json()``.
+            The deal specification stored under ``instrument.spec`` in the
+            canonical ``to_json()`` envelope.
 
         Raises
         ------
