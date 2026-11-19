@@ -175,8 +175,9 @@ The native analytics object receives the derived returns with `frequency="quarte
 import numpy as np
 from finstack_quant.analytics import Performance
 return_panel = pd.DataFrame({"BOOK": returns, "BENCH": [p["benchmark_return"] for p in history]}, index=pd.to_datetime(history_dates[1:]))
-book_performance = Performance.from_returns(return_panel, benchmark_ticker="BENCH", frequency="quarterly")
-metrics_table = pd.DataFrame({name: getattr(book_performance, name)() for name in ["cagr", "volatility", "sharpe", "sortino", "calmar", "max_drawdown", "max_drawdown_duration", "tracking_error", "information_ratio", "up_capture", "down_capture", "batting_average", "omega_ratio"]})
+book_performance = Performance.from_returns(return_panel, benchmark_ticker="BENCH", frequency="quarterly", initial_date=history_dates[0])
+metric_inputs = {"volatility": {"annualize": True}, "sharpe": {"risk_free_rate": 0.0}, "sortino": {"mar": 0.0}, "omega_ratio": {"threshold": 0.0}}
+metrics_table = pd.DataFrame({name: getattr(book_performance, name)(**metric_inputs.get(name, {})) for name in ["cagr", "volatility", "sharpe", "sortino", "calmar", "max_drawdown", "max_drawdown_duration", "tracking_error", "information_ratio", "up_capture", "down_capture", "batting_average", "omega_ratio"]})
 manual_vol = np.std(returns, ddof=1) * np.sqrt(4)
 manual_sharpe = np.mean(returns) * 4 / manual_vol
 active = return_panel.BOOK - return_panel.BENCH
@@ -201,13 +202,16 @@ Read the sign and denominator before ranking: maximum drawdown is a negative ret
 
 {/* notebook-block notebook="03_analytics/performance_analytics.ipynb" cell="exercise-same-sharpe" role="exercise" */}
 ```python exec id=exercise-same-sharpe role=exercise
+from datetime import date
+
 # Controlled 24-month experiment, not the analyst book's realized history.
 z = np.array([-3.0, -1.0, -0.5, 0.0, 0.5, 1.0]*4)
 z = (z-z.mean())/z.std(ddof=1)
 fund_a = 0.006 + 0.025*z
 fund_b = 0.006 - 0.025*z
-funds = Performance.from_returns(pd.DataFrame({"A":fund_a,"B":fund_b},index=pd.date_range("2023-01-31",periods=24,freq="ME")),frequency="monthly")
-comparison = pd.DataFrame({m:getattr(funds,m)() for m in ["sharpe","sortino","calmar","max_drawdown","cagr"]})
+funds = Performance.from_returns(pd.DataFrame({"A":fund_a,"B":fund_b},index=pd.date_range("2023-01-31",periods=24,freq="ME")),frequency="monthly", initial_date=date(2022, 12, 31))
+comparison_inputs = {"sharpe": {"risk_free_rate": 0.0}, "sortino": {"mar": 0.0}}
+comparison = pd.DataFrame({m:getattr(funds,m)(**comparison_inputs.get(m, {})) for m in ["sharpe","sortino","calmar","max_drawdown","cagr"]})
 print(comparison.to_string())
 print("Same sample mean and variance do not imply the same downside distribution or compounded drawdown.")
 ```

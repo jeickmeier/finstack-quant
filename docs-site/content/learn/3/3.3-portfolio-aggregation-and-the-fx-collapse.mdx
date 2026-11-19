@@ -100,6 +100,7 @@ from finstack_quant.portfolio import Portfolio, PortfolioResult, InstrumentArtif
 # value_portfolio returns PortfolioValuation. Assemble the reporting envelope explicitly.
 envelope = PortfolioResult(valuation, aggregated)
 meta = envelope.meta
+# No financial rounding mode was configured, so the stamp records none.
 stable_meta = {key: value for key, value in meta.items() if key != "timestamp"}
 stable_meta["timestamp"] = "<generated during valuation>"
 print("Generated result metadata:", stable_meta)

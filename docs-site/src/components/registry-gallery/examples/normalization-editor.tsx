@@ -7,7 +7,7 @@ import { useNormalize } from "@/hooks/statements/use-normalize/use-normalize";
 import data from "../data.json";
 import { WorkerPreview } from "../worker-preview";
 const resultJson = JSON.stringify(data.statementResult);
-const nodeIds = Object.keys(data.statementResult.nodes);
+const nodeIds = Object.keys(data.statementResult.cells);
 const start = data.normalizationEditor.config as unknown as ComponentProps<
   typeof NormalizationEditor
 >["defaultConfig"];

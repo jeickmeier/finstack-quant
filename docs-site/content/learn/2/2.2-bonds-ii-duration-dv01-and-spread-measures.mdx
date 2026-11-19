@@ -102,7 +102,8 @@ values = {}
 for bp in (-1.0, 0.0, 1.0, 25.0):
     bumped = MarketContext.from_json(market.to_json())
     bumped.insert(DiscountCurve('USD-OIS', AS_OF,
-        [(t, df * math.exp(-bp * 1e-4 * t)) for t, df in zip(curve.knots, curve.dfs)], interp='log_linear'))
+        [(t, df * math.exp(-bp * 1e-4 * t)) for t, df in zip(curve.knots, curve.dfs)],
+        interp='log_linear', extrapolation=curve.extrapolation, day_count=curve.day_count))
     values[bp] = price_instrument(bond, bumped, AS_OF).price
 dv01 = (values[1.0] - values[-1.0]) / 2  # native signed change for +1 bp
 actual = values[25.0] - values[0.0]
@@ -151,10 +152,10 @@ from _shared.instrument_fixtures import floating_bond,instrument_envelope
 AS_OF = date(2025, 1, 15)
 market=build_market('foundations')
 # This flat term-SOFR input is local to the FRN comparison; the shared rates book begins in 2.3.
-market.insert(ForwardCurve.flat('USD-SOFR-3M', 0.25, AS_OF, 0.05))
+market.insert(ForwardCurve.flat('USD-SOFR-3M', AS_OF, 0.05, 'act_360'))
 first_fixing = date(2024, 1, 1)
 term_sofr_fixings = [(first_fixing + timedelta(days=offset), 0.05) for offset in range((AS_OF - first_fixing).days + 1)]
-market.insert_series(ScalarTimeSeries('FIXING:USD-SOFR-3M', term_sofr_fixings))
+market.insert_series(ScalarTimeSeries('FIXING:USD-SOFR-3M', term_sofr_fixings, 'step', 'error'))
 corporate=instruments('foundations')['USD-CORP']
 corporate['instrument']['spec']['cashflow_spec']['fixed']['stub']='short_front'
 corporate['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':99.0}}
@@ -189,7 +190,7 @@ from finstack_quant.core.market_data import DiscountCurve
 from finstack_quant.valuations.instruments import price_instrument
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
-market=build_market('foundations').insert(DiscountCurve('USD-OIS',AS_OF,[(0,1)]+[(t,math.exp(-.04*t)) for t in (2,5,10,30)],interp='log_linear'))
+market=build_market('foundations').insert(DiscountCurve('USD-OIS',AS_OF,[(0,1)]+[(t,math.exp(-.04*t)) for t in (2,5,10,30)],interp='log_linear',extrapolation='extend',day_count='act_365f'))
 contract=instruments('foundations')['USD-CORP'];contract['instrument']['spec']['maturity']='2032-01-15'
 r=price_instrument(json.dumps(contract),market,AS_OF,metrics=['dv01','bucketed_dv01'])
 buckets={key:r.get_metric(key) for key in r.metrics if key.startswith('bucketed_dv01::USD-OIS::')}

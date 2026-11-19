@@ -177,7 +177,7 @@ seasoned_date=AS_OF+timedelta(days=219)
 seasoned_market=tracks.build_market("vol",seasoned_date)
 observed_dates=[AS_OF+timedelta(days=i) for i in range(220) if (AS_OF+timedelta(days=i)).weekday()<5]
 closes=[(day,5200*math.exp(.012*math.sin(i*.71))) for i,day in enumerate(observed_dates)]
-seasoned_market.insert_series(ScalarTimeSeries("SPX-CLOSE",closes))
+seasoned_market.insert_series(ScalarTimeSeries("SPX-CLOSE",closes,"step","error"))
 seasoned=deepcopy(inputs["SPX-VARIANCE"])
 # Explicitly choose a flat 20% forward-volatility assumption to isolate accrued-versus-forward accounting.
 seasoned["instrument"]["spec"]["instrument_pricing_overrides"]={"market_quotes":{"implied_volatility":.20}}

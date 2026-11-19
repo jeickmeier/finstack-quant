@@ -116,6 +116,8 @@ The cash-bond LVaR table retains native model loss, spread cost and adjusted los
 
 {/* notebook-block notebook="05_portfolio/liquidity_risk.ipynb" cell="risk-budget-and-liquidity" role="build" */}
 ```python exec id=risk-budget-and-liquidity role=build
+from datetime import date
+
 from finstack_quant.models.factor.risk import position_risk_report, evaluate_risk_budget
 from finstack_quant.models.liquidity import lvar_bangia,roll_effective_spread,amihud_illiquidity,almgren_chriss_impact,kyle_lambda
 from finstack_quant.portfolio import value_portfolio
@@ -135,7 +137,7 @@ lvar_rows=[]
 for pid in ["USD-CORP","EUR-GOVT"]:
  pv=float(values["position_values"][pid]["value_base"]["amount"])
  returns_frame=panel[[pid]]
- proxy=Performance.from_returns(returns_frame,frequency="daily")
+ proxy=Performance.from_returns(returns_frame,frequency="daily", initial_date=date(2023, 2, 7))
  var=proxy.parametric_var(.99).iloc[0]*100_000
  spread=float(liquidity.loc[pid,"spread_fraction"])
  result=lvar_bangia(var,spread,spread*.25,.99,pv)

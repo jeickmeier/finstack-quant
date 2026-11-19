@@ -88,7 +88,7 @@ from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import price_instrument
 
-note_market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2026, 1, 1), 0.0))
+note_market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2026, 1, 1), 0.0, "act_365f"))
 note_market.insert_price("SPX-SPOT", Money(100.0, "USD"))
 note_spec = {
     "id": "NOTE-PAYOFF-PROOF", "underlying_ticker": "SPX",

@@ -157,6 +157,7 @@ from finstack_quant.core.cashflow import CFKind
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import Bond
 floating=FloatingCouponSpec(rate_spec=FloatingRateSpec(
+    index_id="USD-SOFR-3M",
     forward_curve_id="USD-SOFR-3M",
     spread_bp=Decimal("200"),
     reset_frequency=Tenor.parse("3M"),

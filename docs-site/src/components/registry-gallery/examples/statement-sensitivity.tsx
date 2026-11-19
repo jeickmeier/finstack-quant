@@ -14,7 +14,7 @@ const run = data.statementSensitivityRun as StatementSensitivityDefaults;
 const captured = statementSensitivity;
 const result = statementResult;
 const nodeIds = Object.keys(data.statementModel.nodes);
-const periods = data.statementModel.periods.map((period) => period.id);
+const periods = data.statementModel.periods.periods.map((period) => period.id);
 
 export function Example({ density = "compact" }: ExampleProps) {
   const [count, setCount] = useState(0);

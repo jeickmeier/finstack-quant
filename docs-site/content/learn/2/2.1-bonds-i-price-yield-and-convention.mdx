@@ -196,7 +196,7 @@ from finstack_quant.valuations.instruments import Bond,price_instrument,instrume
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 step_schedule=(CashFlowSchedule.builder().principal(Money(2_000_000,'USD'),date(2024,1,15),date(2030,1,15))
- .step_up_cf(StepUpCouponSpec(0.055,[(date(2027,1,15),0.065)],ScheduleParams(frequency=Tenor.parse('6M'), day_count=DayCount.THIRTY_360, calendar_id='weekends_only'))).build())
+ .step_up_cf(StepUpCouponSpec(0.055,[(date(2027,1,15),0.065)],ScheduleParams(frequency=Tenor.parse('6M'), day_count=DayCount.THIRTY_360, calendar_id='weekends_only', business_day_convention='modified_following'))).build())
 step_bond=Bond.from_cashflows('STEP-UP',step_schedule,'semi_annual','USD-OIS')
 step_price=price_instrument(step_bond,build_market('foundations'),AS_OF,metrics=['ytm'])
 print({'stepup_price_USD':step_price.price,'curve_implied_street_ytm':step_price.get_metric('ytm')})

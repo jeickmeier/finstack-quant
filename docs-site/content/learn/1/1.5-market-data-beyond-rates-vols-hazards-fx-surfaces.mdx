@@ -116,7 +116,7 @@ from finstack_quant.calibration import calibrate
 from _shared.analyst_book import single_name_calibration_envelope
 AS_OF = date(2025, 1, 15)
 
-hazard = HazardCurve.flat('FIXED-HAZARD', AS_OF, 0.02, 0.40)
+hazard = HazardCurve.flat('FIXED-HAZARD', AS_OF, 0.02, 0.40, 'act_365f')
 lower_recovery = hazard.with_recovery_rate(0.25)
 calibrated = {}
 for recovery in (0.40, 0.25):
@@ -147,7 +147,7 @@ from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 world = MarketContext.from_json(build_market('foundations').to_json())
 world.insert(VolSurface('SPX-VOL', [0.25, 1.0], [4000.0, 5200.0, 6400.0], [[0.25, 0.20, 0.19], [0.25, 0.20, 0.19]], secondary_axis='strike', quote_type='black_lognormal', interpolation_mode='vol'))
-world.insert(HazardCurve.flat('ILLUSTRATIVE-HAZARD',AS_OF,0.02,0.4))
+world.insert(HazardCurve.flat('ILLUSTRATIVE-HAZARD',AS_OF,0.02,0.4,'act_365f'))
 hazard=world.get_hazard('ILLUSTRATIVE-HAZARD')
 rows=[{'year':year,'survival':hazard.sp(year),'cumulative_PD':1-hazard.sp(year),'conditional_year_PD':1-hazard.sp(year)/hazard.sp(year-1)} for year in range(1,6)]
 print(rows)
@@ -193,7 +193,7 @@ from finstack_quant.calibration import calibrate
 from finstack_quant.core.market_data import HazardCurve,MarketContext
 from _shared.analyst_book import single_name_calibration_envelope
 AS_OF = date(2025, 1, 15)
-fixed=HazardCurve.flat('FIXED',AS_OF,0.02,0.4)
+fixed=HazardCurve.flat('FIXED',AS_OF,0.02,0.4,'act_365f')
 pds={}
 for recovery in (0.4,0.25):
     envelope=single_name_calibration_envelope(AS_OF);envelope['plan']['steps'][-1]['recovery_rate']=recovery

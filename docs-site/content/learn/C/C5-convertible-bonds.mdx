@@ -243,7 +243,7 @@ credit_rows=[]
 for spot in [50.,100.,150.]:
     base_market=tracks.build_market("credit");base_market.insert_price("CONVERT",spot,"USD")
     widened=tracks.build_market("credit");widened.insert_price("CONVERT",spot,"USD")
-    widened.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.035)],recovery_rate=0.))
+    widened.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.035)],recovery_rate=0.,day_count="act_365f"))
     before=price_instrument(json.dumps(convert),base_market,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
     after=price_instrument(json.dumps(convert),widened,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
     credit_rows.append({"spot":spot,"convert_credit_pnl":after.value.amount-before.value.amount,

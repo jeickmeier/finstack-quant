@@ -383,6 +383,7 @@ builder.value_money("ebitda", [("2025", usd(100)), ("2028", usd(120))])
 builder.availability_dates("ebitda", [("2025", ENTRY_DATE)])
 builder.value_money("eligible_cash", [("2028", usd(40))])
 builder.value("term_amortization", [("2025", 0.0), ("2026", 30.0), ("2027", 30.0), ("2028", 20.0)])
+# Declare the debt roll-forwards before formulas that use their balances.
 add_roll_forward_with_opening(builder, "term", [], ["term_amortization"], 420.0)
 add_roll_forward_with_opening(builder, "junior", [], [], 100.0)
 builder.as_money("closing_debt", "term_end + junior_end")

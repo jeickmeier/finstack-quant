@@ -136,13 +136,14 @@ import json, math
 from datetime import date
 from decimal import Decimal
 from finstack_quant.cashflows.builder import CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec, FloatingLegCompounding, ScheduleParams
-from finstack_quant.core.dates import DayCount
+from finstack_quant.core.dates import BusinessDayConvention, DayCount
 from finstack_quant.core.market_data import ForwardCurve, MarketContext
 from finstack_quant.core.money import Money
 
 from _shared.analyst_book import build_market
 overnight_market = build_market('foundations')
 floating_rate = FloatingRateSpec(
+    index_id='USD-SOFR',
     forward_curve_id='USD-SOFR',
     spread_bp=Decimal('0'),
     reset_frequency=Tenor.parse('1W'),
@@ -153,10 +154,10 @@ floating_rate = FloatingRateSpec(
 )
 schedule = (CashFlowSchedule.builder().principal(Money(1_000_000.0, 'USD'), date(2025, 1, 6), date(2025, 1, 13))
     .floating_cf(FloatingCouponSpec(rate_spec=floating_rate,
-        schedule=ScheduleParams(frequency=Tenor.parse('1W'), day_count=DayCount.ACT_360, calendar_id='weekends_only')))
+        schedule=ScheduleParams(frequency=Tenor.parse('1W'), day_count=DayCount.ACT_360, calendar_id='weekends_only', business_day_convention=BusinessDayConvention.UNADJUSTED)))
     .build(overnight_market))
 overnight_flows = json.loads(schedule.to_json())['flows']
-coupon = next(flow for flow in overnight_flows if flow['kind'] == 'float_reset')
+coupon = next(flow for flow in overnight_flows if flow['kind'] == 'floating')
 period_return = math.prod(1 + 0.05 * days / 360 for days in (1, 1, 1, 1, 3)) - 1
 print({'compounded_period_return': period_return, 'coupon': coupon['amount']})
 ```
@@ -203,7 +204,7 @@ from finstack_quant.core.market_data import DiscountCurve
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 curve=build_market('foundations').get_discount('USD-OIS');before=curve.df(5)
-steep=DiscountCurve('USD-STEEP',AS_OF,[(t,curve.df(t)*math.exp(-0.001*(t/10)*t)) for t in sorted(set(curve.knots)|{5.0})],interp='log_linear')
+steep=DiscountCurve('USD-STEEP',AS_OF,[(t,curve.df(t)*math.exp(-0.001*(t/10)*t)) for t in sorted(set(curve.knots)|{5.0})],interp='log_linear',extrapolation='extend',day_count=curve.day_count)
 base_pv,shock_pv=1000000*curve.df(5),1000000*steep.df(5)
 print({'cashflow_USD':1000000,'payment_year':5,'zero_shock_bp':5,'base_PV':base_pv,'steepened_PV':shock_pv,'PnL':shock_pv-base_pv})
 ```

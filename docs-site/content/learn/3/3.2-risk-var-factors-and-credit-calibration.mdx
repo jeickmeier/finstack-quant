@@ -147,17 +147,22 @@ The controlled skewed sample applies a quadratic transformation to normal draws.
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="skewed-return-risk" role="build" */}
 ```python exec id=skewed-return-risk role=build
+from datetime import date
+
 import pandas as pd
 
 rng = np.random.default_rng(73)
 normal_draws = rng.normal(0, 0.01, 504)
 skewed_returns = normal_draws - 0.002 * ((normal_draws/0.01)**2 - 1)
-skewed_performance = Performance.from_returns(pd.DataFrame({"skewed":skewed_returns},index=panel.index),frequency="daily")
+skewed_performance = Performance.from_returns(pd.DataFrame({"skewed":skewed_returns},index=panel.index),frequency="daily", initial_date=date(2023, 2, 7))
 skewed_measures = {
     "historical":float(skewed_performance.value_at_risk(0.95).iloc[0]),
     "Gaussian":float(skewed_performance.parametric_var(0.95).iloc[0]),
-    "Cornish-Fisher":float(skewed_performance.cornish_fisher_var(0.95).iloc[0]),
 }
+try:
+    skewed_measures["Cornish-Fisher"] = float(skewed_performance.cornish_fisher_var(0.95).iloc[0])
+except AnalyticsError as error:
+    print("Cornish–Fisher estimate rejected:", error)
 print("Controlled skewed daily returns:",skewed_measures)
 print("A correction changes the model; closeness to one empirical quantile is not a guarantee out of sample.")
 ```
@@ -169,11 +174,13 @@ Now give each of two positions a 10% loss in four of one hundred equiprobable st
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="var-nonsubadditivity" role="build" */}
 ```python exec id=var-nonsubadditivity role=build
+from datetime import date
+
 # One hundred equally likely dollar-loss states; four A defaults and four different B defaults.
 loss_a = np.zeros(100); loss_a[:4] = 0.1
 loss_b = np.zeros(100); loss_b[4:8] = 0.1
 state_returns = pd.DataFrame({"A":-loss_a,"B":-loss_b,"AplusB":-(loss_a+loss_b)},index=pd.bdate_range("2025-01-01",periods=100))
-discrete = Performance.from_returns(state_returns,frequency="daily")
+discrete = Performance.from_returns(state_returns,frequency="daily", initial_date=date(2024, 12, 31))
 var_values = discrete.value_at_risk(0.95)
 # Exact 95% ES averages exactly five worst equiprobable states, including partial threshold mass if needed.
 exact_es_a = np.sort(loss_a)[-5:].mean()
@@ -181,8 +188,8 @@ exact_es_b = np.sort(loss_b)[-5:].mean()
 exact_es_sum = np.sort(loss_a+loss_b)[-5:].mean()
 print("Loss-positive VaR:",(-var_values).to_dict())
 print("Exact tail-mass ES:",{"A":exact_es_a,"B":exact_es_b,"AplusB":exact_es_sum})
-print("API closed-threshold tail averages:",(-discrete.expected_shortfall(0.95)).to_dict())
-print("Ties change the included probability mass. The API estimate is not the exact-mass ES used in the coherence theorem.")
+print("API exact fractional empirical ES:",(-discrete.expected_shortfall(0.95)).to_dict())
+print("The API integrates exactly the requested empirical tail mass, including fractional observations; tied thresholds do not add extra mass.")
 ```
 {/* /notebook-block */}
 
@@ -203,9 +210,6 @@ from datetime import date as dt_date
 from pathlib import Path
 
 import numpy as np
-
-import sys
-sys.path.insert(0, "..")
 
 from _shared.instrument_fixtures import fixed_bond
 from finstack_quant.attribution import attribute_pnl_envelope
@@ -241,7 +245,9 @@ AS_OF = "2024-03-31"
 _schedule = (
     Schedule.builder(dt_date(2022, 3, 31), dt_date.fromisoformat(AS_OF))
     .frequency("1M")
-    .end_of_month(True)
+    .stub_rule("none")
+    .grid("end_of_month")
+    .unadjusted()
     .build()
 )
 dates = [d.isoformat() for d in _schedule.dates][-N_MONTHS:]

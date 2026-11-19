@@ -109,7 +109,8 @@ rows = []
 for rate in [0.04, 0.055]:
     scenario_market = tracks.build_market("vol")
     scenario_market.insert(DiscountCurve("USD-TREASURY", AS_OF,
-        [(t, math.exp(-rate*t)) for t in [0.0, 1.0, 5.0, 10.0, 20.0]], day_count="act_365f"))
+        [(t, math.exp(-rate*t)) for t in [0.0, 1.0, 5.0, 10.0, 20.0]],
+        interp="monotone_convex", extrapolation="extend", day_count="act_365f"))
     for iid in ["UST-DELIVERABLE-A", "UST-DELIVERABLE-B"]:
         future = deepcopy(inputs["UST-FUTURE"])
         future["instrument"]["spec"].update({"ctd_bond_id": iid, "ctd_bond": inputs[iid]["instrument"]["spec"]})

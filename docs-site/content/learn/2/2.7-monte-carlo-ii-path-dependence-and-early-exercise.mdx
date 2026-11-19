@@ -372,7 +372,7 @@ bermudan_spec = {
 }
 bermudan_json = json.dumps({"schema": "finstack_quant.instrument/1",
                            "instrument": {"type": "bermudan_swaption", "spec": bermudan_spec}})
-bermudan_market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2026, 1, 15), 0.03))
+bermudan_market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2026, 1, 15), 0.03, "act_365f"))
 mc_bermudan = price_instrument(bermudan_json, bermudan_market, "2026-01-15", "monte_carlo_hull_white_1f")
 tree_bermudan = price_instrument(bermudan_json, bermudan_market, "2026-01-15", "hull_white_1f")
 mc_repeat = price_instrument(bermudan_json, bermudan_market, "2026-01-15", "monte_carlo_hull_white_1f")

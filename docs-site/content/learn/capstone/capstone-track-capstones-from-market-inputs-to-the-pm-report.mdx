@@ -142,7 +142,7 @@ individual_rows=[]
 for position in book_input["positions"]:
     one=price_instrument(json.dumps(instrument_envelope(position["instrument_spec"])),market,AS_OF,metrics=[])
     currency=str(one.value.currency)
-    fx_rate=1.0 if currency=="USD" else market.fx_required().rate(currency,"USD",AS_OF).rate
+    fx_rate=1.0 if currency=="USD" else market.fx_required().rate(currency,"USD",AS_OF, "cashflow_date").rate
     direct_native=one.value.amount*position["quantity"]
     portfolio_native=float(wire["position_values"][position["instrument_id"]]["value_native"]["amount"])
     individual_rows.append({"position":position["instrument_id"],"currency":currency,
@@ -201,6 +201,8 @@ print(risk_table.pivot(index="position",columns="metric",values="value").iloc[:,
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-risk-factor-tail" role="build" */}
 ```python exec id=credit-risk-factor-tail role=build
+from datetime import date
+
 # A scenario distribution, not observed historical returns or a calibrated forecast.
 # Reprice the actual held book at the fixed valuation date; do not proxy it with the
 # differently weighted statistical portfolio from lesson 3.2.
@@ -226,10 +228,11 @@ def shock_curves(curves,usd,eur,hazard,energy,basis):
             curve["knot_points"]=[[t,df*math.exp(-shift*t)] for t,df in curve["knot_points"]]
             curve.pop("rate_calibration",None)
         elif curve["type"]=="forward":
-            curve["knot_points"]=[[t,rate+usd] for t,rate in curve["knot_points"]]
+            curve["knot_points"]=[[t,factor*math.exp(-usd*t)] for t,factor in curve["knot_points"]]
+            curve.pop("rate_calibration",None)
         elif curve["type"]=="hazard":
             curve["knot_points"]=[[t,intensity*math.exp(hazard)] for t,intensity in curve["knot_points"]]
-            curve.pop("hazard_calibration",None);curve["par_points"]=[]
+            curve.pop("hazard_calibration",None)
         elif curve["type"]=="price":
             log_move=energy+(basis if curve["id"]=="WTI-FORWARD" else 0.)
             curve["knot_points"]=[[t,price*math.exp(log_move)] for t,price in curve["knot_points"]]
@@ -268,7 +271,7 @@ scenario_values=np.array([capstone_scenario_value(shock) for shock in factor_pan
 scenario_pnl=scenario_values.sum(axis=1)-combined_base
 scenario_returns=scenario_pnl/combined_base
 daily_risk=Performance.from_returns(pd.DataFrame({"held_book":scenario_returns},
-    index=pd.bdate_range("2023-02-08",periods=504)),frequency="daily")
+    index=pd.bdate_range("2023-02-08",periods=504)),frequency="daily", initial_date=date(2023, 2, 7))
 confidence=.95
 q=float(daily_risk.value_at_risk(confidence).iloc[0])
 tail=float(daily_risk.expected_shortfall(confidence).iloc[0])
@@ -294,7 +297,7 @@ tail_risk_table=pd.DataFrame([{"confidence":confidence,"scenario_count":504,
     "ES_bootstrap_p025":bootstrap_interval[0,1],"ES_bootstrap_p975":bootstrap_interval[1,1],
     "mean_scenario_PnL_USD":scenario_pnl.mean(),"priced_positions":len(book.position_ids)+1}])
 
-fit=daily_risk.multi_factor_greeks(0,factor_panel.T.tolist())
+fit=daily_risk.multi_factor_greeks(0,factor_panel.T.tolist(), risk_free_rate=0.0)
 design=np.column_stack([np.ones(len(factor_panel)),factor_panel])
 from finstack_quant.core.math.stats import ols
 factor_fit=ols(factor_panel,scenario_returns)
@@ -336,7 +339,7 @@ for quote in index_calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=.015
     elif quote["kind"]=="cds_quote":quote["spread_bp"]+=100.0
 stress.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
-stress.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.055)],recovery_rate=0.))
+stress.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.055)],recovery_rate=0.,day_count="act_365f"))
 stress.insert_price("CONVERT",80.,"USD")
 stressed_deal=deepcopy(holding["deal"])
 stressed_deal["instrument"]["spec"].update({"default_spec":{"curve":"constant","cdr":.05},
@@ -376,14 +379,14 @@ replay_calibrated=calibrate(replay_calibration).market
 replay_market.insert(replay_calibrated.get_discount("USD-OIS"))
 replay_market.insert(replay_calibrated.get_hazard("ACME-HZD"))
 replay_market.insert_price("SPX-SPOT",5200*equity_ratio,"USD")
-fx=FxMatrix();fx.set_quotes([(Currency("EUR"),Currency("USD"),1.08*fx_ratio)]);replay_market.insert_fx(fx)
+fx=FxMatrix(None);fx.set_quotes([(Currency("EUR"),Currency("USD"),1.08*fx_ratio)]);replay_market.insert_fx(fx)
 index_calibration=tracks.credit_calibration_envelope()
 for quote in index_calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=rate_change
     elif quote["kind"]=="cds_quote":quote["spread_bp"]+=credit_change_bp
 replay_market.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
 replay_market.insert_price("CONVERT",100*equity_ratio,"USD")
-replay_market.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.025+credit_change_bp/10000)],recovery_rate=0.))
+replay_market.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.025+credit_change_bp/10000)],recovery_rate=0.,day_count="act_365f"))
 replay_native=value_portfolio(book,replay_market,metrics=[])
 replay_wire=json.loads(replay_native.to_json())
 replay_bbb=holding["quantity"]*tranche_metrics(json.dumps(holding["deal"]),"BBB",replay_market,AS_OF).pv
@@ -519,13 +522,14 @@ print(credit_table)
 import json
 from finstack_quant.statements import ModelBuilder,ForecastSpec
 borrower_spec=borrower_model()
-PERIODS = tuple(period['id'] for period in json.loads(borrower_spec.to_json())['periods']);historical=Evaluator().evaluate(borrower_spec)
+PERIODS = tuple(period['id'] for period in json.loads(borrower_spec.to_json())['periods']['periods']);historical=Evaluator().evaluate(borrower_spec)
 quarter_rows=[]
 for scenario_name in ["base","downside"]:
     assumptions=borrower_inputs["scenarios"][scenario_name]
     builder=ModelBuilder.from_spec(borrower_spec)
     for node in ["revenue","cogs","opex"]:
         builder.forecast(node,ForecastSpec.growth(assumptions[node+"_growth_per_quarter"]))
+    builder.remove_node("interest_rate")
     builder=builder.mixed("interest_rate").values([(q,historical.get("interest_rate",q)) for q in PERIODS[:4]]).formula(str(assumptions["annual_interest_rate"])).build()
     forecast=Evaluator().evaluate(builder.build())
     engine=CovenantEngine.from_specs([
@@ -584,7 +588,7 @@ for day in dates:
     dated.insert(common_market.get_discount("USD-OIS"))
     dated.insert(common_market.get_hazard("ACME-HZD"))
     dated.insert_price("SPX-SPOT",quotes["spx"],"USD")
-    fx=FxMatrix();fx.set_quotes([(Currency("EUR"),Currency("USD"),quotes["eur_usd"])]);dated.insert_fx(fx)
+    fx=FxMatrix(None);fx.set_quotes([(Currency("EUR"),Currency("USD"),quotes["eur_usd"])]);dated.insert_fx(fx)
     index_calibration=tracks.credit_calibration_envelope(day)
     for quote in index_calibration["market_data"]:
         if quote["kind"]=="rate_quote":quote["rate"]+=quotes["rate_shift"]
@@ -777,7 +781,7 @@ individual_rows=[]
 for position in book_input["positions"]:
     one=price_instrument(json.dumps(instrument_envelope(position["instrument_spec"])),market,AS_OF,metrics=[])
     currency=str(one.value.currency)
-    fx_rate=1.0 if currency=="USD" else market.fx_required().rate(currency,"USD",AS_OF).rate
+    fx_rate=1.0 if currency=="USD" else market.fx_required().rate(currency,"USD",AS_OF, "cashflow_date").rate
     direct_native=one.value.amount*position["quantity"]
     portfolio_native=float(wire["position_values"][position["instrument_id"]]["value_native"]["amount"])
     individual_rows.append({"position":position["instrument_id"],"currency":currency,
@@ -834,6 +838,8 @@ print(risk_table.pivot(index="position",columns="metric",values="value").iloc[:,
 
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-risk-factor-tail" role="build" */}
 ```python exec id=vol-risk-factor-tail role=build
+from datetime import date
+
 # A scenario distribution, not observed historical returns or a calibrated forecast.
 # Reprice the actual held book at the fixed valuation date; do not proxy it with the
 # differently weighted statistical portfolio from lesson 3.2.
@@ -864,10 +870,11 @@ def capstone_scenario_value(shock):
             curve["knot_points"]=[[t,df*math.exp(-shift*t)] for t,df in curve["knot_points"]]
             curve.pop("rate_calibration",None)
         elif curve["type"]=="forward":
-            curve["knot_points"]=[[t,rate+usd] for t,rate in curve["knot_points"]]
+            curve["knot_points"]=[[t,factor*math.exp(-usd*t)] for t,factor in curve["knot_points"]]
+            curve.pop("rate_calibration",None)
         elif curve["type"]=="hazard":
             curve["knot_points"]=[[t,intensity*math.exp(hazard)] for t,intensity in curve["knot_points"]]
-            curve.pop("hazard_calibration",None);curve["par_points"]=[]
+            curve.pop("hazard_calibration",None)
         elif curve["type"]=="price" and curve["level_kind"]=="price":
             log_move=energy+(basis if curve["id"]=="WTI-FORWARD" else 0.)
             curve["knot_points"]=[[t,price*math.exp(log_move)] for t,price in curve["knot_points"]]
@@ -889,7 +896,7 @@ scenario_values=np.array([capstone_scenario_value(shock) for shock in factor_pan
 scenario_pnl=scenario_values-combined_base
 scenario_returns=scenario_pnl/combined_base
 daily_risk=Performance.from_returns(pd.DataFrame({"held_book":scenario_returns},
-    index=pd.bdate_range("2023-02-08",periods=504)),frequency="daily")
+    index=pd.bdate_range("2023-02-08",periods=504)),frequency="daily", initial_date=date(2023, 2, 7))
 confidence=.95
 q=float(daily_risk.value_at_risk(confidence).iloc[0])
 tail=float(daily_risk.expected_shortfall(confidence).iloc[0])
@@ -912,7 +919,7 @@ tail_risk_table=pd.DataFrame([{"confidence":confidence,"scenario_count":504,
     "ES_bootstrap_p025":bootstrap_interval[0,1],"ES_bootstrap_p975":bootstrap_interval[1,1],
     "mean_scenario_PnL_USD":scenario_pnl.mean(),"priced_positions":len(book.position_ids)}])
 
-fit=daily_risk.multi_factor_greeks(0,factor_panel.T.tolist())
+fit=daily_risk.multi_factor_greeks(0,factor_panel.T.tolist(), risk_free_rate=0.0)
 design=np.column_stack([np.ones(len(factor_panel)),factor_panel])
 from finstack_quant.core.math.stats import ols
 factor_fit=ols(factor_panel,scenario_returns)
@@ -949,7 +956,7 @@ stress.insert(calibrated.get_discount("USD-OIS"))
 stress.insert(calibrated.get_hazard("ACME-HZD"))
 stress.insert_price("SPX-SPOT",4160.,"USD")
 stress.insert(VolSurface("SPX-VOL",[.25,.5,1.,2.],[4000.,5200.,6400.],[[.35,.30,.29]]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
-stress.insert(DiscountCurve("USD-TREASURY",AS_OF,[(t,math.exp(-.055*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
+stress.insert(DiscountCurve("USD-TREASURY",AS_OF,[(t,math.exp(-.055*t)) for t in [0.,1.,5.,10.,20.]],interp="log_linear",extrapolation="extend",day_count="act_365f"))
 stress.insert_price("SPX",4160.,"USD")
 strikes=[5200*math.exp(-3+i*.05) for i in range(121)]
 stress.insert(VolSurface("SPX_VOL",[.25,.5,1.,2.],strikes,[[.30]*len(strikes)]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
@@ -989,10 +996,10 @@ replay_calibrated=calibrate(replay_calibration).market
 replay_market.insert(replay_calibrated.get_discount("USD-OIS"))
 replay_market.insert(replay_calibrated.get_hazard("ACME-HZD"))
 replay_market.insert_price("SPX-SPOT",5200*equity_ratio,"USD")
-fx=FxMatrix();fx.set_quotes([(Currency("EUR"),Currency("USD"),1.08*fx_ratio)]);replay_market.insert_fx(fx)
+fx=FxMatrix(None);fx.set_quotes([(Currency("EUR"),Currency("USD"),1.08*fx_ratio)]);replay_market.insert_fx(fx)
 replay_market.insert_price("SPX",5200*equity_ratio,"USD")
 replay_market.insert(DiscountCurve("USD-TREASURY",AS_OF,
-    [(t,math.exp(-(.04+rate_change)*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
+    [(t,math.exp(-(.04+rate_change)*t)) for t in [0.,1.,5.,10.,20.]],interp="log_linear",extrapolation="extend",day_count="act_365f"))
 replay_native=value_portfolio(book,replay_market,metrics=[])
 replay_wire=json.loads(replay_native.to_json())
 replay_position_rows=[]
@@ -1136,13 +1143,14 @@ print(credit_table)
 import json
 from finstack_quant.statements import ModelBuilder,ForecastSpec
 borrower_spec=borrower_model()
-PERIODS = tuple(period['id'] for period in json.loads(borrower_spec.to_json())['periods']);historical=Evaluator().evaluate(borrower_spec)
+PERIODS = tuple(period['id'] for period in json.loads(borrower_spec.to_json())['periods']['periods']);historical=Evaluator().evaluate(borrower_spec)
 quarter_rows=[]
 for scenario_name in ["base","downside"]:
     assumptions=borrower_inputs["scenarios"][scenario_name]
     builder=ModelBuilder.from_spec(borrower_spec)
     for node in ["revenue","cogs","opex"]:
         builder.forecast(node,ForecastSpec.growth(assumptions[node+"_growth_per_quarter"]))
+    builder.remove_node("interest_rate")
     builder=builder.mixed("interest_rate").values([(q,historical.get("interest_rate",q)) for q in PERIODS[:4]]).formula(str(assumptions["annual_interest_rate"])).build()
     forecast=Evaluator().evaluate(builder.build())
     engine=CovenantEngine.from_specs([
@@ -1202,13 +1210,13 @@ for day in dates:
     dated.insert(common_market.get_discount("USD-OIS"))
     dated.insert(common_market.get_hazard("ACME-HZD"))
     dated.insert_price("SPX-SPOT",quotes["spx"],"USD")
-    fx=FxMatrix();fx.set_quotes([(Currency("EUR"),Currency("USD"),quotes["eur_usd"])]);dated.insert_fx(fx)
+    fx=FxMatrix(None);fx.set_quotes([(Currency("EUR"),Currency("USD"),quotes["eur_usd"])]);dated.insert_fx(fx)
     dated.insert_price("SPX",quotes["spx"],"USD")
     # Supply each realized close available on this valuation date, without look-ahead.
     observed_days=[AS_OF+timedelta(days=i) for i in range((day-AS_OF).days+1)]
     closes=[(observed,history_quotes(observed)["spx"]) for observed in observed_days if observed.weekday()<5]
-    dated.insert_series(ScalarTimeSeries("SPX-CLOSE",closes))
-    dated.insert(DiscountCurve("USD-TREASURY",day,[(t,math.exp(-(.04+quotes["rate_shift"])*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
+    dated.insert_series(ScalarTimeSeries("SPX-CLOSE",closes,"step","error"))
+    dated.insert(DiscountCurve("USD-TREASURY",day,[(t,math.exp(-(.04+quotes["rate_shift"])*t)) for t in [0.,1.,5.,10.,20.]],interp="log_linear",extrapolation="extend",day_count="act_365f"))
     dated_spec=tracks.book_spec("vol", core_stage="common");dated_spec["as_of"]=day.isoformat()
     valuation=value_portfolio(Portfolio.from_spec(json.dumps(dated_spec)),dated,metrics=[])
     dated_wire=json.loads(valuation.to_json())
@@ -1238,7 +1246,7 @@ from datetime import date
 # Use the actual final history date/market and only observations known at that date.
 end_date=dates[-1];elapsed=(end_date-AS_OF).days/365;remaining=1-elapsed
 observed=[(AS_OF+timedelta(days=i),history_quotes(AS_OF+timedelta(days=i))["spx"]) for i in range((end_date-AS_OF).days+1) if (AS_OF+timedelta(days=i)).weekday()<5]
-dated.insert_series(ScalarTimeSeries("SPX-CLOSE",observed))
+dated.insert_series(ScalarTimeSeries("SPX-CLOSE",observed,"step","error"))
 full=price_instrument(json.dumps(variance),dated,end_date,metrics=["variance_expected"])
 forward_only=deepcopy(variance);forward_only["instrument"]["spec"]["start_date"]=end_date.isoformat()
 forward_result=price_instrument(json.dumps(forward_only),dated,end_date,metrics=["variance_expected"])

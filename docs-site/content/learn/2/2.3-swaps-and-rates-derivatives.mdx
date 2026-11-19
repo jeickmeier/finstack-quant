@@ -360,7 +360,7 @@ for flow in flows:
  t=DayCount.ACT_365F.year_fraction(AS_OF,date.fromisoformat(flow['date']))
  pv=float(flow['amount'])*curve.df(t)
  if flow['kind']=='fixed':fixed_pv+=pv
- elif flow['kind']=='float_reset':float_pv+=pv
+ elif flow['kind']=='floating':float_pv+=pv
 annuity=abs(fixed_pv)/float(raw['fixed_leg']['rate']);derived=abs(float_pv)/annuity
 native=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_rate']).get_metric('par_rate')
 print({'fixed_leg_PV_USD':fixed_pv,'floating_leg_PV_USD':float_pv,'notional_weighted_annuity_USD_years':annuity,'derived_par_rate':derived,'native_par_rate':native})

@@ -10,7 +10,7 @@ import { statementGoalSeekRun, statementGoalSeek } from "../fixtures";
 const run = statementGoalSeekRun;
 const result = statementGoalSeek;
 const nodeIds = Object.keys(data.statementModel.nodes);
-const periods = data.statementModel.periods.map((period) => period.id);
+const periods = data.statementModel.periods.periods.map((period) => period.id);
 
 export function Example({ density = "compact" }: ExampleProps) {
   const [count, setCount] = useState(0);

@@ -52,7 +52,7 @@ import pandas as pd
 from _shared.borrower_model import borrower_model, borrower_vintage
 from finstack_quant.statements import Evaluator
 model = borrower_model()
-PERIODS = tuple(period['id'] for period in json.loads(model.to_json())['periods'])
+PERIODS = tuple(period['id'] for period in json.loads(model.to_json())['periods']['periods'])
 model_before = model.to_json()
 evaluation = Evaluator().evaluate(model)
 rows = []
@@ -98,11 +98,13 @@ Use all five balance accounts in the corkscrew extension so its aggregate check 
 {/* notebook-block notebook="04_statement_modeling/statement_modeling.ipynb" cell="statement-checks-and-failure" role="build" */}
 ```python exec id=statement-checks-and-failure role=build
 from _shared.borrower_model import borrower_builder
+from finstack_quant.statements import CheckConfig
+# Identity checks compare exactly unless the suite states a tolerance.
 from finstack_quant.statements_analytics import (AccountType, CorkscrewAccount, CorkscrewConfig, CorkscrewExtension, ThreeStatementMapping, run_three_statement_checks)
 b=borrower_builder()
 for node,formula in {"cfi":"-capex","cff":"-amortization","debt_change":"-amortization","ppe_change":"capex-depreciation"}.items(): b.compute(node,formula)
 checked_model=b.build(); checked_result=Evaluator().evaluate(checked_model)
-check_mapping=ThreeStatementMapping(cash_node="cash_end",retained_earnings_node="equity_end",net_income_node="net_income",assets_nodes=["assets"],liabilities_nodes=["debt_end"],equity_nodes=["equity_end"],ppe_node="ppe_end",depreciation_node="depreciation",tax_expense_node="cash_taxes",pretax_income_node="pretax_income",cfo_node="cash_from_operations",cfi_node="cfi",cff_node="cff",total_cf_node="change_cash",capex_node="capex")
+check_mapping=ThreeStatementMapping(cash_node="cash_end",retained_earnings_node="equity_end",net_income_node="net_income",assets_nodes=["assets"],liabilities_nodes=["debt_end"],equity_nodes=["equity_end"],ppe_node="ppe_end",depreciation_node="depreciation",tax_expense_node="cash_taxes",pretax_income_node="pretax_income",cfo_node="cash_from_operations",cfi_node="cfi",cff_node="cff",total_cf_node="change_cash",capex_node="capex",config=CheckConfig(default_tolerance=0.01,default_relative_tolerance=1e-9))
 checks=json.loads(run_three_statement_checks(checked_model,check_mapping,checked_result).to_json())
 print("Native accounting checks and disclosed warnings:",checks)
 accounts=[CorkscrewAccount(node,kind,[change]) for node,kind,change in [("cash_end",AccountType.Asset,"change_cash"),("nwc_end",AccountType.Asset,"change_nwc"),("ppe_end",AccountType.Asset,"ppe_change"),("debt_end",AccountType.Liability,"debt_change"),("equity_end",AccountType.Equity,"net_income")]]
@@ -112,7 +114,7 @@ print(corkscrew.to_json())
 bad=json.loads(checked_model.to_json()); bad["nodes"]["assets"]["formula_text"] += " + 1000000"
 bad_model=FinancialModelSpec.from_json(json.dumps(bad))
 bad_checks=json.loads(run_three_statement_checks(bad_model,check_mapping).to_json())
-print("Expected accounting failure:",[x for x in bad_checks["results"] if not x["passed"]])
+print("Expected accounting failure:",[x for x in bad_checks["results"] if x["outcome"]=="fail"])
 ```
 {/* /notebook-block */}
 
@@ -155,7 +157,7 @@ Net working capital is AR plus inventory less AP. In the second quarter it rises
 # Same actual operating expenses; compare a growth forecast with a revenue-margin formula.
 b=borrower_builder()
 actuals=[(p,evaluation.get("opex",p)) for p in PERIODS[:4]]
-x=b.mixed("opex");x.values(actuals);x.formula("revenue * 0.14")
+b.remove_node("opex");x=b.mixed("opex");x.values(actuals);x.formula("revenue * 0.14")
 margin_model=x.build().build();margin_result=Evaluator().evaluate(margin_model)
 for p in PERIODS[:4]: pass
 forecast_rows=[]
