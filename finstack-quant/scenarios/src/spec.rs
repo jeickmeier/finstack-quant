@@ -1196,6 +1196,46 @@ impl RateBindingSpec {
     }
 }
 
+/// Structural validation diagnostics for a scenario specification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioValidationReport {
+    /// Whether the specification passed all structural checks.
+    pub valid: bool,
+    /// Failures in specification and operation order.
+    pub errors: Vec<String>,
+    /// Advisory diagnostics associated with the specification.
+    pub warnings: Vec<String>,
+    /// Whether at least one operation needs an instrument inventory.
+    pub requires_instruments: bool,
+    /// Whether applying the scenario can modify instrument state.
+    pub mutates_instruments: bool,
+    /// Number of operations in the submitted specification.
+    pub operation_count: usize,
+}
+
+/// Check a scenario's structure and report diagnostics without applying shocks.
+///
+/// # Arguments
+/// * `spec` - Scenario whose identifiers, timing and operations are checked.
+///   Market and instrument lookups occur only when the scenario is applied.
+#[must_use]
+pub fn validate_scenario_spec(spec: &ScenarioSpec) -> ScenarioValidationReport {
+    let errors: Vec<_> = spec
+        .validation_errors()
+        .map(|error| error.to_string())
+        .collect();
+    ScenarioValidationReport {
+        valid: errors.is_empty(),
+        errors,
+        warnings: Vec::new(),
+        requires_instruments: spec.requires_instruments(),
+        mutates_instruments: spec.mutates_instruments(),
+        operation_count: spec.operations.len(),
+    }
+}
+
 impl ScenarioSpec {
     /// Parse a scenario specification from JSON and validate it.
     ///
@@ -1247,26 +1287,36 @@ impl ScenarioSpec {
     /// more than one time-roll operation is present, or any contained operation
     /// is invalid.
     pub fn validate(&self) -> crate::error::Result<()> {
-        if self.id.trim().is_empty() {
-            return Err(crate::error::Error::Validation(
-                "Scenario ID cannot be empty".into(),
-            ));
-        }
+        self.validation_errors().next().map_or(Ok(()), Err)
+    }
+
+    fn validation_errors(&self) -> impl Iterator<Item = crate::error::Error> + '_ {
+        use crate::error::Error;
+
+        let id_error = self
+            .id
+            .trim()
+            .is_empty()
+            .then(|| Error::Validation("Scenario ID cannot be empty".into()));
         let time_roll_count = self
             .operations
             .iter()
             .filter(|op| matches!(op, OperationSpec::TimeRollForward { .. }))
             .count();
-        if time_roll_count > 1 {
-            return Err(crate::error::Error::Validation(format!(
+        let roll_error = (time_roll_count > 1).then(|| {
+            Error::Validation(format!(
                 "Scenario contains {time_roll_count} TimeRollForward operations; at most one is allowed"
-            )));
-        }
-        for (i, op) in self.operations.iter().enumerate() {
+            ))
+        });
+        let operation_errors = self.operations.iter().enumerate().filter_map(|(i, op)| {
             op.validate()
-                .map_err(|e| crate::error::Error::Validation(format!("Operation {i}: {e}")))?;
-        }
-        Ok(())
+                .err()
+                .map(|error| Error::Validation(format!("Operation {i}: {error}")))
+        });
+        id_error
+            .into_iter()
+            .chain(roll_error)
+            .chain(operation_errors)
     }
 }
 

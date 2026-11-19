@@ -25,6 +25,7 @@ HorizonResult = _scenarios.HorizonResult
 ApplicationReport = _scenarios.ApplicationReport
 ApplicationResult = _scenarios.ApplicationResult
 ScenarioSpec = _scenarios.ScenarioSpec
+ScenarioValidationReport = _scenarios.ScenarioValidationReport
 TemplateMetadata = _scenarios.TemplateMetadata
 
 # Operation specifications
@@ -47,6 +48,7 @@ __all__: list[str] = [
     "OperationSpec",
     "RateBindingSpec",
     "ScenarioSpec",
+    "ScenarioValidationReport",
     "TemplateMetadata",
     "TenorMatchMode",
     "TimeRollMode",

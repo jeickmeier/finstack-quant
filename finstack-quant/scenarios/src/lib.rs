@@ -129,7 +129,8 @@ pub use envelope::{ScenarioEnvelope, ScenarioSchema};
 pub use error::{Error, Result};
 pub use horizon::{HorizonAnalysis, HorizonReport, HorizonResult, HorizonSummary};
 pub use spec::{
-    CurveKind, OperationSpec, RateBindingSpec, ScenarioSpec, TenorMatchMode, TimeRollMode,
+    CurveKind, OperationSpec, RateBindingSpec, ScenarioSpec, ScenarioValidationReport,
+    TenorMatchMode, TimeRollMode, validate_scenario_spec,
 };
 pub use templates::{AssetClass, TemplateMetadata, TemplateRegistry, TemplateSeverity};
 pub use warning::Warning;

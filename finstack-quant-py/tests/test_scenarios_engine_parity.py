@@ -131,16 +131,36 @@ def test_missing_curve_raises_key_error() -> None:
         apply_scenario(spec, _market(), AS_OF)
 
 
-def test_validation_failure_raises_value_error_with_same_message_everywhere() -> None:
+def test_validation_report_lists_semantic_errors_without_running_market_effects() -> None:
     bad_json = json.dumps({"id": "", "operations": []})
-    with pytest.raises(ValueError, match=r"Scenario ID cannot be empty") as from_validate:
-        validate_scenario_spec(bad_json)
+    report = validate_scenario_spec(bad_json)
+    assert report.valid is False
+    assert report.operation_count == 0
+    assert report.warnings == []
+    assert "Scenario ID cannot be empty" in report.errors[0]
+    assert not report.requires_instruments
+    assert not report.mutates_instruments
     with pytest.raises(ValueError, match=r"Scenario ID cannot be empty") as from_from_json:
         ScenarioSpec.from_json(bad_json)
     with pytest.raises(ValueError, match=r"Scenario ID cannot be empty") as from_apply:
         apply_scenario(bad_json, _market(), AS_OF)
-    assert str(from_validate.value) == str(from_from_json.value) == str(from_apply.value)
-    assert "Scenario ID cannot be empty" in str(from_validate.value)
+    assert str(from_from_json.value) == str(from_apply.value)
+    with pytest.raises(ValueError, match="Failed to parse"):
+        validate_scenario_spec("{")
+    assert validate_scenario_spec(ScenarioSpec("base", [])).valid
+    multiple = validate_scenario_spec(
+        json.dumps({
+            "id": "",
+            "operations": [
+                {"kind": "equity_price_pct", "ids": [], "pct": 1.0},
+                {"kind": "equity_price_pct", "ids": ["XYZ"], "pct": -101.0},
+            ],
+        })
+    )
+    assert multiple.operation_count == 2
+    assert len(multiple.errors) == 3
+    assert "Operation 0:" in multiple.errors[1]
+    assert "Operation 1:" in multiple.errors[2]
 
 
 def test_instrument_mutating_scenario_without_instruments_raises_value_error() -> None:

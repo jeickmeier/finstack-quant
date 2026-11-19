@@ -20292,6 +20292,35 @@ export interface ScenarioSpec {
   resolution_mode?: ResolutionMode;
 }
 /**
+ * Structural validation diagnostics without scenario application.
+ */
+export interface ScenarioValidationReport {
+  /**
+   * Failures in specification and operation order.
+   */
+  errors: string[];
+  /**
+   * Whether applying the scenario can modify instrument state.
+   */
+  mutates_instruments: boolean;
+  /**
+   * Number of operations in the submitted specification.
+   */
+  operation_count: number;
+  /**
+   * Whether at least one operation needs an instrument inventory.
+   */
+  requires_instruments: boolean;
+  /**
+   * Whether the specification passed all structural checks.
+   */
+  valid: boolean;
+  /**
+   * Advisory diagnostics associated with the specification.
+   */
+  warnings: string[];
+}
+/**
  * Descriptive metadata of a built-in scenario template.
  */
 export interface TemplateMetadata {

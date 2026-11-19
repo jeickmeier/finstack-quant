@@ -12530,19 +12530,10 @@ export interface ScenariosNamespace {
    */
   readonly composeScenarios: typeof wasm.composeScenarios;
   /**
-   * Validate a scenario specification JSON without executing it.
-   *
-   * Returns `undefined` when the spec is valid, throws on error. This mirrors
-   * the Python `validate_scenario_spec` API, which returns `None` — an invalid
-   * spec raises rather than returning a falsy value, so
-   * `if (validateScenarioSpec(s))` is not a validity check.
-   *
-   * # Errors
-   *
-   * Rejects malformed or schema-incompatible `json_str`, a blank scenario ID,
-   * multiple time-roll operations, invalid operation identifiers or numeric
-   * fields, or variant-specific operation violations.
-   * @param jsonStr - Scenario specification JSON string to deserialize and validate.
+   * Check scenario structure and return diagnostics without applying market effects.
+   * @param scenario - Bare typed scenario object or JSON text in the canonical ScenarioSpec shape.
+   * @returns Structural errors, advisory diagnostics, instrument requirements and operation count.
+   * @throws FinstackWasmError if the input cannot be decoded into the canonical shape or the report cannot be serialized.
    */
   readonly validateScenarioSpec: typeof wasm.validateScenarioSpec;
   /**

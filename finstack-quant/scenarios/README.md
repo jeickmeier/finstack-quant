@@ -238,6 +238,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   (`exports/scenarios.js`) — `parseScenarioSpec`, `parallelBpMany`,
   `composeScenarios`, `validateScenarioSpec`, `applyScenario`,
   `computeHorizonReturn`, and the template helpers.
+  The validation functions return structural diagnostics and instrument
+  requirements. Scenario parsing and application reject invalid specs.
   Unsuffixed builders, composers, and template helpers return structured specs;
   JSON remains explicit through Python `to_json`/`from_json` or JSON-named inputs.
 

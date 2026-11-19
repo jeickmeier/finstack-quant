@@ -438,16 +438,21 @@ test('scenario errors surface before market errors and match Python text', () =>
     () => scenarios.applyScenario({ id: '', operations: [] }, { curves: 5 }, AS_OF),
     /Scenario ID cannot be empty/
   );
-  for (const call of [
-    () => scenarios.validateScenarioSpec({ id: '', operations: [] }),
+  assert.throws(
     () => scenarios.parseScenarioSpec({ id: '', operations: [] }),
-  ]) {
-    assert.throws(
-      call,
-      (error) => error.kind === 'validation' && /Scenario ID cannot be empty/.test(error.message)
-    );
-  }
-  assert.equal(scenarios.validateScenarioSpec(HOLD_1M_UP_25), undefined);
+    (error) => error.kind === 'validation' && /Scenario ID cannot be empty/.test(error.message)
+  );
+  const invalid = scenarios.validateScenarioSpec({ id: '', operations: [] });
+  assert.equal(invalid.valid, false);
+  assert.match(invalid.errors[0], /Scenario ID cannot be empty/);
+  assert.deepEqual(scenarios.validateScenarioSpec(HOLD_1M_UP_25), {
+    valid: true,
+    errors: [],
+    warnings: [],
+    requires_instruments: true,
+    mutates_instruments: false,
+    operation_count: HOLD_1M_UP_25.operations.length,
+  });
   assert.deepEqual(scenarios.parseScenarioSpec(JSON.stringify(HOLD_1M_UP_25)), HOLD_1M_UP_25);
 });
 
@@ -505,7 +510,7 @@ test('built-in templates round-trip through build, component and validate', () =
   for (const id of ids) {
     const spec = scenarios.buildFromTemplate(id);
     assert.equal(spec.id, id);
-    assert.equal(scenarios.validateScenarioSpec(spec), undefined);
+    assert.equal(scenarios.validateScenarioSpec(spec).valid, true);
     for (const component of scenarios.listTemplateComponents(id)) {
       assert.equal(scenarios.buildTemplateComponent(id, component).id, component);
     }

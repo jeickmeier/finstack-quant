@@ -2254,6 +2254,13 @@
             "bytes": 101458
           },
           {
+            "path": "schemas/scenarios/1/scenario_validation_report.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_validation_report.schema.json",
+            "type_name": "ScenarioValidationReport",
+            "kind": "output",
+            "bytes": 1439
+          },
+          {
             "path": "schemas/scenarios/1/template_metadata.schema.json",
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
             "type_name": "TemplateMetadata",
@@ -5139,6 +5146,14 @@
             "type_name": "ScenarioSpec",
             "kind": "input",
             "bytes": 101458
+          },
+          {
+            "domain": "scenarios",
+            "path": "schemas/scenarios/1/scenario_validation_report.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_validation_report.schema.json",
+            "type_name": "ScenarioValidationReport",
+            "kind": "output",
+            "bytes": 1439
           },
           {
             "domain": "scenarios",

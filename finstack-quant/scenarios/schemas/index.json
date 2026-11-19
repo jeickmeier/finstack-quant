@@ -46,6 +46,15 @@
       "type_name": "ScenarioSpec"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_validation_report.schema.json",
+      "bytes": 1439,
+      "kind": "output",
+      "path": "schemas/scenarios/1/scenario_validation_report.schema.json",
+      "summary": "Structural validation diagnostics without scenario application.",
+      "title": "ScenarioValidationReport",
+      "type_name": "ScenarioValidationReport"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
       "bytes": 4906,
       "kind": "output",

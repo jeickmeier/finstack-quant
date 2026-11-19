@@ -1,5 +1,8 @@
 //! JSON Schema generation helpers for scenario contracts.
-use crate::{ApplicationEnvelope, HorizonResult, HorizonSummary, ScenarioSpec, TemplateMetadata};
+use crate::{
+    ApplicationEnvelope, HorizonResult, HorizonSummary, ScenarioSpec, ScenarioValidationReport,
+    TemplateMetadata,
+};
 
 /// Canonical title of the published scenario envelope schema.
 pub const SCENARIO_SCHEMA_TITLE: &str = "Finstack Quant Scenario Specification";
@@ -157,6 +160,13 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Bare scenario specification: the ordered operations the scenario engine applies."
     )
     .with_examples(scenario_spec_examples),
+    finstack_quant_core::schema_artifact!(
+        ScenarioValidationReport,
+        "scenarios",
+        "scenario_validation_report",
+        Output,
+        "Structural validation diagnostics without scenario application."
+    ),
     finstack_quant_core::schema_artifact!(
         TemplateMetadata,
         "scenarios",
