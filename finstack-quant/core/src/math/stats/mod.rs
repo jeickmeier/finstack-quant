@@ -54,6 +54,8 @@
 //!   54(1), 39-51.
 
 mod moments;
+mod ols;
+pub use ols::{OlsResult, ols};
 mod online;
 mod quantile;
 mod realized;

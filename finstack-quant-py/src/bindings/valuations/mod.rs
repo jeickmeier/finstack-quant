@@ -19,6 +19,7 @@ pub(crate) mod typed_convertible;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_deposit;
 pub(crate) mod typed_equity;
+pub(crate) mod typed_fra;
 pub(crate) mod typed_fx;
 mod typed_legs;
 pub(crate) mod typed_macros;
@@ -383,6 +384,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_legs::register(py, &m)?;
     typed_rates::register(py, &m)?;
     typed_deposit::register(&m)?;
+    typed_fra::register(&m)?;
     typed_credit::register(py, &m)?;
     typed_convertible::register(py, &m)?;
     convertible_spot_ladder::register(&m)?;
@@ -407,7 +409,12 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(instruments::EXPORTS);
     exports.extend_from_slice(typed_legs::EXPORTS);
     exports.extend_from_slice(typed_rates::EXPORTS);
-    exports.extend(["Deposit", "DepositBuilder"]);
+    exports.extend([
+        "Deposit",
+        "DepositBuilder",
+        "ForwardRateAgreement",
+        "ForwardRateAgreementBuilder",
+    ]);
     exports.extend_from_slice(typed_credit::EXPORTS);
     exports.extend_from_slice(typed_convertible::EXPORTS);
     exports.extend_from_slice(convertible_spot_ladder::EXPORTS);

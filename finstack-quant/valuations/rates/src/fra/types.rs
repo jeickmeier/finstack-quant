@@ -147,6 +147,29 @@ fn default_fra_side() -> PayReceive {
 }
 
 impl ForwardRateAgreement {
+    /// Copy the contract, due dates, market identifiers and overrides into an editable builder.
+    pub fn to_builder(&self) -> ForwardRateAgreementBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .notional(self.notional)
+            .fixing_date_opt(self.fixing_date)
+            .start_date(self.start_date)
+            .maturity(self.maturity)
+            .fixed_rate(self.fixed_rate)
+            .day_count(self.day_count)
+            .reset_lag_days(self.reset_lag_days)
+            .fixing_calendar_id_opt(self.fixing_calendar_id.clone())
+            .fixing_business_day_convention_opt(self.fixing_business_day_convention)
+            .observed_fixing_opt(self.observed_fixing)
+            .discount_curve_id(self.discount_curve_id.clone())
+            .forward_curve_id(self.forward_curve_id.clone())
+            .side(self.side)
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+            .attributes(self.attributes.clone())
+    }
+
     /// Validate structural invariants of the FRA.
     ///
     /// This does not encode market conventions; it enforces finiteness and
@@ -166,7 +189,7 @@ impl ForwardRateAgreement {
         }
 
         // Guard against unit mistakes (e.g., passing years as days).
-        validation::require_with(self.reset_lag_days.abs() <= 31, || {
+        validation::require_with(self.reset_lag_days.unsigned_abs() <= 31, || {
             "FRA reset_lag_days has an unexpectedly large magnitude (expected business days)"
                 .to_string()
         })?;

@@ -83,7 +83,7 @@ fn extract_vector(vec_obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>>
 /// Shape mismatches (1-D numeric list, wrong array dimensionality, or ragged
 /// rows) raise `ValueError`; non-sequence containers, strings, `bool` values,
 /// and non-numeric entries raise `TypeError`.
-fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize)> {
+pub(super) fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize)> {
     if let Ok(untyped) = matrix.cast::<PyUntypedArray>() {
         let kind = untyped.dtype().kind();
         if !matches!(kind, b'f' | b'i' | b'u') {

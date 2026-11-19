@@ -1415,6 +1415,15 @@ export interface CoreNamespace {
    */
   readonly expectedShortfall: typeof wasm.expectedShortfall;
   /**
+   * Fit a full-rank linear regression over a rectangular predictor panel.
+   * @param x - Finite observations in rows and one predictor feature per column.
+   * @param y - Finite response with one value per observation.
+   * @param addIntercept - Include a constant term by default. False fits through the origin and uses uncentered R².
+   * @returns Fitted slopes, optional intercept, residuals and fit diagnostics.
+   * @throws TypeError for incompatible host types, or FinstackError for mismatched dimensions, non-finite or rank-deficient inputs, zero response variation or unrepresentable results.
+   */
+  readonly ols: typeof wasm.ols;
+  /**
    * Annualized realized variance of a close price series (Rust
    * `stats::realized_variance`): the mean of squared log returns times the
    * annualization factor, with no mean subtraction.
@@ -8824,6 +8833,8 @@ export interface ValuationsInstrumentsNamespace {
   readonly trancheMetrics: typeof wasm.trancheMetrics;
   readonly Deposit: typeof wasm.Deposit;
   readonly DepositBuilder: typeof wasm.DepositBuilder;
+  readonly ForwardRateAgreement: typeof wasm.ForwardRateAgreement;
+  readonly ForwardRateAgreementBuilder: typeof wasm.ForwardRateAgreementBuilder;
   readonly InterestRateSwap: typeof wasm.InterestRateSwap;
   readonly Swaption: typeof wasm.Swaption;
   readonly CapFloor: typeof wasm.CapFloor;

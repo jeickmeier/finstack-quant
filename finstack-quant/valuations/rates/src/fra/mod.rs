@@ -62,4 +62,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::ForwardRateAgreement;
+pub use types::{ForwardRateAgreement, ForwardRateAgreementBuilder};

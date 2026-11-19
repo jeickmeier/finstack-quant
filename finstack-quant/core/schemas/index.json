@@ -46,6 +46,15 @@
       "type_name": "VolCubeExpirySlice"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/math/1/ols_result.schema.json",
+      "bytes": 1891,
+      "kind": "output",
+      "path": "schemas/math/1/ols_result.schema.json",
+      "summary": "Ordinary least-squares coefficients, residuals and fit diagnostics.",
+      "title": "OlsResult",
+      "type_name": "OlsResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/rating_scales/1/rating_scale_entry.schema.json",
       "bytes": 3253,
       "kind": "output",

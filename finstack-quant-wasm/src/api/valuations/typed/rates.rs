@@ -8,6 +8,9 @@ use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
 use finstack_quant_valuations::instruments::rates::deposit::{Deposit, DepositBuilder};
+use finstack_quant_valuations::instruments::rates::fra::{
+    ForwardRateAgreement, ForwardRateAgreementBuilder,
+};
 
 instrument_class!(
     /// Fixed-rate deposit with explicit contractual accrual dates.
@@ -158,6 +161,201 @@ impl JsDepositBuilder {
         &self,
         #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
     ) -> Result<JsDepositBuilder, JsValue> {
+        let rate = crate::utils::wire::js_decimal(&value, "value")?.0;
+        let inner = self.inner.apply(|builder| builder.fixed_rate(rate))?;
+        Ok(Self { inner })
+    }
+}
+
+instrument_class!(
+    /// Forward rate agreement with explicit fixing and interest accrual conventions.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const fra = valuations.instruments.ForwardRateAgreement.example();
+    /// console.log(fra.fixedRate);
+    /// fra.free();
+    /// ```
+    JsForwardRateAgreement, "ForwardRateAgreement", ForwardRateAgreement
+);
+instrument_surface!(
+    JsForwardRateAgreement,
+    "ForwardRateAgreement",
+    JsForwardRateAgreementBuilder,
+    "generated.valuations.ForwardRateAgreement"
+);
+
+factories!(JsForwardRateAgreement, "ForwardRateAgreement", ForwardRateAgreement, {
+    /// Construct the canonical USD 3x6 forward rate agreement fixture.
+    /// @returns A USD 10 million 3x6 contract receiving 4.5 percent fixed.
+    /// @throws Error - Throws if the crate's fixture does not validate.
+    example as example,
+});
+
+getters!(JsForwardRateAgreement, "ForwardRateAgreement", |i| {
+    /// Contractual principal.
+    /// @returns Currency-tagged principal.
+    notional as notional: "Money" => money(i.notional),
+    /// Contractual interest accrual start.
+    /// @returns ISO-8601 date before any calendar adjustment.
+    start_date as startDate: "string" => date(i.start_date),
+    /// Contractual expiry used by the pricing engine.
+    /// @returns Adjusted maturity as an ISO-8601 date, or null if it cannot be resolved.
+    expiry as expiry: "string | null" => opt_date(Instrument::expiry(i)),
+    /// Contractual maturity.
+    /// @returns ISO-8601 date before any calendar adjustment.
+    maturity as maturity: "string" => date(i.maturity),
+    /// Interest accrual day-count convention.
+    /// @returns Day-count handle governing the interest year fraction.
+    day_count as dayCount: "DayCount" => day_count(i.day_count),
+    /// Business-day adjustment convention.
+    /// @returns Wire label such as modified_following.
+    fixing_business_day_convention as fixingBusinessDayConvention: "generated.valuations.ForwardRateAgreement['fixing_business_day_convention'] | null" => json(i.fixing_business_day_convention),
+    /// Calendar used for business-day adjustment.
+    /// @returns The registered calendar identifier, or null for unadjusted dates.
+    fixing_calendar_id as fixingCalendarId: "string | null" => opt_text(i.fixing_calendar_id),
+    /// Annualized simple contractual rate.
+    /// @returns Exact decimal text (0.045 corresponds to 4.5 percent).
+    fixed_rate as fixedRate: "string" => text(i.fixed_rate),
+    /// Discount curve identifier.
+    /// @returns Market identifier used for discounting and par-rate retrieval.
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
+    /// Canonical pricing model key used by the forward rate agreement.
+    /// @returns Registered model identifier.
+    default_model as defaultModel: "string" => text(Instrument::default_model(i)),
+    /// Read the contract's fixing date.
+    /// @returns The rate observation date. When absent the engine subtracts the reset lag from the start date.
+    fixing_date as fixingDate: "string | null" => opt_date(i.fixing_date),
+    /// Read the contract's reset lag days.
+    /// @returns Signed business-day lag used to resolve a missing fixing date.
+    reset_lag_days as resetLagDays: "number" => json(i.reset_lag_days),
+    /// Read the contract's observed fixing.
+    /// @returns Locked annualized fixing as a decimal rate once known, or None.
+    observed_fixing as observedFixing: "number | null" => json(i.observed_fixing),
+    /// Read the contract's forward curve id.
+    /// @returns Market curve used for the projected fixing.
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
+    /// Read the contract's side.
+    /// @returns Fixed leg direction, pay or receive.
+    side as side: "generated.valuations.ForwardRateAgreement['side']" => json(i.side),
+});
+common_getters!(JsForwardRateAgreement, "ForwardRateAgreement");
+
+#[wasm_bindgen(js_class = ForwardRateAgreement)]
+impl JsForwardRateAgreement {
+    /// Copy the forward rate agreement into a new editable builder.
+    /// @returns A builder retaining exact rates, dates, conventions, attributes and pricing overrides.
+    #[wasm_bindgen(js_name = toBuilder)]
+    pub fn to_builder(&self) -> JsForwardRateAgreementBuilder {
+        JsForwardRateAgreementBuilder {
+            inner: super::Staged::new(self.inner.to_builder()),
+        }
+    }
+}
+
+builder_class!(
+    /// Fluent authoring of forward rate agreement terms.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core, valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const builder = valuations.instruments.ForwardRateAgreement.builder().id("DEP");
+    /// const usd = new core.Currency("USD");
+    /// const notional = new core.Money(100_000, usd);
+    /// const configured = builder.notional(notional);
+    /// configured.free();
+    /// notional.free();
+    /// usd.free();
+    /// builder.free();
+    /// ```
+    JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder", ForwardRateAgreementBuilder, JsForwardRateAgreement, |b| b.build()
+);
+
+setters!(JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder", {
+    /// Set the forward rate agreement id.
+    /// @param value - Unique forward rate agreement identifier.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    id as id: "string" => id,
+    /// Set the forward rate agreement start date.
+    /// @param value - Interest accrual start as an ISO-8601 date.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    start_date as startDate: "string" => js_date,
+    /// Set the forward rate agreement maturity.
+    /// @param value - Contractual maturity as an ISO-8601 date.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    maturity as maturity: "string" => js_date,
+    /// Set the forward rate agreement day count.
+    /// @param value - Explicit day-count convention as its wire label.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    day_count as dayCount: "generated.valuations.ForwardRateAgreement['day_count']" => js_wire,
+    /// Set the forward rate agreement discount curve id.
+    /// @param value - Discount curve identifier looked up at pricing time.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    discount_curve_id as discountCurveId: "string" => id,
+    /// Set the forward rate agreement business day convention.
+    /// @param value - Business-day adjustment convention. Defaults to modified following for inferred dates.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    fixing_business_day_convention as fixingBusinessDayConvention: "NonNullable<generated.valuations.ForwardRateAgreement['fixing_business_day_convention']>" => js_wire,
+    /// Set the forward rate agreement calendar id.
+    /// @param value - Registered holiday calendar identifier.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
+    fixing_calendar_id as fixingCalendarId: "string" => id,
+    /// Set the contract's fixing date.
+    /// @param value - ISO-8601 fixing date on or before the accrual start.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value or a consumed builder.
+    fixing_date as fixingDate: "string" => js_date,
+    /// Set the contract's reset lag days.
+    /// @param value - Signed business-day lag from fixing to accrual start, between -31 and 31.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value or a consumed builder.
+    reset_lag_days as resetLagDays: "number" => js_int,
+    /// Set the contract's observed fixing.
+    /// @param value - Finite annualized decimal rate already observed for the contract, e.g. 0.05 for 5 percent.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value or a consumed builder.
+    observed_fixing as observedFixing: "number" => js_f64,
+    /// Set the contract's forward curve id.
+    /// @param value - Identifier of the projection curve used before an observed fixing.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value or a consumed builder.
+    forward_curve_id as forwardCurveId: "string" => id,
+    /// Set the contract's side.
+    /// @param value - Wire label pay for paying fixed and receiving floating, or receive for the opposite cash flow.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped value or a consumed builder.
+    side as side: "generated.valuations.ForwardRateAgreement['side']" => js_wire,
+});
+common_setters!(JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder");
+handle_setters!(JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder", {
+    /// Set the forward rate agreement principal.
+    /// @param value - Positive, currency-tagged principal.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws if the builder has already been consumed.
+    notional as notional => JsMoney,
+});
+
+#[wasm_bindgen(js_class = ForwardRateAgreementBuilder)]
+impl JsForwardRateAgreementBuilder {
+    /// Set the exact annualized simple rate.
+    /// @param value - Decimal string, such as "0.045" for 4.5 percent. The contractual rate is required.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped or invalid decimal or a consumed builder.
+    #[wasm_bindgen(js_name = fixedRate)]
+    pub fn fixed_rate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
+    ) -> Result<JsForwardRateAgreementBuilder, JsValue> {
         let rate = crate::utils::wire::js_decimal(&value, "value")?.0;
         let inner = self.inner.apply(|builder| builder.fixed_rate(rate))?;
         Ok(Self { inner })

@@ -781,6 +781,7 @@
       "normCdfWithParams",
       "normPdf",
       "normPdfWithParams",
+      "ols",
       "populationVariance",
       "prevCdsDate",
       "prevCdsSemiannualRoll",
@@ -1720,6 +1721,9 @@
     "kind": "function"
   },
   "core.expectedShortfall": {
+    "kind": "function"
+  },
+  "core.ols": {
     "kind": "function"
   },
   "core.realizedVariance": {
@@ -4593,6 +4597,8 @@
       "DepositBuilder",
       "EquityOption",
       "EquityOptionBuilder",
+      "ForwardRateAgreement",
+      "ForwardRateAgreementBuilder",
       "FxBarrierOption",
       "FxDigitalOption",
       "FxForward",
@@ -5005,6 +5011,62 @@
       "metricPricingOverrides",
       "notional",
       "scenarioPricingOverrides",
+      "startDate"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.ForwardRateAgreement": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "dayCount",
+      "defaultModel",
+      "discountCurveId",
+      "expiry",
+      "fixedRate",
+      "fixingBusinessDayConvention",
+      "fixingCalendarId",
+      "fixingDate",
+      "forwardCurveId",
+      "id",
+      "instrumentPricingOverrides",
+      "maturity",
+      "metricPricingOverrides",
+      "notional",
+      "observedFixing",
+      "resetLagDays",
+      "scenarioPricingOverrides",
+      "side",
+      "startDate"
+    ]
+  },
+  "valuations.instruments.ForwardRateAgreementBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "dayCount",
+      "discountCurveId",
+      "fixedRate",
+      "fixingBusinessDayConvention",
+      "fixingCalendarId",
+      "fixingDate",
+      "forwardCurveId",
+      "free",
+      "id",
+      "instrumentPricingOverrides",
+      "maturity",
+      "metricPricingOverrides",
+      "notional",
+      "observedFixing",
+      "resetLagDays",
+      "scenarioPricingOverrides",
+      "side",
       "startDate"
     ],
     "getters": []

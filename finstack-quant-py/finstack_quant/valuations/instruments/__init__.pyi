@@ -64,6 +64,10 @@ from finstack_quant.valuations.instruments._typed_rates import (
     Swaption as Swaption,
     SwaptionBuilder as SwaptionBuilder,
 )
+from finstack_quant.valuations.instruments._typed_fra import (
+    ForwardRateAgreement as ForwardRateAgreement,
+    ForwardRateAgreementBuilder as ForwardRateAgreementBuilder,
+)
 from finstack_quant.valuations.instruments._typed_credit.cds import (
     CreditDefaultSwap as CreditDefaultSwap,
     CreditDefaultSwapBuilder as CreditDefaultSwapBuilder,
@@ -263,6 +267,8 @@ __all__ = [
     "EquityOptionBuilder",
     "FixedLegSpec",
     "FloatLegSpec",
+    "ForwardRateAgreement",
+    "ForwardRateAgreementBuilder",
     "FxForward",
     "FxForwardBuilder",
     "FxOption",

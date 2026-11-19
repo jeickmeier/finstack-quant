@@ -557,3 +557,15 @@ test('Deposit builds and reprices with an exact contractual rate', () => {
   assert.equal(moved.maturity, '2025-07-15');
   assert.equal(deposit.maturity, '2025-04-15');
 });
+
+test('typed FRA retains fixing and exact strike rate through a builder copy', () => {
+  const contract = valuations.instruments.ForwardRateAgreement.example();
+  const builder = contract.toBuilder();
+  const fra = builder.id('FRA').fixedRate('0.047505').build();
+  assert.equal(fra.fixedRate, '0.047505');
+  assert.equal(fra.fixingDate, contract.fixingDate);
+  assert.equal(fra.forwardCurveId, 'USD-SOFR-3M');
+  assert.equal(fra.toBuilder().build().toJson(), fra.toJson());
+  fra.free();
+  contract.free();
+});

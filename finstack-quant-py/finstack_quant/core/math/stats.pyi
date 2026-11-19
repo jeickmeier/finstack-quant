@@ -24,6 +24,7 @@ import numpy as np
 import numpy.typing as npt
 
 __all__ = [
+    "OlsResult",
     "correlation",
     "covariance",
     "expected_shortfall",
@@ -34,6 +35,7 @@ __all__ = [
     "mean",
     "mean_var",
     "median",
+    "ols",
     "population_variance",
     "quantile",
     "realized_variance",
@@ -632,5 +634,177 @@ def quantile(data: Sequence[float] | npt.NDArray[np.float64], q: float) -> float
     >>> from finstack_quant.core.math import stats
     >>> stats.quantile([1.0, 2.0, 3.0, 4.0, 5.0], 0.5)
     3.0
+    """
+    ...
+
+class OlsResult:
+    """A full-rank ordinary least-squares fit and its diagnostics.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.math.stats import ols
+    >>> fit = ols([[0], [1], [2]], [1, 3, 5])
+    >>> round(fit.coefficients[0], 10), round(fit.intercept or 0, 10)
+    (2.0, 1.0)
+    """
+
+    @property
+    def coefficients(self) -> list[float]:
+        """Read coefficients from the fitted regression.
+
+        Returns
+        -------
+        list[float]
+            Fitted slopes in predictor column order.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def intercept(self) -> float | None:
+        """Read intercept from the fitted regression.
+
+        Returns
+        -------
+        float | None
+            Fitted constant in response units, or None for a through-origin regression.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def r_squared(self) -> float:
+        """Read r squared from the fitted regression.
+
+        Returns
+        -------
+        float
+            Fraction of total variation accounted for by the fit.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def adj_r_squared(self) -> float:
+        """Read adj r squared from the fitted regression.
+
+        Returns
+        -------
+        float
+            Coefficient of determination adjusted for residual degrees of freedom.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def residual_std_error(self) -> float:
+        """Read residual std error from the fitted regression.
+
+        Returns
+        -------
+        float
+            Residual standard error in original response units.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def residuals(self) -> list[float]:
+        """Read residuals from the fitted regression.
+
+        Returns
+        -------
+        list[float]
+            Observed minus fitted responses in input row order.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def n_obs(self) -> int:
+        """Read n obs from the fitted regression.
+
+        Returns
+        -------
+        int
+            Number of observations in the fit.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def n_features(self) -> int:
+        """Read n features from the fitted regression.
+
+        Returns
+        -------
+        int
+            Number of fitted slopes.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+def ols(
+    x: Sequence[Sequence[float]] | npt.NDArray[np.float64],
+    y: Sequence[float] | npt.NDArray[np.float64],
+    *,
+    add_intercept: bool = True,
+) -> OlsResult:
+    """Fit a linear regression by singular value decomposition.
+
+    Parameters
+    ----------
+    x : Sequence[Sequence[float]] | npt.NDArray[np.float64]
+        Rectangular finite predictors with one observation per row and
+        one feature per column, in regression column order.
+    y : Sequence[float] | npt.NDArray[np.float64]
+        One finite response per observation, in the same row order.
+    add_intercept : bool
+        Fit a constant and report centered R². False fits through the
+        origin and uses uncentered total variation.
+
+    Returns
+    -------
+    OlsResult
+        The fitted slopes, optional intercept and diagnostics in input units.
+
+    Raises
+    ------
+    TypeError
+        If the supplied arrays have incompatible element or container types.
+    ValueError
+        If the dimensions mismatch, inputs are non-finite, the design is rank
+        deficient or lacks residual degrees of freedom, the response variation
+        is zero on the selected basis, or the fit cannot be represented.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.math.stats import ols
+    >>> round(ols([[1], [2], [3]], [2, 4, 6], add_intercept=False).r_squared, 10)
+    1.0
     """
     ...

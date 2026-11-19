@@ -20,6 +20,7 @@ from finstack_quant.valuations.instruments._typed_credit.cds_tranche import CdsT
 from finstack_quant.valuations.instruments._typed_equity import EquityOption
 from finstack_quant.valuations.instruments._typed_fx import FxForward, FxOption
 from finstack_quant.valuations.instruments._typed_deposit import Deposit
+from finstack_quant.valuations.instruments._typed_fra import ForwardRateAgreement
 from finstack_quant.valuations.instruments._typed_rates import CapFloor, InterestRateSwap, Swaption
 from finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit import RevolvingCredit
 from finstack_quant.valuations.instruments._typed_structured_credit.structured_credit import StructuredCredit
@@ -30,6 +31,7 @@ _InstrumentInput = (
     | Bond
     | TermLoan
     | Deposit
+    | ForwardRateAgreement
     | InterestRateSwap
     | Swaption
     | CapFloor

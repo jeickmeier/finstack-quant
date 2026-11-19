@@ -247,6 +247,7 @@ export const core = {
   covariance: wasm.covariance,
   quantile: wasm.quantile,
   expectedShortfall: wasm.expectedShortfall,
+  ols: wasm.ols,
   realizedVariance: wasm.realizedVariance,
   realizedVarianceOhlc: wasm.realizedVarianceOhlc,
   normCdf: wasm.normCdf,

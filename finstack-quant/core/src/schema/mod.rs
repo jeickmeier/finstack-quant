@@ -1,5 +1,6 @@
 //! Deterministic JSON Schema assembly helpers.
 
+use crate::math::stats::OlsResult;
 use serde_json::Value;
 
 use crate::dates::{PeriodPlan, Schedule, ScheduleSpec};
@@ -204,6 +205,13 @@ fn vol_cube_expiry_slice_examples() -> Result<Vec<Value>> {
 /// generator, the contract tests and the bindings all render from one
 /// definition. Render an entry with [`SchemaArtifact::generate`].
 pub const ARTIFACTS: &[SchemaArtifact] = &[
+    schema_artifact!(
+        OlsResult,
+        "math",
+        "ols_result",
+        Output,
+        "Ordinary least-squares coefficients, residuals and fit diagnostics."
+    ),
     crate::schema_artifact!(
     MarketContextState,
     "market_data",

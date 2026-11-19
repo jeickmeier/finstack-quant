@@ -838,3 +838,21 @@ def test_deposit_builder_retains_exact_rate_and_matches_wire_pricing() -> None:
     assert moved.maturity.isoformat() == "2025-07-15"
     assert moved.fixed_rate == rate
     assert deposit.maturity.isoformat() == "2025-04-15"
+
+
+def test_forward_rate_agreement_builder_preserves_fixing_and_exact_rate() -> None:
+    from decimal import Decimal
+
+    from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+    from finstack_quant.valuations.instruments import ForwardRateAgreement, price_instrument
+
+    base = "2024-01-01"
+    market = MarketContext()
+    market.insert(DiscountCurve.flat("USD-OIS", base, 0.04, "act_365f"))
+    market.insert(ForwardCurve.flat("USD-SOFR-3M", base, 0.05, "act_360"))
+    fra = ForwardRateAgreement.example().to_builder().id("FRA").fixed_rate(Decimal("0.047505")).build()
+    assert fra.fixed_rate == Decimal("0.047505")
+    assert fra.fixing_date == ForwardRateAgreement.example().fixing_date
+    assert fra.forward_curve_id == "USD-SOFR-3M"
+    assert fra.price(market, base).value == price_instrument(fra.to_json(), market, base).value
+    assert fra.to_builder().build().to_json() == fra.to_json()

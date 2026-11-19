@@ -30,6 +30,7 @@ use crate::bindings::valuations::typed_credit::{
 };
 use crate::bindings::valuations::typed_deposit::PyDeposit;
 use crate::bindings::valuations::typed_equity::PyEquityOption;
+use crate::bindings::valuations::typed_fra::PyForwardRateAgreement;
 use crate::bindings::valuations::typed_fx::{PyFxForward, PyFxOption};
 use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, PySwaption};
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
@@ -131,6 +132,7 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyAssetBackedFacility,
         PyInterestRateSwap,
         PyDeposit,
+        PyForwardRateAgreement,
         PySwaption,
         PyCapFloor,
         PyCreditDefaultSwap,

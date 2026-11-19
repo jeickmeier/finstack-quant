@@ -296,10 +296,12 @@ tail_risk_table=pd.DataFrame([{"confidence":confidence,"scenario_count":504,
 
 fit=daily_risk.multi_factor_greeks(0,factor_panel.T.tolist())
 design=np.column_stack([np.ones(len(factor_panel)),factor_panel])
-ols=np.linalg.lstsq(design,scenario_returns,rcond=None)[0]
-residual=scenario_returns-design@ols
+from finstack_quant.core.math.stats import ols
+factor_fit=ols(factor_panel,scenario_returns)
+slopes=np.asarray(factor_fit.coefficients)
+residual=np.asarray(factor_fit.residuals)
 covariance=np.cov(factor_panel,rowvar=False,ddof=1)
-contributions=ols[1:]*(covariance@ols[1:])
+contributions=slopes*(covariance@slopes)
 residual_variance=residual.var(ddof=1)
 total_variance=scenario_returns.var(ddof=1)
 factor_risk_table=pd.DataFrame({"factor":factor_names,"return_loading_per_factor_unit":fit.betas,
@@ -912,10 +914,12 @@ tail_risk_table=pd.DataFrame([{"confidence":confidence,"scenario_count":504,
 
 fit=daily_risk.multi_factor_greeks(0,factor_panel.T.tolist())
 design=np.column_stack([np.ones(len(factor_panel)),factor_panel])
-ols=np.linalg.lstsq(design,scenario_returns,rcond=None)[0]
-residual=scenario_returns-design@ols
+from finstack_quant.core.math.stats import ols
+factor_fit=ols(factor_panel,scenario_returns)
+slopes=np.asarray(factor_fit.coefficients)
+residual=np.asarray(factor_fit.residuals)
 covariance=np.cov(factor_panel,rowvar=False,ddof=1)
-contributions=ols[1:]*(covariance@ols[1:])
+contributions=slopes*(covariance@slopes)
 residual_variance=residual.var(ddof=1)
 total_variance=scenario_returns.var(ddof=1)
 factor_risk_table=pd.DataFrame({"factor":factor_names,"return_loading_per_factor_unit":fit.betas,

@@ -1436,3 +1436,24 @@ def test_market_preserves_inflation_series_basis() -> None:
     market = MarketContext().insert_inflation_index(InflationIndex.from_json(json.dumps(payload)))
     restored = MarketContext.from_json(market.to_json()).get_inflation_index("US-CPI")
     assert json.loads(restored.to_json())["series"] == series
+
+
+def test_ols_rectangular_design_and_strided_numpy_predictors() -> None:
+    import numpy as np
+    import pytest
+
+    from finstack_quant.core.math.stats import ols
+
+    panel = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=float)
+    y = np.array([5, 7, 2, 4], dtype=float)
+    fitted = ols(panel[::-1], y[::-1])
+    assert fitted.coefficients == pytest.approx([2.0, -3.0])
+    assert fitted.intercept == pytest.approx(5.0)
+    assert fitted.residuals == pytest.approx([0.0] * 4)
+    assert (fitted.n_obs, fitted.n_features) == (4, 2)
+    with pytest.raises(ValueError, match="rank deficient"):
+        ols([[0, 0], [1, 2], [2, 4], [3, 6]], [5, 7, 2, 4])
+    with pytest.raises(ValueError, match=r"rectangular|ragged"):
+        ols([[0, 0], [1], [2, 4], [3, 6]], [5, 7, 2, 4])
+    with pytest.raises(ValueError, match="finite"):
+        ols([[0], [1], [2]], [5, float("nan"), 2])

@@ -44,6 +44,8 @@ export const instruments = {
   trancheMetrics: wasm.trancheMetrics,
   Deposit: wasm.Deposit,
   DepositBuilder: wasm.DepositBuilder,
+  ForwardRateAgreement: wasm.ForwardRateAgreement,
+  ForwardRateAgreementBuilder: wasm.ForwardRateAgreementBuilder,
   InterestRateSwap: wasm.InterestRateSwap,
   Swaption: wasm.Swaption,
   CapFloor: wasm.CapFloor,

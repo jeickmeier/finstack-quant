@@ -970,3 +970,20 @@ test('expected shortfall weights the fractional boundary and leaves its sample u
   assert.throws(() => core.expectedShortfall([], 0.625), /nonempty/);
   assert.throws(() => core.expectedShortfall(data, 1.0), /confidence/);
 });
+
+test('OLS fits a non-square predictor panel in observation order', () => {
+  const { coefficients, intercept, residuals } = core.ols(
+    [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ],
+    [5, 7, 2, 4]
+  );
+  assert.ok(Math.abs(coefficients[0] - 2) < 1e-12);
+  assert.ok(Math.abs(coefficients[1] + 3) < 1e-12);
+  assert.ok(Math.abs(intercept - 5) < 1e-12);
+  assert.ok(residuals.every((value) => Math.abs(value) < 1e-12));
+  assert.throws(() => core.ols([[1], [2, 3], [4]], [1, 2, 3]), /rectangular/);
+});

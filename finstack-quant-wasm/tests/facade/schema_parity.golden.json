@@ -215,6 +215,13 @@
             "bytes": 25370
           },
           {
+            "path": "schemas/math/1/ols_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/math/1/ols_result.schema.json",
+            "type_name": "OlsResult",
+            "kind": "output",
+            "bytes": 1891
+          },
+          {
             "path": "schemas/rating_scales/1/rating_scale_entry.schema.json",
             "$id": "https://finstack_quant.dev/schemas/rating_scales/1/rating_scale_entry.schema.json",
             "type_name": "RatingScaleEntry",
@@ -4521,6 +4528,14 @@
             "type_name": "VolCubeExpirySlice",
             "kind": "output",
             "bytes": 25370
+          },
+          {
+            "domain": "core",
+            "path": "schemas/math/1/ols_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/math/1/ols_result.schema.json",
+            "type_name": "OlsResult",
+            "kind": "output",
+            "bytes": 1891
           },
           {
             "domain": "core",
