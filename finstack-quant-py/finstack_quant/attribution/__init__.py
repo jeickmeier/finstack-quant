@@ -9,6 +9,7 @@ Examples:
 
 from finstack_quant.finstack_quant import attribution as _attribution
 
+AttributionInputs = _attribution.AttributionInputs
 AttributionResultEnvelope = _attribution.AttributionResultEnvelope
 PnlAttribution = _attribution.PnlAttribution
 ReturnContributionResult = _attribution.ReturnContributionResult
@@ -24,6 +25,7 @@ default_attribution_metrics = _attribution.default_attribution_metrics
 schema = _attribution.schema
 
 __all__: list[str] = [
+    "AttributionInputs",
     "AttributionResultEnvelope",
     "PnlAttribution",
     "ReturnContributionResult",

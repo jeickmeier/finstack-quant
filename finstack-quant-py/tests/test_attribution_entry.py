@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 from finstack_quant.attribution import (
+    AttributionInputs,
     PnlAttribution,
     ReturnContributionResult,
     attribute_pnl,
@@ -622,3 +623,22 @@ def test_taylor_sensitivity_steps_rebuild_rates_bucket() -> None:
     assert rates_raw["move_unit"] == "basis_point"
     assert len(rates_raw["buckets"]) == 11
     assert PnlAttribution.from_json(attr.to_json()).sensitivity_steps == raw
+
+
+def test_typed_attribution_reuses_snapshots_in_single_and_batch_calls() -> None:
+    opening = MarketContext.from_json(_market_json(AS_OF_T0))
+    closing = MarketContext.from_json(_market_json(AS_OF_T1, shift=0.002))
+    instrument = _bond_json()
+    wire = {
+        "market_t0": opening,
+        "market_t1": closing,
+        "as_of_t0": AS_OF_T0,
+        "as_of_t1": AS_OF_T1,
+        "method": {"waterfall": default_waterfall_order()},
+    }
+    inputs = AttributionInputs(opening, closing, date.fromisoformat(AS_OF_T0), AS_OF_T1, wire["method"])
+    expected = attribute_pnl(instrument, wire)
+    assert attribute_pnl(instrument, inputs).to_json() == expected.to_json()
+    pd.testing.assert_frame_equal(attribute_pnl_many(inputs, [instrument]), attribute_pnl_many(wire, [instrument]))
+    closing.insert(DiscountCurve.flat("USD-OIS", AS_OF_T1, 0.08, "act_365f"))
+    assert attribute_pnl(instrument, inputs).to_json() == expected.to_json()

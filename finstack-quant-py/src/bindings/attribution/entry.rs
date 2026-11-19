@@ -6,13 +6,15 @@ use crate::bindings::attribution::return_contribution::{
     PyReturnContributionResult, extract_return_contribution_spec,
 };
 use crate::bindings::core::currency::extract_currency;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{extract_date_iso, py_to_date};
 use crate::bindings::extract::{extract_instrument, extract_market_ref};
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::{py_to_serde, spec_from_py};
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::errors::core_to_py;
 use finstack_quant_attribution::{AttributionEnvelope, AttributionInputs, AttributionSpec};
+use finstack_quant_core::market_data::context::MarketContextState;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -25,7 +27,54 @@ fn instrument_payload(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentJson> {
         .map_err(core_to_py)
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._entry", "AttributionInputs")]
+#[pyclass(
+    name = "AttributionInputs",
+    module = "finstack_quant.attribution",
+    frozen,
+    skip_from_py_object
+)]
+pub(super) struct PyAttributionInputs {
+    inner: AttributionInputs,
+}
+
+#[pymethods]
+impl PyAttributionInputs {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._entry", "AttributionInputs.__init__")]
+    #[new]
+    #[pyo3(signature = (market_t0, market_t1, as_of_t0, as_of_t1, method, *, config=None))]
+    fn new(
+        market_t0: PyRef<'_, PyMarketContext>,
+        market_t1: PyRef<'_, PyMarketContext>,
+        as_of_t0: &Bound<'_, PyAny>,
+        as_of_t1: &Bound<'_, PyAny>,
+        method: &Bound<'_, PyAny>,
+        config: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let py = method.py();
+        Ok(Self {
+            inner: AttributionInputs {
+                market_t0: MarketContextState::try_from(&market_t0.inner).map_err(core_to_py)?,
+                market_t1: MarketContextState::try_from(&market_t1.inner).map_err(core_to_py)?,
+                as_of_t0: py_to_date(as_of_t0)?,
+                as_of_t1: py_to_date(as_of_t1)?,
+                method: py_to_serde(py, method, "AttributionMethod")?,
+                config: config
+                    .map(|value| py_to_serde(py, value, "AttributionConfig"))
+                    .transpose()?,
+                model_params_t0: None,
+                credit_factor_model: None,
+                credit_factor_detail_options: Default::default(),
+                full_cross_attribution: false,
+            },
+        })
+    }
+}
+
 fn attribution_inputs(py: Python<'_>, inputs: &Bound<'_, PyAny>) -> PyResult<AttributionInputs> {
+    if let Ok(typed) = inputs.cast::<PyAttributionInputs>() {
+        return Ok(typed.borrow().inner.clone());
+    }
     let Ok(fields) = inputs.cast::<PyDict>() else {
         return spec_from_py(py, inputs, "AttributionInputs");
     };

@@ -20,6 +20,7 @@ from finstack_quant.attribution._result_envelope import AttributionResultEnvelop
 from finstack_quant.attribution._pnl_attribution import PnlAttribution as PnlAttribution
 from finstack_quant.attribution._return_contribution import ReturnContributionResult as ReturnContributionResult
 from finstack_quant.attribution._entry import (
+    AttributionInputs as AttributionInputs,
     attribute_pnl as attribute_pnl,
     attribute_pnl_envelope as attribute_pnl_envelope,
     attribute_pnl_many as attribute_pnl_many,
@@ -32,6 +33,7 @@ from finstack_quant.attribution._entry import (
 )
 
 __all__ = [
+    "AttributionInputs",
     "AttributionResultEnvelope",
     "PnlAttribution",
     "ReturnContributionResult",

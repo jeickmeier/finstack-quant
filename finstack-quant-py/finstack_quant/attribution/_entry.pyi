@@ -13,9 +13,62 @@ from finstack_quant.attribution._pnl_attribution import PnlAttribution
 from finstack_quant.attribution._result_envelope import AttributionResultEnvelope
 from finstack_quant.attribution._return_contribution import ReturnContributionResult
 
+class AttributionInputs:
+    """Capture dated market snapshots and a methodology for P&L attribution.
+
+    Examples
+    --------
+    >>> from finstack_quant.attribution import AttributionInputs
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> start = MarketContext()
+    >>> end = MarketContext()
+    >>> inputs = AttributionInputs(start, end, "2025-01-01", "2025-01-02", "parallel")
+    >>> isinstance(inputs, AttributionInputs)
+    True
+    """
+
+    def __init__(
+        self,
+        market_t0: MarketContext,
+        market_t1: MarketContext,
+        as_of_t0: datetime.date | str,
+        as_of_t1: datetime.date | str,
+        method: str | Mapping[str, Any],
+        *,
+        config: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Snapshot the two markets before attributing their movement.
+
+        Parameters
+        ----------
+        market_t0 : MarketContext
+            Opening market, copied into the request at construction.
+        market_t1 : MarketContext
+            Closing market, copied into the request at construction.
+        as_of_t0 : datetime.date or str
+            Opening calendar date. Text uses YYYY-MM-DD.
+        as_of_t1 : datetime.date or str
+            Closing calendar date. Text uses YYYY-MM-DD. Attribution checks
+            that this date is on or after the opening date.
+        method : str or Mapping[str, Any]
+            Use "parallel", "metrics_based", {"waterfall": [factor, ...]},
+            or {"taylor": {options}} as described by attribute_pnl.
+        config : Mapping[str, Any] or None
+            Native AttributionConfig fields, including strict_validation,
+            with omitted fields taking the attribution engine defaults.
+
+        Raises
+        ------
+        TypeError
+            If either market is not a MarketContext or a date form is unsupported.
+        ValueError
+            If a date, market snapshot, method or configuration is invalid.
+        """
+        ...
+
 # Entry Points
 
-def attribute_pnl(instrument: object, inputs: Mapping[str, Any] | str) -> PnlAttribution:
+def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, Any] | str) -> PnlAttribution:
     """
     Run P&L attribution for a single instrument.
 
@@ -31,7 +84,7 @@ def attribute_pnl(instrument: object, inputs: Mapping[str, Any] | str) -> PnlAtt
         Typed instrument wrapper from ``finstack_quant.valuations`` or a
         canonical v1 instrument envelope JSON string
         (``{"schema": "finstack_quant.instrument/1", "instrument": {...}}``).
-    inputs : Mapping[str, Any] or str
+    inputs : AttributionInputs or Mapping[str, Any] or str
         The Rust ``AttributionInputs`` serde form (the document WASM
         ``attributePnlMany`` takes as ``inputs``; WASM ``attributePnl`` takes
         the same keys plus ``instrument``), as a dict or JSON text. Unknown
@@ -118,7 +171,7 @@ def attribute_pnl(instrument: object, inputs: Mapping[str, Any] | str) -> PnlAtt
     """
     ...
 
-def attribute_pnl_many(inputs: Mapping[str, Any] | str, instruments: list[object]) -> pd.DataFrame:
+def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, instruments: list[object]) -> pd.DataFrame:
     """
     Run one attribution set-up against many instruments and tabulate.
 
@@ -129,7 +182,7 @@ def attribute_pnl_many(inputs: Mapping[str, Any] | str, instruments: list[object
 
     Parameters
     ----------
-    inputs : Mapping[str, Any] or str
+    inputs : AttributionInputs or Mapping[str, Any] or str
         The Rust ``AttributionInputs`` serde form, dict or JSON text, with the
         keys documented on :func:`attribute_pnl` (``market_t0``,
         ``market_t1``, ``as_of_t0``, ``as_of_t1``, ``method`` and the optional

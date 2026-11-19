@@ -1287,6 +1287,7 @@ schema = { python = "finstack_quant.attribution.schema", status = "exists", note
 #     siblings) — consumed by the Python DataFrame exports; not yet a
 #     standalone host API
 public = [
+    "AttributionInputs",
     "AttributionResultEnvelope",
     "PnlAttribution",
     "ReturnContributionResult",
@@ -2046,7 +2047,7 @@ js = "analytics.schema"
 
 [parity.modules."finstack_quant.attribution"]
 js = "attribution"
-types = { AttributionResultEnvelope = "AttributionResultEnvelope", PnlAttribution = "PnlAttribution", ReturnContributionResult = "ReturnContributionResult" }
+types = { AttributionInputs = "AttributionInputs", AttributionResultEnvelope = "AttributionResultEnvelope", PnlAttribution = "PnlAttribution", ReturnContributionResult = "ReturnContributionResult" }
 
 [parity.modules."finstack_quant.attribution.schema"]
 js = "attribution.schema"
