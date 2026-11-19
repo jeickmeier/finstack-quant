@@ -1419,7 +1419,7 @@
           "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
           "pointer": "#",
           "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
-          "sha256": "7c7aedbbf5ee5a12d6ac02334e013249f809338662263d66c394cbb419c3dc06",
+          "sha256": "330d667b6877fb2362396ccef82ceb0d3d65b03f2979c72946e4bd151007b726",
           "description": "Bare scenario specification: the ordered operations the scenario engine applies."
         }
       ]
@@ -2152,7 +2152,7 @@
           "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
           "pointer": "#",
           "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-          "sha256": "f61ba7561356a78f98e0ff1e5058eea509463f6000486319ecf24913f2553f0e",
+          "sha256": "41b776ebbff20262b9e8d852e1b343794907f764aebae9ff48a1db68612391ad",
           "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
         }
       ]

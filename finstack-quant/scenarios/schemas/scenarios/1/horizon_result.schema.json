@@ -3542,29 +3542,6 @@
           "type": "object"
         },
         {
-          "description": "Vol-surface arbitrage warning detected post-shock.",
-          "properties": {
-            "detail": {
-              "description": "Free-text from `ArbitrageViolation` Display.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "vol_surface_arbitrage",
-              "type": "string"
-            },
-            "vol_surface_id": {
-              "description": "Volatility-surface identifier.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "vol_surface_id",
-            "detail"
-          ],
-          "type": "object"
-        },
-        {
           "description": "Vol-surface bucket shock selected zero grid points (no-op).",
           "properties": {
             "kind": {
@@ -3579,35 +3556,6 @@
           "required": [
             "kind",
             "vol_surface_id"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "Vol-surface negative bucket shock that may produce non-positive vols.",
-          "properties": {
-            "bucket": {
-              "description": "Whether this was a parallel (`false`) or bucket (`true`) shock.",
-              "type": "boolean"
-            },
-            "kind": {
-              "const": "vol_surface_large_negative_shock",
-              "type": "string"
-            },
-            "pct": {
-              "description": "Percent shock value.",
-              "format": "double",
-              "type": "number"
-            },
-            "vol_surface_id": {
-              "description": "Volatility-surface identifier.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "vol_surface_id",
-            "pct",
-            "bucket"
           ],
           "type": "object"
         },

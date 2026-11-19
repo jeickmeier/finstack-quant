@@ -1760,7 +1760,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Parallel percent shift to a volatility surface.\n\nShocks are **sticky-strike** multiplicative grid moves: each stored\n`(expiry, secondary_value)` vol is multiplied by `1 + pct/100`. This is\nnot a sticky-delta re-mark. The post-shock fixed-strike calendar-spread\ncheck applies only to `Strike`-axis `BlackLognormal` surfaces and is a\nheuristic screen, not a no-arbitrage certificate.\n\n`pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;\n`pct < -100` fails validation).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceParallelPct {\n    vol_surface_id: \"SPX\".into(),\n    pct: 10.0, // +10% volatility increase\n};\n```",
+          "description": "Parallel percent shift to a volatility surface.\n\nShocks are **sticky-strike** multiplicative grid moves: each stored\n`(expiry, secondary_value)` quote is multiplied by `(100 + pct) / 100`.\nRun surface diagnostics separately on the shocked artifact.\n\n`pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;\n`pct < -100` fails validation).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceParallelPct {\n    vol_surface_id: \"SPX\".into(),\n    pct: 10.0, // +10% volatility increase\n};\n```",
           "properties": {
             "kind": {
               "const": "vol_surface_parallel_pct",
@@ -1785,7 +1785,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Bucketed volatility surface shock.\n\nSame sticky-strike multiplicative convention as\n[`OperationSpec::VolSurfaceParallelPct`], restricted to the selected\nexpiry/strike buckets (`pct >= -100`). Tenor selection requires an\nexplicit `expiry_clock` on the target surface anchored at the execution\ndate; strike filtering requires a `Strike` secondary axis. The\ncalendar-spread check applies only to `Strike`-axis `BlackLognormal`\nsurfaces and is not a no-arbitrage certificate.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceBucketPct {\n    vol_surface_id: \"SPX\".into(),\n    tenors: Some(vec![\"1M\".into(), \"3M\".into()]),\n    strikes: Some(vec![90.0, 95.0, 100.0]),\n    pct: 15.0,\n};\n```",
+          "description": "Bucketed volatility surface shock.\n\nSame sticky-strike multiplicative convention as\n[`OperationSpec::VolSurfaceParallelPct`], restricted to the selected\nexpiry/strike buckets (`pct >= -100`). Tenor selection requires an\nexplicit `expiry_clock` on the target surface anchored at the execution\ndate; strike filtering requires a `Strike` secondary axis.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceBucketPct {\n    vol_surface_id: \"SPX\".into(),\n    tenors: Some(vec![\"1M\".into(), \"3M\".into()]),\n    strikes: Some(vec![90.0, 95.0, 100.0]),\n    pct: 15.0,\n};\n```",
           "properties": {
             "kind": {
               "const": "vol_surface_bucket_pct",

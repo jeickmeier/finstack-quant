@@ -577,35 +577,7 @@ export type Warning =
       [k: string]: unknown;
     }
   | {
-      /**
-       * Free-text from `ArbitrageViolation` Display.
-       */
-      detail: string;
-      kind: "vol_surface_arbitrage";
-      /**
-       * Volatility-surface identifier.
-       */
-      vol_surface_id: string;
-      [k: string]: unknown;
-    }
-  | {
       kind: "vol_surface_bucket_empty_selection";
-      /**
-       * Volatility-surface identifier.
-       */
-      vol_surface_id: string;
-      [k: string]: unknown;
-    }
-  | {
-      /**
-       * Whether this was a parallel (`false`) or bucket (`true`) shock.
-       */
-      bucket: boolean;
-      kind: "vol_surface_large_negative_shock";
-      /**
-       * Percent shock value.
-       */
-      pct: number;
       /**
        * Volatility-surface identifier.
        */

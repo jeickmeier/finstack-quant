@@ -510,10 +510,8 @@ pub enum OperationSpec {
     /// Parallel percent shift to a volatility surface.
     ///
     /// Shocks are **sticky-strike** multiplicative grid moves: each stored
-    /// `(expiry, secondary_value)` vol is multiplied by `1 + pct/100`. This is
-    /// not a sticky-delta re-mark. The post-shock fixed-strike calendar-spread
-    /// check applies only to `Strike`-axis `BlackLognormal` surfaces and is a
-    /// heuristic screen, not a no-arbitrage certificate.
+    /// `(expiry, secondary_value)` quote is multiplied by `(100 + pct) / 100`.
+    /// Run surface diagnostics separately on the shocked artifact.
     ///
     /// `pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;
     /// `pct < -100` fails validation).
@@ -540,9 +538,7 @@ pub enum OperationSpec {
     /// [`OperationSpec::VolSurfaceParallelPct`], restricted to the selected
     /// expiry/strike buckets (`pct >= -100`). Tenor selection requires an
     /// explicit `expiry_clock` on the target surface anchored at the execution
-    /// date; strike filtering requires a `Strike` secondary axis. The
-    /// calendar-spread check applies only to `Strike`-axis `BlackLognormal`
-    /// surfaces and is not a no-arbitrage certificate.
+    /// date; strike filtering requires a `Strike` secondary axis.
     ///
     /// # Example
     /// ```rust
