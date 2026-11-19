@@ -240,9 +240,9 @@ class TestModelBuilderCapitalStructure:
         model = b.build()
         assert '"TL-A"' in model.to_json()
 
-    def test_reporting_currency_and_fx_policy(self, usd: Currency) -> None:
+    def test_reporting_currency_and_fx_policy(self) -> None:
         b = statements.ModelBuilder("deal")
-        b.reporting_currency(usd)
+        b.reporting_currency("USD")
         b.fx_policy("period_end")
         b.periods("2025Q1..Q1", None)
         b.value("x", [("2025Q1", 1.0)])

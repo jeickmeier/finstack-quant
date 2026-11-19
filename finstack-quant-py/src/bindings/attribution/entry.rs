@@ -7,7 +7,7 @@ use crate::bindings::attribution::return_contribution::{
 };
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::py_to_date;
+use crate::bindings::date_utils::{extract_date_iso, py_to_date};
 use crate::bindings::extract::{extract_instrument, extract_market_ref};
 use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
@@ -15,6 +15,7 @@ use crate::errors::core_to_py;
 use finstack_quant_attribution::{AttributionEnvelope, AttributionInputs, AttributionSpec};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 /// The validated instrument payload of a typed instrument wrapper or a
 /// canonical envelope (`dict` or JSON text), through the canonical loader.
@@ -22,6 +23,19 @@ fn instrument_payload(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentJson> {
     extract_instrument(obj)?
         .into_instrument_json()
         .map_err(core_to_py)
+}
+
+fn attribution_inputs(py: Python<'_>, inputs: &Bound<'_, PyAny>) -> PyResult<AttributionInputs> {
+    let Ok(fields) = inputs.cast::<PyDict>() else {
+        return spec_from_py(py, inputs, "AttributionInputs");
+    };
+    let normalized = fields.copy()?;
+    for key in ["as_of_t0", "as_of_t1"] {
+        if let Some(date) = fields.get_item(key)? {
+            normalized.set_item(key, extract_date_iso(&date)?)?;
+        }
+    }
+    spec_from_py(py, normalized.as_any(), "AttributionInputs")
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._entry", "attribute_pnl")]
@@ -33,7 +47,7 @@ pub(crate) fn attribute_pnl(
     inputs: &Bound<'_, PyAny>,
 ) -> PyResult<PyPnlAttribution> {
     let instrument = instrument_payload(instrument)?;
-    let inputs: AttributionInputs = spec_from_py(py, inputs, "AttributionInputs")?;
+    let inputs = attribution_inputs(py, inputs)?;
     let spec = AttributionSpec { instrument, inputs };
     // `execute` turns a Rust panic into `Error::Internal` so it
     // surfaces as a catchable `RuntimeError` rather than a
@@ -56,7 +70,7 @@ pub(crate) fn attribute_pnl_many<'py>(
         .iter()
         .map(instrument_payload)
         .collect::<PyResult<Vec<_>>>()?;
-    let inputs: AttributionInputs = spec_from_py(py, inputs, "AttributionInputs")?;
+    let inputs = attribution_inputs(py, inputs)?;
     let attributions = py
         .detach(|| finstack_quant_attribution::attribute_pnl_many(&inputs, payloads))
         .map_err(core_to_py)?;

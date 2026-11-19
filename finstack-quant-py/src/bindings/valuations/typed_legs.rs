@@ -9,6 +9,9 @@
 use pyo3::prelude::*;
 use rust_decimal::prelude::ToPrimitive;
 
+use crate::bindings::cashflows::builder::specs::{
+    decimal_bps_from_any, decimal_rate_from_any, fields_with_decimal_from_py,
+};
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
@@ -48,7 +51,7 @@ impl PyFixedLegSpec {
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: finstack_quant_valuations::instruments::FixedLegSpec =
-            crate::bindings::module_utils::fields_from_py(py, fields, "FixedLegSpec")?;
+            fields_with_decimal_from_py(py, fields, "FixedLegSpec", "rate", decimal_rate_from_any)?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -174,7 +177,13 @@ impl PyFloatLegSpec {
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: finstack_quant_valuations::instruments::FloatLegSpec =
-            crate::bindings::module_utils::fields_from_py(py, fields, "FloatLegSpec")?;
+            fields_with_decimal_from_py(
+                py,
+                fields,
+                "FloatLegSpec",
+                "spread_bp",
+                decimal_bps_from_any,
+            )?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -327,7 +336,13 @@ impl PyPremiumLegSpec {
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: finstack_quant_valuations::instruments::PremiumLegSpec =
-            crate::bindings::module_utils::fields_from_py(py, fields, "PremiumLegSpec")?;
+            fields_with_decimal_from_py(
+                py,
+                fields,
+                "PremiumLegSpec",
+                "coupon_bp",
+                decimal_bps_from_any,
+            )?;
         Ok(Self { inner })
     }
 

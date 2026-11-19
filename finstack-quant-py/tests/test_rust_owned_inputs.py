@@ -6,6 +6,7 @@ accepted on one path what Rust rejects on another.
 
 from __future__ import annotations
 
+from decimal import Decimal
 import json
 import math
 import pickle
@@ -36,6 +37,22 @@ def test_metadata_keeps_json_like_strings_literal() -> None:
 
     assert json.loads(model.build().to_json())["meta"] == metadata
     assert book.build().meta == metadata
+
+
+def test_contractual_spreads_keep_fractional_basis_points() -> None:
+    from finstack_quant.cashflows.builder import FloatingRateSpec
+    from finstack_quant.core.types import Bps, Rate
+
+    spread = Decimal("25.125")
+    assert FloatingRateSpec.sofr(spread).spread_bp == spread
+    assert FloatingRateSpec.sofr("25.125").spread_bp == spread
+    assert FloatingRateSpec.sofr(Rate(0.0025125)).spread_bp == spread
+    assert FloatingRateSpec.sofr(Bps(25)).spread_bp == Decimal(25)
+    assert FloatingRateSpec.sofr(0).spread_bp == Decimal(0)
+    with pytest.raises(TypeError, match="bool"):
+        FloatingRateSpec.sofr(True)
+    with pytest.raises(ValueError, match="Non-finite value"):
+        FloatingRateSpec.sofr(float("inf"))
 
 
 def _dcf_model() -> statements.FinancialModelSpec:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 from decimal import Decimal
 from typing import Any
+from finstack_quant.core.types import Bps, Rate
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.cashflows.builder._specs.schedule import ScheduleParams
 
@@ -522,7 +523,7 @@ class FloatingRateSpec:
         *,
         index_id: str,
         forward_curve_id: str,
-        spread_bp: Decimal | str,
+        spread_bp: Decimal | Rate | Bps | float | str,
         reset_frequency: Tenor,
         gearing: Decimal | str = "1",
         gearing_includes_spread: bool = True,
@@ -552,7 +553,7 @@ class FloatingRateSpec:
             Contractual fixing series identifier without the FIXING prefix.
         forward_curve_id : str
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
-        spread_bp : decimal.Decimal | str
+        spread_bp : Decimal | Rate | Bps | float | str
             Spread/margin over the index in basis points.
         reset_frequency : Tenor
             Index reset cadence, for instruments that reset inside a payment
@@ -935,7 +936,7 @@ class FloatingRateSpec:
         ...
 
     @staticmethod
-    def sofr(spread_bp: Decimal | float | str) -> FloatingRateSpec:
+    def sofr(spread_bp: Decimal | Rate | Bps | float | str) -> FloatingRateSpec:
         """
         USD SOFR compounded in arrears (ARRC / ISDA 2021).
 
@@ -945,7 +946,7 @@ class FloatingRateSpec:
 
         Parameters
         ----------
-        spread_bp : Decimal, float or str
+        spread_bp : Decimal | Rate | Bps | float | str
             Spread over the index in basis points (``50`` means +50 bp per annum).
 
         Returns
@@ -968,13 +969,13 @@ class FloatingRateSpec:
         ...
 
     @staticmethod
-    def sonia(spread_bp: Decimal | float | str) -> FloatingRateSpec:
+    def sonia(spread_bp: Decimal | Rate | Bps | float | str) -> FloatingRateSpec:
         """
         GBP SONIA compounded in arrears: Act/365F daily compounding, no reset lag, GBLO fixings.
 
         Parameters
         ----------
-        spread_bp : Decimal, float or str
+        spread_bp : Decimal | Rate | Bps | float | str
             Spread over the index in basis points (``50`` means +50 bp per annum).
 
         Returns
@@ -997,13 +998,13 @@ class FloatingRateSpec:
         ...
 
     @staticmethod
-    def euribor_3m(spread_bp: Decimal | float | str) -> FloatingRateSpec:
+    def euribor_3m(spread_bp: Decimal | Rate | Bps | float | str) -> FloatingRateSpec:
         """
         EUR 3M EURIBOR term rate: one fixing per coupon period at its lagged accrual start, with a 2-business-day TARGET2 lag and an explicit 3M index tenor.
 
         Parameters
         ----------
-        spread_bp : Decimal, float or str
+        spread_bp : Decimal | Rate | Bps | float | str
             Spread over the index in basis points (``50`` means +50 bp per annum).
 
         Returns

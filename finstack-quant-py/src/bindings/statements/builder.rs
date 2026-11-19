@@ -8,7 +8,7 @@ use super::capital_structure::PyWaterfallSpec;
 use super::registry::PyRegistry;
 use super::types::{PyFinancialModelSpec, PyForecastSpec, PyNodeSpec};
 use super::{PERIOD_GRAMMAR, extract_money_series, extract_scalar_series, extract_value_series};
-use crate::bindings::core::currency::PyCurrency;
+use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::periods::PyPeriodPlan;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::pydoc::pydoc;
@@ -430,9 +430,9 @@ impl PyModelBuilder {
     #[pyo3(text_signature = "($self, currency)")]
     fn reporting_currency<'py>(
         mut slf: PyRefMut<'py, Self>,
-        currency: PyRef<'_, PyCurrency>,
+        currency: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let ccy = currency.inner;
+        let ccy = extract_currency(currency)?;
         slf.builder_mut()?.reporting_currency(ccy);
         Ok(slf)
     }

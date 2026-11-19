@@ -516,15 +516,14 @@ class ModelBuilder:
         """
         ...
 
-    def reporting_currency(self, currency: Currency) -> ModelBuilder:
+    def reporting_currency(self, currency: Currency | str) -> ModelBuilder:
         """
         Set the reporting currency used for capital-structure totals.
 
         Parameters
         ----------
         currency:
-            A :class:`Currency` instance. A bare ISO-4217 string is not
-            accepted; construct ``Currency("USD")`` first.
+            Currency handle or ISO 4217 currency code such as ``"USD"``.
 
         Returns
         -------
@@ -534,7 +533,9 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the builder has already been consumed.
+            If the builder has already been consumed or the code is unknown.
+        TypeError
+            If the currency is neither a handle nor a string.
 
         """
         ...

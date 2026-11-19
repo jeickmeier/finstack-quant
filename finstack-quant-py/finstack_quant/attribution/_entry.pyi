@@ -41,11 +41,12 @@ def attribute_pnl(instrument: object, inputs: Mapping[str, Any] | str) -> PnlAtt
           T₀, typed or as its serde form.
         * ``market_t1`` (MarketContext | dict, required): market snapshot at
           T₁.
-        * ``as_of_t0`` (datetime.date | str, required): valuation date T₀ as a
-          date or ISO ``YYYY-MM-DD`` (a ``datetime.datetime`` or
-          ``pandas.Timestamp`` is rejected; pass ``.date()``).
-        * ``as_of_t1`` (datetime.date | str, required): valuation date T₁ in
-          the same forms; must not precede ``as_of_t0``.
+        * ``as_of_t0`` (datetime.date | datetime.datetime | pandas.Timestamp |
+          str, required): valuation date T₀. A date-like object contributes
+          its local calendar date, and a string must use ISO ``YYYY-MM-DD``.
+        * ``as_of_t1`` (datetime.date | datetime.datetime | pandas.Timestamp |
+          str, required): valuation date T₁ in the same forms; must not
+          precede ``as_of_t0``.
         * ``method`` (str | dict, required): ``"parallel"``,
           ``"metrics_based"``, ``{"taylor": {"include_gamma": True, ...}}``, or
           ``{"waterfall": [...]}`` with factor tokens in application order
@@ -134,7 +135,7 @@ def attribute_pnl_many(inputs: Mapping[str, Any] | str, instruments: list[object
         ``market_t1``, ``as_of_t0``, ``as_of_t1``, ``method`` and the optional
         ``config``, ``full_cross_attribution``, ``model_params_t0``,
         ``credit_factor_model`` and ``credit_factor_detail_options``), applied
-        to every instrument.
+        to every instrument. Date-like values use their local calendar date.
     instruments : list[object]
         Typed instrument wrappers or canonical instrument envelope JSON
         strings, in the row order wanted.

@@ -5,7 +5,7 @@
 //! ``initialize_fixed`` is not wrapped because that path also resolves
 //! ``fixed_quantity`` without historical observations.
 
-use crate::bindings::core::currency::PyCurrency;
+use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_instrument, extract_market};
 use crate::bindings::json_bridge::{deserialize_json_with_context, serialize_json_with_context};
@@ -336,7 +336,7 @@ impl PyCompositeSpec {
     #[new]
     fn new(
         id: &str,
-        reporting_currency: PyRef<'_, PyCurrency>,
+        reporting_currency: &Bound<'_, PyAny>,
         capital: PyRef<'_, PyMoney>,
         legs: Vec<PyRef<'_, PyCompositeLegSpec>>,
         weighting_method: PyRef<'_, PyWeightingMethod>,
@@ -344,7 +344,7 @@ impl PyCompositeSpec {
     ) -> PyResult<Self> {
         let inner = CompositeSpec::new(
             id,
-            reporting_currency.inner,
+            extract_currency(reporting_currency)?,
             capital.inner,
             legs.into_iter().map(|leg| leg.inner.clone()).collect(),
             weighting_method.inner.clone(),

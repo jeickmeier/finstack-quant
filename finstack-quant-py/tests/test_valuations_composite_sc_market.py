@@ -70,7 +70,7 @@ def _equity_envelope(instrument_id: str, price: float) -> str:
 def _fixed_spec() -> CompositeSpec:
     return CompositeSpec(
         "A-B",
-        Currency("USD"),
+        "USD",
         Money(100.0, Currency("USD")),
         [
             CompositeLegSpec("A", _equity_envelope("A", 100.0), 1.0),

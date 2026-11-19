@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from decimal import Decimal
 from typing import Any, Literal
+
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
+from finstack_quant.core.types import Bps, Rate
 
 class FixedLegSpec:
     """
@@ -37,7 +39,7 @@ class FixedLegSpec:
         self,
         *,
         discount_curve_id: str,
-        rate: Decimal | str,
+        rate: Decimal | Rate | Bps | float | str,
         frequency: Tenor,
         day_count: DayCount | str,
         start: datetime.date | str,
@@ -59,9 +61,9 @@ class FixedLegSpec:
         ----------
         discount_curve_id : str
             Discount curve identifier for pricing this leg.
-        rate : decimal.Decimal | str
-            Fixed rate as an exact decimal fraction (``"0.04"`` = 4%); a
-            ``float`` or ``Rate`` is rejected.
+        rate : Decimal | Rate | Bps | float | str
+            Fixed rate as a decimal fraction (``"0.04"`` = 4%). A ``Bps``
+            quantity is scaled by 10,000.
         frequency : Tenor
             Payment frequency.
         day_count : DayCount | str
@@ -407,7 +409,7 @@ class FloatLegSpec:
         discount_curve_id: str,
         index_id: str,
         forward_curve_id: str,
-        spread_bp: Decimal | str,
+        spread_bp: Decimal | Rate | Bps | float | str,
         frequency: Tenor,
         day_count: DayCount | str,
         start: datetime.date | str,
@@ -436,9 +438,9 @@ class FloatLegSpec:
             Contractual index identifying historical rate publications.
         forward_curve_id : str
             Forward curve identifier for rate projections.
-        spread_bp : decimal.Decimal | str
-            Spread over the index in basis points, as an exact decimal
-            (``"25"`` = 25bp); a ``float`` or ``Bps`` is rejected.
+        spread_bp : Decimal | Rate | Bps | float | str
+            Spread over the index in basis points (``"25.125"`` = 25.125 bp).
+            A ``Rate`` is converted from its decimal fraction.
         frequency : Tenor
             Payment frequency.
         day_count : DayCount | str
@@ -479,7 +481,7 @@ class FloatLegSpec:
         ValueError
             If a required field is missing, a keyword is unknown, an enum
             value or date string is invalid, ``compounding`` does not name a
-            variant, ``spread_bp`` is not an exact-decimal string, or the
+            variant, ``spread_bp`` cannot be represented as a decimal, or the
             accrual period is malformed (``start >= end``).
         TypeError
             If a positional argument is passed, or a value is not
@@ -874,7 +876,7 @@ class PremiumLegSpec:
         end: datetime.date | str,
         frequency: Tenor,
         day_count: DayCount | str,
-        coupon_bp: Decimal | str,
+        coupon_bp: Decimal | Rate | Bps | float | str,
         discount_curve_id: str,
         date_regime: Literal["standard", "bespoke"],
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
@@ -899,9 +901,9 @@ class PremiumLegSpec:
             Payment frequency.
         day_count : DayCount | str
             Day count convention for accrual.
-        coupon_bp : decimal.Decimal | str
-            Contractual running coupon in basis points, as an exact decimal
-            (``"100"`` = 100bp = 1%); a ``float`` or ``Bps`` is rejected.
+        coupon_bp : Decimal | Rate | Bps | float | str
+            Contractual running coupon in basis points (``"100"`` = 1%).
+            A ``Rate`` is converted from its decimal fraction.
         discount_curve_id : str
             Discount curve identifier for pricing this leg.
         date_regime : str
@@ -920,8 +922,7 @@ class PremiumLegSpec:
         ------
         ValueError
             If a required field is missing, a keyword is unknown, an enum
-            value or date string is invalid, or ``coupon_bp`` is not an
-            exact-decimal string.
+            value or date string is invalid, or ``coupon_bp`` cannot be represented as a decimal.
         TypeError
             If a positional argument is passed, or a value is not
             JSON-encodable (neither a wire value nor a typed wrapper).

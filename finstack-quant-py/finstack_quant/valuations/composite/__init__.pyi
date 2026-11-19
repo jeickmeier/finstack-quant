@@ -712,7 +712,7 @@ class CompositeSpec:
     def __init__(
         self,
         id: str,
-        reporting_currency: Currency,
+        reporting_currency: Currency | str,
         capital: Money,
         legs: list[CompositeLegSpec],
         weighting_method: WeightingMethod,
@@ -725,8 +725,9 @@ class CompositeSpec:
         ----------
         id : str
             Stable composite identifier used for pricing and serialization.
-        reporting_currency : Currency
-            Currency used for capital, values, risk, P&L, and return reporting.
+        reporting_currency : Currency | str
+            Currency handle or ISO 4217 code for capital, values, risk, P&L,
+            and return reporting.
         capital : Money
             Positive return denominator in exactly ``reporting_currency``.
         legs : list[CompositeLegSpec]
@@ -739,7 +740,9 @@ class CompositeSpec:
         Raises
         ------
         ValueError
-            If any specification invariant or embedded definition is invalid.
+            If a currency code, specification invariant, or embedded definition is invalid.
+        TypeError
+            If the reporting currency is neither a handle nor a string.
         """
         ...
 

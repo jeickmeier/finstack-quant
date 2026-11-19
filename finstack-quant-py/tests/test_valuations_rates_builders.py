@@ -296,11 +296,10 @@ def test_leg_spec_decimal_fields_take_exact_decimal_strings() -> None:
         date_regime="standard",
     )
     assert premium.coupon_bp == pytest.approx(100.0)
-    # One spelling per value: a float, a ``Rate`` or a percent label is not the
-    # exact-decimal wire form.
-    for rate in (0.04, Rate(0.04), "4%"):
-        with pytest.raises(ValueError, match="invalid FixedLegSpec"):
-            _fixed_leg(rate=rate)
+    for rate in (0.04, Rate(0.04)):
+        assert _fixed_leg(rate=rate).rate == pytest.approx(0.04)
+    with pytest.raises(ValueError, match="invalid decimal"):
+        _fixed_leg(rate="4%")
 
 
 def test_leg_specs_accept_iso_string_dates_and_stub_names() -> None:
