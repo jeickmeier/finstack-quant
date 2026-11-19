@@ -318,11 +318,56 @@ class ScenarioPnlBatchItem:
         """
         ...
 
+class ScenarioRevalueView:
+    """Valuation of a shocked portfolio with its scenario application report.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, apply_scenario_and_revalue
+    >>> book = Portfolio.builder("empty", "USD", "2025-01-01").build()
+    >>> result = apply_scenario_and_revalue(book, '{"id": "zero", "operations": []}', MarketContext())
+    >>> result.report.operations_applied
+    0
+    """
+
+    @property
+    def valuation(self) -> PortfolioValuation:
+        """Return the stressed valuation in the portfolio base currency.
+
+        Returns
+        -------
+        PortfolioValuation
+            Valuation with holdings and any requested position metrics.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def report(self) -> ApplicationReport:
+        """Return the recorded operations, diagnostics, and market changes.
+
+        Returns
+        -------
+        ApplicationReport
+            Report of the executed effects and their target changes.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
 def apply_scenario_and_revalue(
     portfolio: Portfolio | str,
     scenario: ScenarioSpec | str,
     market: MarketContext | str,
-) -> tuple[PortfolioValuation, ApplicationReport]:
+    *,
+    options: dict[str, object] | str | None = None,
+) -> ScenarioRevalueView:
     """
     Apply a scenario and revalue the portfolio.
 
@@ -335,12 +380,15 @@ def apply_scenario_and_revalue(
         JSON string describing market-data shocks.
     market : MarketContext or str
         Base market context object or JSON to shock before revaluation.
+    options : dict[str, object] | str | None
+        Portfolio valuation options as a mapping or JSON object. Omit for
+        standard metrics and strict risk. Use ``{"metrics": {"mode": "only", "metrics": []}}`` for PV
+        only, or ``{"strict_risk": False}`` to permit PV-only fallback on error.
 
     Returns
     -------
-    tuple[PortfolioValuation, ApplicationReport]
-        The revalued portfolio and the scenario application report. Call
-        ``.to_json()`` on either for its wire form.
+    ScenarioRevalueView
+        The stressed valuation and the application report.
 
     Raises
     ------
@@ -358,8 +406,8 @@ def apply_scenario_and_revalue(
     >>> from finstack_quant.portfolio import Portfolio, apply_scenario_and_revalue
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> scenario = '{"id":"s","name":"S","operations":[]}'
-    >>> valuation, report = apply_scenario_and_revalue(Portfolio.from_spec(spec), scenario, MarketContext())
-    >>> (valuation.total_value, report.operations_applied)
+    >>> result = apply_scenario_and_revalue(Portfolio.from_spec(spec), scenario, MarketContext())
+    >>> (result.valuation.total_value, result.report.operations_applied)
     (0.0, 0)
     """
     ...

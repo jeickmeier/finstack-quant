@@ -626,6 +626,7 @@ fn apply_scenario_and_revalue_empty_portfolio() {
         &JsPortfolio::from_spec(JsValue::from(&spec)).expect("portfolio"),
         JsValue::from(&scenario),
         &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
+        None,
     )
     .unwrap();
     let obj = as_json(&result);
@@ -643,6 +644,7 @@ fn apply_scenario_and_revalue_built_empty_portfolio() {
         &portfolio,
         JsValue::from(&scenario),
         &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
+        Some(JsValue::from(r#"{"metrics":{"mode":"only","metrics":[]}}"#)),
     )
     .unwrap();
     let obj = as_json(&result);

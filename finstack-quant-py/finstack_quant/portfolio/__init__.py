@@ -91,6 +91,7 @@ aggregate_metrics = _portfolio.aggregate_metrics
 value_portfolio = _portfolio.value_portfolio
 aggregate_full_cashflows = _portfolio.aggregate_full_cashflows
 net_in_currency_by_date = _portfolio.net_in_currency_by_date
+ScenarioRevalueView = _portfolio.ScenarioRevalueView
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
 scenario_pnl = _portfolio.scenario_pnl
 scenario_pnl_batch = _portfolio.scenario_pnl_batch
@@ -208,6 +209,7 @@ __all__ = [
     "ReplayResult",
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
+    "ScenarioRevalueView",
     "SensitivityMatrix",
     "StressPnl",
     "StressResult",

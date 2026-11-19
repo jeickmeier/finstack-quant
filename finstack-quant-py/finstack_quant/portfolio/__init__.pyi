@@ -51,6 +51,7 @@ from finstack_quant.portfolio._metrics import (
 from finstack_quant.portfolio._scenarios import (
     ScenarioPnl as ScenarioPnl,
     ScenarioPnlBatchItem as ScenarioPnlBatchItem,
+    ScenarioRevalueView as ScenarioRevalueView,
     apply_scenario_and_revalue as apply_scenario_and_revalue,
     scenario_pnl as scenario_pnl,
     scenario_pnl_batch as scenario_pnl_batch,
@@ -205,6 +206,7 @@ __all__ = [
     "ReplayResult",
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
+    "ScenarioRevalueView",
     "SensitivityMatrix",
     "StressPnl",
     "StressResult",

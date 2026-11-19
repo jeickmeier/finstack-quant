@@ -16,51 +16,65 @@ use pyo3::types::PyDict;
 use pyo3::types::PyModule;
 use serde::Serialize;
 
-/// Apply a scenario to a portfolio and revalue it.
-///
-/// Parameters
-/// ----------
-/// portfolio : Portfolio | str
-///     Built portfolio or canonical ``PortfolioSpec`` JSON.
-/// scenario : ScenarioSpec | str
-///     Typed :class:`~finstack_quant.scenarios.ScenarioSpec` or its canonical
-///     JSON string.
-/// market : MarketContext | str
-///     Base market to shock before revaluation.
-///
-/// Returns
-/// -------
-/// tuple[PortfolioValuation, ApplicationReport]
-///     The revalued portfolio and the scenario application report. Call
-///     ``.to_json()`` on either for its wire form.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._scenarios", "ScenarioRevalueView")]
+#[pyclass(
+    name = "ScenarioRevalueView",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+pub struct PyScenarioRevalueView {
+    inner: finstack_quant_portfolio::scenarios::ScenarioRevalueView,
+}
+
+#[pymethods]
+impl PyScenarioRevalueView {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._scenarios", "ScenarioRevalueView.valuation")]
+    fn valuation(&self) -> PyPortfolioValuation {
+        PyPortfolioValuation::from_inner(self.inner.valuation.clone())
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._scenarios", "ScenarioRevalueView.report")]
+    fn report(&self) -> PyApplicationReport {
+        PyApplicationReport {
+            inner: self.inner.report.clone(),
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._scenarios", "apply_scenario_and_revalue")]
 #[pyfunction]
-#[pyo3(text_signature = "(portfolio, scenario, market)")]
+#[pyo3(signature = (portfolio, scenario, market, *, options=None))]
 fn apply_scenario_and_revalue(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     scenario: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
-) -> PyResult<(PyPortfolioValuation, PyApplicationReport)> {
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyScenarioRevalueView> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
     let scenario = extract_scenario_spec(py, scenario)?;
     let market = extract_market_ref(py, market)?;
+    let options = crate::bindings::module_utils::opt_spec_from_py::<
+        finstack_quant_portfolio::valuation::PortfolioValuationOptions,
+    >(py, options, "PortfolioValuationOptions")?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation, report } = py
+    let inner = py
         .detach(|| {
             finstack_quant_portfolio::scenarios::apply_scenario_and_revalue(
                 portfolio_ref,
                 &scenario,
                 market_ref,
                 &config,
+                options.as_ref(),
             )
         })
         .map_err(portfolio_to_py)?;
-    Ok((
-        PyPortfolioValuation::from_inner(valuation),
-        PyApplicationReport { inner: report },
-    ))
+    Ok(PyScenarioRevalueView { inner })
 }
 
 /// Compute the profit and loss attributable to a scenario.
@@ -377,6 +391,7 @@ impl PyScenarioPnlBatchItem {
 
 /// Register the scenarios bindings on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyScenarioRevalueView>()?;
     m.add_class::<PyScenarioPnl>()?;
     m.add_class::<PyScenarioPnlBatchItem>()?;
     m.add_function(pyo3::wrap_pyfunction!(apply_scenario_and_revalue, m)?)?;

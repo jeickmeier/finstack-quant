@@ -99,6 +99,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "InstrumentArtifactCache",
         "MaterializationReport",
         "PortfolioValuation",
+        "ScenarioRevalueView",
         "ScenarioPnl",
         "ScenarioPnlBatchItem",
         "PortfolioResult",

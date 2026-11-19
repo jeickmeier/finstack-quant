@@ -230,16 +230,17 @@ fn replace_portfolio_instruments(
 
 /// Apply a scenario and re-value the portfolio.
 ///
-/// Revaluation uses [`PortfolioValuationOptions::default`](crate::valuation::PortfolioValuationOptions::default)
-/// (standard risk set, `strict_risk = true`).
+/// Revaluation uses the requested metrics and risk failure policy.
 ///
 /// # Arguments
 ///
 /// * `portfolio` - Original portfolio used as the base case.
 /// * `scenario` - Scenario specification to apply.
-/// * `market` - Market data context to mutate.
+/// * `market` - Base market inputs to copy before applying shocks.
 /// * `config` - Active configuration used for scenario-report provenance and
 ///   stressed valuation.
+/// * `options` - Requested metric set and risk failure policy. `None`
+///   selects standard metrics and strict risk failures.
 ///
 /// # Returns
 ///
@@ -249,9 +250,8 @@ fn replace_portfolio_instruments(
 /// # Errors
 ///
 /// Propagates errors from the internal `apply_scenario` helper and
-/// [`value_portfolio`](crate::valuation::value_portfolio). Revaluation uses
-/// the default valuation options, so a failed requested risk metric aborts
-/// the call.
+/// [`value_portfolio`](crate::valuation::value_portfolio). With strict risk
+/// enabled, a failed requested metric aborts the call.
 ///
 /// # Examples
 ///
@@ -266,7 +266,7 @@ fn replace_portfolio_instruments(
 /// # let market: MarketContext = unimplemented!("Provide market data");
 /// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
 /// let config = FinstackConfig::default();
-/// let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation, report: _report } = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config)?;
+/// let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation, report: _report } = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config, None)?;
 /// println!("Stressed total: {}", valuation.total_base_currency);
 /// # Ok(())
 /// # }
@@ -276,6 +276,7 @@ pub fn apply_scenario_and_revalue(
     scenario: &ScenarioSpec,
     market: &MarketContext,
     config: &finstack_quant_core::config::FinstackConfig,
+    options: Option<&crate::valuation::PortfolioValuationOptions>,
 ) -> Result<ScenarioRevalueView> {
     let AppliedScenarioState {
         portfolio,
@@ -289,7 +290,8 @@ pub fn apply_scenario_and_revalue(
         Cow::Borrowed(portfolio) => plan.register_portfolio(portfolio),
         Cow::Owned(portfolio) => plan.register_owned_portfolio(portfolio),
     };
-    let profile = crate::evaluation::EvaluationProfile::from_options(&Default::default());
+    let defaults = crate::valuation::PortfolioValuationOptions::default();
+    let profile = crate::evaluation::EvaluationProfile::from_options(options.unwrap_or(&defaults));
     let evaluation = plan.register_evaluation(
         market_state,
         portfolio_state,
@@ -845,7 +847,7 @@ mod tests {
             resolution_mode: Default::default(),
         };
 
-        let result = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config);
+        let result = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config, None);
         assert!(result.is_ok());
     }
 

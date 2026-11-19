@@ -13,6 +13,7 @@ use wasm_bindgen::prelude::*;
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenarioJson - Scenario specification JSON.
 /// @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
+/// @param options - Optional portfolio valuation options as an object or JSON. Omit for strict risk with standard metrics.
 ///
 /// Each position's `valuation_result` matches what `priceInstrument` returns:
 /// the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain
@@ -34,16 +35,30 @@ pub fn apply_scenario_and_revalue(
     #[wasm_bindgen(js_name = "scenarioJson", unchecked_param_type = "JsonInput")]
     scenario_json: JsValue,
     market: &JsMarketContext,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.portfolio.PortfolioValuationOptions | JsonInput"
+    )]
+    options: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
     let scenario =
         finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
+    let options = options
+        .as_ref()
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            crate::utils::input::from_js_json::<
+                finstack_quant_portfolio::valuation::PortfolioValuationOptions,
+            >(value, "options")
+        })
+        .transpose()?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let out = finstack_quant_portfolio::scenarios::apply_scenario_and_revalue(
         &portfolio.inner,
         &scenario,
         market.inner(),
         &config,
+        options.as_ref(),
     )
     .map_err(to_js_err)?;
     to_js_value_with_bigints(&out)
