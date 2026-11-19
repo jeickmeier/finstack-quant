@@ -272,7 +272,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_config.schema.json",
-      "bytes": 13156,
+      "bytes": 12705,
       "kind": "input",
       "path": "schemas/statements_analytics/1/ecl_config.schema.json",
       "summary": "Configuration for ECL calculation.",
@@ -368,6 +368,33 @@
       "summary": "Flags line items whose period-over-period growth exceeds configurable upper / lower bounds.",
       "title": "GrowthRateConsistency",
       "type_name": "GrowthRateConsistency"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/impaired_ecl_result.schema.json",
+      "bytes": 41563,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/impaired_ecl_result.schema.json",
+      "summary": "Signed recovery shortfall and nonnegative credit-impaired allowance.",
+      "title": "ImpairedEclResult",
+      "type_name": "ImpairedEclResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/impaired_ecl_scenario.schema.json",
+      "bytes": 23126,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/impaired_ecl_scenario.schema.json",
+      "summary": "Exact scenario probability and its scoped dated expected recovery.",
+      "title": "ImpairedEclScenario",
+      "type_name": "ImpairedEclScenario"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/impaired_exposure.schema.json",
+      "bytes": 39173,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/impaired_exposure.schema.json",
+      "summary": "Sourced carrying exposure, qualified report date, original effective rate and clock.",
+      "title": "ImpairedExposure",
+      "type_name": "ImpairedExposure"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/interest_expense_reconciliation.schema.json",
@@ -523,6 +550,15 @@
       "type_name": "RatingPdMap"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/recovery_evidence.schema.json",
+      "bytes": 22302,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/recovery_evidence.schema.json",
+      "summary": "Sourced expected recovery and dated receipt.",
+      "title": "RecoveryEvidence",
+      "type_name": "RecoveryEvidence"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/regression_result.schema.json",
       "bytes": 1221,
       "kind": "output",
@@ -631,6 +667,33 @@
       "type_name": "StageResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_assessment.schema.json",
+      "bytes": 62364,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/statement_covenant_assessment.schema.json",
+      "summary": "Effective covenant terms and available evidence by dated period.",
+      "title": "StatementCovenantAssessment",
+      "type_name": "StatementCovenantAssessment"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_forecast.schema.json",
+      "bytes": 64911,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/statement_covenant_forecast.schema.json",
+      "summary": "Qualified forecast, breach evidence and per-period coverage.",
+      "title": "StatementCovenantForecast",
+      "type_name": "StatementCovenantForecast"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_spec.schema.json",
+      "bytes": 23350,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/statement_covenant_spec.schema.json",
+      "summary": "Named covenants, result periods, publication cutoff and units.",
+      "title": "StatementCovenantSpec",
+      "type_name": "StatementCovenantSpec"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_scoring_mapping.schema.json",
       "bytes": 1966,
       "kind": "input",
@@ -692,6 +755,15 @@
       "summary": "Probability-weighted ECL across macro scenarios with the per-scenario audit trail.",
       "title": "WeightedEclResult",
       "type_name": "WeightedEclResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/weighted_impaired_ecl_result.schema.json",
+      "bytes": 44763,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/weighted_impaired_ecl_result.schema.json",
+      "summary": "Weighted impairment and dated recovery scenario contributions.",
+      "title": "WeightedImpairedEclResult",
+      "type_name": "WeightedImpairedEclResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/working_capital_consistency.schema.json",

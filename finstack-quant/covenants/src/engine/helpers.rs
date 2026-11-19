@@ -2,6 +2,7 @@ use super::types::{BoundKind, CovenantSpec, CovenantType, ThresholdTest};
 use finstack_quant_core::dates::Date;
 
 pub(super) struct SpecEvaluation {
+    pub(super) untriggered: bool,
     pub(super) passed: bool,
     pub(super) actual_value: Option<f64>,
     pub(super) threshold: Option<f64>,

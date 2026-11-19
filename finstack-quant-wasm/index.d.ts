@@ -10916,6 +10916,29 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly capitalStructureSummaryTable: typeof wasm.capitalStructureSummaryTable;
   /**
+   * Assess the selected statement covenant tests on qualified reporting dates.
+   *
+   * @param engine - Covenant engine holding effective terms, windows and waivers.
+   * @param model - Statement model with source and publication dates.
+   * @param results - Statement evaluation from the supplied model and selected publication cutoff.
+   * @param spec - Exact covenant and period IDs, scope, cutoff and metric bindings.
+   * @returns Qualified assess results with run provenance and per-period coverage.
+   * @throws If inputs are malformed, provenance differs, or dates, scopes or bindings are invalid.
+   */
+  readonly assessStatementCovenants: typeof wasm.assessStatementCovenants;
+  /**
+   * Forecast the selected statement covenant tests on qualified reporting dates.
+   *
+   * @param engine - Covenant engine holding effective terms, windows and waivers.
+   * @param model - Statement model with source and publication dates.
+   * @param results - Statement evaluation from the supplied model and selected publication cutoff.
+   * @param spec - Exact covenant and period IDs, scope, cutoff and metric bindings.
+   * @param config - Forecast policy with an explicit reference date, scope and any requested volatility.
+   * @returns Qualified forecast results with run provenance and per-period coverage.
+   * @throws If inputs are malformed, provenance differs, or dates, scopes or bindings are invalid.
+   */
+  readonly forecastStatementCovenants: typeof wasm.forecastStatementCovenants;
+  /**
    * Evaluate covenant compliance at the end of every statement result period.
    *
    * Each period of `results.periods` is tested on its last calendar day with
@@ -11186,6 +11209,23 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly classifyStage: typeof wasm.classifyStage;
   /**
+   * Weight named credit-impaired recoveries on one dated carrying basis.
+   * @param exposure - Common sourced carrying exposure, report date and original EIR convention.
+   * @param scenarios - Unique named recovery scenarios with exact decimal string weights, summing to one.
+   * @returns Dated same-currency allowance and every credit-impaired scenario outcome. The total is absent when any positive-weight recovery is unavailable.
+   * @throws If the scenario IDs, weights or evidence are invalid, or if the monetary calculations overflow.
+   */
+  readonly computeImpairedEclWeighted: typeof wasm.computeImpairedEclWeighted;
+  /**
+   * Measure Stage 3 allowance from an approved dated recovery.
+   *
+   * @param exposure - Sourced carrying amount, reporting date, annual effective original interest rate and recovery day count.
+   * @param recovery - Approved expected recovery cash and receipt date in the exposure currency.
+   * @returns Dated recovery evidence, present value, signed shortfall and nonnegative allowance.
+   * @throws If amounts, source, date, rate, day count or currency are invalid.
+   */
+  readonly computeImpairedEcl: typeof wasm.computeImpairedEcl;
+  /**
    * Expected credit loss of one exposure under a single cumulative-PD schedule.
    *
    * Twin of Python and Rust `compute_ecl` (one scenario of weight `1.0`). The
@@ -11194,9 +11234,8 @@ export interface StatementsAnalyticsNamespace {
    * `classifyStage` first and pass its `stage`.
    * @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
    * @param pdSchedule - Cumulative PD knots as `[timeYears, cumulativePd]` pairs, ascending in time and non-decreasing in PD (decimals).
-   * @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).
+   * @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime).
    * @param bucketWidthYears - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
-   * @param stage3TimeToRecoveryYears - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
    * @returns `WeightedEclResult`: the ECL in the exposure's currency units, the stage and the per-scenario bucket audit trail.
    *
    * # Errors
@@ -11213,7 +11252,6 @@ export interface StatementsAnalyticsNamespace {
    *   optional cumulative-PD schedules anchored at (0,0), and optional LGD fractions.
    * @param stage - Already resolved IFRS 9 impairment stage.
    * @param bucketWidthYears - Integration width in years, defaulting to the Rust policy.
-   * @param stage3TimeToRecoveryYears - Elected discount horizon for Stage 3 recovery.
    * @returns Scenario evidence and total allowance. The total is null if required evidence is unavailable.
    * @throws Validation error for invalid exposure, stage, scenario weights, or supplied PD or LGD data.
    */

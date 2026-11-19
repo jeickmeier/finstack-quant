@@ -28,7 +28,7 @@
 //!
 //! Total ECL = sum of bucket ECLs over the appropriate horizon:
 //! - Stage 1: min(1 year, remaining maturity)
-//! - Stage 2/3: remaining maturity
+//! - Stage 2: remaining maturity
 //!
 //! # References
 //!
@@ -148,26 +148,11 @@ pub struct EclConfig {
     /// Downturn LGD adjuster applied when `lgd_type == `[`LgdType::Downturn`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub downturn_lgd: Option<DownturnLgd>,
-
-    /// Assumed time (in years) from the reporting date to recovery
-    /// realisation for Stage 3 (credit-impaired) exposures. Used to
-    /// discount expected recoveries `(1 - LGD) x EAD` at the EIR.
-    /// The allowance is current EAD less those discounted recoveries.
-    /// Default: 1.0 year, a common practical recovery-lag assumption.
-    #[serde(default = "default_stage3_time_to_recovery_years")]
-    pub stage3_time_to_recovery_years: f64,
-}
-
-/// Default Stage 3 time-to-recovery assumption in years.
-pub const DEFAULT_STAGE3_TIME_TO_RECOVERY_YEARS: f64 = 1.0;
-
-fn default_stage3_time_to_recovery_years() -> f64 {
-    DEFAULT_STAGE3_TIME_TO_RECOVERY_YEARS
 }
 
 impl EclConfig {
     /// Validate staging thresholds, finite bucket width, LGD methodology
-    /// parameters, and Stage 3 recovery time. Scenario weights are validated
+    /// parameters. Scenario weights are validated
     /// where PD sources are supplied.
     ///
     /// `EclConfig` exposes public fields and can be constructed directly
@@ -233,14 +218,6 @@ impl EclConfig {
                     ));
                 }
             }
-        }
-        if !self.stage3_time_to_recovery_years.is_finite()
-            || self.stage3_time_to_recovery_years < 0.0
-        {
-            return Err(Error::Validation(format!(
-                "stage3_time_to_recovery_years must be finite and non-negative, got {}",
-                self.stage3_time_to_recovery_years
-            )));
         }
         Ok(())
     }
@@ -356,21 +333,6 @@ impl EclConfigBuilder {
     /// The updated builder.
     pub fn downturn_lgd(mut self, adjuster: DownturnLgd) -> Self {
         self.config.downturn_lgd = Some(adjuster);
-        self
-    }
-
-    /// Set the Stage 3 time-to-recovery assumption in years.
-    ///
-    /// # Arguments
-    ///
-    /// * `years` - Time from reporting date to expected recovery realisation
-    ///   used to discount Stage 3 recoveries (default 1.0).
-    ///
-    /// # Returns
-    ///
-    /// The updated builder.
-    pub fn stage3_time_to_recovery(mut self, years: f64) -> Self {
-        self.config.stage3_time_to_recovery_years = years;
         self
     }
 
@@ -517,27 +479,14 @@ fn effective_lgd(config: &EclConfig, base_lgd: f64) -> Result<f64> {
 /// appropriate horizon (12 months for Stage 1, remaining maturity for
 /// Stage 2).
 ///
-/// # Stage 3 (credit-impaired)
-///
-/// For Stage 3 exposures the obligor has already defaulted, so the
-/// performing PD curve does not apply: the allowance is measured as the
-/// current carrying exposure less discounted recoveries with PD ≡ 1, i.e.
-/// `ECL = EAD - (1 - LGD) x EAD x DF(t_recovery)` where `t_recovery` is
-/// [`EclConfig::stage3_time_to_recovery_years`]. This matches IFRS 9
-/// 5.5.33 / B5.5.33 (allowance = gross carrying amount − PV of expected
-/// recoveries discounted at the EIR). The result carries a single bucket
-/// with `marginal_pd = 1.0`. Note this also means a Stage 3 exposure with
-/// zero remaining maturity still carries a positive allowance.
-///
 /// # Arguments
 ///
 /// * `exposure` - Validated credit exposure providing EAD, LGD, EIR, maturity,
 ///   rating, and any EAD schedule for the expected-loss calculation.
-/// * `stage` - Assigned IFRS 9 stage that selects the 12-month, lifetime, or
-///   credit-impaired calculation horizon.
+/// * `stage` - Stage 1 selects the 12-month horizon and Stage 2 selects the remaining lifetime.
 /// * `pd_source` - Term structure supplying cumulative default probabilities
 ///   for the exposure's current rating.
-/// * `config` - ECL bucketing, LGD methodology, and Stage 3 recovery-time policy.
+/// * `config` - ECL bucketing and LGD methodology.
 ///
 /// # Returns
 ///
@@ -595,60 +544,54 @@ pub fn compute_ecl_from_curve(
     exposure.validate()?;
     config.validate()?;
 
-    // Stage 3: current carrying exposure less the present value of recoveries.
-    // LGD is the undiscounted fraction lost at recovery. The PD curve is still
-    // validated for the exposure rating so invalid curve/rating mappings are
-    // not silently hidden by the shortcut.
-    if stage == Stage::Stage3 {
-        let rating = exposure.current_rating.as_deref().unwrap_or("NR");
-        if !(0.0..=1.0).contains(&pd_source.cumulative_pd(rating, 0.0)?) {
-            return Err(Error::Validation(
-                "PD source must return finite probabilities in [0, 1]".into(),
-            ));
-        }
-        let t_recovery = config.stage3_time_to_recovery_years;
-        let lgd = effective_lgd(config, exposure.lgd)?;
-        let ead = exposure.ead_at(0.0)?;
-        let df = 1.0 / (1.0 + exposure.eir).powf(t_recovery);
-        let ecl = ead - (1.0 - lgd) * ead * df;
-        validate_finite_ecl(ecl)?;
-        return Ok(EclResult {
-            exposure_id: exposure.id.clone(),
-            stage,
-            ecl,
-            horizon: t_recovery,
-            buckets: vec![EclBucket {
-                t_start: 0.0,
-                t_end: t_recovery,
-                marginal_pd: 1.0,
-                lgd,
-                ead,
-                discount_factor: df,
-                ecl,
-            }],
-            meta: finstack_quant_core::config::results_meta(
-                &finstack_quant_core::config::FinstackConfig::default(),
-            ),
-        });
-    }
-
     let horizon = match stage {
         Stage::Stage1 => 1.0_f64.min(exposure.remaining_maturity_years),
-        Stage::Stage2 | Stage::Stage3 => exposure.remaining_maturity_years,
+        Stage::Stage2 => exposure.remaining_maturity_years,
+        Stage::Stage3 => return Err(Error::Validation(
+            "Stage 3 requires dated carrying and recovery evidence through compute_impaired_ecl"
+                .into(),
+        )),
     };
 
     let rating = exposure.current_rating.as_deref().unwrap_or("NR");
-    let dt = config.bucket_width_years;
-    let n_buckets = (horizon / dt).ceil() as usize;
-    let n_buckets = n_buckets.max(1); // At least one bucket
+    let width = config.bucket_width_years;
+    let regular_count = (horizon / width).ceil() as usize;
+    let mut edges = Vec::with_capacity(regular_count + 1);
+    edges.push(0.0);
+    edges.extend(
+        (1..regular_count)
+            .map(|i| i as f64 * width)
+            .filter(|&time| time < horizon),
+    );
+    for knots in [pd_source.knots(rating), exposure.ead_schedule.as_deref()]
+        .into_iter()
+        .flatten()
+    {
+        edges.extend(
+            knots
+                .iter()
+                .map(|&(time, _)| time)
+                .filter(|&time| time > 0.0 && time < horizon),
+        );
+    }
+    edges.push(horizon);
+    edges.sort_unstable_by(f64::total_cmp);
+    edges.dedup_by(|next, previous| {
+        // A published knot and a generated edge can represent the same date.
+        // Retain the exact final horizon when they differ by rounding only.
+        if (*next - *previous).abs() <= 8.0 * f64::EPSILON * next.abs().max(previous.abs()) {
+            *previous = *next;
+            true
+        } else {
+            false
+        }
+    });
 
     let lgd = effective_lgd(config, exposure.lgd)?;
-    let mut ecl = 0.0;
-    let mut bucket_details = Vec::with_capacity(n_buckets);
-
-    for i in 0..n_buckets {
-        let t_start = i as f64 * dt;
-        let t_end = ((i + 1) as f64 * dt).min(horizon);
+    let mut ecl = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    let mut bucket_details = Vec::with_capacity(edges.len() - 1);
+    for edge in edges.windows(2) {
+        let [t_start, t_end] = [edge[0], edge[1]];
         let t_mid = (t_start + t_end) / 2.0;
 
         // Use the unconditional bucket default probability
@@ -669,7 +612,7 @@ pub fn compute_ecl_from_curve(
         let df = 1.0 / (1.0 + exposure.eir).powf(t_mid);
 
         let bucket_ecl = uncond_mpd * lgd * ead * df;
-        ecl += bucket_ecl;
+        ecl.add(bucket_ecl)?;
 
         bucket_details.push(EclBucket {
             t_start,
@@ -682,7 +625,7 @@ pub fn compute_ecl_from_curve(
         });
     }
 
-    validate_finite_ecl(ecl)?;
+    let ecl = ecl.get_total()?;
     Ok(EclResult {
         exposure_id: exposure.id.clone(),
         stage,
@@ -711,7 +654,7 @@ pub fn compute_ecl_from_curve(
 ///   and reporting-date PD curve. Weights must be finite, non-negative, and
 ///   sum to 1 within `1e-6`.
 /// * `config` - Integration bucket width in years, LGD methodology, staging
-///   policy, and Stage 3 recovery horizon in years.
+///   policy.
 ///
 /// # LGD methodology interaction
 ///
@@ -831,7 +774,7 @@ pub(super) fn measure_weighted(
         } else {
             complete = false;
             EclScenarioMeasurement::Unavailable {
-                reason: "missing cumulative default or recovery evidence".into(),
+                reason: "missing reporting-date cumulative default curve".into(),
             }
         };
         scenario_breakdown.push(EclScenarioOutcome {
@@ -1063,51 +1006,28 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_ecl_stage3_is_carrying_value_less_pv_recovery() {
-        let exposure = make_exposure();
-        let curve = make_pd_curve();
-        let config = EclConfig::default();
-
-        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
-
-        // PD ≡ 1: ECL = EAD - (1 - LGD) x EAD x DF(t_recovery), default t_recovery = 1.0
-        let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05_f64;
-        assert!(
-            (result.ecl - expected).abs() < 1e-6,
-            "Stage 3 ECL {} vs expected {}",
-            result.ecl,
-            expected
-        );
-        assert_eq!(result.buckets.len(), 1);
-        assert!((result.buckets[0].marginal_pd - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn test_stage3_zero_maturity_still_has_allowance() {
+    fn performing_grid_splits_at_known_knots_and_exact_maturity() {
         let mut exposure = make_exposure();
+        exposure.remaining_maturity_years = 0.75;
+        exposure.eir = 0.0;
+        exposure.lgd = 0.5;
+        exposure.ead_schedule = Some(vec![(0.0, 100.0), (0.4, 60.0), (0.75, 60.0)]);
+        let rating = exposure.current_rating.as_deref().unwrap_or("NR");
+        let curve = RawPdCurve::new(rating, vec![(0.0, 0.0), (0.3, 0.03), (0.75, 0.06)]).unwrap();
+        let config = EclConfigBuilder::new().bucket_width(0.5).build().unwrap();
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).unwrap();
+        let ends = result
+            .buckets
+            .iter()
+            .map(|bucket| bucket.t_end)
+            .collect::<Vec<_>>();
+        assert_eq!(ends, [0.3, 0.4, 0.5, 0.75]);
+        let expected = 0.5 * (0.03 * 85.0 + 0.03 / 0.45 * (0.1 * 65.0 + 0.35 * 60.0));
+        assert!((result.ecl - expected).abs() < 1e-12);
         exposure.remaining_maturity_years = 0.0;
-        let curve = make_pd_curve();
-        let config = EclConfig::default();
-
-        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
-        assert!(
-            result.ecl > 0.0,
-            "Stage 3 with zero remaining maturity must not produce ECL = 0"
-        );
-    }
-
-    #[test]
-    fn test_stage3_time_to_recovery_configurable() {
-        let exposure = make_exposure();
-        let curve = make_pd_curve();
-        let config = EclConfigBuilder::new()
-            .stage3_time_to_recovery(2.0)
-            .build()
-            .unwrap();
-
-        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
-        let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05_f64.powi(2);
-        assert!((result.ecl - expected).abs() < 1e-6);
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).unwrap();
+        assert!(result.buckets.is_empty());
+        assert_eq!(result.ecl, 0.0);
     }
 
     #[test]
@@ -1255,27 +1175,6 @@ mod tests {
         .ecl;
         let expected = 0.02 * expected_lgd * 100_000.0;
         assert!((ecl - expected).abs() < 1e-9, "got {ecl}, want {expected}");
-    }
-
-    #[test]
-    fn downturn_applies_to_stage3_shortcut() {
-        // Stage 3, eir 0: ECL = LGD_eff × EAD = 0.53 × 100,000 = 53,000.
-        let adjuster =
-            finstack_quant_models::credit::lgd::DownturnLgd::regulatory_floor(0.08, 0.25).unwrap();
-        let config = EclConfigBuilder::new()
-            .lgd_type(LgdType::Downturn)
-            .downturn_lgd(adjuster)
-            .build()
-            .unwrap();
-        let ecl = compute_ecl_from_curve(
-            &lgd_test_exposure(),
-            Stage::Stage3,
-            &one_year_2pct_curve(),
-            &config,
-        )
-        .unwrap()
-        .ecl;
-        assert!((ecl - 53_000.0).abs() < 1e-9, "got {ecl}");
     }
 
     #[test]

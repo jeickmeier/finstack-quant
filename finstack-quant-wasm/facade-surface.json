@@ -4368,6 +4368,7 @@
       "addRollForward",
       "addRollForwardWithOpening",
       "addVintageBuildup",
+      "assessStatementCovenants",
       "backtestForecast",
       "capitalStructureSummary",
       "capitalStructureSummaryTable",
@@ -4375,6 +4376,8 @@
       "companyMetricsGet",
       "computeEcl",
       "computeEclWeighted",
+      "computeImpairedEcl",
+      "computeImpairedEclWeighted",
       "computeMultiple",
       "creditAssessment",
       "creditAssessmentReportText",
@@ -4399,6 +4402,7 @@
       "explanationToText",
       "forecastBreaches",
       "forecastMetricsSummaryText",
+      "forecastStatementCovenants",
       "generateTornadoEntries",
       "goalSeek",
       "peerFilterAccepts",
@@ -4530,6 +4534,12 @@
   "statements_analytics.capitalStructureSummaryTable": {
     "kind": "function"
   },
+  "statements_analytics.assessStatementCovenants": {
+    "kind": "function"
+  },
+  "statements_analytics.forecastStatementCovenants": {
+    "kind": "function"
+  },
   "statements_analytics.evaluateCovenants": {
     "kind": "function"
   },
@@ -4579,6 +4589,12 @@
     "kind": "function"
   },
   "statements_analytics.classifyStage": {
+    "kind": "function"
+  },
+  "statements_analytics.computeImpairedEclWeighted": {
+    "kind": "function"
+  },
+  "statements_analytics.computeImpairedEcl": {
     "kind": "function"
   },
   "statements_analytics.computeEcl": {

@@ -197,17 +197,26 @@ def test_compute_ecl_ead_schedule_reduces_lifetime_ecl() -> None:
     assert amortizing < bullet
 
 
-def test_compute_ecl_stage3_time_to_recovery() -> None:
-    """Stage 3 allowance is carrying EAD less discounted recovery."""
-    from finstack_quant.statements_analytics import compute_ecl
+def test_dated_recovery_changes_allowance() -> None:
+    from finstack_quant.core.money import Money
+    from finstack_quant.statements_analytics import ImpairedExposure, RecoveryEvidence, compute_impaired_ecl
 
-    curve = [(0.0, 0.0), (1.0, 0.02)]
-    exposure = _exposure()
-    fast = compute_ecl(exposure, curve, stage="stage3", stage3_time_to_recovery_years=0.5).ecl
-    slow = compute_ecl(exposure, curve, stage="stage3", stage3_time_to_recovery_years=3.0).ecl
-    # Longer time to recovery reduces recovery PV and increases impairment.
-    assert slow > fast
-    assert fast >= 0.45 * 1_000_000.0
+    exposure = ImpairedExposure(
+        exposure_id="credit-impaired",
+        carrying_amount_source="ledger",
+        carrying_amount=Money(100, "USD"),
+        reporting_date="2025-01-01",
+        effective_interest_rate="0.10",
+        recovery_day_count="act_365f",
+    )
+    immediate = compute_impaired_ecl(
+        exposure, RecoveryEvidence(source_id="workout", amount=Money(88, "USD"), date="2025-01-01")
+    )
+    delayed = compute_impaired_ecl(
+        exposure, RecoveryEvidence(source_id="workout", amount=Money(88, "USD"), date="2026-01-01")
+    )
+    assert immediate.allowance.amount == pytest.approx(12)
+    assert delayed.allowance.amount == pytest.approx(20)
 
 
 def test_same_rating_pd_deterioration_reaches_stage_two() -> None:
@@ -217,12 +226,12 @@ def test_same_rating_pd_deterioration_reaches_stage_two() -> None:
     assert classify_stage(exposure).stage == Stage.Stage2
 
 
-def test_stage_three_full_loss_and_invalid_bucket_inputs() -> None:
+def test_performing_ecl_rejects_stage_three_and_invalid_buckets() -> None:
     from finstack_quant.statements_analytics import Stage, compute_ecl
 
     exposure = _exposure(ead=100.0, lgd=1.0, eir=0.1)
-    result = compute_ecl(exposure, [(1.0, 0.1)], stage=Stage.Stage3)
-    assert result.ecl == pytest.approx(100.0)
+    with pytest.raises(ValueError, match="dated carrying and recovery"):
+        compute_ecl(exposure, [(1.0, 0.1)], stage=Stage.Stage3)
     for invalid in [float("nan"), float("inf")]:
         with pytest.raises(ValueError, match="bucket_width_years"):
             compute_ecl(exposure, [(1.0, 0.1)], stage=Stage.Stage2, bucket_width_years=invalid)

@@ -438,6 +438,225 @@ export type TerminalFcffBasis =
       kind: "trailing_additive";
     };
 /**
+ * Consequence of covenant breach
+ */
+export type CovenantConsequence =
+  | "default"
+  | {
+      rate_increase: {
+        /**
+         * Increase in basis points
+         */
+        bp_increase: number;
+      };
+    }
+  | {
+      cash_sweep: {
+        /**
+         * Percentage of cash flow to sweep
+         */
+        sweep_percentage: number;
+      };
+    }
+  | "block_distributions"
+  | {
+      require_collateral: {
+        /**
+         * Description of collateral requirement
+         */
+        description: string;
+      };
+    }
+  | {
+      accelerate_maturity: {
+        /**
+         * New accelerated maturity date
+         */
+        new_maturity: DateWire;
+      };
+    };
+/**
+ * Type of financial or operational covenant
+ */
+export type CovenantType =
+  | {
+      max_debt_to_ebitda: {
+        /**
+         * Maximum allowed ratio
+         */
+        threshold: number;
+      };
+    }
+  | {
+      min_interest_coverage: {
+        /**
+         * Minimum required ratio
+         */
+        threshold: number;
+      };
+    }
+  | {
+      min_fixed_charge_coverage: {
+        /**
+         * Minimum required coverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      max_total_leverage: {
+        /**
+         * Maximum allowed leverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      max_senior_leverage: {
+        /**
+         * Maximum allowed senior leverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      min_asset_coverage: {
+        /**
+         * Minimum required coverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      negative: {
+        /**
+         * Description of restriction
+         */
+        restriction: string;
+      };
+    }
+  | {
+      affirmative: {
+        /**
+         * Description of requirement
+         */
+        requirement: string;
+      };
+    }
+  | {
+      custom: {
+        /**
+         * Name of metric to test
+         */
+        metric: string;
+        /**
+         * Threshold test (min or max)
+         */
+        test: ThresholdTest;
+      };
+    }
+  | {
+      basket: {
+        /**
+         * Maximum allowed utilization of the basket
+         */
+        limit: number;
+        /**
+         * Basket identifier/metric name
+         */
+        name: string;
+      };
+    }
+  | {
+      min_dscr: {
+        /**
+         * Minimum required coverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      max_net_debt_to_ebitda: {
+        /**
+         * Maximum allowed ratio
+         */
+        threshold: number;
+      };
+    }
+  | {
+      max_capex: {
+        /**
+         * Maximum allowed capex amount
+         */
+        threshold: number;
+      };
+    }
+  | {
+      min_liquidity: {
+        /**
+         * Minimum required liquidity
+         */
+        threshold: number;
+      };
+    };
+/**
+ * Threshold test type (maximum or minimum bound)
+ */
+export type ThresholdTest =
+  | {
+      maximum: number;
+    }
+  | {
+      minimum: number;
+    };
+/**
+ * Whether a covenant is tested periodically or only upon an action.
+ */
+export type CovenantScope = "maintenance" | "incurrence";
+/**
+ * Unit of a tenor period.
+ */
+export type TenorUnit = "days" | "weeks" | "months" | "years";
+/**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ */
+export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ */
+export type PositiveF64Wire = number;
+/**
+ * Availability and contractual applicability of an individual test.
+ */
+export type CovenantAssessmentState = "inactive" | "waived" | "untriggered" | "assessed" | "incomplete";
+/**
+ * Piecewise-constant threshold schedule for covenants.
+ *
+ * Entries are stored sorted by date ascending. The effective threshold for a
+ * test date is the last entry with date <= test_date. If no entry applies,
+ * [`ThresholdSchedule::threshold_for`] returns `None`.
+ */
+export type ThresholdSchedule = [DateWire, number][];
+/**
+ * Comparable units of the elected statement observation.
+ */
+export type CovenantStatementUnit =
+  | {
+      kind: "ratio";
+    }
+  | {
+      /**
+       * Expected consistent ISO reporting currency.
+       */
+      currency: Currency;
+      kind: "money";
+    };
+/**
  * The measure to calculate for an identified borrowing and reporting period.
  */
 export type CreditMeasure =
@@ -539,6 +758,143 @@ export type LboAcquisition =
        */
       seller_consideration: Money;
     };
+/**
+ * Supported day-count conventions with industry-standard definitions.
+ *
+ * Each variant implements a specific day count convention as defined by
+ * ISDA, ICMA, or local market conventions. The conventions determine how
+ * interest accrues between payment dates.
+ *
+ * The variant docs are deliberately short: they are published verbatim as the
+ * `description` of each wire value in the `common/1/day_count` JSON Schema,
+ * which every instrument contract inlines. Each one carries the convention
+ * name, its defining rule and its standards citation. Formulas, market usage
+ * and worked examples live in the sections below.
+ *
+ * # Standards References
+ *
+ * Implementations follow:
+ * - **ISDA**: 2006 ISDA Definitions, Section 4.16.
+ *   `docs/REFERENCES.md#isda-2006-definitions`
+ * - **ICMA**: ICMA Rule Book, Rule 251. `docs/REFERENCES.md#icma-rule-book`
+ * - **ISMA** (1999). "Recommendations for Accrued Interest Calculations."
+ * - **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)
+ * - **ISO**: ISO 20022 Day Count Fraction Codes
+ *
+ * # Formulas
+ *
+ * The 30/360 family shares one day-count formula and differs only in how the
+ * day-of-month values are adjusted:
+ *
+ * ```text
+ * Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
+ * year_fraction = Days / 360
+ *
+ * Thirty360 (fixed US 30U/360 EOM):
+ *   D₁' = 30   if D₁ is 31 or last day of February
+ *   D₂' = 30   if D₂ is 31 and D₁' = 30
+ *   D₂' = 30   if D₂ is last day of Feb and D₁ is last day of Feb
+ *
+ * Thirty360Isda (ISDA bond basis, §4.16(f)):
+ *   D₁' = min(D₁, 30)
+ *   D₂' = 30   if D₂ is 31 and D₁' = 30
+ *
+ * ThirtyE360 (ISDA §4.16(g)):
+ *   D₁' = min(D₁, 30)
+ *   D₂' = min(D₂, 30)
+ *
+ * ThirtyE360Isda (ISDA §4.16(h)):
+ *   D₁' = 30   if D₁ is the last day of its month (incl. end of February)
+ *   D₂' = 30   if D₂ is 31, or if D₂ is the last day of February and the
+ *              period does not end on the termination (maturity) date
+ *
+ * Thirty360It (QuantLib `Thirty360::Italian`):
+ *   D₁' = 30   if D₁ is 31 or (month is February and D₁ > 27)
+ *   D₂' = 30   if D₂ is 31 or (month is February and D₂ > 27)
+ * ```
+ *
+ * - **`Thirty360` versus `Thirty360Isda`**: `Thirty360` is the fixed US
+ *   30U/360 EOM algorithm with its paired February month-end rule (QuantLib
+ *   `Thirty360::USA`); it is not `30/360 PSA`, which lacks the paired end
+ *   adjustment. `Thirty360Isda` is ISDA 2006 §4.16(f) bond basis without any
+ *   February rule (QuantLib `Thirty360::BondBasis`). They differ for periods
+ *   that start or end on the last day of February.
+ * - **`ThirtyE360Isda` termination-date exception**: ISDA §4.16(h) keeps D₂
+ *   unadjusted when the period ends on the termination date and that date is
+ *   the last day of February. [`DayCountContext::end_is_termination_date`]
+ *   must be explicit for this convention: `Some(true)` when the
+ *   chronologically later endpoint is the contractual termination date,
+ *   `Some(false)` otherwise. QuantLib's `Thirty360::ISDA` is this convention.
+ * - **`Thirty360It`** is distinct from US 30U/360 EOM (February EOM only when both
+ *   ends are February EOM) and from 30E/360 (no February-after-27 rule).
+ *
+ * The actual-day conventions:
+ *
+ * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+ *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+ *   denominator is 366 if that period's end date is in a leap year, else
+ *   365, for every coupon frequency. Partial accrual keeps the enclosing
+ *   coupon's denominator.
+ *   Accrual dates outside that coupon are rejected; sum separate coupon
+ *   slices for calculations spanning multiple coupon periods. This is **not**
+ *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+ *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+ * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
+ *   every February 29 that falls in the period, so a full leap year still
+ *   yields exactly 1.0.
+ * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
+ *   (days in segment) / (days in that year) for each segment, and sum.
+ * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+ *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+ *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+ *   and the enclosing unadjusted nominal `coupon_period` in
+ *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+ *   sliced by the schedule builder before calling `year_fraction`.
+ * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
+ *   **backwards from `end`** until the candidate is before `start`; each
+ *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
+ *   leap year is bumped to 29 February. The residual fraction is
+ *   `days(start, residual_end) / den`, where `den` is 366 if 29 February lies
+ *   in `[start, residual_end)`, else 365. No [`DayCountContext`] is required.
+ * - **`Bus252`**: requires `calendar` in [`DayCountContext`] and counts its
+ *   business days in `[start, end)` through
+ *   [`HolidayCalendar::count_business_days`](crate::dates::HolidayCalendar::count_business_days).
+ *   Built-in calendars answer from a cached per-year prefix count; custom
+ *   calendars scan each calendar day unless they override the count. A count
+ *   outside `0..=elapsed days` is an error.
+ * - **`OneOne`**: inflation fixed legs compound across annual periods using
+ *   this convention. Empty intervals return zero and reversed intervals are
+ *   rejected, as for all day counts in this API.
+ *
+ * # Usage
+ *
+ * | Convention | Standard for |
+ * | --- | --- |
+ * | `Act360` | USD and EUR money markets, short-term rate derivatives (SOFR, €STR), FX swaps and forwards |
+ * | `Act365F` | GBP money markets (SONIA), cable (GBP/USD) FX, some Commonwealth bond markets |
+ * | `Act365L` | GBP floating-rate notes, some European bond markets |
+ * | `Thirty360` | US corporate bonds, US municipal bonds, US agency debt |
+ * | `ThirtyE360` | Eurobonds, international bonds, some interest rate swaps |
+ * | `Nl365` | Some Canadian money-market and mortgage instruments, legacy systems that ignore leap days |
+ * | `ActAct` | US Treasury bonds, USD and EUR swap fixed legs, government bonds in many markets |
+ * | `ActActIsma` | International bonds with regular coupons, Eurobonds, ICMA-governed securities |
+ * | `Bus252` | BRL-denominated instruments (ANBIMA), some equity derivatives and variance swaps |
+ */
+export type DayCount =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30_360_isda"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
 /**
  * Explicit low and high directions for an enterprise exit multiple.
  */
@@ -696,19 +1052,6 @@ export type DownturnMethod =
  */
 export type LgdType = "point_in_time" | "through_the_cycle" | "downturn";
 /**
- * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
- *
- * There is no default mode: every financial rounding names one explicitly.
- */
-export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
-/**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
-/**
  * IFRS 9 impairment stage for a credit exposure.
  *
  * Under IFRS 9, financial instruments are classified into three stages that
@@ -845,6 +1188,55 @@ export type ForecastFadeShape = "linear" | "geometric" | "exponential";
  * - **Mixed**: Value OR Forecast OR Formula (precedence: Value > Forecast > Formula)
  */
 export type NodeType = "value" | "calculated" | "mixed";
+/**
+ * Dated credit-impaired measurement for one elected scenario.
+ */
+export type ImpairedEclOutcome =
+  | {
+      /**
+       * Scenario identity, preserved in caller order.
+       */
+      id: string;
+      /**
+       * Exact elected scenario probability.
+       */
+      weight: DecimalWire;
+      /**
+       * Sourced result before scenario weighting.
+       */
+      result: ImpairedEclResult;
+      status: "measured";
+      /**
+       * Nonnegative same-currency contribution at the exact scenario weight.
+       */
+      weighted_allowance: Money;
+    }
+  | {
+      /**
+       * Scenario identity, preserved in caller order.
+       */
+      id: string;
+      /**
+       * Exact elected scenario probability.
+       */
+      weight: DecimalWire;
+      /**
+       * Explanation of the unavailable scenario.
+       */
+      reason: string;
+      status: "unavailable";
+    }
+  | {
+      /**
+       * Scenario identity, preserved in caller order.
+       */
+      id: string;
+      /**
+       * Exact elected scenario probability.
+       */
+      weight: DecimalWire;
+      status: "zero_weight";
+    };
 /**
  * Convention that determines how `growth_rate` compounds in a lease.
  *
@@ -2738,6 +3130,282 @@ export interface DcfProjection {
   terminal_date: DateWire;
 }
 /**
+ * Financial covenant specification with test frequency and consequences.
+ */
+export interface Covenant {
+  /**
+   * Actions taken if covenant is breached
+   */
+  consequences: CovenantConsequence[];
+  /**
+   * Type of covenant (leverage, coverage, etc.)
+   */
+  covenant_type: CovenantType;
+  /**
+   * Optional cure period in days before default
+   */
+  cure_period_days?: number | null;
+  /**
+   * Whether the covenant is currently active
+   */
+  is_active: boolean;
+  /**
+   * Optional instance label disambiguating covenants of the same type.
+   *
+   * [`CovenantType::covenant_id`] is discriminant-only, so two covenants of
+   * the same type (e.g. a senior and a total leverage test, or two baskets)
+   * would collide in compliance reports and breach tracking without a
+   * distinct label. Waivers and breaches key off it.
+   */
+  label: string;
+  /**
+   * Whether the covenant is maintenance or incurrence.
+   */
+  scope: CovenantScope;
+  /**
+   * Optional activation condition for springing covenants.
+   */
+  springing_condition?: SpringingCondition | null;
+  /**
+   * How frequently the covenant is tested.
+   *
+   * Descriptive metadata only: the engine does **not** enforce this
+   * schedule. Callers control test dates by choosing when to invoke
+   * [`super::CovenantEngine::evaluate`].
+   */
+  test_frequency: Tenor;
+}
+/**
+ * Optional activation condition for springing covenants.
+ */
+export interface SpringingCondition {
+  /**
+   * Metric that controls activation (e.g., revolver utilization), named by
+   * its statements node ID.
+   */
+  metric_id: Id;
+  /**
+   * Threshold test applied to the metric.
+   */
+  test: ThresholdTest;
+}
+/**
+ * A parsed tenor representing a time period.
+ *
+ * Tenors are commonly used in financial markets to specify maturities,
+ * payment frequencies, and rate fixing periods.
+ */
+export interface Tenor {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: TenorUnit;
+}
+/**
+ * Evidence for an explicitly selected covenant on one observation date.
+ */
+export interface CovenantAssessment {
+  /**
+   * Stable covenant instance key.
+   */
+  covenant_id: string;
+  /**
+   * Threshold after the active schedule and lender amendments, when applicable.
+   */
+  effective_threshold?: number | null;
+  /**
+   * Missing metric identifier when the assessment could not complete.
+   */
+  missing_metric?: string | null;
+  /**
+   * Report produced by the engine for an assessed test.
+   */
+  report?: CovenantReport | null;
+  /**
+   * Applicability and evidence state of the test.
+   */
+  state: CovenantAssessmentState;
+  /**
+   * Effective terms selected on the observation date when applicable.
+   */
+  terms?: CovenantSpec | null;
+}
+/**
+ * Covenant check result.
+ */
+export interface CovenantReport {
+  /**
+   * Actual value of the metric
+   */
+  actual_value?: number | null;
+  /**
+   * Stable machine-readable covenant instance identifier.
+   */
+  covenant_id?: string | null;
+  /**
+   * Type of covenant being checked
+   */
+  covenant_type: string;
+  /**
+   * Details or explanation
+   */
+  details?: string | null;
+  /**
+   * Cushion relative to threshold (positive => passing buffer)
+   */
+  headroom?: number | null;
+  /**
+   * Signed cushion in the covenant metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
+  /**
+   * Audit stamp: numeric mode, rounding context, and FX policy in force.
+   */
+  meta?: ResultsMeta;
+  /**
+   * Whether the covenant passed
+   */
+  passed: boolean;
+  /**
+   * Required threshold
+   */
+  threshold?: number | null;
+}
+/**
+ * Metadata bundle that accompanies valuation outputs.
+ *
+ * The metadata is intentionally small so it can be attached to reports and
+ * downstream data stores for reproducibility and audit trails.
+ */
+export interface ResultsMeta {
+  /**
+   * Optional FX policy applied by the computing layer (human-readable key).
+   */
+  fx_policy_applied?: string | null;
+  /**
+   * Numeric engine mode used to produce the results.
+   *
+   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
+   * envelopes stay wire-compatible across host languages.
+   */
+  numeric_mode: string;
+  /**
+   * Whether the producing computation ran in parallel.
+   *
+   * Serial results omit the field entirely so existing payloads and golden
+   * files stay byte-identical.
+   */
+  parallel?: boolean;
+  /**
+   * Rounding context snapshot applied to IO boundaries.
+   */
+  rounding: RoundingContext;
+  /**
+   * Timestamp when result was computed (ISO 8601 format).
+   * Useful for audit trails and reproducibility.
+   */
+  timestamp?: string | null;
+  /**
+   * Finstack Quant library version used to produce the result.
+   */
+  version?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * Snapshot of active rounding settings used for result stamping.
+ *
+ * Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
+ * alongside valuation results.
+ */
+export interface RoundingContext {
+  /**
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
+   */
+  ingest_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Explicitly selected rounding mode; absent when none was selected.
+   */
+  mode?: RoundingMode | null;
+  /**
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
+   */
+  output_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Tolerance settings snapshot for floating-point comparisons.
+   */
+  tolerances?: ToleranceConfig;
+  /**
+   * Schema version for forward compatibility.
+   */
+  version: number;
+  [k: string]: unknown;
+}
+/**
+ * Numerical tolerance configuration for floating-point comparisons.
+ *
+ * Provides the configurable epsilon for generic floating-point zero-checks.
+ * The default is chosen to balance numerical stability with practical
+ * precision requirements.
+ */
+export interface ToleranceConfig {
+  /**
+   * Epsilon for generic floating-point comparisons (default: 1e-10).
+   *
+   * Used for general numerical comparisons where higher tolerance is acceptable.
+   */
+  generic_epsilon?: PositiveF64Wire;
+}
+/**
+ * Covenant evaluation specification.
+ */
+export interface CovenantSpec {
+  /**
+   * The covenant to evaluate
+   */
+  covenant: Covenant;
+  /**
+   * Earnings denominator used to validate a leverage ratio. Required for net
+   * debt/EBITDA, where a negative ratio can mean net cash or negative earnings.
+   * Values must be finite and in the same reporting-period convention as the
+   * ratio. A non-positive denominator makes the test a breach with no headroom.
+   */
+  denominator_metric_id?: Id | null;
+  /**
+   * Metric ID to use for evaluation (for financial covenants), conventionally
+   * a statements node ID such as `debt_to_ebitda`, `ebitda`,
+   * `interest_coverage`, or `dscr`.
+   */
+  metric_id?: Id | null;
+  /**
+   * Time-varying threshold schedule that overrides the static threshold in
+   * [`CovenantType`] when present. Enables leverage step-down schedules.
+   */
+  threshold_schedule?: ThresholdSchedule | null;
+}
+/**
+ * Bind one contractual metric, denominator or springing trigger to a named node.
+ */
+export interface CovenantObservationBinding {
+  /**
+   * Exact statement node identifier, with no name fallback.
+   */
+  node: string;
+  /**
+   * Expected monetary or ratio units.
+   */
+  unit: CovenantStatementUnit;
+}
+/**
  * Flags periods where a coverage ratio (e.g.
  */
 export interface CoverageFloorCheck {
@@ -3734,14 +4402,6 @@ export interface EclConfig {
    */
   lgd_type: LgdType;
   /**
-   * Assumed time (in years) from the reporting date to recovery
-   * realisation for Stage 3 (credit-impaired) exposures. Used to
-   * discount expected recoveries `(1 - LGD) x EAD` at the EIR.
-   * The allowance is current EAD less those discounted recoveries.
-   * Default: 1.0 year, a common practical recovery-lag assumption.
-   */
-  stage3_time_to_recovery_years?: number;
-  /**
    * Staging configuration for IFRS 9.
    */
   staging: StagingConfig;
@@ -3868,94 +4528,6 @@ export interface EclResult {
    */
   stage: Stage;
   [k: string]: unknown;
-}
-/**
- * Metadata bundle that accompanies valuation outputs.
- *
- * The metadata is intentionally small so it can be attached to reports and
- * downstream data stores for reproducibility and audit trails.
- */
-export interface ResultsMeta {
-  /**
-   * Optional FX policy applied by the computing layer (human-readable key).
-   */
-  fx_policy_applied?: string | null;
-  /**
-   * Numeric engine mode used to produce the results.
-   *
-   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
-   * envelopes stay wire-compatible across host languages.
-   */
-  numeric_mode: string;
-  /**
-   * Whether the producing computation ran in parallel.
-   *
-   * Serial results omit the field entirely so existing payloads and golden
-   * files stay byte-identical.
-   */
-  parallel?: boolean;
-  /**
-   * Rounding context snapshot applied to IO boundaries.
-   */
-  rounding: RoundingContext;
-  /**
-   * Timestamp when result was computed (ISO 8601 format).
-   * Useful for audit trails and reproducibility.
-   */
-  timestamp?: string | null;
-  /**
-   * Finstack Quant library version used to produce the result.
-   */
-  version?: string | null;
-  [k: string]: unknown;
-}
-/**
- * Snapshot of active rounding settings used for result stamping.
- *
- * Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
- * alongside valuation results.
- */
-export interface RoundingContext {
-  /**
-   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
-   */
-  ingest_scale_by_currency: {
-    [k: string]: number;
-  };
-  /**
-   * Explicitly selected rounding mode; absent when none was selected.
-   */
-  mode?: RoundingMode | null;
-  /**
-   * Validated output scale snapshot by currency code, with values in `0..=28`.
-   */
-  output_scale_by_currency: {
-    [k: string]: number;
-  };
-  /**
-   * Tolerance settings snapshot for floating-point comparisons.
-   */
-  tolerances?: ToleranceConfig;
-  /**
-   * Schema version for forward compatibility.
-   */
-  version: number;
-  [k: string]: unknown;
-}
-/**
- * Numerical tolerance configuration for floating-point comparisons.
- *
- * Provides the configurable epsilon for generic floating-point zero-checks.
- * The default is chosen to balance numerical stability with practical
- * precision requirements.
- */
-export interface ToleranceConfig {
-  /**
-   * Epsilon for generic floating-point comparisons (default: 1e-10).
-   *
-   * Used for general numerical comparisons where higher tolerance is acceptable.
-   */
-  generic_epsilon?: PositiveF64Wire;
 }
 /**
  * Named cumulative-PD and LGD assumptions with an exact scenario probability.
@@ -4519,6 +5091,43 @@ export interface FreeRentWindowSpec {
   start: PeriodId;
 }
 /**
+ * A projected covenant breach.
+ */
+export interface FutureBreach {
+  /**
+   * Date of the breach
+   */
+  breach_date: DateWire;
+  /**
+   * Probability of breach (if stochastic)
+   */
+  breach_probability: number;
+  /**
+   * Human-readable covenant description.
+   */
+  covenant_description: string;
+  /**
+   * Stable covenant instance identifier.
+   */
+  covenant_id: string;
+  /**
+   * Headroom (negative means breach), if meaningful and finite.
+   */
+  headroom?: number | null;
+  /**
+   * Signed cushion in the metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
+  /**
+   * Projected value, if finite.
+   */
+  projected_value?: number | null;
+  /**
+   * Threshold value
+   */
+  threshold: number;
+}
+/**
  * Outcome of a `goal_seek` solve.
  */
 export interface GoalSeekResult {
@@ -4626,6 +5235,102 @@ export interface GrowthRateConsistency {
    */
   scope: PeriodScope;
   [k: string]: unknown;
+}
+/**
+ * Signed recovery shortfall and nonnegative credit-impaired allowance.
+ */
+export interface ImpairedEclResult {
+  /**
+   * Nonnegative reported allowance on the same currency basis.
+   */
+  allowance: Money;
+  /**
+   * Present value discount factor at the annual effective original EIR.
+   */
+  discount_factor: number;
+  /**
+   * Admitted carrying value, date, rate and source.
+   */
+  exposure: ImpairedExposure;
+  /**
+   * Dated recovery cash discounted once to the reporting date.
+   */
+  present_value_recovery: Money;
+  /**
+   * Approved estimated cash recovery and its receipt date.
+   */
+  recovery: RecoveryEvidence;
+  /**
+   * Carrying amount less discounted recovery before the nonnegative allowance floor.
+   */
+  signed_shortfall: Money;
+  /**
+   * Year fraction between the reporting and recovery dates on the elected clock.
+   */
+  time_to_recovery_years: number;
+}
+/**
+ * Same-currency carrying exposure and annual effective interest policy at the reporting cut.
+ */
+export interface ImpairedExposure {
+  /**
+   * Nonnegative carrying value in reporting currency.
+   */
+  carrying_amount: Money;
+  /**
+   * Approved source observation or subledger position.
+   */
+  carrying_amount_source: string;
+  /**
+   * Elected annual effective original EIR as an exact decimal rate, above -100%.
+   */
+  effective_interest_rate: DecimalWire;
+  /**
+   * Exposure identity from the approved reporting population.
+   */
+  exposure_id: string;
+  /**
+   * Year-fraction convention used to discount dated recovery cash.
+   */
+  recovery_day_count: DayCount;
+  /**
+   * Effective reporting date for the carrying amount and discounting.
+   */
+  reporting_date: DateWire;
+}
+/**
+ * Dated expected recovery assessed on the same exposure and currency basis.
+ */
+export interface RecoveryEvidence {
+  /**
+   * Nonnegative expected cash recovery in the exposure currency.
+   */
+  amount: Money;
+  /**
+   * Date when the recovery cash is expected to be received.
+   */
+  date: DateWire;
+  /**
+   * Approved recovery estimate or sourced cash-recovery record.
+   */
+  source_id: string;
+}
+/**
+ * Exact scenario probability and its scoped dated expected recovery.
+ */
+export interface ImpairedEclScenario {
+  /**
+   * Unique named economic scenario.
+   */
+  id: string;
+  /**
+   * Dated expected recovery for this scenario, or None if unavailable.
+   */
+  recovery?: RecoveryEvidence | null;
+  /**
+   * Exact probability in [0, 1].
+   */
+  weight: DecimalWire;
 }
 /**
  * Reconciles interest expense against debt balances or the capital-structure interest schedule.
@@ -5944,6 +6649,94 @@ export interface StageResult {
   [k: string]: unknown;
 }
 /**
+ * Effective covenant terms and available evidence by dated period.
+ */
+export interface StatementCovenantAssessment {
+  /**
+   * Historical and projected observations in request order.
+   */
+  periods: StatementCovenantPeriod[];
+  /**
+   * Run identity of the admitted statement.
+   */
+  provenance: RunProvenance;
+  /**
+   * Maintenance or incurrence selection.
+   */
+  scope: CovenantScope;
+}
+/**
+ * Covenant results over one verified statement reporting interval.
+ */
+export interface StatementCovenantPeriod {
+  /**
+   * Individual effective terms, status and reports from the covenant owner.
+   */
+  assessments: CovenantAssessment[];
+  /**
+   * Last included day of the stored fiscal or calendar interval.
+   */
+  date: DateWire;
+  /**
+   * Whether observations in this period are historical actuals.
+   */
+  is_actual: boolean;
+  /**
+   * Available typed observations by contractual metric identity.
+   */
+  observations: {
+    [k: string]: AmountOrScalar;
+  };
+  /**
+   * Stored reporting period selected by the caller.
+   */
+  period: PeriodId;
+}
+/**
+ * Qualified forecast, breach evidence and per-period coverage.
+ */
+export interface StatementCovenantForecast {
+  /**
+   * Evidence and availability for every elected projected period.
+   */
+  assessment: StatementCovenantAssessment;
+  /**
+   * Native breach probabilities or deterministic breaches from assessed dates.
+   */
+  breaches: FutureBreach[];
+  /**
+   * Elected stochastic reference date.
+   */
+  reference_date: DateWire;
+}
+/**
+ * Named covenants, result periods, publication cutoff and units.
+ */
+export interface StatementCovenantSpec {
+  /**
+   * Named metric aliases and their admitted native units.
+   */
+  bindings: {
+    [k: string]: CovenantObservationBinding;
+  };
+  /**
+   * Existing covenant instance IDs, unique and in presentation order.
+   */
+  covenant_ids: string[];
+  /**
+   * Inclusive publication cutoff agreed with the evaluated statement run.
+   */
+  observed_through: DateWire;
+  /**
+   * Existing period IDs, unique and in model timeline order.
+   */
+  periods: PeriodId[];
+  /**
+   * Analysis scope applied to all selected contracts.
+   */
+  scope: CovenantScope;
+}
+/**
  * Annual monetary statement sources for a canonical credit score.
  */
 export interface StatementScoringMapping {
@@ -6090,6 +6883,23 @@ export interface WeightedEclResult {
    * Assigned impairment stage.
    */
   stage: Stage;
+}
+/**
+ * Weighted impairment and dated recovery scenario contributions.
+ */
+export interface WeightedImpairedEclResult {
+  /**
+   * Sum of measured scenario contributions, or None for missing positive-weight evidence.
+   */
+  allowance?: Money | null;
+  /**
+   * Common carrying exposure, date, currency and original effective interest policy.
+   */
+  exposure: ImpairedExposure;
+  /**
+   * Measures and coverage in exact scenario input order.
+   */
+  outcomes: ImpairedEclOutcome[];
 }
 /**
  * Verifies that the change in working capital on the cash flow statement equals the negative delta of net working capital on the balance sheet.

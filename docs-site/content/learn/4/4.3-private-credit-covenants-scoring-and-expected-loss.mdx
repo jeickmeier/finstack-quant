@@ -4,7 +4,7 @@ title: "Private Credit: Covenants, Scoring, and Expected Loss"
 description: "Connect native borrower forecasts to contractual tests, compare credit signals, and reconcile staged physical expected loss with the held loan exposure."
 desk_question: "Will this borrower breach its covenants, and what loss estimate belongs beside the loan price?"
 references: ["#ifrs-9-impairment", "#asc-326-cecl", "#bcbs-2015-ecl-guidance", "#altman-1968", "#ohlson-1980", "#zmijewski-1984", "#merton-1974", "#crosbie-bohn-2003-kmv", "#lando-skodeberg-2002", "#israel-rosenthal-wei-2001", "#schuermann-2004-lgd", "#altman-et-al-2005-recovery", "#moodys-rating-symbols"]
-api: ["finstack_quant.covenants.CovenantEngine", "finstack_quant.covenants.CovenantSpec", "finstack_quant.covenants.evaluate_engine", "finstack_quant.models.credit.scoring.altman_z_score", "finstack_quant.models.credit.pd.MasterScale", "finstack_quant.models.credit.migration.GeneratorMatrix", "finstack_quant.models.credit.lgd.WorkoutLgd", "finstack_quant.statements_analytics.compute_ecl", "finstack_quant.statements_analytics.compute_ecl_weighted", "finstack_quant.models.credit.MertonModel"]
+api: ["finstack_quant.covenants.CovenantEngine", "finstack_quant.covenants.CovenantSpec", "finstack_quant.covenants.evaluate_engine", "finstack_quant.models.credit.scoring.altman_z_score", "finstack_quant.models.credit.pd.MasterScale", "finstack_quant.models.credit.migration.GeneratorMatrix", "finstack_quant.models.credit.lgd.WorkoutLgd", "finstack_quant.statements_analytics.compute_ecl", "finstack_quant.statements_analytics.compute_ecl_weighted", "finstack_quant.statements_analytics.compute_impaired_ecl", "finstack_quant.models.credit.MertonModel"]
 status: "published"
 ---
 
@@ -277,7 +277,13 @@ For impairment, use the shared physical PD assumptions, quarterly cumulative-PD 
 
 {/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="staged-borrower-ecl" role="build" */}
 ```python exec id=staged-borrower-ecl role=build
-from finstack_quant.statements_analytics import EclScenario, Exposure, StagingConfig, QualitativeFlags, classify_stage, compute_ecl, compute_ecl_weighted
+from decimal import Decimal
+
+from finstack_quant.core.money import Money
+from finstack_quant.statements_analytics import (
+    EclScenario, Exposure, ImpairedExposure, QualitativeFlags, RecoveryEvidence,
+    StagingConfig, classify_stage, compute_ecl, compute_ecl_weighted, compute_impaired_ecl,
+)
 
 ead43 = credit_data["loan"]["holding_notional"]
 eir43, maturity43, lgd43 = 0.075,5.0,credit_data["credit"]["base"]["lgd"]
@@ -316,8 +322,21 @@ joint_pd_lgd_ecl = joint_native.ecl
 assert weighted_native.ecl is not None and joint_pd_lgd_ecl is not None
 assert joint_pd_lgd_ecl > weighted_native.ecl
 assert all(row.status == "measured" for row in joint_native.scenario_breakdown)
-stage3_ecl = compute_ecl(defaulted_comparator,physical_schedules["base"],stage="stage3",stage3_time_to_recovery_years=1.0)
-print("Stage1 / lifetime / fixed-LGD weighted lifetime / joint PD-LGD weighted lifetime / Stage3 ECL USD:",base_ecl.ecl,lifetime_ecl.ecl,weighted_native.ecl,joint_pd_lgd_ecl,stage3_ecl.ecl)
+impaired = ImpairedExposure(
+    exposure_id="BORROWER-DEFAULTED",
+    carrying_amount_source="closing-loan-ledger",
+    carrying_amount=Money.from_decimal(Decimal(str(ead43)), "USD"),
+    reporting_date="2025-12-31",
+    effective_interest_rate=str(eir43),
+    recovery_day_count="act_365f",
+)
+recovery = RecoveryEvidence(
+    source_id="approved-workout-estimate",
+    amount=Money.from_decimal(Decimal(str(round(0.42 * ead43, 2))), "USD"),
+    date="2026-12-31",
+)
+stage3_ecl = compute_impaired_ecl(impaired, recovery).allowance.amount
+print("Stage1 / lifetime / fixed-LGD weighted lifetime / joint PD-LGD weighted lifetime / Stage3 ECL USD:",base_ecl.ecl,lifetime_ecl.ecl,weighted_native.ecl,joint_pd_lgd_ecl,stage3_ecl)
 print(base_ecl.to_dataframe().to_string(index=False))
 print("Constant EAD, EIR and conditional annual PD are controlled impairment assumptions, not the loan pricer's amortizing market cash flows.")
 ```
@@ -325,7 +344,7 @@ print("Constant EAD, EIR and conditional annual PD are controlled impairment ass
 
 <ExecutedOutput lesson="4.3" block="staged-borrower-ecl" />
 
-The Stage 1 bucket sum reconciles to about USD 13,266. Constant-EAD lifetime loss is about USD 55,086. The native probability-weighted calculation holds LGD fixed because it takes one exposure; a second explicit weighted sum allows scenario-specific LGD and therefore shows the additional joint PD/LGD stress. The simplified Stage 3 calculation assumes certain default and discounts its specified loss at the recovery horizon.
+The Stage 1 bucket sum reconciles to about USD 13,266. Constant-EAD lifetime loss is about USD 55,086. The native probability-weighted calculation holds LGD fixed because it takes one exposure; a second explicit weighted sum allows scenario-specific LGD and therefore shows the additional joint PD/LGD stress. The Stage 3 allowance deducts the present value of the approved dated cash recovery from the carrying amount and floors the signed shortfall at zero.
 
 Now carry the held loan's USD 25,000 quarterly amortization into EAD. The native schedule interpolates linearly, so pin each integration midpoint to the pre-payment balance and disclose the approximation between knots. The final quarter begins with USD 525,000 before the last amortization and balloon redemption. A hand sum reconciles the native result, which must be below the constant-EAD comparator. Invalid decreasing cumulative PD is rejected with `ValueError`.
 
@@ -339,7 +358,15 @@ ead_knots = [(0.0,ead43),*midpoint_ead,(5.0,0.0)]
 amortizing_exposure = Exposure(id="BORROWER-TL-amortizing",ead=ead43,lgd=lgd43,eir=eir43,remaining_maturity_years=maturity43,current_pd=base_lifetime_pd,origination_pd=base_lifetime_pd,
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
 amortizing_loss = compute_ecl(amortizing_exposure,physical_schedules["base"],stage="stage2",bucket_width_years=0.25)
-manual_amortizing_loss = sum((physical_schedules["base"][i+1][1]-physical_schedules["base"][i][1])*balance*lgd43/(1+eir43)**t for i,(t,balance) in enumerate(midpoint_ead))
+# Independent integration on the union of the quarterly PD and published exposure knots.
+ead_times, ead_balances = zip(*ead_knots)
+pd_times, pd_values = zip(*physical_schedules["base"])
+edges = np.union1d(pd_times, ead_times)
+midpoints = (edges[1:] + edges[:-1]) / 2
+default_mass = np.diff(np.interp(edges, pd_times, pd_values))
+midpoint_balances = np.interp(midpoints, ead_times, ead_balances)
+manual_amortizing_loss = np.sum(default_mass * midpoint_balances * lgd43 / (1 + eir43) ** midpoints)
+assert abs(amortizing_loss.ecl - manual_amortizing_loss) < 1e-8
 decreasing_pd_error = None
 try:
     compute_ecl(amortizing_exposure,[(0.0,0.0),(1.0,0.05),(2.0,0.04)],stage="stage2")
@@ -347,7 +374,7 @@ except ValueError as error:
     decreasing_pd_error = str(error)
 print("Decreasing cumulative-PD schedule rejected:", decreasing_pd_error)
 print(f"Amortizing lifetime ECL={amortizing_loss.ecl:,.2f}; constant-EAD comparator={lifetime_ecl.ecl:,.2f}")
-print("Quarterly midpoint EAD matches the payment grid. Linear interpolation between those knots is not an exact continuous-time jump schedule.")
+print("The loss grid includes both PD and exposure knots. The published balances are interpolated linearly between knots.")
 ```
 {/* /notebook-block */}
 

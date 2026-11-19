@@ -17,7 +17,9 @@ mod templates;
 pub use handles::{JsCorkscrewExtension, JsCreditScorecardExtension, JsDependencyTracer};
 
 pub use capital_structure::capital_structure_summary;
-pub use covenants::{evaluate_covenants, forecast_breaches};
+pub use covenants::{
+    assess_statement_covenants, evaluate_covenants, forecast_breaches, forecast_statement_covenants,
+};
 
 pub use comps::{
     compute_multiple, peer_stats, percentile_rank, regression_fair_value, relative_value_report,

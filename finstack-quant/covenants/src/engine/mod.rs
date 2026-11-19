@@ -21,7 +21,7 @@ mod covenant_engine;
 mod helpers;
 mod types;
 
-pub use covenant_engine::CovenantEngine;
+pub use covenant_engine::{CovenantAssessment, CovenantAssessmentState, CovenantEngine};
 pub use helpers::InstrumentMutator;
 pub(crate) use helpers::{
     headroom_for, headroom_raw_for, is_covenant_breached, spec_metric_name,

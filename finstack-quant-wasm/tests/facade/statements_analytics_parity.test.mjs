@@ -650,3 +650,54 @@ test('statement credit scores use annual monetary sources and a string period', 
     builder.free();
   }
 });
+
+test('computeImpairedEcl discounts dated recovery without a default curve', () => {
+  const result = sa.computeImpairedEcl(
+    {
+      exposure_id: 'loan',
+      carrying_amount_source: 'ledger',
+      carrying_amount: { amount: '100', currency: 'USD' },
+      reporting_date: '2025-01-01',
+      effective_interest_rate: '0.10',
+      recovery_day_count: 'act_365f',
+    },
+    { source_id: 'approved workout', amount: { amount: '88', currency: 'USD' }, date: '2026-01-01' }
+  );
+  assert.equal(result.allowance.currency, 'USD');
+  assert.ok(Math.abs(Number(result.allowance.amount) - 20) < 1e-10);
+  assert.equal(result.recovery.source_id, 'approved workout');
+});
+
+test('weighted Stage 3 keeps measured recovery when another scenario is unavailable', () => {
+  const money = (amount) => ({ amount, currency: 'USD' });
+  const exposure = {
+    exposure_id: 'weighted-loan',
+    carrying_amount_source: 'ledger',
+    carrying_amount: money('100'),
+    reporting_date: '2025-01-01',
+    effective_interest_rate: '0',
+    recovery_day_count: 'act_365f',
+  };
+  const recovery = (amount) => ({
+    source_id: 'approved-workout',
+    amount: money(amount),
+    date: '2026-01-01',
+  });
+  const base = { id: 'base', weight: '0.70', recovery: recovery('80') };
+  const measured = sa.computeImpairedEclWeighted(exposure, [
+    base,
+    { id: 'stress', weight: '0.30', recovery: recovery('20') },
+  ]);
+  assert.equal(Number(measured.allowance.amount), 38);
+  const partial = sa.computeImpairedEclWeighted(exposure, [
+    base,
+    { id: 'stress', weight: '0.30' },
+    { id: 'ignored', weight: '0', recovery: recovery('-12') },
+  ]);
+  assert.equal(partial.allowance, null);
+  assert.deepEqual(
+    partial.outcomes.map((row) => row.status),
+    ['measured', 'unavailable', 'zero_weight']
+  );
+  assert.equal(Number(partial.outcomes[0].weighted_allowance.amount), 14);
+});

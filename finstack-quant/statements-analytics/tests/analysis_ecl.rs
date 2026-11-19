@@ -62,68 +62,6 @@ impl PdTermStructure for ForecastHorizonGuardCurve {
 // Stage 3 measurement (IFRS 9 5.5.33 / B5.5.33)
 
 #[test]
-fn stage3_ecl_is_carrying_value_less_pv_recovery() {
-    let exp = exposure("defaulted-1");
-    let config = EclConfig::default();
-
-    let result = compute_ecl_from_curve(&exp, Stage::Stage3, &bbb_curve(), &config).unwrap();
-
-    // PD ≡ 1 for credit-impaired assets: ECL = EAD - (1 - LGD) x EAD x DF(t_recovery),
-    // with default time-to-recovery of 1.0 year at EIR 5%.
-    let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05;
-    assert!(
-        (result.ecl - expected).abs() < 1e-6,
-        "Stage 3 ECL {} != carrying value less PV recovery {}",
-        result.ecl,
-        expected
-    );
-    assert_eq!(result.buckets.len(), 1);
-    assert!((result.buckets[0].marginal_pd - 1.0).abs() < 1e-12);
-}
-
-#[test]
-fn stage3_zero_remaining_maturity_has_positive_allowance() {
-    let mut exp = exposure("defaulted-matured");
-    exp.remaining_maturity_years = 0.0;
-
-    let result =
-        compute_ecl_from_curve(&exp, Stage::Stage3, &bbb_curve(), &EclConfig::default()).unwrap();
-
-    assert!(
-        result.ecl > 0.0,
-        "A defaulted exposure at maturity must still carry an allowance, got {}",
-        result.ecl
-    );
-}
-
-#[test]
-fn stage3_ecl_exceeds_stage2_for_same_exposure() {
-    let exp = exposure("compare");
-    let config = EclConfig::default();
-    let curve = bbb_curve();
-
-    let s2 = compute_ecl_from_curve(&exp, Stage::Stage2, &curve, &config).unwrap();
-    let s3 = compute_ecl_from_curve(&exp, Stage::Stage3, &curve, &config).unwrap();
-
-    assert!(
-        s3.ecl > s2.ecl,
-        "Credit-impaired ECL ({}) must exceed performing lifetime ECL ({})",
-        s3.ecl,
-        s2.ecl
-    );
-}
-
-#[test]
-fn stage3_still_validates_pd_curve_rating() {
-    let exp = exposure("defaulted-rating-mismatch");
-    let wrong_curve = RawPdCurve::new("AAA", vec![(0.0, 0.0), (1.0, 0.005), (5.0, 0.02)]).unwrap();
-
-    let err = compute_ecl_from_curve(&exp, Stage::Stage3, &wrong_curve, &EclConfig::default())
-        .expect_err("Stage 3 shortcut must still validate curve/rating mapping");
-    assert!(err.to_string().contains("RawPdCurve is for rating"));
-}
-
-#[test]
 fn negative_eir_is_rejected() {
     let mut exp = exposure("negative-eir");
     exp.eir = -0.01;
@@ -395,41 +333,10 @@ fn unchanged_rating_still_compares_distinct_pd_snapshots() {
 }
 
 #[test]
-fn impaired_full_loss_is_not_discounted_and_delayed_recovery_increases_loss() {
-    let mut exp = exposure("recovery");
-    let curve = bbb_curve();
-    exp.lgd = 1.0;
+fn performing_measure_rejects_impaired_stage() {
+    let exposure = exposure("recovery");
     let config = EclConfig::default();
-    assert_eq!(
-        compute_ecl_from_curve(&exp, Stage::Stage3, &curve, &config)
-            .unwrap()
-            .ecl,
-        exp.ead
-    );
-    exp.lgd = 0.4;
-    let immediate = EclConfig {
-        stage3_time_to_recovery_years: 0.0,
-        ..config.clone()
-    };
-    let later = compute_ecl_from_curve(&exp, Stage::Stage3, &curve, &config)
-        .unwrap()
-        .ecl;
-    assert!(
-        later
-            > compute_ecl_from_curve(&exp, Stage::Stage3, &curve, &immediate)
-                .unwrap()
-                .ecl
-    );
-    exp.days_past_due = 90;
-    let scenario = MacroScenario {
-        id: "base".into(),
-        weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
-        lgd_override: None,
-    };
-    let engine = CeclEngine::new(CeclConfig::default(), vec![(&scenario, &curve)]).unwrap();
-    assert!((engine.compute_cecl(&exp).unwrap().ecl - later).abs() < 1e-8);
-    exp.lgd = 1.0;
-    assert_eq!(engine.compute_cecl(&exp).unwrap().ecl, exp.ead);
+    assert!(compute_ecl_from_curve(&exposure, Stage::Stage3, &bbb_curve(), &config).is_err());
 }
 
 #[test]

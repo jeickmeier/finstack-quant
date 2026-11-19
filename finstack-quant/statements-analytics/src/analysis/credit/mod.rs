@@ -23,3 +23,10 @@ mod scoring_bridge;
 pub use scoring_bridge::{
     CreditScoringModel, StatementScoringMapping, score_statement, score_statement_series,
 };
+
+mod verified_covenants;
+pub use verified_covenants::{
+    CovenantObservationBinding, CovenantStatementUnit, StatementCovenantAssessment,
+    StatementCovenantForecast, StatementCovenantPeriod, StatementCovenantSpec,
+    assess_statement_covenants, forecast_statement_covenants,
+};

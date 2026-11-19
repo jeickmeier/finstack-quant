@@ -1650,6 +1650,9 @@ public = [
     "ForecastMetrics",
     "FreeRentWindowSpec",
     "GoalSeekResult",
+    "ImpairedEclResult",
+    "ImpairedEclScenario",
+    "ImpairedExposure",
     "LboCheckMappings",
     "LboDebtFunding",
     "LboEarnings",
@@ -1669,6 +1672,7 @@ public = [
     "PeerStats",
     "PropertyTemplateNodes",
     "QualitativeFlags",
+    "RecoveryEvidence",
     "RegressionResult",
     "RelativeValueCompany",
     "RelativeValueDimension",
@@ -1691,6 +1695,9 @@ public = [
     "Stage",
     "StageResult",
     "StagingConfig",
+    "StatementCovenantAssessment",
+    "StatementCovenantForecast",
+    "StatementCovenantSpec",
     "StatementScoringMapping",
     "StatementValuationCut",
     "TerminalFcffBasis",
@@ -1703,6 +1710,7 @@ public = [
     "VarianceRow",
     "WaccInputs",
     "WeightedEclResult",
+    "WeightedImpairedEclResult",
     "add_ncf_buildup",
     "add_noi_buildup",
     "add_property_operating_statement",
@@ -1710,11 +1718,14 @@ public = [
     "add_roll_forward",
     "add_roll_forward_with_opening",
     "add_vintage_buildup",
+    "assess_statement_covenants",
     "backtest_forecast",
     "capital_structure_summary",
     "classify_stage",
     "compute_ecl",
     "compute_ecl_weighted",
+    "compute_impaired_ecl",
+    "compute_impaired_ecl_weighted",
     "compute_multiple",
     "credit_assessment",
     "credit_assessment_report_text",
@@ -1733,6 +1744,7 @@ public = [
     "evaluate_scenario_set_with_market",
     "explain_formula",
     "forecast_breaches",
+    "forecast_statement_covenants",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",
@@ -2497,7 +2509,7 @@ js = "statements.schema"
 [parity.modules."finstack_quant.statements_analytics"]
 js = "statements_analytics"
 renames = { PLSummaryReport = { js = "statements_analytics.plSummaryReport", reason = "the Rust PLSummaryReport borrows the statement result, so it is not a WASM handle; plSummaryReport returns its to_table TableEnvelope and plSummaryReportText its text rendering" } }
-types = { StatementScoringMapping = "StatementScoringMapping", CreditScoringModel = "CreditScoringModel", CreditContextReport = "CreditContextReport", CreditContextSpec = "CreditContextSpec", CreditContextMetrics = "CreditContextMetrics", CreditMeasureRow = "CreditMeasureRow", DatedLboRequest = "DatedLboRequest", DatedLboResult = "DatedLboResult", LboEarnings = "LboEarnings", LboDebtFunding = "LboDebtFunding", LboFunding = "LboFunding", LboFundingResult = "LboFundingResult", LboExitBridge = "LboExitBridge", EclScenario = "EclScenario", EclScenarioOutcome = "EclScenarioOutcome", CorporateDcfRequest = "CorporateDcfRequest", StatementValuationCut = "StatementValuationCut", DcfProjection = "DcfProjection", TerminalFcffBasis = "TerminalFcffBasis", DcfInputs = "DcfInputs", DcfOptions = "DcfOptions", DcfSensitivityGridSpec = "DcfSensitivityGridSpec", DcfSensitivityGridResult = "DcfSensitivityGridResult", DcfDistributionResult = "DcfDistributionResult", AccountType = "AccountType", BridgeChart = "BridgeChart", BridgeStep = "BridgeStep", CapitalStructureSummary = "CapitalStructureSummary", CapitalStructureTranche = "CapitalStructureTranche", CompanyMetrics = "CompanyMetrics", CorkscrewAccount = "CorkscrewAccount", CorkscrewConfig = "CorkscrewConfig", CorkscrewReport = "CorkscrewReport", CorporateAnalysis = "CorporateAnalysis", CorporateValuationResult = "CorporateValuationResult", CreditAssessment = "CreditAssessment", CreditAssessmentPoint = "CreditAssessmentPoint", CreditMapping = "CreditMapping", DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", DimensionScore = "DimensionScore", EclBucket = "EclBucket", EclResult = "EclResult", EquityBridge = "EquityBridge", Explanation = "Explanation", ExplanationStep = "ExplanationStep", Exposure = "Exposure", ForecastMetrics = "ForecastMetrics", FreeRentWindowSpec = "FreeRentWindowSpec", GoalSeekResult = "GoalSeekResult", LboCheckMappings = "LboCheckMappings", LboResult = "LboResult", LeaseGrowthConvention = "LeaseGrowthConvention", LeaseSpec = "LeaseSpec", ManagementFeeBase = "ManagementFeeBase", ManagementFeeSpec = "ManagementFeeSpec", MaturityWallBucket = "MaturityWallBucket", ParameterSpec = "ParameterSpec", PeerFilter = "PeerFilter", PeerSet = "PeerSet", PeerStats = "PeerStats", PropertyTemplateNodes = "PropertyTemplateNodes", QualitativeFlags = "QualitativeFlags", RegressionResult = "RegressionResult", RelativeValueCompany = "RelativeValueCompany", RelativeValueDimension = "RelativeValueDimension", RelativeValueMultiple = "RelativeValueMultiple", RelativeValuePoint = "RelativeValuePoint", RelativeValueReport = "RelativeValueReport", RelativeValueResult = "RelativeValueResult", RenewalSpec = "RenewalSpec", RentRollOutputNodes = "RentRollOutputNodes", RentStepSpec = "RentStepSpec", ScenarioDiff = "ScenarioDiff", ScenarioResults = "ScenarioResults", ScenarioSet = "ScenarioSet", ScorecardConfig = "ScorecardConfig", ScorecardMetric = "ScorecardMetric", ScorecardReport = "ScorecardReport", ScoringDimension = "ScoringDimension", SensitivityConfig = "SensitivityConfig", SensitivityResult = "SensitivityResult", Stage = "Stage", StageResult = "StageResult", StagingConfig = "StagingConfig", TerminalValueSpec = "TerminalValueSpec", ThreeStatementMapping = "ThreeStatementMapping", TornadoEntry = "TornadoEntry", ValuationDiscounts = "ValuationDiscounts", VarianceConfig = "VarianceConfig", VarianceReport = "VarianceReport", VarianceRow = "VarianceRow", WeightedEclResult = "WeightedEclResult", WaccInputs = "WaccInputs"}
+types = { ImpairedEclScenario = "ImpairedEclScenario", WeightedImpairedEclResult = "WeightedImpairedEclResult", ImpairedExposure = "ImpairedExposure", RecoveryEvidence = "RecoveryEvidence", ImpairedEclResult = "ImpairedEclResult", StatementCovenantSpec = "StatementCovenantSpec", StatementCovenantAssessment = "StatementCovenantAssessment", StatementCovenantForecast = "StatementCovenantForecast", StatementScoringMapping = "StatementScoringMapping", CreditScoringModel = "CreditScoringModel", CreditContextReport = "CreditContextReport", CreditContextSpec = "CreditContextSpec", CreditContextMetrics = "CreditContextMetrics", CreditMeasureRow = "CreditMeasureRow", DatedLboRequest = "DatedLboRequest", DatedLboResult = "DatedLboResult", LboEarnings = "LboEarnings", LboDebtFunding = "LboDebtFunding", LboFunding = "LboFunding", LboFundingResult = "LboFundingResult", LboExitBridge = "LboExitBridge", EclScenario = "EclScenario", EclScenarioOutcome = "EclScenarioOutcome", CorporateDcfRequest = "CorporateDcfRequest", StatementValuationCut = "StatementValuationCut", DcfProjection = "DcfProjection", TerminalFcffBasis = "TerminalFcffBasis", DcfInputs = "DcfInputs", DcfOptions = "DcfOptions", DcfSensitivityGridSpec = "DcfSensitivityGridSpec", DcfSensitivityGridResult = "DcfSensitivityGridResult", DcfDistributionResult = "DcfDistributionResult", AccountType = "AccountType", BridgeChart = "BridgeChart", BridgeStep = "BridgeStep", CapitalStructureSummary = "CapitalStructureSummary", CapitalStructureTranche = "CapitalStructureTranche", CompanyMetrics = "CompanyMetrics", CorkscrewAccount = "CorkscrewAccount", CorkscrewConfig = "CorkscrewConfig", CorkscrewReport = "CorkscrewReport", CorporateAnalysis = "CorporateAnalysis", CorporateValuationResult = "CorporateValuationResult", CreditAssessment = "CreditAssessment", CreditAssessmentPoint = "CreditAssessmentPoint", CreditMapping = "CreditMapping", DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", DimensionScore = "DimensionScore", EclBucket = "EclBucket", EclResult = "EclResult", EquityBridge = "EquityBridge", Explanation = "Explanation", ExplanationStep = "ExplanationStep", Exposure = "Exposure", ForecastMetrics = "ForecastMetrics", FreeRentWindowSpec = "FreeRentWindowSpec", GoalSeekResult = "GoalSeekResult", LboCheckMappings = "LboCheckMappings", LboResult = "LboResult", LeaseGrowthConvention = "LeaseGrowthConvention", LeaseSpec = "LeaseSpec", ManagementFeeBase = "ManagementFeeBase", ManagementFeeSpec = "ManagementFeeSpec", MaturityWallBucket = "MaturityWallBucket", ParameterSpec = "ParameterSpec", PeerFilter = "PeerFilter", PeerSet = "PeerSet", PeerStats = "PeerStats", PropertyTemplateNodes = "PropertyTemplateNodes", QualitativeFlags = "QualitativeFlags", RegressionResult = "RegressionResult", RelativeValueCompany = "RelativeValueCompany", RelativeValueDimension = "RelativeValueDimension", RelativeValueMultiple = "RelativeValueMultiple", RelativeValuePoint = "RelativeValuePoint", RelativeValueReport = "RelativeValueReport", RelativeValueResult = "RelativeValueResult", RenewalSpec = "RenewalSpec", RentRollOutputNodes = "RentRollOutputNodes", RentStepSpec = "RentStepSpec", ScenarioDiff = "ScenarioDiff", ScenarioResults = "ScenarioResults", ScenarioSet = "ScenarioSet", ScorecardConfig = "ScorecardConfig", ScorecardMetric = "ScorecardMetric", ScorecardReport = "ScorecardReport", ScoringDimension = "ScoringDimension", SensitivityConfig = "SensitivityConfig", SensitivityResult = "SensitivityResult", Stage = "Stage", StageResult = "StageResult", StagingConfig = "StagingConfig", TerminalValueSpec = "TerminalValueSpec", ThreeStatementMapping = "ThreeStatementMapping", TornadoEntry = "TornadoEntry", ValuationDiscounts = "ValuationDiscounts", VarianceConfig = "VarianceConfig", VarianceReport = "VarianceReport", VarianceRow = "VarianceRow", WeightedEclResult = "WeightedEclResult", WaccInputs = "WaccInputs"}
 constructors = { DcfInputs = "statements_analytics.dcfInputs", DcfOptions = "statements_analytics.dcfOptions", DcfSensitivityGridSpec = "statements_analytics.dcfSensitivityGridSpec" }
 
 [parity.modules."finstack_quant.valuations"]

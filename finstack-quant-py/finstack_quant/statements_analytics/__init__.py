@@ -66,6 +66,11 @@ credit_assessment = _sa.credit_assessment
 DependencyTracer = _sa.DependencyTracer
 DependencyTree = _sa.DependencyTree
 explain_formula = _sa.explain_formula
+StatementCovenantSpec = _sa.StatementCovenantSpec
+StatementCovenantAssessment = _sa.StatementCovenantAssessment
+StatementCovenantForecast = _sa.StatementCovenantForecast
+assess_statement_covenants = _sa.assess_statement_covenants
+forecast_statement_covenants = _sa.forecast_statement_covenants
 evaluate_covenants = _sa.evaluate_covenants
 forecast_breaches = _sa.forecast_breaches
 run_checks = _sa.run_checks
@@ -179,6 +184,13 @@ StagingConfig = _sa.StagingConfig
 TerminalValueSpec = _sa.TerminalValueSpec
 ThreeStatementMapping = _sa.ThreeStatementMapping
 ValuationDiscounts = _sa.ValuationDiscounts
+ImpairedEclScenario = _sa.ImpairedEclScenario
+WeightedImpairedEclResult = _sa.WeightedImpairedEclResult
+compute_impaired_ecl_weighted = _sa.compute_impaired_ecl_weighted
+ImpairedExposure = _sa.ImpairedExposure
+RecoveryEvidence = _sa.RecoveryEvidence
+ImpairedEclResult = _sa.ImpairedEclResult
+compute_impaired_ecl = _sa.compute_impaired_ecl
 EclScenario = _sa.EclScenario
 EclScenarioOutcome = _sa.EclScenarioOutcome
 WeightedEclResult = _sa.WeightedEclResult
@@ -230,6 +242,9 @@ __all__: list[str] = [
     "ForecastMetrics",
     "FreeRentWindowSpec",
     "GoalSeekResult",
+    "ImpairedEclResult",
+    "ImpairedEclScenario",
+    "ImpairedExposure",
     "LboCheckMappings",
     "LboDebtFunding",
     "LboEarnings",
@@ -249,6 +264,7 @@ __all__: list[str] = [
     "PeerStats",
     "PropertyTemplateNodes",
     "QualitativeFlags",
+    "RecoveryEvidence",
     "RegressionResult",
     "RelativeValueCompany",
     "RelativeValueDimension",
@@ -271,6 +287,9 @@ __all__: list[str] = [
     "Stage",
     "StageResult",
     "StagingConfig",
+    "StatementCovenantAssessment",
+    "StatementCovenantForecast",
+    "StatementCovenantSpec",
     "StatementScoringMapping",
     "StatementValuationCut",
     "TerminalFcffBasis",
@@ -283,6 +302,7 @@ __all__: list[str] = [
     "VarianceRow",
     "WaccInputs",
     "WeightedEclResult",
+    "WeightedImpairedEclResult",
     "add_ncf_buildup",
     "add_noi_buildup",
     "add_property_operating_statement",
@@ -290,11 +310,14 @@ __all__: list[str] = [
     "add_roll_forward",
     "add_roll_forward_with_opening",
     "add_vintage_buildup",
+    "assess_statement_covenants",
     "backtest_forecast",
     "capital_structure_summary",
     "classify_stage",
     "compute_ecl",
     "compute_ecl_weighted",
+    "compute_impaired_ecl",
+    "compute_impaired_ecl_weighted",
     "compute_multiple",
     "credit_assessment",
     "credit_assessment_report_text",
@@ -313,6 +336,7 @@ __all__: list[str] = [
     "evaluate_scenario_set_with_market",
     "explain_formula",
     "forecast_breaches",
+    "forecast_statement_covenants",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",

@@ -58,9 +58,8 @@ pub fn classify_stage(
 /// `classifyStage` first and pass its `stage`.
 /// @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
 /// @param pdSchedule - Cumulative PD knots as `[timeYears, cumulativePd]` pairs, ascending in time and non-decreasing in PD (decimals).
-/// @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).
+/// @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime).
 /// @param bucketWidthYears - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
-/// @param stage3TimeToRecoveryYears - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
 /// @returns `WeightedEclResult`: the ECL in the exposure's currency units, the stage and the per-scenario bucket audit trail.
 ///
 /// # Errors
@@ -83,11 +82,6 @@ pub fn compute_ecl(
         unchecked_optional_param_type = "number | null"
     )]
     bucket_width_years: Option<JsValue>,
-    #[wasm_bindgen(
-        js_name = "stage3TimeToRecoveryYears",
-        unchecked_optional_param_type = "number | null"
-    )]
-    stage3_time_to_recovery_years: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let exposure: ecl::Exposure = from_js_json(&exposure, "exposure")?;
     let pd_schedule: Vec<(f64, f64)> = from_js_json(&pd_schedule, "pdSchedule")?;
@@ -96,10 +90,6 @@ pub fn compute_ecl(
         js_wire::<ecl::Stage>(&stage, "stage")?,
         pd_schedule,
         js_opt_f64(bucket_width_years.as_ref(), "bucketWidthYears")?,
-        js_opt_f64(
-            stage3_time_to_recovery_years.as_ref(),
-            "stage3TimeToRecoveryYears",
-        )?,
     )
     .map_err(to_js_err)?;
     to_js_value(&result)
@@ -111,7 +101,6 @@ pub fn compute_ecl(
 ///   optional cumulative-PD schedules anchored at (0,0), and optional LGD fractions.
 /// @param stage - Already resolved IFRS 9 impairment stage.
 /// @param bucketWidthYears - Integration width in years, defaulting to the Rust policy.
-/// @param stage3TimeToRecoveryYears - Elected discount horizon for Stage 3 recovery.
 /// @returns Scenario evidence and total allowance. The total is null if required evidence is unavailable.
 /// @throws Validation error for invalid exposure, stage, scenario weights, or supplied PD or LGD data.
 #[wasm_bindgen(js_name = computeEclWeighted, unchecked_return_type = "generated.statements_analytics.WeightedEclResult")]
@@ -128,11 +117,6 @@ pub fn compute_ecl_weighted(
         unchecked_optional_param_type = "number | null"
     )]
     bucket_width_years: Option<JsValue>,
-    #[wasm_bindgen(
-        js_name = "stage3TimeToRecoveryYears",
-        unchecked_optional_param_type = "number | null"
-    )]
-    stage3_time_to_recovery_years: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let exposure: ecl::Exposure = from_js_json(&exposure, "exposure")?;
     let scenarios: Vec<ecl::EclScenario> = from_js_json(&scenarios, "scenarios")?;
@@ -141,11 +125,56 @@ pub fn compute_ecl_weighted(
         js_wire::<ecl::Stage>(&stage, "stage")?,
         &scenarios,
         js_opt_f64(bucket_width_years.as_ref(), "bucketWidthYears")?,
-        js_opt_f64(
-            stage3_time_to_recovery_years.as_ref(),
-            "stage3TimeToRecoveryYears",
-        )?,
     )
     .map_err(to_js_err)?;
     to_js_value(&result)
+}
+
+/// Measure Stage 3 allowance from an approved dated recovery.
+///
+/// @param exposure - Sourced carrying amount, reporting date, annual effective original interest rate and recovery day count.
+/// @param recovery - Approved expected recovery cash and receipt date in the exposure currency.
+/// @returns Dated recovery evidence, present value, signed shortfall and nonnegative allowance.
+/// @throws If amounts, source, date, rate, day count or currency are invalid.
+#[wasm_bindgen(js_name = computeImpairedEcl, unchecked_return_type = "generated.statements_analytics.ImpairedEclResult")]
+pub fn compute_impaired_ecl(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.ImpairedExposure | string"
+    )]
+    exposure: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.RecoveryEvidence | string"
+    )]
+    recovery: JsValue,
+) -> Result<JsValue, JsValue> {
+    to_js_value(
+        &ecl::compute_impaired_ecl(
+            &from_js_json(&exposure, "exposure")?,
+            &from_js_json(&recovery, "recovery")?,
+        )
+        .map_err(to_js_err)?,
+    )
+}
+
+/// Weight named credit-impaired recoveries on one dated carrying basis.
+/// @param exposure - Common sourced carrying exposure, report date and original EIR convention.
+/// @param scenarios - Unique named recovery scenarios with exact decimal string weights, summing to one.
+/// @returns Dated same-currency allowance and every credit-impaired scenario outcome. The total is absent when any positive-weight recovery is unavailable.
+/// @throws If the scenario IDs, weights or evidence are invalid, or if the monetary calculations overflow.
+#[wasm_bindgen(js_name = computeImpairedEclWeighted, unchecked_return_type = "generated.statements_analytics.WeightedImpairedEclResult")]
+pub fn compute_impaired_ecl_weighted(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.ImpairedExposure | string"
+    )]
+    exposure: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly generated.statements_analytics.ImpairedEclScenario[] | string"
+    )]
+    scenarios: JsValue,
+) -> Result<JsValue, JsValue> {
+    let scenarios: Vec<ecl::ImpairedEclScenario> = from_js_json(&scenarios, "scenarios")?;
+    to_js_value(
+        &ecl::compute_impaired_ecl_weighted(&from_js_json(&exposure, "exposure")?, &scenarios)
+            .map_err(to_js_err)?,
+    )
 }

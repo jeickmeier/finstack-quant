@@ -62,8 +62,185 @@ fn forecast_breaches(
     .map_err(core_to_py)
 }
 
+#[pyclass(
+    name = "StatementCovenantSpec",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantSpec")]
+#[derive(Clone)]
+struct PyStatementCovenantSpec {
+    inner: finstack_quant_statements_analytics::analysis::StatementCovenantSpec,
+}
+
+#[pymethods]
+impl PyStatementCovenantSpec {
+    #[new]
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, scope, covenant_ids, periods, observed_through, bindings)"
+    )]
+    #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantSpec.__init__")]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner =
+            crate::bindings::module_utils::fields_from_py(py, fields, "StatementCovenantSpec")?;
+        Ok(Self { inner })
+    }
+}
+
+#[pyclass(
+    name = "StatementCovenantAssessment",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantAssessment")]
+#[derive(Clone)]
+struct PyStatementCovenantAssessment {
+    inner: finstack_quant_statements_analytics::analysis::StatementCovenantAssessment,
+}
+
+#[pymethods]
+impl PyStatementCovenantAssessment {
+    #[getter]
+    #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantAssessment.provenance")]
+    fn provenance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.provenance)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantAssessment.to_dataframe")]
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
+        const COLUMNS: [ColumnSchema<'static>; 9] = [
+            ("period", "str"),
+            ("date", "str"),
+            ("is_actual", "bool"),
+            ("covenant_id", "str"),
+            ("state", "str"),
+            ("passed", "boolean"),
+            ("threshold", "float64"),
+            ("headroom_raw", "float64"),
+            ("missing_metric", "str"),
+        ];
+        let rows =
+            self.inner
+                .periods
+                .iter()
+                .flat_map(|period| {
+                    period.assessments.iter().map(|test| serde_json::json!({
+                "period": period.period.to_string(),
+                "date": period.date.to_string(),
+                "is_actual": period.is_actual,
+                "covenant_id": test.covenant_id,
+                "state": test.state,
+                "passed": test.report.as_ref().map(|report| report.passed),
+                "threshold": test.effective_threshold,
+                "headroom_raw": test.report.as_ref().and_then(|report| report.headroom_raw),
+                "missing_metric": test.missing_metric,
+            }))
+                })
+                .collect::<Vec<_>>();
+        serde_rows_to_dataframe_with_schema(py, &rows, &COLUMNS)
+    }
+}
+
+crate::bindings::macros::wire_methods!(
+    PyStatementCovenantAssessment,
+    finstack_quant_statements_analytics::analysis::StatementCovenantAssessment,
+    "StatementCovenantAssessment",
+    module = "finstack_quant.statements_analytics._covenants"
+);
+
+#[pyclass(
+    name = "StatementCovenantForecast",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantForecast")]
+#[derive(Clone)]
+struct PyStatementCovenantForecast {
+    inner: finstack_quant_statements_analytics::analysis::StatementCovenantForecast,
+}
+
+#[pymethods]
+impl PyStatementCovenantForecast {
+    #[getter]
+    #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantForecast.assessment")]
+    fn assessment(&self) -> PyStatementCovenantAssessment {
+        PyStatementCovenantAssessment {
+            inner: self.inner.assessment.clone(),
+        }
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantForecast.breaches")]
+    fn breaches(&self) -> Vec<PyFutureBreach> {
+        self.inner
+            .breaches
+            .iter()
+            .cloned()
+            .map(PyFutureBreach::from_inner)
+            .collect()
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantForecast.reference_date")]
+    fn reference_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::date_utils::date_to_py(py, self.inner.reference_date)
+    }
+}
+
+#[doc = pydoc!("finstack_quant.statements_analytics._covenants", "assess_statement_covenants")]
+#[pyfunction]
+fn assess_statement_covenants(
+    engine: &PyCovenantEngine,
+    model: &Bound<'_, PyAny>,
+    results: &Bound<'_, PyAny>,
+    spec: &PyStatementCovenantSpec,
+) -> PyResult<PyStatementCovenantAssessment> {
+    let model = crate::bindings::extract::extract_model_ref(model)?;
+    let results = extract_results_ref(results)?;
+    let inner = finstack_quant_statements_analytics::analysis::assess_statement_covenants(
+        &engine.inner,
+        &model,
+        &results,
+        &spec.inner,
+    )
+    .map_err(core_to_py)?;
+    Ok(PyStatementCovenantAssessment { inner })
+}
+
+#[doc = pydoc!("finstack_quant.statements_analytics._covenants", "forecast_statement_covenants")]
+#[pyfunction]
+fn forecast_statement_covenants(
+    engine: &PyCovenantEngine,
+    model: &Bound<'_, PyAny>,
+    results: &Bound<'_, PyAny>,
+    spec: &PyStatementCovenantSpec,
+    config: &PyCovenantForecastConfig,
+) -> PyResult<PyStatementCovenantForecast> {
+    let model = crate::bindings::extract::extract_model_ref(model)?;
+    let results = extract_results_ref(results)?;
+    let inner = finstack_quant_statements_analytics::analysis::forecast_statement_covenants(
+        &engine.inner,
+        &model,
+        &results,
+        &spec.inner,
+        config.inner.clone(),
+    )
+    .map_err(core_to_py)?;
+    Ok(PyStatementCovenantForecast { inner })
+}
+
 /// Register the statement covenant functions.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyStatementCovenantSpec>()?;
+    m.add_class::<PyStatementCovenantAssessment>()?;
+    m.add_class::<PyStatementCovenantForecast>()?;
+    m.add_function(pyo3::wrap_pyfunction!(assess_statement_covenants, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(forecast_statement_covenants, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(evaluate_covenants, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(forecast_breaches, m)?)?;
     Ok(())

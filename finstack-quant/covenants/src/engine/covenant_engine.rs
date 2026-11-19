@@ -13,6 +13,42 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+/// Availability and contractual applicability of an individual test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CovenantAssessmentState {
+    /// The selected test is outside the effective window or was made inactive.
+    Inactive,
+    /// The lender waived the test without a replacement threshold.
+    Waived,
+    /// The specified springing condition was assessed and was not met.
+    Untriggered,
+    /// The applicable covenant was evaluated on the supplied metric observations.
+    Assessed,
+    /// The test is applicable but required metric evidence is absent.
+    Incomplete,
+}
+
+/// Evidence for an explicitly selected covenant on one observation date.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CovenantAssessment {
+    /// Stable covenant instance key.
+    pub covenant_id: String,
+    /// Applicability and evidence state of the test.
+    pub state: CovenantAssessmentState,
+    /// Effective terms selected on the observation date when applicable.
+    pub terms: Option<CovenantSpec>,
+    /// Threshold after the active schedule and lender amendments, when applicable.
+    pub effective_threshold: Option<f64>,
+    /// Report produced by the engine for an assessed test.
+    pub report: Option<CovenantReport>,
+    /// Missing metric identifier when the assessment could not complete.
+    pub missing_metric: Option<String>,
+}
+
 /// Covenant engine for evaluation and consequence application.
 ///
 /// Only `specs` is required on the wire: `breach_history`, `windows` and
@@ -255,76 +291,169 @@ impl CovenantEngine {
         let mut reports = IndexMap::new();
 
         for spec in specs {
-            let cid = spec.covenant.instance_key();
-            let cid = cid.as_str();
-            let description = spec.covenant.description();
-
-            if !spec.covenant.is_active {
-                reports.insert(
-                    cid.to_string(),
-                    CovenantReport::passed(&description)
-                        .with_covenant_id(cid)
-                        .with_details("Covenant inactive"),
-                );
-                continue;
-            }
-
-            if let Some(waiver) = self.active_waiver(cid, test_date)
-                && waiver.amended_threshold.is_none()
-            {
-                tracing::info!(covenant_id = cid, %test_date, "covenant waived by lender agreement");
-                reports.insert(
-                    cid.to_string(),
-                    CovenantReport::passed(&description)
-                        .with_covenant_id(cid)
-                        .with_details("Waived by lender agreement"),
-                );
-                continue;
-            }
-
-            let evaluation = self.evaluate_spec(spec, context, test_date)?;
-
-            let mut report = if evaluation.passed {
-                CovenantReport::passed(&description)
-            } else {
-                CovenantReport::failed(&description)
-            };
-            report = report.with_covenant_id(cid);
-
-            if let Some(value) = evaluation.actual_value {
-                report = report.with_actual(value);
-            }
-            if let Some(thresh) = evaluation.threshold {
-                report = report.with_threshold(thresh);
-            }
-            if let Some(hr) = evaluation.headroom {
-                report = report.with_headroom(hr);
-            }
-            report.headroom_raw = evaluation.headroom_raw;
-
-            if !evaluation.passed {
-                tracing::warn!(
-                    covenant_id = cid,
-                    actual = evaluation.actual_value,
-                    threshold = evaluation.threshold,
-                    %test_date,
-                    "covenant breach detected",
-                );
-                if let Some(breach) = self.find_active_breach(cid, test_date)
-                    && breach.cure_deadline.is_some_and(|d| test_date <= d)
-                {
-                    report = report.with_details("In cure period");
-                }
-            }
-
-            if let Some(detail) = evaluation.detail {
-                report = report.with_details(&detail);
-            }
-
-            reports.insert(cid.to_string(), report);
+            let (_, report) = self.assess_spec_at(spec, context, test_date)?;
+            reports.insert(spec.covenant.instance_key(), report);
         }
 
         Ok(reports)
+    }
+
+    fn assess_spec_at(
+        &self,
+        spec: &CovenantSpec,
+        context: &dyn CovenantMetricSource,
+        test_date: Date,
+    ) -> finstack_quant_core::Result<(CovenantAssessmentState, CovenantReport)> {
+        let id = spec.covenant.instance_key();
+        let cid = id.as_str();
+        let description = spec.covenant.description();
+        if !spec.covenant.is_active {
+            return Ok((
+                CovenantAssessmentState::Inactive,
+                CovenantReport::passed(&description)
+                    .with_covenant_id(cid)
+                    .with_details("Covenant inactive"),
+            ));
+        }
+        if self
+            .active_waiver(cid, test_date)
+            .is_some_and(|waiver| waiver.amended_threshold.is_none())
+        {
+            return Ok((
+                CovenantAssessmentState::Waived,
+                CovenantReport::passed(&description)
+                    .with_covenant_id(cid)
+                    .with_details("Waived by lender agreement"),
+            ));
+        }
+
+        let evaluation = self.evaluate_spec(spec, context, test_date)?;
+
+        let mut report = if evaluation.passed {
+            CovenantReport::passed(&description)
+        } else {
+            CovenantReport::failed(&description)
+        };
+        report = report.with_covenant_id(cid);
+
+        if let Some(value) = evaluation.actual_value {
+            report = report.with_actual(value);
+        }
+        if let Some(thresh) = evaluation.threshold {
+            report = report.with_threshold(thresh);
+        }
+        if let Some(hr) = evaluation.headroom {
+            report = report.with_headroom(hr);
+        }
+        report.headroom_raw = evaluation.headroom_raw;
+
+        if !evaluation.passed {
+            tracing::warn!(
+                covenant_id = cid,
+                actual = evaluation.actual_value,
+                threshold = evaluation.threshold,
+                %test_date,
+                "covenant breach detected",
+            );
+            if let Some(breach) = self.find_active_breach(cid, test_date)
+                && breach.cure_deadline.is_some_and(|d| test_date <= d)
+            {
+                report = report.with_details("In cure period");
+            }
+        }
+
+        if let Some(detail) = evaluation.detail {
+            report = report.with_details(&detail);
+        }
+
+        let state = if evaluation.untriggered {
+            CovenantAssessmentState::Untriggered
+        } else {
+            CovenantAssessmentState::Assessed
+        };
+        Ok((state, report))
+    }
+
+    /// Assess an explicitly selected set of tests without updating breach history.
+    ///
+    /// # Arguments
+    /// * `context` - Source of typed or prevalidated financial observations for the selected tests.
+    /// * `test_date` - Date selecting applicable terms, waivers, threshold schedules and amendments.
+    /// * `scope` - Elected maintenance or incurrence testing scope.
+    /// * `selected` - Nonempty ordered distinct covenant instance keys from the engine.
+    ///
+    /// # Errors
+    /// Rejects invalid terms, unknown or duplicate keys, or invalid supplied observations.
+    /// A required missing metric is recorded as incomplete independently of other tests.
+    pub fn assess_selected(
+        &self,
+        context: &dyn CovenantMetricSource,
+        test_date: Date,
+        scope: CovenantScope,
+        selected: &[String],
+    ) -> finstack_quant_core::Result<Vec<CovenantAssessment>> {
+        use finstack_quant_core::{Error, InputError};
+
+        self.validate()?;
+        let mut distinct = BTreeSet::new();
+        if selected.is_empty() || selected.iter().any(|key| !distinct.insert(key)) {
+            return Err(Error::Validation(
+                "Covenant assessment requires distinct selected test identities".into(),
+            ));
+        }
+        let effective = self.applicable_specs(test_date);
+        let exists = |key: &str| {
+            self.specs
+                .iter()
+                .chain(
+                    self.windows
+                        .iter()
+                        .flat_map(|window| window.covenants.iter()),
+                )
+                .any(|spec| spec.covenant.scope == scope && spec.covenant.instance_key() == key)
+        };
+        selected
+            .iter()
+            .map(|key| {
+                if !exists(key) {
+                    return Err(Error::Validation(format!(
+                        "Unknown selected covenant '{key}' in the elected scope"
+                    )));
+                }
+                let terms = effective
+                    .iter()
+                    .find(|spec| {
+                        spec.covenant.scope == scope && spec.covenant.instance_key() == *key
+                    })
+                    .copied();
+                let mut outcome = CovenantAssessment {
+                    covenant_id: key.clone(),
+                    state: CovenantAssessmentState::Inactive,
+                    effective_threshold: terms
+                        .and_then(|term| self.effective_threshold(term, test_date)),
+                    terms: terms.cloned(),
+                    report: None,
+                    missing_metric: None,
+                };
+                let Some(terms) = terms else {
+                    return Ok(outcome);
+                };
+                match self.assess_spec_at(terms, context, test_date) {
+                    Ok((state, report)) => {
+                        outcome.state = state;
+                        if state == CovenantAssessmentState::Assessed {
+                            outcome.report = Some(report);
+                        }
+                    }
+                    Err(Error::Input(InputError::NotFound { id })) => {
+                        outcome.state = CovenantAssessmentState::Incomplete;
+                        outcome.missing_metric = Some(id);
+                    }
+                    Err(error) => return Err(error),
+                }
+                Ok(outcome)
+            })
+            .collect()
     }
 
     /// Evaluate covenants and update the engine's breach history.
@@ -538,6 +667,7 @@ impl CovenantEngine {
                     "springing condition not met — covenant inactive",
                 );
                 return Ok(SpecEvaluation {
+                    untriggered: true,
                     passed: true,
                     actual_value: None,
                     threshold: None,
@@ -552,6 +682,7 @@ impl CovenantEngine {
 
         let Some(base_threshold) = covenant_type.threshold_value() else {
             return Ok(SpecEvaluation {
+                untriggered: false,
                 passed: true,
                 actual_value: None,
                 threshold: None,
@@ -592,6 +723,7 @@ impl CovenantEngine {
         let headroom_raw = headroom_raw_for(covenant_type.bound_kind(), metric_value, threshold);
 
         Ok(SpecEvaluation {
+            untriggered: false,
             passed,
             actual_value: metric_value.is_finite().then_some(metric_value),
             threshold: Some(threshold),

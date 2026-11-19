@@ -102,8 +102,6 @@ pub struct EclScenario {
 ///   applicable horizon. LGD is an optional scenario loss fraction in [0, 1].
 /// * `bucket_width_years` - Integration bucket width in years (`0.25` =
 ///   quarterly); `None` uses the canonical policy default.
-/// * `stage3_time_to_recovery_years` - Stage 3 discounting horizon to expected
-///   recovery in years; `None` uses the canonical policy default.
 ///
 /// # Returns
 ///
@@ -119,7 +117,6 @@ pub fn compute_ecl_weighted(
     stage: Stage,
     scenarios: &[EclScenario],
     bucket_width_years: Option<f64>,
-    stage3_time_to_recovery_years: Option<f64>,
 ) -> Result<WeightedEclResult> {
     if scenarios.is_empty() {
         return Err(Error::Validation(
@@ -140,9 +137,6 @@ pub fn compute_ecl_weighted(
     if let Some(years) = bucket_width_years {
         config = config.bucket_width(years);
     }
-    if let Some(years) = stage3_time_to_recovery_years {
-        config = config.stage3_time_to_recovery(years);
-    }
     let config = config.build()?;
 
     let mut priced = exposure.clone();
@@ -152,7 +146,10 @@ pub fn compute_ecl_weighted(
     let required_horizon = match stage {
         Stage::Stage1 => exposure.remaining_maturity_years.min(1.0),
         Stage::Stage2 => exposure.remaining_maturity_years,
-        Stage::Stage3 => 0.0,
+        Stage::Stage3 => return Err(Error::Validation(
+            "Stage 3 requires dated carrying and recovery evidence through compute_impaired_ecl"
+                .into(),
+        )),
     };
     let curves = scenarios
         .iter()
@@ -211,8 +208,6 @@ pub fn compute_ecl_weighted(
 ///   non-decreasing in PD; a `(0, 0)` knot is inserted when absent.
 /// * `bucket_width_years` - Integration bucket width in years (`0.25` =
 ///   quarterly); `None` uses the canonical policy default.
-/// * `stage3_time_to_recovery_years` - Stage 3 discounting horizon to expected
-///   recovery in years; `None` uses the canonical policy default.
 ///
 /// # Returns
 ///
@@ -227,7 +222,6 @@ pub fn compute_ecl(
     stage: Stage,
     pd_schedule: Vec<(f64, f64)>,
     bucket_width_years: Option<f64>,
-    stage3_time_to_recovery_years: Option<f64>,
 ) -> Result<WeightedEclResult> {
     compute_ecl_weighted(
         exposure,
@@ -239,7 +233,6 @@ pub fn compute_ecl(
             lgd_override: None,
         }],
         bucket_width_years,
-        stage3_time_to_recovery_years,
     )
 }
 
@@ -288,8 +281,7 @@ mod tests {
                 lgd_override: None,
             },
         ];
-        let complete =
-            compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None, None).unwrap();
+        let complete = compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None).unwrap();
         assert!((complete.ecl.unwrap() - 3.75).abs() < 1.0e-12);
         assert!(matches!(
             complete.scenario_breakdown[2].measurement,
@@ -297,8 +289,7 @@ mod tests {
         ));
 
         scenarios[1].pd_schedule = None;
-        let partial =
-            compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None, None).unwrap();
+        let partial = compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None).unwrap();
         assert_eq!(partial.ecl, None);
         assert!(matches!(
             partial.scenario_breakdown[0].measurement,
@@ -310,7 +301,7 @@ mod tests {
         ));
 
         scenarios[1].weight = DecimalWire("0.2500000000000000000000000001".parse().unwrap());
-        assert!(compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None, None).is_err());
+        assert!(compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None).is_err());
     }
 
     #[test]
@@ -388,16 +379,14 @@ mod tests {
             pd_schedule: Some(vec![(0.0, 0.0), (1.0, 0.1), (2.0, 0.2)]),
             lgd_override: None,
         }];
-        let drawn_only =
-            compute_ecl_weighted(&base, Stage::Stage2, &scenarios, None, None).unwrap();
+        let drawn_only = compute_ecl_weighted(&base, Stage::Stage2, &scenarios, None).unwrap();
 
         let revolver = Exposure {
             undrawn: 100.0,
             ccf: 0.5,
             ..base
         };
-        let priced =
-            compute_ecl_weighted(&revolver, Stage::Stage2, &scenarios, None, None).unwrap();
+        let priced = compute_ecl_weighted(&revolver, Stage::Stage2, &scenarios, None).unwrap();
         assert!((priced.ecl.unwrap() - 1.5 * drawn_only.ecl.unwrap()).abs() < 1e-9);
         assert_eq!(priced.scenario_breakdown.len(), 1);
 
@@ -405,7 +394,6 @@ mod tests {
             &revolver,
             Stage::Stage2,
             scenarios[0].pd_schedule.clone().unwrap(),
-            None,
             None,
         )
         .unwrap();

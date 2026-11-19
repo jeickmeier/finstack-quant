@@ -37,6 +37,8 @@ export const statements_analytics = {
   creditAssessment: wasm.creditAssessment,
   capitalStructureSummary: wasm.capitalStructureSummary,
   capitalStructureSummaryTable: wasm.capitalStructureSummaryTable,
+  assessStatementCovenants: wasm.assessStatementCovenants,
+  forecastStatementCovenants: wasm.forecastStatementCovenants,
   evaluateCovenants: wasm.evaluateCovenants,
   // Raw export is prefixed: `forecastBreaches` is also the covenants
   // namespace's forecast over dated metric rows, so the raw names must differ.
@@ -56,6 +58,8 @@ export const statements_analytics = {
   relativeValueReportTable: wasm.relativeValueReportTable,
   validateScorecardConfig: wasm.validateScorecardConfig,
   classifyStage: wasm.classifyStage,
+  computeImpairedEclWeighted: wasm.computeImpairedEclWeighted,
+  computeImpairedEcl: wasm.computeImpairedEcl,
   computeEcl: wasm.computeEcl,
   computeEclWeighted: wasm.computeEclWeighted,
   addVintageBuildup: wasm.addVintageBuildup,

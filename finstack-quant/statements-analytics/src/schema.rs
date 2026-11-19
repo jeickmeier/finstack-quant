@@ -71,16 +71,20 @@ use crate::{
     analysis::EclScenario, analysis::EclScenarioOutcome, analysis::EffectiveTaxRateCheck,
     analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GoalSeekSpec, analysis::GrowthRateConsistency,
+    analysis::ImpairedEclResult, analysis::ImpairedEclScenario, analysis::ImpairedExposure,
     analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboDebtFunding,
     analysis::LboEarnings, analysis::LboExitBridge, analysis::LboFunding,
     analysis::LboFundingResult, analysis::LboResult, analysis::LeverageRangeCheck,
     analysis::LiquidityRunwayCheck, analysis::PeerFilter, analysis::PeerSet, analysis::PeerStats,
-    analysis::RatingPdMap, analysis::RegressionResult, analysis::RelativeValueReport,
-    analysis::RelativeValueReportConfig, analysis::RelativeValueResult, analysis::ScenarioDiff,
-    analysis::ScenarioResults, analysis::ScenarioSet, analysis::ScoringDimension,
-    analysis::SensitivityResult, analysis::StageResult, analysis::StatementScoringMapping,
-    analysis::StatementValuationCut, analysis::TerminalFcffBasis, analysis::TrendCheck,
-    analysis::VarianceConfig, analysis::WaccInputs, analysis::WeightedEclResult,
+    analysis::RatingPdMap, analysis::RecoveryEvidence, analysis::RegressionResult,
+    analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
+    analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
+    analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
+    analysis::StageResult, analysis::StatementCovenantAssessment,
+    analysis::StatementCovenantForecast, analysis::StatementCovenantSpec,
+    analysis::StatementScoringMapping, analysis::StatementValuationCut,
+    analysis::TerminalFcffBasis, analysis::TrendCheck, analysis::VarianceConfig,
+    analysis::WaccInputs, analysis::WeightedEclResult, analysis::WeightedImpairedEclResult,
     analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig, extensions::CorkscrewReport,
     extensions::ScorecardConfig, extensions::ScorecardReport, templates::real_estate::LeaseSpec,
     templates::real_estate::ManagementFeeSpec, templates::real_estate::PropertyTemplateNodes,
@@ -470,6 +474,70 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "interest_expense_reconciliation",
         Component,
         "Reconciles interest expense against debt balances or the capital-structure interest schedule."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementCovenantForecast,
+        "statements_analytics",
+        "statement_covenant_forecast",
+        Output,
+        "Qualified forecast, breach evidence and per-period coverage."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementCovenantAssessment,
+        "statements_analytics",
+        "statement_covenant_assessment",
+        Output,
+        "Effective covenant terms and available evidence by dated period."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementCovenantSpec,
+        "statements_analytics",
+        "statement_covenant_spec",
+        Input,
+        "Named covenants, result periods, publication cutoff and units."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        ImpairedEclResult,
+        "statements_analytics",
+        "impaired_ecl_result",
+        Output,
+        "Signed recovery shortfall and nonnegative credit-impaired allowance."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        RecoveryEvidence,
+        "statements_analytics",
+        "recovery_evidence",
+        Input,
+        "Sourced expected recovery and dated receipt."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        ImpairedExposure,
+        "statements_analytics",
+        "impaired_exposure",
+        Input,
+        "Sourced carrying exposure, qualified report date, original effective rate and clock."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        WeightedImpairedEclResult,
+        "statements_analytics",
+        "weighted_impaired_ecl_result",
+        Output,
+        "Weighted impairment and dated recovery scenario contributions."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        ImpairedEclScenario,
+        "statements_analytics",
+        "impaired_ecl_scenario",
+        Input,
+        "Exact scenario probability and its scoped dated expected recovery."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

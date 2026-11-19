@@ -85,3 +85,10 @@ pub use engine::{
 pub use request::{EclScenario, classify_stage, compute_ecl, compute_ecl_weighted};
 
 pub use cecl::{CeclConfig, CeclEngine, CeclMethodology, CeclResult, ReversionMethod};
+
+mod recovery;
+pub use recovery::{
+    ImpairedEclMeasurement, ImpairedEclOutcome, ImpairedEclResult, ImpairedEclScenario,
+    ImpairedExposure, RecoveryEvidence, WeightedImpairedEclResult, compute_impaired_ecl,
+    compute_impaired_ecl_weighted,
+};

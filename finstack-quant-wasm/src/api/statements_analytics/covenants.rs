@@ -96,3 +96,67 @@ pub fn forecast_breaches(
         .map_err(to_js_err)?,
     )
 }
+
+/// Assess the selected statement covenant tests on qualified reporting dates.
+///
+/// @param engine - Covenant engine holding effective terms, windows and waivers.
+/// @param model - Statement model with source and publication dates.
+/// @param results - Statement evaluation from the supplied model and selected publication cutoff.
+/// @param spec - Exact covenant and period IDs, scope, cutoff and metric bindings.
+/// @returns Qualified assess results with run provenance and per-period coverage.
+/// @throws If inputs are malformed, provenance differs, or dates, scopes or bindings are invalid.
+#[wasm_bindgen(js_name = assessStatementCovenants, unchecked_return_type = "generated.statements_analytics.StatementCovenantAssessment")]
+pub fn assess_statement_covenants(
+    engine: &JsCovenantEngine,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.StatementCovenantSpec | string"
+    )]
+    spec: JsValue,
+) -> Result<JsValue, JsValue> {
+    to_js_value(
+        &finstack_quant_statements_analytics::analysis::assess_statement_covenants(
+            &engine.inner,
+            &from_js_json(&model, "model")?,
+            &from_js_json(&results, "results")?,
+            &from_js_json(&spec, "spec")?,
+        )
+        .map_err(to_js_err)?,
+    )
+}
+
+/// Forecast the selected statement covenant tests on qualified reporting dates.
+///
+/// @param engine - Covenant engine holding effective terms, windows and waivers.
+/// @param model - Statement model with source and publication dates.
+/// @param results - Statement evaluation from the supplied model and selected publication cutoff.
+/// @param spec - Exact covenant and period IDs, scope, cutoff and metric bindings.
+/// @param config - Forecast policy with an explicit reference date, scope and any requested volatility.
+/// @returns Qualified forecast results with run provenance and per-period coverage.
+/// @throws If inputs are malformed, provenance differs, or dates, scopes or bindings are invalid.
+#[wasm_bindgen(js_name = forecastStatementCovenants, unchecked_return_type = "generated.statements_analytics.StatementCovenantForecast")]
+pub fn forecast_statement_covenants(
+    engine: &JsCovenantEngine,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.StatementCovenantSpec | string"
+    )]
+    spec: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantForecastConfig | string")]
+    config: JsValue,
+) -> Result<JsValue, JsValue> {
+    to_js_value(
+        &finstack_quant_statements_analytics::analysis::forecast_statement_covenants(
+            &engine.inner,
+            &from_js_json(&model, "model")?,
+            &from_js_json(&results, "results")?,
+            &from_js_json(&spec, "spec")?,
+            from_js_json(&config, "config")?,
+        )
+        .map_err(to_js_err)?,
+    )
+}

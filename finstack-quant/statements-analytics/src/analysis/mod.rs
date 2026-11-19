@@ -54,12 +54,14 @@ mod reports;
 pub use backtesting::{ForecastMetrics, backtest_forecast};
 pub use credit::{
     CapitalStructureSummary, CapitalStructureSummaryConfig, CapitalStructureTranche,
-    CreditContextMetrics, CreditContextReport, CreditContextSpec, CreditMeasure,
-    CreditMeasureCoverage, CreditMeasureRow, CreditMeasureValue, CreditNumeratorNodes,
-    CreditReferenceValue, CreditScoringModel, DebtInstrumentKind, MaturityWallBucket,
-    StatementScoringMapping, StatementsAdapter, capital_structure_summary, compute_credit_context,
-    evaluate_covenants, evaluate_credit_context, forecast_breaches, score_statement,
-    score_statement_series,
+    CovenantObservationBinding, CovenantStatementUnit, CreditContextMetrics, CreditContextReport,
+    CreditContextSpec, CreditMeasure, CreditMeasureCoverage, CreditMeasureRow, CreditMeasureValue,
+    CreditNumeratorNodes, CreditReferenceValue, CreditScoringModel, DebtInstrumentKind,
+    MaturityWallBucket, StatementCovenantAssessment, StatementCovenantForecast,
+    StatementCovenantPeriod, StatementCovenantSpec, StatementScoringMapping, StatementsAdapter,
+    assess_statement_covenants, capital_structure_summary, compute_credit_context,
+    evaluate_covenants, evaluate_credit_context, forecast_breaches, forecast_statement_covenants,
+    score_statement, score_statement_series,
 };
 pub use goal_seek::{GoalSeekResult, GoalSeekSpec, goal_seek};
 pub use introspection::{
@@ -101,10 +103,13 @@ pub use checks::{
 pub use ecl::{
     CeclConfig, CeclEngine, CeclMethodology, CeclResult, DEFAULT_REVOLVER_CCF, EclBucket,
     EclConfig, EclConfigBuilder, EclResult, EclScenario, EclScenarioMeasurement,
-    EclScenarioOutcome, Exposure, LgdType, MacroScenario, PdTermStructure, QualitativeFlags,
-    RatingPdMap, RawPdCurve, ReversionMethod, Stage, StageResult, StagingConfig, StagingTrigger,
-    WeightedEclResult, classify_stage, classify_stage_from_curves, compute_ecl,
-    compute_ecl_from_curve, compute_ecl_weighted, compute_ecl_weighted_from_curves,
+    EclScenarioOutcome, Exposure, ImpairedEclMeasurement, ImpairedEclOutcome, ImpairedEclResult,
+    ImpairedEclScenario, ImpairedExposure, LgdType, MacroScenario, PdTermStructure,
+    QualitativeFlags, RatingPdMap, RawPdCurve, RecoveryEvidence, ReversionMethod, Stage,
+    StageResult, StagingConfig, StagingTrigger, WeightedEclResult, WeightedImpairedEclResult,
+    classify_stage, classify_stage_from_curves, compute_ecl, compute_ecl_from_curve,
+    compute_ecl_weighted, compute_ecl_weighted_from_curves, compute_impaired_ecl,
+    compute_impaired_ecl_weighted,
 };
 
 pub use comps::{
