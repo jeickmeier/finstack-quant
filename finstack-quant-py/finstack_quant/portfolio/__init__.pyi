@@ -61,7 +61,13 @@ from finstack_quant.portfolio._allocation import (
     WeightAllocationResult as WeightAllocationResult,
     allocate_weights as allocate_weights,
 )
-from finstack_quant.portfolio._replay import ReplayResult as ReplayResult, replay_portfolio as replay_portfolio
+from finstack_quant.portfolio._replay import (
+    ReplayConfig as ReplayConfig,
+    ReplayResult as ReplayResult,
+    ReplayStep as ReplayStep,
+    ReplaySummary as ReplaySummary,
+    replay_portfolio as replay_portfolio,
+)
 from finstack_quant.portfolio._brinson import (
     BrinsonPeriodResult as BrinsonPeriodResult,
     CarinoLinkedAttribution as CarinoLinkedAttribution,
@@ -205,7 +211,10 @@ __all__ = [
     "PositionValue",
     "PositionVolContribution",
     "ReconciliationReport",
+    "ReplayConfig",
     "ReplayResult",
+    "ReplayStep",
+    "ReplaySummary",
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
     "ScenarioRevalueView",

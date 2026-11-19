@@ -463,8 +463,13 @@ def test_replay_portfolio_returns_typed_result() -> None:
     expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.ReplayResult)
-    assert result.summary["num_steps"] == expected["summary"]["num_steps"] == 2
+    assert result.summary.num_steps == expected["summary"]["num_steps"] == 2
     assert len(result.steps) == 2
+    assert isinstance(result.summary, pf.ReplaySummary)
+    assert isinstance(result.steps[0], pf.ReplayStep)
+    assert result.steps[0].date == date(2025, 1, 15)
+    assert result.steps[0].valuation.total_base_currency == result.summary.start_value
+    assert result.steps[0].daily_mtm_pnl is None
     assert _frame_columns(result) == ["date", "value", "daily_mtm_pnl", "cumulative_mtm_pnl"]
 
 
@@ -477,7 +482,7 @@ def test_replay_portfolio_typed_snapshot_tuples_match_the_json_wire() -> None:
         {"date": "2025-01-16", "market": json.loads(m1.to_json())},
     ]
 
-    typed = pf.replay_portfolio(portfolio, [(date(2025, 1, 15), m0), ("2025-01-16", m1)], config)
+    typed = pf.replay_portfolio(portfolio, [(date(2025, 1, 15), m0), ("2025-01-16", m1)], pf.ReplayConfig("pv_only"))
     from_dicts = pf.replay_portfolio(portfolio, wire, config)
     from_json = pf.replay_portfolio(portfolio, json.dumps(wire), config)
 

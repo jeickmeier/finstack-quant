@@ -84,7 +84,10 @@ FiCarinoLinkedResult = _portfolio.FiCarinoLinkedResult
 GridAttributionResult = _portfolio.GridAttributionResult
 GridCarinoLinkedResult = _portfolio.GridCarinoLinkedResult
 LinkedReturn = _portfolio.LinkedReturn
+ReplayConfig = _portfolio.ReplayConfig
 ReplayResult = _portfolio.ReplayResult
+ReplayStep = _portfolio.ReplayStep
+ReplaySummary = _portfolio.ReplaySummary
 WeightAllocationResult = _portfolio.WeightAllocationResult
 
 parse_portfolio_spec_json = _portfolio.parse_portfolio_spec_json
@@ -208,7 +211,10 @@ __all__ = [
     "PositionValue",
     "PositionVolContribution",
     "ReconciliationReport",
+    "ReplayConfig",
     "ReplayResult",
+    "ReplayStep",
+    "ReplaySummary",
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
     "ScenarioRevalueView",
