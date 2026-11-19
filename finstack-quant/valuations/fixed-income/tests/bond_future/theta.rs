@@ -174,6 +174,24 @@ fn theta_holds_a_live_exchange_quote_fixed() {
 }
 
 #[test]
+fn observed_quote_values_and_rolls_without_an_embedded_ctd() {
+    let as_of = date!(2025 - 01 - 14);
+    let market = MarketContext::new();
+    let mut future = future(Position::Long);
+    future.ctd_bond = None;
+    future.terms.quoted_price = Some(126.0);
+    let result = theta_result(&future, &market, as_of).expect("quoted future without CTD");
+    assert_eq!(result.value.amount(), 5_000.0);
+    assert_eq!(result.measures["theta"], 0.0);
+
+    future.terms.quoted_price = None;
+    let error = future
+        .value(&market, as_of)
+        .expect_err("unquoted future needs CTD");
+    assert!(error.to_string().contains("CTD"));
+}
+
+#[test]
 fn quoted_theta_does_not_require_irrelevant_ctd_projection_inputs() {
     let as_of = date!(2025 - 01 - 14);
     let market = MarketContext::new();
