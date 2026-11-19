@@ -171,8 +171,26 @@ fn density_price(inst: &CmsOption, market: &MarketContext, as_of: Date, vol: f64
             0.0
         };
         let split = kink.clamp(-12.0, 12.0);
-        gauss_legendre_integrate_adaptive(integrand, -12.0, split, 16, 1e-13, 20).unwrap()
-            + gauss_legendre_integrate_adaptive(integrand, split, 12.0, 16, 1e-13, 20).unwrap()
+        gauss_legendre_integrate_adaptive(
+            |z| Ok(integrand(z)),
+            -12.0,
+            split,
+            16,
+            1e-13,
+            20,
+            1_000_000,
+        )
+        .unwrap()
+            + gauss_legendre_integrate_adaptive(
+                |z| Ok(integrand(z)),
+                split,
+                12.0,
+                16,
+                1e-13,
+                20,
+                1_000_000,
+            )
+            .unwrap()
     };
     df * integrate(true) / integrate(false)
 }

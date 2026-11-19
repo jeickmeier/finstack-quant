@@ -359,8 +359,8 @@ mod tests {
             0.0
         }
 
-        fn integrate_fn(&self, _f: &dyn Fn(&[f64]) -> f64) -> f64 {
-            0.0
+        fn integrate_fn(&self, _f: &dyn Fn(&[f64]) -> Result<f64>) -> Result<f64> {
+            Ok(0.0)
         }
 
         fn sample_mixing(&self, _u01: f64) -> Result<f64> {

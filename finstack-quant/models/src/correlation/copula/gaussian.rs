@@ -192,7 +192,10 @@ impl Copula for GaussianCopula {
         self.conditional_default_prob(default_threshold, &[systematic], correlation)
     }
 
-    fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
+    fn integrate_fn(
+        &self,
+        f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
+    ) -> finstack_quant_core::Result<f64> {
         // Gauss-Hermite quadrature over standard normal factor Z
         self.quadrature.integrate(|z| f(&[z]))
     }
@@ -265,8 +268,9 @@ mod tests {
         let correlation = 0.30;
 
         // E[P(default|Z)] should equal P(default)
-        let integrated_prob =
-            copula.integrate_fn(&|z| copula.conditional_default_prob(threshold, z, correlation));
+        let integrated_prob = super::super::expect_integral(&copula, &|z| {
+            copula.conditional_default_prob(threshold, z, correlation)
+        });
 
         assert!(
             (integrated_prob - pd).abs() < 0.001,

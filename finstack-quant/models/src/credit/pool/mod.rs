@@ -66,7 +66,7 @@ fn expected_shocked_smm(base_cpr: f64, shock_volatility: f64) -> f64 {
             let smm = log_smm.exp();
             let cpr = -(12.0 * (-smm).ln_1p()).exp_m1();
             let survival = norm_cdf((log_base - cpr.ln()) / sigma);
-            survival * smm
+            Ok(survival * smm)
         },
         lower_log,
         upper_smm.ln(),

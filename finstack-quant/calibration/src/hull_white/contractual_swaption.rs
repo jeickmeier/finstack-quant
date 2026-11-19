@@ -101,6 +101,10 @@ pub(crate) fn price(
     }
 
     const TOLERANCE: f64 = 1e-12;
+    // Hard evaluation limit per unit panel. A full refinement of the
+    // 16-point rule to depth 20 needs 16 * (2^22 - 1) samples, so this never
+    // changes a result the depth limit allows; it bounds the work explicitly.
+    const PANEL_MAX_EVALS: usize = 1 << 26;
     // Exponential tilting shifts each weighted normal term by its loading.
     // Enclose every such center and verify the remaining absolute tail bound,
     // rather than truncating the unweighted state at a fixed number of sigmas.
@@ -142,12 +146,13 @@ pub(crate) fn price(
     for panel in 0..panels {
         let left = -bound + panel as f64 * width;
         value += gauss_legendre_integrate_adaptive(
-            integrand,
+            |x| Ok(integrand(x)),
             left,
             left + width,
             16,
             TOLERANCE * 0.9 / panels as f64,
             20,
+            PANEL_MAX_EVALS,
         )?;
     }
     Ok(value)

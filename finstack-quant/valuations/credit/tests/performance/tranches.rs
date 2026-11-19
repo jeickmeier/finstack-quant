@@ -176,15 +176,11 @@ impl Copula for CountedCopula {
             )
     }
 
-    fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
-        self.inner.integrate_fn(f)
-    }
-
-    fn try_integrate_fn(
+    fn integrate_fn(
         &self,
         f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
     ) -> finstack_quant_core::Result<f64> {
-        self.inner.try_integrate_fn(f)
+        self.inner.integrate_fn(f)
     }
 
     fn try_integrate_pair(
@@ -233,7 +229,10 @@ impl Copula for ConditionalInputs {
         self.conditional_default_prob(threshold, &[], 0.0)
     }
 
-    fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
+    fn integrate_fn(
+        &self,
+        f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
+    ) -> finstack_quant_core::Result<f64> {
         f(&[0.0, 1.0])
     }
 
@@ -287,7 +286,7 @@ fn factor_nodes(pricer: &CdsTranchePricer) -> Vec<FactorNode> {
             let collected = RefCell::new(Vec::new());
             pricer
                 .copula()
-                .try_integrate_fn(&|factors| {
+                .integrate_fn(&|factors| {
                     collected.borrow_mut().push(factors.to_vec());
                     Ok(0.0)
                 })
@@ -300,7 +299,7 @@ fn factor_nodes(pricer: &CdsTranchePricer) -> Vec<FactorNode> {
                     // no private model fields or production getters needed.
                     let weight = pricer
                         .copula()
-                        .try_integrate_fn(&|candidate| {
+                        .integrate_fn(&|candidate| {
                             Ok(if candidate == point.as_slice() {
                                 1.0
                             } else {

@@ -32,6 +32,13 @@ use finstack_quant_valuations_core::pricer::{
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
+/// Hard limit on integrand evaluations per replication interval.
+///
+/// A full refinement of the 16-point rule to depth 16 needs `16 * (2^18 - 1)`
+/// samples, so this never changes a result the depth limit allows; it bounds
+/// the work explicitly, as the adaptive rule requires.
+const INTERVAL_MAX_EVALS: usize = 1 << 22;
+
 /// Inputs shared by CMS options and CMS swap embedded options.
 pub(crate) struct CmsOptionletInputs<'a> {
     /// Positive forward reference-swap rate, in decimal units.
@@ -156,13 +163,14 @@ pub(crate) fn replicated_cms_optionlet(
                     } else {
                         hpp
                     };
-                    second / scale * otm(k) * k
+                    Ok(second / scale * otm(k) * k)
                 },
                 interval[0],
                 interval[1],
                 16,
                 tolerance,
                 16,
+                INTERVAL_MAX_EVALS,
             )
         };
         numerator += integrate(true)?;

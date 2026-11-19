@@ -24,8 +24,8 @@
 //!
 //! // Integrate x² over standard normal (expected value = 1.0)
 //! let quad = GaussHermiteQuadrature::new(7)?;
-//! let integral = quad.integrate(|x| x * x);
-//! assert!((integral - 1.0).abs() < 0.1);
+//! let integral = quad.integrate(|x| Ok(x * x))?;
+//! assert!((integral - 1.0).abs() < 1e-12);
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 //!
@@ -293,44 +293,117 @@ impl GaussHermiteQuadrature {
         }
     }
 
-    /// Integrate a function over the standard normal distribution.
-    ///
-    /// # Arguments
-    /// * `f` - Function to integrate, takes x (standard normal variate) as input
-    ///
-    /// # Returns
-    /// The approximate integral of f(x) * φ(x) dx from -∞ to +∞,
-    /// where φ(x) is the standard normal PDF.
-    ///
-    /// # Convention
+    /// Expectation of `f(Z)` for a standard normal `Z`.
     ///
     /// The stored nodes and weights follow the physicists' Gauss-Hermite rule
-    /// for `∫ e^{-z^2} g(z) dz`. This helper converts that convention to a
+    /// for `∫ e^{-z^2} g(z) dz`. This method converts that convention to a
     /// standard-normal expectation by evaluating `f(√2 z)` and dividing the
-    /// weighted sum by `√π`.
-    pub fn integrate<F2>(&self, f: F2) -> f64
+    /// weighted sum by `√π`. The normalized weights sum to one, so the result
+    /// is a weighted average of the samples: samples too large for the
+    /// unnormalized sum are averaged with normalized weights instead, and a
+    /// representable expectation is not lost to overflow.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Fallible integrand taking a standard normal variate, evaluated
+    ///   once per node in increasing coordinate order. It must describe one
+    ///   deterministic function for the whole call. The first error it returns
+    ///   stops the rule and is returned unchanged.
+    ///
+    /// # Returns
+    ///
+    /// The finite approximation of `∫ f(x) φ(x) dx` over the real line, where
+    /// `φ` is the standard normal density.
+    ///
+    /// # Errors
+    ///
+    /// Returns the callback's own error unchanged. Returns
+    /// [`InputError::SolverConvergenceFailed`] (a computation error) when a
+    /// sample is NaN or infinite, when a nonzero weighted sample underflows to
+    /// zero, or when the weighted sum is not representable; `iterations` is
+    /// the number of callbacks made and `last_x` the coordinate concerned.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use finstack_quant_core::math::integration::GaussHermiteQuadrature;
+    ///
+    /// // E[Z²] = 1 for a standard normal Z.
+    /// let quad = GaussHermiteQuadrature::new(7)?;
+    /// let second_moment = quad.integrate(|x| Ok(x * x))?;
+    /// assert!((second_moment - 1.0).abs() < 1e-12);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn integrate<F>(&self, mut f: F) -> Result<f64, Error>
     where
-        F2: Fn(f64) -> f64,
+        F: FnMut(f64) -> Result<f64, Error>,
     {
+        const RULE: &str = "GaussHermiteQuadrature::integrate";
+        const NOT_REPRESENTABLE: &str = "weighted sum is not representable";
         let sqrt_2 = std::f64::consts::SQRT_2;
-        let mut acc = NeumaierAccumulator::new();
-        let mut fallback = false;
-        let mut raw = 0.0_f64;
+        let sqrt_pi = std::f64::consts::PI.sqrt();
+        let order = self.points.len();
+        let mut samples = [0.0_f64; MAX_HERMITE_ORDER];
+        let mut direct = true;
         for (i, &z) in self.points.iter().enumerate() {
-            let term = self.weights[i] * f(sqrt_2 * z);
-            raw += term;
-            if !fallback && acc.add(term).is_err() {
-                fallback = true;
+            let x = sqrt_2 * z;
+            let sample = f(x)?;
+            if !sample.is_finite() {
+                return Err(quadrature_failure(
+                    RULE,
+                    i + 1,
+                    f64::NAN,
+                    x,
+                    "integrand was not finite",
+                ));
             }
+            direct &= sample.abs() <= HERMITE_DIRECT_LIMIT;
+            samples[i] = sample;
         }
-        let sum = if fallback {
-            raw
-        } else {
-            acc.get_total().unwrap_or(raw)
-        };
-        sum / std::f64::consts::PI.sqrt()
+        let mut acc = NeumaierAccumulator::new();
+        for (i, &sample) in samples.iter().enumerate().take(order) {
+            let weight = if direct {
+                self.weights[i]
+            } else {
+                self.weights[i] / sqrt_pi
+            };
+            let term = weight * sample;
+            let x = sqrt_2 * self.points[i];
+            if sample != 0.0 && term == 0.0 {
+                return Err(quadrature_failure(
+                    RULE,
+                    order,
+                    f64::NAN,
+                    x,
+                    "a nonzero weighted sample underflowed to zero",
+                ));
+            }
+            acc.add(term)
+                .map_err(|_| quadrature_failure(RULE, order, f64::NAN, x, NOT_REPRESENTABLE))?;
+        }
+        let total = acc
+            .get_total()
+            .map_err(|_| quadrature_failure(RULE, order, f64::NAN, 0.0, NOT_REPRESENTABLE))?;
+        let value = if direct { total / sqrt_pi } else { total };
+        if !value.is_finite() || (total != 0.0 && value == 0.0) {
+            return Err(quadrature_failure(
+                RULE,
+                order,
+                f64::NAN,
+                0.0,
+                NOT_REPRESENTABLE,
+            ));
+        }
+        Ok(value)
     }
 }
+
+/// Largest supported Gauss-Hermite order.
+const MAX_HERMITE_ORDER: usize = 20;
+
+/// Largest sample magnitude for which the unnormalized Hermite sum, whose
+/// weights total `√π`, cannot overflow.
+const HERMITE_DIRECT_LIMIT: f64 = f64::MAX / 8.0;
 
 /// Largest count that converts to `f64` without losing its identity.
 const MAX_EXACT_COUNT: u64 = 1 << 53;
@@ -557,17 +630,17 @@ fn half_width(a: f64, b: f64) -> f64 {
     }
 }
 
-/// Explicit work controls of one adaptive Simpson run.
+/// Explicit work controls of one adaptive run.
 #[derive(Clone, Copy)]
-struct SimpsonLimits {
+struct QuadratureLimits {
     /// Deepest bisection level allowed, with the root panel at depth zero.
     max_depth: usize,
     /// Hard limit on callback invocations.
     max_evals: usize,
 }
 
-/// Actual work done so far by one adaptive Simpson run.
-struct SimpsonWork {
+/// Actual work done so far by one adaptive run.
+struct QuadratureWork {
     rule: &'static str,
     max_evals: usize,
     evaluations: usize,
@@ -575,7 +648,7 @@ struct SimpsonWork {
     depth: usize,
 }
 
-impl SimpsonWork {
+impl QuadratureWork {
     fn failure(&self, residual: f64, x: f64, reason: &str) -> Error {
         quadrature_failure(
             self.rule,
@@ -689,12 +762,12 @@ fn adaptive_simpson_core<const N: usize, F>(
     a: f64,
     b: f64,
     tol: [f64; N],
-    limits: SimpsonLimits,
+    limits: QuadratureLimits,
 ) -> Result<[f64; N], Error>
 where
     F: FnMut(f64) -> Result<[f64; N], Error>,
 {
-    let SimpsonLimits {
+    let QuadratureLimits {
         max_depth,
         max_evals,
     } = limits;
@@ -718,7 +791,7 @@ where
         return Ok([0.0; N]);
     }
     let (lo, hi, negate) = if a < b { (a, b, false) } else { (b, a, true) };
-    let mut work = SimpsonWork {
+    let mut work = QuadratureWork {
         rule,
         max_evals,
         evaluations: 0,
@@ -941,7 +1014,7 @@ where
     F: FnMut(f64) -> Result<f64, Error>,
 {
     let mut scalar = |x: f64| f(x).map(|value| [value]);
-    let limits = SimpsonLimits {
+    let limits = QuadratureLimits {
         max_depth,
         max_evals,
     };
@@ -1017,7 +1090,7 @@ where
     F: FnMut(f64) -> Result<(f64, f64), Error>,
 {
     let mut paired = |x: f64| f(x).map(|(first, second)| [first, second]);
-    let limits = SimpsonLimits {
+    let limits = QuadratureLimits {
         max_depth,
         max_evals,
     };
@@ -1116,78 +1189,55 @@ fn gl_nodes_weights(order: usize) -> Result<(&'static [f64], &'static [f64]), Er
     }
 }
 
-/// Gauss–Legendre quadrature over finite interval \[a,b\].
+/// One Gauss–Legendre panel on the increasing interval `[a, b]`.
 ///
-/// This is a low-level building block for numerical integration. For most use
-/// cases requiring automatic error control, prefer [`gauss_legendre_integrate_adaptive`].
-///
-/// # When to Use
-///
-/// - **Use this function** when you need precise control over quadrature order
-///   and have verified the function is smooth over the interval.
-/// - **Use [`gauss_legendre_integrate_adaptive`]** when you need automatic error
-///   control and aren't sure about function smoothness.
-///
-/// # Arguments
-///
-/// * `f` - Function to integrate
-/// * `a` - Lower bound of integration (must be finite)
-/// * `b` - Upper bound of integration (must be finite)
-/// * `order` - Quadrature order (supported: 2, 4, 8, 16)
-///
-/// # Returns
-///
-/// - `Ok(0.0)` if `a == b`
-/// - `Ok(integral)` for the approximate integral value
-///
-/// # Errors
-///
-/// Returns [`Error::Validation`] when:
-/// - `a` or `b` is not finite (NaN or infinity)
-/// - `order` is not one of the supported values (2, 4, 8, 16)
-///
-/// # Complexity
-///
-/// - **Time**: O(order) function evaluations
-/// - **Space**: O(1) auxiliary space (nodes/weights are static)
-///
-/// # Precision Guidelines
-///
-/// | Order | Polynomial Exactness | Recommended Use |
-/// |-------|---------------------|-----------------|
-/// | 2 | Degree 3 | Very rough estimates |
-/// | 4 | Degree 7 | Quick calculations |
-/// | 8 | Degree 15 | Standard accuracy |
-/// | 16 | Degree 31 | High precision |
-///
-fn gauss_legendre_integrate<F2>(f: F2, a: f64, b: f64, order: usize) -> Result<f64, Error>
+/// Maps the stored weight-one rule on `[-1, 1]` by a stable midpoint and
+/// half-width and returns `half * sum(w_i * f(x_i))`. Every node costs one
+/// counted evaluation.
+fn gauss_legendre_panel<F>(
+    work: &mut QuadratureWork,
+    f: &mut F,
+    a: f64,
+    b: f64,
+    rule: (&[f64], &[f64]),
+) -> Result<f64, Error>
 where
-    F2: Fn(f64) -> f64,
+    F: FnMut(f64) -> Result<[f64; 1], Error>,
 {
-    if !(a.is_finite() && b.is_finite()) {
-        return Err(crate::Error::Validation(
-            "Gauss-Legendre integration bounds must be finite".to_string(),
-        ));
-    }
-    let (xs, ws) = gl_nodes_weights(order)?;
-    // Exact comparison: zero-width integration interval is a standard degenerate case.
-    #[allow(clippy::float_cmp)]
-    if a == b {
-        return Ok(if f(a).is_finite() { 0.0 } else { f64::NAN });
-    }
+    let (nodes, weights) = rule;
     let half = half_width(a, b);
     let mid = midpoint(a, b);
-    let mut acc = 0.0;
-    for i in 0..xs.len() {
-        let x = mid + half * xs[i];
-        let fx = f(x);
-        if !fx.is_finite() {
-            return Ok(f64::NAN);
+    let mut sum = NeumaierAccumulator::new();
+    let mut previous = a;
+    for (&node, &weight) in nodes.iter().zip(weights) {
+        let x = mid + half * node;
+        if !(previous < x && x < b) {
+            return Err(work.failure(
+                f64::NAN,
+                x,
+                "nodes are not distinct inside their panel in binary64",
+            ));
         }
-        acc += ws[i] * fx;
+        previous = x;
+        let [sample] = work.sample(f, x)?;
+        let term = weight * sample;
+        if sample != 0.0 && term == 0.0 {
+            return Err(work.failure(f64::NAN, x, "a nonzero weighted sample underflowed to zero"));
+        }
+        sum.add(term)
+            .map_err(|_| work.failure(f64::NAN, x, LEGENDRE_NOT_REPRESENTABLE))?;
     }
-    Ok(acc * half)
+    let sum = sum
+        .get_total()
+        .map_err(|_| work.failure(f64::NAN, mid, LEGENDRE_NOT_REPRESENTABLE))?;
+    let value = sum * half;
+    if !value.is_finite() || (sum != 0.0 && value == 0.0) {
+        return Err(work.failure(f64::NAN, mid, LEGENDRE_NOT_REPRESENTABLE));
+    }
+    Ok(value)
 }
+
+const LEGENDRE_NOT_REPRESENTABLE: &str = "panel estimate is not representable";
 
 /// Build a composite Gauss-Legendre grid over a finite interval.
 ///
@@ -1233,193 +1283,331 @@ pub fn gauss_legendre_grid(
     Ok(grid)
 }
 
-/// Composite Gauss–Legendre over \[a,b\] using `panels` sub-intervals.
+/// Composite Gauss–Legendre rule on `panels` equal sub-intervals.
 ///
-/// Divides the integration interval into `panels` equal sub-intervals and applies
-/// Gauss-Legendre quadrature to each. This improves accuracy for functions that
-/// are not well-approximated by polynomials over the full interval.
+/// Applies the `order`-point rule to each panel and sums the scaled weighted
+/// samples once with a compensated total. More panels do not raise the rule's
+/// polynomial degree; no accuracy claim is made for arbitrary integrands.
 ///
 /// # Arguments
 ///
-/// * `f` - Function to integrate
-/// * `a` - Lower bound of integration
-/// * `b` - Upper bound of integration
-/// * `order` - Quadrature order per panel (supported: 2, 4, 8, 16)
-/// * `panels` - Number of sub-intervals (must be > 0)
+/// * `f` - Fallible integrand, evaluated once at each of the `order * panels`
+///   nodes in increasing coordinate order. It must describe one deterministic
+///   function for the whole call. The first error it returns stops the rule
+///   and is returned unchanged.
+/// * `a` - Finite lower endpoint, in the domain units accepted by `f`.
+/// * `b` - Finite upper endpoint in the same units. `b < a` evaluates the same
+///   increasing-bound rule and negates the result; `b == a` returns `+0.0`
+///   without calling `f`.
+/// * `order` - Nodes per panel; supported values are 2, 4, 8 and 16.
+/// * `panels` - Positive whole number of equal-width panels, at most `2^53`.
 ///
 /// # Returns
 ///
-/// Approximate integral value.
+/// The finite composite estimate of the signed integral of `f` from `a` to `b`.
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] under the same conditions as
-/// [`gauss_legendre_grid`]: non-finite bounds, `b <= a`, zero `panels`, or an
-/// unsupported `order` (supported orders: 2, 4, 8, 16).
+/// Returns [`Error::Validation`] for a non-finite endpoint, an unsupported
+/// `order`, or a `panels` that is zero, above `2^53`, or whose node count
+/// overflows. Returns the callback's own error unchanged. Returns
+/// [`InputError::SolverConvergenceFailed`] (a computation error) when a sample
+/// is NaN or infinite, when a nonzero weighted sample underflows to zero, or
+/// when the sum is not representable; `iterations` is the number of callbacks
+/// made and `last_x` the coordinate concerned.
 ///
-/// # Complexity
+/// # Example
 ///
-/// - **Time**: O(panels × order) function evaluations
-/// - **Space**: O(panels × order) for the node grid
-pub fn gauss_legendre_integrate_composite<F2>(
-    f: F2,
+/// ```rust
+/// use finstack_quant_core::math::integration::gauss_legendre_integrate_composite;
+///
+/// let integral = gauss_legendre_integrate_composite(|x| Ok(x * x), 0.0, 1.0, 4, 2)?;
+/// assert!((integral - 1.0 / 3.0).abs() < 1e-14);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn gauss_legendre_integrate_composite<F>(
+    mut f: F,
     a: f64,
     b: f64,
     order: usize,
     panels: usize,
 ) -> Result<f64, Error>
 where
-    F2: Fn(f64) -> f64,
+    F: FnMut(f64) -> Result<f64, Error>,
 {
-    Ok(gauss_legendre_grid(a, b, order, panels)?
-        .into_iter()
-        .map(|(x, w)| w * f(x))
-        .sum())
+    const RULE: &str = "gauss_legendre_integrate_composite";
+    if !a.is_finite() || !b.is_finite() {
+        return Err(Error::Validation(format!(
+            "{RULE}: endpoints must be finite, got [{a}, {b}]"
+        )));
+    }
+    gl_nodes_weights(order)?;
+    if panels == 0 || panels as u64 > MAX_EXACT_COUNT || order.checked_mul(panels).is_none() {
+        return Err(Error::Validation(format!(
+            "{RULE}: panels must be a positive count that converts to f64 exactly, got {panels}"
+        )));
+    }
+    #[allow(clippy::float_cmp)]
+    if a == b {
+        return Ok(0.0);
+    }
+    let (lo, hi, negate) = if a < b { (a, b, false) } else { (b, a, true) };
+    let grid = gauss_legendre_grid(lo, hi, order, panels)?;
+    let mut total = NeumaierAccumulator::new();
+    for (index, (x, weight)) in grid.into_iter().enumerate() {
+        let sample = f(x)?;
+        let made = index + 1;
+        if !sample.is_finite() {
+            return Err(quadrature_failure(
+                RULE,
+                made,
+                f64::NAN,
+                x,
+                "integrand was not finite",
+            ));
+        }
+        let term = weight * sample;
+        if sample != 0.0 && term == 0.0 {
+            return Err(quadrature_failure(
+                RULE,
+                made,
+                f64::NAN,
+                x,
+                "a nonzero weighted sample underflowed to zero",
+            ));
+        }
+        total.add(term).map_err(|_| {
+            quadrature_failure(RULE, made, f64::NAN, x, "weighted sum is not representable")
+        })?;
+    }
+    let value = total.get_total().map_err(|_| {
+        quadrature_failure(
+            RULE,
+            order * panels,
+            f64::NAN,
+            hi,
+            "weighted sum is not representable",
+        )
+    })?;
+    Ok(oriented(value, negate))
 }
 
-/// Adaptive Gauss–Legendre integration with automatic refinement.
+/// One pending adaptive Gauss–Legendre panel with its known one-panel value.
+struct LegendrePanel {
+    a: f64,
+    b: f64,
+    coarse: f64,
+    tol: f64,
+    depth: usize,
+}
+
+/// Adaptive Gauss–Legendre quadrature with an absolute global error budget.
 ///
-/// Recursively bisects the interval and refines where the error estimate
-/// exceeds tolerance, providing automatic accuracy control.
+/// Each panel compares its one-panel value `Q1` with the sum `Q2` of the same
+/// rule on its two halves, uses `e = |Q2 - Q1|` as the error estimate and
+/// keeps `Q2`. A panel whose estimate exceeds its share of the budget is
+/// bisected, the left half receiving `tol / 2` and the right half the
+/// remainder, until `max_depth`; each child reuses the half value its parent
+/// already computed. Terminal values and estimates are summed with compensated
+/// totals and the call succeeds only when the summed estimate is at most `tol`.
+/// The root costs `3 * order` evaluations and every bisection `2 * order` more.
+///
+/// The estimate is an operational difference, not a Kronrod rule or a bound on
+/// the true error.
 ///
 /// # Arguments
 ///
-/// * `f` - Function to integrate (must implement `Copy` for recursive calls)
-/// * `a` - Finite first endpoint, in the domain units accepted by `f`.
-/// * `b` - Finite second endpoint in the same units as `a`; values below `a`
-///   produce a signed integral.
-/// * `order` - Quadrature order per subinterval (supported: 2, 4, 8, 16)
-/// * `tol` - Finite, non-negative absolute budget for the sum of all terminal
-///   quadrature error estimates, in integral units.
-/// * `max_depth` - Maximum recursion depth to prevent infinite refinement
+/// * `f` - Fallible integrand. It must describe one deterministic function for
+///   the whole call; mutable diagnostics are allowed. The first error it
+///   returns stops the run and is returned unchanged.
+/// * `a` - Finite lower endpoint, in the domain units accepted by `f`.
+/// * `b` - Finite upper endpoint in the same units. `b < a` runs the same
+///   increasing-bound refinement and negates the result; `b == a` returns
+///   `+0.0` without calling `f`.
+/// * `order` - Nodes per panel; supported values are 2, 4, 8 and 16.
+/// * `tol` - Finite, nonnegative absolute budget for the sum of all terminal
+///   error estimates, in integral units. Zero is allowed and requests a zero
+///   computed estimate, not exact integration.
+/// * `max_depth` - Deepest bisection level, with the root panel at depth zero.
+///   Depth zero still performs the root comparison. A depth-limited panel may
+///   exceed its local share if the summed estimate still fits `tol`.
+/// * `max_evals` - Positive hard limit on callback invocations, at least
+///   `3 * order` for the root comparison. The run never exceeds it and returns
+///   no partial integral when it is reached.
 ///
 /// # Returns
 ///
-/// Approximate integral value whose summed quadrature error estimate is at most
-/// `tol`. The estimate is a refinement diagnostic, not a rigorous error bound
-/// for arbitrary integrands.
+/// The finite signed integral estimate whose summed error estimate is at most
+/// `tol`.
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] for non-finite endpoints, a negative or
-/// non-finite tolerance, or an unsupported quadrature order. Returns
-/// [`InputError::SolverConvergenceFailed`] when the summed error estimate
-/// exceeds `tol` at `max_depth`, or the value or error estimate is non-finite.
-///
-/// # Algorithm
-///
-/// At each level:
-/// 1. Compute integral over `[a, b]` using single Gauss-Legendre
-/// 2. Compute integral over `[a, mid]` + `[mid, b]`
-/// 3. If difference ≤ `tol` (halved per side at each level so the leaf
-///    budgets sum to the caller's tolerance), return composite result
-/// 4. Otherwise, recursively refine each half until `max_depth`.
-/// 5. Sum the absolute error estimates across all terminal intervals and
-///    accept only when their total meets the original `tol`. This allows a
-///    difficult region to use unused budget from smooth regions without
-///    spending the same global budget independently on every leaf.
-///
-/// # Complexity
-///
-/// - **Time**: O(order × 2^max_depth) evaluations worst case
-/// - **Space**: O(max_depth) stack frames
+/// Returns [`Error::Validation`] for a non-finite endpoint, a negative or
+/// non-finite `tol`, an unsupported `order`, or `max_evals == 0`. Returns the
+/// callback's own error unchanged. Returns
+/// [`InputError::SolverConvergenceFailed`] (a computation error) when the
+/// summed estimate exceeds `tol`, when `max_evals` is reached or is below
+/// `3 * order`, when a sample or panel value is NaN, infinite or lost to
+/// underflow, or when a panel cannot be bisected in binary64. Its `iterations`
+/// is the number of callbacks actually made, `last_x` the coordinate concerned
+/// and `reason` names the cause and the panel depth reached.
 ///
 /// # Example
 ///
 /// ```rust
 /// use finstack_quant_core::math::integration::gauss_legendre_integrate_adaptive;
 ///
-/// // Integrate a function with a peak
 /// let integral = gauss_legendre_integrate_adaptive(
-///     |x| (-x * x).exp(),
-///     -5.0, 5.0,
-///     8,    // order
-///     1e-8, // tolerance
-///     20    // max depth
-/// ).expect("Integration succeeds");
+///     |x| Ok((-x * x).exp()),
+///     -5.0,
+///     5.0,
+///     8,      // order
+///     1e-8,   // tolerance
+///     20,     // max depth
+///     10_000, // max evaluations
+/// )?;
 ///
 /// // Should be close to sqrt(π) ≈ 1.7725
 /// assert!((integral - std::f64::consts::PI.sqrt()).abs() < 1e-6);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-pub fn gauss_legendre_integrate_adaptive<F2>(
-    f: F2,
+pub fn gauss_legendre_integrate_adaptive<F>(
+    mut f: F,
     a: f64,
     b: f64,
     order: usize,
     tol: f64,
     max_depth: usize,
+    max_evals: usize,
 ) -> Result<f64, Error>
 where
-    F2: Fn(f64) -> f64 + Copy,
+    F: FnMut(f64) -> Result<f64, Error>,
 {
-    if !a.is_finite() || !b.is_finite() || !tol.is_finite() || tol < 0.0 {
-        return Err(crate::Error::Validation(
-            "adaptive Gauss-Legendre endpoints and tolerance must be finite with tol >= 0"
-                .to_string(),
-        ));
+    const RULE: &str = "gauss_legendre_integrate_adaptive";
+    if !a.is_finite() || !b.is_finite() {
+        return Err(Error::Validation(format!(
+            "{RULE}: endpoints must be finite, got [{a}, {b}]"
+        )));
     }
-    gl_nodes_weights(order)?;
+    if !tol.is_finite() || tol < 0.0 {
+        return Err(Error::Validation(format!(
+            "{RULE}: tolerance must be finite and nonnegative, got {tol}"
+        )));
+    }
+    let rule = gl_nodes_weights(order)?;
+    if max_evals == 0 {
+        return Err(Error::Validation(format!(
+            "{RULE}: max_evals must be positive"
+        )));
+    }
     #[allow(clippy::float_cmp)]
     if a == b {
-        return if f(a).is_finite() {
-            Ok(0.0)
-        } else {
-            Err(InputError::SolverConvergenceFailed {
-                iterations: 0,
-                residual: f64::NAN,
-                last_x: a,
-                reason: "gauss_legendre_integrate_adaptive integrand evaluated to NaN or infinity"
-                    .to_string(),
-            }
-            .into())
-        };
+        return Ok(0.0);
     }
-
-    fn recurse<F2>(
-        f: F2,
-        a: f64,
-        b: f64,
-        order: usize,
-        tol: f64,
-        depth: usize,
-        max_depth: usize,
-    ) -> Result<(f64, f64), Error>
-    where
-        F2: Fn(f64) -> f64 + Copy,
-    {
-        let mid = midpoint(a, b);
-        #[allow(clippy::float_cmp)]
-        if mid == a || mid == b {
-            return Ok((f64::NAN, f64::INFINITY));
-        }
-        let i1 = gauss_legendre_integrate(f, a, b, order)?;
-        let i2_left = gauss_legendre_integrate(f, a, mid, order)?;
-        let i2_right = gauss_legendre_integrate(f, mid, b, order)?;
-        let i2 = i2_left + i2_right;
-        let err = (i2 - i1).abs();
-        if err <= tol || !err.is_finite() || depth >= max_depth {
-            return Ok((i2, err));
-        }
-        let (left, left_error) = recurse(f, a, mid, order, tol * 0.5, depth + 1, max_depth)?;
-        let (right, right_error) = recurse(f, mid, b, order, tol * 0.5, depth + 1, max_depth)?;
-        Ok((left + right, left_error + right_error))
-    }
-
-    let (value, error_estimate) = recurse(f, a, b, order, tol, 0, max_depth)?;
-    if value.is_finite() && error_estimate <= tol {
-        Ok(value)
-    } else {
-        Err(InputError::SolverConvergenceFailed {
-            iterations: max_depth,
-            residual: error_estimate,
-            last_x: midpoint(a, b),
-            reason: format!(
-                "gauss_legendre_integrate_adaptive did not meet total tolerance {tol:.2e} at \
-                 max_depth {max_depth} (interval [{a:.6e}, {b:.6e}], summed error estimate {error_estimate:.2e})"
+    let (lo, hi, negate) = if a < b { (a, b, false) } else { (b, a, true) };
+    let mut work = QuadratureWork {
+        rule: RULE,
+        max_evals,
+        evaluations: 0,
+        last_x: lo,
+        depth: 0,
+    };
+    let root_evals = 3 * order;
+    if max_evals < root_evals {
+        return Err(work.failure(
+            f64::NAN,
+            lo,
+            &format!(
+                "evaluation limit {max_evals} is below the {root_evals} samples the root \
+                 comparison needs"
             ),
-        }
-        .into())
+        ));
     }
+    let mut sampler = |x: f64| f(x).map(|value| [value]);
+    let coarse = gauss_legendre_panel(&mut work, &mut sampler, lo, hi, rule)?;
+    let mut stack = vec![LegendrePanel {
+        a: lo,
+        b: hi,
+        coarse,
+        tol,
+        depth: 0,
+    }];
+    let mut value = NeumaierAccumulator::new();
+    let mut error = NeumaierAccumulator::new();
+    let mut deepest = 0;
+
+    while let Some(panel) = stack.pop() {
+        work.depth = panel.depth;
+        deepest = deepest.max(panel.depth);
+        let mid = midpoint(panel.a, panel.b);
+        if !(panel.a < mid && mid < panel.b) {
+            return Err(work.failure(
+                f64::NAN,
+                mid,
+                "panel cannot be bisected in binary64 on a nonzero interval",
+            ));
+        }
+        let left = gauss_legendre_panel(&mut work, &mut sampler, panel.a, mid, rule)?;
+        let right = gauss_legendre_panel(&mut work, &mut sampler, mid, panel.b, rule)?;
+        let refined = left + right;
+        let estimate = (refined - panel.coarse).abs();
+        if !refined.is_finite() || !estimate.is_finite() {
+            return Err(work.failure(f64::NAN, mid, LEGENDRE_NOT_REPRESENTABLE));
+        }
+        if estimate <= panel.tol || panel.depth >= max_depth {
+            value
+                .add(refined)
+                .map_err(|_| work.failure(f64::NAN, mid, LEGENDRE_NOT_REPRESENTABLE))?;
+            error
+                .add(estimate)
+                .map_err(|_| work.failure(f64::NAN, mid, LEGENDRE_NOT_REPRESENTABLE))?;
+            continue;
+        }
+        let left_tol = panel.tol / 2.0;
+        // Right is pushed first so the left panel is refined first. Each child
+        // carries the half value just computed as its own one-panel value.
+        stack.push(LegendrePanel {
+            a: mid,
+            b: panel.b,
+            coarse: right,
+            tol: panel.tol - left_tol,
+            depth: panel.depth + 1,
+        });
+        stack.push(LegendrePanel {
+            a: panel.a,
+            b: mid,
+            coarse: left,
+            tol: left_tol,
+            depth: panel.depth + 1,
+        });
+    }
+
+    work.depth = deepest;
+    let value = value.get_total().map_err(|_| {
+        work.failure(
+            f64::NAN,
+            work.last_x,
+            "summed integral is not representable",
+        )
+    })?;
+    let estimate = error.get_total().map_err(|_| {
+        work.failure(
+            f64::NAN,
+            work.last_x,
+            "summed error estimate is not representable",
+        )
+    })?;
+    if estimate > tol {
+        return Err(work.failure(
+            estimate,
+            work.last_x,
+            &format!(
+                "summed error estimate {estimate:.2e} exceeds tolerance {tol:.2e} on \
+                 [{a:.6e}, {b:.6e}] with max_depth {max_depth}"
+            ),
+        ));
+    }
+    Ok(oriented(value, negate))
 }
 
 #[cfg(test)]
@@ -1432,9 +1620,12 @@ mod tests {
         let f = |x: f64| x * x;
 
         // Test different orders
-        let result2 = gauss_legendre_integrate(f, 0.0, 1.0, 2).expect("supported order");
-        let result4 = gauss_legendre_integrate(f, 0.0, 1.0, 4).expect("supported order");
-        let result8 = gauss_legendre_integrate(f, 0.0, 1.0, 8).expect("supported order");
+        let result2 = gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, 1.0, 2, 1)
+            .expect("supported order");
+        let result4 = gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, 1.0, 4, 1)
+            .expect("supported order");
+        let result8 = gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, 1.0, 8, 1)
+            .expect("supported order");
 
         let exact = 1.0 / 3.0;
 
@@ -1448,18 +1639,23 @@ mod tests {
         let f = |x: f64| x;
 
         // Infinite bounds
-        assert!(gauss_legendre_integrate(f, 0.0, f64::INFINITY, 4).is_err());
-        assert!(gauss_legendre_integrate(f, f64::NEG_INFINITY, 0.0, 4).is_err());
+        assert!(
+            gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, f64::INFINITY, 4, 1).is_err()
+        );
+        assert!(
+            gauss_legendre_integrate_composite(|x| Ok(f(x)), f64::NEG_INFINITY, 0.0, 4, 1).is_err()
+        );
 
         // NaN bounds
-        assert!(gauss_legendre_integrate(f, 0.0, f64::NAN, 4).is_err());
+        assert!(gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, f64::NAN, 4, 1).is_err());
     }
     #[test]
     fn test_gauss_legendre_equal_bounds() {
         let f = |x: f64| x * x;
 
         // Equal bounds should give 0
-        let result = gauss_legendre_integrate(f, 5.0, 5.0, 4).expect("supported order");
+        let result = gauss_legendre_integrate_composite(|x| Ok(f(x)), 5.0, 5.0, 4, 1)
+            .expect("supported order");
         assert!(result.abs() < 1e-12);
     }
     #[test]
@@ -1467,8 +1663,8 @@ mod tests {
         let f = |x: f64| x;
 
         // Unsupported order
-        assert!(gauss_legendre_integrate(f, 0.0, 1.0, 3).is_err());
-        assert!(gauss_legendre_integrate(f, 0.0, 1.0, 7).is_err());
+        assert!(gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, 1.0, 3, 1).is_err());
+        assert!(gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, 1.0, 7, 1).is_err());
     }
     // ── H3 regression: large-bounds/small-width midpoint safety ──
     //
@@ -1479,7 +1675,7 @@ mod tests {
     fn test_gauss_legendre_large_bounds_small_width_midpoint() {
         let a = 1.0e14_f64;
         let b = a + 1.0;
-        let result = gauss_legendre_integrate(|_| 1.0, a, b, 4).expect("valid");
+        let result = gauss_legendre_integrate_composite(|_| Ok(1.0), a, b, 4, 1).expect("valid");
         assert!(
             (result - 1.0).abs() < 1e-6,
             "Integral of 1 over [1e14, 1e14+1] should be 1.0, got {result}"
@@ -1494,7 +1690,7 @@ mod tests {
         // Interval width = 1e-12; integrand = 1; exact answer ≈ 1e-12
         let a = 1.0_f64;
         let b = 1.0 + 1.0e-12;
-        let result = gauss_legendre_integrate(|_| 1.0, a, b, 4).expect("valid");
+        let result = gauss_legendre_integrate_composite(|_| Ok(1.0), a, b, 4, 1).expect("valid");
         // Must be positive — interval must not be treated as zero-width.
         assert!(
             result > 0.0,
@@ -1548,18 +1744,30 @@ mod tests {
         // The right leaf misses its half-budget (3.25e-6), but the summed
         // terminal error estimate (about 6.29e-6) fits the global budget.
         let tolerance = 6.5e-6;
-        let value = gauss_legendre_integrate_adaptive(|x| x.sin(), 0.0, 1.0, 2, tolerance, 1)
-            .expect("summed leaf error is within total tolerance");
+        let value =
+            gauss_legendre_integrate_adaptive(|x| Ok(x.sin()), 0.0, 1.0, 2, tolerance, 1, 100_000)
+                .expect("summed leaf error is within total tolerance");
         let exact = 1.0 - 1.0_f64.cos();
 
         assert!((value - exact).abs() <= tolerance);
-        assert!(gauss_legendre_integrate_adaptive(|x| x.sin(), 0.0, 1.0, 2, 4.7e-6, 1).is_err());
+        assert!(
+            gauss_legendre_integrate_adaptive(|x| Ok(x.sin()), 0.0, 1.0, 2, 4.7e-6, 1, 100_000)
+                .is_err()
+        );
     }
 
     #[test]
     fn gauss_legendre_adaptive_enforces_global_polynomial_error_budget() {
         let tolerance = 2e-10;
-        let result = gauss_legendre_integrate_adaptive(|x| x.powi(4), 0.0, 1.0, 2, tolerance, 5);
+        let result = gauss_legendre_integrate_adaptive(
+            |x| Ok(x.powi(4)),
+            0.0,
+            1.0,
+            2,
+            tolerance,
+            5,
+            100_000,
+        );
         match result {
             Err(Error::Input(InputError::SolverConvergenceFailed { residual, .. })) => {
                 assert!(residual > tolerance);
@@ -1568,8 +1776,16 @@ mod tests {
         }
 
         for (a, b, exact) in [(0.0, 1.0, 0.2), (1.0, 0.0, -0.2)] {
-            let value = gauss_legendre_integrate_adaptive(|x| x.powi(4), a, b, 2, tolerance, 8)
-                .expect("sufficient refinement meets the global budget");
+            let value = gauss_legendre_integrate_adaptive(
+                |x| Ok(x.powi(4)),
+                a,
+                b,
+                2,
+                tolerance,
+                8,
+                100_000,
+            )
+            .expect("sufficient refinement meets the global budget");
             assert!((value - exact).abs() <= tolerance);
         }
     }
@@ -1577,10 +1793,15 @@ mod tests {
     #[test]
     fn gauss_legendre_adaptive_rejects_invalid_budget_and_non_finite_values() {
         for tolerance in [-1.0, f64::NAN, f64::INFINITY] {
-            assert!(gauss_legendre_integrate_adaptive(|x| x, 0.0, 1.0, 2, tolerance, 5).is_err());
+            assert!(
+                gauss_legendre_integrate_adaptive(Ok, 0.0, 1.0, 2, tolerance, 5, 100_000).is_err()
+            );
         }
-        assert!(gauss_legendre_integrate_adaptive(|_| f64::NAN, 0.0, 1.0, 2, 1e-8, 5).is_err());
-        assert!(gauss_legendre_integrate_adaptive(|x| x, 0.0, 0.0, 3, 1e-8, 5).is_err());
+        assert!(
+            gauss_legendre_integrate_adaptive(|_| Ok(f64::NAN), 0.0, 1.0, 2, 1e-8, 5, 100_000)
+                .is_err()
+        );
+        assert!(gauss_legendre_integrate_adaptive(Ok, 0.0, 0.0, 3, 1e-8, 5, 100_000).is_err());
     }
 
     #[test]
@@ -1599,7 +1820,10 @@ mod tests {
             adaptive_simpson_pair(|x| Ok((cusp(x), x)), 0.0, 1.0, [0.0, 0.0], 200, 1_000_000)
                 .expect_err("midpoint collapse must fail");
         assert!(pair.to_string().contains("cannot be bisected"), "{pair}");
-        assert!(gauss_legendre_integrate_adaptive(cusp, 0.0, 1.0, 4, 0.0, 200).is_err());
+        assert!(
+            gauss_legendre_integrate_adaptive(|x| Ok(cusp(x)), 0.0, 1.0, 4, 0.0, 200, 1_000_000)
+                .is_err()
+        );
 
         // Same-sign large bounds where `(a + b) / 2.0` would overflow `f64::MAX`
         let a = 1.0e308_f64;

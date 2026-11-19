@@ -335,7 +335,10 @@ impl Copula for StudentTCopula {
         norm_cdf(conditional_threshold)
     }
 
-    fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
+    fn integrate_fn(
+        &self,
+        f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
+    ) -> finstack_quant_core::Result<f64> {
         // Two-layer integration over BOTH latent factor slots [Z, W]:
         //
         // E[g(Z, W)] = E_W[ E_Z[ g(Z, W) | W ] ]
@@ -351,12 +354,12 @@ impl Copula for StudentTCopula {
         for &(w_val, w_weight) in &self.gamma_quadrature {
             let inner = self
                 .inner_quadrature
-                .integrate(|z_gauss| f(&[z_gauss, w_val]));
+                .integrate(|z_gauss| f(&[z_gauss, w_val]))?;
 
             result += w_weight * inner;
         }
 
-        result
+        Ok(result)
     }
 
     fn try_integrate_pair(
@@ -650,8 +653,9 @@ mod tests {
             let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
             let correlation = 0.30;
 
-            let integrated_prob = copula
-                .integrate_fn(&|z| copula.conditional_default_prob(threshold, z, correlation));
+            let integrated_prob = super::super::expect_integral(&copula, &|z| {
+                copula.conditional_default_prob(threshold, z, correlation)
+            });
 
             assert!(
                 (integrated_prob - pd).abs() < 0.005,
@@ -672,8 +676,9 @@ mod tests {
             let threshold = student_t_inv_cdf(pd, 5.0).expect("valid Student-t inputs");
             let correlation = 0.30;
 
-            let integrated_prob = copula
-                .integrate_fn(&|z| copula.conditional_default_prob(threshold, z, correlation));
+            let integrated_prob = super::super::expect_integral(&copula, &|z| {
+                copula.conditional_default_prob(threshold, z, correlation)
+            });
 
             assert!(
                 (integrated_prob - pd).abs() < 0.005,
@@ -803,7 +808,7 @@ mod tests {
         let rho = 0.30;
         let pd = 0.05;
         let threshold = standard_normal_inv_cdf(pd);
-        let gaussian_joint = gaussian.integrate_fn(&|factors| {
+        let gaussian_joint = super::super::expect_integral(&gaussian, &|factors| {
             gaussian
                 .conditional_default_prob(threshold, factors, rho)
                 .powi(2)
@@ -811,9 +816,10 @@ mod tests {
         for df in [200.0, 500.0, 1000.0, 10_000.0] {
             let copula = StudentTCopula::new(df).expect("valid df");
             let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
-            let marginal = copula
-                .integrate_fn(&|factors| copula.conditional_default_prob(threshold, factors, rho));
-            let joint = copula.integrate_fn(&|factors| {
+            let marginal = super::super::expect_integral(&copula, &|factors| {
+                copula.conditional_default_prob(threshold, factors, rho)
+            });
+            let joint = super::super::expect_integral(&copula, &|factors| {
                 copula
                     .conditional_default_prob(threshold, factors, rho)
                     .powi(2)
@@ -918,7 +924,7 @@ mod tests {
         let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let rho = 0.30;
 
-        let quad_joint = copula.integrate_fn(&|factors| {
+        let quad_joint = super::super::expect_integral(&copula, &|factors| {
             let p = copula.conditional_default_prob(threshold, factors, rho);
             p * p
         });
@@ -1033,7 +1039,9 @@ mod tests {
         };
 
         let integrate = |c: &StudentTCopula| {
-            c.integrate_fn(&|z| c.conditional_default_prob(threshold, z, correlation))
+            super::super::expect_integral(c, &|z| {
+                c.conditional_default_prob(threshold, z, correlation)
+            })
         };
 
         let result_default = integrate(&copula_default);

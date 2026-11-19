@@ -106,7 +106,7 @@ impl CdsTranchePricer {
         let tolerance = INTEGRATION_TOLERANCE;
         match self.copula_spec {
             CopulaSpec::Gaussian => integrate_normal(&|z| f(&[z]), tolerance * 0.5),
-            CopulaSpec::StudentT { .. } => self.copula().try_integrate_fn(f),
+            CopulaSpec::StudentT { .. } => self.copula().integrate_fn(f),
             CopulaSpec::RandomFactorLoading { .. } | CopulaSpec::MultiFactor => integrate_normal(
                 &|second| integrate_normal(&|z| f(&[z, second]), tolerance / 8.0),
                 tolerance / 8.0,

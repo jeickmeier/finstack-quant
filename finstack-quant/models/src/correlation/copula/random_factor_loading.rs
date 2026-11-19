@@ -346,7 +346,10 @@ impl Copula for RandomFactorLoadingCopula {
         self.conditional_default_prob(default_threshold, &[systematic, mixing], correlation)
     }
 
-    fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
+    fn integrate_fn(
+        &self,
+        f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
+    ) -> finstack_quant_core::Result<f64> {
         // Double integral: outer over loading shock η, inner over market Z
         self.outer_quadrature
             .integrate(|eta| self.inner_quadrature.integrate(|z| f(&[z, eta])))
@@ -494,7 +497,7 @@ mod tests {
         let correlation = 0.30;
 
         // E[P(default|Z,η)] should equal P(default)
-        let integrated_prob = copula.integrate_fn(&|factors| {
+        let integrated_prob = super::super::expect_integral(&copula, &|factors| {
             copula.conditional_default_prob(threshold, factors, correlation)
         });
 

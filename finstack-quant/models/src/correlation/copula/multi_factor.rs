@@ -97,10 +97,10 @@ impl MultiFactorCopula {
     /// dimension applies `x = √2·z` and the `1/√π` normalization.
     fn integrate_recursive(
         &self,
-        f: &dyn Fn(&[f64]) -> f64,
+        f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
         scratch: &mut [f64],
         depth: usize,
-    ) -> f64 {
+    ) -> finstack_quant_core::Result<f64> {
         const SQRT_2: f64 = std::f64::consts::SQRT_2;
         if depth == scratch.len() {
             return f(scratch);
@@ -117,9 +117,9 @@ impl MultiFactorCopula {
         let mut acc = 0.0_f64;
         for (x, w) in nodes {
             scratch[depth] = x;
-            acc += w * self.integrate_recursive(f, scratch, depth + 1);
+            acc += w * self.integrate_recursive(f, scratch, depth + 1)?;
         }
-        acc / std::f64::consts::PI.sqrt()
+        Ok(acc / std::f64::consts::PI.sqrt())
     }
 
     fn decompose_correlation(&self, total_correlation: f64) -> (f64, f64) {
@@ -206,7 +206,10 @@ impl Copula for MultiFactorCopula {
         norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
     }
 
-    fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
+    fn integrate_fn(
+        &self,
+        f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
+    ) -> finstack_quant_core::Result<f64> {
         // Nested Gauss-Hermite integration over one global dimension and,
         // when configured, one shared sector dimension.
         let mut scratch = [0.0_f64; NUM_FACTORS];
@@ -267,7 +270,7 @@ mod tests {
         let threshold = standard_normal_inv_cdf(pd);
         let correlation = 0.30;
 
-        let integrated_prob = copula.integrate_fn(&|factors| {
+        let integrated_prob = super::super::expect_integral(&copula, &|factors| {
             copula.conditional_default_prob(threshold, factors, correlation)
         });
 

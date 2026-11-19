@@ -74,7 +74,7 @@ fn test_financial_application_option_payoff() {
 
     // Use Gauss-Hermite for integration over normal distribution
     let quad = GaussHermiteQuadrature::new(10).expect("valid order");
-    let result = quad.integrate(f);
+    let result = quad.integrate(|x| Ok(f(x))).unwrap();
 
     // Result should be positive (call option value component)
     assert!(result > 0.0);
@@ -145,7 +145,7 @@ fn gauss_hermite_supported_orders_match_standard_normal_moments() {
     for order in [5, 7, 10, 15, 20] {
         let quad = GaussHermiteQuadrature::new(order).expect("supported order");
         for (power, expected) in moments {
-            let actual = quad.integrate(|x| x.powi(power));
+            let actual = quad.integrate(|x| Ok(x.powi(power))).unwrap();
             assert!(
                 (actual - expected).abs() <= 1e-12,
                 "order {order}, E[X^{power}]: got {actual:.16e}, expected {expected:.16e}"
@@ -189,7 +189,7 @@ fn test_gauss_legendre_adaptive_max_depth_returns_convergence_error() {
     // the routine must error (matching adaptive_simpson) instead of silently
     // returning the unconverged estimate.
     let f = |x: f64| (10.0 * x).sin() / (1.0 + x * x);
-    let result = gauss_legendre_integrate_adaptive(f, 0.0, 5.0, 2, 0.0, 0);
+    let result = gauss_legendre_integrate_adaptive(|x| Ok(f(x)), 0.0, 5.0, 2, 0.0, 0, MAX_EVALS);
 
     assert!(
         result.is_err(),
@@ -284,10 +284,10 @@ fn test_gauss_legendre_composite() {
     let f = |x: f64| x * x * x;
 
     // Single panel
-    let result1 = gauss_legendre_integrate_composite(f, 0.0, 2.0, 4, 1).unwrap();
+    let result1 = gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, 2.0, 4, 1).unwrap();
 
     // Multiple panels
-    let result10 = gauss_legendre_integrate_composite(f, 0.0, 2.0, 4, 10).unwrap();
+    let result10 = gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, 2.0, 4, 10).unwrap();
 
     let exact = 4.0;
 
@@ -300,7 +300,7 @@ fn test_gauss_legendre_composite() {
 fn test_gauss_legendre_composite_zero_panels() {
     let f = |x: f64| x;
 
-    assert!(gauss_legendre_integrate_composite(f, 0.0, 1.0, 4, 0).is_err());
+    assert!(gauss_legendre_integrate_composite(|x| Ok(f(x)), 0.0, 1.0, 4, 0).is_err());
 }
 
 #[test]
@@ -308,7 +308,8 @@ fn test_gauss_legendre_adaptive() {
     // Smooth function
     let f = |x: f64| x.exp();
 
-    let result = gauss_legendre_integrate_adaptive(f, 0.0, 1.0, 4, 1e-8, 20).unwrap();
+    let result =
+        gauss_legendre_integrate_adaptive(|x| Ok(f(x)), 0.0, 1.0, 4, 1e-8, 20, MAX_EVALS).unwrap();
 
     let exact = 1.0_f64.exp() - 1.0;
     assert!((result - exact).abs() < 1e-6);
@@ -319,7 +320,8 @@ fn test_gauss_legendre_adaptive_oscillatory() {
     // Oscillatory function
     let f = |x: f64| (10.0 * x).sin();
 
-    let result = gauss_legendre_integrate_adaptive(f, 0.0, PI, 8, 1e-6, 25).unwrap();
+    let result =
+        gauss_legendre_integrate_adaptive(|x| Ok(f(x)), 0.0, PI, 8, 1e-6, 25, MAX_EVALS).unwrap();
 
     let exact = (1.0 - (10.0 * PI).cos()) / 10.0;
     assert!((result - exact).abs() < 1e-3);
@@ -330,7 +332,8 @@ fn test_gauss_legendre_adaptive_max_depth() {
     let f = |x: f64| x * x;
 
     // Even with max_depth=0, should still return result
-    let result = gauss_legendre_integrate_adaptive(f, 0.0, 1.0, 4, 1e-10, 0).unwrap();
+    let result =
+        gauss_legendre_integrate_adaptive(|x| Ok(f(x)), 0.0, 1.0, 4, 1e-10, 0, MAX_EVALS).unwrap();
 
     // Should be reasonably accurate
     assert!((result - 1.0 / 3.0).abs() < 1e-6);
@@ -381,7 +384,7 @@ fn test_convergence_behavior() {
 fn test_gauss_hermite_order20_cancellation_accuracy() {
     let quad = GaussHermiteQuadrature::new(20).expect("order 20 valid");
     // E[X^2 - 1] = 1 - 1 = 0
-    let result = quad.integrate(|x| x * x - 1.0);
+    let result = quad.integrate(|x| Ok(x * x - 1.0)).unwrap();
     assert!(
         result.abs() < 1e-10,
         "E[X^2-1] should be 0; compensated sum got {result}"
@@ -887,4 +890,165 @@ fn adaptive_simpson_pair_shares_callback_work_and_preserves_node_order() {
     assert_eq!(pair.0.to_bits(), first.to_bits());
     assert_eq!(pair.1.to_bits(), second.to_bits());
     assert_eq!(pair_calls.get() * 2, scalar_calls.get());
+}
+
+#[test]
+fn gauss_legendre_adaptive_counts_work_and_reuses_child_estimates() {
+    use finstack_quant_core::{Error, InputError};
+    use std::cell::Cell;
+
+    for order in [2_usize, 4, 8, 16] {
+        let calls = Cell::new(0_usize);
+        let counted = |x: f64| {
+            calls.set(calls.get() + 1);
+            Ok(x.exp())
+        };
+
+        // One evaluation short of the root comparison: no callback at all.
+        assert!(matches!(
+            gauss_legendre_integrate_adaptive(counted, 0.0, 1.0, order, 1.0, 0, 3 * order - 1),
+            Err(Error::Input(InputError::SolverConvergenceFailed {
+                iterations: 0,
+                ..
+            }))
+        ));
+        assert_eq!(calls.get(), 0);
+
+        // Exactly 3 * order runs the root comparison.
+        gauss_legendre_integrate_adaptive(counted, 0.0, 1.0, order, 1.0, 0, 3 * order)
+            .expect("root comparison");
+        assert_eq!(calls.get(), 3 * order);
+
+        // One bisection of the root costs 2 * order per child and nothing for
+        // the children's one-panel values, which the parent already computed.
+        // A cusp keeps the root estimate nonzero at every order.
+        calls.set(0);
+        let cusp = |x: f64| {
+            calls.set(calls.get() + 1);
+            Ok((x - 0.3).abs().sqrt())
+        };
+        let _ = gauss_legendre_integrate_adaptive(cusp, 0.0, 1.0, order, 0.0, 1, MAX_EVALS);
+        assert_eq!(calls.get(), 3 * order + 2 * (2 * order));
+
+        // A limit reached mid-run reports the actual count and never exceeds it.
+        calls.set(0);
+        let limit = 3 * order + 1;
+        let Err(Error::Input(InputError::SolverConvergenceFailed {
+            iterations, reason, ..
+        })) = gauss_legendre_integrate_adaptive(cusp, 0.0, 1.0, order, 0.0, 30, limit)
+        else {
+            panic!("zero tolerance cannot be met within {limit} evaluations");
+        };
+        assert!(calls.get() <= limit);
+        assert_eq!(iterations, calls.get());
+        assert!(reason.contains("evaluation limit"), "{reason}");
+    }
+}
+
+#[test]
+fn gauss_legendre_rules_share_orientation_and_zero_width_semantics() {
+    use finstack_quant_core::Error;
+    use std::cell::Cell;
+
+    let calls = Cell::new(0_usize);
+    let counted = |x: f64| {
+        calls.set(calls.get() + 1);
+        Ok(x.exp())
+    };
+    let adaptive = gauss_legendre_integrate_adaptive(counted, 2.0, 2.0, 8, 0.0, 0, 1)
+        .expect("zero-width adaptive");
+    let composite =
+        gauss_legendre_integrate_composite(counted, 2.0, 2.0, 8, 3).expect("zero-width composite");
+    assert_eq!(adaptive.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(composite.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(calls.get(), 0, "a zero-width interval makes no callback");
+
+    // Order and counts stay explicit even on a zero interval.
+    assert!(matches!(
+        gauss_legendre_integrate_adaptive(counted, 2.0, 2.0, 3, 0.0, 0, 1),
+        Err(Error::Validation(_))
+    ));
+    assert!(matches!(
+        gauss_legendre_integrate_composite(counted, 2.0, 2.0, 8, 0),
+        Err(Error::Validation(_))
+    ));
+    assert_eq!(calls.get(), 0);
+
+    let forward =
+        gauss_legendre_integrate_adaptive(counted, 0.0, 1.0, 8, 1e-12, 20, MAX_EVALS).expect("fwd");
+    let reversed =
+        gauss_legendre_integrate_adaptive(counted, 1.0, 0.0, 8, 1e-12, 20, MAX_EVALS).expect("rev");
+    assert_eq!(reversed.to_bits(), (-forward).to_bits());
+    let forward = gauss_legendre_integrate_composite(counted, 0.0, 1.0, 8, 3).expect("fwd");
+    let reversed = gauss_legendre_integrate_composite(counted, 1.0, 0.0, 8, 3).expect("rev");
+    assert_eq!(reversed.to_bits(), (-forward).to_bits());
+    assert!((forward - (1.0_f64.exp() - 1.0)).abs() < 1e-14);
+}
+
+#[test]
+fn fixed_rules_stop_at_the_first_callback_error_and_reject_non_finite_samples() {
+    use finstack_quant_core::{Error, InputError};
+    use std::cell::Cell;
+
+    let calls = Cell::new(0_usize);
+    let failing = |x: f64| {
+        calls.set(calls.get() + 1);
+        if calls.get() == 3 {
+            Err(Error::Validation(format!("caller rejected {x}")))
+        } else {
+            Ok(x)
+        }
+    };
+    let quad = GaussHermiteQuadrature::new(10).unwrap();
+    assert!(matches!(quad.integrate(failing), Err(Error::Validation(_))));
+    assert_eq!(calls.get(), 3);
+    calls.set(0);
+    assert!(matches!(
+        gauss_legendre_integrate_composite(failing, 0.0, 1.0, 4, 2),
+        Err(Error::Validation(_))
+    ));
+    assert_eq!(calls.get(), 3);
+    calls.set(0);
+    assert!(matches!(
+        gauss_legendre_integrate_adaptive(failing, 0.0, 1.0, 4, 1e-8, 5, MAX_EVALS),
+        Err(Error::Validation(_))
+    ));
+    assert_eq!(calls.get(), 3);
+
+    for bad in [f64::NAN, f64::INFINITY] {
+        assert!(matches!(
+            quad.integrate(|_| Ok(bad)),
+            Err(Error::Input(InputError::SolverConvergenceFailed {
+                iterations: 1,
+                ..
+            }))
+        ));
+        assert!(matches!(
+            gauss_legendre_integrate_composite(|_| Ok(bad), 0.0, 1.0, 4, 2),
+            Err(Error::Input(InputError::SolverConvergenceFailed {
+                iterations: 1,
+                ..
+            }))
+        ));
+    }
+}
+
+#[test]
+fn gauss_hermite_returns_normal_moments_and_does_not_overflow_a_representable_mean() {
+    for order in [5_usize, 7, 10, 15, 20] {
+        let quad = GaussHermiteQuadrature::new(order).unwrap();
+        for (power, expected) in [(0, 1.0), (1, 0.0), (2, 1.0), (4, 3.0)] {
+            let actual = quad.integrate(|z| Ok(z.powi(power))).unwrap();
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "order {order}, E[Z^{power}] = {actual}"
+            );
+        }
+        // The unnormalized weights sum to sqrt(pi) > 1, so a constant above
+        // f64::MAX / sqrt(pi) would overflow that sum although its expectation
+        // is representable.
+        let constant = 0.75 * f64::MAX;
+        let large = quad.integrate(|_| Ok(constant)).unwrap();
+        assert!((large / constant - 1.0).abs() < 1e-14);
+    }
 }

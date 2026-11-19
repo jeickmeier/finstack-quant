@@ -200,9 +200,9 @@ mod serde_tests {
         let quad15 = GaussHermiteQuadrature::new(15).expect("valid order");
         let quad20 = GaussHermiteQuadrature::new(20).expect("valid order");
 
-        let result10 = quad10.integrate(f);
-        let result15 = quad15.integrate(f);
-        let result20 = quad20.integrate(f);
+        let result10 = quad10.integrate(|x| Ok(f(x))).unwrap();
+        let result15 = quad15.integrate(|x| Ok(f(x))).unwrap();
+        let result20 = quad20.integrate(|x| Ok(f(x))).unwrap();
 
         let expected = 3.0;
 
