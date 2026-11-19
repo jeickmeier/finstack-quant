@@ -753,6 +753,24 @@ impl PySimulatedPaths {
         self.inner.values_per_path()
     }
 
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.to_numpy")]
+    fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, numpy::PyArray2<f64>>> {
+        use numpy::{PyArray1, PyArrayMethods};
+        PyArray1::from_vec(py, self.inner.asset_values.clone())
+            .reshape([self.inner.num_paths, self.inner.values_per_path()])
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.terminal_values")]
+    fn terminal_values<'py>(&self, py: Python<'py>) -> Bound<'py, numpy::PyArray1<f64>> {
+        let values = self
+            .inner
+            .asset_values
+            .chunks_exact(self.inner.values_per_path())
+            .filter_map(|row| row.last().copied())
+            .collect();
+        numpy::PyArray1::from_vec(py, values)
+    }
+
     #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let per_path = self.inner.values_per_path();

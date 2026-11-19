@@ -7,9 +7,9 @@ use crate::bindings::pydoc::pydoc;
 use finstack_quant_models::monte_carlo::greeks::lrm::LrmGreeks;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::simulate::PathSummary;
-use numpy::PyArray1;
+use numpy::{PyArray1, PyArray3, PyArrayMethods};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyInt};
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary")]
 #[pyclass(
@@ -24,6 +24,29 @@ pub struct PyPathSummary {
 impl PyPathSummary {
     pub(super) fn from_inner(inner: PathSummary) -> Self {
         Self { inner }
+    }
+
+    fn validated_shape(&self) -> PyResult<[usize; 3]> {
+        let summary = &self.inner;
+        let shape = [
+            summary.num_simulated_paths,
+            summary.times.len(),
+            summary.dim,
+        ];
+        let [paths, times, dim] = shape;
+        let expected = paths
+            .checked_mul(times)
+            .and_then(|points| points.checked_mul(dim));
+        if times == 0
+            || dim == 0
+            || dim != summary.factor_names.len()
+            || expected != Some(summary.values.len())
+        {
+            return Err(crate::errors::value_error(
+                "PathSummary dimensions do not match stored paths, times, and factors",
+            ));
+        }
+        Ok(shape)
     }
 }
 
@@ -65,24 +88,49 @@ impl PyPathSummary {
         self.inner.values.clone()
     }
 
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.to_numpy")]
+    fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray3<f64>>> {
+        let shape = self.validated_shape()?;
+        PyArray1::from_vec(py, self.inner.values.clone()).reshape(shape)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.terminal_values")]
+    #[pyo3(signature = (factor=None))]
+    fn terminal_values<'py>(
+        &self,
+        py: Python<'py>,
+        factor: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let [paths, times, dim] = self.validated_shape()?;
+        let index = match factor {
+            None => 0,
+            Some(factor) => match factor.extract::<String>() {
+                Ok(name) => self
+                    .inner
+                    .factor_names
+                    .iter()
+                    .position(|candidate| candidate == &name)
+                    .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(name))?,
+                Err(_) => factor
+                    .cast::<PyInt>()?
+                    .extract::<usize>()
+                    .ok()
+                    .filter(|index| *index < dim)
+                    .ok_or_else(|| {
+                        pyo3::exceptions::PyIndexError::new_err("factor index out of bounds")
+                    })?,
+            },
+        };
+        let values = (0..paths)
+            .map(|path| self.inner.values[(path * times + (times - 1)) * dim + index])
+            .collect();
+        Ok(PyArray1::from_vec(py, values))
+    }
+
     #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let [_, _, dim] = self.validated_shape()?;
         let summary = &self.inner;
-        let dim = summary.factor_names.len();
-        let expected = summary
-            .num_simulated_paths
-            .saturating_mul(summary.times.len())
-            .saturating_mul(dim);
-        if dim == 0 || summary.values.len() != expected {
-            return Err(crate::errors::value_error(format!(
-                "PathSummary holds {} values but {} paths x {} times x {} factors need {}",
-                summary.values.len(),
-                summary.num_simulated_paths,
-                summary.times.len(),
-                dim,
-                expected
-            )));
-        }
         let data = PyDict::new(py);
         for (factor, name) in summary.factor_names.iter().enumerate() {
             let column: Vec<f64> = summary

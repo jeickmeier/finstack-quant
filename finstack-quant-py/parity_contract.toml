@@ -1941,7 +1941,7 @@ names = [
 # Python twin; it needs no `[parity.js.*].wasm_only` entry.
 # A member that computes, validates or applies defaults in Rust is never
 # `literal`: it needs a WASM function (recorded under `renames`).
-exclusion_reasons = ["pandas", "arrow", "pickle", "pure-python", "dunder", "literal"]
+exclusion_reasons = ["numpy", "pandas", "arrow", "pickle", "pure-python", "dunder", "literal"]
 # Plus, by naming rule, any `to_*_dataframe` / `to_*_series` pandas exit.
 python_rule_excluded_members = { to_dataframe = "pandas", to_series = "pandas", from_dataframe = "pandas", to_arrow = "arrow" }
 js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", toString = "JavaScript twin of Python __str__" }
@@ -1966,6 +1966,10 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.credit.migration.RatingPaths.default_rate" = "share of the Rust paths that end in the default state"
 "finstack_quant.models.credit.migration.RatingPaths.paths" = "the Rust `Vec<RatingPath>`"
 "finstack_quant.models.factor.FactorCovarianceMatrix.data" = "Rust `as_slice()` (row-major values)"
+"finstack_quant.models.monte_carlo.PathSummary.to_numpy" = "NumPy representation of stored path values"
+"finstack_quant.models.monte_carlo.PathSummary.terminal_values" = "NumPy selection from the stored path cube"
+"finstack_quant.models.credit.SimulatedPaths.to_numpy" = "NumPy representation of stored asset values"
+"finstack_quant.models.credit.SimulatedPaths.terminal_values" = "NumPy selection from stored asset paths"
 "finstack_quant.models.factor.FactorCovarianceMatrix.to_numpy" = "NumPy exit of Rust `as_slice()`"
 "finstack_quant.models.factor.FactorModelConfig.factor_ids" = "ids of the Rust `factors` field"
 "finstack_quant.models.factor.FactorModelConfig.n_factors" = "length of the Rust `factors` field"
@@ -2964,3 +2968,9 @@ excluded = { data_json = "literal" }
 
 [parity.members."finstack_quant.statements_analytics.Stage"]
 excluded = { from_str = "literal" }
+
+[parity.members."finstack_quant.models.monte_carlo.PathSummary"]
+excluded = { to_numpy = "numpy", terminal_values = "numpy" }
+
+[parity.members."finstack_quant.models.credit.SimulatedPaths"]
+excluded = { to_numpy = "numpy", terminal_values = "numpy" }

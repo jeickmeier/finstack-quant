@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from typing import Any
+import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 from finstack_quant.core.money import Money
 
@@ -1044,6 +1046,47 @@ class PathSummary:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def to_numpy(self) -> NDArray[np.float64]:
+        """Return the simulated states as an independent float64 array.
+
+        Returns
+        -------
+        numpy.ndarray
+            Shape (stored paths, time points, state factors), including the initial state.
+
+        Raises
+        ------
+        ValueError
+            If the stored values do not match the result dimensions.
+        """
+        ...
+
+    def terminal_values(self, factor: int | str | None = None) -> NDArray[np.float64]:
+        """Return one factor's last stored value per path.
+
+        Parameters
+        ----------
+        factor : int | str | None
+            Zero-based factor index or exact factor name. Omit to use the first factor.
+
+        Returns
+        -------
+        numpy.ndarray
+            One float64 per stored path, in simulation order.
+
+        Raises
+        ------
+        ValueError
+            If the stored path dimensions are inconsistent.
+        IndexError
+            If a factor index lies outside the state dimension.
+        KeyError
+            If no factor matches a supplied name.
+        TypeError
+            If the factor is neither an integer nor a string.
         """
         ...
 

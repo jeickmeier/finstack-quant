@@ -10,6 +10,7 @@ stay self-contained.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -20,6 +21,7 @@ from finstack_quant.models.correlation import (
     PortfolioLossResult,
     simulate_portfolio_loss,
 )
+from finstack_quant.models.credit import MertonModel
 from finstack_quant.models.monte_carlo import PathSummary, simulate_paths
 
 # monte_carlo
@@ -73,14 +75,31 @@ def test_path_summary_to_dataframe_has_one_column_per_factor() -> None:
     assert list(df["spot"]) == summary.values[0::2]
     assert list(df["variance"]) == summary.values[1::2]
     assert df.loc[(5, 0.0)].tolist() == [100.0, 0.03]
+    cube = summary.to_numpy()
+    assert cube.shape == (6, 3, 2)
+    assert cube.dtype == np.float64
+    np.testing.assert_array_equal(cube.reshape(18, 2), df.to_numpy())
+    np.testing.assert_array_equal(summary.terminal_values(), cube[:, -1, 0])
+    np.testing.assert_array_equal(summary.terminal_values("variance"), cube[:, -1, 1])
+    np.testing.assert_array_equal(summary.terminal_values(1), cube[:, -1, 1])
+    cube[0, 0, 0] = -1.0
+    assert summary.to_numpy()[0, 0, 0] == 100.0
+    with pytest.raises(KeyError, match="missing"):
+        summary.terminal_values("missing")
+    with pytest.raises(IndexError, match="out of bounds"):
+        summary.terminal_values(2)
+    with pytest.raises(TypeError):
+        summary.terminal_values(1.5)
 
 
 def test_path_summary_to_dataframe_rejects_an_inconsistent_shape() -> None:
     inconsistent = PathSummary.from_json(
         '{"num_paths":1,"num_simulated_paths":1,"dim":1,"times":[0.0,1.0],"factor_names":["spot"],"values":[1.0]}'
     )
-    with pytest.raises(ValueError, match="1 values"):
+    with pytest.raises(ValueError, match="dimensions"):
         inconsistent.to_dataframe()
+    with pytest.raises(ValueError, match="dimensions"):
+        inconsistent.to_numpy()
     assert inconsistent._repr_html_() is None
 
 
@@ -99,6 +118,18 @@ def test_path_summary_dataframe_is_reproducible_from_the_seed() -> None:
     other_seed = simulate_paths(_gbm_spec(8)).to_dataframe()
     assert list(other_seed.columns) == list(first.columns)
     assert not first.equals(other_seed), "a different seed must produce different paths"
+
+
+def test_merton_paths_numpy_includes_initial_state_and_preserves_path_order() -> None:
+    paths = MertonModel(100.0, 0.25, 80.0, 0.05).simulate_paths(4, 2, 1.0, seed=42, antithetic=False)
+    matrix = paths.to_numpy()
+    assert matrix.shape == (4, 3)
+    assert matrix.dtype == np.float64
+    np.testing.assert_array_equal(matrix[:, 0], [100.0] * 4)
+    np.testing.assert_array_equal(paths.terminal_values(), matrix[:, -1])
+    assert matrix[2, 1] == paths.get(2, 1)
+    matrix[0, 0] = -1.0
+    assert paths.get(0, 0) == 100.0
 
 
 # models.correlation

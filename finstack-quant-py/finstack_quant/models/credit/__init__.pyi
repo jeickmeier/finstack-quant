@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from finstack_quant.core.types import CreditRating
 import datetime
+import numpy as np
+from numpy.typing import NDArray
 import pandas
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.market_data import HazardCurve
@@ -1115,6 +1117,35 @@ class SimulatedPaths:
         This accessor does not raise; it returns the stored or derived value.
         """
         ...
+    def to_numpy(self) -> NDArray[np.float64]:
+        """Return the simulated states as an independent float64 array.
+
+        Returns
+        -------
+        numpy.ndarray
+            Shape (paths, steps + 1), including the initial asset value.
+
+        Raises
+        ------
+        ValueError
+            If the stored values do not match the result dimensions.
+        """
+        ...
+
+    def terminal_values(self) -> NDArray[np.float64]:
+        """Return the final asset value of each simulated path.
+
+        Returns
+        -------
+        numpy.ndarray
+            Independent float64 array in stored path order.
+
+        Notes
+        -----
+        This method does not raise for a valid result.
+        """
+        ...
+
     def to_dataframe(self) -> pandas.DataFrame:
         """
         Long frame with ``path`` (int), ``time`` (float, years), ``asset_value`` (float); one row per path per grid point, ordered by path then time.
