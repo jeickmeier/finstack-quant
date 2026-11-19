@@ -5,6 +5,7 @@
 
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::types::CurveId;
 use std::collections::BTreeMap;
 
 /// FRTB risk classes per BCBS d457.
@@ -254,14 +255,14 @@ pub struct FrtbSensitivities {
     /// Base/reporting currency.
     pub base_currency: Currency,
 
-    /// GIRR delta by (currency, tenor).
+    /// Ordinary GIRR yield delta by (risk currency, curve identifier, tenor).
     ///
     /// Units: base-currency P&L per **1 percentage-point** (1pp) parallel
     /// shift of the yield curve — i.e. `100 × DV01`. This matches the
     /// FRTB risk-weight convention (`GIRR_DELTA_RISK_WEIGHTS` are stated
     /// in percent, e.g. `1.7` for 1.7%). See the module-level docs on
     /// sensitivity conventions.
-    pub girr_delta: FxHashMap<(Currency, String), f64>,
+    pub girr_delta: FxHashMap<(Currency, CurveId, String), f64>,
     /// GIRR inflation delta by currency.
     ///
     /// Units: base-currency P&L per 1pp shift in inflation (same
@@ -348,6 +349,29 @@ impl<'de> serde::Deserialize<'de> for FrtbSensitivities {
     {
         super::wire::deserialize(deserializer)
     }
+}
+
+fn validate_yield_delta(
+    curve_id: &CurveId,
+    tenor: &str,
+    amount: f64,
+) -> finstack_quant_core::Result<()> {
+    if curve_id.as_str().trim().is_empty() {
+        return Err(finstack_quant_core::Error::Validation(
+            "FRTB girr_delta curve_id must not be empty".into(),
+        ));
+    }
+    if super::params::girr::tenor_to_years(tenor).is_none() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "FRTB girr_delta has unknown tenor '{tenor}'"
+        )));
+    }
+    if !amount.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(
+            "FRTB girr_delta amount must be finite".into(),
+        ));
+    }
+    Ok(())
 }
 
 impl FrtbSensitivities {
@@ -439,9 +463,8 @@ impl FrtbSensitivities {
             }
         }
 
-        for ((_, label), value) in &self.girr_delta {
-            tenor("girr_delta", label)?;
-            finite("girr_delta", *value)?;
+        for ((_, curve_id, label), value) in &self.girr_delta {
+            validate_yield_delta(curve_id, label, *value)?;
         }
         for value in self
             .girr_inflation_delta
@@ -612,18 +635,35 @@ impl FrtbSensitivities {
         Ok(())
     }
 
-    /// Add a GIRR delta sensitivity.
+    /// Add an ordinary GIRR yield delta at one qualified curve vertex.
     ///
     /// # Arguments
+    /// * `currency` - Risk currency identifying the GIRR bucket, without converting the supplied value.
+    /// * `curve_id` - Exact yield curve identifier, distinguishing OIS, term indices and offshore curves.
+    /// * `tenor` - One of the ten regulatory yield vertices such as `5Y`; matching is case sensitive.
+    /// * `amount` - Reporting-currency P&L from the prescribed upward one-basis-point reprice, multiplied by 100.
     ///
-    /// * `ccy` - Currency of the interest-rate risk factor; identifies the GIRR currency bucket without converting the supplied sensitivity.
-    /// * `tenor` - Regulatory tenor label used as the bucket key; repeated keys accumulate their sensitivities.
-    /// * `delta` - Signed base-currency P&L per one percentage-point yield shift, equal to 100 times DV01; risk weights are applied later.
-    pub fn add_girr_delta(&mut self, ccy: Currency, tenor: &str, delta: f64) {
-        *self
-            .girr_delta
-            .entry((ccy, tenor.to_string()))
-            .or_insert(0.0) += delta;
+    /// # Errors
+    /// Rejects empty curve identifiers, unsupported vertices, and non-finite
+    /// amounts or sums. A rejected contribution leaves the map unchanged.
+    pub fn add_girr_delta(
+        &mut self,
+        currency: Currency,
+        curve_id: impl Into<CurveId>,
+        tenor: &str,
+        amount: f64,
+    ) -> finstack_quant_core::Result<()> {
+        let curve_id = curve_id.into();
+        validate_yield_delta(&curve_id, tenor, amount)?;
+        let key = (currency, curve_id, tenor.to_owned());
+        let total = self.girr_delta.get(&key).copied().unwrap_or_default() + amount;
+        if !total.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "FRTB girr_delta sum must be finite".into(),
+            ));
+        }
+        self.girr_delta.insert(key, total);
+        Ok(())
     }
 
     /// Add a CSR non-sec delta sensitivity.

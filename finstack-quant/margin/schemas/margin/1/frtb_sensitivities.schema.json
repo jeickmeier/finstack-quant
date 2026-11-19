@@ -163,11 +163,13 @@
       "girr_delta": [
         [
           "USD",
+          "USD-OIS",
           "10Y",
           -8000.0
         ],
         [
           "USD",
+          "USD-OIS",
           "5Y",
           12500.0
         ]
@@ -705,11 +707,14 @@
     },
     "girr_delta": {
       "items": {
-        "maxItems": 3,
-        "minItems": 3,
+        "maxItems": 4,
+        "minItems": 4,
         "prefixItems": [
           {
             "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+          },
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
           },
           {
             "type": "string"

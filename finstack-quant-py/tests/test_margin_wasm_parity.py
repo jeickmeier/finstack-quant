@@ -130,8 +130,8 @@ def simm_sensitivities() -> SimmSensitivities:
 
 def frtb_sensitivities() -> FrtbSensitivities:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("USD", "5Y", 100_000.0)
-    sens.add_girr_delta("EUR", "10Y", -40_000.0)
+    sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
+    sens.add_girr_delta("EUR", "EUR-ESTR", "10Y", -40_000.0)
     sens.add_girr_inflation_delta("USD", 5_000.0)
     sens.add_girr_xccy_basis_delta("EUR", 2_000.0)
     sens.add_girr_vega("USD", "1Y", "5Y", 3_000.0)

@@ -31,7 +31,7 @@ Complete three mandatory sessions: risk mapping, margin and capital, then XVA an
 
 Variation margin collateralizes current mark-to-market under CSA terms. Initial margin protects against potential adverse moves during closeout. Schedule and SIMM are bilateral approaches for non-centrally cleared derivatives; neither is exchange clearing margin. Exchange daily settlement is studied in V1. Legal netting eligibility is a supplied teaching assumption, not something inferred from a common counterparty name.
 
-SIMM IR delta uses currency per basis point on its prescribed tenor grid. This implementation pins SIMM 2.6, the embedded 2023 vintage. FRTB GIRR sensitivities use currency per percentage point, so the same derivative is 100 times the per-bp amount. Credit-spread delta is also scaled explicitly before FRTB. A string rename of a generic risk bucket cannot establish these conventions. Reprice directly on the target grids and retain position quantity, full contractual notional, currency, factor, tenor, sign and bump size in every row.
+SIMM IR delta uses currency per basis point on its prescribed tenor grid. This implementation pins SIMM 2.6, the embedded 2023 vintage. The FRTB GIRR illustration uses the PV change from an upward one-basis-point shift multiplied by 100, in currency per percentage point. Credit-spread delta is also scaled explicitly before FRTB. A string rename of a generic risk bucket cannot establish these conventions. Reprice directly on the target grids and retain position quantity, full contractual notional, currency, factor, tenor, sign and bump size in every row.
 
 The IR experiment inserts all target knots while retaining original interpolation breakpoints, then applies a triangular nodal zero/forward-rate shock. A zero bump must preserve PV. For CDS spread delta, rebuild the calibrated credit curve from bumped quotes on 1Y/2Y/3Y/5Y/10Y targets. The missing 2Y quote is a disclosed synthetic par quote from the original curve; all original quotes remain calibration anchors. Its small base-price drift is measured separately from sensitivity. Residual credit-sector classification is explicit because this exercise does not infer a detailed issuer sector.
 
@@ -39,7 +39,7 @@ A single SIMM sensitivity below concentration thresholds has IM equal to absolut
 
 SA-CCR estimates exposure at default, $EAD=\alpha(RC+PFE)$. FRTB estimates market-risk capital and has separate delta, vega, curvature, default-risk and residual-risk concepts. The executable book case below covers the two trades' GIRR/credit delta; the regulatory-capital lab supplies the remaining explicit illustrative components. XVA uses exposure, hazard, discounting and funding assumptions: CVA is counterparty loss, DVA own-default benefit, FVA funding, and MVA funding of segregated IM. These illustrative profiles are assumptions, not a simulated exposure forecast.
 
-The visible table preserves OIS and SOFR source factors, but the native SIMM and FRTB GIRR sensitivity containers key interest-rate inputs by currency and tenor. Adding both curves therefore nets them at that key; a separate subcurve-basis treatment is unavailable through these containers. The resulting charge is an illustrative simplified native calculation. It is not a complete subcurve-sensitive regulatory calculation.
+The native SIMM example aggregates OIS and SOFR by currency and tenor. The FRTB calculation preserves the curve identifier, so offsetting rows on separate curves retain within-currency basis risk. The IR example uses direct zero and forward-curve shocks to illustrate the units and curve coordinates.
 
 Schedule residual maturity and SA-CCR start/end dates are derived from the same priced contracts: the IRS runs from 15 April 2025 to 15 April 2028, and the CDS ends on 20 March 2030. The IM profile uses an assumed linear decay to the longest actual maturity; it does not claim to reprice future margin on each date.
 
@@ -104,13 +104,19 @@ rows = []
 for framework, grid in [("SIMM", grid_simm), ("FRTB", grid_frtb)]:
     for curve_id in ["USD-OIS", "USD-SOFR-3M"]:
         zero = price_instrument(swap, target_market(curve_id, grid, next(iter(grid)), 0.0), AS_OF, model="discounting").value.amount
+        assert abs(zero - base_pv) < 1e-6, "USD: inserting grid points must preserve the base price."
         for tenor in grid:
             up = price_instrument(swap, target_market(curve_id, grid, tenor, .0001), AS_OF, model="discounting").value.amount
-            down = price_instrument(swap, target_market(curve_id, grid, tenor, -.0001), AS_OF, model="discounting").value.amount
-            # Signed derivative: positive means this payer swap gains when this rate rises.
-            per_bp = quantity * (up - down) / 2
-            rows.append(dict(framework=framework, position="USD-PAYER-IRS", quantity=quantity, contractual_notional_usd=2_000_000, currency="USD", factor=curve_id, tenor=tenor, bump_decimal=.0001, derivative_sign="up-minus-down", units="USD/bp" if framework == "SIMM" else "USD/percentage-point", amount=per_bp if framework == "SIMM" else 100 * per_bp))
+            if framework == "SIMM":
+                down = price_instrument(swap, target_market(curve_id, grid, tenor, -.0001), AS_OF, model="discounting").value.amount
+                amount = float(quantity * (up - down) / 2)
+                quote_basis, units = "centered", "USD/bp"
+            else:
+                amount = float(100 * quantity * (up - base_pv))
+                quote_basis, units = "up-minus-base", "USD/percentage-point"
+            rows.append(dict(framework=framework, position="USD-PAYER-IRS", quantity=quantity, contractual_notional_usd=2_000_000, currency="USD", factor=curve_id, tenor=tenor, bump_decimal=.0001, quote_basis=quote_basis, units=units, amount=amount))
 mapping = pd.DataFrame(rows)
+assert np.isfinite(mapping.amount).all()
 print(mapping.to_string(index=False))
 ```
 {/* /notebook-block */}
@@ -134,7 +140,7 @@ assert native_simm.amount > 0 and native_simm.approximation
 print("Instrument-derived SIMM estimate (USD):", native_simm.amount)
 frtb = FrtbSensitivities("USD")
 for row in mapping[mapping.framework == "FRTB"].itertuples():
-    frtb.add_girr_delta(row.currency, row.tenor, row.amount)
+    frtb.add_girr_delta(row.currency, row.factor, row.tenor, row.amount)
 capital = FrtbSbaEngine().calculate(frtb)
 assert simm_result.amount > 0 and capital.total > 0
 
@@ -253,11 +259,10 @@ csa=margin_api.CsaSpec.usd_regulatory().with_vm_threshold(0.,0.)
 initial_vm=margin_api.VmCalculator(csa).calculate(net_mtm,0.,"USD",AS_OF)
 next_vm=margin_api.VmCalculator(csa).calculate(net_mtm+50_000.,net_mtm,"USD",AS_OF)
 print("VM initial and controlled+50k mark move:",initial_vm.to_json(),next_vm.to_json())
-# The native IR containers net OIS and SOFR within currency/tenor; no subcurve basis dimension is available.
-# This is a simplified native charge, not a complete regulatory subcurve treatment.
+# Preserve the OIS and SOFR curve identifiers in the ordinary GIRR delta inputs.
 # Capital is distinct from IM. Explicit two-trade GIRR and credit-spread delta scope.
 capital_sens=FrtbSensitivities("USD")
-for row in full_mapping[full_mapping.framework=="FRTB"].itertuples():capital_sens.add_girr_delta(row.currency,row.tenor,row.amount)
+for row in full_mapping[full_mapping.framework=="FRTB"].itertuples():capital_sens.add_girr_delta(row.currency,row.factor,row.tenor,row.amount)
 for row in full_mapping[(full_mapping.framework=="SIMM") & (full_mapping.factor=="ACME-HZD par CDS")].itertuples():capital_sens.add_csr_nonsec_delta("ACME",16,row.tenor,"cds",100*row.amount)
 capital_result=FrtbSbaEngine().calculate(capital_sens)
 print("FRTB BCBSd457 embedded parameter vintage; two-trade delta-only charge:",capital_result.total,capital_result.binding_scenario)

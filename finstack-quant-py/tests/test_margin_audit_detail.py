@@ -180,8 +180,8 @@ def test_xva_rows_sum_to_each_reported_leg() -> None:
 
 def test_frtb_scenario_breakdown_covers_every_scenario() -> None:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("USD", "5Y", 25_000.0)
-    sens.add_girr_delta("USD", "10Y", -15_000.0)
+    sens.add_girr_delta("USD", "USD-OIS", "5Y", 25_000.0)
+    sens.add_girr_delta("USD", "USD-OIS", "10Y", -15_000.0)
     sens.add_equity_delta("ACME", 1, 12_000.0)
 
     result = frtb_sba_charge(sens)

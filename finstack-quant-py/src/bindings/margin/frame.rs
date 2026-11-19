@@ -119,6 +119,7 @@ pub(super) fn sensitivity_rows(frame: &Bound<'_, PyAny>) -> PyResult<Vec<Sensiti
                 risk_class: req_str(row, "risk_class")?,
                 bucket: opt_str(row, "bucket")?,
                 tenor: opt_str(row, "tenor")?,
+                curve_id: opt_str(row, "curve_id")?,
                 expiry_tenor: opt_str(row, "expiry_tenor")?,
                 issuer: opt_str(row, "issuer")?,
                 kind: req_str(row, "kind")?,

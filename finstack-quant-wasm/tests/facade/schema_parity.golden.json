@@ -1536,7 +1536,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sensitivities.schema.json",
             "type_name": "FrtbSensitivities",
             "kind": "input",
-            "bytes": 19361
+            "bytes": 19509
           },
           {
             "path": "schemas/margin/1/funding_config.schema.json",
@@ -4663,7 +4663,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sensitivities.schema.json",
             "type_name": "FrtbSensitivities",
             "kind": "input",
-            "bytes": 19361
+            "bytes": 19509
           },
           {
             "domain": "margin",

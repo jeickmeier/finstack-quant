@@ -35,7 +35,7 @@ use wasm_bindgen::prelude::*;
 /// import init, { margin } from "finstack-quant-wasm";
 /// await init();
 /// const sens = new margin.FrtbSensitivities("USD");
-/// sens.addGirrDelta("USD", "5Y", 100_000);
+/// sens.addGirrDelta("USD", "USD-OIS", "5Y", 100_000);
 /// margin.frtbSbaCharge(sens).total; // capital charge in USD
 /// ```
 #[wasm_bindgen(js_name = FrtbSensitivities)]
@@ -103,26 +103,28 @@ impl JsFrtbSensitivities {
         self.inner.validate().map_err(to_js_err)
     }
 
-    /// Add a GIRR delta sensitivity.
-    /// @param tenor - GIRR tenor bucket, such as `"5Y"`.
-    /// @param amount - Signed base-currency P&L per 1 percentage point of curve shift (`100 * DV01`).
-    /// @param currency - ISO-4217 currency of the curve of the shocked risk factor.
-    ///
-    /// # Errors
-    ///
-    /// Throws if the currency is not a known ISO-4217 code.
+    /// Add an ordinary GIRR yield delta at one curve vertex.
+    /// @param currency - ISO-4217 risk currency of the curve.
+    /// @param curveId - Exact yield curve identifier distinguishing OIS or a specific term-index curve.
+    /// @param tenor - Case-sensitive regulatory vertex such as "5Y".
+    /// @param amount - Signed reporting-currency P&L from the upward one-bp reprice, multiplied by 100.
+    /// @throws TypeError for mistyped arguments or FinstackError for an invalid currency, missing curve identity, unknown tenor or non-finite amount or aggregate.
     #[wasm_bindgen(js_name = addGirrDelta)]
     pub fn add_girr_delta(
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(js_name = "curveId", unchecked_param_type = "string")] curve_id: JsValue,
         #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
         #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
-        let tenor = js_string(&tenor, "tenor")?;
-        let amount = js_f64(&amount, "amount")?;
-        let currency = js_currency(&currency, "currency")?;
-        self.inner.add_girr_delta(currency, &tenor, amount);
-        Ok(())
+        self.inner
+            .add_girr_delta(
+                js_currency(&currency, "currency")?,
+                js_string(&curve_id, "curveId")?,
+                &js_string(&tenor, "tenor")?,
+                js_f64(&amount, "amount")?,
+            )
+            .map_err(to_js_err)
     }
 
     /// Add a GIRR inflation delta sensitivity.
@@ -769,7 +771,7 @@ impl JsFrtbSensitivities {
 /// const engine = new margin.FrtbSbaEngine(["low", "high"], ["girr", "fx"]);
 /// engine.scenarios; // ["low", "high"]
 /// const sens = new margin.FrtbSensitivities("USD");
-/// sens.addGirrDelta("USD", "5Y", 100_000);
+/// sens.addGirrDelta("USD", "USD-OIS", "5Y", 100_000);
 /// engine.calculate(sens).binding_scenario;
 /// ```
 #[wasm_bindgen(js_name = FrtbSbaEngine)]

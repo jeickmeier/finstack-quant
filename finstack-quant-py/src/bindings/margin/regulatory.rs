@@ -140,15 +140,18 @@ impl PyFrtbSensitivities {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Add a GIRR delta: ``amount`` is base-currency P&L per **1 percentage
-    /// point** of curve shift (``100 x DV01``) at ``tenor``; ``currency``
-    /// identifies the shocked curve. Raises ``ValueError`` for an unknown
-    /// currency.
-    #[pyo3(signature = (currency, tenor, amount))]
-    fn add_girr_delta(&mut self, currency: &str, tenor: &str, amount: f64) -> PyResult<()> {
-        let ccy = parse_currency(currency)?;
-        self.inner.add_girr_delta(ccy, tenor, amount);
-        Ok(())
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._regulatory", "FrtbSensitivities.add_girr_delta")]
+    #[pyo3(signature = (currency, curve_id, tenor, amount))]
+    fn add_girr_delta(
+        &mut self,
+        currency: &str,
+        curve_id: &str,
+        tenor: &str,
+        amount: f64,
+    ) -> PyResult<()> {
+        self.inner
+            .add_girr_delta(parse_currency(currency)?, curve_id, tenor, amount)
+            .map_err(core_to_py)
     }
 
     /// Add a GIRR inflation delta: ``amount`` is base-currency P&L per 1

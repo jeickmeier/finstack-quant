@@ -101,8 +101,8 @@ function simmSensitivities() {
 
 function frtbSensitivities() {
   const sens = new margin.FrtbSensitivities('USD');
-  sens.addGirrDelta('USD', '5Y', 100_000);
-  sens.addGirrDelta('EUR', '10Y', -40_000);
+  sens.addGirrDelta('USD', 'USD-OIS', '5Y', 100_000);
+  sens.addGirrDelta('EUR', 'EUR-ESTR', '10Y', -40_000);
   sens.addGirrInflationDelta('USD', 5_000);
   sens.addGirrXccyBasisDelta('EUR', 2_000);
   sens.addGirrVega('USD', '1Y', '5Y', 3_000);
@@ -731,8 +731,8 @@ test('addRraoPosition requires the exotic flag', () => {
 test('GIRR requires explicit risk currency and DRC delegates complete Rust validation', () => {
   const sens = new margin.FrtbSensitivities('USD');
   assert.throws(() => sens.addGirrDelta('5Y', 100));
-  sens.addGirrDelta('EUR', '5Y', 100);
-  assert.deepEqual(JSON.parse(sens.toJson()).girr_delta, [['EUR', '5Y', 100]]);
+  sens.addGirrDelta('EUR', 'EUR-ESTR', '5Y', 100);
+  assert.deepEqual(JSON.parse(sens.toJson()).girr_delta, [['EUR', 'EUR-ESTR', '5Y', 100]]);
   const position = {
     issuer: 'ACME',
     jtd_amount: 1_000_000,

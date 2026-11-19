@@ -32,7 +32,7 @@ class FrtbSensitivities:
     Examples
     --------
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
     """
 
     def __init__(self, base_currency: str) -> None:
@@ -77,7 +77,7 @@ class FrtbSensitivities:
         --------
         >>> from finstack_quant.margin import FrtbSensitivities
         >>> original = FrtbSensitivities("USD")
-        >>> original.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> original.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> restored = FrtbSensitivities.from_json(original.to_json())
         >>> restored.base_currency
         'USD'
@@ -114,7 +114,8 @@ class FrtbSensitivities:
         ----------
         frame : pd.DataFrame
             Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
-            ``tenor``, ``amount`` (plus ``sector``, ``seniority``,
+            ``tenor``, ``amount`` (plus ``curve_id`` required on ordinary GIRR
+            delta, and DRC columns ``sector``, ``seniority``,
             ``maturity_years``, ``pnl_adjustment`` on ``drc``
             rows) encoded as ``to_dataframe`` documents.
             ``curvature_up`` / ``curvature_down`` rows are recombined into
@@ -143,7 +144,7 @@ class FrtbSensitivities:
         Examples
         --------
         >>> original = FrtbSensitivities("USD")
-        >>> original.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> original.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> original.add_drc_position({
         ...     "issuer": "ACME",
         ...     "jtd_amount": 1_000_000.0,
@@ -180,28 +181,33 @@ class FrtbSensitivities:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> sens.validate()
         """
         ...
 
-    def add_girr_delta(self, currency: str, tenor: str, amount: float) -> None:
-        """
-        Add a GIRR delta sensitivity (currency P&L per 1 percentage-point move).
+    def add_girr_delta(self, currency: str, curve_id: str, tenor: str, amount: float) -> None:
+        """Add an ordinary GIRR yield delta at one qualified curve vertex.
 
         Parameters
         ----------
-        tenor : str
-            GIRR tenor bucket, such as ``"5Y"``.
-        amount : float
-            Signed sensitivity amount per 1 percentage-point move (``100 * DV01``).
         currency : str
-            Currency code; identifies the shocked risk factor.
+            ISO-4217 risk currency used to select the GIRR currency bucket.
+        curve_id : str
+            Exact yield curve identifier, such as USD-OIS or USD-SOFR-3M.
+        tenor : str
+            Case-sensitive regulatory yield vertex such as 5Y.
+        amount : float
+            Signed reporting-currency P&L from the upward one-basis-point
+            reprice, multiplied by 100. Matching vertices accumulate.
 
         Raises
         ------
+        TypeError
+            If an argument has an incompatible Python type.
         ValueError
-            If ``currency`` is not a recognized ISO currency code.
+            If currency, curve identifier, tenor, amount or its sum is invalid.
+            Invalid contributions leave existing sensitivities unchanged.
         """
         ...
 
@@ -854,7 +860,7 @@ class FrtbSensitivities:
         ``DataFrame``.
 
         Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-        ``amount``, then the DRC columns ``sector``, ``seniority``,
+        ``amount``, the ordinary GIRR ``curve_id``, then the DRC columns ``sector``, ``seniority``,
         ``maturity_years``, ``pnl_adjustment`` (``None`` /
         ``NaN`` on non-DRC rows). One row per populated bucket; an empty
         container still carries all ten columns. Long format is used
@@ -924,7 +930,7 @@ class FrtbSbaEngine:
     --------
     >>> from finstack_quant.margin import FrtbSbaEngine, FrtbSensitivities
     >>> sensitivities = FrtbSensitivities("USD")
-    >>> sensitivities.add_girr_delta("USD", "5Y", 100_000.0)
+    >>> sensitivities.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
     >>> round(FrtbSbaEngine(scenarios=["medium"]).calculate(sensitivities).total, 2)
     110000.0
     """
@@ -1020,7 +1026,7 @@ class FrtbSbaEngine:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> FrtbSbaEngine().calculate(sens).binding_scenario
         'low'
         """
@@ -1039,7 +1045,7 @@ class FrtbSbaResult:
     --------
     >>> from finstack_quant.margin import FrtbSensitivities, frtb_sba_charge
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
     >>> result = frtb_sba_charge(sens)
     >>> result.total > 0.0
     True
@@ -1245,7 +1251,7 @@ class FrtbSbaResult:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 1.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 1.0)
         >>> result = frtb_sba_charge(sens)
         >>> sorted(result.scenario_breakdown) == sorted(result.scenario_charges)
         True
@@ -1271,7 +1277,7 @@ class FrtbSbaResult:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 1.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 1.0)
         >>> result = frtb_sba_charge(sens)
         >>> "numeric_mode" in result.meta
         True
@@ -1332,7 +1338,7 @@ class FrtbSbaResult:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> frtb_sba_charge(sens).to_scenario_dataframe()["scenario"].tolist()
         ['low', 'medium', 'high']
         """
@@ -2821,7 +2827,7 @@ def frtb_sba_charge(sensitivities: FrtbSensitivities, correlation_scenario: str 
     Examples
     --------
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
     >>> result = frtb_sba_charge(sens)
     >>> result.total > 0.0
     True

@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sensitivities.schema.json",
-      "bytes": 19361,
+      "bytes": 19509,
       "kind": "input",
       "path": "schemas/margin/1/frtb_sensitivities.schema.json",
       "summary": "FRTB sensitivity inputs organized by risk class.",

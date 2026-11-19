@@ -25,7 +25,7 @@
 //! use finstack_quant_margin::regulatory::frtb::FrtbSensitivities;
 //!
 //! let mut sens = FrtbSensitivities::new(Currency::USD);
-//! sens.add_girr_delta(Currency::USD, "5Y", 25_000.0);
+//! sens.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 25_000.0).expect("valid GIRR delta");
 //! sens.add_equity_curvature("ACME", 1, 70.0, -60.0);
 //!
 //! let rows = sens.to_rows()?;
@@ -63,6 +63,8 @@ pub struct SensitivityRow {
     /// Tenor label; FRTB delta rows with a basis carry `"tenor/basis"` and
     /// GIRR vega rows carry `"option_maturity/underlying_tenor"`.
     pub tenor: Option<String>,
+    /// Exact yield curve identifier on ordinary GIRR delta rows.
+    pub curve_id: Option<String>,
     /// SIMM curvature option-expiry tenor; `None` on every other row.
     pub expiry_tenor: Option<String>,
     /// Currency, issuer, underlier, commodity name, `"CCY1/CCY2"` currency
@@ -133,6 +135,7 @@ impl SensitivityRow {
             &self.issuer,
             &self.bucket,
             &self.tenor,
+            &self.curve_id,
             &self.expiry_tenor,
             &self.sector,
             &self.seniority,
@@ -143,6 +146,7 @@ impl SensitivityRow {
                 &other.issuer,
                 &other.bucket,
                 &other.tenor,
+                &other.curve_id,
                 &other.expiry_tenor,
                 &other.sector,
                 &other.seniority,
@@ -255,7 +259,7 @@ fn pair_label(ccy1: Currency, ccy2: Currency) -> Option<String> {
 /// Which optional column group a table carries.
 #[derive(Clone, Copy)]
 enum Layout {
-    /// FRTB: the five DRC columns.
+    /// FRTB: the GIRR curve identifier and DRC details.
     Frtb,
     /// SIMM: the `expiry_tenor` column.
     Simm,
@@ -273,6 +277,7 @@ fn rows_to_table(rows: Vec<SensitivityRow>, layout: Layout) -> Result<TableEnvel
     let mut risk_class = Vec::with_capacity(n);
     let mut bucket = Vec::with_capacity(n);
     let mut tenor = Vec::with_capacity(n);
+    let mut curve_id = Vec::with_capacity(n);
     let mut expiry_tenor = Vec::with_capacity(n);
     let mut issuer = Vec::with_capacity(n);
     let mut kind = Vec::with_capacity(n);
@@ -285,6 +290,7 @@ fn rows_to_table(rows: Vec<SensitivityRow>, layout: Layout) -> Result<TableEnvel
         risk_class.push(row.risk_class);
         bucket.push(row.bucket);
         tenor.push(row.tenor);
+        curve_id.push(row.curve_id);
         expiry_tenor.push(row.expiry_tenor);
         issuer.push(row.issuer);
         kind.push(row.kind);
@@ -308,6 +314,10 @@ fn rows_to_table(rows: Vec<SensitivityRow>, layout: Layout) -> Result<TableEnvel
     ];
     match layout {
         Layout::Frtb => {
+            columns.push(dimension(
+                "curve_id",
+                TableColumnData::NullableString(curve_id),
+            ));
             columns.push(dimension("sector", TableColumnData::NullableString(sector)));
             columns.push(dimension(
                 "seniority",
@@ -353,7 +363,8 @@ impl FrtbSensitivities {
     /// instrument id; `bucket` is the numeric bucket (or DRC rating bucket)
     /// where the risk class has one; `tenor` is the delta tenor
     /// (`"tenor/basis"` for CSR and commodity deltas), vega maturity
-    /// (`"option_maturity/underlying_tenor"` for GIRR vega) or null. DRC rows
+    /// (`"option_maturity/underlying_tenor"` for GIRR vega) or null.
+    /// Ordinary GIRR delta carries `curve_id`. DRC rows
     /// also carry `sector`, `seniority`, `maturity_years` and
     /// `pnl_adjustment`, so [`Self::from_rows`] rebuilds every position.
     ///
@@ -372,15 +383,18 @@ impl FrtbSensitivities {
     pub fn to_rows(&self) -> Result<Vec<SensitivityRow>> {
         let mut rows = Vec::new();
 
-        for ((currency, tenor), amount) in &self.girr_delta {
-            rows.push(SensitivityRow::new(
-                "girr",
-                "delta",
-                Some(currency.to_string()),
-                None,
-                Some(tenor.clone()),
-                *amount,
-            ));
+        for ((currency, curve_id, tenor), amount) in &self.girr_delta {
+            rows.push(SensitivityRow {
+                curve_id: Some(curve_id.to_string()),
+                ..SensitivityRow::new(
+                    "girr",
+                    "delta",
+                    Some(currency.to_string()),
+                    None,
+                    Some(tenor.clone()),
+                    *amount,
+                )
+            });
         }
         for (currency, amount) in &self.girr_inflation_delta {
             rows.push(SensitivityRow::new(
@@ -647,7 +661,12 @@ impl FrtbSensitivities {
                 let ccy = row.issuer_currency()?;
                 match (row.kind.as_str(), curvature) {
                     (_, Some((up, down))) => self.add_girr_curvature(ccy, up, down),
-                    ("delta", _) => self.add_girr_delta(ccy, row.tenor()?, amount),
+                    ("delta", _) => self.add_girr_delta(
+                        ccy,
+                        row.need(&row.curve_id, "curve_id")?,
+                        row.tenor()?,
+                        amount,
+                    )?,
                     ("inflation_delta", _) => self.add_girr_inflation_delta(ccy, amount),
                     ("xccy_basis_delta", _) => self.add_girr_xccy_basis_delta(ccy, amount),
                     ("vega", _) => {
@@ -1057,6 +1076,7 @@ mod tests {
                 "issuer",
                 "kind",
                 "amount",
+                "curve_id",
                 "sector",
                 "seniority",
                 "maturity_years",
@@ -1070,9 +1090,9 @@ mod tests {
     fn frtb_rows_are_sorted_and_curvature_is_split() {
         let mut sens = FrtbSensitivities::new(Currency::USD);
         sens.girr_delta
-            .insert((Currency::USD, "5Y".to_string()), 100.0);
+            .insert((Currency::USD, "USD-OIS".into(), "5Y".to_string()), 100.0);
         sens.girr_delta
-            .insert((Currency::EUR, "2Y".to_string()), 50.0);
+            .insert((Currency::EUR, "EUR-ESTR".into(), "2Y".to_string()), 50.0);
         sens.equity_curvature
             .insert(("ACME".to_string(), 3), (7.0, -4.0));
         let table = sens.to_table().expect("table");
@@ -1094,7 +1114,8 @@ mod tests {
 
     fn every_frtb_adder() -> FrtbSensitivities {
         let mut sens = FrtbSensitivities::new(Currency::EUR);
-        sens.add_girr_delta(Currency::USD, "5Y", 25_000.0);
+        sens.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 25_000.0)
+            .expect("valid GIRR delta");
         sens.add_girr_inflation_delta(Currency::USD, 1_000.0);
         sens.add_girr_xccy_basis_delta(Currency::EUR, 500.0);
         sens.add_girr_vega(Currency::USD, "1Y", "5Y", 2_000.0);

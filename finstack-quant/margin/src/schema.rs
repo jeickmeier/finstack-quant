@@ -298,24 +298,24 @@ mod examples {
         example(&crate::regulatory::frtb::FrtbRiskClass::Girr)
     }
 
-    fn frtb_sensitivities_value() -> crate::regulatory::frtb::FrtbSensitivities {
+    fn frtb_sensitivities_value() -> Result<crate::regulatory::frtb::FrtbSensitivities> {
         let mut sensitivities = crate::regulatory::frtb::FrtbSensitivities::new(Currency::USD);
-        sensitivities.add_girr_delta(Currency::USD, "5Y", 12_500.0);
-        sensitivities.add_girr_delta(Currency::USD, "10Y", -8_000.0);
+        sensitivities.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 12_500.0)?;
+        sensitivities.add_girr_delta(Currency::USD, "USD-OIS", "10Y", -8_000.0)?;
         // Equity and FX deltas are P&L per one percent move.
         sensitivities.add_equity_delta("AAPL", 8, 2_500.0);
         sensitivities.add_fx_delta(Currency::EUR, Currency::USD, 4_000.0);
-        sensitivities
+        Ok(sensitivities)
     }
 
     pub(super) fn frtb_sensitivities() -> Result<Vec<Value>> {
-        example(&frtb_sensitivities_value())
+        example(&frtb_sensitivities_value()?)
     }
 
     /// The SBA charge of [`frtb_sensitivities`] across all three scenarios.
     pub(super) fn frtb_sba_result() -> Result<Vec<Value>> {
         example(&crate::regulatory::frtb::frtb_sba_charge(
-            &frtb_sensitivities_value(),
+            &frtb_sensitivities_value()?,
             None,
         )?)
     }

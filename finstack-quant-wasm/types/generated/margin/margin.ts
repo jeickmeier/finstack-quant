@@ -991,7 +991,7 @@ export interface FrtbSensitivities {
   fx_delta: [valuations.Currency, valuations.Currency, number][];
   fx_vega: [valuations.Currency, valuations.Currency, string, number][];
   girr_curvature: [valuations.Currency, number, number][];
-  girr_delta: [valuations.Currency, string, number][];
+  girr_delta: [valuations.Currency, valuations.Id, string, number][];
   girr_inflation_delta: [valuations.Currency, number][];
   girr_vega: [valuations.Currency, string, string, number][];
   girr_xccy_basis_delta: [valuations.Currency, number][];
