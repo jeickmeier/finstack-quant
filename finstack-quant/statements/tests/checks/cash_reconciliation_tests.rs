@@ -1,440 +1,281 @@
-//! Tests for the surrounding crate component and its documented behavior.
-//!
+//! Cash roll-forward and component reconciliation (STATEMENTS-CONTRACTS-011).
 #![allow(clippy::unwrap_used)]
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::checks::builtins::CashReconciliation;
-use finstack_quant_statements::checks::{Check, CheckContext};
+use finstack_quant_statements::checks::{
+    Check, CheckContext, CheckOutcome, CheckResult, DatedOpening,
+};
 use finstack_quant_statements::evaluator::Evaluator;
-use finstack_quant_statements::types::{AmountOrScalar, NodeId};
+use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, NodeId};
+use time::macros::date;
 
 fn q(quarter: u8) -> PeriodId {
     PeriodId::quarter(2025, quarter).expect("valid period fixture")
 }
 
-#[test]
-fn cash_reconciliation_passes() {
-    // Cash(Q2) = Cash(Q1) + TotalCF(Q2) = 100 + 50 = 150 ✓
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "cash",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(150.0)),
-            ],
-        );
-        model_builder.value(
-            "total_cf",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(50.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
+fn opening(value: f64) -> DatedOpening {
+    DatedOpening {
+        date: date!(2025 - 01 - 01),
+        value: AmountOrScalar::scalar(value),
+    }
+}
 
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
+/// Two quarters of scalar series; a `None` cell is left without a value.
+fn model(series: &[(&str, [Option<f64>; 2])]) -> FinancialModelSpec {
+    let mut builder = ModelBuilder::new("cash");
+    builder.periods("2025Q1..Q2", None).unwrap();
+    for (node, values) in series {
+        let cells: Vec<(PeriodId, f64)> = values
+            .iter()
+            .enumerate()
+            .filter_map(|(index, value)| value.map(|v| (q(index as u8 + 1), v)))
+            .collect();
+        builder.value_scalar(*node, &cells);
+    }
+    builder.build().unwrap()
+}
 
-    let check = CashReconciliation {
+fn check() -> CashReconciliation {
+    CashReconciliation {
         cash_balance_node: NodeId::new("cash"),
         total_cash_flow_node: NodeId::new("total_cf"),
+        opening_balance: opening(80.0),
+        adjustment_nodes: vec![],
         cfo_node: None,
         cfi_node: None,
         cff_node: None,
         tolerance: None,
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(result.passed);
-    assert!(result.findings.is_empty());
+    }
 }
 
-#[test]
-fn cash_reconciliation_fails() {
-    // Expected Cash(Q2) = 100 + 50 = 150, actual = 160 → diff = 10
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "cash",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(160.0)),
-            ],
-        );
-        model_builder.value(
-            "total_cf",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(50.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let check = CashReconciliation {
-        cash_balance_node: NodeId::new("cash"),
-        total_cash_flow_node: NodeId::new("total_cf"),
-        cfo_node: None,
-        cfi_node: None,
-        cff_node: None,
-        tolerance: None,
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(!result.passed);
-    assert_eq!(result.findings.len(), 1);
-
-    let mat = result.findings[0].materiality.as_ref().unwrap();
-    assert!((mat.absolute - 10.0).abs() < 0.01);
+fn run(model: &FinancialModelSpec, check: &CashReconciliation) -> CheckResult {
+    let results = Evaluator::new().evaluate(model).unwrap();
+    check.execute(&CheckContext::new(model, &results)).unwrap()
 }
 
+/// Every period is reconciled, the first from the explicit dated opening:
+/// 80 + 20 = 100 in Q1 and 100 + 50 = 150 in Q2.
 #[test]
-fn component_check_passes() {
-    // Cash(Q2)=150, Cash(Q1)=100, TotalCF(Q2)=50,
-    // CFO=80, CFI=-20, CFF=-10 → 80-20-10=50=TotalCF ✓
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "cash",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(150.0)),
-            ],
-        );
-        model_builder.value(
-            "total_cf",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(50.0)),
-            ],
-        );
-        model_builder.value(
-            "cfo",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(80.0)),
-            ],
-        );
-        model_builder.value(
-            "cfi",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(-20.0)),
-            ],
-        );
-        model_builder.value(
-            "cff",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(-10.0)),
-            ],
-        );
-        model_builder.build().unwrap()
+fn every_period_reconciles_from_the_explicit_opening() {
+    let model = model(&[
+        ("cash", [Some(100.0), Some(150.0)]),
+        ("total_cf", [Some(20.0), Some(50.0)]),
+    ]);
+    let result = run(&model, &check());
+    assert_eq!(result.outcome, CheckOutcome::Pass);
+    assert_eq!(result.comparisons.len(), 2);
+    let first = &result.comparisons[0];
+    assert_eq!(
+        (
+            first.identity.as_str(),
+            first.period,
+            first.actual.value(),
+            first.expected.value(),
+            first.tolerance.value()
+        ),
+        ("cash_roll_forward", Some(q(1)), 100.0, 100.0, 0.0)
+    );
+    // A wrong opening fails the first period, which used to be skipped.
+    let wrong = CashReconciliation {
+        opening_balance: opening(70.0),
+        ..check()
     };
+    let result = run(&model, &wrong);
+    assert_eq!(result.outcome, CheckOutcome::Fail);
+    let finding = &result.findings[0];
+    assert_eq!(finding.period, Some(q(1)));
+    let materiality = finding.materiality.as_ref().unwrap();
+    // Residual 10 against the opening of 70, with no floor on the reference.
+    assert_eq!(materiality.absolute, 10.0);
+    assert_eq!(materiality.reference_value, 70.0);
+    assert!((materiality.relative_pct.unwrap() - 100.0 / 7.0).abs() < 1e-12);
+    assert_eq!(materiality.reference_label, "opening_cash");
+}
 
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
+/// Signed FX and cash-scope adjustments enter the roll-forward once each:
+/// 80 + 20 - 3 + 1 = 98.
+#[test]
+fn signed_adjustments_enter_the_roll_forward() {
+    let model = model(&[
+        ("cash", [Some(98.0), Some(148.0)]),
+        ("total_cf", [Some(20.0), Some(50.0)]),
+        ("fx", [Some(-3.0), Some(0.0)]),
+        ("scope", [Some(1.0), Some(0.0)]),
+    ]);
+    let adjusted = CashReconciliation {
+        adjustment_nodes: vec![NodeId::new("fx"), NodeId::new("scope")],
+        ..check()
+    };
+    assert_eq!(run(&model, &adjusted).outcome, CheckOutcome::Pass);
+    // Without the adjustments the first period is off by 2.
+    assert_eq!(run(&model, &check()).outcome, CheckOutcome::Fail);
+    // An adjustment listed twice is rejected.
+    let duplicated = CashReconciliation {
+        adjustment_nodes: vec![NodeId::new("fx"), NodeId::new("fx")],
+        ..check()
+    };
+    let results = Evaluator::new().evaluate(&model).unwrap();
+    let error = duplicated
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap_err();
+    assert!(error.to_string().contains("appears twice"), "{error}");
+}
 
-    let check = CashReconciliation {
-        cash_balance_node: NodeId::new("cash"),
-        total_cash_flow_node: NodeId::new("total_cf"),
+/// The component identity runs for every period, including the first, with
+/// `|total cash flow|` as its reference.
+#[test]
+fn components_reconcile_in_every_period() {
+    let components = |cff_q1: f64| {
+        model(&[
+            ("cash", [Some(100.0), Some(150.0)]),
+            ("total_cf", [Some(20.0), Some(50.0)]),
+            ("cfo", [Some(30.0), Some(60.0)]),
+            ("cfi", [Some(-15.0), Some(-20.0)]),
+            ("cff", [Some(cff_q1), Some(10.0)]),
+        ])
+    };
+    let with_components = CashReconciliation {
         cfo_node: Some(NodeId::new("cfo")),
         cfi_node: Some(NodeId::new("cfi")),
         cff_node: Some(NodeId::new("cff")),
-        tolerance: None,
+        ..check()
     };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(result.passed);
-    assert!(result.findings.is_empty());
+    let result = run(&components(5.0), &with_components);
+    assert_eq!(result.outcome, CheckOutcome::Pass);
+    assert_eq!(result.evaluated, 4);
+    assert_eq!(result.comparisons.len(), 4);
+    // 30 - 15 + 6 = 21 against a total of 20 in the first period.
+    let result = run(&components(6.0), &with_components);
+    assert_eq!(result.outcome, CheckOutcome::Fail);
+    let finding = &result.findings[0];
+    assert_eq!(finding.period, Some(q(1)));
+    let comparison = finding.comparison.as_ref().unwrap();
+    assert_eq!(comparison.identity, "cash_flow_components");
+    assert_eq!(
+        (comparison.actual.value(), comparison.expected.value()),
+        (20.0, 21.0)
+    );
+    assert_eq!(
+        finding.materiality.as_ref().unwrap().reference_label,
+        "total_cash_flow"
+    );
 }
 
+/// CFO, CFI and CFF are configured together or not at all.
 #[test]
-fn component_check_fails() {
-    // TotalCF(Q2)=50, but CFO=80+CFI=-20+CFF=-5=55 → diff=5
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "cash",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(150.0)),
-            ],
-        );
-        model_builder.value(
-            "total_cf",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(50.0)),
-            ],
-        );
-        model_builder.value(
-            "cfo",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(80.0)),
-            ],
-        );
-        model_builder.value(
-            "cfi",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(-20.0)),
-            ],
-        );
-        model_builder.value(
-            "cff",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(-5.0)), // mismatch: 80-20-5=55≠50
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let check = CashReconciliation {
-        cash_balance_node: NodeId::new("cash"),
-        total_cash_flow_node: NodeId::new("total_cf"),
+fn a_partial_component_configuration_is_rejected() {
+    let model = model(&[
+        ("cash", [Some(100.0), Some(150.0)]),
+        ("total_cf", [Some(20.0), Some(50.0)]),
+        ("cfo", [Some(20.0), Some(50.0)]),
+    ]);
+    let partial = CashReconciliation {
         cfo_node: Some(NodeId::new("cfo")),
-        cfi_node: Some(NodeId::new("cfi")),
-        cff_node: Some(NodeId::new("cff")),
-        tolerance: None,
+        ..check()
     };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(!result.passed);
-    // Should have the component mismatch finding
-    let component_findings: Vec<_> = result
-        .findings
-        .iter()
-        .filter(|f| f.message.contains("components"))
-        .collect();
-    assert_eq!(component_findings.len(), 1);
-
-    let mat = component_findings[0].materiality.as_ref().unwrap();
-    assert!((mat.absolute - 5.0).abs() < 0.01);
-}
-
-#[test]
-fn nan_cash_balance_warns_and_skips() {
-    use finstack_quant_statements::checks::Severity;
-
-    // A NaN prior cash balance poisons the roll-forward (`NaN > tolerance`
-    // is false), silently passing a blatantly broken reconciliation. It must
-    // be treated like a missing input: warn and skip.
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "cash",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(9999.0)), // broken roll-forward
-            ],
-        );
-        model_builder.value(
-            "total_cf",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(50.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let mut results = evaluator.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("cash".to_string())
-        .or_default()
-        .insert(q(1), f64::NAN);
-
-    let check = CashReconciliation {
-        cash_balance_node: NodeId::new("cash"),
-        total_cash_flow_node: NodeId::new("total_cf"),
-        cfo_node: None,
-        cfi_node: None,
-        cff_node: None,
-        tolerance: None,
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(
-        result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Warning && f.message.contains("cash")),
-        "a NaN cash balance must warn and skip, not silently pass: {:?}",
-        result.findings
-    );
-    assert!(
-        !result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Error),
-        "the poisoned period must be skipped, not judged: {:?}",
-        result.findings
-    );
-}
-
-#[test]
-fn nan_component_warns_instead_of_silently_skipping() {
-    use finstack_quant_statements::checks::Severity;
-
-    // All three component nodes are configured, but CFO is NaN in Q2. The
-    // component identity cannot be evaluated — that skip must be surfaced,
-    // not silent.
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "cash",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(150.0)),
-            ],
-        );
-        model_builder.value(
-            "total_cf",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(50.0)),
-            ],
-        );
-        model_builder.value(
-            "cfo",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(80.0)),
-            ],
-        );
-        model_builder.value(
-            "cfi",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(-20.0)),
-            ],
-        );
-        model_builder.value(
-            "cff",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(-10.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let mut results = evaluator.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("cfo".to_string())
-        .or_default()
-        .insert(q(2), f64::NAN);
-
-    let check = CashReconciliation {
-        cash_balance_node: NodeId::new("cash"),
-        total_cash_flow_node: NodeId::new("total_cf"),
+    let results = Evaluator::new().evaluate(&model).unwrap();
+    let error = partial
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap_err();
+    assert!(error.to_string().contains("all three or none"), "{error}");
+    // The same node in two component roles is rejected too.
+    let repeated = CashReconciliation {
         cfo_node: Some(NodeId::new("cfo")),
-        cfi_node: Some(NodeId::new("cfi")),
-        cff_node: Some(NodeId::new("cff")),
-        tolerance: None,
+        cfi_node: Some(NodeId::new("cfo")),
+        cff_node: Some(NodeId::new("total_cf")),
+        ..check()
     };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
     assert!(
-        result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Warning
-                && f.message.contains("component")
-                && f.message.contains("cfo")),
-        "a NaN component must produce a skip warning naming the node: {:?}",
-        result.findings
+        repeated
+            .execute(&CheckContext::new(&model, &results))
+            .is_err()
     );
 }
 
+/// A missing input makes the comparison incomplete and names the node; the
+/// period is neither skipped nor read as zero.
 #[test]
-fn partial_component_configuration_warns() {
-    use finstack_quant_statements::checks::Severity;
+fn a_missing_input_is_incomplete_not_skipped() {
+    let model = model(&[
+        ("cash", [Some(100.0), Some(150.0)]),
+        ("total_cf", [Some(20.0), None]),
+    ]);
+    let result = run(&model, &check());
+    assert_eq!(result.outcome, CheckOutcome::Incomplete);
+    assert_eq!(result.comparisons.len(), 1);
+    let finding = &result.findings[0];
+    assert!(finding.coverage);
+    assert_eq!(finding.period, Some(q(2)));
+    assert_eq!(finding.nodes, [NodeId::new("total_cf")]);
+    // A missing prior close leaves the next period without an opening.
+    let no_close = model_without_first_close();
+    let result = run(&no_close, &check());
+    assert_eq!(result.outcome, CheckOutcome::Incomplete);
+    let periods: Vec<_> = result.findings.iter().map(|f| f.period).collect();
+    assert_eq!(periods, [Some(q(1)), Some(q(2))]);
+}
 
-    // Configuring only CFO (without CFI/CFF) silently disabled the component
-    // identity before; it must now surface a configuration warning.
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "cash",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(150.0)),
-            ],
-        );
-        model_builder.value(
-            "total_cf",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(50.0)),
-            ],
-        );
-        model_builder.value(
-            "cfo",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(50.0)),
-            ],
-        );
-        model_builder.build().unwrap()
+fn model_without_first_close() -> FinancialModelSpec {
+    model(&[
+        ("cash", [None, Some(150.0)]),
+        ("total_cf", [Some(20.0), Some(50.0)]),
+    ])
+}
+
+/// The opening is dated at the first period boundary, in the cash units.
+#[test]
+fn the_opening_is_dated_and_typed() {
+    let model = model(&[
+        ("cash", [Some(100.0), Some(150.0)]),
+        ("total_cf", [Some(20.0), Some(50.0)]),
+    ]);
+    let results = Evaluator::new().evaluate(&model).unwrap();
+    let context = CheckContext::new(&model, &results);
+    let misdated = CashReconciliation {
+        opening_balance: DatedOpening {
+            date: date!(2024 - 12 - 31),
+            value: AmountOrScalar::scalar(80.0),
+        },
+        ..check()
     };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let check = CashReconciliation {
-        cash_balance_node: NodeId::new("cash"),
-        total_cash_flow_node: NodeId::new("total_cf"),
-        cfo_node: Some(NodeId::new("cfo")),
-        cfi_node: None,
-        cff_node: None,
-        tolerance: None,
+    let error = misdated.execute(&context).unwrap_err();
+    assert!(error.to_string().contains("first period starts"), "{error}");
+    let monetary = CashReconciliation {
+        opening_balance: DatedOpening {
+            date: date!(2025 - 01 - 01),
+            value: AmountOrScalar::amount(80.0, finstack_quant_core::currency::Currency::USD)
+                .unwrap(),
+        },
+        ..check()
     };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
+    let error = monetary.execute(&context).unwrap_err();
     assert!(
-        result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Warning && f.message.contains("1 of the three")),
-        "partial CFO/CFI/CFF configuration must warn: {:?}",
-        result.findings
+        error.to_string().contains("mixes monetary and scalar"),
+        "{error}"
     );
+}
+
+/// Monetary cash is reconciled exactly: 0.10 + 0.20 is 0.30 in money, where
+/// binary floats give 0.30000000000000004.
+#[test]
+fn monetary_cash_is_reconciled_exactly() {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::money::Money;
+    let usd = |amount: f64| Money::new(amount, Currency::USD).unwrap();
+    let mut builder = ModelBuilder::new("money");
+    builder.periods("2025Q1..Q1", None).unwrap();
+    builder.value_money("cash", &[(q(1), usd(0.30))]);
+    builder.value_money("total_cf", &[(q(1), usd(0.20))]);
+    let model = builder.build().unwrap();
+    let exact = CashReconciliation {
+        opening_balance: DatedOpening {
+            date: date!(2025 - 01 - 01),
+            value: AmountOrScalar::amount(0.10, Currency::USD).unwrap(),
+        },
+        ..check()
+    };
+    let result = run(&model, &exact);
+    assert_eq!(result.outcome, CheckOutcome::Pass, "{:?}", result.findings);
 }

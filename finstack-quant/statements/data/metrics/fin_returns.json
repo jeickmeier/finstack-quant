@@ -5,45 +5,45 @@
     {
       "id": "roe",
       "name": "Return on Equity",
-      "formula": "(revenue - cogs - opex - depreciation - amortization - interest_expense - taxes) / total_equity",
-      "description": "Net income as percentage of shareholder equity. CONVENTION: `opex` excludes depreciation and amortization. Denominator is period-end equity; average beginning/ending equity externally if the balance moves materially within a period.",
+      "formula": "ratio(net_income, (lag(total_equity, 1) + total_equity) / 2)",
+      "description": "Net income over average shareholder equity. Net income is the shared reported-cost `fin.net_income`, after statement `tax_expense`. A same-period, unannualized decimal return. The denominator is the average of the opening balance (the prior period's close) and the closing balance, so the first period of a model is unavailable. Unavailable when an input is missing or the average is zero or negative; a loss stays negative. Rolled up by recomputing from the coarser period's earnings and its own opening and closing balances.",
       "category": "returns",
       "unit_type": "percentage",
       "rollup": "formula",
-      "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "interest_expense", "taxes", "total_equity"],
+      "requires": ["net_income", "total_equity"],
       "tags": ["returns", "profitability"]
     },
     {
       "id": "roa",
       "name": "Return on Assets",
-      "formula": "(revenue - cogs - opex - depreciation - amortization - interest_expense - taxes) / total_assets",
-      "description": "Net income as percentage of total assets. CONVENTION: `opex` excludes depreciation and amortization. Denominator is period-end assets.",
+      "formula": "ratio(net_income, (lag(total_assets, 1) + total_assets) / 2)",
+      "description": "Net income over average total assets. Net income is the shared reported-cost `fin.net_income`, after statement `tax_expense`. A same-period, unannualized decimal return. The denominator is the average of the opening balance (the prior period's close) and the closing balance, so the first period of a model is unavailable. Unavailable when an input is missing or the average is zero or negative; a loss stays negative. Rolled up by recomputing from the coarser period's earnings and its own opening and closing balances.",
       "category": "returns",
       "unit_type": "percentage",
       "rollup": "formula",
-      "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "interest_expense", "taxes", "total_assets"],
+      "requires": ["net_income", "total_assets"],
       "tags": ["returns", "profitability"]
     },
     {
       "id": "roic",
       "name": "Return on Invested Capital",
-      "formula": "(revenue - cogs - opex - depreciation - amortization - taxes) / (total_debt + total_equity)",
-      "description": "NOPAT as percentage of invested capital. NOPAT is approximated as EBIT minus reported taxes (rather than EBIT times one minus a marginal tax rate). With a deductible interest expense and otherwise identical tax assumptions, this overstates operating ROIC by the interest tax shield divided by invested capital. CONVENTION: `opex` excludes depreciation and amortization.",
+      "formula": "ratio(ebit - operating_tax, (lag(operating_invested_capital, 1) + operating_invested_capital) / 2)",
+      "description": "EBIT less operating tax over average operating invested capital. EBIT is the shared reported-cost `fin.ebit`. `operating_tax` is the explicit operating tax expense before financing effects, a separate input from statement `tax_expense`; a credit is negative and raises the numerator. `operating_invested_capital` is the explicit period-end operating assets less non-interest-bearing operating liabilities, including required operating cash and excluding excess cash and nonoperating assets, in the same scope and currency as EBIT. A same-period, unannualized decimal return. The denominator is the average of the opening balance (the prior period's close) and the closing balance, so the first period of a model is unavailable. Unavailable when an input is missing or the average is zero or negative; a loss stays negative. Rolled up by recomputing from the coarser period's earnings and its own opening and closing balances.",
       "category": "returns",
       "unit_type": "percentage",
       "rollup": "formula",
-      "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "taxes", "total_debt", "total_equity"],
+      "requires": ["ebit", "operating_tax", "operating_invested_capital"],
       "tags": ["returns", "profitability"]
     },
     {
       "id": "roce",
       "name": "Return on Capital Employed",
-      "formula": "(revenue - cogs - opex - depreciation - amortization) / (total_assets - current_liabilities)",
-      "description": "EBIT as percentage of capital employed. CONVENTION: `opex` excludes depreciation and amortization.",
+      "formula": "ratio(ebit, (lag(total_assets - current_liabilities, 1) + total_assets - current_liabilities) / 2)",
+      "description": "EBIT over average capital employed, total assets less current liabilities at each period end. EBIT is the shared reported-cost `fin.ebit`. A same-period, unannualized decimal return. The denominator is the average of the opening balance (the prior period's close) and the closing balance, so the first period of a model is unavailable. Unavailable when an input is missing or the average is zero or negative; a loss stays negative. Rolled up by recomputing from the coarser period's earnings and its own opening and closing balances.",
       "category": "returns",
       "unit_type": "percentage",
       "rollup": "formula",
-      "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "total_assets", "current_liabilities"],
+      "requires": ["ebit", "total_assets", "current_liabilities"],
       "tags": ["returns", "profitability"]
     }
   ]

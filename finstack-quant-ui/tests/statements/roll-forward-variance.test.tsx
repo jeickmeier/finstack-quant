@@ -77,7 +77,10 @@ const bridgeRequest = {
   comparisonLabel: labels[1],
 };
 const revenue = (json: string) =>
-  rolled.map((period) => JSON.parse(json).nodes.revenue[period] as number);
+  rolled.map((period) => {
+    const value = JSON.parse(json).cells.revenue[period].value;
+    return typeof value === "number" ? value : Number(value.amount);
+  });
 const backtestRequest = {
   actual: revenue(comparisonJson),
   forecast: revenue(baseJson),

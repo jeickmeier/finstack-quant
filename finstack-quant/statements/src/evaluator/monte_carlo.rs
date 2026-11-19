@@ -1,9 +1,7 @@
 //! Monte Carlo evaluation types and aggregation utilities.
 
 use crate::error::{Error, Result};
-use crate::evaluator::results::{
-    CapitalStructureClaimCategory, CapitalStructureWarning, EvalWarning,
-};
+use crate::evaluator::results::{CapitalStructureWarning, EvalWarning};
 use crate::types::FinancialModelSpec;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::stats::quantile_sorted;
@@ -11,8 +9,8 @@ use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, 
 use indexmap::IndexMap;
 use serde_json::json;
 
-/// Results for a single Monte Carlo path: per-node per-period values and any warnings emitted.
-pub(crate) type PathResult = (IndexMap<String, IndexMap<PeriodId, f64>>, Vec<EvalWarning>);
+/// Most samples a run may hold: paths x metrics x forecast periods.
+pub const MAX_MONTE_CARLO_SAMPLES: usize = 100_000_000;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -46,11 +44,20 @@ fn default_percentiles() -> Vec<f64> {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MonteCarloConfig {
-    /// Number of Monte Carlo paths to simulate.
+    /// Number of Monte Carlo paths to simulate: at least one, and at most
+    /// `u32::MAX`, the path-identifier domain.
     pub n_paths: usize,
-    /// Base random seed used to derive per-path seeds.
+    /// Base random seed used to derive per-path streams: an exact unsigned
+    /// 64-bit integer, a canonical decimal string in JSON (`"42"`, never the
+    /// number `42`) so every host carries it exactly.
+    #[serde(with = "crate::types::forecast_seed")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
     pub seed: u64,
-    /// Percentiles to compute in the closed interval [0, 1].
+    /// Node identifiers to report. Required: at least one, each a node of
+    /// the model, none repeated. Only these are sampled and stored.
+    pub metrics: Vec<String>,
+    /// Probability levels to compute, each finite in `[0, 1]` and distinct.
+    /// Omitted or empty selects `0.05`, `0.5` and `0.95`.
     #[serde(default = "default_percentiles")]
     pub percentiles: Vec<f64>,
     /// Whether to include the long-format path table in serialized results.
@@ -59,16 +66,23 @@ pub struct MonteCarloConfig {
 }
 
 impl MonteCarloConfig {
-    /// Create a new Monte Carlo configuration with default percentiles.
+    /// Create a Monte Carlo configuration with the default percentiles.
     ///
     /// # Arguments
     ///
-    /// * `n_paths` - Number of Monte Carlo paths to simulate for the pricing estimate
-    /// * `seed` - RNG seed that makes Monte Carlo or sampling paths reproducible
-    pub fn new(n_paths: usize, seed: u64) -> Self {
+    /// * `n_paths` - Number of paths to simulate, from 1 to `u32::MAX`.
+    /// * `seed` - Exact base seed; the same seed replays the same paths.
+    /// * `metrics` - Node identifiers to report: at least one, each a node of
+    ///   the model, none repeated.
+    pub fn new(
+        n_paths: usize,
+        seed: u64,
+        metrics: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
         Self {
             n_paths,
             seed,
+            metrics: metrics.into_iter().map(Into::into).collect(),
             percentiles: default_percentiles(),
             include_path_data: false,
         }
@@ -89,13 +103,53 @@ impl MonteCarloConfig {
     }
 }
 
+/// The market and observation context a Monte Carlo run evaluates in.
+///
+/// It is the same context an ordinary market-aware evaluation takes
+/// ([`Evaluator::evaluate_with_market`](crate::evaluator::Evaluator::evaluate_with_market)).
+#[derive(Clone, Copy)]
+pub struct MonteCarloContext<'a> {
+    /// Market the capital structure's instruments are projected on.
+    pub market: &'a finstack_quant_core::market_data::context::MarketContext,
+    /// Valuation date of the capital structure's contractual flows.
+    pub as_of: finstack_quant_core::dates::Date,
+    /// Explicit observations the paths may read.
+    pub cutoff: crate::evaluator::ObservationCutoff,
+}
+
+/// Why a Monte Carlo run published no statistics.
+///
+/// A run is complete only when every path has a value for every requested
+/// metric in every forecast period.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MonteCarloIncomplete {
+    /// First metric, in the requested order, with a sample without a value.
+    pub metric: String,
+    /// First forecast period of that metric with such a sample.
+    pub period: PeriodId,
+    /// Lowest path with such a sample for that metric and period.
+    pub path: u32,
+    /// Why that cell had no value: `missing`, `masked`, or the reason an
+    /// unavailable cell gives (for example `missing_peer_shock`).
+    pub reason: String,
+    /// Number of samples without a value across the run.
+    pub missing_samples: usize,
+}
+
 /// Per-metric percentile time series.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PercentileSeries {
     /// Metric / node identifier.
     pub metric: String,
-    /// Period → ordered list of `(percentile, value)` pairs.
+    /// Units of every value: scalar, or money in one currency.
+    pub value_type: crate::types::NodeValueType,
+    /// Number of samples behind each quantile: the path count.
+    pub sample_count: usize,
+    /// Period → `(probability, value)` pairs in ascending probability. The
+    /// value is the R-7 sample quantile, in `value_type` units.
     pub values: IndexMap<PeriodId, Vec<(f64, f64)>>,
 }
 
@@ -103,10 +157,25 @@ pub struct PercentileSeries {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MonteCarloResults {
-    /// Aggregated percentile results: `metric → PercentileSeries`.
+    /// Aggregated percentile results: `metric → PercentileSeries`, in the
+    /// requested metric order. Empty when the run is incomplete.
     pub percentile_results: IndexMap<String, PercentileSeries>,
+    /// Why no statistics were published, when a requested sample had no
+    /// value on some path. `None` for a complete run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub incomplete: Option<MonteCarloIncomplete>,
     /// Number of Monte Carlo paths simulated.
     pub n_paths: usize,
+    /// The run's exact base seed, a decimal string in JSON: an unsigned
+    /// 64-bit value does not fit a JavaScript number.
+    #[serde(with = "crate::types::forecast_seed")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    pub seed: u64,
+    /// Version of the mapping from the seed, path and node to a random
+    /// stream. With the seed it replays any path from the result alone.
+    pub stream_version: u32,
+    /// The metrics requested, in order.
+    pub metrics: Vec<String>,
     /// Percentiles computed for each metric/period.
     pub percentiles: Vec<f64>,
     /// Forecast (non-actual) periods included in the simulation.
@@ -140,7 +209,11 @@ fn percentile_label(percentile: f64) -> String {
 }
 
 impl MonteCarloResults {
-    /// Get a time series of a specific percentile for a metric.
+    /// Get a time series of one probability level for a metric.
+    ///
+    /// The level is matched exactly: pass a probability the run was
+    /// configured with. `None` when the metric or the level was not computed,
+    /// including for an incomplete run.
     pub fn percentile_by_period(
         &self,
         metric: &str,
@@ -150,7 +223,7 @@ impl MonteCarloResults {
         let mut out = IndexMap::new();
 
         for (period, pairs) in &series.values {
-            if let Some((_, value)) = pairs.iter().find(|(q, _)| (*q - percentile).abs() < 1e-12) {
+            if let Some((_, value)) = pairs.iter().find(|(q, _)| q.total_cmp(&percentile).is_eq()) {
                 out.insert(*period, *value);
             }
         }
@@ -194,7 +267,7 @@ impl MonteCarloResults {
                 .map(|pairs| {
                     pairs
                         .iter()
-                        .find(|(q, _)| (*q - percentile).abs() < 1e-12)
+                        .find(|(q, _)| q.total_cmp(&percentile).is_eq())
                         .map_or(f64::NAN, |(_, value)| *value)
                 })
                 .collect();
@@ -211,108 +284,169 @@ impl MonteCarloResults {
             .map_err(Into::into)
     }
 
-    /// Estimate the probability that a metric exceeds a threshold in any forecast period.
+    /// Estimate the probability that a metric exceeds a threshold in any
+    /// forecast period.
     ///
-    /// This checks **upside** breaches only (`value > threshold`). For downside
-    /// breaches (e.g. DSCR falling below a floor), negate both the metric values
-    /// and the threshold, or use a derived metric that flips the sign.
+    /// A path counts once when any forecast-period value is strictly greater
+    /// than the threshold; the count is divided by the path count. This is an
+    /// **upper** breach. For a floor (for example coverage falling below a
+    /// minimum), report a metric that flips the sign.
     ///
     /// Path values come from the in-memory simulation store or, for results
     /// restored from JSON (where that store is not serialized), from the
     /// long-format `path_data` table (`MonteCarloConfig::with_path_data`).
     ///
-    /// Returns `None` if the metric has no data (including restored results
-    /// without `path_data`), no forecast periods, or if any period's path
-    /// vector is shorter than `n_paths` (incomplete simulation).
-    pub fn breach_probability(&self, metric: &str, threshold: f64) -> Option<f64> {
+    /// # Arguments
+    ///
+    /// * `metric` - A requested metric.
+    /// * `threshold` - A finite upper threshold in the metric's own units: a
+    ///   scalar for a scalar metric, money in the metric's currency for a
+    ///   monetary one.
+    ///
+    /// # Returns
+    ///
+    /// `None` when no path samples are available: the run is incomplete, the
+    /// metric was not requested, or the result was restored without
+    /// `path_data`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an evaluation error when the threshold is not finite or its
+    /// units differ from the metric's, or when a restored path table does not
+    /// hold exactly one finite sample for every path and forecast period.
+    pub fn breach_probability(
+        &self,
+        metric: &str,
+        threshold: crate::types::AmountOrScalar,
+    ) -> Result<Option<f64>> {
+        use crate::types::{AmountOrScalar, NodeValueType};
+        let Some(series) = self.percentile_results.get(metric) else {
+            return Ok(None);
+        };
+        let level = match (threshold, series.value_type) {
+            (AmountOrScalar::Scalar(value), NodeValueType::Scalar) => value,
+            (AmountOrScalar::Amount(money), NodeValueType::Monetary { currency })
+                if money.currency() == currency =>
+            {
+                money.amount()
+            }
+            _ => {
+                return Err(Error::eval(format!(
+                    "breach threshold {threshold:?} is not in the units of metric '{metric}' \
+                     ({:?})",
+                    series.value_type
+                )));
+            }
+        };
+        if !level.is_finite() {
+            return Err(Error::eval(format!(
+                "breach threshold for metric '{metric}' must be finite, got {level}"
+            )));
+        }
+        // A restored result is untrusted: the path count sizes the tally.
+        if self.n_paths == 0 || u32::try_from(self.n_paths).is_err() {
+            return Err(Error::eval(format!(
+                "Monte Carlo results record {} paths; a run has 1 to {}",
+                self.n_paths,
+                u32::MAX
+            )));
+        }
         let restored;
         let metric_map = if self.path_values.is_empty() {
-            restored = metric_path_values(self.path_data.as_ref()?, metric)?;
+            let Some(table) = self.path_data.as_ref() else {
+                return Ok(None);
+            };
+            restored = self.restore_metric_paths(table, metric)?;
             &restored
         } else {
-            self.path_values.get(metric)?
+            match self.path_values.get(metric) {
+                Some(map) => map,
+                None => return Ok(None),
+            }
         };
-        if metric_map.is_empty() || self.n_paths == 0 {
-            return None;
-        }
-
-        let forecast_set: HashSet<PeriodId> = self.forecast_periods.iter().copied().collect();
-        let period_vectors: Vec<&Vec<(u32, f64)>> = metric_map
-            .iter()
-            .filter(|(p, _)| forecast_set.contains(p))
-            .map(|(_, v)| v)
-            .collect();
-
-        if period_vectors.is_empty() {
-            return None;
-        }
-
-        if period_vectors.iter().any(|v| v.len() < self.n_paths) {
-            return None;
-        }
-
-        // Group by path_id (robust to rayon-reduce ordering) and mark a path
-        // as breached if any forecast period exceeds the threshold.
-        let mut breached: std::collections::HashMap<u32, bool> =
-            std::collections::HashMap::with_capacity(self.n_paths);
-        for period_values in &period_vectors {
-            for (path_id, value) in period_values.iter() {
-                let entry = breached.entry(*path_id).or_insert(false);
-                if *value > threshold {
-                    *entry = true;
+        let mut breached = vec![false; self.n_paths];
+        for values in metric_map.values() {
+            for (path, value) in values {
+                if *value > level {
+                    breached[*path as usize] = true;
                 }
             }
         }
-
-        if breached.len() < self.n_paths {
-            return None;
-        }
-
-        let breached_paths = breached.values().filter(|b| **b).count();
-        Some(breached_paths as f64 / self.n_paths as f64)
+        let count = breached.iter().filter(|hit| **hit).count();
+        Ok(Some(count as f64 / self.n_paths as f64))
     }
-}
 
-/// Rebuild one metric's `period -> [(path_id, value)]` store from the
-/// long-format path table written by [`MonteCarloAccumulator::finish`].
-///
-/// Returns `None` when the table lacks the expected columns or a period label
-/// does not parse.
-fn metric_path_values(
-    table: &TableEnvelope,
-    metric: &str,
-) -> Option<IndexMap<PeriodId, Vec<(u32, f64)>>> {
-    let column = |name: &str| {
-        table
-            .columns
-            .iter()
-            .find(|c| c.name == name)
-            .map(|c| &c.data)
-    };
-    let (
-        Some(TableColumnData::UInt32(path_ids)),
-        Some(TableColumnData::String(periods)),
-        Some(TableColumnData::String(metrics)),
-        Some(TableColumnData::Float64(values)),
-    ) = (
-        column("path_id"),
-        column("period"),
-        column("metric"),
-        column("value"),
-    )
-    else {
-        return None;
-    };
-    let mut out: IndexMap<PeriodId, Vec<(u32, f64)>> = IndexMap::new();
-    for (((path_id, period), row_metric), value) in
-        path_ids.iter().zip(periods).zip(metrics).zip(values)
-    {
-        if row_metric == metric {
-            let period: PeriodId = period.parse().ok()?;
+    /// Rebuild one metric's `period -> [(path_id, value)]` store from the
+    /// long-format path table, requiring exactly one finite sample for every
+    /// path and forecast period.
+    fn restore_metric_paths(
+        &self,
+        table: &TableEnvelope,
+        metric: &str,
+    ) -> Result<IndexMap<PeriodId, Vec<(u32, f64)>>> {
+        let malformed = |what: &str| Error::eval(format!("Monte Carlo path table: {what}"));
+        let column = |name: &str| {
+            table
+                .columns
+                .iter()
+                .find(|c| c.name == name)
+                .map(|c| &c.data)
+        };
+        let (
+            Some(TableColumnData::UInt32(path_ids)),
+            Some(TableColumnData::String(periods)),
+            Some(TableColumnData::String(metrics)),
+            Some(TableColumnData::Float64(values)),
+        ) = (
+            column("path_id"),
+            column("period"),
+            column("metric"),
+            column("value"),
+        )
+        else {
+            return Err(malformed(
+                "expected the columns path_id, period, metric and value",
+            ));
+        };
+        let forecast: HashSet<PeriodId> = self.forecast_periods.iter().copied().collect();
+        let mut seen: HashSet<(u32, PeriodId)> = HashSet::new();
+        let mut out: IndexMap<PeriodId, Vec<(u32, f64)>> = IndexMap::new();
+        for (((path_id, period), row_metric), value) in
+            path_ids.iter().zip(periods).zip(metrics).zip(values)
+        {
+            if row_metric != metric {
+                continue;
+            }
+            let period: PeriodId = period
+                .parse()
+                .map_err(|_| malformed(&format!("'{period}' is not a period")))?;
+            if !forecast.contains(&period) || (*path_id as usize) >= self.n_paths {
+                return Err(malformed(&format!(
+                    "the sample of path {path_id} in {period} is outside the run"
+                )));
+            }
+            if !value.is_finite() {
+                return Err(malformed(&format!(
+                    "the sample of path {path_id} in {period} for '{metric}' is not finite"
+                )));
+            }
+            if !seen.insert((*path_id, period)) {
+                return Err(malformed(&format!(
+                    "path {path_id} has more than one sample of '{metric}' in {period}"
+                )));
+            }
             out.entry(period).or_default().push((*path_id, *value));
         }
+        if Some(seen.len()) != self.n_paths.checked_mul(self.forecast_periods.len()) {
+            return Err(malformed(&format!(
+                "'{metric}' has {} samples; a complete run has {} paths x {} forecast periods",
+                seen.len(),
+                self.n_paths,
+                self.forecast_periods.len()
+            )));
+        }
+        Ok(out)
     }
-    (!out.is_empty()).then_some(out)
 }
 
 fn normalize_percentiles(raw: &[f64]) -> Result<Vec<f64>> {
@@ -333,7 +467,15 @@ fn normalize_percentiles(raw: &[f64]) -> Result<Vec<f64>> {
 
     let mut v: Vec<f64> = raw.to_vec();
     v.sort_by(|a, b| a.total_cmp(b));
-    v.dedup();
+    if let Some(pair) = v
+        .windows(2)
+        .find(|pair| pair[0].total_cmp(&pair[1]).is_eq())
+    {
+        return Err(Error::eval(format!(
+            "Monte Carlo percentiles must be distinct; {} is requested more than once",
+            pair[0]
+        )));
+    }
     Ok(v)
 }
 
@@ -344,14 +486,12 @@ enum WarningKey<'a> {
     DivisionByZero(&'a PeriodId, &'a str),
     NonFiniteValue(&'a PeriodId, &'a str, u64),
     CapitalStructure(&'a PeriodId, CapitalStructureKey<'a>),
-    NonFiniteSkipped(&'a PeriodId, &'a str, &'a str, usize),
+    GappedSample(&'a PeriodId, &'a str, &'a str, usize),
+    ForecastClipped(&'a PeriodId, &'a str, u64),
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum CapitalStructureKey<'a> {
-    ResidualScaleMismatch(u64),
-    CashflowIgnored(finstack_quant_core::dates::Date, String),
-    NegativeClaimNeutralized(CapitalStructureClaimCategory, &'a str, u64),
     NegativeAvailableCashFloored(&'a str, u64),
     InterestShortfall(&'a str, u64),
     FeeShortfall(&'a str, u64),
@@ -372,12 +512,19 @@ impl<'a> WarningKey<'a> {
             EvalWarning::CapitalStructure { period, warning } => {
                 Self::CapitalStructure(period, CapitalStructureKey::of(warning))
             }
-            EvalWarning::NonFiniteSkipped {
+            EvalWarning::GappedSample {
                 node_id,
                 period,
                 function,
-                count,
-            } => Self::NonFiniteSkipped(period, node_id, function, *count),
+                observations,
+                ..
+            } => Self::GappedSample(period, node_id, function, *observations),
+            EvalWarning::ForecastClipped {
+                node_id,
+                period,
+                published,
+                ..
+            } => Self::ForecastClipped(period, node_id, published.to_bits()),
         }
     }
 }
@@ -385,18 +532,6 @@ impl<'a> WarningKey<'a> {
 impl<'a> CapitalStructureKey<'a> {
     fn of(warning: &'a CapitalStructureWarning) -> Self {
         match warning {
-            CapitalStructureWarning::ResidualScaleMismatch { applied_ratio } => {
-                Self::ResidualScaleMismatch(applied_ratio.to_bits())
-            }
-            CapitalStructureWarning::CashflowIgnored {
-                cashflow_kind,
-                cashflow_date,
-            } => Self::CashflowIgnored(*cashflow_date, cashflow_kind.to_string()),
-            CapitalStructureWarning::NegativeClaimNeutralized {
-                category,
-                instrument_id,
-                amount,
-            } => Self::NegativeClaimNeutralized(*category, instrument_id, amount.to_bits()),
             CapitalStructureWarning::NegativeAvailableCashFloored { node_id, amount } => {
                 Self::NegativeAvailableCashFloored(node_id, amount.to_bits())
             }
@@ -422,80 +557,169 @@ fn warning_period(warning: &EvalWarning) -> &PeriodId {
         EvalWarning::DivisionByZero { period, .. }
         | EvalWarning::NonFiniteValue { period, .. }
         | EvalWarning::CapitalStructure { period, .. }
-        | EvalWarning::NonFiniteSkipped { period, .. } => period,
+        | EvalWarning::GappedSample { period, .. }
+        | EvalWarning::ForecastClipped { period, .. } => period,
+    }
+}
+
+/// A sample without a value: `(metric index, period, path, reason)`. The
+/// least one in this order is the one reported.
+type Gap = (usize, PeriodId, u32, &'static str);
+
+/// Count a gap and keep the least one in metric, period and path order.
+fn note_gap(first_gap: &mut Option<Gap>, gaps: &mut usize, gap: Gap) {
+    *gaps += 1;
+    if first_gap.is_none_or(|held| (gap.0, gap.1, gap.2) < (held.0, held.1, held.2)) {
+        *first_gap = Some(gap);
     }
 }
 
 pub(crate) struct MonteCarloAccumulator {
     expected_paths: usize,
     observed_paths: usize,
+    seed: u64,
+    metrics: Vec<String>,
+    value_types: Vec<crate::types::NodeValueType>,
     percentiles: Vec<f64>,
     forecast_periods: Vec<PeriodId>,
-    forecast_set: HashSet<PeriodId>,
-    path_values: IndexMap<String, IndexMap<PeriodId, Vec<(u32, f64)>>>,
+    /// `(path, value)` samples indexed by metric, then by forecast period.
+    samples: Vec<Vec<Vec<(u32, f64)>>>,
+    first_gap: Option<Gap>,
+    gaps: usize,
     include_path_data: bool,
     warnings: Vec<EvalWarning>,
 }
 
 impl MonteCarloAccumulator {
-    pub(crate) fn new(model: &FinancialModelSpec, config: &MonteCarloConfig) -> Result<Self> {
+    /// Validate the run's size and requests before anything is allocated.
+    ///
+    /// `value_types` are the resolved units of the model's nodes.
+    pub(crate) fn new(
+        model: &FinancialModelSpec,
+        config: &MonteCarloConfig,
+        value_types: &IndexMap<crate::types::NodeId, crate::types::NodeValueType>,
+    ) -> Result<Self> {
+        if config.n_paths == 0 {
+            return Err(Error::eval(
+                "Monte Carlo configuration requires n_paths > 0",
+            ));
+        }
+        if u32::try_from(config.n_paths).is_err() {
+            return Err(Error::eval(format!(
+                "Monte Carlo configuration requires n_paths <= {}, the path-identifier domain; \
+                 got {}",
+                u32::MAX,
+                config.n_paths
+            )));
+        }
         let forecast_periods: Vec<PeriodId> = model
             .periods
             .iter()
             .filter(|p| !p.is_actual)
             .map(|p| p.id)
             .collect();
-
         if forecast_periods.is_empty() {
             return Err(Error::eval(
                 "Monte Carlo evaluation requires at least one forecast period. \
                  Use .periods(range, Some(actuals_cutoff)) to define forecast periods.",
             ));
         }
+        if config.metrics.is_empty() {
+            return Err(Error::eval(
+                "Monte Carlo configuration requires `metrics`: list the nodes to report",
+            ));
+        }
+        let mut seen = HashSet::new();
+        let mut metric_types = Vec::with_capacity(config.metrics.len());
+        for metric in &config.metrics {
+            if !seen.insert(metric.as_str()) {
+                return Err(Error::eval(format!(
+                    "Monte Carlo metric '{metric}' is requested more than once"
+                )));
+            }
+            let value_type = value_types.get(metric.as_str()).ok_or_else(|| {
+                Error::eval(format!(
+                    "Monte Carlo metric '{metric}' is not a node of the model"
+                ))
+            })?;
+            metric_types.push(*value_type);
+        }
+        // Work and storage: one sample per path, metric and forecast period.
+        let samples = config
+            .n_paths
+            .checked_mul(config.metrics.len())
+            .and_then(|count| count.checked_mul(forecast_periods.len()))
+            .filter(|count| *count <= MAX_MONTE_CARLO_SAMPLES)
+            .ok_or_else(|| {
+                Error::eval(format!(
+                    "Monte Carlo run of {} paths x {} metrics x {} forecast periods exceeds \
+                     the limit of {MAX_MONTE_CARLO_SAMPLES} samples; request fewer paths or \
+                     metrics",
+                    config.n_paths,
+                    config.metrics.len(),
+                    forecast_periods.len()
+                ))
+            })?;
+        debug_assert!(samples > 0);
 
         Ok(Self {
             expected_paths: config.n_paths,
             observed_paths: 0,
+            seed: config.seed,
+            metrics: config.metrics.clone(),
+            value_types: metric_types,
             percentiles: normalize_percentiles(&config.percentiles)?,
-            forecast_set: forecast_periods.iter().copied().collect(),
+            samples: vec![vec![Vec::new(); forecast_periods.len()]; config.metrics.len()],
             forecast_periods,
-            path_values: IndexMap::new(),
+            first_gap: None,
+            gaps: 0,
             include_path_data: config.include_path_data,
             warnings: Vec::new(),
         })
     }
 
+    /// Fold one path's result into the run: exactly one sample per requested
+    /// metric and forecast period, read from the path's typed cells.
     pub(crate) fn push_path(
         &mut self,
         path_idx: usize,
-        path_results: IndexMap<String, IndexMap<PeriodId, f64>>,
+        results: &crate::evaluator::StatementResult,
         warnings: Vec<EvalWarning>,
     ) -> Result<()> {
         self.observed_paths += 1;
+        let path = path_idx as u32;
         // Actual periods are not simulated: their warnings repeat the
         // deterministic evaluation's on every path.
         self.warnings.extend(
             warnings
                 .into_iter()
-                .filter(|warning| self.forecast_set.contains(warning_period(warning))),
+                .filter(|warning| self.forecast_periods.contains(warning_period(warning))),
         );
 
-        for (metric, period_map) in path_results {
-            let metric_entry = self.path_values.entry(metric.clone()).or_default();
-            for (period_id, value) in period_map {
-                if !self.forecast_set.contains(&period_id) {
-                    continue;
-                }
-                if !value.is_finite() {
-                    return Err(Error::eval(format!(
-                        "Monte Carlo aggregation encountered non-finite value for metric '{}' in period {}",
-                        metric, period_id
-                    )));
-                }
-                metric_entry
-                    .entry(period_id)
-                    .or_default()
-                    .push((path_idx as u32, value));
+        for (index, metric) in self.metrics.iter().enumerate() {
+            for (period_index, period) in self.forecast_periods.iter().enumerate() {
+                let gap = match results.get_cell(metric, period) {
+                    Some(cell) => match (cell.numeric(), cell.reason) {
+                        (Some(value), _) if value.is_finite() => {
+                            self.samples[index][period_index].push((path, value));
+                            continue;
+                        }
+                        (Some(value), _) => {
+                            return Err(Error::eval(format!(
+                                "Monte Carlo path {path} produced the invalid sample {value} \
+                                 for metric '{metric}' in period {period}"
+                            )));
+                        }
+                        (None, Some(reason)) => reason.as_str(),
+                        (None, None) => cell.status.as_str(),
+                    },
+                    None => "missing",
+                };
+                note_gap(
+                    &mut self.first_gap,
+                    &mut self.gaps,
+                    (index, *period, path, gap),
+                );
             }
         }
 
@@ -503,44 +727,11 @@ impl MonteCarloAccumulator {
     }
 
     pub(crate) fn finish(mut self) -> Result<MonteCarloResults> {
-        if self.observed_paths == 0 {
-            return Err(Error::eval(
-                "Monte Carlo aggregation requires at least one path",
-            ));
-        }
         if self.observed_paths != self.expected_paths {
             return Err(Error::eval(format!(
                 "Monte Carlo aggregation mismatch: expected {} paths, got {}",
                 self.expected_paths, self.observed_paths
             )));
-        }
-
-        let mut percentile_results: IndexMap<String, PercentileSeries> = IndexMap::new();
-        for (metric, period_map) in &self.path_values {
-            let mut series = PercentileSeries {
-                metric: metric.clone(),
-                values: IndexMap::new(),
-            };
-
-            for (period_id, values) in period_map {
-                if values.is_empty() {
-                    continue;
-                }
-
-                let mut sorted: Vec<f64> = values.iter().map(|(_, v)| *v).collect();
-                sorted.sort_by(|a, b| a.total_cmp(b));
-                let mut pairs: Vec<(f64, f64)> = Vec::with_capacity(self.percentiles.len());
-                for &q in &self.percentiles {
-                    let value = quantile_sorted(&sorted, q)?.ok_or_else(|| {
-                        Error::eval("Monte Carlo quantile requested for empty sorted sample")
-                    })?;
-                    pairs.push((q, value));
-                }
-
-                series.values.insert(*period_id, pairs);
-            }
-
-            percentile_results.insert(metric.clone(), series);
         }
 
         // Rayon's reduce tree makes the merge order of partitions
@@ -553,16 +744,82 @@ impl MonteCarloAccumulator {
         self.warnings
             .dedup_by(|lhs, rhs| WarningKey::of(lhs) == WarningKey::of(rhs));
 
-        let path_data = if !self.include_path_data
-            || self
-                .path_values
-                .values()
-                .all(|periods| periods.values().all(Vec::is_empty))
+        // Statistics are published only for a complete run.
+        if let Some((index, period, path, reason)) = self.first_gap {
+            return Ok(MonteCarloResults {
+                percentile_results: IndexMap::new(),
+                incomplete: Some(MonteCarloIncomplete {
+                    metric: self.metrics[index].clone(),
+                    period,
+                    path,
+                    reason: reason.to_string(),
+                    missing_samples: self.gaps,
+                }),
+                n_paths: self.observed_paths,
+                seed: self.seed,
+                stream_version: crate::forecast::stream::STREAM_VERSION,
+                metrics: self.metrics,
+                percentiles: self.percentiles,
+                forecast_periods: self.forecast_periods,
+                warnings: self.warnings,
+                path_values: IndexMap::new(),
+                path_data: None,
+            });
+        }
+
+        let mut percentile_results: IndexMap<String, PercentileSeries> = IndexMap::new();
+        for ((metric, value_type), by_period) in self
+            .metrics
+            .iter()
+            .zip(&self.value_types)
+            .zip(&self.samples)
         {
+            let mut series = PercentileSeries {
+                metric: metric.clone(),
+                value_type: *value_type,
+                sample_count: self.observed_paths,
+                values: IndexMap::new(),
+            };
+            for (period_id, values) in self.forecast_periods.iter().zip(by_period) {
+                let mut sorted: Vec<f64> = values.iter().map(|(_, v)| *v).collect();
+                sorted.sort_by(|a, b| a.total_cmp(b));
+                let mut pairs: Vec<(f64, f64)> = Vec::with_capacity(self.percentiles.len());
+                for &q in &self.percentiles {
+                    let value = quantile_sorted(&sorted, q)?.ok_or_else(|| {
+                        Error::eval(format!(
+                            "Monte Carlo aggregation has no samples of '{metric}' in {period_id}"
+                        ))
+                    })?;
+                    pairs.push((q, value));
+                }
+                series.values.insert(*period_id, pairs);
+            }
+            percentile_results.insert(metric.clone(), series);
+        }
+
+        // The per-metric store the breach test reads, keyed for lookup.
+        let path_values: IndexMap<String, IndexMap<PeriodId, Vec<(u32, f64)>>> = self
+            .metrics
+            .iter()
+            .cloned()
+            .zip(std::mem::take(&mut self.samples))
+            .map(|(metric, by_period)| {
+                (
+                    metric,
+                    self.forecast_periods
+                        .iter()
+                        .copied()
+                        .zip(by_period)
+                        .collect(),
+                )
+            })
+            .collect();
+
+        let path_data = if !self.include_path_data {
             None
         } else {
             let mut rows = Vec::new();
-            for (metric, period_values) in &self.path_values {
+            for (metric, period_values) in &path_values {
                 for (period, values) in period_values {
                     for &(path, value) in values {
                         rows.push((path, metric.as_str(), period.to_string(), value));
@@ -600,22 +857,27 @@ impl MonteCarloAccumulator {
 
         Ok(MonteCarloResults {
             percentile_results,
+            incomplete: None,
             n_paths: self.observed_paths,
+            seed: self.seed,
+            stream_version: crate::forecast::stream::STREAM_VERSION,
+            metrics: self.metrics,
             percentiles: self.percentiles,
             forecast_periods: self.forecast_periods,
             warnings: self.warnings,
-            path_values: self.path_values,
+            path_values,
             path_data,
         })
     }
 
     // Only the rayon `reduce` path calls `merge`; the wasm32 serial
-    // accumulator folds in place, so this is dead code there.
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    // accumulator folds in place.
+    #[cfg(any(not(target_arch = "wasm32"), test))]
     pub(crate) fn merge(mut self, other: Self) -> Result<Self> {
         if self.expected_paths != other.expected_paths
             || self.percentiles != other.percentiles
             || self.forecast_periods != other.forecast_periods
+            || self.metrics != other.metrics
             || self.include_path_data != other.include_path_data
         {
             return Err(Error::eval(
@@ -625,12 +887,19 @@ impl MonteCarloAccumulator {
 
         self.observed_paths += other.observed_paths;
         self.warnings.extend(other.warnings);
+        self.gaps += other.gaps;
+        if let Some(gap) = other.first_gap {
+            self.gaps -= 1;
+            note_gap(&mut self.first_gap, &mut self.gaps, gap);
+        }
 
-        for (metric, period_map) in other.path_values {
-            let target_metric = self.path_values.entry(metric).or_default();
-            for (period_id, values) in period_map {
-                target_metric.entry(period_id).or_default().extend(values);
-            }
+        for (target, source) in self
+            .samples
+            .iter_mut()
+            .flatten()
+            .zip(other.samples.into_iter().flatten())
+        {
+            target.extend(source);
         }
 
         Ok(self)
@@ -640,10 +909,14 @@ impl MonteCarloAccumulator {
         Self {
             expected_paths: self.expected_paths,
             observed_paths: 0,
+            seed: self.seed,
+            metrics: self.metrics.clone(),
+            value_types: self.value_types.clone(),
             percentiles: self.percentiles.clone(),
             forecast_periods: self.forecast_periods.clone(),
-            forecast_set: self.forecast_set.clone(),
-            path_values: IndexMap::new(),
+            samples: vec![vec![Vec::new(); self.forecast_periods.len()]; self.metrics.len()],
+            first_gap: None,
+            gaps: 0,
             include_path_data: self.include_path_data,
             warnings: Vec::new(),
         }
@@ -653,354 +926,394 @@ impl MonteCarloAccumulator {
 #[cfg(test)]
 mod tests {
     use super::{
-        MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
+        MAX_MONTE_CARLO_SAMPLES, MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults,
         normalize_percentiles, percentile_label,
     };
     use crate::builder::ModelBuilder;
     use crate::error::Result;
-    use crate::evaluator::EvalWarning;
-    use crate::types::AmountOrScalar;
-    use crate::types::FinancialModelSpec;
+    use crate::evaluator::{CellStatus, ResultCell, StatementResult, UnavailableReason};
+    use crate::types::{AmountOrScalar, FinancialModelSpec, NodeId, NodeValueType};
+    use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_core::money::Money;
     use indexmap::IndexMap;
 
-    /// Aggregate path-level results into [`MonteCarloResults`].
-    fn aggregate_monte_carlo_paths(
-        model: &FinancialModelSpec,
-        config: &MonteCarloConfig,
-        all_paths: &[PathResult],
-    ) -> Result<MonteCarloResults> {
-        let mut accumulator = MonteCarloAccumulator::new(model, config)?;
-        for (path_idx, (path_results, warnings)) in all_paths.iter().cloned().enumerate() {
-            accumulator.push_path(path_idx, path_results, warnings)?;
+    fn q(quarter: u8) -> PeriodId {
+        PeriodId::quarter(2025, quarter).expect("quarter")
+    }
+
+    /// An actual first quarter and forecast second and third quarters, with a
+    /// scalar `ratio` and a dollar `cash`.
+    fn model() -> FinancialModelSpec {
+        let mut builder = ModelBuilder::new("mc");
+        builder
+            .periods("2025Q1..Q3", Some("2025Q1"))
+            .expect("periods");
+        let scalar: Vec<_> = (1..=3)
+            .map(|n| (q(n), AmountOrScalar::scalar(1.0)))
+            .collect();
+        builder.value("ratio", &scalar);
+        let money: Vec<_> = (1..=3)
+            .map(|n| (q(n), Money::from((100_i64, Currency::USD))))
+            .collect();
+        builder.value_money("cash", &money);
+        builder.build().expect("model")
+    }
+
+    fn value_types() -> IndexMap<NodeId, NodeValueType> {
+        IndexMap::from([
+            (NodeId::new("ratio"), NodeValueType::Scalar),
+            (
+                NodeId::new("cash"),
+                NodeValueType::Monetary {
+                    currency: Currency::USD,
+                },
+            ),
+        ])
+    }
+
+    fn accumulator(config: &MonteCarloConfig) -> Result<MonteCarloAccumulator> {
+        MonteCarloAccumulator::new(&model(), config, &value_types())
+    }
+
+    /// One path's result holding `ratio` cells for the second and third
+    /// quarters.
+    fn ratio_cells(second: ResultCell, third: ResultCell) -> StatementResult {
+        let mut result = StatementResult::new();
+        result.set_cell("ratio", q(2), second);
+        result.set_cell("ratio", q(3), third);
+        result
+    }
+
+    /// A value cell, without the finiteness check a result setter applies.
+    fn raw(value: f64) -> ResultCell {
+        ResultCell {
+            status: CellStatus::Value,
+            value: Some(AmountOrScalar::Scalar(value)),
+            reason: None,
+            source: None,
         }
-        accumulator.finish()
+    }
+
+    /// One path's samples of `ratio`: its second- and third-quarter values.
+    fn ratio_path(second: f64, third: f64) -> StatementResult {
+        ratio_cells(raw(second), raw(third))
+    }
+
+    fn aggregate(config: &MonteCarloConfig, paths: &[(f64, f64)]) -> MonteCarloResults {
+        let mut accumulator = accumulator(config).expect("valid run");
+        for (path, (second, third)) in paths.iter().enumerate() {
+            accumulator
+                .push_path(path, &ratio_path(*second, *third), Vec::new())
+                .expect("valid sample");
+        }
+        accumulator.finish().expect("aggregation")
     }
 
     #[test]
     fn percentile_labels_are_percent_labels() {
         assert_eq!(percentile_label(0.05), "p5");
         assert_eq!(percentile_label(0.5), "p50");
-        assert_eq!(percentile_label(0.95), "p95");
         assert_eq!(percentile_label(0.975), "p97.5");
-        assert_eq!(percentile_label(0.01), "p1");
     }
 
     #[test]
-    fn normalize_percentiles_sorts_and_dedupes() {
-        let raw = vec![0.95, 0.05, 0.5, 0.5];
-        let norm = normalize_percentiles(&raw).expect("valid percentiles");
-        assert_eq!(norm, vec![0.05, 0.5, 0.95]);
-    }
-
-    #[test]
-    fn normalize_percentiles_rejects_out_of_range() {
-        // A user writing `5` for the 5th percentile must get an error, not a
-        // silent clamp to the maximum.
-        assert!(normalize_percentiles(&[5.0]).is_err());
-        assert!(normalize_percentiles(&[-0.1]).is_err());
-        assert!(normalize_percentiles(&[f64::NAN]).is_err());
-    }
-
-    #[test]
-    fn aggregate_rejects_non_finite_path_values() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = {
-            let mut model_builder = ModelBuilder::new("mc-agg");
-            model_builder
-                .periods("2025Q1..Q1", None)
-                .expect("valid periods");
-            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
-            model_builder.build().expect("valid model")
-        };
-        let config = MonteCarloConfig::new(1, 7);
-
-        let mut path = IndexMap::new();
-        path.insert(
-            "revenue".to_string(),
-            [(period, f64::NAN)].into_iter().collect(),
+    fn percentiles_are_sorted_distinct_and_in_range() {
+        assert_eq!(
+            normalize_percentiles(&[0.95, 0.05, 0.5]).expect("valid"),
+            vec![0.05, 0.5, 0.95]
         );
-
-        let err = aggregate_monte_carlo_paths(&model, &config, &[(path, Vec::new())])
-            .expect_err("NaN must fail");
-        assert!(err.to_string().contains("non-finite"));
-    }
-
-    #[test]
-    fn breach_probability_is_order_independent() {
-        // Two paths; path 0 breaches in period 1, path 1 never breaches.
-        // Expected probability: exactly 0.5 regardless of rayon-reduce order.
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = {
-            let mut model_builder = ModelBuilder::new("mc-breach");
-            model_builder
-                .periods("2025Q1..Q1", None)
-                .expect("valid periods");
-            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
-            model_builder.build().expect("valid model")
-        };
-        let config = MonteCarloConfig::new(2, 7);
-
-        for insertion_order in [[0usize, 1], [1, 0]] {
-            let mut acc = MonteCarloAccumulator::new(&model, &config).expect("acc");
-            let values = [200.0, 50.0];
-            for &path_idx in &insertion_order {
-                let mut path = IndexMap::new();
-                path.insert(
-                    "revenue".to_string(),
-                    [(period, values[path_idx])].into_iter().collect(),
-                );
-                acc.push_path(path_idx, path, Vec::new())
-                    .expect("push_path");
-            }
-            let results = acc.finish().expect("finish");
-            let p = results
-                .breach_probability("revenue", 100.0)
-                .expect("breach");
-            assert!(
-                (p - 0.5).abs() < 1e-12,
-                "breach probability must be 0.5 regardless of insertion order, got {p}"
-            );
+        assert_eq!(
+            normalize_percentiles(&[]).expect("default"),
+            vec![0.05, 0.5, 0.95]
+        );
+        let error = normalize_percentiles(&[0.5, 0.05, 0.5])
+            .expect_err("duplicate level")
+            .to_string();
+        assert!(error.contains("more than once"), "{error}");
+        // `5` for the 5th percentile is an error, not a clamp to the maximum.
+        for level in [5.0, -0.1, f64::NAN, f64::INFINITY] {
+            assert!(normalize_percentiles(&[level]).is_err(), "{level}");
         }
     }
 
+    /// Path count, metrics and the run's size are checked before a path runs.
     #[test]
-    fn breach_probability_survives_a_json_round_trip_with_path_data() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = {
-            let mut model_builder = ModelBuilder::new("mc-breach-json");
-            model_builder
-                .periods("2025Q1..Q1", None)
-                .expect("valid periods");
-            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
-            model_builder.build().expect("valid model")
+    fn the_run_is_validated_before_any_path() {
+        let rejected = |config: MonteCarloConfig| {
+            accumulator(&config)
+                .err()
+                .expect("rejected configuration")
+                .to_string()
         };
-        let paths: Vec<PathResult> = [200.0, 50.0, 150.0, 80.0]
-            .into_iter()
-            .map(|value| {
-                let mut path = IndexMap::new();
-                path.insert(
-                    "revenue".to_string(),
-                    [(period, value)].into_iter().collect(),
-                );
-                (path, Vec::new())
-            })
-            .collect();
+        assert!(rejected(MonteCarloConfig::new(0, 7, ["ratio"])).contains("n_paths > 0"));
+        if let Ok(beyond) = usize::try_from(u64::from(u32::MAX) + 1) {
+            assert!(
+                rejected(MonteCarloConfig::new(beyond, 7, ["ratio"])).contains("path-identifier")
+            );
+        }
+        assert!(rejected(MonteCarloConfig::new(4, 7, [""; 0])).contains("metrics"));
+        assert!(rejected(MonteCarloConfig::new(4, 7, ["ghost"])).contains("'ghost'"));
+        assert!(
+            rejected(MonteCarloConfig::new(4, 7, ["ratio", "ratio"])).contains("more than once")
+        );
+        // Two forecast periods and two metrics: four samples a path.
+        let within = MAX_MONTE_CARLO_SAMPLES / 4;
+        accumulator(&MonteCarloConfig::new(within, 7, ["ratio", "cash"])).expect("at the limit");
+        assert!(
+            rejected(MonteCarloConfig::new(within + 1, 7, ["ratio", "cash"]))
+                .contains("exceeds the limit")
+        );
 
-        let with_paths = MonteCarloConfig::new(4, 7).with_path_data(true);
-        let live = aggregate_monte_carlo_paths(&model, &with_paths, &paths).expect("finish");
-        let restored: MonteCarloResults =
-            serde_json::from_str(&serde_json::to_string(&live).expect("serialize"))
-                .expect("deserialize");
-        assert!(restored.path_values.is_empty());
-        assert_eq!(live.breach_probability("revenue", 100.0), Some(0.5));
-        assert_eq!(restored.breach_probability("revenue", 100.0), Some(0.5));
-        assert_eq!(restored.breach_probability("missing", 100.0), None);
-
-        let without_paths = MonteCarloConfig::new(4, 7);
-        let live = aggregate_monte_carlo_paths(&model, &without_paths, &paths).expect("finish");
-        let restored: MonteCarloResults =
-            serde_json::from_str(&serde_json::to_string(&live).expect("serialize"))
-                .expect("deserialize");
-        assert_eq!(restored.breach_probability("revenue", 100.0), None);
+        let mut actuals_only = ModelBuilder::new("no-forecast");
+        actuals_only
+            .periods("2025Q1..Q2", Some("2025Q2"))
+            .expect("periods");
+        actuals_only.value(
+            "ratio",
+            &[
+                (q(1), AmountOrScalar::scalar(1.0)),
+                (q(2), AmountOrScalar::scalar(1.0)),
+            ],
+        );
+        let error = MonteCarloAccumulator::new(
+            &actuals_only.build().expect("model"),
+            &MonteCarloConfig::new(4, 7, ["ratio"]),
+            &value_types(),
+        )
+        .err()
+        .expect("no forecast period")
+        .to_string();
+        assert!(error.contains("forecast period"), "{error}");
     }
 
+    /// R-7 against the definition worked by hand: `h = (n - 1) q`, linear
+    /// between the order statistics around `h`.
     #[test]
-    fn accumulator_preserves_warnings_for_valid_paths() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = {
-            let mut model_builder = ModelBuilder::new("mc-agg");
-            model_builder
-                .periods("2025Q1..Q1", None)
-                .expect("valid periods");
-            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
-            model_builder.build().expect("valid model")
-        };
-        let config = MonteCarloConfig::new(1, 7);
-        let mut accumulator = MonteCarloAccumulator::new(&model, &config).expect("accumulator");
-
-        let mut path = IndexMap::new();
-        path.insert(
-            "revenue".to_string(),
-            [(period, 100.0)].into_iter().collect(),
+    fn quantiles_are_r7_with_units_and_sample_count() {
+        let config = MonteCarloConfig::new(5, 7, ["ratio"])
+            .with_percentiles(vec![0.0, 0.1, 0.25, 0.5, 0.9, 1.0]);
+        // Second-quarter samples 3, 1, 4, 1, 5 sort to 1, 1, 3, 4, 5.
+        let results = aggregate(
+            &config,
+            &[(3.0, 0.0), (1.0, 0.0), (4.0, 0.0), (1.0, 0.0), (5.0, 0.0)],
         );
+        let series = &results.percentile_results["ratio"];
+        assert_eq!(series.value_type, NodeValueType::Scalar);
+        assert_eq!(series.sample_count, 5);
+        let by_hand = [
+            (0.0, 1.0),
+            (0.1, 1.0),       // h = 0.4: between 1 and 1
+            (0.25, 1.0),      // h = 1
+            (0.5, 3.0),       // h = 2
+            (0.9, 4.0 + 0.6), // h = 3.6: 60% of the way from 4 to 5
+            (1.0, 5.0),
+        ];
+        for ((level, expected), (stored_level, value)) in by_hand.iter().zip(&series.values[&q(2)])
+        {
+            assert_eq!(level, stored_level);
+            assert!((value - expected).abs() < 1e-12, "q={level}: {value}");
+        }
+        // Retrieval is by the exact probability key.
+        assert_eq!(
+            results.percentile_by_period("ratio", 0.9).expect("level")[&q(2)],
+            4.6
+        );
+        assert!(results.percentile_by_period("ratio", 0.9000001).is_none());
+        // The run replays from the result alone.
+        assert_eq!(results.seed, 7);
+        assert_eq!(
+            results.stream_version,
+            crate::forecast::stream::STREAM_VERSION
+        );
+        assert_eq!(results.metrics, vec!["ratio".to_string()]);
+    }
+
+    /// A sample without a value makes the run incomplete: no statistics, and
+    /// the first gap in metric, period and path order is named.
+    #[test]
+    fn a_missing_sample_makes_the_run_incomplete() {
+        let config = MonteCarloConfig::new(3, 7, ["ratio"]).with_path_data(true);
+        let mut accumulator = accumulator(&config).expect("valid run");
+        let gap = |cell: ResultCell| ratio_cells(raw(1.0), cell);
+        // The later path arrives first.
         accumulator
             .push_path(
-                0,
-                path,
-                vec![EvalWarning::DivisionByZero {
-                    node_id: "revenue".into(),
-                    period,
-                }],
+                2,
+                &gap(ResultCell::without_value(CellStatus::Masked)),
+                Vec::new(),
             )
-            .expect("path should be accepted");
-        let results = accumulator.finish().expect("results should finish");
-        assert_eq!(results.warnings.len(), 1);
+            .expect("a gap is not an error");
+        accumulator
+            .push_path(
+                1,
+                &gap(ResultCell::unavailable(UnavailableReason::MissingPeerShock)),
+                Vec::new(),
+            )
+            .expect("a gap is not an error");
+        accumulator
+            .push_path(0, &ratio_path(1.0, 1.0), Vec::new())
+            .expect("valid sample");
+        let results = accumulator
+            .finish()
+            .expect("an incomplete run still returns");
+        assert!(results.percentile_results.is_empty());
+        assert!(results.path_data.is_none());
+        let incomplete = results.incomplete.as_ref().expect("incomplete");
+        assert_eq!(
+            (
+                incomplete.metric.as_str(),
+                incomplete.period,
+                incomplete.path
+            ),
+            ("ratio", q(3), 1)
+        );
+        assert_eq!(incomplete.reason, "missing_peer_shock");
+        assert_eq!(incomplete.missing_samples, 2);
+        assert_eq!(
+            results
+                .breach_probability("ratio", AmountOrScalar::scalar(0.0))
+                .expect("typed threshold"),
+            None
+        );
+
+        // A value that is not finite is an execution error.
+        let mut accumulator = super::MonteCarloAccumulator::new(&model(), &config, &value_types())
+            .expect("valid run");
+        let error = accumulator
+            .push_path(0, &ratio_path(f64::NAN, 1.0), Vec::new())
+            .expect_err("invalid sample")
+            .to_string();
+        assert!(error.contains("invalid sample"), "{error}");
+    }
+
+    /// The same paths give the same result whatever order they arrive in or
+    /// however they are partitioned and merged.
+    #[test]
+    fn results_do_not_depend_on_path_order_or_partitioning() {
+        let config = MonteCarloConfig::new(4, 7, ["ratio"]).with_path_data(true);
+        let paths = [(1.0, 9.0), (2.0, 8.0), (3.0, 7.0), (4.0, 6.0)];
+        let serial = aggregate(&config, &paths);
+
+        let seed = accumulator(&config).expect("valid run");
+        let mut left = seed.empty_like();
+        let mut right = seed.empty_like();
+        for path in [3, 1] {
+            let (second, third) = paths[path];
+            left.push_path(path, &ratio_path(second, third), Vec::new())
+                .expect("sample");
+        }
+        for path in [2, 0] {
+            let (second, third) = paths[path];
+            right
+                .push_path(path, &ratio_path(second, third), Vec::new())
+                .expect("sample");
+        }
+        let merged = right.merge(left).expect("merge").finish().expect("finish");
+        assert_eq!(
+            serde_json::to_value(&serial).expect("serialize"),
+            serde_json::to_value(&merged).expect("serialize")
+        );
+    }
+
+    /// Breach probability counts a path once when any forecast value is
+    /// strictly above a typed, finite threshold, and needs path samples.
+    #[test]
+    fn breach_probability_is_strict_typed_and_needs_path_samples() {
+        let config = MonteCarloConfig::new(4, 7, ["ratio"]).with_path_data(true);
+        // Path 0 breaches in both quarters and counts once; path 1 equals
+        // the threshold, which is not a breach.
+        let results = aggregate(&config, &[(6.0, 7.0), (5.0, 5.0), (1.0, 5.5), (1.0, 1.0)]);
+        let breach =
+            |results: &MonteCarloResults, threshold| results.breach_probability("ratio", threshold);
+        assert_eq!(
+            breach(&results, AmountOrScalar::scalar(5.0)).expect("typed"),
+            Some(0.5)
+        );
+        // A threshold in other units, or not finite, is an error.
+        assert!(
+            breach(
+                &results,
+                AmountOrScalar::Amount(Money::from((5_i64, Currency::USD)))
+            )
+            .is_err()
+        );
+        assert!(breach(&results, AmountOrScalar::scalar(f64::NAN)).is_err());
+        assert_eq!(
+            results
+                .breach_probability("cash", AmountOrScalar::scalar(5.0))
+                .expect("unrequested metric"),
+            None
+        );
+
+        // Restored from JSON: the path table gives the same answer.
+        let wire = serde_json::to_value(&results).expect("serialize");
+        let restored: MonteCarloResults = serde_json::from_value(wire.clone()).expect("restore");
+        assert_eq!(
+            breach(&restored, AmountOrScalar::scalar(5.0)).expect("typed"),
+            Some(0.5)
+        );
+        // A restored path count outside a run's domain is refused before it
+        // sizes anything.
+        for n_paths in [0_u64, 1 << 63] {
+            let mut forged = wire.clone();
+            forged["n_paths"] = serde_json::json!(n_paths);
+            let forged: MonteCarloResults = serde_json::from_value(forged).expect("restore");
+            assert!(breach(&forged, AmountOrScalar::scalar(5.0)).is_err());
+        }
+        // Without path samples it is unavailable.
+        let mut without = wire;
+        without.as_object_mut().expect("object").remove("path_data");
+        let restored: MonteCarloResults = serde_json::from_value(without).expect("restore");
+        assert_eq!(
+            breach(&restored, AmountOrScalar::scalar(5.0)).expect("typed"),
+            None
+        );
+        // An incomplete or repeated key set cannot be restored.
+        let truncated = aggregate(
+            &MonteCarloConfig::new(3, 7, ["ratio"]).with_path_data(true),
+            &[(6.0, 7.0), (5.0, 5.0), (1.0, 5.5)],
+        );
+        let mut short: MonteCarloResults =
+            serde_json::from_value(serde_json::to_value(&truncated).expect("serialize"))
+                .expect("restore");
+        short.n_paths = 4;
+        let error = breach(&short, AmountOrScalar::scalar(5.0))
+            .expect_err("incomplete key set")
+            .to_string();
+        assert!(error.contains("complete run"), "{error}");
     }
 
     #[test]
-    fn monte_carlo_config_rejects_unknown_fields() {
-        let json = r#"{"n_paths": 10, "seed": 7, "bogus_field": true}"#;
-        assert!(serde_json::from_str::<MonteCarloConfig>(json).is_err());
-    }
-
-    #[test]
-    fn monte_carlo_config_serde_uses_constructor_defaults() {
-        let config: MonteCarloConfig =
-            serde_json::from_str(r#"{"n_paths": 10, "seed": 7}"#).expect("valid config");
-
+    fn config_wire_form_is_exact_and_closed() {
+        let config: MonteCarloConfig = serde_json::from_value(serde_json::json!({
+            "n_paths": 16,
+            "seed": "18446744073709551615",
+            "metrics": ["ratio"]
+        }))
+        .expect("config");
+        assert_eq!(config.seed, u64::MAX);
         assert_eq!(config.percentiles, vec![0.05, 0.5, 0.95]);
         assert!(!config.include_path_data);
-        assert_eq!(config.percentiles, MonteCarloConfig::new(10, 7).percentiles);
-    }
-
-    #[test]
-    fn path_data_rows_sorted_regardless_of_push_order() {
-        // Rayon merge order is nondeterministic; finish() must emit a
-        // canonical (path_id, metric, period) row order either way.
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = {
-            let mut model_builder = ModelBuilder::new("mc-sort");
-            model_builder
-                .periods("2025Q1..Q1", None)
-                .expect("valid periods");
-            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
-            model_builder.build().expect("valid model")
-        };
-        let config = MonteCarloConfig::new(2, 7).with_path_data(true);
-
-        let mut acc = MonteCarloAccumulator::new(&model, &config).expect("acc");
-        for path_idx in [1usize, 0] {
-            let mut path = IndexMap::new();
-            path.insert(
-                "revenue".to_string(),
-                [(period, 100.0 + path_idx as f64)].into_iter().collect(),
-            );
-            acc.push_path(path_idx, path, Vec::new()).expect("push");
-        }
-        let results = acc.finish().expect("finish");
-        let table = results.path_data.expect("path data");
-        let path_id_column = table
-            .columns
-            .iter()
-            .find(|c| c.name == "path_id")
-            .expect("path_id column");
-        match &path_id_column.data {
-            finstack_quant_core::table::TableColumnData::UInt32(ids) => {
-                assert_eq!(ids, &vec![0, 1], "rows must be sorted by path_id");
-            }
-            other => panic!("unexpected column type: {other:?}"),
-        }
-    }
-
-    #[test]
-    fn path_data_orders_all_columns_and_matches_partition_merges() {
-        use finstack_quant_core::table::TableColumnData;
-        let mut builder = ModelBuilder::new("mc-row-order");
-        builder.periods("2025Q1..Q3", None).expect("periods");
-        builder.value("a", &[(PeriodId::quarter(2025, 1).unwrap(), 1.0.into())]);
-        let model = builder.build().expect("model");
-        let config = MonteCarloConfig::new(3, 7).with_path_data(true);
-        let mut serial = MonteCarloAccumulator::new(&model, &config).expect("accumulator");
-        let mut merged = serial.empty_like();
-        for path_idx in [2usize, 0, 1] {
-            let mut path = IndexMap::new();
-            for metric in ["z", "a"] {
-                let mut periods = IndexMap::new();
-                for quarter in [3, 1, 2] {
-                    let period = PeriodId::quarter(2025, quarter).expect("period");
-                    periods.insert(period, 100.0 * path_idx as f64 + f64::from(quarter));
-                }
-                path.insert(metric.to_string(), periods);
-            }
-            serial
-                .push_path(path_idx, path.clone(), Vec::new())
-                .expect("serial push");
-            let mut partition = merged.empty_like();
-            partition
-                .push_path(path_idx, path, Vec::new())
-                .expect("partition push");
-            merged = partition.merge(merged).expect("merge");
-        }
-        let serial = serial.finish().expect("serial finish");
-        let merged = merged.finish().expect("merged finish");
-        let table = serial.path_data.as_ref().expect("path data");
         assert_eq!(
-            serde_json::to_value(table).unwrap(),
-            serde_json::to_value(merged.path_data.as_ref().unwrap()).unwrap()
+            serde_json::to_value(&config).expect("serialize")["seed"],
+            serde_json::json!("18446744073709551615")
         );
-        let mut expected_ids = Vec::new();
-        let mut expected_periods = Vec::new();
-        let mut expected_metrics = Vec::new();
-        let mut expected_values = Vec::new();
-        for path in 0..3u32 {
-            for metric in ["a", "z"] {
-                for quarter in 1..=3 {
-                    expected_ids.push(path);
-                    expected_metrics.push(metric.to_string());
-                    expected_periods.push(format!("2025Q{quarter}"));
-                    expected_values.push(100.0 * f64::from(path) + f64::from(quarter));
-                }
-            }
+        for invalid in [
+            serde_json::json!({"n_paths": 16, "seed": "7"}),
+            serde_json::json!({"n_paths": 16, "seed": 7, "metrics": ["ratio"]}),
+            serde_json::json!({"n_paths": 16, "seed": "-7", "metrics": ["ratio"]}),
+            serde_json::json!({"n_paths": 16, "seed": "7", "metrics": ["ratio"], "extra": 1}),
+        ] {
+            assert!(serde_json::from_value::<MonteCarloConfig>(invalid).is_err());
         }
-        assert_eq!(table.columns[0].data, TableColumnData::UInt32(expected_ids));
-        assert_eq!(
-            table.columns[1].data,
-            TableColumnData::String(expected_periods)
-        );
-        assert_eq!(
-            table.columns[2].data,
-            TableColumnData::String(expected_metrics)
-        );
-        assert_eq!(
-            table.columns[3].data,
-            TableColumnData::Float64(expected_values)
-        );
-        for result in [&serial, &merged] {
-            assert_eq!(result.breach_probability("a", 150.0), Some(1.0 / 3.0));
-        }
-    }
-
-    #[test]
-    fn path_data_is_opt_in() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = {
-            let mut model_builder = ModelBuilder::new("mc-path-data");
-            model_builder
-                .periods("2025Q1..Q1", None)
-                .expect("valid periods");
-            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
-            model_builder.build().expect("valid model")
-        };
-
-        let mut path = IndexMap::new();
-        path.insert(
-            "revenue".to_string(),
-            [(period, 100.0)].into_iter().collect(),
-        );
-
-        let default_config = MonteCarloConfig::new(1, 7);
-        let default_results =
-            aggregate_monte_carlo_paths(&model, &default_config, &[(path.clone(), Vec::new())])
-                .expect("default aggregation should finish");
-        assert!(default_results.path_data.is_none());
-        assert_eq!(
-            default_results.breach_probability("revenue", 50.0),
-            Some(1.0)
-        );
-
-        let opt_in_config = MonteCarloConfig::new(1, 7).with_path_data(true);
-        let opt_in_results =
-            aggregate_monte_carlo_paths(&model, &opt_in_config, &[(path, Vec::new())])
-                .expect("opt-in aggregation should finish");
-        assert!(opt_in_results.path_data.is_some());
     }
 
     #[test]
     fn parallel_monte_carlo_reports_the_lowest_failing_path() {
-        // y = sqrt(x) with x ~ N(0.5, 1): many paths go non-finite. The error
-        // must name the lowest failing path's metric/period on every run, the
-        // same error the serial (wasm32) loop returns.
+        // y = sqrt(x) with x ~ N(0.5, 1): many paths fail. The error must
+        // name the lowest failing path's on every run, the same error the
+        // serial (wasm32) loop returns.
         use crate::evaluator::Evaluator;
         use crate::types::ForecastSpec;
 
@@ -1010,10 +1323,7 @@ mod tests {
                 .periods("2025Q1..2026Q4", Some("2025Q1"))
                 .expect("valid periods");
             let mut model_builder = model_builder.mixed("x");
-            model_builder.values(&[(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                AmountOrScalar::scalar(1.0),
-            )]);
+            model_builder.values(&[(q(1), AmountOrScalar::scalar(1.0))]);
             model_builder.forecast(ForecastSpec::normal(0.5, 1.0, 7));
             let mut model_builder = model_builder.build().expect("valid mixed node");
             model_builder
@@ -1028,17 +1338,17 @@ mod tests {
         let serial_error = (1..=64)
             .find_map(|n| {
                 Evaluator::new()
-                    .evaluate_monte_carlo(&model, &MonteCarloConfig::new(n, 42))
+                    .evaluate_monte_carlo(&model, &MonteCarloConfig::new(n, 42, ["y"]), None)
                     .err()
             })
-            .expect("some early path must go non-finite")
+            .expect("some early path must fail")
             .to_string();
 
-        let config = MonteCarloConfig::new(2_000, 42);
+        let config = MonteCarloConfig::new(2_000, 42, ["y"]);
         for _ in 0..20 {
             let error = Evaluator::new()
-                .evaluate_monte_carlo(&model, &config)
-                .expect_err("non-finite paths must fail");
+                .evaluate_monte_carlo(&model, &config, None)
+                .expect_err("failing paths must fail the run");
             assert_eq!(error.to_string(), serial_error);
         }
     }

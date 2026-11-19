@@ -22,10 +22,7 @@ fn growth_model() -> FinancialModelSpec {
     params.insert("curve".into(), serde_json::json!([0.05, 0.05, 0.05]));
     model_builder.forecast(
         "revenue",
-        ForecastSpec {
-            method: ForecastMethod::CurvePct,
-            params,
-        },
+        ForecastSpec::from_params(ForecastMethod::CurvePct, params).unwrap(),
     );
     model_builder
         .compute("cumulative_revenue", "cumsum(revenue)")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 import pandas as pd
 
 from finstack_quant.core.money import Money
@@ -387,17 +387,31 @@ class ForecastSpec:
             ``target``, ``shape``, ``half_life``, ``long_run_mean``,
             ``reversion_speed``, ``historical``, ``mode``, ``phi``, ...).
             Rates are decimal fractions per period. Every method also accepts
-            optional ``min`` / ``max`` bounds that clamp generated values to a
-            band (in the node's own units). ``None`` means no parameters,
-            which is only valid for ``forward_fill``.
+            optional ``min`` / ``max`` bounds that clamp the published values
+            to a band (in the node's own units) without changing the levels
+            later steps build on; each clipped cell is reported as a
+            ``forecast_clipped`` warning. Methods that step from a base
+            (``growth_pct``, ``curve_pct``, ``fade_to_target``, ``normal``,
+            ``log_normal``, ``mean_reverting``, ``bootstrap``) accept an
+            optional ``start`` level in the node's own units; without it
+            the base is the visible value in the period just before the
+            first forecast period, and a forecast with no base is
+            unavailable (``missing_forecast_base``). ``None`` means no parameters,
+            which is only valid for ``forward_fill``. ``seed`` is an exact
+            unsigned 64-bit ``int`` (a decimal string in a JSON object
+            string). The ``time_series`` ``method``, the ``bootstrap``
+            ``mode``, the ``seasonal`` ``mode`` and the ``fade_to_target``
+            ``shape`` have no default and must be given.
 
         Raises
         ------
         ValueError
             If ``params`` is not a JSON object / dict, names a parameter the
             method does not accept, omits a required one, sets one to
-            ``null``/``None``, or carries a value of the wrong type (a string
-            ``rate``, a non-list ``curve``).
+            ``null``/``None``, carries a value of the wrong type (a string
+            ``rate``, a non-list ``curve``), or fails a static requirement of
+            the method (a non-finite number, ``min`` above ``max``, a negative
+            ``std_dev``, a ``half_life`` on a non-exponential fade).
 
         """
         ...
@@ -562,36 +576,39 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def fade_to_target(target: float) -> ForecastSpec:
+    def fade_to_target(target: float, shape: Literal["linear", "geometric", "exponential"]) -> ForecastSpec:
         """
-        Linear fade-to-target spec:
-        ``v[t] = base + (target - base) * t / N``.
+        Fade-to-target spec with the chosen shape.
 
-        Values glide from the last observed value to ``target`` in equal
-        steps, reaching it exactly at the final forecast period. For the
-        ``"geometric"`` (CAGR-to-terminal) or ``"exponential"`` (half-life)
-        shapes, construct ``ForecastSpec(ForecastMethod.fade_to_target(),
-        params)`` with ``shape`` and, for exponential, ``half_life``.
+        Values glide from the last observed value to ``target``. The
+        ``"linear"`` shape moves in equal steps,
+        ``v[t] = base + (target - base) * t / N``, and reaches the target at
+        the final forecast period; ``"geometric"`` compounds toward it;
+        ``"exponential"`` closes the gap with a ``half_life`` set through
+        ``ForecastSpec(ForecastMethod.fade_to_target(), params)``.
 
         Parameters
         ----------
         target:
             Terminal level in the node's own units (a currency amount for
             monetary nodes, a decimal ratio for scalar nodes such as margins).
+        shape:
+            Path of the fade. There is no default.
 
         Returns
         -------
         ForecastSpec
-            A linear fade-to-target forecast specification.
+            A fade-to-target forecast specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If ``shape`` is not one of the three shapes.
 
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> spec = ForecastSpec.fade_to_target(0.02)
+        >>> spec = ForecastSpec.fade_to_target(0.02, "linear")
         >>> ForecastSpec.from_json(spec.to_json()).to_json() == spec.to_json()
         True
         """
@@ -639,37 +656,39 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def bootstrap(historical: list[float], seed: int) -> ForecastSpec:
+    def bootstrap(historical: list[float], mode: Literal["growth", "diff"], seed: int) -> ForecastSpec:
         """
-        Growth-mode bootstrap spec: resample historical growth rates and
-        compound them from the base value.
+        Bootstrap spec: resample historical changes and apply them from the
+        base value.
 
-        The history must be strictly positive in growth mode. For additive
-        resampling of level changes (series that cross zero), construct
-        ``ForecastSpec(ForecastMethod.bootstrap(), params)`` with
-        ``mode = "diff"``.
+        ``"growth"`` resamples growth rates and compounds them, which needs a
+        strictly positive history; ``"diff"`` resamples level changes and
+        suits series that cross zero.
 
         Parameters
         ----------
         historical:
             At least 2 historical values in the node's own units, oldest
-            first; consecutive pairs define the resampled growth rates.
+            first; consecutive pairs define the resampled changes.
+        mode:
+            What is resampled. There is no default.
         seed:
-            Seed for the deterministic resampling draws.
+            Exact unsigned 64-bit seed for the resampling draws.
 
         Returns
         -------
         ForecastSpec
-            A growth-mode bootstrap forecast specification.
+            A bootstrap forecast specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If ``mode`` is not ``"growth"`` or ``"diff"``.
 
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> spec = ForecastSpec.bootstrap([100.0, 105.0, 110.0], 7)
+        >>> spec = ForecastSpec.bootstrap([100.0, 105.0, 110.0], "growth", 7)
         >>> ForecastSpec.from_json(spec.to_json()).to_json() == spec.to_json()
         True
         """
@@ -751,7 +770,7 @@ class ForecastSpec:
         Returns
         -------
         dict[str, Any]
-            Parameter mapping in insertion order; rates are decimal fractions per model period and levels use the node's units.
+            Parameter mapping in insertion order; rates are decimal fractions per model period, levels use the node's units and ``seed`` is an exact ``int``.
 
         Notes
         -----
@@ -822,27 +841,36 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def time_series(historical: list[float]) -> ForecastSpec:
-        """Forecast an external historical series using its estimated linear trend.
+    def time_series(
+        historical: list[float], method: Literal["linear", "exponential", "moving_average"]
+    ) -> ForecastSpec:
+        """Forecast an external historical series with the chosen trend method.
+
+        Tuning parameters (``alpha``, ``beta``, ``phi`` for ``"exponential"``;
+        ``window`` for ``"moving_average"``) are set through
+        ``ForecastSpec(ForecastMethod.time_series(), params)``.
 
         Parameters
         ----------
         historical:
-            Oldest-first levels in the node's units; eventual evaluation requires at least two observations.
+            Oldest-first levels in the node's units; evaluation requires at least two observations.
+        method:
+            Trend method. There is no default.
 
         Returns
         -------
         ForecastSpec
-            Linear time-series forecast configuration.
+            Time-series forecast configuration.
 
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
+        Raises
+        ------
+        ValueError
+            If ``method`` is not one of the three trend methods.
 
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> ForecastSpec.time_series([100.0, 105.0, 110.0]).method.kind
+        >>> ForecastSpec.time_series([100.0, 105.0, 110.0], "linear").method.kind
         'time_series'
         """
         ...
@@ -1092,6 +1120,7 @@ class FinancialModelSpec:
     >>> from finstack_quant.statements import ModelBuilder
     >>> builder = ModelBuilder("demo")
     >>> _ = builder.periods("2025Q1..Q1")
+    >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
     >>> builder.build().id
     'demo'
 
@@ -1100,7 +1129,13 @@ class FinancialModelSpec:
     @staticmethod
     def from_json(json: str) -> FinancialModelSpec:
         """
-        Deserialize a model specification from JSON text.
+        Load and validate a model specification from JSON text.
+
+        This is the one loading path Rust, Python and JavaScript share
+        (Rust ``FinancialModelSpec::from_json``): the document may be at most
+        64 MiB and nested 96 levels deep, an object may not repeat a key or
+        carry an unknown field, ``schema_version`` must be the integer ``1``,
+        and the decoded model must be runnable.
 
         Parameters
         ----------
@@ -1110,22 +1145,31 @@ class FinancialModelSpec:
         Returns
         -------
         FinancialModelSpec
-            Parsed specification.
+            The validated specification.
 
         Raises
         ------
-        ValueError
-            If ``json`` is not valid JSON or fails schema validation.
+        finstack_quant.portfolio.ContractValidationError
+            A ``ValueError``. If ``json`` is malformed, repeats a key, has a
+            missing or different ``schema_version``, does not match the model
+            schema, or decodes to a model that is not runnable (an empty or
+            out-of-order timeline, a reserved node id, an invalid formula or
+            units, an unknown reference, a dependency cycle or an invalid
+            capital structure). ``report`` lists the diagnostics with their
+            ``code`` and the JSON ``pointer`` of the field concerned, and the
+            message carries the first diagnostic's text. An input over a size
+            or depth limit raises the subclass ``ContractLimitExceededError``.
 
         Examples
         --------
         >>> from finstack_quant.statements import FinancialModelSpec
         >>> payload = (
         ...     '{"id":"demo","periods":{"calendar": "gregorian", "periods": [{"id":"2025Q1","start":"2025-01-01",'
-        ...     '"end":"2025-04-01","is_actual":false}]},"nodes":{},"schema_version":1}'
+        ...     '"end":"2025-04-01","is_actual":false}]},'
+        ...     '"nodes":{"revenue":{"node_id":"revenue","node_type":"value","value_type":{"type":"scalar"}}},"schema_version":1}'
         ... )
         >>> (FinancialModelSpec.from_json(payload).id, FinancialModelSpec.from_json(payload).node_count)
-        ('demo', 0)
+        ('demo', 1)
 
         """
         ...
@@ -1150,6 +1194,7 @@ class FinancialModelSpec:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> '"id":"demo"' in builder.build().to_json()
         True
 
@@ -1158,12 +1203,14 @@ class FinancialModelSpec:
 
     def content_hash(self) -> str:
         """
-        Versioned SHA-256 content hash of the canonical model JSON.
+        Versioned SHA-256 content hash of the validated model's canonical JSON.
 
         Mirrors Rust ``FinancialModelSpec::content_hash`` (WASM
-        ``statements.financialModelContentHash``). The hash is taken over the
-        canonical JSON, so it does not depend on key order or on how typed
-        numbers were spelled in the source document.
+        ``statements.financialModelContentHash``). The model is validated
+        first, and the hash is taken over the canonical JSON of the validated
+        model, so it does not depend on key order or on how typed numbers
+        were spelled in the source document, and a model that is not runnable
+        has no hash.
 
         Returns
         -------
@@ -1173,15 +1220,71 @@ class FinancialModelSpec:
         Raises
         ------
         ValueError
-            If the model contains a non-finite number.
+            If the model is not runnable or contains a non-finite number.
+        RuntimeError
+            If the model's formulas form a dependency cycle.
 
         Examples
         --------
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> builder.build().content_hash().startswith("sha256:")
         True
+        """
+        ...
+
+    @property
+    def source_snapshot(self) -> str | None:
+        """
+        Identity of the source snapshot the observations were taken from.
+
+        Returns
+        -------
+        str | None
+            The snapshot identifier, or ``None`` when the model names none. An evaluation with an observation cutoff needs it.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def apply_edits(self, edits: list[dict[str, Any]] | str) -> FinancialModelSpec:
+        """
+        Apply named edits atomically and return the edited model.
+
+        Edits apply in order to a copy, which must pass the runnable-model
+        validation. This model is never changed.
+
+        Parameters
+        ----------
+        edits:
+            Edit objects (or their JSON array text), each tagged by ``"edit"``: ``add_node`` and ``replace_node`` (``node``); ``remove_node``, ``remove_forecast`` and ``remove_where`` (``node_id``); ``set_observation`` (``node_id``, ``period``, ``value``, optional ``availability_date``); ``remove_observation`` (``node_id``, ``period``); ``set_formula`` (``node_id``, ``formula``); ``set_forecast`` (``node_id``, ``forecast``; the node becomes mixed); ``set_where`` (``node_id``, ``predicate``).
+
+        Returns
+        -------
+        FinancialModelSpec
+            A new model with every edit applied.
+
+        Raises
+        ------
+        ValueError
+            If an edit is malformed, adds an identifier that is already defined, names a node or observation that does not exist, or the edited model fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+        >>> edited = builder.build().apply_edits([
+        ...     {"edit": "set_observation", "node_id": "revenue", "period": "2025Q1", "value": 110.0}
+        ... ])
+        >>> edited.get_node("revenue").values
+        {'2025Q1': 110.0}
+
         """
         ...
 
@@ -1251,8 +1354,9 @@ class FinancialModelSpec:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> builder.build().node_ids()
-        []
+        ['revenue']
         """
         ...
 
@@ -1279,8 +1383,10 @@ class FinancialModelSpec:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
-        >>> builder.build().has_node("revenue")
-        False
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+        >>> model = builder.build()
+        >>> (model.has_node("revenue"), model.has_node("cogs"))
+        (True, False)
         """
         ...
 
@@ -1504,8 +1610,8 @@ class NodeSpec:
         rollup : str, optional
             How the line rolls up to a coarser frequency: ``"sum"`` (flows),
             ``"period_end"`` (balances, trailing metrics) or ``"formula"``
-            (ratios, which need a formula). Without it the line sums. A
-            :class:`RollupSpec` entry overrides it.
+            (ratios, which need a formula). Without it the line needs a
+            :class:`RollupSpec` entry, which also overrides it.
         meta : Mapping[str, Any], default {}
             Free-form JSON metadata.
 
@@ -1663,7 +1769,7 @@ class NodeSpec:
         -------
         str | None
             The declared method, or ``None`` when the line declares none and so
-            sums unless a :class:`RollupSpec` entry says otherwise.
+            needs a :class:`RollupSpec` entry to be rolled up.
 
         Raises
         ------

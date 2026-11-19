@@ -303,10 +303,19 @@ impl ValidationReport {
 impl ValidationReport {
     /// One-line summary used as the message of every report-carrying error:
     /// `validation failed with N error(s)`, counting error-severity
-    /// diagnostics only.
+    /// diagnostics only, followed by the first retained error's message so
+    /// the text alone says what went wrong.
     #[must_use]
     pub fn summary(&self) -> String {
-        format!("validation failed with {} error(s)", self.error_count())
+        let count = self.error_count();
+        match self
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.severity == Severity::Error)
+        {
+            Some(first) => format!("validation failed with {count} error(s): {}", first.message),
+            None => format!("validation failed with {count} error(s)"),
+        }
     }
 }
 

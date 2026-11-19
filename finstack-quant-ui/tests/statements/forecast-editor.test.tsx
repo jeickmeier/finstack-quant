@@ -53,15 +53,19 @@ it("submits the fields the Rust schema publishes", async () => {
   expect(forecast).toEqual({ method: "growth_pct", params: { rate: 0.05 } });
 });
 
-it("offers the fade parameters and leaves Rust's defaults unset", async () => {
-  const onApply = show({ method: "fade_to_target", params: { target: 10 } });
-  expect(screen.getByRole("button", { name: "Add shape" })).toBeTruthy();
+it("offers the optional fade parameters and keeps the chosen shape", async () => {
+  const onApply = show({
+    method: "fade_to_target",
+    params: { target: 10, shape: "linear" },
+  });
+  // The shape is a required choice, so only the half life is optional.
+  expect(screen.queryByRole("button", { name: "Add shape" })).toBeNull();
   expect(screen.getByRole("button", { name: "Add half life" })).toBeTruthy();
   await apply();
   await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
   expect((onApply.mock.calls[0] as unknown[])[0]).toEqual({
     method: "fade_to_target",
-    params: { target: 10 },
+    params: { target: 10, shape: "linear" },
   });
 });
 
@@ -98,7 +102,7 @@ it("sends only the scheduled values that were entered", async () => {
 it("reads comma-separated history as exact numbers", async () => {
   const onApply = show({
     method: "bootstrap",
-    params: { historical: [1, 2], seed: 7 },
+    params: { historical: [1, 2], mode: "growth", seed: "7" },
   });
   fireEvent.change(screen.getByRole("textbox", { name: /Historical/ }), {
     target: { value: "1.5, 2.5, 3" },
@@ -107,7 +111,7 @@ it("reads comma-separated history as exact numbers", async () => {
   await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
   expect((onApply.mock.calls[0] as unknown[])[0]).toEqual({
     method: "bootstrap",
-    params: { historical: [1.5, 2.5, 3], seed: 7 },
+    params: { historical: [1.5, 2.5, 3], mode: "growth", seed: "7" },
   });
 });
 
@@ -149,14 +153,14 @@ it(
   "holds a required field's error until an edit or Apply",
   { timeout: budget(10000) },
   async () => {
-    const onApply = show({ method: "growth_pct", params: { rate: 0.03 } });
+    const onApply = show({ method: "forward_fill" });
     await userEvent.click(
       screen.getByRole("combobox", { name: /forecast method/ }),
     );
     await userEvent.click(
-      await screen.findByRole("option", { name: "Fade to target" }),
+      await screen.findByRole("option", { name: "Fixed growth" }),
     );
-    const target = await screen.findByRole("textbox", { name: /^Target/ });
+    const target = await screen.findByRole("textbox", { name: /^Rate/ });
     const button = screen.getByRole<HTMLButtonElement>("button", {
       name: "Apply forecast",
     });
@@ -179,8 +183,8 @@ it(
     fireEvent.click(button);
     await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
     expect((onApply.mock.calls[0] as unknown[])[0]).toEqual({
-      method: "fade_to_target",
-      params: { target: 10 },
+      method: "growth_pct",
+      params: { rate: 10 },
     });
   },
 );

@@ -131,52 +131,43 @@ fn quantile_rejects_a_monetary_level_and_cross_currency_arithmetic() {
 }
 
 #[test]
-fn coalesce_skips_nan_and_both_infinities_and_retains_finite_zero() {
+fn coalesce_skips_unavailable_values_and_retains_zero() {
     let period = PeriodId::quarter(2025, 1).expect("quarter");
-    let model = {
-        let mut model_builder = ModelBuilder::new("nonfinite_fallbacks");
+    let build = |formulas: &[(&str, &str)]| {
+        let mut model_builder = ModelBuilder::new("fallbacks");
         model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value("seed", &[(period, 10.0.into())]);
         model_builder
-            .compute("positive_infinity", "coalesce(exp(1000), 7)")
+            .compute("gone", "lag(seed, 1)")
             .expect("formula");
-        model_builder
-            .compute("negative_infinity", "coalesce(-exp(1000), 8)")
-            .expect("formula");
-        model_builder
-            .compute("mixed", "coalesce(0 / 0, exp(1000), -exp(1000), 9)")
-            .expect("formula");
-        model_builder
-            .compute("all_missing", "coalesce(exp(1000), -exp(1000), 0 / 0)")
-            .expect("formula");
-        model_builder
-            .compute("zero", "coalesce(0, 10)")
-            .expect("formula");
-        model_builder
-            .compute("short_circuit", "coalesce(3, 1 / 0)")
-            .expect("formula");
+        for (node, formula) in formulas {
+            model_builder.compute(*node, *formula).expect("formula");
+        }
         model_builder.build().expect("model")
     };
+    let model = build(&[
+        ("first", "coalesce(gone, 7)"),
+        ("mixed", "coalesce(gone, gone, 9)"),
+        ("all_missing", "coalesce(gone, gone)"),
+        ("zero", "coalesce(0, 10)"),
+        ("short_circuit", "coalesce(3, 1 / 0)"),
+    ]);
     let result = Evaluator::new().evaluate(&model).expect("evaluation");
     for (node, expected) in [
-        ("positive_infinity", 7.0),
-        ("negative_infinity", 8.0),
+        ("first", 7.0),
         ("mixed", 9.0),
         ("zero", 0.0),
         ("short_circuit", 3.0),
     ] {
         assert_eq!(result.get(node, &period), Some(expected), "{node}");
     }
-    assert!(
-        result
-            .get("all_missing", &period)
-            .expect("NaN result")
-            .is_nan()
-    );
-    assert!(!result.meta.warnings.iter().any(|warning| matches!(
-        warning,
-        finstack_quant_statements::evaluator::EvalWarning::DivisionByZero { node_id, .. }
-            if node_id == "short_circuit"
-    )));
+    assert!(result.get("all_missing", &period).is_none());
+
+    // An overflow is invalid arithmetic, not a missing value to recover.
+    let error = Evaluator::new()
+        .evaluate(&build(&[("overflow", "coalesce(exp(1000), 7)")]))
+        .expect_err("overflow");
+    assert!(error.to_string().contains("exp()"), "{error}");
 }
 
 #[test]
@@ -187,7 +178,9 @@ fn ranks_honor_direction_and_minimum_ties_while_skipping_missing_history() {
     let observations: Vec<_> = periods
         .iter()
         .copied()
-        .zip([20.0, 30.0, f64::NAN, 30.0, 20.0, 10.0].map(AmountOrScalar::scalar))
+        .zip([20.0, 30.0, f64::NAN, 30.0, 20.0, 10.0])
+        .filter(|(_, value)| value.is_finite())
+        .map(|(period, value)| (period, AmountOrScalar::scalar(value)))
         .collect();
     let model = {
         let mut model_builder = ModelBuilder::new("ranking");
@@ -222,12 +215,7 @@ fn ranks_honor_direction_and_minimum_ties_while_skipping_missing_history() {
         );
     }
     for node in ["default_rank", "ascending_rank", "descending_rank"] {
-        assert!(
-            result
-                .get(node, &periods[2])
-                .expect("missing rank")
-                .is_nan()
-        );
+        assert!(result.get(node, &periods[2]).is_none());
     }
 }
 
@@ -269,7 +257,8 @@ fn rank_rejects_invalid_arity_at_compilation_and_standalone_evaluation() {
 #[test]
 fn rank_rejects_nonfinite_and_monetary_direction_flags() {
     let period = PeriodId::quarter(2025, 1).expect("quarter");
-    for direction in ["exp(1000)", "0 / 0"] {
+    {
+        let direction = "lag(observations, 1)";
         let model = {
             let mut model_builder = ModelBuilder::new("invalid_rank_direction");
             model_builder.periods("2025Q1..Q1", None).expect("periods");

@@ -46,6 +46,9 @@ fn minimal_ts_mapping() -> ThreeStatementMapping {
         wc_change_cf_node: None,
         current_assets_nodes: vec![],
         current_liabilities_nodes: vec![],
+        opening_cash: Some(opening(80.0)),
+        opening_retained_earnings: Some(opening(180.0)),
+        config: Default::default(),
     }
 }
 
@@ -76,6 +79,9 @@ fn full_ts_mapping() -> ThreeStatementMapping {
         wc_change_cf_node: None,
         current_assets_nodes: vec![],
         current_liabilities_nodes: vec![],
+        opening_cash: Some(opening(80.0)),
+        opening_retained_earnings: Some(opening(180.0)),
+        config: Default::default(),
     }
 }
 
@@ -89,6 +95,7 @@ fn credit_mapping() -> CreditMapping {
         cash_burn_node: None,
         leverage_warn: None,
         coverage_min_warn: None,
+        config: Default::default(),
     }
 }
 
@@ -96,14 +103,14 @@ fn credit_mapping() -> CreditMapping {
 
 #[test]
 fn three_statement_minimal_has_expected_checks() {
-    let suite = three_statement_checks(minimal_ts_mapping());
+    let suite = three_statement_checks(minimal_ts_mapping()).expect("valid suite");
     // BS articulation, RE reconciliation, GrowthRate, NonFinite, MissingValue = 5
     assert_eq!(suite.len(), 5, "minimal mapping should produce 5 checks");
 }
 
 #[test]
 fn three_statement_full_has_expected_checks() {
-    let suite = three_statement_checks(full_ts_mapping());
+    let suite = three_statement_checks(full_ts_mapping()).expect("valid suite");
     // BS articulation, RE reconciliation, Cash recon, Depreciation recon,
     // EffectiveTaxRate, GrowthRate, NonFinite, MissingValue = 8.
     // Capex / dividend / interest / working-capital reconciliations stay off:
@@ -118,7 +125,7 @@ fn partial_mapping_skips_optional_checks() {
     mapping.total_cf_node = None; // disables cash recon
     mapping.ppe_node = None; // disables depreciation recon
 
-    let suite = three_statement_checks(mapping);
+    let suite = three_statement_checks(mapping).expect("valid suite");
     // BS articulation, RE reconciliation, EffectiveTaxRate, GrowthRate,
     // NonFinite, MissingValue = 6
     assert_eq!(
@@ -130,7 +137,7 @@ fn partial_mapping_skips_optional_checks() {
 
 #[test]
 fn credit_suite_has_expected_checks() {
-    let suite = credit_underwriting_checks(credit_mapping());
+    let suite = credit_underwriting_checks(credit_mapping()).expect("valid suite");
     // NonFinite, Leverage, Coverage, FcfSign, TrendEbitda, TrendDebt = 6
     assert_eq!(suite.len(), 6, "credit suite should produce 6 checks");
 }
@@ -139,7 +146,7 @@ fn credit_suite_has_expected_checks() {
 fn credit_suite_without_fcf_has_fewer() {
     let mut cm = credit_mapping();
     cm.fcf_node = None;
-    let suite = credit_underwriting_checks(cm);
+    let suite = credit_underwriting_checks(cm).expect("valid suite");
     // NonFinite, Leverage, Coverage, TrendEbitda, TrendDebt = 5
     assert_eq!(
         suite.len(),
@@ -166,7 +173,7 @@ fn reconciliation_ts_mapping() -> ThreeStatementMapping {
 
 #[test]
 fn reconciliation_checks_are_registered_when_inputs_present() {
-    let suite = three_statement_checks(reconciliation_ts_mapping());
+    let suite = three_statement_checks(reconciliation_ts_mapping()).expect("valid suite");
     let ids = suite.check_ids();
 
     for expected in [
@@ -190,7 +197,7 @@ fn liquidity_runway_is_registered_when_cash_and_burn_present() {
     cm.cash_node = Some(NodeId::new("cash"));
     cm.cash_burn_node = Some(NodeId::new("monthly_burn"));
 
-    let suite = credit_underwriting_checks(cm);
+    let suite = credit_underwriting_checks(cm).expect("valid suite");
     let ids = suite.check_ids();
     assert!(
         ids.contains(&"liquidity_runway"),
@@ -204,7 +211,7 @@ fn liquidity_runway_stays_off_without_a_burn_node() {
     cm.cash_node = Some(NodeId::new("cash"));
     cm.cash_burn_node = None;
 
-    let suite = credit_underwriting_checks(cm);
+    let suite = credit_underwriting_checks(cm).expect("valid suite");
     let ids = suite.check_ids();
     assert!(
         !ids.contains(&"liquidity_runway"),
@@ -216,7 +223,7 @@ fn liquidity_runway_stays_off_without_a_burn_node() {
 fn lbo_suite_merges_both() {
     let ts = full_ts_mapping();
     let cr = credit_mapping();
-    let suite = lbo_model_checks(ts, cr);
+    let suite = lbo_model_checks(ts, cr).expect("valid suite");
     // 8 (three-statement full) + 6 (credit) = 14
     assert_eq!(suite.len(), 14, "LBO suite should merge both suites");
 }
@@ -240,10 +247,17 @@ fn three_statement_suite_runs_against_balanced_model() {
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
 
-    let suite = three_statement_checks(minimal_ts_mapping());
+    let suite = three_statement_checks(minimal_ts_mapping()).expect("valid suite");
     let report = suite.run(&model, &results).unwrap();
 
     // BS should pass (balanced). RE may flag if 300+50 != 350.
     // The key test is that it runs without error.
     assert!(report.summary.total_checks > 0);
+}
+
+fn opening(value: f64) -> finstack_quant_statements::checks::DatedOpening {
+    finstack_quant_statements::checks::DatedOpening {
+        date: time::macros::date!(2025 - 01 - 01),
+        value: finstack_quant_statements::types::AmountOrScalar::scalar(value),
+    }
 }

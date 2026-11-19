@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "a9a98fba34302b835147ba04d59099e35e8b2db0756f7d2025efe4de5c83e76a",
+          "sha256": "e16aec955c73a8aa04dd9a6f88ce22fbd7b251a9324b41f50fda67fa4133b685",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "b23f67c31395ff678c55694b511f930c24f62e446c0cc2712ec7de787d1890b6",
+          "sha256": "3b7070b32d82251fd4b37196e235fa4e31f02f86b6b30b067122d153ac175bd3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -2257,8 +2257,8 @@
           }
         ],
         "returns": "TableEnvelope",
-        "declaration": "/**\n * Export a statement result as a wide-format table.\n *\n * Free-function twin of Python `StatementResult.to_arrow_wide`\n * (Rust `StatementResult::to_table_wide`): one row per period in\n * chronological order and one column per node in declaration order.\n * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).\n * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds native numeric `NaN`, not zero. Canonical table JSON retains the established `\"nan\"` sentinel.\n *\n * # Errors\n *\n * Throws with kind `validation` if the result input is malformed or table\n * construction fails.\n */\nexport function statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
-        "sha256": "b7f6b35affc2e150968d26dfe02d0fa6dd20a6650088744a07d5a3e6bd7a1ced"
+        "declaration": "/**\n * Export a statement result as a wide-format table.\n *\n * Free-function twin of Python `StatementResult.to_arrow_wide`\n * (Rust `StatementResult::to_table_wide`): the approximate numeric view, with\n * one row per period of the result's plan and one column per node in\n * declaration order.\n * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).\n * @returns `TableEnvelope` with a `period_id` column followed by one nullable number column per node; a cell without a value is `null`, never zero. Each node column's metadata carries its units: `value_type` (`scalar` or `monetary`) and, for money, `currency`.\n *\n * # Errors\n *\n * Throws with kind `validation` if the result input is malformed or table\n * construction fails.\n */\nexport function statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
+        "sha256": "d532662712cb9a1bc447f8c42ebf8986b4c6117af851e9df62c8079b2858fae5"
       }
     },
     {
@@ -2283,8 +2283,8 @@
           }
         ],
         "returns": "generated.statements.NormalizationResult[]",
-        "declaration": "/**\n * Normalize a target metric by applying an adjustment catalog period by period.\n *\n * Twin of Python `normalize` (Rust `adjustments::normalize`).\n * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).\n * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).\n * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.\n *\n * # Errors\n *\n * Throws with kind `validation` if an input is malformed, the target node or\n * a referenced node is absent from the results, the configuration is\n * invalid, or the target and a reference node have incompatible units.\n */\nexport function normalize(results: StatementResult | string, config: generated.statements.NormalizationConfig | string): generated.statements.NormalizationResult[];",
-        "sha256": "fb17d606c8fac175671a5a33de2f8485b6bdcf28400a4e7ddf5a0097b133690a"
+        "declaration": "/**\n * Build the ordered bridge from a reported node to its adjusted value for every period.\n *\n * Twin of Python `normalize` (Rust `adjustments::normalize`). The whole\n * configuration is validated before any period is calculated. Each period\n * starts from the reported target value and applies the adjustments in\n * declaration order: a signed fixed amount (zero for a period not listed)\n * or a signed decimal percentage of a reference node's reported value. Each\n * cap limits its own adjustment's magnitude and keeps its sign. Money is\n * exact and nothing is converted between currencies. Nothing is written to\n * the results.\n * @param results - Evaluated or rolled-up `StatementResult` holding the target node and any reference nodes, with its period plan (object or JSON).\n * @param config - `NormalizationConfig`: the reported `target_node`, the new `output_node` and the ordered adjustments. A fixed amount and an absolute cap are in the target's units: a number for a scalar target, `{amount, currency}` for a monetary one (object or JSON).\n * @returns One `NormalizationResult` per period of the plan, in timeline order: the reported `base_value`, each row (raw amount, cap base and limit, applied amount and `adjusted_value`, the target through that row) and the `final_value`. A period whose target, percentage reference or cap base has no value carries `unavailable` with the reason and no rows.\n *\n * # Errors\n *\n * Throws with kind `validation` if an input is malformed, the results carry\n * no period plan, the output node is empty or equals the target, an\n * adjustment id repeats, the target or a referenced node is absent or has no\n * recorded units, units or currencies differ, a fixed amount names a period\n * outside the plan, a number is non-finite or a cap negative, or any row's\n * arithmetic cannot be represented.\n */\nexport function normalize(results: StatementResult | string, config: generated.statements.NormalizationConfig | string): generated.statements.NormalizationResult[];",
+        "sha256": "c9570f10cd6d9de88a34a3e38bf9ffd4950fae155c11415abbdeb83db8c7d144"
       }
     },
     {

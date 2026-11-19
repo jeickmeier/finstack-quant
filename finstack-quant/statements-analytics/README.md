@@ -62,8 +62,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = builder.build()?;
 
     let checks = CheckSuite::builder("corporate")
-        .add_check(NonFiniteCheck { nodes: vec![] })
-        .build();
+        .add_check(NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() })
+        .build()?;
 
     let analysis = CorporateAnalysisBuilder::new(model)
         .dcf(0.10, TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 })

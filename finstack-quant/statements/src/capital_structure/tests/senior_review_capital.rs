@@ -1,7 +1,7 @@
 //! Regression coverage for capital-structure review findings.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use crate::capital_structure::waterfall::execute_waterfall;
+use crate::capital_structure::waterfall::execute_waterfall_same_period;
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
@@ -114,7 +114,7 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         }
         let expected_expense = (-net).max(0.0);
         let expected_income = net.max(0.0);
-        let (flows, closing, funding, _) =
+        let (flows, closing, funding) =
             calculate_period_flows(&swap, &period, swap.notional, &market, as_of, None)
                 .expect("declared IRS period flows");
         assert_eq!(closing.amount(), 0.0);
@@ -133,13 +133,13 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
             raw.get_day_count(),
             dated_meta,
         );
-        let (_, closing, funding, _) = calculate_period_flows(
+        let (_, closing, funding) = calculate_period_flows(
             &swap,
             &period,
             Money::from((0_i64, Currency::USD)),
             &market,
             as_of,
-            Some(&dated),
+            Some(crate::capital_structure::SuppliedSchedule::holder(&dated)),
         )
         .expect("dated hedge schedule");
         assert_eq!(closing.amount(), 0.0);
@@ -185,7 +185,12 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
                     .expect("both swap sides are supported")
             };
             let result = Evaluator::new()
-                .evaluate_with_market(&model, &market, as_of)
+                .evaluate_with_market(
+                    &model,
+                    &market,
+                    as_of,
+                    crate::evaluator::ObservationCutoff::FullSnapshot,
+                )
                 .expect("signed IRS evaluation");
             assert_eq!(result.get("balance", &period.id), Some(0.0));
             assert!(
@@ -261,7 +266,12 @@ fn canonical_negative_debt_coupons_are_income() {
         model_builder.build().expect("negative-rate debt model")
     };
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &market, as_of)
+        .evaluate_with_market(
+            &model,
+            &market,
+            as_of,
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("negative-rate debt evaluation");
     assert_eq!(result.get("expense", &period.id), Some(0.0));
     assert!((result.get("income", &period.id).expect("income") + net).abs() < 1e-9);
@@ -295,7 +305,12 @@ fn placeholder_rate_option_schedule_is_rejected_explicitly() {
         model_builder.build().expect("valid model specification")
     };
     let error = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), as_of)
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            as_of,
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect_err("runtime must reject the placeholder too");
     assert!(error.to_string().contains("placeholder cashflow schedule"));
 }
@@ -322,8 +337,14 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
         pik_toggle: Some(PikToggleSpec {
             liquidity_metric: "cash".into(),
             threshold: 100.0,
-            target_instrument_ids: targets,
-            min_periods_in_pik: 0,
+            elections: Vec::<String>::into_iter(targets)
+                .map(|instrument_id| crate::capital_structure::PikElectionSpec {
+                    instrument_id,
+                    pik_fraction: rust_decimal::Decimal::ONE,
+                    min_coupon_periods: 0,
+                    notice_days: 0,
+                })
+                .collect(),
         }),
         ..Default::default()
     };
@@ -349,11 +370,14 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
                 .build()
                 .expect_err("hedge payments cannot become borrowing principal")
         };
-        assert!(error.to_string().contains(if !targets.is_empty() {
-            "hedge or option"
-        } else {
-            "must explicitly list"
-        }));
+        assert!(
+            error.to_string().contains(if !targets.is_empty() {
+                "not a term loan"
+            } else {
+                "must list each loan"
+            }),
+            "{error}"
+        );
     }
     {
         let mut model_builder = ModelBuilder::new("debt-pik");
@@ -469,13 +493,16 @@ fn empty_debt_context() -> (
 
 fn ecf_sweep() -> EcfSweepSpec {
     EcfSweepSpec {
-        ebitda_node: "cash".into(),
-        taxes_node: None,
-        capex_node: None,
-        working_capital_node: None,
-        cash_interest_node: None,
+        cash_measure: "cash".into(),
+        deductions: vec![
+            crate::capital_structure::EcfTerm::PaidCashInterest,
+            crate::capital_structure::EcfTerm::PaidFees,
+            crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+        ],
+        credits: Vec::new(),
         sweep_percentage: 0.5,
-        target_instrument_id: Some("TL".into()),
+        facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL".into()]),
+        payment_lag_days: None,
     }
 }
 
@@ -515,7 +542,12 @@ fn loan_issuance_is_funded_once_before_on_and_after_first_period_start() {
                 model_builder_1.build().expect("valid model")
             };
             let results = Evaluator::new()
-                .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+                .evaluate_with_market(
+                    &model,
+                    &MarketContext::new(),
+                    date!(2025 - 01 - 01),
+                    crate::evaluator::ObservationCutoff::FullSnapshot,
+                )
                 .expect("issuance evaluation");
             for period in [q1, q2] {
                 assert_eq!(
@@ -555,7 +587,12 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
 
     let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
     let empty_market = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("empty-market evaluation");
 
     let cashflows = plain
@@ -604,8 +641,8 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
             .unwrap();
     let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
     assert_eq!(
-        plain.node_sources["cash"][&q1],
-        finstack_quant_statements::evaluator::CellSource::Value
+        plain.get_source("cash", &q1),
+        Some(finstack_quant_statements::evaluator::CellSource::Value)
     );
     assert_eq!(plain.get("cash", &q1), Some(10.0));
     assert!(plain.cs_cashflows.is_some());
@@ -642,7 +679,12 @@ fn plain_evaluate_names_instruments_that_need_market_data() {
     assert!(message.contains("evaluate_with_market"), "{message}");
 
     Evaluator::new()
-        .evaluate_with_market(&model, &swap_market(0.03), date!(2025 - 01 - 01))
+        .evaluate_with_market(
+            &model,
+            &swap_market(0.03),
+            date!(2025 - 01 - 01),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("the swap evaluates against a market");
 }
 
@@ -702,7 +744,12 @@ fn bond_issuance_is_funded_once_before_on_and_after_first_period_start() {
                     .expect("bond waterfall has no prepayment priority")
             };
             let results = Evaluator::new()
-                .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+                .evaluate_with_market(
+                    &model,
+                    &MarketContext::new(),
+                    date!(2025 - 01 - 01),
+                    crate::evaluator::ObservationCutoff::FullSnapshot,
+                )
                 .expect("bond evaluation");
             for period in [q1, q2] {
                 assert_eq!(
@@ -751,7 +798,7 @@ fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
             } else {
                 zero
             };
-            let (_, closing, funding, _) = calculate_period_flows(
+            let (_, closing, funding) = calculate_period_flows(
                 &loan,
                 &periods[0],
                 opening,
@@ -793,7 +840,12 @@ fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
                     model_builder_1.build().expect("valid OID model")
                 };
                 let result = Evaluator::new()
-                    .evaluate_with_market(&model, &market, periods[0].start)
+                    .evaluate_with_market(
+                        &model,
+                        &market,
+                        periods[0].start,
+                        crate::evaluator::ObservationCutoff::FullSnapshot,
+                    )
                     .expect("OID model evaluation");
                 for period in &periods {
                     assert_eq!(
@@ -911,7 +963,12 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
                     model_builder_1.build().expect("valid custom bond model")
                 };
                 let result = Evaluator::new()
-                    .evaluate_with_market(&model, &market, periods[0].start)
+                    .evaluate_with_market(
+                        &model,
+                        &market,
+                        periods[0].start,
+                        crate::evaluator::ObservationCutoff::FullSnapshot,
+                    )
                     .expect("custom bond evaluation");
                 for period in &periods {
                     assert_eq!(
@@ -948,7 +1005,7 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
             } else {
                 zero
             };
-            let (flows, closing, funding, _) = calculate_period_flows(
+            let (flows, closing, funding) = calculate_period_flows(
                 &instrument,
                 &periods[0],
                 opening,
@@ -962,11 +1019,18 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
                 funding.amount(),
                 if issue > periods[0].start { 100.0 } else { 0.0 }
             );
+            // The breakdown reports the principal funding established, apart
+            // from its cash: this schedule has no funding leg, so no proceeds.
+            assert_eq!(flows.funding_principal, Some(funding));
+            assert_eq!(flows.funding_proceeds, Some(zero));
             if waterfall {
                 let (_, context, mut state, _) = empty_debt_context();
                 state.opening_balances.insert("TL".into(), opening);
-                state.period_new_funding.insert("TL".into(), funding);
-                let result = execute_waterfall(
+                // Nothing is due: the economic close is the schedule's own.
+                state
+                    .set_period_principal_flows("TL", &periods[0], Vec::new())
+                    .expect("no principal due");
+                let result = execute_waterfall_same_period(
                     &context,
                     &WaterfallSpec::default(),
                     &mut state,
@@ -976,7 +1040,11 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
                 assert_eq!(result.flows["TL"].debt_balance.amount(), 100.0);
             }
         }
-        let (_, closing, funding, _) = calculate_period_flows(
+        // A paid-off ledger cannot be read against the stale raw schedule,
+        // which still carries the principal: the mismatch is an error, not a
+        // resurrected or rescaled balance. The runtime rebuilds the residual
+        // schedule after every balance change, so it never meets this.
+        let error = calculate_period_flows(
             &instrument,
             &periods[1],
             zero,
@@ -984,9 +1052,10 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
             periods[0].start,
             None,
         )
-        .expect("paid-off debt stays zero after issuance period");
-        assert_eq!(closing.amount(), 0.0);
-        assert_eq!(funding.amount(), 0.0);
+        .expect_err("a paid-off ledger disagrees with the raw schedule")
+        .to_string();
+        assert!(error.contains("opens at 0 USD"), "{error}");
+        assert!(error.contains("carries 100 USD"), "{error}");
     }
 }
 
@@ -1008,7 +1077,7 @@ fn implicit_issuance_rejects_negative_principal_and_keeps_zero_at_zero() {
     )
     .expect_err("negative principal cannot imply a funding receipt");
     assert!(error.to_string().contains("nonnegative initial principal"));
-    let (_, closing, funding, _) = calculate_period_flows(
+    let (_, closing, funding) = calculate_period_flows(
         &no_funding_schedule(0.0, date!(2025 - 01 - 15)),
         &period,
         zero,
@@ -1062,7 +1131,12 @@ fn newly_funded_loan_preserves_contractual_pik_in_its_first_period() {
             model_builder_1.build().expect("valid model")
         };
         let results = Evaluator::new()
-            .evaluate_with_market(&model, &market, issue)
+            .evaluate_with_market(
+                &model,
+                &market,
+                issue,
+                crate::evaluator::ObservationCutoff::FullSnapshot,
+            )
             .expect("PIK issuance evaluation");
         let actual = results
             .get("balance", &period)
@@ -1133,7 +1207,12 @@ fn contractual_pik_is_redeemed_at_maturity_and_capitalized_once() {
             model_builder_1.build().expect("valid maturity model")
         };
         let result = Evaluator::new()
-            .evaluate_with_market(&model, &market, issue)
+            .evaluate_with_market(
+                &model,
+                &market,
+                issue,
+                crate::evaluator::ObservationCutoff::FullSnapshot,
+            )
             .expect("PIK maturity evaluation");
         assert!(
             (result.get("principal", &period).expect("principal") - expected_principal).abs()
@@ -1203,7 +1282,12 @@ fn loan_swept_after_issuance_stays_repaid_in_later_periods() {
         model_builder.build().expect("valid model")
     };
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("issuance and sweep");
     assert_eq!(result.get("balance", &periods[0]), Some(100.0));
     assert_eq!(result.get("balance", &periods[1]), Some(0.0));
@@ -1217,14 +1301,24 @@ fn named_prepayment_without_its_priority_is_rejected_before_state_changes() {
     for mandatory in [true, false] {
         let (_, context, mut state, flows) = empty_debt_context();
         let spec = WaterfallSpec {
-            mandatory_prepay_node: mandatory.then(|| "20".into()),
-            voluntary_prepay_node: (!mandatory).then(|| "20".into()),
+            mandatory_prepayment: (mandatory.then(|| "20".into())).map(|amount: String| {
+                crate::capital_structure::PrepaymentSpec {
+                    amount,
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                }
+            }),
+            voluntary_prepayment: ((!mandatory).then(|| "20".into())).map(|amount: String| {
+                crate::capital_structure::PrepaymentSpec {
+                    amount,
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                }
+            }),
             ..Default::default()
         };
         let node_name = if mandatory {
-            "mandatory_prepay_node"
+            "mandatory_prepayment"
         } else {
-            "voluntary_prepay_node"
+            "voluntary_prepayment"
         };
         assert!(
             spec.validate()
@@ -1232,7 +1326,7 @@ fn named_prepayment_without_its_priority_is_rejected_before_state_changes() {
                 .to_string()
                 .contains(node_name)
         );
-        let error = execute_waterfall(&context, &spec, &mut state, &flows)
+        let error = execute_waterfall_same_period(&context, &spec, &mut state, &flows)
             .expect_err("invalid waterfall must not allocate principal");
         assert!(error.to_string().contains(node_name));
         assert_eq!(state.opening_balances["TL"].amount(), 100.0);
@@ -1252,11 +1346,17 @@ fn named_prepayment_priorities_consume_the_shared_cash_pool() {
             PaymentPriority::VoluntaryPrepayment,
             PaymentPriority::Equity,
         ],
-        mandatory_prepay_node: Some("20".into()),
-        voluntary_prepay_node: Some("20".into()),
+        mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+            amount: "20".into(),
+            facilities: crate::capital_structure::FacilitySelection::AllEligible,
+        }),
+        voluntary_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+            amount: "20".into(),
+            facilities: crate::capital_structure::FacilitySelection::AllEligible,
+        }),
         ..Default::default()
     };
-    let result = execute_waterfall(&context, &spec, &mut state, &flows)
+    let result = execute_waterfall_same_period(&context, &spec, &mut state, &flows)
         .expect("configured priorities cap their payments");
     let debt = &result.flows["TL"];
     let equity = result.equity_distribution.expect("waterfall residual");
@@ -1280,10 +1380,18 @@ fn positive_ecf_requires_sweep_even_with_other_prepayment_priorities() {
                 priority,
                 PaymentPriority::Equity,
             ],
-            mandatory_prepay_node: (priority == PaymentPriority::MandatoryPrepayment)
-                .then(|| "0".into()),
-            voluntary_prepay_node: (priority == PaymentPriority::VoluntaryPrepayment)
-                .then(|| "0".into()),
+            mandatory_prepayment: (priority == PaymentPriority::MandatoryPrepayment).then(|| {
+                crate::capital_structure::PrepaymentSpec {
+                    amount: "0".into(),
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                }
+            }),
+            voluntary_prepayment: (priority == PaymentPriority::VoluntaryPrepayment).then(|| {
+                crate::capital_structure::PrepaymentSpec {
+                    amount: "0".into(),
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                }
+            }),
             ecf_sweep: Some(ecf_sweep()),
             ..Default::default()
         };
@@ -1310,7 +1418,7 @@ fn ecf_sweep_priority_pays_the_sized_sweep_and_preserves_cash() {
         ecf_sweep: Some(ecf_sweep()),
         ..Default::default()
     };
-    let result = execute_waterfall(&context, &spec, &mut state, &flows)
+    let result = execute_waterfall_same_period(&context, &spec, &mut state, &flows)
         .expect("positive ECF has its Sweep priority");
     let debt = &result.flows["TL"];
     let equity = result.equity_distribution.expect("waterfall residual");
@@ -1378,10 +1486,11 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
             periods[0].start,
             None,
         )
-        .expect("period flows")
-        .1
-        .amount()
+        .map(|(_, closing, _)| closing.amount())
     };
-    assert_eq!(close(100), 105.0);
-    assert_eq!(close(0), 105.0);
+    // Funded on the period boundary: the ledger opens at zero and closes on
+    // the dated schedule, face plus the capitalized coupon.
+    assert_eq!(close(0).expect("newly funded"), 105.0);
+    // A ledger that already holds the face disagrees with that schedule.
+    assert!(close(100).is_err());
 }

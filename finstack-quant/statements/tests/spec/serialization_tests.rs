@@ -15,14 +15,8 @@ fn test_results_serialization() {
     let mut results = StatementResult::new();
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
-    results.nodes.insert(
-        "revenue".to_string(),
-        [(period, 100_000.0)].into_iter().collect(),
-    );
-    results.nodes.insert(
-        "cogs".to_string(),
-        [(period, 60_000.0)].into_iter().collect(),
-    );
+    results.set_scalar("revenue", period, 100_000.0).unwrap();
+    results.set_scalar("cogs", period, 60_000.0).unwrap();
 
     results.meta = EvalStats {
         eval_time_ms: Some(42),
@@ -92,6 +86,16 @@ fn test_capital_structure_cashflows_serialization() {
         mandatory_prepayment: None,
         sweep_prepayment: None,
         voluntary_prepayment: None,
+        interest_arrears: None,
+        principal_pending: None,
+        principal_arrears: None,
+        principal_advance_reserve: None,
+        scheduled_cash_interest_due: None,
+        scheduled_principal_due: None,
+        fee_rebates: None,
+        repayment_refunds: None,
+        funding_proceeds: None,
+        funding_principal: None,
     };
 
     let mut period_map = IndexMap::new();
@@ -201,6 +205,7 @@ fn financial_model_missing_version_is_rejected_by_all_loaders() {
     let model = {
         let mut model_builder = ModelBuilder::new("missing-version");
         model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().expect("model")
     };
     let mut json = serde_json::to_value(model).expect("model serializes");
@@ -225,6 +230,7 @@ fn financial_model_accepts_explicit_null_optional_capital_structure() {
     let model = {
         let mut model_builder = ModelBuilder::new("null-capital-structure");
         model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().expect("model")
     };
     let mut json = serde_json::to_value(model).expect("model serializes");
@@ -232,12 +238,11 @@ fn financial_model_accepts_explicit_null_optional_capital_structure() {
     json["capital_structure"] = serde_json::Value::Null;
 
     let bytes = serde_json::to_vec(&json).expect("fixture serializes");
-    let (loaded, report) = FinancialModelSpec::from_slice_strict(&bytes, &LoadLimits::default())
+    let loaded = FinancialModelSpec::from_slice_strict(&bytes, &LoadLimits::default())
         .expect("null optional capital structure is absent");
 
     assert_eq!(u32::from(loaded.schema_version), 1);
     assert!(loaded.capital_structure.is_none());
-    assert!(report.diagnostics.is_empty());
 }
 
 #[test]
@@ -245,6 +250,7 @@ fn financial_model_strict_loader_rejects_zero_future_malformed_and_invalid_seman
     let model = {
         let mut model_builder = ModelBuilder::new("strict");
         model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().expect("model")
     };
     let base = serde_json::to_value(model).expect("model serializes");
@@ -292,6 +298,7 @@ fn financial_model_requires_exact_v1_marker() {
         model_builder
             .periods("2025Q1..Q2", None)
             .expect("valid periods");
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().expect("valid model")
     };
     let valid = serde_json::to_value(model).expect("serialize model");
@@ -446,7 +453,7 @@ fn test_empty_results_serialization() {
     let deserialized: StatementResult =
         serde_json::from_str(&json).expect("Failed to deserialize empty StatementResult");
 
-    assert_eq!(deserialized.nodes.len(), 0);
+    assert_eq!(deserialized.cells.len(), 0);
     assert_eq!(deserialized.meta.num_nodes, 0);
     assert_eq!(deserialized.meta.num_periods, 0);
     assert_eq!(deserialized.meta.eval_time_ms, None);
@@ -458,10 +465,7 @@ fn test_results_to_json_file() {
     let mut results = StatementResult::new();
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
-    results.nodes.insert(
-        "revenue".to_string(),
-        [(period, 100_000.0)].into_iter().collect(),
-    );
+    results.set_scalar("revenue", period, 100_000.0).unwrap();
 
     // Serialize to JSON string
     let json = serde_json::to_string_pretty(&results).expect("Failed to serialize");
@@ -518,6 +522,16 @@ fn test_capital_structure_json_roundtrip() {
         mandatory_prepayment: None,
         sweep_prepayment: None,
         voluntary_prepayment: None,
+        interest_arrears: None,
+        principal_pending: None,
+        principal_arrears: None,
+        principal_advance_reserve: None,
+        scheduled_cash_interest_due: None,
+        scheduled_principal_due: None,
+        fee_rebates: None,
+        repayment_refunds: None,
+        funding_proceeds: None,
+        funding_principal: None,
     };
 
     let json = serde_json::to_string(&breakdown).expect("Failed to serialize");

@@ -17,8 +17,11 @@ use time::Month;
 
 fn non_finite_suite() -> CheckSuite {
     CheckSuite::builder("corporate-test")
-        .add_check(NonFiniteCheck { nodes: vec![] })
+        .add_check(NonFiniteCheck {
+            nodes: finstack_quant_statements::checks::builtins::NodeSelection::all(),
+        })
         .build()
+        .expect("unique check ids")
 }
 
 #[test]
@@ -130,16 +133,17 @@ fn test_cs_cashflows_populated_on_statement_result() {
                 ),
             ],
         );
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "BOND-001",
+            fixed_bond(
                 "BOND-001",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 issue,
                 maturity,
                 "USD-OIS",
-            )
-            .expect("valid bond");
+            ),
+        );
         model_builder.build().expect("model should build")
     };
 
@@ -158,7 +162,12 @@ fn test_cs_cashflows_populated_on_statement_result() {
 
     let mut evaluator = Evaluator::new();
     let result = evaluator
-        .evaluate_with_market(&model, &market_ctx, issue)
+        .evaluate_with_market(
+            &model,
+            &market_ctx,
+            issue,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("evaluation should succeed");
 
     // cs_cashflows should be populated when model has a capital structure
@@ -895,16 +904,17 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
                 )],
             )
             .expect("availability");
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "BOND-001",
+            fixed_bond(
                 "BOND-001",
                 Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 as_of,
                 Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                 "USD-OIS",
-            )
-            .expect("bond");
+            ),
+        );
         model_builder
             .compute("ufcf", "revenue - cs.interest_expense.total")
             .expect("formula");
@@ -1018,20 +1028,13 @@ fn dcf_with_market_as_of(as_of: Date) -> finstack_quant_statements::Result<()> {
     .map(|_| ())
 }
 
-/// A quarter-end `as_of` hides that quarter's actuals (they become visible on
-/// the period's exclusive end); the error names both dates and the remedy
-/// instead of only reporting a missing value.
+/// The valuation reads the model's full snapshot: `as_of` dates pricing and
+/// does not hide observations. An `as_of` after the model has no forecast
+/// flow left, and the error names the valuation date.
 #[test]
-fn dcf_as_of_errors_explain_visibility_and_valuation_date() {
-    let quarter_end = Date::from_calendar_date(2025, Month::June, 30).expect("date");
-    let message = dcf_with_market_as_of(quarter_end)
-        .expect_err("2025Q2 actuals are not visible on 2025-06-30")
-        .to_string();
-    assert!(
-        message.contains("its actual is available on 2025-07-01, after as_of 2025-06-30")
-            && message.contains("availability_dates"),
-        "{message}"
-    );
+fn dcf_as_of_reads_the_full_snapshot_and_explains_the_valuation_date() {
+    dcf_with_market_as_of(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
+        .expect("quarter-end valuation reads the 2025Q2 observation");
 
     dcf_with_market_as_of(Date::from_calendar_date(2025, Month::July, 1).expect("date"))
         .expect("the day after quarter end sees 2025Q2");
@@ -1044,4 +1047,29 @@ fn dcf_as_of_errors_explain_visibility_and_valuation_date() {
         message.contains("in forecast periods ending after the valuation date 2026-01-01"),
         "{message}"
     );
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

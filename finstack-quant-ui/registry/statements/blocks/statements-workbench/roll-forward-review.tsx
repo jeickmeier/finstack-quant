@@ -26,10 +26,13 @@ const comparisonLabel = "After roll forward";
 const varianceConfig = createWireCodec(varianceConfigSchema);
 const varianceConfigJson = (config: VarianceConfigWire) =>
   varianceConfig.stringify(config);
-/** A returned cell as a number; a missing cell or non-finite sentinel is NaN, which Rust rejects. */
+/** A returned cell as a number; a cell without a value is NaN, which Rust rejects. */
 function cell(result: StatementResult, nodeId: string, period: string) {
-  const value = result.nodes[nodeId]?.[period];
-  return typeof value === "number" ? value : Number.NaN;
+  const value = result.cells[nodeId]?.[period]?.value;
+  if (typeof value === "number") return value;
+  return value === undefined || value === null
+    ? Number.NaN
+    : Number(value.amount);
 }
 /** Toggle buttons over node ids; the selection keeps the offered order. */
 function NodeToggles({
@@ -101,7 +104,7 @@ export function RollForwardReview({
     );
     return {
       ids: Object.keys(model.nodes).filter(
-        (id) => id in before.nodes && id in after.nodes,
+        (id) => id in before.cells && id in after.cells,
       ),
       periods: model.periods.periods
         .filter((period) => period.is_actual && forecastBefore.has(period.id))

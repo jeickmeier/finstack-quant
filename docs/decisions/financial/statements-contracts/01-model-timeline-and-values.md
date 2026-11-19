@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full model timeline, explicit value and readiness contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited path can accept gaps, unresolved references and unguarded model construction.
+**Implementation status:** Reconciled (2026-11-16). `FinancialModelSpec::validate_semantics` is the one validation path for the builder, every loader and the evaluator. It requires a canonical contiguous plan (`PeriodPlan::validate_canonical`) with actuals as a prefix, checks each node kind against its permitted sources, validates node identifiers with the formula identifier rules, admits only finite observations, resolves every reference, rejects same-period cycles and requires a node or a capital-structure instrument. An absent observation evaluates as a missing cell (`CellSource::Missing`). The audited sections below describe revision `7e82fd03ad`.
 
-**Validation status:** Existing source and regression evidence mapped. Independent model-admission qualification remains pending.
+**Validation status:** Model-admission qualification, including the worked example, is in the [model regression tests](../../../../finstack-quant/statements/tests/finance_model_regressions.rs).
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 
@@ -48,4 +48,4 @@ The invalid/missing/undefined distinctions of [ADR 0009](../conventions/0009-mis
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

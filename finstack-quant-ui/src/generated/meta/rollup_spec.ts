@@ -24,13 +24,13 @@ export default [
     "path": "#/$defs/d_3fa8d82393fc10f6839b/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json#/$defs/RollupMethod/oneOf/0",
     "const": "sum",
-    "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing."
+    "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nMoney is summed exactly and scalars with a compensated sum. A source\ncell without a value leaves the target unavailable."
   },
   {
     "path": "#/$defs/d_3fa8d82393fc10f6839b/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json#/$defs/RollupMethod/oneOf/1",
     "const": "period_end",
-    "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA."
+    "description": "Copy the last source period's cell with its status: balances such as\ncash, debt and equity, and trailing metrics such as last-twelve-month\nEBITDA."
   },
   {
     "path": "#/$defs/d_3fa8d82393fc10f6839b/oneOf/2",
@@ -89,7 +89,7 @@ export default [
   {
     "path": "#/properties/methods",
     "source": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json#/properties/methods",
-    "description": "Rollup method per node id, overriding the node's own declaration. A\nnode not listed uses its declared [`NodeSpec::rollup`], and sums when\nit declares none.\n\n[`NodeSpec::rollup`]: crate::types::NodeSpec::rollup"
+    "description": "Rollup method per node id, overriding the node's own declaration. A\nnode not listed uses its declared [`NodeSpec::rollup`]; a node with\nneither fails the rollup.\n\n[`NodeSpec::rollup`]: crate::types::NodeSpec::rollup"
   },
   {
     "path": "#/properties/methods/additionalProperties",

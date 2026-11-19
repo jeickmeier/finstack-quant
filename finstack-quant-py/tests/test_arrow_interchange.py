@@ -81,10 +81,12 @@ def test_to_arrow_long_returns_arrow_table_with_stream_protocol() -> None:
     assert at.column_names() == [
         "node_id",
         "period_id",
+        "status",
         "value",
-        "value_money",
+        "amount",
         "currency",
         "value_type",
+        "reason",
         "source",
     ]
 
@@ -102,11 +104,11 @@ def test_pyarrow_values_match_pandas_export_exactly() -> None:
 
 
 def test_null_handling_for_scalar_nodes() -> None:
-    # Scalar (non-Money) nodes leave value_money/currency null in the long table.
+    # Scalar (non-Money) nodes leave amount/currency null in the long table.
     tbl = pa.table(_statement_result().to_arrow_long())
-    assert tbl.column("value_money").null_count == tbl.num_rows
+    assert tbl.column("amount").null_count == tbl.num_rows
     assert tbl.column("currency").null_count == tbl.num_rows
-    assert all(v is None for v in tbl.column("value_money").to_pylist())
+    assert all(v is None for v in tbl.column("amount").to_pylist())
 
 
 def test_polars_roundtrip_matches_values_exactly() -> None:
@@ -115,7 +117,7 @@ def test_polars_roundtrip_matches_values_exactly() -> None:
     df_pd = res.to_dataframe(orient="long")
     assert df_pl.get_column("value").to_list() == df_pd["value"].tolist()
     assert df_pl.get_column("node_id").to_list() == df_pd["node_id"].tolist()
-    assert df_pl.get_column("value_money").null_count() == df_pl.height
+    assert df_pl.get_column("amount").null_count() == df_pl.height
 
 
 def test_arrow_table_is_reusable_across_consumers() -> None:

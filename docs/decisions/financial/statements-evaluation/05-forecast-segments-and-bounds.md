@@ -1,6 +1,6 @@
 # STATEMENTS-EVALUATION-005 — Forecast segment anchoring, overrides and output bounds
 
-Decision status: **Accepted for the full forecast segment, anchoring and bounds contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full forecast segment, anchoring and bounds contract (2026-11-15)**. Implementation status: **Reconciled (2026-11-17)**. A node has one forecast suffix per evaluation run or simulation path: the model's forecast periods, generated once and advanced one step per slot whether or not the slot is masked or publishes an explicit value. A method that steps from a base uses the `start` level of its specification, else the visible published value of the slot immediately before the suffix; trend, seasonal and keyed-override methods use their own inputs. A forecast without a base is unavailable with reason `missing_forecast_base`, and an actual hidden by the cutoff is unavailable (`hidden_by_cutoff`) and is never forecast or used as a base. Bounds clip published outputs only; the raw series stays the state for later steps, and each clipped cell is recorded as a `forecast_clipped` warning carrying the raw and published values. Validation status: **Qualified** by an explicit value mid-suffix that leaves the growth recurrence, the seasonal phase and the stochastic draws unchanged, a start level and a preceding-slot base, a missing base giving a typed unavailable forecast, and clipping that does not feed the next step. The sections after the accepted decision describe the implementation audited before reconciliation. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
 ## Accepted decision for forecast segments, anchoring and output bounds
 
@@ -37,4 +37,4 @@ The audited dispatcher requires a base even when a method uses its own supplied 
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-evaluation-forecasts-and-reporting).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

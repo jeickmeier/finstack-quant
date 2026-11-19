@@ -158,6 +158,11 @@ pub fn standard_check_suite() -> CheckSuite {
         .add_check(CashReconciliation {
             cash_balance_node: NodeId::new("cash"),
             total_cash_flow_node: NodeId::new("total_cf"),
+            opening_balance: finstack_quant_statements::checks::DatedOpening {
+                date: time::macros::date!(2025 - 01 - 01),
+                value: AmountOrScalar::scalar(0.0),
+            },
+            adjustment_nodes: vec![],
             cfo_node: Some(NodeId::new("cfo")),
             cfi_node: Some(NodeId::new("cfi")),
             cff_node: Some(NodeId::new("cff")),
@@ -166,12 +171,16 @@ pub fn standard_check_suite() -> CheckSuite {
         .add_check(RetainedEarningsReconciliation {
             retained_earnings_node: NodeId::new("retained_earnings"),
             net_income_node: NodeId::new("net_income"),
+            opening_balance: finstack_quant_statements::checks::DatedOpening {
+                date: time::macros::date!(2025 - 01 - 01),
+                value: AmountOrScalar::scalar(0.0),
+            },
             dividends_node: Some(NodeId::new("dividends")),
             other_adjustments: vec![],
             tolerance: Some(1.0),
             dividends_sign_convention: Default::default(),
         })
-        .add_check(NonFiniteCheck { nodes: vec![] })
+        .add_check(NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() })
         .add_check(MissingValueCheck {
             required_nodes: vec![NodeId::new("cash"), NodeId::new("assets")],
             scope: PeriodScope::AllPeriods,
@@ -180,7 +189,7 @@ pub fn standard_check_suite() -> CheckSuite {
             positive_nodes: vec![NodeId::new("assets"), NodeId::new("cash")],
             negative_nodes: vec![],
         })
-        .build()
+        .build().expect("unique check ids")
 }
 
 /// `n_bonds` fixed-coupon bonds plus `cs.*` interest/principal/balance formulas.
@@ -200,15 +209,7 @@ pub fn bond_cs_model(n_bonds: usize, n_quarters: usize) -> FinancialModelSpec {
     for i in 0..n_bonds {
         let id = format!("BOND-{i:03}");
         builder
-            .add_bond(
-                &id,
-                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.05,
-                issue,
-                maturity,
-                "USD-OIS",
-            )
-            .unwrap()
+            .add_debt(&id, fixed_bond(&id, Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"), 0.05, issue, maturity, "USD-OIS"))
             .compute(format!("int_{i}"), format!("cs.interest_expense.{id}"))
             .unwrap()
             .compute(format!("prin_{i}"), format!("cs.principal_payment.{id}"))
@@ -282,13 +283,17 @@ pub fn waterfall_model(n_loans: usize, n_quarters: usize) -> FinancialModelSpec 
     builder
         .waterfall(WaterfallSpec {
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".to_string(),
-                taxes_node: Some("taxes".to_string()),
-                capex_node: Some("capex".to_string()),
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".to_string(),
+                deductions: vec![
+                    finstack_quant_statements::capital_structure::EcfTerm::Input { expression: "taxes".to_string() },
+                    finstack_quant_statements::capital_structure::EcfTerm::Input { expression: "capex".to_string() },
+                    finstack_quant_statements::capital_structure::EcfTerm::PaidCashInterest,
+                    finstack_quant_statements::capital_structure::EcfTerm::PaidFees,
+                    finstack_quant_statements::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: None,
+                facilities: finstack_quant_statements::capital_structure::FacilitySelection::AllEligible,
             }),
             priority_of_payments: vec![
                 PaymentPriority::Fees,
@@ -407,4 +412,29 @@ pub fn formula_family_model() -> FinancialModelSpec {
         model_builder.compute("lagged_roll", "lag(rolling_mean(revenue, 12), 1)").unwrap();
         model_builder.build().unwrap()
     }
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

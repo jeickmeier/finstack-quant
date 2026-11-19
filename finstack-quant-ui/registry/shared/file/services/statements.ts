@@ -80,6 +80,7 @@ export function createStatementsService(
               request.modelJson,
               request.marketJson,
               request.asOf,
+              "full_snapshot",
             );
           }
           return evaluator.evaluate(request.modelJson);

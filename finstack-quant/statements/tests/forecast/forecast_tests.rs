@@ -26,10 +26,7 @@ fn test_forward_fill_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::ForwardFill,
-                params: indexmap! {},
-            },
+            ForecastSpec::from_params(ForecastMethod::ForwardFill, indexmap! {}).unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -84,10 +81,11 @@ fn test_growth_pct_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -143,10 +141,7 @@ fn test_growth_pct_negative() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(-0.1) }, // -10% decline
-            },
+            ForecastSpec::growth(-0.1), // -10% decline
         );
         model_builder.build().unwrap()
     };
@@ -185,12 +180,13 @@ fn test_curve_pct_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::CurvePct,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::CurvePct,
+                indexmap! {
                     "curve".into() => serde_json::json!([0.05, 0.06, 0.05])
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -246,15 +242,16 @@ fn test_override_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Override,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Override,
+                indexmap! {
                     "overrides".into() => serde_json::json!({
                         "2025Q2": 120_000.0,
                         "2025Q4": 140_000.0,
                     })
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -315,10 +312,11 @@ fn test_forecast_with_formula_fallback() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.compute("cogs", "revenue * 0.6").unwrap();
         model_builder.build().unwrap()
@@ -368,10 +366,11 @@ fn test_multiple_periods_with_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.03) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.03) },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -446,10 +445,11 @@ fn test_forecast_pl_model() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.compute("cogs", "revenue * 0.6").unwrap();
         model_builder.value(
@@ -467,10 +467,7 @@ fn test_forecast_pl_model() {
         );
         model_builder.forecast(
             "opex",
-            ForecastSpec {
-                method: ForecastMethod::ForwardFill,
-                params: indexmap! {},
-            },
+            ForecastSpec::from_params(ForecastMethod::ForwardFill, indexmap! {}).unwrap(),
         );
         model_builder
             .compute("gross_profit", "revenue - cogs")
@@ -537,14 +534,15 @@ fn test_normal_forecast_deterministic() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Normal,
+                indexmap! {
                     "mean".into() => serde_json::json!(100_000.0),
                     "std_dev".into() => serde_json::json!(15_000.0),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -561,14 +559,15 @@ fn test_normal_forecast_deterministic() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Normal,
+                indexmap! {
                     "mean".into() => serde_json::json!(100_000.0),
                     "std_dev".into() => serde_json::json!(15_000.0),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -616,14 +615,15 @@ fn test_lognormal_forecast_always_positive() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::LogNormal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::LogNormal,
+                indexmap! {
                     "mean".into() => serde_json::json!(11.5),
                     "std_dev".into() => serde_json::json!(0.15),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -661,11 +661,13 @@ fn test_lognormal_forecast_always_positive() {
     );
 }
 
-/// As-of visibility: actual periods hidden by `as_of` must be treated as
-/// forecast periods (no hard error) and the forecast base must come from the
-/// last *visible* actual, never from hidden future actuals (no look-ahead).
+/// As-of visibility: an actual hidden by the cutoff is unavailable, not
+/// forecast (a forecast is eligible only in a forecast period), and it is not
+/// a forecast base either: the slot before the suffix has no visible value,
+/// so the forecast is unavailable with a reason. Nothing reads the hidden
+/// value.
 #[test]
-fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
+fn test_as_of_hidden_actual_is_unavailable_and_is_not_a_forecast_base() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use time::Month;
@@ -689,23 +691,46 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.10) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.10) },
+            )
+            .unwrap(),
         );
+        // Each observation is published on its period's exclusive end.
+        model_builder
+            .availability_dates(
+                "revenue",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        Date::from_calendar_date(2025, Month::April, 1).unwrap(),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        Date::from_calendar_date(2025, Month::July, 1).unwrap(),
+                    ),
+                ],
+            )
+            .unwrap();
+        model_builder.source_snapshot("original");
         model_builder.build().unwrap()
     };
 
-    // Q1's explicit value becomes visible at its exclusive period end; Q2
-    // remains hidden until its own period end.
+    // Q1 is published on the cutoff day; Q2 is published later and stays
+    // hidden.
     let as_of = Date::from_calendar_date(2025, Month::April, 1).unwrap();
     let mut evaluator = Evaluator::new();
     let results = evaluator
-        .evaluate_with_market(&model, &MarketContext::new(), as_of)
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(as_of),
+        )
         .expect("hidden actuals must resolve through the forecast, not hard-error");
 
-    // Q1 actual is visible at its default period-end availability date.
+    // Q1 is visible: its availability date is the cutoff day (inclusive).
     assert_eq!(
         results.get(
             "revenue",
@@ -714,29 +739,23 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
         Some(100_000.0)
     );
 
-    // Q2 (hidden actual) and Q3/Q4 are forecast from the visible Q1 base:
-    // 110k, 121k, 133.1k. Anchoring on the hidden 999k would leak look-ahead.
-    let q2 = results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
-        )
-        .unwrap();
-    let q3 = results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
-        )
-        .unwrap();
-    let q4 = results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
-        )
-        .unwrap();
-    assert!((q2 - 110_000.0).abs() < 1.0, "got q2={q2}");
-    assert!((q3 - 121_000.0).abs() < 1.0, "got q3={q3}");
-    assert!((q4 - 133_100.0).abs() < 1.0, "got q4={q4}");
+    use finstack_quant_statements::evaluator::UnavailableReason;
+    let reason = |quarter: u8| {
+        results
+            .get_cell(
+                "revenue",
+                &PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+            )
+            .expect("cell")
+            .reason
+    };
+    assert_eq!(reason(2), Some(UnavailableReason::HiddenByCutoff));
+    for quarter in [3, 4] {
+        assert_eq!(
+            reason(quarter),
+            Some(UnavailableReason::MissingForecastBase)
+        );
+    }
 }
 
 #[test]
@@ -763,27 +782,58 @@ fn test_explicit_availability_date_controls_actual_visibility() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.10) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.10) },
+            )
+            .unwrap(),
         );
         model_builder
-            .availability_dates("revenue", &[(q1_2025, release_date)])
+            .availability_dates(
+                "revenue",
+                &[
+                    (
+                        q4_2024,
+                        Date::from_calendar_date(2025, Month::January, 1).unwrap(),
+                    ),
+                    (q1_2025, release_date),
+                ],
+            )
             .unwrap();
+        model_builder.source_snapshot("original");
         model_builder.build().unwrap()
     };
 
     let before_release = Date::from_calendar_date(2025, Month::April, 1).unwrap();
     let mut evaluator = Evaluator::new();
     let hidden = evaluator
-        .evaluate_with_market(&model, &MarketContext::new(), before_release)
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            before_release,
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(before_release),
+        )
         .unwrap();
-    assert!((hidden.get("revenue", &q1_2025).unwrap() - 110.0).abs() < 1e-12);
+    // Before the release Q1 is hidden: it is unavailable, and it leaves the
+    // forecast that follows it without a base.
+    use finstack_quant_statements::evaluator::UnavailableReason;
+    assert_eq!(
+        hidden.get_cell("revenue", &q1_2025).unwrap().reason,
+        Some(UnavailableReason::HiddenByCutoff)
+    );
+    assert_eq!(
+        hidden.get_cell("revenue", &q2_2025).unwrap().reason,
+        Some(UnavailableReason::MissingForecastBase)
+    );
 
     let mut evaluator = Evaluator::new();
     let visible = evaluator
-        .evaluate_with_market(&model, &MarketContext::new(), release_date)
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            release_date,
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(release_date),
+        )
         .unwrap();
     assert_eq!(visible.get("revenue", &q1_2025), Some(999.0));
     assert!((visible.get("revenue", &q2_2025).unwrap() - 1_098.9).abs() < 1e-12);
@@ -806,14 +856,15 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
         );
         model_builder.forecast(
             "a",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Normal,
+                indexmap! {
                     "mean".into() => serde_json::json!(0.0),
                     "std_dev".into() => serde_json::json!(1_000.0),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.value(
             "b",
@@ -824,14 +875,15 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
         );
         model_builder.forecast(
             "b",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Normal,
+                indexmap! {
                     "mean".into() => serde_json::json!(0.0),
                     "std_dev".into() => serde_json::json!(1_000.0),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };

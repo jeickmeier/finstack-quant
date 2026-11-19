@@ -97,18 +97,28 @@ function warningEntry(warning: EvalWarning): WarningEntry {
       detail: String(value),
     };
   }
-  if ("non_finite_skipped" in warning) {
-    const {
-      node_id,
-      period,
-      count,
-      function: name,
-    } = warning.non_finite_skipped;
+  if ("forecast_clipped" in warning) {
+    const { node_id, period, raw, published } = warning.forecast_clipped;
     return {
       nodeId: node_id,
       period,
-      kind: "non_finite_skipped",
-      detail: `${count} dropped by ${name}`,
+      kind: "forecast_clipped",
+      detail: `${raw} published as ${published}`,
+    };
+  }
+  if ("gapped_sample" in warning) {
+    const {
+      node_id,
+      period,
+      function: name,
+      observations,
+      slots,
+    } = warning.gapped_sample;
+    return {
+      nodeId: node_id,
+      period,
+      kind: "gapped_sample",
+      detail: `${name} over ${observations} of ${slots} periods`,
     };
   }
   const { period, warning: cause } = warning.capital_structure;

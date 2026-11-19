@@ -710,7 +710,12 @@ fn test_evaluate_with_market_basic() {
 
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let results = evaluator
-        .evaluate_with_market(&model, &market_ctx, as_of)
+        .evaluate_with_market(
+            &model,
+            &market_ctx,
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
 
     assert_eq!(
@@ -746,7 +751,12 @@ fn test_evaluate_with_market_no_capital_structure() {
 
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let results = evaluator
-        .evaluate_with_market(&model, &market_ctx, as_of)
+        .evaluate_with_market(
+            &model,
+            &market_ctx,
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
 
     assert_eq!(
@@ -802,8 +812,7 @@ fn test_shift_function() {
                 "shifted",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
     assert!(
         results
@@ -811,8 +820,7 @@ fn test_shift_function() {
                 "shifted",
                 &PeriodId::quarter(2025, 2).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
     assert_eq!(
         results
@@ -907,10 +915,10 @@ fn test_ttm_function_supports_expression_arguments() {
         PeriodId::quarter(2024, 2).expect("valid period fixture"),
         PeriodId::quarter(2024, 3).expect("valid period fixture"),
     ] {
-        let value = results.get("ttm_gross_profit", &partial).unwrap();
+        let value = results.get("ttm_gross_profit", &partial);
         assert!(
-            value.is_nan(),
-            "partial TTM window at {partial} should be NaN under C18 guard, got {value}"
+            value.is_none(),
+            "partial TTM window at {partial} should be NaN under C18 guard, got {value:?}"
         );
     }
     assert_eq!(
@@ -1129,42 +1137,14 @@ fn test_shift_zero_periods() {
 }
 
 #[test]
-fn test_shift_negative_returns_nan() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q2", None).unwrap();
-        model_builder.value(
-            "revenue",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(110.0),
-                ),
-            ],
-        );
-        model_builder
-            .compute("future_shifted", "shift(revenue, -1)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    // Negative shift (forward-looking) should return NaN
-    assert!(
-        results
-            .get(
-                "future_shifted",
-                &PeriodId::quarter(2025, 1).expect("valid period fixture")
-            )
-            .unwrap()
-            .is_nan()
-    );
+fn test_shift_negative_literal_is_rejected_at_build() {
+    let mut model_builder = ModelBuilder::new("test");
+    model_builder.periods("2025Q1..2025Q2", None).unwrap();
+    model_builder.value_scalar("revenue", &[]);
+    let error = model_builder
+        .compute("future_shifted", "shift(revenue, -1)")
+        .expect_err("a negative literal shift reads a future period");
+    assert!(error.to_string().contains("future period"), "{error}");
 }
 
 #[test]
@@ -1342,7 +1322,6 @@ fn test_ewm_mean_function() {
         )
         .unwrap();
     assert!(ewm > 0.0);
-    assert!(!ewm.is_nan());
 }
 
 #[test]
@@ -1407,32 +1386,37 @@ fn test_cumulative_functions() {
 // Forecast Evaluation Error Paths
 
 #[test]
-fn test_forecast_error_no_actual_periods() {
+fn test_forecast_without_a_base_is_unavailable() {
     // All periods are forecast - should error
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder
             .periods("2025Q1..2025Q2", None) // No actuals_until
             .unwrap();
-        model_builder.value(
+        model_builder.value_scalar(
             "revenue",
             &[], // No values provided
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
 
-    let mut evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&model);
+    let result = Evaluator::new().evaluate(&model).unwrap();
 
-    // Should error due to missing base value
-    assert!(result.is_err());
+    // No start level and no preceding slot: the forecast has no base.
+    let period = *model.periods.last().map(|period| &period.id).unwrap();
+    let cell = result.get_cell("revenue", &period).unwrap();
+    assert_eq!(
+        cell.reason,
+        Some(finstack_quant_statements::evaluator::UnavailableReason::MissingForecastBase)
+    );
 }
 
 #[test]
@@ -1458,10 +1442,11 @@ fn test_forecast_error_all_actual_periods() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -1491,7 +1476,7 @@ fn test_forecast_error_all_actual_periods() {
 // Division by Zero and NaN Handling
 
 #[test]
-fn test_division_by_zero_produces_nan() {
+fn test_division_by_zero_is_an_error() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..2025Q1", None).unwrap();
@@ -1515,16 +1500,15 @@ fn test_division_by_zero_produces_nan() {
         model_builder.build().unwrap()
     };
 
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let result = results
-        .get(
-            "result",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
-    assert!(result.is_nan());
+    let error = Evaluator::new()
+        .evaluate(&model)
+        .expect_err("a division by zero fails the run");
+    let message = error.to_string();
+    assert!(message.contains("division by zero"), "{message}");
+    assert!(
+        message.contains("result") && message.contains("2025Q1"),
+        "{message}"
+    );
 }
 
 #[test]
@@ -1561,8 +1545,7 @@ fn test_pct_change_division_by_zero() {
                 "change",
                 &PeriodId::quarter(2025, 2).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 }
 
@@ -1629,26 +1612,13 @@ fn test_rolling_functions_edge_cases() {
 
 #[test]
 fn test_lag_negative_periods_error() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder.value(
-            "revenue",
-            &[(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                AmountOrScalar::scalar(100.0),
-            )],
-        );
-        model_builder
-            .compute("bad_lag", "lag(revenue, -1)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let eval_result = evaluator.evaluate(&model);
-
-    assert!(eval_result.is_err());
+    let mut model_builder = ModelBuilder::new("test");
+    model_builder.periods("2025Q1..2025Q1", None).unwrap();
+    model_builder.value_scalar("revenue", &[]);
+    let error = model_builder
+        .compute("bad_lag", "lag(revenue, -1)")
+        .expect_err("a negative literal lag reads a future period");
+    assert!(error.to_string().contains("future period"), "{error}");
 }
 
 #[test]
@@ -1800,8 +1770,7 @@ fn test_ewm_var_insufficient_data() {
                 "ewm_variance",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 }
 
@@ -1944,9 +1913,9 @@ fn test_timeseries_expression_args_return_nan_at_boundary() {
 
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-    assert!(results.get("lagged", &q1).unwrap().is_nan());
-    assert!(results.get("diffed", &q1).unwrap().is_nan());
-    assert!(results.get("pct", &q1).unwrap().is_nan());
+    assert!(results.get("lagged", &q1).is_none());
+    assert!(results.get("diffed", &q1).is_none());
+    assert!(results.get("pct", &q1).is_none());
     // Periods with available history behave normally.
     assert!((results.get("lagged", &q2).unwrap() - 100.0).abs() < 1e-12);
     assert!((results.get("diffed", &q2).unwrap() - 10.0).abs() < 1e-12);
@@ -1987,8 +1956,7 @@ fn test_growth_rate_negative_base_returns_nan() {
                 "g",
                 &PeriodId::quarter(2025, 2).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan(),
+            .is_none(),
         "growth_rate over a negative base must be NaN, not a sign-flipped rate"
     );
 }
@@ -2000,7 +1968,8 @@ fn test_pct_change_zero_periods_propagates_nan() {
     let model = {
         let mut model_builder = ModelBuilder::new("pct-zero");
         model_builder.periods("2025Q1..Q1", None).unwrap();
-        model_builder.compute("x", "0 / 0").unwrap();
+        model_builder.value_scalar("seed", &[]);
+        model_builder.compute("x", "lag(seed, 1)").unwrap();
         model_builder.compute("y", "pct_change(x, 0)").unwrap();
         model_builder.build().unwrap()
     };
@@ -2014,8 +1983,7 @@ fn test_pct_change_zero_periods_propagates_nan() {
                 "y",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 }
 

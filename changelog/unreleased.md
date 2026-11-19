@@ -839,3 +839,1040 @@ Wire changes. Each field below is now nullable; every value that exists is uncha
 
 - `FxSpot::new_t1` (use `FxSpot::new(..).with_settlement_days(1)`), `Ndf::effective_fixing_source` and `Ndf::with_quote_convention` (use the builder's `quote_convention`).
 - `InstrumentPricingOverrides::with_bk_sigma` and `with_bk_mean_reversion`; set `model_config.bk_sigma` / `model_config.bk_mean_reversion` directly.
+
+### Statements: formula grammar and runnable-model validation follow the accepted contracts
+
+Formulas (STATEMENTS-CONTRACTS-004): `cumsum`, `cumprod`, `cummin`,
+`cummax`, `std`, `var` and `median` take exactly one argument; a negative
+literal offset to `lag`, `shift`, `diff`, `pct_change` or `growth_rate` is
+rejected at compile time; an identifier needs nonempty dot-separated segments
+(`a..b` and `a.` are rejected); canonical rendering writes logical negation as
+`!`, so `parse_formula("not a > b")` returns `"!(a > b)"`; and `dsl::compile`
+validates a caller-built `StmtExpr` (finite literals, names, arity, 256 terms,
+320 levels) before lowering it.
+
+Models (STATEMENTS-CONTRACTS-001): a period plan must be canonical and
+contiguous, each period with the exact bounds of its identifier (core gains
+`PeriodPlan::validate_canonical`), so gapped plans, business-day grids and
+re-bounded periods are rejected. A node ID follows the formula identifier
+rules (no hyphens or spaces). A `value` node takes observations only and a
+`calculated` node needs a formula; attach a forecast to a `mixed` node.
+Observations must be finite: leave a missing cell out instead of storing NaN.
+Build and load now reject a formula that references an unknown node (it was a
+warning until evaluation) and a model with no node and no capital-structure
+instrument, so `with_builtin_metrics` needs every catalogue input defined.
+An absent observation on a `value` or `mixed` node evaluates as a missing
+cell (NaN) with the new cell source `missing`, where it was an evaluation
+error.
+
+### Statements: authoring, imports and point-in-time availability follow the accepted contract
+
+STATEMENTS-CONTRACTS-002. Node ids are unique: `value`, `value_money`,
+`value_scalar`, `compute`, `insert_node`, `mixed().build()` and imports reject
+a repeated id, a repeated period within one call, and a repeated availability
+date, where the last definition used to win. Change an existing node with the
+new `replace_node` / `remove_node` builder edits or the atomic
+`FinancialModelSpec::apply_edits` (Python `FinancialModelSpec.apply_edits`,
+WASM `statements.applyModelEdits`), which takes a batch of named `ModelEdit`s
+and commits all or none. `where_clause(node_id, clause)` names its target and
+validates the predicate; it no longer applies to the last touched node.
+
+Imports need a timeline: Rust `ModelBuilder::import_observations(columns,
+rows)` replaces `resolve_period_columns`, and Python `from_dataframe` no longer
+infers periods or takes `actuals_until`. Period labels are unique, may be in
+any order, and must belong to the timeline; a missing cell stays missing and a
+zero stays a known zero.
+
+Point-in-time evaluation is explicit: `evaluate_with_market(model, market,
+as_of, cutoff)` takes `ObservationCutoff::FullSnapshot` or `Through(date)`
+(Python and WASM: `"full_snapshot"` or a date as the fourth argument). `as_of`
+dates pricing only. A cutoff date needs the model's new `source_snapshot`
+identity and an availability date on every observation in an actual period;
+the default of "visible at the period's end" is removed. Statements analytics
+entry points (`evaluate_dcf`, the orchestrator, scenario sets) read the full
+snapshot.
+
+### Statements: every unit resolves before a model runs
+
+STATEMENTS-CONTRACTS-005. A model builds only when every node and formula
+resolves to `Scalar` or `Monetary(currency)`. A node with no observations and
+no declared `value_type` is rejected (declare it, for example with
+`value_scalar(id, [])`); so is a formula whose units nothing anchors. A
+declared unit must agree with inference. A corkscrew such as
+`lag(balance, 1) + flow` resolves from its flow. The variance of a monetary
+series (`var`, `rolling_var`, `ewm_var`) is rejected, where it used to leave
+the node's units unknown; use the standard deviation or a same-currency ratio.
+A formula that reads a `cs` reference with no resolved currency is the one
+case that may still carry unresolved units.
+
+### Statements: cells have distinct states; a masked cell is not zero
+
+STATEMENTS-EVALUATION-001. The evaluator tracks each cell as a value, a
+missing observation, a masked cell or an unavailable cell with a reason
+(`UnavailableReason`). A false `where` mask now leaves the cell without a
+value (status `masked`) where it was `0.0`,
+so downstream formulas no longer read a masked cell as zero. A mask that has
+no value leaves the cell unavailable. An observation hidden by the observation
+cutoff with no forecast or formula is unavailable instead of an evaluation
+error. A monetary formula or forecast result that cannot be represented as
+`Money` is an evaluation error naming the node and period; it was a warning.
+
+`lag(x, n)` / `shift(x, n)` drop the same-period dependency on `x` only for a
+positive integer literal `n`; a zero, non-integer or dynamic offset keeps it,
+which can surface a same-period cycle that was previously hidden.
+
+`evaluate_prepared` reuses a plan only for payload changes in existing
+observation slots. Adding or removing an observation slot, or changing an
+availability date, mask, forecast, formula, timeline or the capital structure,
+needs a new `prepare`. Sensitivity and goal seek re-prepare when a shock adds
+a slot.
+
+### Statements: results are typed cells; `nodes`, `monetary_nodes` and `node_sources` are gone
+
+STATEMENTS-EVALUATION-013. `StatementResult.cells` is the one result: for each
+node and each plan period a `ResultCell` with a `status` (`value`, `missing`,
+`masked`, `unavailable`), an exact `Money` amount or finite scalar `value`, a
+`reason` for an unavailable cell and the `source` that supplied it. The float
+map `nodes`, the parallel `monetary_nodes` and `node_sources` are removed, and
+the result JSON changes with them. A result can no longer hold `NaN` or an
+infinity. `get` returns a value only for a value cell; `get_cell` returns the
+typed cell (WASM `statementResultGetCell`). `get_or` substitutes its fallback
+only for a missing observation at a known node and period: an unknown node or
+period, a masked cell and an unavailable cell are errors.
+
+The long table has one row per node and plan period with columns `node_id`,
+`period_id`, `status`, `value`, `amount` (exact decimal text), `currency`,
+`value_type`, `reason` and `source`; `value_money` is gone. The wide table is
+a nullable float view over the full period index with each column's units in
+its metadata.
+
+`node_to_dated_schedule` (Python `to_dated_schedule`, WASM
+`nodeToDatedSchedule`) no longer takes the model and has no default anchor:
+pass `"start"` or `"end"`. It returns one dated typed cell per result period,
+gaps included. New `node_to_pricing_flows` (`to_pricing_flows`,
+`nodeToPricingFlows`) reads a monetary node for pricing from a
+`PricingFlowSelection`: expected currency, sign convention
+(`inflow_positive` or `outflow_magnitude`, negated once), required periods
+and anchor; any required period without an amount is an error.
+
+Each result carries `provenance`: model id and content hash, source snapshot,
+observation cutoff, valuation date and run id.
+
+### Statements: formulas are checked; division by zero and invalid math fail the run
+
+STATEMENTS-EVALUATION-002. Formulas evaluate on typed values: a finite scalar,
+exact money, a Boolean or an unavailable value.
+
+- **Errors, not `NaN`.** Division or remainder by zero, `ln` or `log10` of a
+  non-positive number, `sqrt` of a negative number, an overflow, mixed units
+  and mixed currencies are evaluation errors naming the node and period. They
+  used to give `NaN` and a warning. Guard a denominator that can be zero, for
+  example `if(sign(ebitda) > 0, debt / ebitda, 0)`.
+- **Unavailable propagates.** A missing, masked or unavailable operand makes
+  the result unavailable. `sum`, `mean`, `min` and `max` no longer skip it,
+  and the `non_finite_skipped` warning is removed. `coalesce` returns the
+  first available value, including zero, and does not recover an error.
+  `is_missing` is true only for an unavailable value.
+- **Three-valued logic.** `false and x` is false and `true or x` is true
+  even when `x` is unavailable, in either operand order; otherwise an
+  unavailable operand makes the result unavailable.
+- **Boolean controls.** `if`, `and`, `or`, `not` and `where` need a Boolean:
+  a comparison, a logical operator or `is_missing`. A number is rejected when
+  the model is built (`if(flag, a, b)` becomes `if(flag == 1, a, b)`; a
+  `where` clause of `0` becomes `1 == 0`). A Boolean is not a number:
+  `(a > b) * x` becomes `if(a > b, x, 0)`. A node whose formula is Boolean
+  is published as `1` or `0`.
+- **Exact comparisons.** `==` and `!=` compare the represented values; the
+  `1e-10` tolerance is gone. Same-currency money compares, adds, subtracts,
+  sums and averages as exact decimals.
+- **Rounding and clamp.** `round` of money needs its decimal places stated;
+  `floor`, `ceil` and one-argument `round` of money are rejected when the
+  model is built. The digits of `round` and the offset of `shift` must be
+  exact integers. `clamp` with a lower bound above its upper bound is an error.
+- **Annualization.** `annualize_rate` takes method `0` (simple) or `1`
+  (compound); any other value is an error, as is compounding a rate below
+  -100%. An annualization factor must be positive and finite.
+
+### Statements: offsets, changes, growth and reporting windows are exact and typed
+
+STATEMENTS-EVALUATION-003. `lag`, `shift`, `diff`, `pct_change` and the
+reporting windows read typed history, so money keeps its currency and exact
+amount (`lag(cash, 1) + cash` is exact).
+
+- **Offsets** must be exact non-negative integers. A fractional offset and a
+  future read (`shift` by a negative amount) are errors; a negative `shift`
+  used to give no value. A slot before the first period is unavailable.
+- **`pct_change`** is unavailable for an exactly zero base (reason
+  `undefined_base`); a base within `1e-10` of zero used to qualify.
+- **`growth_rate`** needs an exact positive lookback, a strictly positive
+  base and a non-negative ending value; outside that domain it is
+  unavailable (`undefined_base`). A zero ending value is -100%. Daily and
+  weekly plans measure years as Actual/365 Fixed, where they used
+  Actual/Actual.
+- **`ytd`, `qtd`, `fiscal_ytd`, `ttm`** sum only complete windows: a window
+  with a missing slot is unavailable, where `ytd`, `qtd` and `fiscal_ytd`
+  used to sum the values present. `qtd` follows the fiscal quarter on a
+  fiscal plan. `fiscal_ytd` is rejected on a fiscal plan; use `ytd`.
+
+### Statements: historical statistics run on calendar slots
+
+STATEMENTS-EVALUATION-004. Rolling, cumulative, full-history and
+exponentially weighted functions read the typed value of each calendar slot.
+
+- **Rolling windows** cover the last `window` calendar slots, where they used
+  the last `window` observations: a missing period now occupies a slot.
+  `min_periods` must be from 1 through the window (`0` is rejected).
+- **Cumulative functions** (`cumsum`, `cumprod`, `cummin`, `cummax`) need
+  every slot from the model start; a gap makes the result unavailable, where
+  it was skipped. Recover a gap explicitly, for example
+  `cumsum(coalesce(x, 0))`. A `cumprod` overflow is an error.
+- **Full-history statistics** (`std`, `var`, `median`) add a `gapped_sample`
+  warning with the sample and slot counts when periods are missing.
+- **`rank`** uses exact ties; the `1e-10` tie band is gone.
+- **Money** sums and means are exact, and `std`, `quantile`, `median` and
+  `ewm_mean` keep the currency.
+- **EWM** takes its correction toggle as a Boolean, `0` or `1`; any other
+  value is an error.
+
+### Statements: metric registration pins bindings; imports are atomic and reject conflicts
+
+STATEMENTS-CONTRACTS-006.
+
+- **Conflicts are rejected.** `add_metric_from_registry` and
+  `with_builtin_metrics` fail when a node with a metric's name (or a
+  dependency's) is already defined differently, and import nothing. A
+  pre-existing user node used to win silently. To override a metric, import
+  it and then call `replace_node`. A node that holds the same unchanged
+  template is shared.
+- **Bindings are pinned at registration.** An unqualified reference binds in
+  the metric's own namespace, an exact qualified reference (`other.metric`)
+  in any namespace, and anything else is a model input. A metric registered
+  later does not capture an earlier metric's reference.
+  `Registry.get_dependencies` now returns the closure across namespaces and
+  through historical references.
+- **Registration is atomic** for a document and for the whole built-in
+  catalogue: `load_builtins` adds nothing if any built-in identifier is
+  already registered.
+- **Names.** Namespaces follow the formula identifier grammar and `cs` is
+  reserved. A metric may share its name with a function (`mean`): references
+  are qualified in the parsed formula, not in its text.
+- `StoredMetric` gains `qualified_formula`, `dependencies` and
+  `requirements`.
+
+### Statements: bundled earnings use reported costs; margins need positive revenue
+
+STATEMENTS-CONTRACTS-007. **The bundled `fin.*` convention flips.** `cogs`
+and `opex` are now the reported costs, with their depreciation and
+amortization included; they used to exclude D&A. `depreciation` and
+`amortization` are the D&A included in those lines.
+
+| Metric | Was | Now |
+| --- | --- | --- |
+| `fin.operating_income` | `revenue - cogs - opex - depreciation - amortization` | `gross_profit - opex` |
+| `fin.ebit` | `ebitda - depreciation - amortization` | `operating_income` |
+| `fin.ebitda` | `revenue - cogs - opex` | `ebit + depreciation + amortization` |
+| `fin.ebt` | inlined chain | `ebit - interest_expense` |
+| `fin.net_income` | inlined chain | `ebt - tax_expense` |
+
+A model that feeds ex-D&A operating expenses must restate `opex` to include
+D&A, or define its own metrics in another namespace. `fin.roe`, `fin.roa`,
+`fin.roic` and `fin.roce` drop their separate D&A deductions for the same
+reason. `fin.ebitda` now needs `depreciation` and `amortization` inputs.
+
+The four margins and two cost ratios are `ratio(numerator, revenue)`: they are
+unavailable when revenue is zero or negative (`undefined_base`) or missing,
+where a zero revenue used to give no value or fail the run.
+
+New formula function `ratio(numerator, base)`: a decimal ratio over a strictly
+positive base in the same units, unavailable for a non-positive base. The
+reason `undefined_change` is renamed `undefined_base`.
+
+### Statements: one typed forecast specification; seeds are exact strings on the wire
+
+STATEMENTS-CONTRACTS-003. `ForecastSpec` is now a closed typed enum (a method
+with its typed parameters) and replaces the free-form parameter map.
+`ForecastParameters` is renamed `ForecastSpec`; `ForecastSpec::parameters()`
+and the public `method` / `params` fields are gone (`method()` and `params()`
+are accessors, `from_params` and `with_param` build checked specifications).
+The schema `forecast_parameters` is renamed `forecast_spec`.
+
+- **Rejected on read.** An unknown, duplicate, `null` or method-inapplicable
+  field fails when the document is read or the parameter is set, where it
+  used to fail when the forecast ran.
+- **No default choices.** `time_series` needs its `method`, `bootstrap` its
+  `mode`, and `fade_to_target` its `shape`. The constructors take them:
+  `ForecastSpec.time_series(history, "linear")`,
+  `ForecastSpec.bootstrap(history, "growth", seed)`,
+  `ForecastSpec.fade_to_target(target, "linear")`.
+- **Seeds are exact.** In JSON a seed is a canonical decimal string
+  (`"seed": "42"`); a JSON number is rejected, including an integer-valued
+  float. Rust and Python pass an integer. Only stochastic methods take one.
+- **Static checks at build and load**, even when observations cover every
+  forecast period: finite numbers, `min` not above `max`, non-negative
+  standard deviations, `half_life` only with the exponential fade, smoothing
+  factors only with the exponential trend, a moving-average `window`, a
+  growth curve with one rate per forecast period, override keys that are
+  periods of the model, and a correlation peer that is another stochastic
+  forecast node.
+
+### Statements: one forecast suffix per node, an explicit base and recorded clipping
+
+STATEMENTS-EVALUATION-005. A forecast is generated once per node and run over
+the model's forecast periods, one step per period.
+
+- **Base.** A method that steps from a level (`growth_pct`, `curve_pct`,
+  `fade_to_target`, `normal`, `log_normal`, `mean_reverting`, `bootstrap`)
+  takes an optional `start` level. Without it the base is the visible value
+  in the period just before the first forecast period. A forecast with
+  neither is unavailable with reason `missing_forecast_base`, where it used to
+  search further back or fail the run.
+- **Explicit values do not restart the forecast.** A value published in a
+  forecast period replaces that cell only; later cells follow the same
+  recurrence, seasonal phase and draws. A model whose periods are all
+  forecast periods needs `start`, since an explicit value in a forecast
+  period is no longer a base.
+- **Hidden actuals.** An actual hidden by the observation cutoff is
+  unavailable (`hidden_by_cutoff`); it is not forecast, and the forecast that
+  follows it has no base.
+- **Bounds.** `min` / `max` clip the published value only, for every method;
+  later steps build on the unclipped level. Each clipped cell adds a
+  `forecast_clipped` warning with the raw and published values.
+
+### Statements: signed growth, keyed override carry and exact fade targets
+
+STATEMENTS-EVALUATION-006.
+
+- **Override keys are canonical.** An `override` forecast key must be the
+  canonical text of its period (`"2025M02"`, not `"2025m2"`); another
+  spelling is rejected when the model is built.
+- **Override without a base.** Slots before the first key carry the base
+  when there is one and are otherwise unavailable (`missing_forecast_base`);
+  the run no longer fails.
+- **Fades.** Linear and geometric fades return the exact target in the final
+  period. The geometric fade interpolates log magnitudes, so extreme
+  endpoints no longer overflow. A geometric fade to zero, a `start` across
+  zero from the target and an exponential fade without `half_life` are
+  rejected when the model is built.
+- **Growth.** Rates below -100% flip the sign of the level, as before; the
+  log advisories about negative bases and large rates are removed.
+
+### Statements: stochastic forecasts on versioned random streams
+
+STATEMENTS-EVALUATION-007. **Every seeded forecast value changes**: normal,
+log-normal, mean-reverting and bootstrap forecasts, single-run and Monte
+Carlo, now draw from a stream derived from a versioned key (the seed, the
+node, the evaluation mode, and the run seed and path on a Monte Carlo path).
+Re-pin any stored stochastic numbers.
+
+- **Replay.** A single run records `provenance.forecast_streams`: per
+  stochastic node the `seed`, `stream_version` and the PCG64 `state` and
+  `stream` (decimal strings), enough to replay its draws.
+- **Log-normal.** The step is taken in log space with no exponent clipping.
+  A level that is not finite and strictly positive is an error (it used to be
+  clipped, or underflow to an absorbing zero); a positive subnormal is valid.
+  A `start` level must be strictly positive.
+- **Bootstrap.** Index draws are unbiased. Growth mode needs strictly positive
+  history, `start` and base; fewer than two history levels fail at build.
+- **Zero volatility.** A zero `std_dev` is the deterministic transition and
+  consumes no draws.
+- **Mean reversion.** `reversion_speed` outside `(0, 1]` fails at build.
+
+### Statements: correlated forecasts need Monte Carlo and no longer depend on node order
+
+STATEMENTS-EVALUATION-008.
+
+- **Breaking: ordinary runs.** `Evaluator.evaluate` on a model with a non-zero
+  forecast `correlation` now fails with an error naming Monte Carlo; it used
+  to ignore the correlation. Use `evaluate_monte_carlo`, or set the
+  coefficient to zero.
+- **Order.** A correlated node no longer needs its peer declared or evaluated
+  first; the helper formula that forced the order (`peer * 0 + ...`) is not
+  needed.
+- **Build checks.** A non-zero correlation needs a positive `std_dev` on both
+  nodes, and peer cycles are rejected.
+- **Exact cases.** A zero coefficient is an uncorrelated node (same draws);
+  `1` copies and `-1` negates the peer shock exactly.
+- New unavailable reason `missing_peer_shock`.
+
+### Statements: trend forecasts check their parameters at build
+
+STATEMENTS-EVALUATION-009.
+
+- **Rejected at build.** An exponential trend without `alpha` and `beta`, a
+  smoothing factor of exactly 1 (the range is the open interval), a history
+  of fewer than two observations and a moving-average `window` longer than
+  the history now fail when the model is built; they used to fail when the
+  forecast ran, and a smoothing factor of 1 passed the build.
+- **Numerics.** The linear trend is fitted on centered and scaled
+  coordinates with compensated sums, so a small slope at a large level is
+  kept; moving-average windows of extreme finite levels no longer overflow.
+  Ordinary results change only in the last digits.
+
+### Statements: seasonal forecasts state their multiplicative domain
+
+STATEMENTS-EVALUATION-010.
+
+- **Rejected at build.** A seasonal history shorter than two complete
+  seasons, and multiplicative `growth` at or below -1, fail when the model is
+  built.
+- **Multiplicative mode.** The trend must be non-zero with one sign and every
+  observation must share it or be exactly zero. A wholly negative series is
+  now accepted; an observation against the trend's sign is rejected, where
+  it used to produce a negative factor.
+- **Edges.** Edge trend slopes are used as computed; slopes below 1e-10 were
+  snapped to zero. The log advisory comparing the history with the node's
+  last actual is removed.
+
+### Statements: bond and swap construction helpers removed
+
+STATEMENTS-CAPITAL-001. **Breaking.** `ModelBuilder.add_bond`,
+`add_bond_with_convention`, `add_swap` and `add_swap_with_conventions`
+(`addBond`, `addBondWithConvention`, `addSwap`, `addSwapWithConventions` in
+WASM) are removed, with the `BondConventionParams`, `SwapParams` and
+`SwapConventions` types and their schemas. Build the instrument through its
+own Valuations API and attach it:
+
+```python
+bond = Bond.fixed("SENIOR", Money(1_000_000.0, usd), 0.05, issue, maturity, "short_front", "USD-OIS")
+builder.add_debt("SENIOR", bond)
+swap = InterestRateSwap.from_conventions({...})
+builder.add_debt("IRS", swap)
+```
+
+`Bond.fixed` uses the same US corporate conventions `add_bond` did.
+`InterestRateSwap.from_conventions` takes its conventions from the named
+index, which may differ from the fixed semi-annual 30/360 against quarterly
+ACT/360 legs `add_swap` used; author the legs explicitly where they matter.
+
+### Statements: capital cash is classified by name and sign; distress cash is reported
+
+STATEMENTS-CAPITAL-002.
+
+- **Distress cash.** Recoveries, accrual paid on default and protection
+  payments are reported in `cs_cashflows.distress_cash`: per period, each row
+  has its instrument, payment date, kind and the company's signed amount.
+  They are outside debt service, totals and the waterfall. They used to be
+  dropped with a `cashflow_ignored` warning, which is removed.
+- **Rejected instead of ignored or absolute-valued.** A cashflow kind with no
+  capital-structure classification (margin, collateral, unknown) fails the
+  run. A fee or repayment row that is a company receipt fails instead of
+  being counted as a claim. An empty or reversed reporting period fails
+  before a schedule is read. A zero opening balance in another currency than
+  the schedule's fails.
+- **Inflation coupons** are netted with the other coupons; they used to be
+  ignored.
+- **PIK** is its signed principal effect, so a correction reduces the
+  capitalized total.
+- **Rust.** `calculate_period_flows` takes a supplied schedule as
+  `SuppliedSchedule { schedule, perspective }`
+  (`SuppliedSchedule::holder(&schedule)` for the canonical form).
+
+### Statements checks: exact by default, four outcomes, verified results
+
+STATEMENTS-CONTRACTS-014. **Breaking.**
+
+- **Tolerance.** `CheckConfig` defaults are `default_tolerance = 0` and
+  `default_relative_tolerance = 0` (they were `0.01` and `1e-9`): an identity
+  must hold exactly unless a tolerance is stated. State one where floating
+  point noise matters, for example
+  `CheckConfig(default_tolerance=0.01, default_relative_tolerance=1e-9)`.
+- **Outcomes.** `CheckResult.passed` is replaced by `outcome` (`pass`,
+  `fail`, `incomplete`, `unevaluated`) and `evaluated`; `CheckReport` gains
+  `outcome`, and its summary `incomplete` and `unevaluated`. A check that
+  lacked required data is incomplete, and an empty suite or a check with
+  nothing to examine is unevaluated; neither is a pass. Python
+  `CheckReport.passed` is true only for the outcome `pass`, and
+  `to_dataframe()` has `outcome` and `evaluated` in place of `passed`.
+- **Filters.** `min_severity` and `materiality_threshold` hide advisory
+  findings only. Error-severity findings, coverage findings (new
+  `CheckFinding.coverage`) and comparisons are always reported.
+- **Identifiers.** A suite with two checks of one identifier is rejected.
+  `CheckSuiteBuilder::build`, `CheckSuite::merge` and the analytics suite
+  factories return `Result`; a merge needs equal configurations.
+  `TrendCheck` has a required `id`, and the credit suite's non-finite check
+  is `credit_inputs_non_finite`.
+- **Supplied results.** Results passed to a check run must be an evaluated
+  run of the same model; hand-built or stale results are rejected. Rust
+  `CheckSuite::run_model` takes the requested observation cutoff.
+
+### Statements checks: accounting identities reconcile every period from explicit openings
+
+STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
+
+- **Openings.** `cash_reconciliation` and `retained_earnings_reconciliation`
+  need `opening_balance: {"date", "value"}` dated at the first period start,
+  and reconcile every period including the first (they used to start in the
+  second). `ThreeStatementMapping` takes `opening_cash` and
+  `opening_retained_earnings`; without them the suite leaves that
+  roll-forward out.
+- **Cash adjustments.** `cash_reconciliation.adjustment_nodes` lists signed
+  FX and cash-scope adjustments.
+- **Rejected as configuration errors.** An unknown node, an account listed
+  twice or in two groups, only one or two of CFO/CFI/CFF, and a negative
+  dividend magnitude (select `inflow_positive` for signed dividends). These
+  used to warn and skip.
+- **Incomplete, not skipped.** A period with a missing input is a coverage
+  finding naming the nodes, and the check is `incomplete`.
+- **Arithmetic.** Money is summed exactly and scalars with compensated sums;
+  references have no floor. A sum that cannot be represented is an error
+  instead of a failed finding.
+
+### Statements capital: fee rebates, repayment refunds and funding amounts
+
+- A fee row or repayment row that is a company receipt is reported as a
+  receipt: `fee_rebates` and `repayment_refunds` on the cashflow breakdown.
+  Such a row used to fail the evaluation (STATEMENTS-CAPITAL-002).
+- The breakdown of a borrowing reports `funding_proceeds`, the signed company
+  cash of funding settled in the period, apart from `funding_principal`, the
+  principal that funding established.
+- All four are selectable as `cs.<component>.<scope>` and appear in the
+  capital long tables.
+
+### Statements capital: dated sweeps with arrears, PIK notice periods
+
+- `EcfSweepSpec.payment_lag_days` (optional) makes the measured sweep a dated
+  obligation due that many days after the close of the measured period. It
+  is paid in the period that contains its due date, oldest first, and what
+  cannot be paid is carried as arrears. `PrepaymentOutcome` gains `carried`:
+  the part of `unpaid` carried forward (zero without a lag, as before)
+  (STATEMENTS-CAPITAL-007).
+- `PikElectionSpec.notice_days` (default 0): an election takes effect at the
+  first coupon period starting at least that many days after the close of
+  the period that observed the metric (STATEMENTS-CAPITAL-008).
+
+### Statements capital: contractual PIK toggles count in the forecast exercise
+
+- A PIK toggle recorded on a term loan (`covenants.pik_toggles`) that is in
+  force when the forecast begins is PIK in force for the modeled exercise: a
+  metric at or above the threshold ends it at the next coupon period, after
+  the election's minimum number of coupon periods counted from the toggle's
+  date. The exercise used to read only its own elections, so such a loan
+  stayed PIK (STATEMENTS-CAPITAL-008).
+
+### Loans: scheduled principal after a posting
+
+- A revolving credit's contractual repayment dated after a principal posting
+  repays what is left of the drawn balance; it used to fail the rebuild when
+  a sweep had left less than the scheduled repayment.
+- A term loan's amortization is capped at the principal outstanding
+  including capitalized interest, in exact decimal arithmetic. On a loan
+  that capitalizes interest a capped amortization used to stop at the funded
+  balance and leave the capitalized interest to maturity.
+
+### Statements capital: exact table amounts, typed host lookup
+
+- `CapitalStructureCashflows::to_table` and `to_totals_table` (Python
+  `to_dataframe` / `to_totals_dataframe`) report each amount twice: `value`,
+  its float view, and `amount`, the exact amount as decimal text. `amount`
+  used to be the float (STATEMENTS-CAPITAL-009).
+- Python `CapitalStructureCashflows.get_money(component, scope, period_id)`
+  and WASM `capitalStructureCashflowsGetMoney` return a component as exact
+  money, the typed twin of `get_component`.
+
+### Statements checks: typed comparisons, coverage in the analytics checks
+
+Breaking, with no compatibility path (STATEMENTS-CONTRACTS-014).
+
+- `CheckComparison` records `actual`, `expected`, `difference` and
+  `tolerance` as typed values: a number for a scalar, `{amount, currency}`
+  for money. `difference` is a recorded field (the exact residual), not a
+  method, and the verdict is judged on the exact values.
+  `CheckComparison::from_floats` builds one from float views in one unit.
+- `Materiality.relative_pct` is optional: absent when the percentage is
+  undefined (a zero reference) or does not apply. It used to be `0.0`.
+- Python `CheckReport.to_dataframe()` gains `comparison_currency` and
+  `to_comparisons_dataframe()` gains `currency`; their value columns stay
+  float views.
+- The statements-analytics checks (leverage, coverage, liquidity, FCF sign,
+  trend, growth, tax rate, working capital, capex, depreciation, dividends,
+  interest) report a configured input without a value as a coverage finding
+  and are incomplete; they used to skip the period and could pass. An
+  optional component node that is configured but has no value is a gap too
+  (it was read as zero). `checks::coverage_finding` is public.
+
+### Statements: checks on rolled-up results, `bigint` seeds
+
+- A check suite runs against a rollup at its target periods:
+  `CheckSuite::run_rolled(model, rolled)`, and `run_model` (the entry point
+  behind Python and WASM `run_checks`) when the supplied results are a
+  rollup. The rollup must come from a verified run of the model
+  (STATEMENTS-EVALUATION-014). Checks iterate the period plan of the results
+  they are given (`CheckContext::periods`).
+- WASM Statements inputs accept a JavaScript `bigint` for a seed in a plain
+  object; it is read as the seed's decimal wire text
+  (STATEMENTS-CONTRACTS-003).
+
+### Statements: located load diagnostics, typed waterfall inputs, `numeric_series`
+
+Breaking, with no compatibility path.
+
+- A model that decodes but is not runnable now fails on load with a located
+  diagnostic: `ContractError::Report` whose code is `statements/<failure>`
+  and whose pointer is the offending node, period plan or capital-structure
+  field (STATEMENTS-CONTRACTS-016). Python raises `ContractValidationError`
+  for it (a `ValueError`; a dependency cycle used to raise `RuntimeError`),
+  and WASM throws `ContractValidationError` with kind `validation`.
+- The message of every contract report error now ends with its first error
+  diagnostic's text: `validation failed with 1 error(s): <message>`.
+- Waterfall inputs (the cash pool, prepayment amounts, ECF terms, the PIK
+  metric) are evaluated as typed values. Money keeps its exact amount and
+  must be in the waterfall currency; an input in another currency, a
+  condition, or an input with no value is an error naming the expression.
+- Python `StatementResult.get_node` is renamed `numeric_series` and WASM
+  `statementResultGetNode` is renamed `statementResultNumericSeries`,
+  matching the Rust accessor they wrap.
+- `EvaluationContext::get_cs_value`, a float reader of a capital reference,
+  is removed; capital references are typed.
+- Monetary rounding in formulas keeps its one mode, midpoint ties away from
+  zero (owner resolution; STATEMENTS-EVALUATION-002).
+
+### Statements: fixes from the branch review
+
+- A run's provenance records the content identity of the validated model, so
+  a hand-built model whose value types were not yet inferred keeps a run that
+  verifies against it (rollups and supplied-results checks rejected it).
+- `lag`, `diff` and the other history functions over a consolidated
+  `cs.<component>.total` are unavailable for a period whose close FX quote is
+  missing, as the same-period read is; the evaluation used to fail.
+- A formula check rejects a reference to an unknown node inside `lag` or
+  `shift` when it is built; it used to report every period incomplete.
+- `MonteCarloResults.breach_probability` refuses a restored result whose path
+  count is zero or above 4,294,967,295.
+- The P&L summary, the credit assessment and the variance and scenario
+  comparison tables treat a cell without a value as a gap or as missing data;
+  they showed `NaN`.
+- A principal posting may repay interest a term loan has capitalized; it was
+  refused as exceeding the funded principal.
+- An excess-cash-flow sweep request is rounded to the currency's minor unit
+  (half away from zero) before it is paid; it used to be truncated.
+- `CapitalStructureCashflows.periods()` lists every period an instrument has,
+  including one that could not be consolidated.
+- WASM `applyScenario` reports a model that fails to load as a
+  `ContractValidationError` with its `report`, as every other entry point does.
+
+### Statements models: one bounded loading path, identity after validation, decimal-string seeds
+
+Breaking, with no compatibility path (STATEMENTS-CONTRACTS-016).
+
+- `FinancialModelSpec::from_json` is now the bounded loader every host uses:
+  at most 64 MiB and 96 levels of nesting, no repeated key, no unknown field,
+  and `schema_version` as the integer `1`. It returns `ContractError`
+  (it returned the statements `Error`), and `from_slice_strict` returns the
+  model alone (it returned a pair with an empty report).
+  `FinancialModelSpec::from_value` is removed.
+- A decode failure is a contract diagnostic with a code and, where one exists,
+  a JSON pointer: Python raises `ContractValidationError` (a `ValueError`)
+  with `report`, and `ContractLimitExceededError` for an oversized or
+  over-nested input; WASM throws `ContractValidationError` with `code` and
+  `report`. A model that decodes but is not runnable still raises by kind
+  (`ValueError`, `KeyError`, `RuntimeError`; `kind` in WASM), now through the
+  core error, so its message gains the core prefix.
+- A document that repeats a key inside a map (for example two entries for one
+  node) is rejected; the last entry used to win silently.
+- `FinancialModelSpec.content_hash` validates the model first and hashes the
+  validated model. A model that is not runnable has no hash (it used to hash),
+  and a hand-built model whose value types were not yet inferred now hashes
+  the same as its validated form.
+- `MonteCarloConfig.seed` is a canonical decimal string in JSON (`"42"`), as
+  forecast seeds and the result seed already were; the number `42` is
+  rejected. The Python constructor still takes an `int`.
+- `GoalSeekResult::from_json` parses under the same limits, rejects repeated
+  keys and validates its embedded model, which must carry `schema_version: 1`.
+- The published `financial_model_spec` schema example is a runnable model with
+  a value node and a formula node.
+
+### Statements Monte Carlo: explicit metrics, one entry point with the evaluation context, typed samples
+
+Breaking, with no compatibility path (STATEMENTS-EVALUATION-011).
+
+- `MonteCarloConfig` requires `metrics`: the node identifiers to report, at
+  least one, each a node of the model, none repeated. Only these are sampled
+  and stored (every node was). `MonteCarloConfig::new(n_paths, seed, metrics)`
+  in Rust; `MonteCarloConfig(n_paths, seed, metrics, percentiles=None,
+  include_path_data=False)` in Python.
+- `n_paths` must be 1 to 4,294,967,295, and paths x metrics x forecast periods
+  may not exceed 100,000,000 samples. Both are checked before a path runs.
+- Requested percentiles must be distinct; a repeated level is an error (it was
+  dropped).
+- `Evaluator::evaluate_monte_carlo(model, config, context)` takes an optional
+  market, valuation date and observation cutoff, the context of
+  `evaluate_with_market`. A model with floating-rate debt can now be
+  simulated. Python: `evaluate_monte_carlo(model, config, market=None,
+  as_of=None, observation_cutoff=None)`; WASM: `evaluateMonteCarlo(model,
+  config, market?, asOf?, observationCutoff?)`.
+- A requested sample without a value no longer fails the run. The run is
+  incomplete: `percentile_results` is empty and `incomplete` names the first
+  such sample, its reason and the count. A value that is not finite is still
+  an error.
+- `MonteCarloResults` gains `incomplete`, `seed` (a decimal string in JSON),
+  `stream_version` and `metrics`; each `PercentileSeries` gains `value_type` and `sample_count`.
+- `percentile_by_period` matches the probability level exactly (it matched
+  within 1e-12).
+- `breach_probability(metric, threshold)` takes a typed threshold: a number
+  for a scalar metric, money in the metric's currency for a monetary one. A
+  threshold in other units or not finite is an error, as is a restored path
+  table without exactly one finite sample per path and forecast period. In
+  Rust it returns `Result<Option<f64>>`.
+
+### Statements capital: a period's debt state commits once, and the PIK metric is a traced input
+
+Breaking, with no compatibility path (STATEMENTS-EVALUATION-012).
+
+- `pik_toggle.liquidity_metric` may not depend on a same-period `cs` output,
+  directly or through other nodes; the run is rejected before it starts, like
+  the cash pool and the prepayment sizing inputs. Read a prior period with
+  `lag(...)` and state the first period's fallback (for example
+  `coalesce(lag(cs.debt_balance.total, 1), 0)`).
+- A period now works on a staged copy of the debt state. The ledger, the
+  coupon elections and the rebuilt schedules replace the committed state only
+  after the formulas that read final capital amounts have evaluated, so a
+  period that fails leaves the state of the last committed period.
+
+### Statements metrics: bundled leverage and coverage use `ratio`, complete windows and due-date service
+
+Breaking, with no compatibility path (STATEMENTS-CONTRACTS-008).
+
+- The six `fin_leverage` metrics divide with `ratio`: a missing input and a
+  zero or negative denominator are unavailable, where an exactly zero
+  denominator failed the run and a negative one produced a negative multiple.
+  Zero debt is a valid zero; a negative EBITDA still gives signed coverage over
+  a positive denominator.
+- `fin.debt_service_coverage` is
+  `ratio(ttm(ebitda), ttm(scheduled_cash_interest_due + scheduled_principal_due))`.
+  It no longer reads `interest_expense` or `principal_payment`: supply the two
+  new inputs, the scheduled cash interest and scheduled principal recognized
+  once on their contractual due dates.
+- New capital components `cs.scheduled_cash_interest_due.<scope>` and
+  `cs.scheduled_principal_due.<scope>` report those amounts from each
+  borrowing's contractual schedule: a missed installment is recognized on its
+  due date, and arrears settlements, prepayments, sweeps, PIK, fees and hedge
+  flows are excluded. `CashflowBreakdown` gains the two fields.
+- The bundled descriptions and the metrics README no longer state leverage or
+  coverage thresholds.
+
+### Statements capital: typed `cs` selectors, three reporting scopes and period-close FX with provenance
+
+Breaking, with no compatibility path (STATEMENTS-CAPITAL-009,
+STATEMENTS-CONTRACTS-004, STATEMENTS-CONTRACTS-005).
+
+- A capital reference has three exact scopes: `cs.<component>.<instrument_id>`
+  (the instrument's native currency), `cs.<component>.total.<CCY>` (the total
+  of the instruments in one native currency, new) and `cs.<component>.total`
+  (the consolidated total in the reporting currency). `total` is reserved and
+  cannot be an instrument id.
+- New components: `net_interest_expense_cash`, `scheduled_principal`,
+  `mandatory_prepayment`, `voluntary_prepayment`, `sweep_prepayment` and
+  `opening_balance`.
+- An unknown component or a malformed scope fails when the formula is parsed.
+  An unknown instrument, a native currency no instrument uses, a consolidated
+  total with instruments in more than one currency and no reporting currency,
+  and any `cs` reference in a model without a capital structure fail when the
+  model is built (they failed at evaluation, or resolved to an unknown unit).
+- A `cs` reference evaluates to exact money in the scope's currency.
+- `capital_structure.fx_policy` accepts only `period_end`; `cashflow_date` is
+  removed. A model whose instruments differ from its reporting currency must
+  set it: there is no default.
+- Each native total converts at one rate read on the inclusive period-close
+  date. `CapitalStructureCashflows.fx_conversions` records the pair, rate,
+  date and source per period.
+- A missing quote or FX matrix no longer fails the run. The period's
+  consolidated total is unavailable (`consolidation_unavailable` gives the
+  reason), a formula reading it gets an unavailable cell with the new reason
+  `missing_fx_quote`, and per-instrument and native-currency values stay.
+- `CapitalStructureCashflows::set_period` replaces a period as a whole, clears
+  rows the replacement omits, returns an error for a conflicting reporting
+  currency and keeps periods in chronological order.
+- Rust: `CsComponent`, `CsScope`, `FxConversionRecord`,
+  `CapitalStructureCashflows::get_money` and `types::CapitalFxPolicy`;
+  `StmtExpr::CsRef` holds `{component, scope}`; `ModelBuilder::fx_policy`
+  takes `CapitalFxPolicy`.
+- Python: `CapitalStructureCashflows.fx_conversions` and
+  `consolidation_unavailable`; `get_component` accepts the new scopes and
+  components.
+
+### Statements capital: PIK is elected per loan and applied by the loan's coupon terms
+
+Breaking, with no compatibility path (STATEMENTS-CAPITAL-008).
+
+- `PikToggleSpec` is `{liquidity_metric, threshold, elections}`.
+  `target_instrument_ids` and `min_periods_in_pik` are removed. Each election
+  is `{instrument_id, pik_fraction, min_coupon_periods}`: `pik_fraction` is the
+  share of each elected coupon that capitalizes, an exact decimal in `(0, 1]`,
+  and `min_coupon_periods` (default 0) counts the loan's coupon periods, not
+  reporting periods.
+- An election may name only a term loan of the capital structure (it could
+  name a revolver or a bond). The threshold must be finite.
+- A request takes effect at the start of the loan's next coupon period after
+  the period that observes the metric. The waterfall no longer moves the
+  coupon due in the current period into PIK or capitalizes at the period
+  close: the elected share is zero cash and capitalizes once on the coupon
+  date, through the loan's own coupon terms.
+- Overdue cash interest is never transferred into PIK. It stays a cash claim
+  and is carried as arrears.
+- The toggle is not exercised in actual periods; record a historical election
+  on the loan (`covenants.pik_toggles`).
+- A request made when no coupon period is left, including after a full payoff,
+  elects nothing (in the maturity period it failed the run since the previous
+  entry).
+- Python: `PikToggleSpec` takes keyword-only `liquidity_metric`, `threshold`
+  and `elections`; the `elections` property replaces `target_instrument_ids`
+  and `min_periods_in_pik`.
+- Rust: `loan_terms::CouponElection` and `TermLoan::coupon_period_starts` in
+  `finstack-quant-valuations-fixed-income`;
+  `TermLoan::cashflow_schedule_with_postings` takes the elections.
+
+### Statements capital: coupons are rebuilt by the instrument after a principal change
+
+Breaking, with no compatibility path (STATEMENTS-CAPITAL-005).
+
+- After a waterfall prepayment or a toggled PIK coupon, the term loan or
+  revolver recompiles its own schedule from its terms and the dated principal
+  changes. Statements no longer infers a coupon rate from schedule rows.
+  Coupons, the contractual cash/PIK split, balance-based fees, later
+  amortization and the terminal repayment all follow the dated principal.
+- A change posted at a period close earns from the following day. Interest
+  earned before a change inside a coupon is kept whole in `cs.accrued_interest`.
+- Revolver commitment and usage fees now respond to a sweep (they were left on
+  the original balance), and a swept revolver keeps its commitment and terms
+  for a contractual redraw.
+- The debt ledger and the rebuilt schedules commit together. A period fails,
+  changing nothing, when a schedule cannot be rebuilt or does not carry the
+  ledger's closing balance.
+- `pik_toggle.target_instrument_ids` may name only term loans and revolvers;
+  a bond target is rejected when the model is validated. A revolver rejects a
+  principal change on or before its balance anchor (the later of the valuation
+  date and the commitment date). A coupon toggled to PIK in the period in which
+  its loan matures fails that period (it was capitalized after maturity).
+- The ledger and schedule agreement bounds are half of the currency's minor
+  unit (they were 0.005 in every currency).
+- Rust: `loan_terms::PrincipalPosting`, `TermLoan::cashflow_schedule_with_postings`
+  and `RevolvingCredit::cashflow_schedule_with_postings` in
+  `finstack-quant-valuations-fixed-income`. A revolver emits one interest row
+  per stretch between postings inside a coupon period.
+
+### Statements capital: prepayments elect their facilities; the sweep formula is authored term by term
+
+Breaking, with no compatibility path (STATEMENTS-CAPITAL-007).
+
+- `WaterfallSpec.mandatory_prepay_node` and `voluntary_prepay_node` are
+  replaced by `mandatory_prepayment` and `voluntary_prepayment`, each
+  `{"amount": <formula>, "facilities": ...}`. `facilities` is required:
+  `"all_eligible"` or `{"named": ["TL-A", ...]}`.
+- `EcfSweepSpec` is `{cash_measure, deductions, credits, sweep_percentage,
+  facilities}`. `ebitda_node`, `taxes_node`, `capex_node`,
+  `working_capital_node`, `cash_interest_node` and `target_instrument_id` are
+  removed. A deduction or credit is `{"type": "input", "expression": ...}`,
+  `{"type": "paid_cash_interest"}`, `{"type": "paid_fees"}` or
+  `{"type": "paid_scheduled_principal"}`; the paid terms are the cash earlier
+  priorities actually paid this period. Nothing is deducted unless listed, so
+  a sweep that relied on the automatic interest, fee and scheduled-principal
+  deductions must now list them.
+- ECF is exact money in the waterfall currency:
+  `cash_measure - deductions + credits`. The percentage applies to positive
+  ECF; a non-positive ECF requests nothing.
+- A negative mandatory or voluntary request is an error (it was floored to
+  zero). A sizing expression that reads a same-period `cs` output is rejected
+  when the run starts.
+- A named facility must be a debt instrument of the capital structure. A term
+  loan with a call schedule cannot be elected by any prepayment: the waterfall
+  repays at par and does not price the call premium or make-whole.
+- Each rung reports its requested, paid and unpaid amounts:
+  `CapitalStructureCashflows.prepayments` maps a period to its
+  `PrepaymentOutcome` list. Python gains `CapitalStructureCashflows.prepayments`
+  and `retained_cash`; `EcfSweepSpec` takes its fields as
+  keyword-only arguments and the `WaterfallSpec` prepayment arguments take the
+  wire mappings.
+
+### Statements capital: waterfall allocation is exact; residual cash is equity or retained
+
+STATEMENTS-CAPITAL-006. **Breaking.**
+
+- **Whole minor units.** When a class's cash does not cover its claims, each
+  pro-rata quota is floored to the currency's minor unit and the units left
+  over go to the largest fractional remainders, ties by instrument id. Five
+  cents across three two-cent claims pay 2, 2 and 1. Allocation used
+  floating-point shares with the rounding residue on the last row.
+- **Every unpaid amount is carried.** The `1e-6` materiality threshold on
+  interest, fee and principal shortfalls is removed.
+- **Negative claims are rejected.** A negative fee or interest claim fails
+  the period. The `negative_claim_neutralized` warning and
+  `CapitalStructureClaimCategory` are removed.
+- **Retained cash.** The residual is an equity distribution only when
+  `Equity` is the terminal priority. Otherwise it is
+  `CapitalStructureCashflows.retained_cash` (Python `retained_cash`), and
+  `equity_distribution` is zero. It used to go to equity either way.
+- **Cash pool independence is transitive.** `available_cash_node` may not
+  reach any same-period `cs` component through the formulas and masks of the
+  nodes it names; the error names the chain. Only four components were
+  checked, and only in the pool's own text.
+- **Debt-free periods run.** With no debt claims the whole pool is residual,
+  in the model's capital currency.
+- **Exact conservation.** A period whose uses do not equal its available
+  cash exactly fails.
+
+### Statements capital: principal follows effective dates; unpaid principal is arrears
+
+STATEMENTS-CAPITAL-004. **Breaking.**
+
+- **`debt_balance` is economic principal.** A scheduled reduction takes
+  effect on its contractual date whether or not its cash was paid. Unpaid
+  scheduled principal no longer stays in the balance and no longer rebuilds
+  interest on it; it is `principal_arrears`.
+- **Three new amounts** on `CashflowBreakdown`, as `cs.<component>` and as
+  rows of `flows`: `principal_pending` (cash owed for a reduction already
+  effective and not yet due), `principal_arrears` (cash due and unpaid) and
+  `principal_advance_reserve` (face paid for whose reduction is still to
+  come, excluded from prepayment capacity).
+- **A sweep cannot prepay scheduled principal.** Principal a scheduled
+  reduction removes in the period is not prepayable, so a sweep ordered ahead
+  of amortization goes to other debt.
+- **Dated claims are required.** A waterfall fails for an instrument without
+  dated principal claims; the aggregate same-period fallback is removed.
+  Claims must equal the contractual principal cash exactly, and scheduled
+  principal beyond the balance is rejected instead of clamped.
+
+### Statements capital: the ledger must agree with its schedule; arrears are separate from accrued interest
+
+STATEMENTS-CAPITAL-003. **Breaking.**
+
+- **No rescaling.** `calculate_period_flows` fails when the opening balance
+  it is given disagrees with the principal the dated schedule carries into
+  the period, naming the instrument, period, currency and both amounts. It
+  used to scale the period's coupons, fees and capitalization by the ratio
+  and warn. `scheduled_opening_principal(schedule, period_start)` returns the
+  agreeing opening. The `residual_scale_mismatch` warning is removed from
+  `CapitalStructureWarning`.
+- **One balance clock.** Every debt balance closes on the dated schedule:
+  newly issued and redrawn debt moves on balance-effective dates, as carried
+  debt does. A schedule whose opening notional and funding row both hold the
+  same principal now reports their sum.
+- **Contractual accrual.** `accrued_interest` is calculated from the
+  instrument's own earning terms
+  (`Instrument::contractual_accrual_config`), so ACT/ACT ISMA debt accrues
+  instead of failing. An instrument that states no terms cannot be accrued.
+- **Arrears.** Cash interest due and unpaid is `interest_arrears`
+  (`cs.interest_arrears.<instrument or total>`, and a row of
+  `CashflowBreakdown::flows`). It is no longer added to `accrued_interest`.
+
+### Statements metrics: bundled returns use average balances and explicit ROIC inputs
+
+STATEMENTS-CONTRACTS-009. **Breaking.**
+
+- **Average balances.** `fin.roe`, `fin.roa`, `fin.roce` and `fin.roic`
+  divide same-period earnings by the average of the opening balance (the
+  prior period's close) and the closing balance. They used the period-end
+  balance. The first period of a model is unavailable.
+- **Shared earnings.** ROE and ROA read `fin.net_income` (after
+  `tax_expense`); ROCE and ROIC read `fin.ebit`. The `taxes` input is no
+  longer read.
+- **ROIC inputs.** `fin.roic` is `(ebit - operating_tax) / average
+  operating_invested_capital`. A model that loads it supplies
+  `operating_tax` (signed; a credit is negative) and
+  `operating_invested_capital`; it no longer reads `total_debt +
+  total_equity`.
+- **Unavailable, not an error.** A zero or negative average balance or a
+  missing input leaves the return unavailable; a loss stays negative.
+
+### Statements normalization: an ordered bridge to a new adjusted node
+
+STATEMENTS-EVALUATION-015. **Breaking.**
+
+- **`output_node` is required** on `NormalizationConfig`
+  (`NormalizationConfig::new(target, output)`, Python
+  `NormalizationConfig(target_node, output_node)`). The adjusted metric is
+  published under that new id; the reported node is never overwritten.
+- **`merge_into_results(results, config)`** calculates the bridge and
+  publishes it. It no longer takes result rows and a node id, rejects any id
+  the result already holds, needs a source run, keeps the check report and
+  records the configuration in `StatementResult.normalizations`.
+- **Typed amounts.** A fixed amount is a scalar for a scalar target and money
+  in its currency for a monetary one (`{"amount": "5", "currency": "USD"}`;
+  Python accepts `Money`). Bridge values (`base_value`, `raw_amount`,
+  `capped_amount`, `adjusted_value`, `final_value`) are typed the same way on
+  the wire; the Python accessors return floats.
+- **Caps are one of two forms**: `{"type": "absolute", "amount": ...}` or
+  `{"type": "reference", "base_node": ..., "fraction": ..., "base_mode":
+  ...}`. The `{base_node, value}` form is removed. Rust:
+  `AdjustmentCap::Absolute` / `AdjustmentCap::Reference` and
+  `Adjustment::with_cap(cap)`; Python `Adjustment.with_cap(cap)` takes the
+  mapping and `Adjustment.cap` replaces `cap_base_node`, `cap_value` and
+  `cap_base_mode`. Rows record `cap_base` and `cap_limit`.
+- **Validated before calculation.** Unknown references, nodes without recorded
+  units, unit or currency mismatches, fixed amounts keyed outside the result's
+  periods, non-finite numbers and negative caps are rejected up front.
+- **Unavailable, not an error.** A target, percentage reference or cap base
+  without a value leaves the period `unavailable` with its reason
+  (`base_value` and `final_value` may be absent). A row whose arithmetic
+  cannot be represented is an error and nothing is published.
+- **Rollup.** A result holding a published adjusted node cannot be rolled
+  up; normalize the rolled result.
+
+### Statements rollup: every line needs a method and results are typed
+
+STATEMENTS-EVALUATION-014. **Breaking.**
+
+- **No automatic sum.** A line rolls up by its `RollupSpec.methods` entry or
+  else its declared `NodeSpec.rollup`; a line with neither fails the rollup,
+  naming every such line. Declare `sum` on flows. The bundled flow metrics
+  (`fin.gross_profit`, `fin.ebitda` and the rest of `fin_basic`) now declare
+  it.
+- **Verified source.** `StatementResult::rollup` accepts only a result that
+  is a run of the given model (content, source snapshot, period plan and run
+  identity); a hand-built result or another model's result is rejected.
+- **`sum`.** Money is summed exactly and scalars with a Neumaier compensated
+  sum, which the formula functions `sum()` and `mean()` now use too (they
+  used Kahan summation). A
+  source cell that is missing, masked or unavailable leaves the target
+  `unavailable` (it used to be absent); a sum that cannot be represented is
+  an error (it used to be dropped).
+- **`period_end`.** The final source cell is copied with its status.
+- **`formula`.** The mask and formula are re-evaluated on typed cells: a
+  false mask is a `masked` cell (it used to be `0`), and an input without a
+  value leaves the result `unavailable` instead of failing the rollup.
+- **Provenance.** A rolled result has `rollup_provenance` (source run,
+  frequency, the method used for each node, the source periods of each
+  target) and no run `provenance`. Python: `StatementResult.rollup_provenance`.
+
+### Statements checks: formula checks state their mode and scope
+
+STATEMENTS-CONTRACTS-015. **Breaking.**
+
+- **`mode` and `scope` are required** on every `FormulaCheckSpec`
+  (`"mode": "predicate" | "residual"`, `"scope": "all_periods" |
+  "actuals_only" | "forecast_only"`). The mode is no longer inferred from the
+  tolerance.
+- **A predicate is Boolean.** `revenue > 0`, not `revenue`; a numeric
+  predicate, a Boolean residual (`a == b` with a tolerance: write `a - b`) and
+  a tolerance on a predicate are rejected. A residual without a tolerance is
+  an exact comparison with zero.
+- **`eligibility`.** An optional Boolean formula; a period in which it is
+  false is out of scope.
+- **Lazy evaluation.** `coalesce(a, b)` uses `b` when `a` has no value and an
+  untaken `if` branch does not read its inputs; the check no longer skips a
+  period because some referenced cell is missing.
+- **Incomplete, not a warning.** A period whose formula or eligibility
+  condition needed an observation without a value is a coverage finding and
+  the check is `incomplete`. A reference to a node the model does not have is
+  an error.
+- **Python.** `FormulaCheckSpec(spec)` takes the canonical fields as one
+  mapping and has `mode`, `scope` and `eligibility` properties; the positional
+  constructor is removed.
+
+### Statements checks: data-quality coverage and validity are separate
+
+STATEMENTS-CONTRACTS-013. **Breaking.**
+
+- **`non_finite` needs a selection.** `nodes` is required: `"all"` or a list
+  of node ids (`{"type": "non_finite", "nodes": "all"}`). The empty list no
+  longer means all nodes. Rust: `NodeSelection::all()` /
+  `NodeSelection::named(..)`.
+- **Unavailable is not invalid.** `non_finite` fails only on a NaN or
+  infinity in a value cell. A missing or unavailable cell is coverage:
+  require it with `missing_value`.
+- **`missing_value`.** A missing required observation is a coverage finding
+  and the check is `incomplete`, in actual and forecast periods alike (it
+  used to be an error in actuals and a warning in forecasts). An empty scope
+  is `unevaluated`.
+- **Configuration errors.** Unknown or duplicate node ids in any of the three
+  checks, overlapping sign groups, and a result cell outside the model's
+  periods.

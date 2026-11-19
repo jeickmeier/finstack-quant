@@ -47,6 +47,35 @@ export default [
     "description": "Missing values, NaN/Inf, sign conventions"
   },
   {
+    "path": "#/$defs/d_3644af53ded616741924",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome",
+    "description": "Verdict of a check, or of a whole report, decided from every outcome\nbefore any reporting filter is applied."
+  },
+  {
+    "path": "#/$defs/d_3644af53ded616741924/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome/oneOf/0",
+    "const": "pass",
+    "description": "Work was evaluated, required coverage was complete and nothing failed."
+  },
+  {
+    "path": "#/$defs/d_3644af53ded616741924/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome/oneOf/1",
+    "const": "fail",
+    "description": "At least one error-severity finding."
+  },
+  {
+    "path": "#/$defs/d_3644af53ded616741924/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome/oneOf/2",
+    "const": "incomplete",
+    "description": "Nothing failed, but required data was missing or unavailable for at\nleast one period or cell."
+  },
+  {
+    "path": "#/$defs/d_3644af53ded616741924/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome/oneOf/3",
+    "const": "unevaluated",
+    "description": "Nothing was evaluated: an empty suite, or a check with no applicable\nperiod or cell."
+  },
+  {
     "path": "#/$defs/d_5df3315c25302264a1a6",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/DecimalWire",
     "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
@@ -77,7 +106,7 @@ export default [
   {
     "path": "#/$defs/d_60e7f94bf13dea34e179/properties/relative_pct",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/Materiality/properties/relative_pct",
-    "description": "Discrepancy as a percentage of the reference value.",
+    "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
     "format": "double"
   },
   {
@@ -86,9 +115,16 @@ export default [
     "description": "Full report aggregating all [`CheckResult`]s from a check run."
   },
   {
+    "path": "#/$defs/d_69ed1d0fd3aee296bce5/properties/outcome",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckReport/properties/outcome",
+    "description": "Verdict of the suite from the unfiltered check outcomes: `fail` when\nany check failed, else `incomplete` when any check is incomplete,\nelse `pass` when at least one check passed, else `unevaluated` (an\nempty suite, or one with no applicable check).",
+    "ref": "#/$defs/CheckOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome"
+  },
+  {
     "path": "#/$defs/d_69ed1d0fd3aee296bce5/properties/results",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckReport/properties/results",
-    "description": "Individual results for each check."
+    "description": "Individual results for each check, in declared order."
   },
   {
     "path": "#/$defs/d_69ed1d0fd3aee296bce5/properties/results/items",
@@ -1075,6 +1111,24 @@ export default [
     "description": "Naira (566)"
   },
   {
+    "path": "#/$defs/d_897cb2f33ded7ef3d8c5",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar",
+    "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+  },
+  {
+    "path": "#/$defs/d_897cb2f33ded7ef3d8c5/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar/anyOf/0",
+    "description": "Currency-aware amount",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_897cb2f33ded7ef3d8c5/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar/anyOf/1",
+    "description": "Unitless scalar (ratio, percentage, count, etc.)",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_8cf6a34771f30e7523cf",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary",
     "description": "Aggregate counts for a completed check run."
@@ -1089,7 +1143,14 @@ export default [
   {
     "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/failed",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/failed",
-    "description": "Number of checks that failed (at least one error-severity finding).",
+    "description": "Number of checks whose outcome is `fail` (an error-severity finding).",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/incomplete",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/incomplete",
+    "description": "Number of checks whose outcome is `incomplete` (a coverage finding).",
     "format": "uint",
     "minimum": 0
   },
@@ -1103,7 +1164,7 @@ export default [
   {
     "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/passed",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/passed",
-    "description": "Number of checks that passed.",
+    "description": "Number of checks whose outcome is `pass`.",
     "format": "uint",
     "minimum": 0
   },
@@ -1111,6 +1172,13 @@ export default [
     "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/total_checks",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/total_checks",
     "description": "Total number of checks executed.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/unevaluated",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/unevaluated",
+    "description": "Number of checks whose outcome is `unevaluated` (nothing examined).",
     "format": "uint",
     "minimum": 0
   },
@@ -1155,9 +1223,16 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison"
   },
   {
+    "path": "#/$defs/d_a64e478bd80b60331435/properties/evaluated",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckResult/properties/evaluated",
+    "description": "Number of periods or cells the check examined.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_a64e478bd80b60331435/properties/findings",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckResult/properties/findings",
-    "description": "Individual findings produced by the check."
+    "description": "Findings produced by the check. The suite's `min_severity` and\n`materiality_threshold` filters remove advisory findings only: an\nerror-severity or coverage finding is always retained."
   },
   {
     "path": "#/$defs/d_a64e478bd80b60331435/properties/findings/items",
@@ -1166,9 +1241,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckFinding"
   },
   {
-    "path": "#/$defs/d_a64e478bd80b60331435/properties/passed",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckResult/properties/passed",
-    "description": "Whether the check passed (no error-severity findings)."
+    "path": "#/$defs/d_a64e478bd80b60331435/properties/outcome",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckResult/properties/outcome",
+    "description": "Verdict of the check, decided from all of its findings before the\nsuite's reporting filters: `fail` on an error-severity finding, else\n`incomplete` on a coverage finding, else `unevaluated` when\n`evaluated` is zero, else `pass`.",
+    "ref": "#/$defs/CheckOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome"
   },
   {
     "path": "#/$defs/d_ab7ac1a2678059460e09",
@@ -1194,6 +1271,11 @@ export default [
   {
     "path": "#/$defs/d_ab7ac1a2678059460e09/properties/comparison/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckFinding/properties/comparison/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_ab7ac1a2678059460e09/properties/coverage",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckFinding/properties/coverage",
+    "description": "True for a coverage finding: required data was missing or unavailable,\nso the check could not evaluate the period or cell it names. A\ncoverage finding makes its check incomplete and is never removed by\nthe reporting filters."
   },
   {
     "path": "#/$defs/d_ab7ac1a2678059460e09/properties/materiality",
@@ -1264,19 +1346,28 @@ export default [
   {
     "path": "#/$defs/d_e423eb660d927a5db922",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison",
-    "description": "The two numbers a check compared, and the tolerance it allowed.\n\nRecorded for every numeric comparison a check performs — whether it passed\nor failed — so the verdict can be reconstructed from exported data:\nthe comparison fails exactly when `|actual - expected| > tolerance`.\n\n`actual`, `expected` and `tolerance` are all in the units of the compared\nnodes (currency units for monetary nodes, the same units as\n[`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not\na fraction or percentage."
+    "description": "The two values a check compared, their difference and the tolerance it\nallowed.\n\nRecorded for every numeric comparison a check performs, whether it passed\nor failed, so the verdict can be reconstructed from exported data: the\ncomparison fails exactly when `|difference| > tolerance`.\n\nEvery value is typed in the units of the compared nodes: exact money in\ntheir currency, or a scalar. `difference` is the one exact residual the\ncheck computed (an exact sum for money), not a difference of the two\nrecorded sides; `tolerance` is an absolute amount in the same units."
   },
   {
     "path": "#/$defs/d_e423eb660d927a5db922/properties/actual",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison/properties/actual",
     "description": "Observed (left-hand) value, in the compared nodes' units.",
-    "format": "double"
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_e423eb660d927a5db922/properties/difference",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison/properties/difference",
+    "description": "Signed residual `actual - expected`, in the same units.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_e423eb660d927a5db922/properties/expected",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison/properties/expected",
     "description": "Value the identity requires (right-hand side), in the same units.",
-    "format": "double"
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_e423eb660d927a5db922/properties/identity",
@@ -1291,8 +1382,9 @@ export default [
   {
     "path": "#/$defs/d_e423eb660d927a5db922/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison/properties/tolerance",
-    "description": "Absolute tolerance applied to `|actual - expected|`, in the same units.\nThis is the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
-    "format": "double"
+    "description": "Absolute tolerance applied to `|difference|`, in the same units. This\nis the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_f0101272ae2f9a75933d",

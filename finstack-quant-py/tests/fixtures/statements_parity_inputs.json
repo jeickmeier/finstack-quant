@@ -53,7 +53,7 @@
     "builtin_checks": [
       {
         "type": "non_finite",
-        "nodes": []
+        "nodes": "all"
       }
     ],
     "formula_checks": [
@@ -62,6 +62,8 @@
         "name": "Revenue above 110",
         "category": "internal_consistency",
         "severity": "error",
+        "mode": "predicate",
+        "scope": "all_periods",
         "formula": "revenue > 110",
         "message_template": "Revenue too small in {period}",
         "tolerance": null
@@ -70,6 +72,7 @@
   },
   "normalization_config": {
     "target_node": "profit",
+    "output_node": "adjusted_profit",
     "adjustments": [
       {
         "id": "one_off",
@@ -674,6 +677,32 @@
             "currency": "USD"
           }
         }
+      },
+      "equity": {
+        "node_id": "equity",
+        "node_type": "value",
+        "values": {
+          "2025Q1": {
+            "amount": "-200",
+            "currency": "USD"
+          },
+          "2025Q2": {
+            "amount": "-200",
+            "currency": "USD"
+          },
+          "2025Q3": {
+            "amount": "-200",
+            "currency": "USD"
+          },
+          "2025Q4": {
+            "amount": "-200",
+            "currency": "USD"
+          },
+          "2026Q1": {
+            "amount": "-80",
+            "currency": "USD"
+          }
+        }
       }
     }
   },
@@ -701,10 +730,10 @@
         "net_debt"
       ],
       "equity_nodes": [
-        "ebitda"
+        "equity"
       ],
       "cash_node": "net_debt",
-      "retained_earnings_node": "ebitda",
+      "retained_earnings_node": "equity",
       "net_income_node": "ebitda"
     },
     "credit": {
@@ -802,6 +831,7 @@
     "nodes": {
       "revenue": {
         "node_id": "revenue",
+        "rollup": "sum",
         "node_type": "value",
         "tags": [
           "income_statement"
@@ -829,6 +859,7 @@
       },
       "debt_draws": {
         "node_id": "debt_draws",
+        "rollup": "sum",
         "node_type": "value",
         "tags": [
           "debt"
@@ -842,6 +873,7 @@
       },
       "ebitda": {
         "node_id": "ebitda",
+        "rollup": "sum",
         "node_type": "calculated",
         "tags": [
           "income_statement"
@@ -859,6 +891,7 @@
       },
       "score": {
         "node_id": "score",
+        "rollup": "sum",
         "node_type": "calculated",
         "tags": [
           "metric"
@@ -1417,5 +1450,141 @@
       "ev_ebitda",
       "pe"
     ]
+  },
+  "stochastic_model": {
+    "id": "stochastic",
+    "periods": {
+      "calendar": "gregorian",
+      "periods": [
+        {
+          "id": "2025Q1",
+          "start": "2025-01-01",
+          "end": "2025-04-01",
+          "is_actual": true
+        },
+        {
+          "id": "2025Q2",
+          "start": "2025-04-01",
+          "end": "2025-07-01",
+          "is_actual": false
+        },
+        {
+          "id": "2025Q3",
+          "start": "2025-07-01",
+          "end": "2025-10-01",
+          "is_actual": false
+        },
+        {
+          "id": "2025Q4",
+          "start": "2025-10-01",
+          "end": "2026-01-01",
+          "is_actual": false
+        }
+      ]
+    },
+    "nodes": {
+      "normal": {
+        "node_id": "normal",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "normal",
+          "params": {
+            "mean": 1.5,
+            "seed": "9007199254740993",
+            "std_dev": 3.0
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "log_normal": {
+        "node_id": "log_normal",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "log_normal",
+          "params": {
+            "mean": 0.02,
+            "seed": "7",
+            "std_dev": 0.2
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "mean_reverting": {
+        "node_id": "mean_reverting",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "mean_reverting",
+          "params": {
+            "long_run_mean": 80.0,
+            "reversion_speed": 0.4,
+            "seed": "11",
+            "std_dev": 2.0
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "bootstrap_growth": {
+        "node_id": "bootstrap_growth",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "bootstrap",
+          "params": {
+            "historical": [
+              100.0,
+              110.0,
+              99.0,
+              104.0
+            ],
+            "mode": "growth",
+            "seed": "13"
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "bootstrap_diff": {
+        "node_id": "bootstrap_diff",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "bootstrap",
+          "params": {
+            "historical": [
+              100.0,
+              110.0,
+              99.0,
+              104.0
+            ],
+            "mode": "diff",
+            "seed": "13"
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      }
+    },
+    "schema_version": 1
   }
 }

@@ -14,17 +14,20 @@
 pub mod builtins;
 mod formula;
 pub(crate) mod helpers;
+pub(crate) mod identity;
 mod suite;
 mod traits;
 pub(crate) mod types;
 
 pub use helpers::{get_finite_node_value, sum_nodes};
+pub use identity::{DatedOpening, coverage_finding};
 
 pub use suite::{
-    BuiltinCheckSpec, CheckSuite, CheckSuiteBuilder, CheckSuiteSpec, FormulaCheckSpec,
+    BuiltinCheckSpec, CheckSuite, CheckSuiteBuilder, CheckSuiteSpec, FormulaCheckMode,
+    FormulaCheckSpec,
 };
 pub use traits::{Check, CheckContext};
 pub use types::{
-    CheckCategory, CheckComparison, CheckConfig, CheckFinding, CheckReport, CheckResult,
-    CheckSummary, Materiality, PeriodScope, Severity, SignConventionPolicy,
+    CheckCategory, CheckComparison, CheckConfig, CheckFinding, CheckOutcome, CheckReport,
+    CheckResult, CheckSummary, Materiality, PeriodScope, Severity, SignConventionPolicy,
 };

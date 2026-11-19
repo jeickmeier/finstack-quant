@@ -498,9 +498,13 @@ test('namespace results match their published result types', () => {
     scenarios.computeHorizonReturn(DEPOSIT, OIS_MARKET, AS_OF, hold),
   ]);
 
-  // statements: the evaluator keeps the JSON sentinel strings.
+  // statements: a cell without a value states its status and reason.
   const results = new statements.Evaluator().evaluate(LAG_MODEL);
-  assert.equal(results.nodes.lagged['2025Q1'], 'nan');
+  assert.deepEqual(results.cells.lagged['2025Q1'], {
+    status: 'unavailable',
+    reason: 'missing_input',
+    source: 'formula',
+  });
   declarations.push(['statement_result', 'fq.StatementResult', results]);
 
   // statements_analytics: flat results restore non-finite values as numbers.

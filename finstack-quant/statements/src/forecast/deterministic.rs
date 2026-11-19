@@ -30,14 +30,16 @@ pub(super) fn forward_fill(
 
 /// Growth percentage: apply a constant compound growth rate each period.
 ///
-/// The recurrence relation is `v[t] = v[t-1] * (1 + rate)`, where `rate`
-/// represents the fractional growth between consecutive periods.
+/// The signed recurrence is `v[t] = v[t-1] * (1 + rate)`, applied once per
+/// period. A rate of -100% gives zero, and a lower rate flips the sign of a
+/// non-zero level.
 ///
 /// # Arguments
 ///
 /// * `base_value` - Value compounded from
 /// * `forecast_periods` - Periods that require projected values
-/// * `rate` - Growth rate per period as a decimal (e.g., 0.05 for 5% growth)
+/// * `rate` - Finite growth rate per model period as a decimal (e.g., 0.05
+///   for 5% growth); any sign and magnitude
 pub(super) fn growth_pct(
     base_value: f64,
     forecast_periods: &[PeriodId],
@@ -47,27 +49,6 @@ pub(super) fn growth_pct(
         return Err(Error::forecast(
             "GrowthPct forecast requires finite base_value and rate",
         ));
-    }
-
-    // Warn on extreme growth rates (>100% per period)
-    if rate.abs() > 1.0 {
-        tracing::warn!(
-            "Growth rate {:.2}% exceeds 100% per period - verify this is intentional",
-            rate * 100.0
-        );
-    }
-
-    // Multiplicative growth on a negative base compounds the loss and can
-    // never change sign: "grow 5%" on -100 forecasts -105, -110.25, ...
-    // That is almost always a misconfiguration (the statistical methods
-    // reject negative bases outright), so surface it.
-    if base_value < 0.0 {
-        tracing::warn!(
-            base_value,
-            rate,
-            "GrowthPct forecast on a negative base compounds the loss (the series cannot \
-             change sign) - verify this is intentional"
-        );
     }
 
     let mut results = IndexMap::new();
@@ -92,8 +73,9 @@ pub(super) fn growth_pct(
 
 /// Curve percentage: apply period-specific growth rates supplied as a curve.
 ///
-/// The recurrence relation is `v[t] = v[t-1] * (1 + curve[t])`, where `curve`
-/// contains the growth factor for the *t*-th forecast period.
+/// The signed recurrence is `v[t] = v[t-1] * (1 + curve[t])`, where `curve`
+/// holds the growth rate of the *t*-th forecast period. A rate of -100%
+/// gives zero, and a lower rate flips the sign of a non-zero level.
 ///
 /// # Arguments
 ///
@@ -118,15 +100,6 @@ pub(super) fn curve_pct(
             curve.len(),
             forecast_periods.len()
         )));
-    }
-
-    // Same negative-base compounding trap as GrowthPct: see the warning there.
-    if base_value < 0.0 {
-        tracing::warn!(
-            base_value,
-            "CurvePct forecast on a negative base compounds the loss (the series cannot \
-             change sign) - verify this is intentional"
-        );
     }
 
     let mut results = IndexMap::new();
@@ -308,7 +281,7 @@ mod tests {
         assert!(err.to_string().contains("Overflow"));
     }
 
-    /// High growth rates (>100% per period) should warn but still succeed.
+    /// Growth rates above 100% per period are valid.
     #[test]
     fn test_growth_pct_high_rate_no_error() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];

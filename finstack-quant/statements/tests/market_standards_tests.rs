@@ -202,25 +202,21 @@ fn test_variance_single_value_returns_nan() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // With sample variance, single value should return NaN (undefined)
-    let variance = results
-        .get(
-            "variance",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
+    let variance = results.get(
+        "variance",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
     assert!(
-        variance.is_nan(),
+        variance.is_none(),
         "Variance of single value should be NaN with sample variance"
     );
 
-    let std_dev = results
-        .get(
-            "std_dev",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
+    let std_dev = results.get(
+        "std_dev",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
     assert!(
-        std_dev.is_nan(),
+        std_dev.is_none(),
         "Std dev of single value should be NaN with sample variance"
     );
 }
@@ -686,28 +682,22 @@ fn test_exponential_smoothing_requires_alpha() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::TimeSeries,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::TimeSeries,
+                indexmap! {
                     "historical".into() => serde_json::json!([90.0, 95.0, 100.0]),
                     "method".into() => serde_json::json!("exponential"),
                     "beta".into() => serde_json::json!(0.1),
                     // Missing alpha - should error
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build()
     };
 
-    assert!(result.is_ok()); // Model builds fine
-
-    let model = result.unwrap();
-    let mut evaluator = Evaluator::new();
-    let eval_result = evaluator.evaluate(&model);
-
-    // Should error during evaluation when alpha is missing
-    assert!(eval_result.is_err());
-    let err = eval_result.unwrap_err();
+    // The missing factor is a static requirement: the model does not build.
+    let err = result.unwrap_err();
     assert!(
         err.to_string().contains("alpha"),
         "Error should mention missing alpha parameter: {}",
@@ -718,77 +708,6 @@ fn test_exponential_smoothing_requires_alpha() {
 #[test]
 fn test_exponential_smoothing_requires_beta() {
     // Should error if beta not provided
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder
-            .periods("2025Q1..2025Q4", Some("2025Q1"))
-            .unwrap();
-        model_builder.value(
-            "revenue",
-            &[(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                AmountOrScalar::scalar(100.0),
-            )],
-        );
-        model_builder.forecast(
-            "revenue",
-            ForecastSpec {
-                method: ForecastMethod::TimeSeries,
-                params: indexmap! {
-                    "historical".into() => serde_json::json!([90.0, 95.0, 100.0]),
-                    "method".into() => serde_json::json!("exponential"),
-                    "alpha".into() => serde_json::json!(0.3),
-                    // Missing beta - should error
-                },
-            },
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&model);
-
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("beta"));
-}
-
-#[test]
-fn test_moving_average_requires_window() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder
-            .periods("2025Q1..2025Q4", Some("2025Q1"))
-            .unwrap();
-        model_builder.value(
-            "revenue",
-            &[(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                AmountOrScalar::scalar(100.0),
-            )],
-        );
-        model_builder.forecast(
-            "revenue",
-            ForecastSpec {
-                method: ForecastMethod::TimeSeries,
-                params: indexmap! {
-                    "historical".into() => serde_json::json!([90.0, 95.0, 100.0]),
-                    "method".into() => serde_json::json!("moving_average"),
-                    // Missing window - should error
-                },
-            },
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&model);
-
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("window"));
-}
-
-#[test]
-fn test_seasonal_requires_mode() {
     let result = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder
@@ -803,17 +722,82 @@ fn test_seasonal_requires_mode() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Seasonal,
-                params: indexmap! {
-                    "historical".into() => serde_json::json!([100.0, 90.0, 110.0, 80.0, 100.0, 90.0, 110.0, 80.0]),
-                    "season_length".into() => serde_json::json!(4),
-                    // Missing mode - should error
+            ForecastSpec::from_params(
+                ForecastMethod::TimeSeries,
+                indexmap! {
+                    "historical".into() => serde_json::json!([90.0, 95.0, 100.0]),
+                    "method".into() => serde_json::json!("exponential"),
+                    "alpha".into() => serde_json::json!(0.3),
+                    // Missing beta - should error
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build()
     };
+
+    // The missing factor is a static requirement: the model does not build.
+    assert!(result.unwrap_err().to_string().contains("beta"));
+}
+
+#[test]
+fn test_moving_average_requires_window() {
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
+            "revenue",
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
+        );
+        model_builder.forecast(
+            "revenue",
+            ForecastSpec::from_params(
+                ForecastMethod::TimeSeries,
+                indexmap! {
+                    "historical".into() => serde_json::json!([90.0, 95.0, 100.0]),
+                    "method".into() => serde_json::json!("moving_average"),
+                    // Missing window - should error
+                },
+            )
+            .unwrap(),
+        );
+        model_builder.build()
+    };
+
+    // The missing window is a static requirement: the model does not build.
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("window"));
+}
+
+#[test]
+fn test_seasonal_requires_mode() {
+    let result = (|| -> finstack_quant_statements::Result<_> {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
+            "revenue",
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
+        );
+        model_builder.forecast(
+            "revenue",
+            ForecastSpec::from_params(ForecastMethod::Seasonal, indexmap! {
+                    "historical".into() => serde_json::json!([100.0, 90.0, 110.0, 80.0, 100.0, 90.0, 110.0, 80.0]),
+                    "season_length".into() => serde_json::json!(4),
+                    // Missing mode - should error
+                })?,
+        );
+        model_builder.build()
+    })();
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("mode"));
@@ -821,7 +805,7 @@ fn test_seasonal_requires_mode() {
 
 #[test]
 fn test_seasonal_decomposition_requires_season_length() {
-    let result = {
+    let result = (|| -> finstack_quant_statements::Result<_> {
         let mut model_builder = ModelBuilder::new("test");
         model_builder
             .periods("2025Q1..2025Q4", Some("2025Q1"))
@@ -835,17 +819,14 @@ fn test_seasonal_decomposition_requires_season_length() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Seasonal,
-                params: indexmap! {
+            ForecastSpec::from_params(ForecastMethod::Seasonal, indexmap! {
                     "historical".into() => serde_json::json!([90.0, 85.0, 95.0, 80.0, 100.0, 95.0, 105.0, 90.0]),
                     "mode".into() => serde_json::json!("additive"),
                     // Missing season_length - should error
-                },
-            },
+                })?,
         );
         model_builder.build()
-    };
+    })();
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("season_length"));
@@ -978,14 +959,11 @@ fn test_seasonal_mode_enum_additive() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Seasonal,
-                params: indexmap! {
+            ForecastSpec::from_params(ForecastMethod::Seasonal, indexmap! {
                     "historical".into() => serde_json::json!([100.0, 90.0, 120.0, 80.0, 110.0, 100.0, 130.0, 90.0]),
                     "season_length".into() => serde_json::json!(4),
                     "mode".into() => serde_json::json!("additive"),
-                },
-            },
+                }).unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -1035,14 +1013,11 @@ fn test_seasonal_mode_enum_multiplicative() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Seasonal,
-                params: indexmap! {
+            ForecastSpec::from_params(ForecastMethod::Seasonal, indexmap! {
                     "historical".into() => serde_json::json!([100.0, 90.0, 110.0, 80.0, 110.0, 99.0, 132.0, 96.0]),
                     "season_length".into() => serde_json::json!(4),
                     "mode".into() => serde_json::json!("multiplicative"),
-                },
-            },
+                }).unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -1079,7 +1054,7 @@ fn test_seasonal_mode_enum_multiplicative() {
 #[test]
 fn test_seasonal_mode_typo_errors() {
     // Typo in mode should error, not silently default
-    let result = {
+    let result = (|| -> finstack_quant_statements::Result<_> {
         let mut model_builder = ModelBuilder::new("test");
         model_builder
             .periods("2025Q1..2025Q4", Some("2025Q1"))
@@ -1093,17 +1068,17 @@ fn test_seasonal_mode_typo_errors() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Seasonal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Seasonal,
+                indexmap! {
                     "historical".into() => serde_json::json!([100.0, 100.0, 100.0, 100.0]),
                     "season_length".into() => serde_json::json!(2),
                     "mode".into() => serde_json::json!("additiv"), // Typo
                 },
-            },
+            )?,
         );
         model_builder.build()
-    };
+    })();
 
     // Should error on typo, not silently default
     assert!(result.is_err());
@@ -1148,15 +1123,13 @@ fn test_rolling_window_with_limited_history() {
     // Default (min_periods = window): partial windows are NaN, so a 1- or
     // 2-observation history is never presented as a 4-period statistic.
     for quarter in [1, 2] {
-        let value = results
-            .get(
-                "rolling_mean_4",
-                &PeriodId::quarter(2025, quarter).expect("valid period fixture"),
-            )
-            .unwrap();
+        let value = results.get(
+            "rolling_mean_4",
+            &PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+        );
         assert!(
-            value.is_nan(),
-            "partial window must be NaN by default, got {value} in Q{quarter}"
+            value.is_none(),
+            "partial window must be NaN by default, got {value:?} in Q{quarter}"
         );
     }
 
@@ -1195,14 +1168,11 @@ fn test_seasonal_allows_negative_values() {
         );
         model_builder.forecast(
             "net_income",
-            ForecastSpec {
-                method: ForecastMethod::Seasonal,
-                params: indexmap! {
+            ForecastSpec::from_params(ForecastMethod::Seasonal, indexmap! {
                     "historical".into() => serde_json::json!([-50.0, 20.0, 30.0, -40.0, -45.0, 25.0, 35.0, -35.0]),
                     "season_length".into() => serde_json::json!(4),
                     "mode".into() => serde_json::json!("additive"),
-                },
-            },
+                }).unwrap(),
         );
         model_builder.build().unwrap()
     };

@@ -11,6 +11,8 @@ mod audit_regressions;
 mod builder_all;
 #[path = "canonical_contract.rs"]
 mod canonical_contract;
+#[path = "capital_opening_and_accrual.rs"]
+mod capital_opening_and_accrual;
 #[path = "capital_structure_builder.rs"]
 mod capital_structure_builder;
 #[path = "capital_structure_integration.rs"]
@@ -49,6 +51,8 @@ mod integration_all;
 mod market_standards_tests;
 #[path = "monte_carlo_capital_structure.rs"]
 mod monte_carlo_capital_structure;
+#[path = "normalization_bridges.rs"]
+mod normalization_bridges;
 #[path = "production_reporting_audit.rs"]
 mod production_reporting_audit;
 #[path = "proptest_evaluator.rs"]
@@ -65,8 +69,35 @@ mod senior_review_dsl;
 mod senior_review_engine_checks;
 #[path = "spec_tests.rs"]
 mod spec_tests;
+#[path = "wire_admission.rs"]
+mod wire_admission;
 
 #[path = "support/rates.rs"]
 mod rates_support;
 #[path = "support/period_flows.rs"]
 mod support;
+
+/// Monte Carlo over every node of the model, for tests that predate the
+/// explicit metric list.
+pub(crate) trait AllMetrics {
+    fn evaluate_all_metrics(
+        &mut self,
+        model: &finstack_quant_statements::types::FinancialModelSpec,
+        config: &finstack_quant_statements::evaluator::MonteCarloConfig,
+    ) -> finstack_quant_statements::Result<finstack_quant_statements::evaluator::MonteCarloResults>;
+}
+
+impl AllMetrics for finstack_quant_statements::evaluator::Evaluator {
+    fn evaluate_all_metrics(
+        &mut self,
+        model: &finstack_quant_statements::types::FinancialModelSpec,
+        config: &finstack_quant_statements::evaluator::MonteCarloConfig,
+    ) -> finstack_quant_statements::Result<finstack_quant_statements::evaluator::MonteCarloResults>
+    {
+        let config = finstack_quant_statements::evaluator::MonteCarloConfig {
+            metrics: model.nodes.keys().map(ToString::to_string).collect(),
+            ..config.clone()
+        };
+        self.evaluate_monte_carlo(model, &config, None)
+    }
+}

@@ -11,6 +11,28 @@ use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+/// One FX conversion applied to consolidate capital-structure totals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FxConversionRecord {
+    /// Native currency converted from.
+    pub from: Currency,
+    /// Reporting currency converted to.
+    pub to: Currency,
+    /// Units of `to` per unit of `from` (1.20 converts EUR 1 to USD 1.20).
+    pub rate: f64,
+    /// Inclusive period-close date the rate was read on.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: finstack_quant_core::dates::Date,
+    /// How the rate was obtained: `direct` for a quoted pair, `triangulated`
+    /// when it was built through the FX matrix's pivot currency.
+    pub source: String,
+}
+
 /// Aggregated cashflows from capital structure instruments by period.
 ///
 /// Instances of this type are produced by the evaluator and exposed to the DSL
@@ -47,6 +69,16 @@ use serde::{Deserialize, Serialize};
 ///         mandatory_prepayment: None,
 ///         sweep_prepayment: None,
 ///         voluntary_prepayment: None,
+///         interest_arrears: None,
+///         principal_pending: None,
+///         principal_arrears: None,
+///         principal_advance_reserve: None,
+///         fee_rebates: None,
+///         repayment_refunds: None,
+///         funding_proceeds: None,
+///         funding_principal: None,
+///         scheduled_cash_interest_due: None,
+///         scheduled_principal_due: None,
 ///     });
 /// cs.totals.insert(period, CashflowBreakdown {
 ///     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -61,6 +93,16 @@ use serde::{Deserialize, Serialize};
 ///     mandatory_prepayment: None,
 ///     sweep_prepayment: None,
 ///     voluntary_prepayment: None,
+///     interest_arrears: None,
+///     principal_pending: None,
+///     principal_arrears: None,
+///     principal_advance_reserve: None,
+///     fee_rebates: None,
+///     repayment_refunds: None,
+///     funding_proceeds: None,
+///     funding_principal: None,
+///     scheduled_cash_interest_due: None,
+///     scheduled_principal_due: None,
 /// });
 ///
 /// assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
@@ -96,15 +138,57 @@ pub struct CapitalStructureCashflows {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reporting_currency: Option<Currency>,
 
-    /// Post-waterfall residual cash distributed to equity per period.
+    /// Every FX conversion applied to form the consolidated `totals`, by
+    /// period: the currency pair, the rate, the date it was read on and how
+    /// it was obtained. Empty when every instrument is in the reporting
+    /// currency.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "IndexMap<String, Vec<FxConversionRecord>>")
+    )]
+    pub fx_conversions: IndexMap<PeriodId, Vec<FxConversionRecord>>,
+
+    /// Why a period has no consolidated `totals`, when consolidation was
+    /// requested and could not be completed (for example a missing FX quote).
+    /// Per-instrument and native-currency values of the period are
+    /// unaffected.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, String>"))]
+    pub consolidation_unavailable: IndexMap<PeriodId, String>,
+
+    /// Residual cash distributed to equity per period: the cash left after
+    /// fees, interest and principal when `Equity` is the waterfall's terminal
+    /// priority, and zero when it is not.
     ///
-    /// Only populated by waterfall evaluation when `available_cash_node` is
-    /// configured: it is the cash remaining after fees, interest, and
-    /// principal allocations. With the per-period allocations this satisfies
-    /// `fees + cash interest + principal + equity == available cash`.
+    /// Only populated for periods in which a waterfall ran. With the
+    /// per-period allocations,
+    /// `fees + cash interest + principal + equity + retained == available cash`
+    /// exactly.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
     pub equity_distribution: IndexMap<PeriodId, Money>,
+
+    /// What each configured prepayment requested, paid and left unpaid in
+    /// each period, in the waterfall's priority order.
+    ///
+    /// Only populated for periods in which a waterfall with a prepayment
+    /// priority ran. An unpaid amount is not carried forward: a prepayment
+    /// request is not a dated contractual obligation.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "IndexMap<String, Vec<PrepaymentOutcome>>")
+    )]
+    pub prepayments: IndexMap<PeriodId, Vec<PrepaymentOutcome>>,
+
+    /// Residual cash the company retains per period: the cash left after the
+    /// payment stack when `Equity` is not a priority, and zero when it is.
+    ///
+    /// Only populated for periods in which a waterfall ran.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
+    pub retained_cash: IndexMap<PeriodId, Money>,
 
     /// Cash the waterfall had to allocate in each period: the value of
     /// `WaterfallSpec.available_cash_node`, floored at zero (a negative pool
@@ -114,10 +198,48 @@ pub struct CapitalStructureCashflows {
     /// Only populated for periods in which a waterfall ran; empty for models
     /// without a waterfall and for JSON written before this field existed.
     /// Reconciles the period's uses:
-    /// `fees + cash interest + principal + equity_distribution == available_cash`.
+    /// `fees + cash interest + principal + equity_distribution + retained_cash == available_cash`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
     pub available_cash: IndexMap<PeriodId, Money>,
+
+    /// Distress cash by period: recoveries, accrual paid on default and
+    /// protection payments, each with its instrument, native currency and
+    /// actual payment date, in schedule order.
+    ///
+    /// These amounts are outside scheduled debt service: they are in no
+    /// breakdown, total or waterfall claim, and they change no principal.
+    /// Only periods with a distress row have an entry.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "IndexMap<String, Vec<DistressCashflow>>")
+    )]
+    pub distress_cash: IndexMap<PeriodId, Vec<DistressCashflow>>,
+}
+
+/// One distress cash amount of a capital-structure instrument.
+///
+/// Distress cash is a recovery, an accrual paid on default or a protection
+/// payment. It is reported separately from scheduled debt service.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DistressCashflow {
+    /// Capital-structure identifier of the instrument.
+    pub instrument_id: String,
+    /// Actual payment date of the cash.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: finstack_quant_core::dates::Date,
+    /// The cashflow kind: `recovery`, `accrued_on_default` or
+    /// `protection_payment`.
+    pub kind: finstack_quant_core::cashflow::CFKind,
+    /// Signed cash in the company's perspective and the instrument's native
+    /// currency: a receipt is positive and a payment is negative.
+    pub amount: Money,
 }
 
 /// Breakdown of cashflows by type for a single period.
@@ -169,7 +291,9 @@ pub struct CashflowBreakdown {
     /// Outstanding debt balance at period end
     pub debt_balance: Money,
 
-    /// Debt coupon interest accrued but not yet paid (liability).
+    /// Contractual cash interest earned through the period close and due
+    /// after it (liability), from the instrument's own earning terms. Interest
+    /// already due and unpaid is `interest_arrears`, not part of this amount.
     /// Hedge-leg accrual valuation is outside the debt-service contract and is zero.
     pub accrued_interest: Money,
 
@@ -198,7 +322,7 @@ pub struct CashflowBreakdown {
     pub scheduled_principal: Option<Money>,
 
     /// Part of `principal_payment` paid at the waterfall's
-    /// `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).
+    /// `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepayment`).
     /// Zero when no waterfall ran. Same sign, currency and absence rule as
     /// [`Self::scheduled_principal`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -211,20 +335,129 @@ pub struct CashflowBreakdown {
     pub sweep_prepayment: Option<Money>,
 
     /// Part of `principal_payment` paid at the waterfall's
-    /// `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).
+    /// `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepayment`).
     /// Zero when no waterfall ran. Same sign, currency and absence rule as
     /// [`Self::scheduled_principal`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voluntary_prepayment: Option<Money>,
+
+    /// Scheduled cash interest that fell due in the period under the
+    /// borrowing's contractual schedule, recognized once on its due date
+    /// whether or not it was paid. It excludes PIK, fees, arrears settled
+    /// from an earlier period and hedge flows. Positive amount in the
+    /// breakdown's currency. `Some` on evaluator-produced breakdowns of a
+    /// borrowing; `None` for a hedge and on hand-built breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_cash_interest_due: Option<Money>,
+
+    /// Scheduled principal that fell due in the period under the borrowing's
+    /// contractual schedule (amortization and maturity), recognized once on
+    /// its due date whether or not it was paid. It excludes prepayments,
+    /// sweeps, arrears settled from an earlier period and advance payments.
+    /// Same sign, currency and absence rule as
+    /// [`Self::scheduled_cash_interest_due`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_principal_due: Option<Money>,
+
+    /// Cash interest already due and still unpaid at the period close:
+    /// overdue arrears carried as a claim into the next period. It is separate
+    /// from `accrued_interest`, which is interest earned but not yet due.
+    /// Positive amount in the breakdown's currency. Always `Some` on
+    /// breakdowns produced by the evaluator or the waterfall; `None` on
+    /// hand-built breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interest_arrears: Option<Money>,
+
+    /// Scheduled principal cash whose face reduction is already effective
+    /// and whose payment falls due after the period close: owed, not yet
+    /// due. `debt_balance` is already net of that face. Positive amount in
+    /// the breakdown's currency; `Some` on evaluator-produced breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal_pending: Option<Money>,
+
+    /// Scheduled principal cash due and still unpaid at the period close,
+    /// carried as a claim into the next period. It is a cash obligation
+    /// separate from `debt_balance`, which follows the contract's effective
+    /// dates whether or not the cash was paid. Positive amount in the
+    /// breakdown's currency; `Some` on evaluator-produced breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal_arrears: Option<Money>,
+
+    /// Face already paid for whose reduction takes effect after the period
+    /// close. It is still part of `debt_balance` and is reserved from further
+    /// prepayment until then. Positive amount in the breakdown's currency;
+    /// `Some` on evaluator-produced breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal_advance_reserve: Option<Money>,
+
+    /// Fee cash the company received in the period: a rebate of a fee it
+    /// paid. A receipt, reported apart from `fees` and never a waterfall
+    /// claim. Positive amount in the breakdown's currency; `Some` on
+    /// evaluator-produced breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fee_rebates: Option<Money>,
+
+    /// Principal cash the company received back in the period: a refund of a
+    /// repayment. A receipt, reported apart from `principal_payment`; the
+    /// balance moves only through the row's explicit principal effect.
+    /// Positive amount in the breakdown's currency; `Some` on
+    /// evaluator-produced breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repayment_refunds: Option<Money>,
+
+    /// Signed company cash of the funding rows that settled in the period:
+    /// positive for proceeds received (net of any discount), negative for
+    /// cash paid. It is the cash, not the principal it establishes. `Some`
+    /// on evaluator-produced breakdowns of a borrowing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub funding_proceeds: Option<Money>,
+
+    /// Principal established by funding that took effect in the period:
+    /// draws and issuance at their explicit principal effect, whatever cash
+    /// was received. `Some` on evaluator-produced breakdowns of a borrowing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub funding_principal: Option<Money>,
+}
+
+/// What one prepayment priority requested and paid in a period.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PrepaymentOutcome {
+    /// The prepayment priority: mandatory prepayment, voluntary prepayment
+    /// or sweep.
+    pub kind: crate::capital_structure::PaymentPriority,
+    /// Amount the priority requested: the mandatory or voluntary amount, or
+    /// the sweep percentage of positive excess cash flow.
+    pub requested: Money,
+    /// Cash paid at par: the request limited by the cash the earlier
+    /// priorities left and by the eligible principal net of reserves.
+    pub paid: Money,
+    /// `requested - paid`.
+    pub unpaid: Money,
+    /// The part of `unpaid` carried as arrears into the next period: all of
+    /// it for a sweep with a dated payment obligation, zero otherwise (an
+    /// unpaid amount without one is reported, not carried).
+    pub carried: Money,
 }
 
 /// Field names of [`CashflowBreakdown::audit_detail`], in the same order.
-const AUDIT_DETAIL_LABELS: [&str; 5] = [
+const AUDIT_DETAIL_LABELS: [&str; 15] = [
     "opening_balance",
     "scheduled_principal",
     "mandatory_prepayment",
     "sweep_prepayment",
     "voluntary_prepayment",
+    "interest_arrears",
+    "principal_pending",
+    "principal_arrears",
+    "principal_advance_reserve",
+    "scheduled_cash_interest_due",
+    "scheduled_principal_due",
+    "fee_rebates",
+    "repayment_refunds",
+    "funding_proceeds",
+    "funding_principal",
 ];
 
 impl CashflowBreakdown {
@@ -240,7 +473,12 @@ impl CashflowBreakdown {
     /// `opening_balance` and the four sources of `principal_payment`
     /// (`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment`,
     /// `voluntary_prepayment`), each only when recorded. Those four rows sum
-    /// to the `principal_payment` row, so do not add them to it.
+    /// to the `principal_payment` row, so do not add them to it. The last
+    /// rows are `interest_arrears` (cash interest due and unpaid at the
+    /// close), the principal settlement amounts `principal_pending`,
+    /// `principal_arrears` and `principal_advance_reserve`, the receipts
+    /// `fee_rebates` and `repayment_refunds`, and the funding amounts
+    /// `funding_proceeds` (signed cash) and `funding_principal`.
     #[must_use]
     pub fn flows(&self) -> Vec<(&'static str, Money)> {
         let mut flows = vec![("interest_expense_cash", self.interest_expense_cash)];
@@ -278,31 +516,63 @@ impl CashflowBreakdown {
             mandatory_prepayment: None,
             sweep_prepayment: None,
             voluntary_prepayment: None,
+            interest_arrears: None,
+            principal_pending: None,
+            principal_arrears: None,
+            principal_advance_reserve: None,
+            scheduled_cash_interest_due: None,
+            scheduled_principal_due: None,
+            fee_rebates: None,
+            repayment_refunds: None,
+            funding_proceeds: None,
+            funding_principal: None,
         }
     }
 
-    /// Opening balance and the four principal components, in the fixed order
-    /// `[opening_balance, scheduled_principal, mandatory_prepayment,
-    /// sweep_prepayment, voluntary_prepayment]`.
-    pub(crate) fn audit_detail(&self) -> [Option<Money>; 5] {
+    /// Opening balance, the four principal components, interest arrears, the
+    /// three principal settlement amounts, the two contractual due-date
+    /// service amounts, the two receipts and the two funding amounts, in the
+    /// order of
+    /// [`AUDIT_DETAIL_LABELS`].
+    pub(crate) fn audit_detail(&self) -> [Option<Money>; 15] {
         [
             self.opening_balance,
             self.scheduled_principal,
             self.mandatory_prepayment,
             self.sweep_prepayment,
             self.voluntary_prepayment,
+            self.interest_arrears,
+            self.principal_pending,
+            self.principal_arrears,
+            self.principal_advance_reserve,
+            self.scheduled_cash_interest_due,
+            self.scheduled_principal_due,
+            self.fee_rebates,
+            self.repayment_refunds,
+            self.funding_proceeds,
+            self.funding_principal,
         ]
     }
 
     /// Mutable view of the fields returned by [`Self::audit_detail`], in the
     /// same order.
-    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 5] {
+    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 15] {
         [
             &mut self.opening_balance,
             &mut self.scheduled_principal,
             &mut self.mandatory_prepayment,
             &mut self.sweep_prepayment,
             &mut self.voluntary_prepayment,
+            &mut self.interest_arrears,
+            &mut self.principal_pending,
+            &mut self.principal_arrears,
+            &mut self.principal_advance_reserve,
+            &mut self.scheduled_cash_interest_due,
+            &mut self.scheduled_principal_due,
+            &mut self.fee_rebates,
+            &mut self.repayment_refunds,
+            &mut self.funding_proceeds,
+            &mut self.funding_principal,
         ]
     }
 
@@ -315,6 +585,9 @@ impl CashflowBreakdown {
         self.mandatory_prepayment = Some(zero);
         self.sweep_prepayment = Some(zero);
         self.voluntary_prepayment = Some(zero);
+        // No cash cap has applied: nothing due is unpaid.
+        self.interest_arrears = Some(zero);
+        self.principal_arrears = Some(zero);
     }
 
     /// Net cash interest received this period, resolving `None` to a zero in
@@ -438,6 +711,7 @@ fn flows_table<'a>(
     let mut instruments = Vec::new();
     let mut periods = Vec::new();
     let mut flow_types = Vec::new();
+    let mut values = Vec::new();
     let mut amounts = Vec::new();
     let mut currencies = Vec::new();
     for (instrument, period, breakdown) in rows {
@@ -445,7 +719,8 @@ fn flows_table<'a>(
             instruments.push(instrument.to_string());
             periods.push(period.to_string());
             flow_types.push(flow_type.to_string());
-            amounts.push(money.amount());
+            values.push(money.amount());
+            amounts.push(money.amount_decimal().to_string());
             currencies.push(money.currency().to_string());
         }
     }
@@ -463,8 +738,10 @@ fn flows_table<'a>(
                 .with_role(TableColumnRole::Index),
             TableColumn::new("flow_type", TableColumnData::String(flow_types))
                 .with_role(TableColumnRole::Dimension),
-            TableColumn::new("amount", TableColumnData::Float64(amounts))
+            TableColumn::new("value", TableColumnData::Float64(values))
                 .with_role(TableColumnRole::Measure),
+            TableColumn::new("amount", TableColumnData::String(amounts))
+                .with_role(TableColumnRole::Attribute),
             TableColumn::new("currency", TableColumnData::String(currencies))
                 .with_role(TableColumnRole::Attribute),
         ],
@@ -474,19 +751,17 @@ fn flows_table<'a>(
 }
 
 impl CapitalStructureCashflows {
-    /// Periods covered by these cashflows, in ascending order.
-    ///
-    /// Uses the periods of the reporting totals when they exist; otherwise the
-    /// sorted union of every instrument's periods.
+    /// Periods covered by these cashflows, in ascending order: every period
+    /// any instrument has a breakdown for, whether or not that period could
+    /// be consolidated.
     #[must_use]
     pub fn periods(&self) -> Vec<PeriodId> {
-        if !self.totals.is_empty() {
-            return self.totals.keys().copied().collect();
-        }
         let mut periods: Vec<PeriodId> = self
             .by_instrument
             .values()
+            .chain(self.totals_by_currency.values())
             .flat_map(|by_period| by_period.keys().copied())
+            .chain(self.totals.keys().copied())
             .collect();
         periods.sort();
         periods.dedup();
@@ -496,9 +771,10 @@ impl CapitalStructureCashflows {
     /// Export per-instrument cashflows as a long table.
     ///
     /// Columns: `instrument`, `period` (period identifier such as `2025Q1`),
-    /// `flow_type` (see [`CashflowBreakdown::flows`]), `amount` (in the row's
-    /// own `currency`) and `currency` (ISO 4217 code). One row per instrument,
-    /// period and flow type; amounts are in each instrument's native currency.
+    /// `flow_type` (see [`CashflowBreakdown::flows`]), `value` (the amount's
+    /// float view), `amount` (the exact amount as decimal text) and
+    /// `currency` (ISO 4217 code). One row per instrument, period and flow
+    /// type; amounts are in each instrument's native currency.
     ///
     /// # Errors
     ///
@@ -575,115 +851,228 @@ impl CapitalStructureCashflows {
         if let Some(equity) = self.equity_distribution.get(&period_id) {
             snapshot.equity_distribution.insert(period_id, *equity);
         }
+        if let Some(retained) = self.retained_cash.get(&period_id) {
+            snapshot.retained_cash.insert(period_id, *retained);
+        }
+        if let Some(prepayments) = self.prepayments.get(&period_id) {
+            snapshot.prepayments.insert(period_id, prepayments.clone());
+        }
         if let Some(cash) = self.available_cash.get(&period_id) {
             snapshot.available_cash.insert(period_id, *cash);
+        }
+        if let Some(rows) = self.distress_cash.get(&period_id) {
+            snapshot.distress_cash.insert(period_id, rows.clone());
+        }
+        if let Some(rows) = self.fx_conversions.get(&period_id) {
+            snapshot.fx_conversions.insert(period_id, rows.clone());
+        }
+        if let Some(reason) = self.consolidation_unavailable.get(&period_id) {
+            snapshot
+                .consolidation_unavailable
+                .insert(period_id, reason.clone());
         }
         snapshot.reporting_currency = self.reporting_currency;
         snapshot
     }
 
-    /// Set a single period's cashflows into this accumulator.
+    /// Replace every result of the periods `period_cs` covers.
     ///
-    /// Copies per-instrument breakdowns, totals, and per-currency totals from `period_cs`
-    /// into this structure, overwriting any existing entries for the same keys.
-    /// Reporting currency is set from the first non-`None` source.
-    pub fn set_period(&mut self, period_cs: CapitalStructureCashflows) {
-        for (inst_id, period_map) in period_cs.by_instrument {
-            let accum_map = self.by_instrument.entry(inst_id).or_default();
-            for (pid, breakdown) in period_map {
-                accum_map.insert(pid, breakdown);
-            }
-        }
-        for (pid, breakdown) in period_cs.totals {
-            self.totals.insert(pid, breakdown);
-        }
-        for (currency, period_map) in period_cs.totals_by_currency {
-            let accum_map = self.totals_by_currency.entry(currency).or_default();
-            for (pid, breakdown) in period_map {
-                accum_map.insert(pid, breakdown);
-            }
-        }
-        for (pid, equity) in period_cs.equity_distribution {
-            self.equity_distribution.insert(pid, equity);
-        }
-        for (pid, cash) in period_cs.available_cash {
-            self.available_cash.insert(pid, cash);
-        }
-        if self.reporting_currency.is_none() {
-            self.reporting_currency = period_cs.reporting_currency;
-        }
-    }
-
-    /// Read one capital-structure component for an instrument or the reporting total.
-    ///
-    /// This is the same lookup used for `cs.<component>.<instrument_or_total>`
-    /// in statement formulas. It reads already-calculated cashflows and does
-    /// not perform FX conversion.
+    /// Replacement is atomic per period: each period present in `period_cs`
+    /// first loses all of its rows here (per-instrument, native-currency and
+    /// consolidated values and their provenance), so a row the replacement
+    /// omits does not survive as stale data, and then receives the new rows.
+    /// Nothing changes when the replacement is rejected.
     ///
     /// # Arguments
     ///
-    /// * `component` - `interest_expense` (cash plus PIK), `interest_expense_cash`,
-    ///   `interest_expense_pik`, `interest_income`, `principal_payment`,
-    ///   `debt_balance`, `fees`, or `accrued_interest`. Flows use positive
-    ///   payment/receipt magnitudes; `debt_balance` is period-end principal.
-    /// * `instrument_or_total` - Instrument identifier for its native-currency
-    ///   value, or `total` for the reporting-currency aggregate.
-    /// * `period_id` - Reporting period whose component is returned, in major
-    ///   currency units. The period must exist in the selected cashflow map.
+    /// * `period_cs` - The complete results of one or more periods, as
+    ///   produced by a period evaluation.
     ///
     /// # Errors
     ///
-    /// Returns a capital-structure error for an unknown component, missing
-    /// instrument or period, unavailable multi-currency reporting totals, or
-    /// incompatible cash/PIK currencies in total interest.
-    pub fn get_component(
-        &self,
-        component: &str,
-        instrument_or_total: &str,
-        period_id: &PeriodId,
-    ) -> Result<f64> {
-        let extract: fn(&CashflowBreakdown) -> Result<f64> = match component {
-            "interest_expense" => |flow| Ok(flow.interest_expense_total()?.amount()),
-            "interest_expense_cash" => |flow| Ok(flow.interest_expense_cash.amount()),
-            "interest_expense_pik" => |flow| Ok(flow.interest_expense_pik.amount()),
-            "interest_income" => |flow| Ok(flow.interest_income_cash_or_zero().amount()),
-            "principal_payment" => |flow| Ok(flow.principal_payment.amount()),
-            "debt_balance" => |flow| Ok(flow.debt_balance.amount()),
-            "fees" => |flow| Ok(flow.fees.amount()),
-            "accrued_interest" => |flow| Ok(flow.accrued_interest.amount()),
-            _ => {
-                return Err(crate::error::Error::capital_structure(format!(
-                    "Unknown capital structure component: {component}. Expected: interest_expense, \
-                 interest_expense_cash, interest_expense_pik, interest_income, principal_payment, \
-                 debt_balance, fees, or accrued_interest"
-                )));
+    /// Returns a capital-structure error when `period_cs` reports in a
+    /// different currency than the results already held: the reporting
+    /// currency is fixed for a run.
+    pub fn set_period(&mut self, period_cs: CapitalStructureCashflows) -> Result<()> {
+        if let (Some(held), Some(new)) = (self.reporting_currency, period_cs.reporting_currency)
+            && held != new
+        {
+            return Err(crate::error::Error::capital_structure(format!(
+                "capital-structure results report in {held}; a period reporting in {new} \
+                 cannot replace them. The reporting currency is fixed for a run."
+            )));
+        }
+        let mut replaced: Vec<PeriodId> = period_cs
+            .by_instrument
+            .values()
+            .flat_map(|periods| periods.keys().copied())
+            .chain(period_cs.totals.keys().copied())
+            .chain(
+                period_cs
+                    .totals_by_currency
+                    .values()
+                    .flat_map(|periods| periods.keys().copied()),
+            )
+            .chain(period_cs.equity_distribution.keys().copied())
+            .chain(period_cs.retained_cash.keys().copied())
+            .chain(period_cs.prepayments.keys().copied())
+            .chain(period_cs.available_cash.keys().copied())
+            .chain(period_cs.distress_cash.keys().copied())
+            .chain(period_cs.fx_conversions.keys().copied())
+            .chain(period_cs.consolidation_unavailable.keys().copied())
+            .collect();
+        replaced.sort();
+        replaced.dedup();
+        for period in &replaced {
+            for periods in self.by_instrument.values_mut() {
+                periods.shift_remove(period);
             }
-        };
-        let flow = if instrument_or_total == "total" {
-            if self.reporting_currency.is_none()
-                && self.totals.is_empty()
-                && self.totals_by_currency.len() > 1
-            {
-                return Err(crate::error::Error::capital_structure(
-                    "Multiple currencies present in capital structure totals and no FX provided. Supply FX in MarketContext or limit to a single currency.",
-                ));
+            for periods in self.totals_by_currency.values_mut() {
+                periods.shift_remove(period);
             }
-            self.totals.get(period_id).ok_or_else(|| {
-                crate::error::Error::capital_structure(format!(
-                    "No total cashflow data for period {period_id}"
-                ))
-            })?
-        } else {
+            self.totals.shift_remove(period);
+            self.equity_distribution.shift_remove(period);
+            self.retained_cash.shift_remove(period);
+            self.prepayments.shift_remove(period);
+            self.available_cash.shift_remove(period);
+            self.distress_cash.shift_remove(period);
+            self.fx_conversions.shift_remove(period);
+            self.consolidation_unavailable.shift_remove(period);
+        }
+        self.by_instrument.retain(|_, periods| !periods.is_empty());
+        self.totals_by_currency
+            .retain(|_, periods| !periods.is_empty());
+
+        for (inst_id, period_map) in period_cs.by_instrument {
             self.by_instrument
-                .get(instrument_or_total)
+                .entry(inst_id)
+                .or_default()
+                .extend(period_map);
+        }
+        self.totals.extend(period_cs.totals);
+        for (currency, period_map) in period_cs.totals_by_currency {
+            self.totals_by_currency
+                .entry(currency)
+                .or_default()
+                .extend(period_map);
+        }
+        self.equity_distribution
+            .extend(period_cs.equity_distribution);
+        self.retained_cash.extend(period_cs.retained_cash);
+        self.prepayments.extend(period_cs.prepayments);
+        self.available_cash.extend(period_cs.available_cash);
+        self.distress_cash.extend(period_cs.distress_cash);
+        self.fx_conversions.extend(period_cs.fx_conversions);
+        self.consolidation_unavailable
+            .extend(period_cs.consolidation_unavailable);
+        if self.reporting_currency.is_none() {
+            self.reporting_currency = period_cs.reporting_currency;
+        }
+        // Accessors and exports read periods chronologically.
+        for periods in self.by_instrument.values_mut() {
+            periods.sort_keys();
+        }
+        for periods in self.totals_by_currency.values_mut() {
+            periods.sort_keys();
+        }
+        self.totals.sort_keys();
+        self.equity_distribution.sort_keys();
+        self.retained_cash.sort_keys();
+        self.prepayments.sort_keys();
+        self.available_cash.sort_keys();
+        self.distress_cash.sort_keys();
+        self.fx_conversions.sort_keys();
+        self.consolidation_unavailable.sort_keys();
+        Ok(())
+    }
+
+    /// Read one reported amount for one scope and period, exactly.
+    ///
+    /// This is the lookup behind `cs.<component>.<scope>` in statement
+    /// formulas. It reads values already computed for the scope and performs
+    /// no FX conversion.
+    ///
+    /// # Arguments
+    ///
+    /// * `component` - The reported amount to read.
+    /// * `scope` - One instrument (its native currency), one native
+    ///   currency's total, or the consolidated total in the reporting
+    ///   currency.
+    /// * `period_id` - Reporting period whose amount is returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when the scope has no data for the
+    /// period (an unknown instrument or currency, or a consolidated total
+    /// that could not be formed, with the reason), or when the breakdown does
+    /// not record the component.
+    pub fn get_money(
+        &self,
+        component: crate::capital_structure::CsComponent,
+        scope: &crate::capital_structure::CsScope,
+        period_id: &PeriodId,
+    ) -> Result<Money> {
+        use crate::capital_structure::CsScope;
+        let flow = match scope {
+            CsScope::Consolidated => self.totals.get(period_id).ok_or_else(|| {
+                crate::error::Error::capital_structure(
+                    match self.consolidation_unavailable.get(period_id) {
+                        Some(reason) => format!(
+                            "The consolidated capital-structure total is unavailable for period \
+                             {period_id}: {reason}"
+                        ),
+                        None => format!("No total cashflow data for period {period_id}"),
+                    },
+                )
+            })?,
+            CsScope::NativeTotal(currency) => self
+                .totals_by_currency
+                .get(currency)
                 .and_then(|periods| periods.get(period_id))
                 .ok_or_else(|| {
                     crate::error::Error::capital_structure(format!(
-                        "No {component} data for instrument '{instrument_or_total}' in period {period_id}"
+                        "No {currency} capital-structure total for period {period_id}"
                     ))
-                })?
+                })?,
+            CsScope::Instrument(instrument) => self
+                .by_instrument
+                .get(instrument)
+                .and_then(|periods| periods.get(period_id))
+                .ok_or_else(|| {
+                    crate::error::Error::capital_structure(format!(
+                        "No {component} data for instrument '{instrument}' in period {period_id}"
+                    ))
+                })?,
         };
-        extract(flow)
+        component.read(flow)
+    }
+
+    /// Read one reported amount as a number, by selector text.
+    ///
+    /// The text form of [`get_money`](Self::get_money): `component` is a
+    /// component name and `scope` is an instrument id, `total` (consolidated)
+    /// or `total.<CCY>` (one native currency's total).
+    ///
+    /// # Arguments
+    ///
+    /// * `component` - Component name, for example `interest_expense`,
+    ///   `principal_payment`, `scheduled_principal`, `debt_balance` or
+    ///   `principal_arrears`; see
+    ///   [`CsComponent`](crate::capital_structure::CsComponent).
+    /// * `scope` - Instrument identifier for its native-currency value,
+    ///   `total` for the consolidated reporting-currency total, or
+    ///   `total.<CCY>` for one native currency's total.
+    /// * `period_id` - Reporting period whose amount is returned, in major
+    ///   currency units of the scope's currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error for an unknown component or a
+    /// malformed scope, and the errors of [`get_money`](Self::get_money).
+    pub fn get_component(&self, component: &str, scope: &str, period_id: &PeriodId) -> Result<f64> {
+        Ok(self
+            .get_money(component.parse()?, &scope.parse()?, period_id)?
+            .amount())
     }
 }
 
@@ -811,6 +1200,16 @@ mod tests {
             mandatory_prepayment: None,
             sweep_prepayment: None,
             voluntary_prepayment: None,
+            interest_arrears: None,
+            principal_pending: None,
+            principal_arrears: None,
+            principal_advance_reserve: None,
+            scheduled_cash_interest_due: None,
+            scheduled_principal_due: None,
+            fee_rebates: None,
+            repayment_refunds: None,
+            funding_proceeds: None,
+            funding_principal: None,
         };
 
         let mut period_map = IndexMap::new();
@@ -976,5 +1375,122 @@ mod tests {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let err = cs.get_component("interest_expense", "total", &period);
         assert!(err.is_err());
+    }
+
+    fn period_results(
+        period: PeriodId,
+        instruments: &[&str],
+        reporting: Option<Currency>,
+    ) -> CapitalStructureCashflows {
+        let mut results = CapitalStructureCashflows::new();
+        for id in instruments {
+            results
+                .by_instrument
+                .entry((*id).to_string())
+                .or_default()
+                .insert(period, CashflowBreakdown::with_currency(Currency::USD));
+        }
+        results
+            .totals
+            .insert(period, CashflowBreakdown::with_currency(Currency::USD));
+        results
+            .equity_distribution
+            .insert(period, Money::from((5_i64, Currency::USD)));
+        results.reporting_currency = reporting;
+        results
+    }
+
+    /// A period is replaced as a whole: a row the replacement omits does not
+    /// survive, a conflicting reporting currency is rejected before anything
+    /// changes, and periods read back chronologically.
+    #[test]
+    fn a_period_is_replaced_atomically_and_read_chronologically() {
+        let q1 = PeriodId::quarter(2025, 1).expect("quarter");
+        let q2 = PeriodId::quarter(2025, 2).expect("quarter");
+        let mut held = CapitalStructureCashflows::new();
+        // The later period arrives first.
+        held.set_period(period_results(q2, &["A", "B"], Some(Currency::USD)))
+            .expect("second quarter");
+        held.set_period(period_results(q1, &["A", "B"], Some(Currency::USD)))
+            .expect("first quarter");
+        assert_eq!(held.periods(), vec![q1, q2]);
+        assert_eq!(
+            held.by_instrument["A"].keys().copied().collect::<Vec<_>>(),
+            vec![q1, q2]
+        );
+        assert_eq!(
+            held.equity_distribution.keys().copied().collect::<Vec<_>>(),
+            vec![q1, q2]
+        );
+
+        // The replacement for the first quarter no longer has instrument B
+        // or an equity distribution.
+        let mut replacement = period_results(q1, &["A"], Some(Currency::USD));
+        replacement.equity_distribution.clear();
+        held.set_period(replacement).expect("replacement");
+        assert!(!held.by_instrument["B"].contains_key(&q1));
+        assert!(held.by_instrument["B"].contains_key(&q2));
+        assert!(!held.equity_distribution.contains_key(&q1));
+        assert!(held.equity_distribution.contains_key(&q2));
+
+        let before = serde_json::to_value(&held).expect("serialize");
+        let error = held
+            .set_period(period_results(q1, &["A", "B"], Some(Currency::EUR)))
+            .expect_err("conflicting reporting currency")
+            .to_string();
+        assert!(error.contains("USD") && error.contains("EUR"), "{error}");
+        assert_eq!(serde_json::to_value(&held).expect("serialize"), before);
+    }
+
+    /// Selector text reads the same values as the typed selectors, and
+    /// monetary amounts export as exact decimal strings with their currency.
+    #[test]
+    fn selector_text_reads_each_scope_and_money_exports_exactly() {
+        use crate::capital_structure::{CsComponent, CsScope};
+        let period = PeriodId::quarter(2025, 1).expect("quarter");
+        let mut results = period_results(period, &["TL"], Some(Currency::USD));
+        let amount = Money::new(1234.56, Currency::USD).expect("amount");
+        results
+            .by_instrument
+            .get_mut("TL")
+            .and_then(|periods| periods.get_mut(&period))
+            .expect("row")
+            .debt_balance = amount;
+        results
+            .totals_by_currency
+            .entry(Currency::USD)
+            .or_default()
+            .insert(period, results.by_instrument["TL"][&period].clone());
+        assert_eq!(
+            results
+                .get_money(
+                    CsComponent::DebtBalance,
+                    &CsScope::Instrument("TL".into()),
+                    &period
+                )
+                .expect("instrument"),
+            amount
+        );
+        for scope in ["TL", "total.USD"] {
+            assert_eq!(
+                results
+                    .get_component("debt_balance", scope, &period)
+                    .expect("text selector"),
+                1234.56
+            );
+        }
+        for (component, scope) in [("coupon", "TL"), ("debt_balance", "total.dollars")] {
+            assert!(results.get_component(component, scope, &period).is_err());
+        }
+        assert!(
+            results
+                .get_component("debt_balance", "GHOST", &period)
+                .is_err()
+        );
+        let wire = serde_json::to_value(&results).expect("serialize");
+        assert_eq!(
+            wire["by_instrument"]["TL"]["2025Q1"]["debt_balance"],
+            serde_json::json!({"amount": "1234.56", "currency": "USD"})
+        );
     }
 }

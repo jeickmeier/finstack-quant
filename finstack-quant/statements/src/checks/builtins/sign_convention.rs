@@ -3,21 +3,27 @@
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
+use crate::checks::identity::require_known_distinct;
 use crate::checks::{Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity};
 use crate::types::NodeId;
 
-/// Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).
+/// Flags finite values with an unexpected sign (revenue below zero, an
+/// expense above zero).
 ///
-/// **Advisory-only**: every finding is `Severity::Warning`, so this check's
-/// `CheckResult::passed` is always `true` and it never fails a pipeline gate.
-/// Treat its findings as review prompts, not assertions.
+/// **Advisory only**: every finding is `Severity::Warning`, so the check
+/// never fails. Zero is valid in either group, and a cell without a value is
+/// not examined: mandatory sign rules belong to the operation that owns
+/// them (the retained-earnings dividend convention, for example).
+///
+/// A node the model does not know, a node listed twice, or a node in both
+/// groups is a configuration error.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SignConventionCheck {
-    /// Nodes expected to carry positive values.
+    /// Nodes expected to be non-negative.
     #[serde(default)]
     pub positive_nodes: Vec<NodeId>,
-    /// Nodes expected to carry negative values.
+    /// Nodes expected to be non-positive.
     #[serde(default)]
     pub negative_nodes: Vec<NodeId>,
 }
@@ -36,53 +42,51 @@ impl Check for SignConventionCheck {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        require_known_distinct(
+            self.id(),
+            context,
+            &[
+                ("positive_nodes", &self.positive_nodes),
+                ("negative_nodes", &self.negative_nodes),
+            ],
+        )?;
         let mut findings = Vec::new();
+        let mut evaluated = 0_usize;
 
-        for period in &context.model.periods {
+        for period in context.periods() {
             let pid = &period.id;
-            // Preserve positive-node findings before negative-node findings.
+            // Positive-node findings come before negative-node findings.
             for (nodes, positive) in [(&self.positive_nodes, true), (&self.negative_nodes, false)] {
                 for node in nodes {
-                    let Some(val) = context.results.get(node.as_str(), pid) else {
+                    let Some(value) = context
+                        .results
+                        .get_cell(node.as_str(), pid)
+                        .and_then(|cell| cell.numeric())
+                        .filter(|value| value.is_finite())
+                    else {
                         continue;
                     };
-                    let message = if !val.is_finite() {
-                        format!(
-                            "Node '{}' has non-finite value ({val}) in period {pid}; \
-                             its sign convention cannot be verified",
-                            node.as_str()
-                        )
-                    } else if (positive && val < 0.0) || (!positive && val > 0.0) {
-                        let sign = if positive { "negative" } else { "positive" };
-                        format!(
-                            "Node '{}' has unexpected {sign} value ({val:.2}) in period {pid}",
-                            node.as_str()
-                        )
-                    } else {
+                    evaluated += 1;
+                    if (positive && value >= 0.0) || (!positive && value <= 0.0) {
                         continue;
-                    };
+                    }
+                    let sign = if positive { "negative" } else { "positive" };
                     findings.push(CheckFinding {
                         check_id: self.id().to_string(),
                         severity: Severity::Warning,
-                        message,
+                        message: format!(
+                            "Node '{node}' has unexpected {sign} value ({value:.2}) in period {pid}"
+                        ),
                         period: Some(*pid),
                         materiality: None,
                         nodes: vec![node.clone()],
                         comparison: None,
+                        coverage: false,
                     });
                 }
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity == Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

@@ -57,15 +57,15 @@ pub enum StmtExpr {
         else_expr: Box<StmtExpr>,
     },
 
-    /// Capital structure reference (e.g., cs.interest_expense.total)
-    ///
-    /// Keeps the component/instrument tokens separate so the compiler can
-    /// rewrite them into encoded column names understood by the evaluator.
+    /// Capital structure reference: `cs.<component>.<scope>`, for example
+    /// `cs.interest_expense.total`, `cs.debt_balance.TL-A` or
+    /// `cs.debt_balance.total.EUR`.
     CsRef {
-        /// Component (interest_expense, principal_payment, debt_balance)
-        component: String,
-        /// Instrument ID or "total" for aggregate
-        instrument_or_total: String,
+        /// The reported amount read.
+        component: crate::capital_structure::CsComponent,
+        /// Whose amount it is: one instrument, one native currency's total
+        /// or the consolidated total.
+        scope: crate::capital_structure::CsScope,
     },
 }
 
@@ -112,7 +112,8 @@ fn binary_symbol(op: BinOp) -> &'static str {
 /// Render the expression as canonical DSL source text.
 ///
 /// Parentheses are emitted only where the operator precedence requires them,
-/// so `parse_formula(expr.to_string())` yields an AST equal to `expr`. This
+/// and logical negation is always written `!`, so
+/// `parse_formula(expr.to_string())` yields an AST equal to a parsed `expr`. This
 /// is the stable, host-facing rendering of a parsed formula (the `Debug`
 /// form is not a contract).
 impl std::fmt::Display for StmtExpr {
@@ -134,17 +135,28 @@ impl std::fmt::Display for StmtExpr {
             Self::NodeRef(id) => f.write_str(id.as_str()),
             Self::BinOp { op, left, right } => {
                 let level = precedence(self);
-                child(f, left, precedence(left) < level)?;
+                // Comparisons do not chain: `(a > b) > c` keeps its
+                // parentheses on either side.
+                let comparison = level == 3;
+                let left_level = precedence(left);
+                child(
+                    f,
+                    left,
+                    left_level < level || (comparison && left_level == level),
+                )?;
                 write!(f, " {} ", binary_symbol(*op))?;
                 // Left-associative: a right operand at the same level needs
                 // parentheses to preserve `a - (b - c)`.
                 child(f, right, precedence(right) <= level)
             }
             Self::UnaryOp { op, operand } => {
-                match op {
-                    UnaryOp::Neg => f.write_str("-")?,
-                    UnaryOp::Not => f.write_str("not ")?,
-                }
+                // `!` binds at unary precedence, so `(!a) > b` renders as
+                // `!a > b`. Keyword `not` binds outside a comparison and
+                // would regroup it.
+                f.write_str(match op {
+                    UnaryOp::Neg => "-",
+                    UnaryOp::Not => "!",
+                })?;
                 child(f, operand, precedence(operand) < precedence(self))
             }
             Self::Call { func, args } => {
@@ -162,10 +174,7 @@ impl std::fmt::Display for StmtExpr {
                 then_expr,
                 else_expr,
             } => write!(f, "if({condition}, {then_expr}, {else_expr})"),
-            Self::CsRef {
-                component,
-                instrument_or_total,
-            } => write!(f, "cs.{component}.{instrument_or_total}"),
+            Self::CsRef { component, scope } => write!(f, "cs.{component}.{scope}"),
         }
     }
 }
@@ -174,6 +183,45 @@ impl StmtExpr {
     /// Create a literal expression.
     pub fn literal(value: f64) -> Self {
         Self::Literal(value)
+    }
+
+    /// The same expression with every node reference renamed by `rename`.
+    ///
+    /// Function names, literals and capital-structure references are left
+    /// untouched: only [`StmtExpr::NodeRef`] names pass through `rename`.
+    ///
+    /// # Arguments
+    ///
+    /// * `rename` - Maps a referenced node identifier to the identifier the
+    ///   returned expression should reference instead.
+    #[must_use]
+    pub fn map_node_refs(&self, rename: &mut impl FnMut(&str) -> String) -> Self {
+        match self {
+            Self::Literal(_) | Self::CsRef { .. } => self.clone(),
+            Self::NodeRef(name) => Self::NodeRef(NodeId::new(rename(name.as_str()))),
+            Self::BinOp { op, left, right } => Self::BinOp {
+                op: *op,
+                left: Box::new(left.map_node_refs(rename)),
+                right: Box::new(right.map_node_refs(rename)),
+            },
+            Self::UnaryOp { op, operand } => Self::UnaryOp {
+                op: *op,
+                operand: Box::new(operand.map_node_refs(rename)),
+            },
+            Self::Call { func, args } => Self::Call {
+                func: func.clone(),
+                args: args.iter().map(|arg| arg.map_node_refs(rename)).collect(),
+            },
+            Self::IfThenElse {
+                condition,
+                then_expr,
+                else_expr,
+            } => Self::IfThenElse {
+                condition: Box::new(condition.map_node_refs(rename)),
+                then_expr: Box::new(then_expr.map_node_refs(rename)),
+                else_expr: Box::new(else_expr.map_node_refs(rename)),
+            },
+        }
     }
 
     /// Create a node reference.
@@ -253,7 +301,12 @@ mod tests {
             ("a - b - c", "a - b - c"),
             ("a * (b + c)", "a * (b + c)"),
             ("-(a + b)", "-(a + b)"),
-            ("not (a > 1) and b <= 2", "not (a > 1) and b <= 2"),
+            ("not (a > 1) and b <= 2", "!(a > 1) and b <= 2"),
+            ("not a > b", "!(a > b)"),
+            ("!a > b", "!a > b"),
+            ("-!a", "-!a"),
+            ("!-a", "!-a"),
+            ("(a > b) == (c > d)", "(a > b) == (c > d)"),
             ("if(a > 0, a, 0)", "if(a > 0, a, 0)"),
             ("lag(revenue, 1) * 1.05", "lag(revenue, 1) * 1.05"),
             (

@@ -5,7 +5,6 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::checks::CheckSuiteSpec;
 use finstack_quant_statements::evaluator::{Evaluator, MonteCarloConfig};
 use finstack_quant_statements::registry::Registry;
-use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 /// Evaluator for financial statement models.
@@ -24,7 +23,7 @@ use wasm_bindgen::prelude::*;
 /// builder.compute("margin", "revenue * 0.4");
 /// const evaluator = new statements.Evaluator();
 /// const result = evaluator.evaluate(builder.build());
-/// result.nodes.margin["2025Q2"];  // 44
+/// result.cells.margin["2025Q2"].value;  // 44
 /// evaluator.free();
 /// ```
 #[wasm_bindgen(js_name = Evaluator)]
@@ -78,23 +77,25 @@ impl JsEvaluator {
     /// Evaluate a model over all of its periods.
     ///
     /// Twin of Python `Evaluator.evaluate` (Rust `Evaluator::evaluate`).
-    /// Non-finite node values and warning values use the canonical strings
-    /// `"nan"`, `"inf"` and `"-inf"`, so a `JSON.stringify`/parse round trip
-    /// preserves missing-data semantics. A capital structure is evaluated
+    /// Every node has one typed cell per period under `cells`: a `value`
+    /// cell carries a finite number or exact tagged money, and a `missing`,
+    /// `masked` or `unavailable` cell carries no value, so a
+    /// `JSON.stringify`/parse round trip preserves it. Non-finite numbers
+    /// appear only in warnings, as `"nan"`, `"inf"` and `"-inf"`. A capital
+    /// structure is evaluated
     /// from an empty market as of the first period's start, so fixed-rate
     /// debt yields `cs_cashflows`; instruments that need market data need
     /// `evaluateWithMarket`.
     ///
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
-    /// @returns `StatementResult` plain object: node values per period, value types, evaluation metadata, capital-structure cashflows and the optional check report.
+    /// @returns `StatementResult` plain object: typed `cells` per node and period (`status`, `value`, `reason`, `source`), value types, run `provenance`, evaluation metadata, capital-structure cashflows and the optional check report.
     /// @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a dependency cycle or a capital-structure failure.
     #[wasm_bindgen(unchecked_return_type = "StatementResult")]
     pub fn evaluate(
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let model =
-            FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+        let model = crate::api::statements::load_model(&model, "model")?;
         to_js_value(&self.inner.evaluate(&model).map_err(to_js_err)?)
     }
 
@@ -102,30 +103,42 @@ impl JsEvaluator {
     ///
     /// Twin of Python `Evaluator.evaluate_with_market` (Rust
     /// `Evaluator::evaluate_with_market`). Required when capital-structure
-    /// instruments need market data (floating coupons, swaps, caps) or
-    /// explicit values need an as-of cutoff.
+    /// instruments need market data (floating coupons, swaps, caps) and for
+    /// point-in-time evaluation.
     ///
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
     /// @param market - `MarketContext` state supplying curves, quotes and FX (object or JSON).
-    /// @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. A value whose declared availability date falls after `asOf` is hidden in any period; an actual with no declared date becomes visible at its period's end; an undated value in a forecast period is an assumption and stays visible. A hidden value makes the node fall back to its forecast or formula, and a value-only node then fails.
+    /// @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments. It does not hide observations.
+    /// @param observationCutoff - `"full_snapshot"` reads every observation in the model. An ISO 8601 date reads an observation only when its availability date is on or before that date, inclusive; the model must then name its `source_snapshot` and give an availability date to every observation in an actual period. An undated explicit value in a forecast period is a forecast assumption and stays visible. A hidden value makes the node fall back to its forecast or formula, and a value-only node then fails.
     /// @returns `StatementResult` plain object, including `cs_cashflows` for capital-structure models.
-    /// @throws Error with kind `validation` if an input is malformed, `asOf` is not an ISO date, or a formula fails to evaluate; kind `not_found` if a node or market datum is missing; kind `computation` for a dependency cycle or a capital-structure failure.
+    /// @throws Error with kind `validation` if an input is malformed, `asOf` or `observationCutoff` is not an ISO date (or `"full_snapshot"`), a cutoff date is used on a model with no `source_snapshot` or with an undated observation in an actual period, or a formula fails to evaluate; kind `not_found` if a node or market datum is missing; kind `computation` for a dependency cycle or a capital-structure failure.
     #[wasm_bindgen(js_name = evaluateWithMarket, unchecked_return_type = "StatementResult")]
     pub fn evaluate_with_market(
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] market: JsValue,
         #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(js_name = "observationCutoff", unchecked_param_type = "string")]
+        observation_cutoff: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let model =
-            FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+        use finstack_quant_statements::evaluator::ObservationCutoff;
+
+        let model = crate::api::statements::load_model(&model, "model")?;
         let market: finstack_quant_core::market_data::context::MarketContext =
             from_js_json(&market, "market")?;
         let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
+        let cutoff = if observation_cutoff.as_string().as_deref() == Some("full_snapshot") {
+            ObservationCutoff::FullSnapshot
+        } else {
+            ObservationCutoff::Through(crate::utils::wire::js_date(
+                &observation_cutoff,
+                "observationCutoff",
+            )?)
+        };
         to_js_value(
             &self
                 .inner
-                .evaluate_with_market(&model, &market, as_of)
+                .evaluate_with_market(&model, &market, as_of, cutoff)
                 .map_err(to_js_err)?,
         )
     }
@@ -133,25 +146,70 @@ impl JsEvaluator {
     /// Evaluate a model under Monte Carlo simulation of its stochastic forecasts.
     ///
     /// Twin of Python `Evaluator.evaluate_monte_carlo` (Rust
-    /// `Evaluator::evaluate_monte_carlo`).
+    /// `Evaluator::evaluate_monte_carlo`). Each path evaluates the complete
+    /// model with fresh state and its own random streams; the requested
+    /// metrics are aggregated into R-7 sample quantiles per forecast period.
     ///
-    /// @param model - `FinancialModelSpec` whose stochastic forecast nodes are simulated (object or JSON).
-    /// @param config - `MonteCarloConfig`: `n_paths`, `seed`, optional `percentiles` (fractions in `[0, 1]`) and `include_path_data` (object or JSON).
-    /// @returns `MonteCarloResults` plain object with percentile summaries per metric, the distinct forecast-period `warnings` (each reported once however many paths raised it; actual periods are not simulated and are omitted) and, when requested, the per-path table.
-    /// @throws Error with kind `validation` if an input is malformed, `n_paths` is zero, or a path fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a capital-structure failure on a path.
+    /// @param model - `FinancialModelSpec` whose stochastic forecast nodes are simulated (object or JSON). It needs at least one forecast period.
+    /// @param config - `MonteCarloConfig`: `n_paths` (1 to 4294967295), `seed` (unsigned 64-bit integer: a canonical decimal string such as `"42"`, or a `bigint` in a plain object), `metrics` (the node identifiers to report: at least one, each a node of the model, none repeated), optional `percentiles` (distinct fractions in `[0, 1]`) and `include_path_data` (object or JSON).
+    /// @param market - Optional `MarketContext` state the capital structure is projected on, as for `evaluateWithMarket` (object or JSON). Omit it to evaluate as `evaluate` does: the full snapshot on an empty market as of the first period's start. Give `market` and `asOf` together.
+    /// @param asOf - ISO 8601 valuation date of the capital structure's contractual flows; required with `market`.
+    /// @param observationCutoff - `"full_snapshot"` (the default with a market) or the ISO 8601 date through which explicit observations are visible.
+    /// @returns `MonteCarloResults` plain object. A complete run has percentile summaries per requested metric (with units and sample count), the run's `seed` and `stream_version`, the distinct forecast-period `warnings` and, when requested, the per-path table. When a requested sample has no value on some path the run is incomplete: `percentile_results` is empty and `incomplete` names the first such sample.
+    /// @throws Error with kind `validation` if an input is malformed, the configuration is rejected (a path count of zero, no, unknown or repeated metrics, repeated or out-of-range percentiles, a run above the sample limit), the model has no forecast period, only one of `market` and `asOf` is given, or a path fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a capital-structure failure on a path.
     #[wasm_bindgen(js_name = evaluateMonteCarlo, unchecked_return_type = "MonteCarloResults")]
     pub fn evaluate_monte_carlo(
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
         #[wasm_bindgen(unchecked_param_type = "generated.statements.MonteCarloConfig | string")]
         config: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "JsonInput")] market: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(
+            js_name = "observationCutoff",
+            unchecked_optional_param_type = "string"
+        )]
+        observation_cutoff: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let model =
-            FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
-        let config: MonteCarloConfig = from_js_json(&config, "config")?;
+        use finstack_quant_statements::evaluator::{MonteCarloContext, ObservationCutoff};
+
+        let absent = |value: &JsValue| value.is_undefined() || value.is_null();
+        let model = crate::api::statements::load_model(&model, "model")?;
+        let config: MonteCarloConfig = crate::utils::input::from_js_json_exact(&config, "config")?;
+        let run = match (absent(&market), absent(&as_of)) {
+            (false, false) => {
+                let market: finstack_quant_core::market_data::context::MarketContext =
+                    from_js_json(&market, "market")?;
+                let cutoff = if absent(&observation_cutoff)
+                    || observation_cutoff.as_string().as_deref() == Some("full_snapshot")
+                {
+                    ObservationCutoff::FullSnapshot
+                } else {
+                    ObservationCutoff::Through(crate::utils::wire::js_date(
+                        &observation_cutoff,
+                        "observationCutoff",
+                    )?)
+                };
+                Some((market, crate::utils::wire::js_date(&as_of, "asOf")?, cutoff))
+            }
+            (true, true) if absent(&observation_cutoff) => None,
+            _ => {
+                return Err(to_js_err(finstack_quant_statements::Error::eval(
+                    "evaluateMonteCarlo: give `market` and `asOf` together; \
+                     `observationCutoff` needs both",
+                )));
+            }
+        };
+        let context = run
+            .as_ref()
+            .map(|(market, as_of, cutoff)| MonteCarloContext {
+                market,
+                as_of: *as_of,
+                cutoff: *cutoff,
+            });
         let result = self
             .inner
-            .evaluate_monte_carlo(&model, &config)
+            .evaluate_monte_carlo(&model, &config, context)
             .map_err(to_js_err)?;
         let js = to_js_value(&result)?;
         if let Some(table) = &result.path_data {
@@ -216,7 +274,8 @@ impl JsRegistry {
             .map_err(to_js_err)
     }
 
-    /// Load the built-in `fin.*` metrics into this registry.
+    /// Load the built-in `fin.*` metrics into this registry, atomically: if
+    /// any built-in identifier is already registered, nothing is added.
     ///
     /// Twin of Python `Registry.load_builtins` (Rust `Registry::load_builtins`).
     ///
@@ -291,7 +350,12 @@ impl JsRegistry {
         to_js_value(&stored.definition)
     }
 
-    /// Metrics one metric depends on, transitively.
+    /// The dependency closure of one metric, in import order.
+    ///
+    /// The closure follows the references pinned when each metric was
+    /// registered: unqualified references in the metric's own namespace,
+    /// exact qualified references in any namespace, and historical
+    /// references such as `lag`.
     ///
     /// Twin of Python `Registry.get_dependencies` (Rust
     /// `Registry::get_dependencies`).

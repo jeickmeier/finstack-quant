@@ -14,6 +14,6 @@ mod sign_convention;
 pub use balance_sheet::BalanceSheetArticulation;
 pub use cash_reconciliation::CashReconciliation;
 pub use missing_values::MissingValueCheck;
-pub use non_finite::NonFiniteCheck;
+pub use non_finite::{AllNodes, NodeSelection, NonFiniteCheck};
 pub use retained_earnings::RetainedEarningsReconciliation;
 pub use sign_convention::SignConventionCheck;

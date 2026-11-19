@@ -425,7 +425,7 @@ pub fn render_tree_detailed(
         &mut output,
         "",
         None,
-        &|node| match results.get(&node.node_id, period) {
+        &|node| match crate::cell_float(results, &node.node_id, period) {
             Some(value) => format!("{} = {:.2}", node.node_id, value),
             None => node.node_id.clone(),
         },
@@ -543,7 +543,7 @@ impl<'a> FormulaExplainer<'a> {
             .get(node_id)
             .ok_or_else(|| Error::node_not_found(node_id))?;
 
-        let final_value = self.results.get(node_id, period).ok_or_else(|| {
+        let final_value = crate::cell_float(self.results, node_id, period).ok_or_else(|| {
             Error::missing_data(format!(
                 "No result for node '{}' in period '{}'",
                 node_id, period
@@ -582,7 +582,7 @@ impl<'a> FormulaExplainer<'a> {
     /// `cs.<component>.<instrument_or_total>` capital-structure component.
     fn component_value(&self, identifier: &str, period: &PeriodId) -> Option<f64> {
         let Some(reference) = identifier.strip_prefix("cs.") else {
-            return self.results.get(identifier, period);
+            return crate::cell_float(self.results, identifier, period);
         };
         let (component, instrument_or_total) = reference.split_once('.')?;
         self.results
@@ -644,11 +644,8 @@ fn collect_additive_terms(
             terms.push((name.as_str().to_string(), positive));
             true
         }
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
-            terms.push((format!("cs.{component}.{instrument_or_total}"), positive));
+        StmtExpr::CsRef { component, scope } => {
+            terms.push((format!("cs.{component}.{scope}"), positive));
             true
         }
         StmtExpr::BinOp {
@@ -686,14 +683,13 @@ pub struct Explanation {
     /// Type of node (Value, Calculated, etc.)
     pub node_type: NodeType,
 
-    /// Evaluation layer that produced `final_value` under the
+    /// Value source selected for the cell under the
     /// `Value > Forecast > Formula` precedence: `value` (the explicit value
-    /// stored on the node), `forecast`, `formula`, or `where_masked` (the
-    /// node's `where` clause zeroed the cell).
+    /// stored on the node), `forecast` or `formula`.
     ///
-    /// Read from [`StatementResult::node_sources`]; `None` when the results
-    /// carry no source for the cell (hand-built results, or results or
-    /// explanations serialized before sources were recorded).
+    /// Read from the result cell; `None` when no source was selected (a
+    /// masked or missing cell, or one left unavailable before a source was
+    /// chosen) and for hand-built results.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<CellSource>,
 
@@ -712,8 +708,8 @@ pub struct Explanation {
     /// capital-structure references.
     ///
     /// Populated only when the formula produced the value (`source` is
-    /// `formula`, or unknown). Empty when `source` is `value`, `forecast` or
-    /// `where_masked`: the formula was not evaluated, and `source` /
+    /// `formula`, or unknown). Empty when `source` is `value` or
+    /// `forecast`: the formula was not evaluated, and `source` /
     /// `forecast` describe where the value came from. When the formula is a
     /// pure sum/difference of references there is one step per term, in
     /// formula order, each with `operation` `"+"` or `"-"`, and the signed
@@ -750,10 +746,10 @@ impl Explanation {
             output.push_str(&format!("Source: {}\n", source.as_str()));
         }
         if let Some(forecast) = &self.forecast {
-            output.push_str(&format!("Forecast: {:?}", forecast.method));
-            if !forecast.params.is_empty() {
+            output.push_str(&format!("Forecast: {:?}", forecast.method()));
+            if !forecast.params().is_empty() {
                 let params: Vec<String> = forecast
-                    .params
+                    .params()
                     .iter()
                     .map(|(name, value)| format!("{name}={value}"))
                     .collect();
@@ -1189,8 +1185,8 @@ mod tests {
         assert!((forecast.final_value - 105.0).abs() < 1e-9);
         assert_eq!(forecast.source, Some(CellSource::Forecast));
         let spec = forecast.forecast.as_ref().expect("forecast spec");
-        assert_eq!(spec.method, ForecastMethod::GrowthPct);
-        assert_eq!(spec.params["rate"], serde_json::json!(0.05));
+        assert_eq!(spec.method(), ForecastMethod::GrowthPct);
+        assert_eq!(spec.params()["rate"], serde_json::json!(0.05));
         let text = forecast.to_text();
         assert!(text.contains("Source: forecast"), "{text}");
         assert!(
@@ -1220,7 +1216,17 @@ mod tests {
             model_builder_1
                 .periods("2025Q1..Q1", None)
                 .expect("test should succeed");
-            model_builder_1.value("ebit", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.value_money("ebit", &[(period, Money::from((100_i64, Currency::USD)))]);
+            // A capital reference names an instrument of the model.
+            let mut loan =
+                finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::example(
+                )
+                .expect("term loan");
+            loan.id = "TL".into();
+            model_builder_1.add_debt(
+                "TL",
+                finstack_quant_statements::types::FinancialStatementInstrument::TermLoan(loan),
+            );
             model_builder_1
                 .compute("pretax", "ebit - cs.interest_expense.TL")
                 .expect("test should succeed");
@@ -1242,11 +1248,11 @@ mod tests {
         );
         let mut results = StatementResult::default();
         results
-            .nodes
-            .insert("ebit".into(), [(period, 100.0)].into_iter().collect());
+            .set_series("ebit", [(period, 100.0)].into_iter().collect())
+            .expect("finite fixture values");
         results
-            .nodes
-            .insert("pretax".into(), [(period, 70.0)].into_iter().collect());
+            .set_series("pretax", [(period, 70.0)].into_iter().collect())
+            .expect("finite fixture values");
         results.cs_cashflows = Some(cashflows);
 
         let explanation =

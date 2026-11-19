@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 
 import pytest
 
@@ -57,7 +56,8 @@ def _results() -> StatementResult:
 
 def test_window_keeps_early_non_finite_leverage_out_of_the_evaluation() -> None:
     results = _results()
-    assert math.isnan(results.get("leverage", "2024Q3"))
+    assert results.get("leverage", "2024Q3") is None
+    assert results.get_cell("leverage", "2024Q3")["status"] == "unavailable"
 
     frame = evaluate_covenants(results, _engine("2024-10-01"))
 

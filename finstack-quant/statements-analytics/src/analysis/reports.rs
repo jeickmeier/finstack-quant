@@ -229,7 +229,7 @@ impl PLSummaryReport<'_> {
             for period in &self.periods {
                 line_items.push(line_item.clone());
                 periods.push(period.to_string());
-                values.push(self.results.get(line_item, period));
+                values.push(crate::cell_value(self.results, line_item, period));
             }
         }
         let columns = vec![
@@ -261,7 +261,7 @@ impl fmt::Display for PLSummaryReport<'_> {
             for period in &self.periods {
                 // Render missing line items as "-" rather than a misleading
                 // 0.00 (zero is a legitimate value, absence is not).
-                let cell = match self.results.get(line_item, period) {
+                let cell = match crate::cell_value(self.results, line_item, period) {
                     Some(value) => format!("{:.2}", value),
                     None => "-".to_string(),
                 };
@@ -271,6 +271,24 @@ impl fmt::Display for PLSummaryReport<'_> {
         }
 
         write!(formatter, "P&L Summary\n\n{}", table.build())
+    }
+}
+
+/// Whether the trailing twelve months ending at `at` lie wholly inside the
+/// results' period plan. `false` in the warm-up periods, where a trailing
+/// sum does not exist rather than being incomplete, and for results without
+/// a plan.
+///
+/// # Errors
+///
+/// Propagates a malformed trailing window, as [`trailing_sum_at`] does.
+pub(crate) fn trailing_window_is_complete(
+    results: &StatementResult,
+    at: &PeriodId,
+) -> finstack_quant_statements::Result<bool> {
+    match results.periods.as_ref() {
+        Some(plan) => Ok(finstack_quant_core::dates::ltm_window(*at, plan)?.is_complete()),
+        None => Ok(false),
     }
 }
 
@@ -306,7 +324,7 @@ pub(crate) fn trailing_sum_at(
 ) -> finstack_quant_statements::Result<Option<f64>> {
     // A node with no value at the target has no trailing sum, whatever the
     // plan; only a window over present data needs the plan.
-    if results.get(node_id, at).is_none() {
+    if crate::cell_float(results, node_id, at).is_none() {
         return Ok(None);
     }
     let Ok(unit) = super::units::node_unit_at(results, node_id, at) else {
@@ -326,7 +344,7 @@ pub(crate) fn trailing_sum_at(
         if super::units::node_unit_at(results, node_id, period).ok() != Some(unit) {
             return Ok(None);
         }
-        let Some(value) = results.get(node_id, period) else {
+        let Some(value) = crate::cell_float(results, node_id, period) else {
             return Ok(None);
         };
         if !value.is_finite() {
@@ -346,7 +364,7 @@ fn leverage_at(
     if super::units::validate_matching_units(results, "total_debt", "ebitda", at).is_err() {
         return Ok(None);
     }
-    let Some(debt) = results.get("total_debt", at) else {
+    let Some(debt) = crate::cell_float(results, "total_debt", at) else {
         return Ok(None);
     };
     let Some(ebitda) = trailing_sum_at(results, "ebitda", at)? else {
@@ -411,7 +429,7 @@ pub struct CreditAssessmentPoint {
 ///     end: time::macros::date!(2026 - 01 - 01),
 ///     is_actual: false,
 /// });
-/// results.nodes.entry("total_debt".into()).or_default().insert(q4, 300.0);
+/// results.set_scalar("total_debt", q4, 300.0)?;
 /// let assessment = CreditAssessment::compute(&results, q4)?;
 /// assert_eq!(assessment.period, "2025Q4");
 /// // A period the results do not contain is an error, not a null assessment.
@@ -479,9 +497,7 @@ impl CreditAssessment {
                     period: period.to_string(),
                     leverage_ratio: leverage_at(results, &period)?,
                     interest_coverage: interest_coverage_at(results, &period)?,
-                    free_cash_flow: results
-                        .get("free_cash_flow", &period)
-                        .filter(|value| value.is_finite()),
+                    free_cash_flow: crate::cell_value(results, "free_cash_flow", &period),
                 })
             })
             .collect::<finstack_quant_statements::Result<_>>()?;
@@ -490,9 +506,7 @@ impl CreditAssessment {
             period: period.to_string(),
             leverage_ratio: leverage_at(results, &period)?,
             interest_coverage: interest_coverage_at(results, &period)?,
-            free_cash_flow: results
-                .get("free_cash_flow", &period)
-                .filter(|value| value.is_finite()),
+            free_cash_flow: crate::cell_value(results, "free_cash_flow", &period),
             series,
         })
     }
@@ -553,7 +567,7 @@ impl CreditAssessmentReport {
             period,
             leverage_ratio: leverage_at(results, &period)?,
             interest_coverage: interest_coverage_at(results, &period)?,
-            free_cash_flow: results.get("free_cash_flow", &period),
+            free_cash_flow: crate::cell_value(results, "free_cash_flow", &period),
         })
     }
 }
@@ -591,7 +605,7 @@ mod tests {
     /// October 1 opening; unprefixed ids are Gregorian.
     fn record_periods(results: &mut StatementResult) {
         let mut ids: Vec<PeriodId> = results
-            .nodes
+            .cells
             .values()
             .flat_map(|values| values.keys().copied())
             .collect();
@@ -674,11 +688,7 @@ mod tests {
 
         let mut results = StatementResult::new();
         // revenue only exists in Q1; Q2 is missing (not zero).
-        results
-            .nodes
-            .entry("revenue".to_string())
-            .or_default()
-            .insert(q1, 1234.5);
+        results.set_scalar("revenue", q1, 1234.5).expect("finite");
 
         let report = PLSummaryReport::new(&results, vec!["revenue"], vec![q1, q2]);
         let output = report.to_string();
@@ -697,37 +707,60 @@ mod tests {
         );
     }
 
+    /// An evaluated two-quarter model whose `revenue` has no observation in
+    /// Q2: the result holds a cell there, without a value.
+    fn evaluated_with_a_gap() -> StatementResult {
+        use finstack_quant_statements::builder::ModelBuilder;
+        use finstack_quant_statements::evaluator::Evaluator;
+        let mut builder = ModelBuilder::new("gap");
+        builder.periods("2025Q1..Q2", None).expect("periods");
+        builder.value_scalar(
+            "revenue",
+            &[(PeriodId::quarter(2025, 1).expect("quarter"), 1234.5)],
+        );
+        let model = builder.build().expect("model");
+        Evaluator::new().evaluate(&model).expect("evaluates")
+    }
+
+    #[test]
+    fn pl_summary_renders_dash_for_a_cell_without_a_value() {
+        let results = evaluated_with_a_gap();
+        let q1 = PeriodId::quarter(2025, 1).expect("quarter");
+        let q2 = PeriodId::quarter(2025, 2).expect("quarter");
+        let report = PLSummaryReport::new(&results, vec!["revenue"], vec![q1, q2]);
+        let output = report.to_string();
+        assert!(output.contains("1234.50"), "{output}");
+        assert!(!output.contains("NaN"), "{output}");
+    }
+
     #[test]
     fn credit_assessment_compute_matches_report_scalars() {
         let mut results = StatementResult::new();
         for (quarter, ebitda) in [(1, 10.0), (2, 20.0), (3, 30.0), (4, 40.0)] {
             results
-                .nodes
-                .entry("ebitda".to_string())
-                .or_default()
-                .insert(
+                .set_scalar(
+                    "ebitda",
                     PeriodId::quarter(2025, quarter).expect("valid period fixture"),
                     ebitda,
-                );
+                )
+                .expect("finite");
         }
         for (quarter, interest) in [(1, 1.0), (2, 2.0), (3, 3.0), (4, 4.0)] {
             results
-                .nodes
-                .entry("interest_expense".to_string())
-                .or_default()
-                .insert(
+                .set_scalar(
+                    "interest_expense",
                     PeriodId::quarter(2025, quarter).expect("valid period fixture"),
                     interest,
-                );
+                )
+                .expect("finite");
         }
         results
-            .nodes
-            .entry("total_debt".to_string())
-            .or_default()
-            .insert(
+            .set_scalar(
+                "total_debt",
                 PeriodId::quarter(2025, 4).expect("valid period fixture"),
                 300.0,
-            );
+            )
+            .expect("finite");
 
         record_periods(&mut results);
         let period = PeriodId::quarter(2025, 4).expect("valid period fixture");
@@ -744,22 +777,20 @@ mod tests {
         let mut results = StatementResult::new();
         for (quarter, ebitda) in [(1, 10.0), (2, 20.0), (3, 30.0), (4, 40.0)] {
             results
-                .nodes
-                .entry("ebitda".to_string())
-                .or_default()
-                .insert(
+                .set_scalar(
+                    "ebitda",
                     PeriodId::quarter(2025, quarter).expect("valid period fixture"),
                     ebitda,
-                );
+                )
+                .expect("finite");
         }
         results
-            .nodes
-            .entry("total_debt".to_string())
-            .or_default()
-            .insert(
+            .set_scalar(
+                "total_debt",
                 PeriodId::quarter(2025, 4).expect("valid period fixture"),
                 300.0,
-            );
+            )
+            .expect("finite");
 
         record_periods(&mut results);
         let assessment = CreditAssessment::compute(
@@ -798,54 +829,48 @@ mod tests {
         let mut results = StatementResult::new();
         for (quarter, ebitda) in [(1, 10.0), (2, 20.0), (3, 30.0), (4, 40.0)] {
             results
-                .nodes
-                .entry("ebitda".to_string())
-                .or_default()
-                .insert(
+                .set_scalar(
+                    "ebitda",
                     PeriodId::quarter(2025, quarter).expect("valid period fixture"),
                     ebitda,
-                );
+                )
+                .expect("finite");
         }
         results
-            .nodes
-            .entry("interest_expense".to_string())
-            .or_default()
-            .insert(
+            .set_scalar(
+                "interest_expense",
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 1.0,
-            );
+            )
+            .expect("finite");
         results
-            .nodes
-            .entry("interest_expense".to_string())
-            .or_default()
-            .insert(
+            .set_scalar(
+                "interest_expense",
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 2.0,
-            );
+            )
+            .expect("finite");
         results
-            .nodes
-            .entry("interest_expense".to_string())
-            .or_default()
-            .insert(
+            .set_scalar(
+                "interest_expense",
                 PeriodId::quarter(2025, 3).expect("valid period fixture"),
                 3.0,
-            );
+            )
+            .expect("finite");
         results
-            .nodes
-            .entry("interest_expense".to_string())
-            .or_default()
-            .insert(
+            .set_scalar(
+                "interest_expense",
                 PeriodId::quarter(2025, 4).expect("valid period fixture"),
                 4.0,
-            );
+            )
+            .expect("finite");
         results
-            .nodes
-            .entry("total_debt".to_string())
-            .or_default()
-            .insert(
+            .set_scalar(
+                "total_debt",
                 PeriodId::quarter(2025, 4).expect("valid period fixture"),
                 300.0,
-            );
+            )
+            .expect("finite");
 
         record_periods(&mut results);
         let report = CreditAssessmentReport::new(
@@ -863,29 +888,19 @@ mod tests {
         let mut results = StatementResult::new();
         for label in ["FY2024Q3", "FY2024Q4", "FY2025Q1", "FY2025Q2"] {
             let period: PeriodId = label.parse().expect("fiscal quarter");
+            results.set_scalar("ebitda", period, 1.0).expect("finite");
             results
-                .nodes
-                .entry("ebitda".into())
-                .or_default()
-                .insert(period, 1.0);
-            results
-                .nodes
-                .entry("interest_expense".into())
-                .or_default()
-                .insert(period, 0.5);
+                .set_scalar("interest_expense", period, 0.5)
+                .expect("finite");
         }
         let at: PeriodId = "FY2025Q2".parse().expect("fiscal quarter");
-        results
-            .nodes
-            .entry("total_debt".into())
-            .or_default()
-            .insert(at, 4.0);
+        results.set_scalar("total_debt", at, 4.0).expect("finite");
         record_periods(&mut results);
         let assessment = CreditAssessment::compute(&results, at).expect("known period");
         assert_eq!(assessment.leverage_ratio, Some(1.0));
         assert_eq!(assessment.interest_coverage, Some(2.0));
         results
-            .nodes
+            .cells
             .get_mut("ebitda")
             .expect("ebitda")
             .swap_remove(&"FY2024Q4".parse::<PeriodId>().expect("quarter"));
@@ -911,11 +926,7 @@ mod tests {
                     end,
                     is_actual: true,
                 });
-                results
-                    .nodes
-                    .entry("ebitda".into())
-                    .or_default()
-                    .insert(period, 1.0);
+                results.set_scalar("ebitda", period, 1.0).expect("finite");
             }
             results.periods = Some(
                 finstack_quant_core::dates::PeriodPlan::try_new(
@@ -926,10 +937,8 @@ mod tests {
             );
             let at = PeriodId::day(year, days).expect("last day");
             results
-                .nodes
-                .entry("total_debt".into())
-                .or_default()
-                .insert(at, f64::from(days));
+                .set_scalar("total_debt", at, f64::from(days))
+                .expect("finite");
             assert_eq!(
                 CreditAssessment::compute(&results, at)
                     .expect("known period")
@@ -939,7 +948,7 @@ mod tests {
             // A gap near the beginning must not be replaced with a shorter
             // 252-observation financial-market annualization window.
             results
-                .nodes
+                .cells
                 .get_mut("ebitda")
                 .expect("ebitda")
                 .swap_remove(&PeriodId::day(year, 1).expect("day"));
@@ -954,7 +963,7 @@ mod tests {
 
     #[test]
     fn business_day_credit_window_is_not_a_complete_daily_year() {
-        use finstack_quant_core::dates::{Date, Period};
+        use finstack_quant_core::dates::Date;
         use time::Month;
         // Two years of weekdays only: absent rows do not prove weekends or
         // holidays, so a business-day grid is never a complete daily LTM
@@ -966,17 +975,13 @@ mod tests {
         while date <= last {
             if date.weekday().number_days_from_monday() < 5 {
                 let id = PeriodId::from_date(date, PeriodKind::Daily, None).expect("day");
-                rows.push(Period {
+                rows.push(finstack_quant_core::dates::Period {
                     id,
                     start: date,
                     end: date.next_day().expect("next day"),
                     is_actual: true,
                 });
-                results
-                    .nodes
-                    .entry("ebitda".into())
-                    .or_default()
-                    .insert(id, 1.0);
+                results.set_scalar("ebitda", id, 1.0).expect("finite");
             }
             date = date.next_day().expect("next day");
         }
@@ -1031,11 +1036,7 @@ mod tests {
                     end: date.next_day().expect("next day"),
                     is_actual: true,
                 });
-                results
-                    .nodes
-                    .entry("ebitda".into())
-                    .or_default()
-                    .insert(period, 1.0);
+                results.set_scalar("ebitda", period, 1.0).expect("finite");
                 date = date.next_day().expect("next day");
             }
             results.periods = Some(
@@ -1070,11 +1071,7 @@ mod tests {
         ] {
             let at: PeriodId = label.parse().expect("period");
             let mut results = StatementResult::new();
-            results
-                .nodes
-                .entry("ebitda".into())
-                .or_default()
-                .insert(at, 1.0);
+            results.set_scalar("ebitda", at, 1.0).expect("finite");
             record_periods(&mut results);
             let window = trailing_sum_at(&results, "ebitda", &at);
             if weekly {

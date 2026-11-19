@@ -11,9 +11,6 @@ use crate::evaluator::results::EvalWarning;
 use crate::types::NodeId;
 use finstack_quant_core::dates::{PeriodId, PeriodKind, PeriodPlan};
 use indexmap::IndexMap;
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// Evaluation context for a single period.
@@ -44,6 +41,12 @@ pub struct EvaluationContext {
     /// Uses `Option<f64>` to distinguish between "not yet evaluated" (`None`) and "evaluated to NaN" (`Some(NaN)`).
     pub(crate) current_values: Vec<Option<f64>>,
 
+    /// State of each current-period cell, in the same column layout as
+    /// `current_values`. `None` for values set outside the evaluator's
+    /// precedence loop. This is the authoritative state; `current_values` is
+    /// its numeric view for the formula kernels.
+    pub(crate) current_cells: Vec<Option<super::cell::Cell>>,
+
     /// Evaluation layer that produced each current-period value, in the same
     /// column layout as `current_values`. `None` for values set outside the
     /// evaluator's precedence loop.
@@ -54,29 +57,6 @@ pub struct EvaluationContext {
 
     /// Warnings collected while evaluating this period
     pub warnings: Vec<EvalWarning>,
-
-    /// Set when a comparison, logical operator or `if` condition consumed a
-    /// non-finite operand during this period's evaluation.
-    ///
-    /// DSL comparisons read `NaN` as false, so a formula check fed a missing
-    /// lag (`lag(x, 1)` in the first period) or a non-finite input would
-    /// otherwise look like a failed test. Formula checks read this flag to
-    /// report insufficient data instead.
-    pub(crate) non_finite_operand: bool,
-
-    /// Per-context memoization of sorted historical lookups.
-    ///
-    /// Within a single period's evaluation many formulas (rolling, expanding,
-    /// statistical, time-series) reach back into the same node's history.
-    /// Each lookup previously rebuilt a fresh `BTreeMap<PeriodId, f64>` by
-    /// iterating `history`. We now cache the constructed map keyed
-    /// by node identifier (or capital-structure reference) so repeated calls
-    /// in the same period are O(1) refcount bumps instead of O(P) walks.
-    ///
-    /// The cache is intentionally `RefCell` (not Mutex) — `EvaluationContext`
-    /// is per-period and never crosses thread boundaries; Monte Carlo paths
-    /// build fresh contexts inside their own thread closures.
-    pub(crate) sorted_history_cache: RefCell<IndexMap<String, Rc<BTreeMap<PeriodId, f64>>>>,
 }
 
 impl EvaluationContext {
@@ -146,43 +126,20 @@ impl EvaluationContext {
             history,
             historical_capital_structure_cashflows,
             current_values: vec![None; num_nodes],
+            current_cells: vec![None; num_nodes],
             current_sources: vec![None; num_nodes],
             capital_structure_cashflows: None,
             warnings: Vec::new(),
-            non_finite_operand: false,
-            sorted_history_cache: RefCell::new(IndexMap::new()),
         }
     }
 
-    /// Invalidate the sorted-history cache for a single node.
-    ///
-    /// Call this whenever the current-period value for `node_id` changes
-    /// after the cache has been populated — otherwise downstream rolling /
-    /// statistical functions can read a stale "current" entry. Cheap when
-    /// the cache is empty (the common case during the first pass over a
-    /// period's nodes).
-    pub(crate) fn invalidate_sorted_cache(&self, node_id: &str) {
-        let mut cache = self.sorted_history_cache.borrow_mut();
-        cache.shift_remove(node_id);
-    }
-
-    /// Replace the current-period capital-structure cashflows, invalidating any
-    /// memoized `cs.*` history so the next pass re-reads the new flows.
-    ///
-    /// The waterfall revises this period's cashflows after the first evaluation
-    /// pass. Aggregates such as `rolling_mean(cs.interest_expense.total, 2)`
-    /// memoize the pre-waterfall value in `sorted_history_cache`; without
-    /// draining that cache the second pass would silently reuse the stale
-    /// pre-waterfall number while a plain `cs.*` reference (which bypasses the
-    /// cache) reads the revised value, producing internally inconsistent
-    /// results. The whole cache is cleared because it is a per-period
-    /// memoization that is cheap to rebuild lazily.
+    /// Replace the current-period capital-structure cashflows. The waterfall
+    /// revises them after the first evaluation pass.
     pub(crate) fn set_capital_structure_cashflows(
         &mut self,
         cashflows: crate::capital_structure::CapitalStructureCashflows,
     ) {
         self.capital_structure_cashflows = Some(cashflows);
-        self.sorted_history_cache.borrow_mut().clear();
     }
 
     /// Set the value for a node in the current period.
@@ -223,12 +180,7 @@ impl EvaluationContext {
         }
 
         self.current_values[*idx] = Some(value);
-        // Drop any cached sorted-history entry whose "current" view depended on
-        // the previous value — repeat sets on the same node within a period are
-        // rare but they happen (e.g., normalization rewrites), and a stale
-        // cache here would silently feed yesterday's value to rolling /
-        // statistical functions.
-        self.invalidate_sorted_cache(node_id);
+        self.current_cells[*idx] = None;
         Ok(())
     }
 
@@ -262,114 +214,127 @@ impl EvaluationContext {
         }
     }
 
-    /// Get a capital-structure component from one completed period.
+    /// The typed value a formula reads for a node in the current period.
     ///
-    /// `component` accepts `interest_expense`, `interest_expense_cash`,
-    /// `interest_expense_pik`, `principal_payment`, `debt_balance`, `fees`, or
-    /// `accrued_interest`. Pass an instrument identifier in
-    /// `instrument_or_total` for its native-currency value, or `total` for the
-    /// cashflow aggregate, which requires the reporting-currency invariant.
+    /// A cell stored by the evaluator keeps its type and state. A value stored
+    /// as a float (a history row, a check or rollup context) is an untyped
+    /// number, or unavailable when it is not finite.
+    pub(crate) fn get_operand(&self, node_id: &str) -> Result<super::value::Value> {
+        let idx = *self
+            .node_to_column
+            .get(node_id)
+            .ok_or_else(|| Error::node_not_found(node_id))?;
+        match self.current_cells[idx] {
+            Some(cell) => Ok(super::value::Value::from_cell(cell)),
+            None => self.get_value(node_id).map(super::value::Value::from_float),
+        }
+    }
+
+    /// The typed value of a `cs.<component>.<scope>` reference this period.
     ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error if no historical snapshot exists for
-    /// `period_id`, the component is unknown, the instrument or its cashflow is
-    /// absent, or an aggregate cannot be formed under the currency invariant.
-    pub fn get_historical_cs_value(
+    /// An exact amount in the scope's currency. A consolidated value whose
+    /// period could not be consolidated (a missing period-close FX quote, or
+    /// no reporting currency) is unavailable; native values still resolve.
+    pub(crate) fn get_cs(&self, component: &str, scope: &str) -> Result<super::value::Value> {
+        let cs_cashflows = self
+            .capital_structure_cashflows
+            .as_ref()
+            .ok_or_else(|| Error::capital_structure("No capital structure defined in model"))?;
+        cs_value(cs_cashflows, component, scope, &self.period_id)
+    }
+
+    /// The typed value of a `cs.<component>.<scope>` reference in a completed
+    /// period, with the availability rules of [`Self::get_cs`].
+    pub(crate) fn get_historical_cs(
         &self,
         component: &str,
-        instrument_or_total: &str,
+        scope: &str,
         period_id: &PeriodId,
-    ) -> Result<f64> {
+    ) -> Result<super::value::Value> {
         let cashflows = self
             .historical_capital_structure_cashflows
             .get(period_id)
             .ok_or_else(|| {
                 Error::capital_structure(format!(
-                    "No historical capital structure data for period {}",
-                    period_id
+                    "No historical capital structure data for period {period_id}"
                 ))
             })?;
-        cashflows.get_component(component, instrument_or_total, period_id)
-    }
-
-    /// Get capital structure value for the current period.
-    ///
-    /// # Arguments
-    /// * `component` - Component type: "interest_expense", "interest_expense_cash", "interest_expense_pik",
-    ///   "principal_payment", or "debt_balance"
-    /// * `instrument_or_total` - Instrument ID or "total" for aggregate
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use finstack_quant_statements::evaluator::EvaluationContext;
-    ///
-    /// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    /// # let context: EvaluationContext = unimplemented!("obtained during evaluation");
-    /// // Total interest (cash + PIK)
-    /// let total_interest = context.get_cs_value("interest_expense", "total")?;
-    ///
-    /// // Cash interest only
-    /// let cash_interest = context.get_cs_value("interest_expense_cash", "total")?;
-    ///
-    /// // PIK interest only
-    /// let pik_interest = context.get_cs_value("interest_expense_pik", "total")?;
-    /// # let _ = (total_interest, cash_interest, pik_interest);
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// The component names `fees` and `accrued_interest` are also supported.
-    /// Per-instrument values use their native currencies; `total` values use
-    /// the capital structure's reporting-currency aggregation convention.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error if this evaluation has no cashflow
-    /// state, `component` is unsupported, the requested instrument or period
-    /// cashflow is absent, or an aggregate cannot satisfy the currency
-    /// invariant.
-    pub fn get_cs_value(&self, component: &str, instrument_or_total: &str) -> Result<f64> {
-        let cs_cashflows = self
-            .capital_structure_cashflows
-            .as_ref()
-            .ok_or_else(|| Error::capital_structure("No capital structure defined in model"))?;
-        cs_cashflows.get_component(component, instrument_or_total, &self.period_id)
+        cs_value(cashflows, component, scope, period_id)
     }
 
     /// Record which evaluation layer produced the current-period value of
     /// `node_id`. Unknown nodes are ignored: `set_value` has already rejected
     /// them by the time the evaluator records a source.
+    /// Store an evaluated cell and its numeric view for the current period.
+    ///
+    /// A cell without a value is stored with a `NaN` numeric view, which the
+    /// formula kernels read as "no value". No warning is recorded: the cell's
+    /// state already says why it has none.
+    pub(crate) fn set_cell(&mut self, node_id: &str, cell: super::cell::Cell) -> Result<()> {
+        let idx = *self
+            .node_to_column
+            .get(node_id)
+            .ok_or_else(|| Error::node_not_found(node_id))?;
+        self.current_values[idx] = Some(cell.numeric().unwrap_or(f64::NAN));
+        self.current_cells[idx] = Some(cell);
+        Ok(())
+    }
+
     pub(crate) fn set_source(&mut self, node_id: &str, source: super::CellSource) {
         if let Some(idx) = self.node_to_column.get(node_id) {
             self.current_sources[*idx] = Some(source);
         }
     }
 
-    /// Recorded evaluation layers for the current period, keyed by node id.
-    pub(crate) fn cell_sources(&self) -> IndexMap<String, super::CellSource> {
-        self.node_to_column
-            .iter()
-            .filter_map(|(node_id, idx)| {
-                self.current_sources[*idx].map(|source| (node_id.as_str().to_string(), source))
-            })
-            .collect()
-    }
-
-    /// Get all results as a map.
+    /// The period's published cells with their value sources, its row for the
+    /// period history, and the warnings raised while evaluating it.
     ///
-    /// Only includes nodes that have been evaluated (Some value).
-    /// Nodes with None are skipped (should not happen in valid evaluation).
-    pub(crate) fn into_results(self) -> (IndexMap<String, f64>, Vec<EvalWarning>) {
+    /// A value set outside the precedence loop becomes a scalar value cell,
+    /// or a missing cell when it is not finite.
+    pub(crate) fn into_results(
+        self,
+    ) -> (
+        IndexMap<String, super::ResultCell>,
+        super::engine::PeriodRow,
+        Vec<EvalWarning>,
+    ) {
         let mut results = IndexMap::new();
         for (node_id, idx) in self.node_to_column.iter() {
-            if let Some(value) = self.current_values[*idx] {
-                results.insert(node_id.as_str().to_string(), value);
-            }
+            let cell = match (self.current_cells[*idx], self.current_values[*idx]) {
+                (Some(cell), _) => super::ResultCell::from_cell(cell, self.current_sources[*idx]),
+                (None, Some(value)) => super::ResultCell::scalar(value).unwrap_or_else(|_| {
+                    super::ResultCell::without_value(super::CellStatus::Missing)
+                }),
+                (None, None) => continue,
+            };
+            results.insert(node_id.as_str().to_string(), cell);
         }
-        (results, self.warnings)
+        (
+            results,
+            (self.current_values, self.current_cells),
+            self.warnings,
+        )
     }
+}
+
+/// One `cs.<component>.<scope>` value of `period_id` read from `cashflows`.
+fn cs_value(
+    cashflows: &crate::capital_structure::CapitalStructureCashflows,
+    component: &str,
+    scope: &str,
+    period_id: &PeriodId,
+) -> Result<super::value::Value> {
+    use crate::capital_structure::CsScope;
+    let scope: CsScope = scope.parse()?;
+    if scope == CsScope::Consolidated && cashflows.consolidation_unavailable.contains_key(period_id)
+    {
+        return Ok(super::value::Value::Unavailable(
+            super::UnavailableReason::MissingFxQuote,
+        ));
+    }
+    cashflows
+        .get_money(component.parse()?, &scope, period_id)
+        .map(super::value::Value::Money)
 }
 
 #[cfg(test)]

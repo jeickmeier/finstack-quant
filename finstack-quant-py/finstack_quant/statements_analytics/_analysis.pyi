@@ -366,10 +366,10 @@ class Explanation:
     @property
     def source(self) -> str | None:
         """
-        Evaluation layer that produced the value under the
+        Value source selected for the cell under the
         ``Value > Forecast > Formula`` precedence: ``"value"`` (the explicit
-        value stored on the node), ``"forecast"``, ``"formula"`` or
-        ``"where_masked"`` (the node's ``where`` clause zeroed the cell).
+        value stored on the node), ``"forecast"`` or ``"formula"``. ``None``
+        for a masked or missing cell, which has no source.
 
         This property does not raise.
 
@@ -413,8 +413,8 @@ class Explanation:
         references.
 
         Populated only when the formula produced the value (``source`` is
-        ``"formula"`` or ``None``); empty when ``source`` is ``"value"``,
-        ``"forecast"`` or ``"where_masked"``. When the formula is a pure
+        ``"formula"`` or ``None``); empty when ``source`` is ``"value"`` or
+        ``"forecast"``. When the formula is a pure
         sum/difference of references there is one step per term in formula
         order, each with ``operation`` ``"+"`` or ``"-"``, and the signed
         values sum to ``final_value``; for any other formula each referenced

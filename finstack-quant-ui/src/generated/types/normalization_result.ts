@@ -2,25 +2,57 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Value that can be currency-aware or unitless.
+ *
+ * Used for node values that can represent:
+ * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+ * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
+ */
+export type D_1A33Cd5924Cacf20C932 = DC3896Cb08B179A9D0375 | number;
+/**
+ * Why a cell has no value although its node and period are valid.
+ *
+ * An unavailable cell is not an error: the model is well formed and the run
+ * continues. Invalid arithmetic, an invalid mask and unrepresentable money
+ * are errors instead and fail the run.
+ */
+export type D_54B78745Cfcb23Fb39C0 =
+  | "missing_mask"
+  | "hidden_by_cutoff"
+  | "missing_input"
+  | "undefined_base"
+  | "missing_forecast_base"
+  | "missing_peer_shock"
+  | "missing_fx_quote";
+
+/**
  * Per-period normalization outcome: base value, applied adjustments and final value.
  */
 export interface NormalizationResultWire {
   /**
-   * Detailed breakdown of applied adjustments
+   * The bridge rows in declaration order. Empty when the period is
+   * unavailable.
    */
-  adjustments: D_662416664Db07Cac434B[];
+  adjustments?: D_662416664Db07Cac434B[];
   /**
-   * The original raw value of the target node
+   * The reported value of the target node. Absent when the period is
+   * unavailable because the target itself has no value.
    */
-  base_value: number;
+  base_value?: D_1A33Cd5924Cacf20C932 | null;
   /**
-   * The final adjusted value
+   * The adjusted value. Absent when the period is unavailable.
    */
-  final_value: number;
+  final_value?: D_1A33Cd5924Cacf20C932 | null;
   /**
    * The period this result applies to
    */
   period: string;
+  /**
+   * Why the period has no adjusted value: the target, a percentage
+   * reference or a cap base is missing, masked or unavailable. Absent
+   * when the period has a value.
+   */
+  unavailable?: D_54B78745Cfcb23Fb39C0 | null;
   /**
    * Unit and currency shared by the base, adjustments, and final value.
    */
@@ -198,30 +230,41 @@ export interface NormalizationResultWire {
         type: "scalar";
         [k: string]: unknown;
       };
-  [k: string]: unknown;
 }
 /**
- * Details of a single applied adjustment.
+ * One row of a normalization bridge.
  */
 export interface D_662416664Db07Cac434B {
   /**
    * Target value through this adjustment: the period's `base_value` plus
-   * the capped amounts of this and every earlier adjustment, in declaration
-   * order and the target's units. The last adjustment's value equals the
-   * period's `final_value`, so a base-to-adjusted bridge reads each step's
-   * span from the previous step's value (or `base_value`) to this one.
+   * the applied amounts of this and every earlier adjustment, in
+   * declaration order. The last row's value equals the period's
+   * `final_value`.
    */
-  adjusted_value: number;
+  adjusted_value: DC3896Cb08B179A9D0375 | number;
   /**
    * ID of the adjustment
    */
   adjustment_id: string;
   /**
-   * The final amount after applying any caps
+   * The value the cap was sized against, for a reference cap.
    */
-  capped_amount: number;
+  cap_base?: D_1A33Cd5924Cacf20C932 | null;
   /**
-   * Whether the amount was capped
+   * The non-negative limit on the adjustment's magnitude, when it has a
+   * cap.
+   */
+  cap_limit?: D_1A33Cd5924Cacf20C932 | null;
+  /**
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
+   */
+  capped_amount: DC3896Cb08B179A9D0375 | number;
+  /**
+   * Whether the cap reduced the amount
    */
   is_capped: boolean;
   /**
@@ -229,8 +272,188 @@ export interface D_662416664Db07Cac434B {
    */
   name: string;
   /**
-   * The raw calculated amount before capping
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
    */
-  raw_amount: number;
-  [k: string]: unknown;
+  raw_amount: DC3896Cb08B179A9D0375 | number;
+}
+/**
+ * Currency-aware amount
+ */
+export interface DC3896Cb08B179A9D0375 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
 }

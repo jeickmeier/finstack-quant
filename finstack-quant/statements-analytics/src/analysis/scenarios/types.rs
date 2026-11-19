@@ -341,7 +341,11 @@ impl SensitivityResult {
         node_id: &str,
         period: &PeriodId,
     ) -> finstack_quant_statements::Result<Option<f64>> {
-        Ok(self.scenario(scenario_index)?.results.get(node_id, period))
+        Ok(crate::cell_float(
+            &self.scenario(scenario_index)?.results,
+            node_id,
+            period,
+        ))
     }
 }
 
@@ -352,11 +356,7 @@ mod tests {
     fn result_with_one_scenario() -> SensitivityResult {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut results = StatementResult::default();
-        results
-            .nodes
-            .entry("profit".to_string())
-            .or_default()
-            .insert(period, 42.0);
+        results.set_scalar("profit", period, 42.0).expect("finite");
         SensitivityResult {
             config: SensitivityConfig::new(SensitivityMode::Diagonal),
             scenarios: vec![SensitivityScenario {

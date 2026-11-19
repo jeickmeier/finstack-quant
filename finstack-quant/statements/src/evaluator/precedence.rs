@@ -2,16 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::types::{NodeSpec, NodeType};
-use finstack_quant_core::dates::{Date, PeriodId};
-
-/// An explicit actual hidden by the as-of visibility cutoff.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct HiddenObservation {
-    /// Date from which the observation is visible.
-    pub(crate) available_on: Date,
-    /// Visibility cutoff of the evaluation.
-    pub(crate) as_of: Date,
-}
+use finstack_quant_core::dates::PeriodId;
 
 /// Resolve the value for a node in a specific period using precedence rules.
 ///
@@ -20,27 +11,30 @@ pub(crate) struct HiddenObservation {
 /// - If explicit value exists for this period (and is visible) → use Value
 /// - Else if forecast is applicable → use Forecast
 /// - Else if formula exists → use Formula
-/// - Else → error (node cannot be resolved)
+/// - Else, for a Value or Mixed node → Missing (the cell has no observation),
+///   or Hidden when its observation exists but was published after the
+///   observation cutoff
+/// - A Calculated node without a formula → error
 ///
 /// # Arguments
 /// * `node_spec` - Node metadata that includes values, forecast config, and formula text
 /// * `period_id` - Period being evaluated
 /// * `is_actual_period` - Flag indicating whether the period is classified as actuals (forecasts are skipped)
-/// * `hidden` - `Some` hides explicit values (as-of evaluation of a
-///   not-yet-available actual) while still allowing forecast/formula
-///   fallbacks; its dates explain the hiding when no fallback exists
+/// * `hidden` - The node's explicit observation for this period was published
+///   after the observation cutoff, so it is not read; a forecast or formula
+///   may still supply the period
 pub(crate) fn resolve_node_value(
     node_spec: &NodeSpec,
     period_id: &PeriodId,
     is_actual_period: bool,
-    hidden: Option<HiddenObservation>,
+    hidden: bool,
 ) -> Result<NodeValueSource> {
     // 1. Check for explicit value (highest precedence)
-    if hidden.is_none()
+    if !hidden
         && let Some(values) = &node_spec.values
         && let Some(amount_or_scalar) = values.get(period_id)
     {
-        return Ok(NodeValueSource::Value(amount_or_scalar.value()));
+        return Ok(NodeValueSource::Value(*amount_or_scalar));
     }
 
     // 2. Check for forecast (only in forecast periods, not actuals)
@@ -55,33 +49,16 @@ pub(crate) fn resolve_node_value(
 
     // 4. No resolution method available
     match node_spec.node_type {
-        NodeType::Value => {
-            let message = match hidden {
-                None => format!(
-                    "Value node '{}' has no value for period {}",
-                    node_spec.node_id, period_id
-                ),
-                Some(HiddenObservation {
-                    available_on,
-                    as_of,
-                }) => format!(
-                    "Value node '{}' has no value visible under the active as_of policy for \
-                     period {period_id}: its actual is available on {available_on}, after \
-                     as_of {as_of} (an actual becomes visible on its availability date, by \
-                     default the period's exclusive end); use an as_of on or after \
-                     {available_on} or set the node's availability_dates",
-                    node_spec.node_id
-                ),
-            };
-            Err(Error::eval(message))
-        }
+        // A missing cell is represented by absence
+        // (STATEMENTS-CONTRACTS-001 #3); a hidden one is unavailable.
+        NodeType::Value | NodeType::Mixed => Ok(if hidden {
+            NodeValueSource::Hidden
+        } else {
+            NodeValueSource::Missing
+        }),
         NodeType::Calculated => Err(Error::eval(format!(
             "Calculated node '{}' has no formula",
             node_spec.node_id
-        ))),
-        NodeType::Mixed => Err(Error::eval(format!(
-            "Mixed node '{}' has no value, forecast, or formula for period {}",
-            node_spec.node_id, period_id
         ))),
     }
 }
@@ -89,14 +66,21 @@ pub(crate) fn resolve_node_value(
 /// Source of a node's value for a period.
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeValueSource {
-    /// Explicit value
-    Value(f64),
+    /// Explicit observation
+    Value(crate::types::AmountOrScalar),
 
     /// Forecast (to be evaluated by the forecast engine)
     Forecast,
 
     /// Formula to evaluate (looked up from the compiled cache, not stored here)
     Formula,
+
+    /// No observation, forecast or formula for this period
+    Missing,
+
+    /// The observation was published after the cutoff and nothing else
+    /// supplies the period
+    Hidden,
 }
 
 #[cfg(test)]
@@ -127,12 +111,15 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
-            None,
+            false,
         )
         .unwrap();
 
         // Should use explicit value, not formula
-        assert_eq!(source, NodeValueSource::Value(100.0));
+        assert_eq!(
+            source,
+            NodeValueSource::Value(AmountOrScalar::scalar(100.0))
+        );
     }
 
     #[test]
@@ -143,7 +130,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
-            None,
+            false,
         )
         .unwrap();
 
@@ -152,61 +139,53 @@ mod tests {
     }
 
     #[test]
-    fn test_value_node_missing_value_error() {
-        let node = NodeSpec::new("revenue", NodeType::Value);
-
-        let result = resolve_node_value(
-            &node,
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            true,
-            None,
-        );
-
-        // Should error because no value provided
-        assert!(result.is_err());
+    fn value_or_mixed_node_without_an_observation_is_missing() {
+        for node_type in [NodeType::Value, NodeType::Mixed] {
+            let node = NodeSpec::new("revenue", node_type);
+            let source = resolve_node_value(
+                &node,
+                &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                true,
+                false,
+            )
+            .expect("an absent observation is a missing cell, not an error");
+            assert_eq!(source, NodeValueSource::Missing);
+        }
     }
 
     #[test]
-    fn test_hidden_value_error_message_is_well_formed() {
-        let node = NodeSpec::new("revenue", NodeType::Value);
-
-        let err = resolve_node_value(
-            &node,
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            true,
-            Some(HiddenObservation {
-                available_on: Date::from_calendar_date(2025, time::Month::April, 1).unwrap(),
-                as_of: Date::from_calendar_date(2025, time::Month::March, 31).unwrap(),
-            }),
-        )
-        .expect_err("hidden value node must error");
-
-        let message = err.to_string();
+    fn hidden_observation_without_a_fallback_is_hidden_not_an_error() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let values = IndexMap::from([(period, AmountOrScalar::scalar(100.0))]);
+        let value_only = NodeSpec::new("revenue", NodeType::Value).with_values(values.clone());
+        assert_eq!(
+            resolve_node_value(&value_only, &period, true, true).expect("hidden"),
+            NodeValueSource::Hidden
+        );
+        let with_formula = NodeSpec::new("revenue", NodeType::Mixed)
+            .with_values(values)
+            .with_formula("123");
         assert!(
-            message
-                .contains("has no value visible under the active as_of policy for period 2025Q1")
-                && message.contains("available on 2025-04-01, after as_of 2025-03-31"),
-            "got: {message}"
+            resolve_node_value(&with_formula, &period, true, true)
+                .expect("the formula supplies the hidden period")
+                .is_formula()
         );
     }
 
     #[test]
     fn test_forecast_in_forecast_period() {
-        use crate::types::{ForecastMethod, ForecastSpec};
+        use crate::types::ForecastSpec;
 
         let node = NodeSpec::new("revenue", NodeType::Mixed)
             .with_formula("lag(revenue, 1)")
-            .with_forecast(ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: IndexMap::new(),
-            });
+            .with_forecast(ForecastSpec::growth(0.05));
 
         // In forecast period, should prefer forecast over formula
         let source = resolve_node_value(
             &node,
             &PeriodId::quarter(2025, 3).expect("valid period fixture"),
             false,
-            None,
+            false,
         )
         .unwrap();
         assert_eq!(source, NodeValueSource::Forecast);
@@ -214,21 +193,18 @@ mod tests {
 
     #[test]
     fn test_formula_in_actual_period() {
-        use crate::types::{ForecastMethod, ForecastSpec};
+        use crate::types::ForecastSpec;
 
         let node = NodeSpec::new("revenue", NodeType::Mixed)
             .with_formula("lag(revenue, 1)")
-            .with_forecast(ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: IndexMap::new(),
-            });
+            .with_forecast(ForecastSpec::growth(0.05));
 
         // In actual period, should use formula (not forecast)
         let source = resolve_node_value(
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
-            None,
+            false,
         )
         .unwrap();
         assert!(source.is_formula());

@@ -40,36 +40,104 @@ def test_dataframe_rejects_extra_period_without_overwriting_existing_nodes(cell:
     assert model.get_node("revenue").values == {"2025Q1": 7.0}
 
 
-@pytest.mark.parametrize("ready", [False, True])
-def test_dataframe_parses_all_null_column_labels_before_mutation(ready: bool) -> None:
+def test_dataframe_parses_all_null_column_labels_before_mutation() -> None:
     builder = s.ModelBuilder("bad-label")
-    if ready:
-        builder.periods("2025Q1..Q2", "2025Q1")
+    builder.periods("2025Q1..Q2", "2025Q1")
     frame = pd.DataFrame([[100.0, None, 200.0]], index=["revenue"], columns=["2025Q1", "typo", "2025Q2"])
-    with pytest.raises(ValueError, match="invalid period id"):
+    with pytest.raises(ValueError, match="Period column 'typo'"):
         builder.from_dataframe(frame)
-    if not ready:
-        builder.periods("2025Q1..Q2", "2025Q1")
-    assert builder.build().node_count == 0
+    with pytest.raises(ValueError, match="at least one node"):
+        builder.build()
 
 
-def test_dataframe_invalid_cell_does_not_install_an_inferred_timeline() -> None:
-    builder = s.ModelBuilder("bad-cell")
-    frame = pd.DataFrame([[100.0, "invalid"]], index=["revenue"], columns=["2025Q1", "2025Q2"])
-    with pytest.raises(ValueError, match="is not numeric"):
+def test_dataframe_import_needs_a_timeline_and_never_infers_one() -> None:
+    builder = s.ModelBuilder("no-plan")
+    frame = pd.DataFrame([[100.0, 200.0]], index=["revenue"], columns=["2025Q1", "2025Q2"])
+    with pytest.raises(ValueError, match="Set the model timeline"):
         builder.from_dataframe(frame)
     builder.periods("2025Q3..Q4", "2025Q3")
+    builder.value_scalar("revenue", [])
     assert builder.build().periods == ["2025Q3", "2025Q4"]
 
 
-def test_dataframe_valid_import_preserves_actual_cutoff_and_missing_cells() -> None:
+def test_dataframe_invalid_cell_leaves_the_builder_unchanged() -> None:
+    builder = s.ModelBuilder("bad-cell")
+    builder.periods("2025Q1..Q2", "2025Q1")
+    frame = pd.DataFrame([[100.0, "invalid"]], index=["revenue"], columns=["2025Q1", "2025Q2"])
+    with pytest.raises(ValueError, match="is not numeric"):
+        builder.from_dataframe(frame)
+    builder.value_scalar("revenue", [])
+    assert builder.build().get_node("revenue").values == {}
+
+
+def test_dataframe_valid_import_maps_unordered_columns_and_keeps_missing_cells_and_zeros() -> None:
     builder = s.ModelBuilder("valid-import")
-    frame = pd.DataFrame([[100.0, None, 300.0]], index=["revenue"], columns=["2025Q1", "2025Q2", "2025Q3"])
-    builder.from_dataframe(frame, actuals_until="2025Q1")
+    builder.periods("2025Q1..Q3", "2025Q1")
+    frame = pd.DataFrame(
+        [[300.0, 100.0, None], [0.0, float("nan"), 5.0]],
+        index=["revenue", "cash"],
+        columns=["2025Q3", "2025Q1", "2025Q2"],
+    )
+    builder.from_dataframe(frame)
     model = builder.build()
     assert model.actual_periods == ["2025Q1"]
     assert model.forecast_periods == ["2025Q2", "2025Q3"]
-    assert model.get_node("revenue").values == {"2025Q1": 100.0, "2025Q3": 300.0}
+    assert model.get_node("revenue").values == {"2025Q3": 300.0, "2025Q1": 100.0}
+    assert model.get_node("cash").values == {"2025Q3": 0.0, "2025Q2": 5.0}
+
+    duplicate = s.ModelBuilder("duplicate-column")
+    duplicate.periods("2025Q1..Q3", None)
+    repeated = pd.DataFrame([[1.0, 2.0]], index=["revenue"], columns=["2025Q1", "2025Q1"])
+    with pytest.raises(ValueError, match="more than once"):
+        duplicate.from_dataframe(repeated)
+
+
+def test_named_edits_snapshot_identity_and_observation_cutoff() -> None:
+    """STATEMENTS-CONTRACTS-002: revision replay through the Python surface."""
+    from finstack_quant.core.market_data import MarketContext
+
+    def snapshot(snapshot_id: str, amount: float, published: str) -> s.FinancialModelSpec:
+        builder = s.ModelBuilder("replay")
+        builder.periods("2025Q1..Q2", "2025Q1")
+        builder.value("revenue", [("2025Q1", amount), ("2025Q2", 125.0)])
+        builder.availability_dates("revenue", [("2025Q1", published)])
+        builder.source_snapshot(snapshot_id)
+        return builder.build()
+
+    original = snapshot("original", 100.0, "2025-04-25")
+    revised = original.apply_edits([
+        {
+            "edit": "set_observation",
+            "node_id": "revenue",
+            "period": "2025Q1",
+            "value": 110.0,
+            "availability_date": "2025-05-15",
+        }
+    ])
+    assert original.get_node("revenue").values["2025Q1"] == 100.0, "edits never change the source model"
+    assert original.source_snapshot == "original"
+
+    def read(model: s.FinancialModelSpec, cutoff: str) -> float | None:
+        result = s.Evaluator().evaluate_with_market(model, MarketContext(), "2025-06-30", cutoff)
+        return result.get("revenue", "2025Q1")
+
+    assert read(original, "2025-04-25") == 100.0
+    assert read(original, "2025-04-24") is None, "an unpublished observation has no value"
+    assert read(revised, "2025-05-15") == 110.0
+    assert read(revised, "2025-05-14") is None
+    assert read(revised, "full_snapshot") == 110.0
+
+    with pytest.raises(ValueError, match="unknown node 'absent'"):
+        original.apply_edits([{"edit": "remove_node", "node_id": "absent"}])
+    with pytest.raises(ValueError, match="invalid model edits"):
+        original.apply_edits([{"edit": "rename_node", "node_id": "revenue"}])
+
+    builder = s.ModelBuilder("duplicates")
+    builder.periods("2025Q1..Q1", None)
+    builder.value("revenue", [("2025Q1", 1.0)])
+    builder.value("revenue", [("2025Q1", 2.0)])
+    with pytest.raises(ValueError, match="defined more than once"):
+        builder.build()
 
 
 def test_wide_export_index_name_is_rejected_during_model_construction() -> None:

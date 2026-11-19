@@ -1,21 +1,22 @@
-//! EBITDA normalization and add-back utilities.
+//! Ordered normalization bridges from a reported metric to a separately
+//! named adjusted metric, such as reported EBITDA to adjusted EBITDA.
 //!
-//! This module groups the public API used to compute adjusted metrics such as
-//! adjusted EBITDA from statement results plus an explicit catalog of
-//! add-backs, caps, and normalization policies.
-//!
-//! Start with [`NormalizationConfig`] to define the adjustment policy and
-//! [`normalize`] to execute it.
+//! Start with [`NormalizationConfig`] to name the reported node, the new
+//! output node and the ordered adjustments, [`normalize`] to build the bridge
+//! and [`merge_into_results`] to publish the adjusted node.
 //!
 //! ## Conventions
 //!
-//! - Adjustment values are expressed in the same units as the statement metric
-//!   being normalized.
-//! - Caps and overrides are applied explicitly through the normalization config
-//!   rather than inferred from accounting metadata.
-//! - The output keeps both the adjusted total and an audit trail of applied
-//!   adjustments so downstream reporting can explain the bridge from reported to
-//!   adjusted values.
+//! - Fixed amounts and absolute caps are typed: scalars for a scalar target,
+//!   money in its currency for a monetary one. Nothing is converted between
+//!   currencies.
+//! - Each cap applies to its own adjustment, limits magnitude and keeps the
+//!   sign. Nothing is inferred from accounting metadata; categories are
+//!   presentation labels.
+//! - The reported node is never overwritten. The adjusted metric is published
+//!   under a new node id with its configuration, and every row of the bridge
+//!   records its raw amount, cap base and limit, applied amount and running
+//!   value.
 
 mod engine;
 mod types;

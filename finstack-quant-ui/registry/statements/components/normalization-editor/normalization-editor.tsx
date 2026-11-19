@@ -19,8 +19,14 @@ import { FinstackTable } from "@/components/finstack/shared/table/finstack-table
 import { normalizationConfigModule } from "./normalization-config";
 import type { NormalizationConfigWire } from "@/lib/finstack/generated/types/normalization_config";
 
-/** Config fields that name a statement node, offered as the model's node ids. */
+/** Config fields that name an existing statement node, offered as the model's node ids. */
 const nodeFieldPath = /(^|\.)(target_node|node_id|base_node)$/;
+/** A returned amount: a number for a scalar target, exact tagged money for a monetary one. */
+type Amount = NonNullable<NormalizationResult["final_value"]>;
+/** The float of a returned amount, for a chart position or display; money's decimal text is parsed, not rounded. */
+export function amountNumber(amount: Amount): number {
+  return typeof amount === "number" ? amount : Number(amount.amount);
+}
 /** One bar of the bridge: a level from zero, or a step between two returned values. */
 export interface Bar {
   id: string;
@@ -40,36 +46,41 @@ export interface Bar {
  * a returned value; nothing is added here.
  */
 export function bridgeBars(result: NormalizationResult): Bar[] {
+  // A period Rust returns as unavailable has no base-to-adjusted bridge.
+  if (result.base_value == null || result.final_value == null) return [];
+  const base = amountNumber(result.base_value);
   const bars: Bar[] = [
     {
       id: "base_value",
       label: labelFor("base_value"),
       kind: "Level",
       from: 0,
-      to: result.base_value,
-      amount: result.base_value,
+      to: base,
+      amount: base,
     },
   ];
-  let previous = result.base_value;
-  for (const step of result.adjustments) {
+  let previous = base;
+  for (const step of result.adjustments ?? []) {
+    const adjusted = amountNumber(step.adjusted_value);
     bars.push({
       id: `adjustment:${step.adjustment_id}`,
       label: step.name,
       kind: step.is_capped ? "Capped adjustment" : "Adjustment",
       from: previous,
-      to: step.adjusted_value,
-      amount: step.capped_amount,
-      raw: step.is_capped ? step.raw_amount : undefined,
+      to: adjusted,
+      amount: amountNumber(step.capped_amount),
+      raw: step.is_capped ? amountNumber(step.raw_amount) : undefined,
     });
-    previous = step.adjusted_value;
+    previous = adjusted;
   }
+  const final = amountNumber(result.final_value);
   bars.push({
     id: "final_value",
     label: labelFor("final_value"),
     kind: "Level",
     from: 0,
-    to: result.final_value,
-    amount: result.final_value,
+    to: final,
+    amount: final,
   });
   return bars;
 }
@@ -89,20 +100,23 @@ export interface NormalizationEditorProps {
   /** Native statements.normalize results, one per period in Rust's order; null while none is available. */
   results: readonly NormalizationResult[] | null | undefined;
   loading?: boolean;
-  /** Native error (a missing node, a non-finite base, a negative cap), shown as returned. */
+  /** Native error (a missing node, mismatched units, a negative cap), shown as returned. */
   error?: string;
   /** Display text of a returned number; defaults to every supplied digit. */
   formatValue?: (value: number) => string;
   density?: "compact" | "comfortable";
 }
 /**
- * Edits a Rust NormalizationConfig (the add-backs and deductions to a target
- * metric such as EBITDA) with the schema form over the generated contract and
+ * Edits a Rust NormalizationConfig (the ordered add-backs and deductions from a
+ * reported metric such as EBITDA to a separately named adjusted metric) with
+ * the schema form over the generated contract and
  * presents the native statements.normalize results as returned, above the
  * form so the answer leads: for a chosen period, a bridge from the reported
  * base through each adjustment, in declaration order, to the adjusted value,
  * and a table of every adjustment's capped amount by period. Bars run between the values Rust returns for each
- * step (`adjusted_value`); nothing is summed, capped or classified here.
+ * step (`adjusted_value`); nothing is summed, capped or classified here. A
+ * period Rust returns without an adjusted value shows its reason instead of a
+ * bridge.
  */
 export function NormalizationEditor({
   defaultConfig,
@@ -241,7 +255,9 @@ function NormalizationResults({
   );
   const rows: Row[] = [
     { id: "base_value", label: labelFor("base_value"), kind: "base_value" },
-    ...results[0].adjustments.map((step, index): Row => ({
+    ...(
+      results.find((result) => result.adjustments?.length)?.adjustments ?? []
+    ).map((step, index): Row => ({
       id: `adjustment:${step.adjustment_id}`,
       label: step.name,
       kind: "adjustment",
@@ -250,11 +266,16 @@ function NormalizationResults({
     { id: "final_value", label: labelFor("final_value"), kind: "final_value" },
   ];
   const cell = (row: Row, result: NormalizationResult): string => {
-    if (row.kind !== "adjustment") return formatValue(result[row.kind]);
-    const step = result.adjustments[row.index];
+    if (row.kind !== "adjustment") {
+      const value = result[row.kind];
+      return value == null ? "Unavailable" : formatValue(amountNumber(value));
+    }
+    const step = result.adjustments?.[row.index];
+    if (!step) return "Unavailable";
+    const applied = formatValue(amountNumber(step.capped_amount));
     return step.is_capped
-      ? `${formatValue(step.capped_amount)} (capped; raw ${formatValue(step.raw_amount)})`
-      : formatValue(step.capped_amount);
+      ? `${applied} (capped; raw ${formatValue(amountNumber(step.raw_amount))})`
+      : applied;
   };
   const columns: ColumnDef<{}, Row, any>[] = [
     {
@@ -289,9 +310,16 @@ function NormalizationResults({
         both as Rust returns them; a capped adjustment shows its capped amount
         and the raw amount before the cap.
       </p>
-      <figure className="min-w-0">
-        <FinstackChart definition={definition} ariaLabel={caption} />
-      </figure>
+      {bars.length === 0 ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {shown.period} has no adjusted value:{" "}
+          {labelFor(shown.unavailable ?? "missing_input")}.
+        </p>
+      ) : (
+        <figure className="min-w-0">
+          <FinstackChart definition={definition} ariaLabel={caption} />
+        </figure>
+      )}
       <FinstackTable
         data={rows}
         columns={columns}

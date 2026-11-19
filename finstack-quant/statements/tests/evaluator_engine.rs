@@ -116,6 +116,7 @@ fn test_recompile_on_reuse() {
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid periods");
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().expect("build should succeed")
     }
     .periods;
@@ -165,15 +166,21 @@ fn test_recompile_on_reuse() {
 
 #[test]
 fn test_results_include_warnings() {
-    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q = |quarter| PeriodId::quarter(2025, quarter).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("warnings");
         model_builder
-            .periods("2025Q1..Q1", None)
-            .expect("valid period");
-        model_builder.value("denominator", &[(period, AmountOrScalar::scalar(0.0))]);
+            .periods("2025Q1..Q2", None)
+            .expect("valid periods");
+        model_builder.value(
+            "base",
+            &[
+                (q(1), AmountOrScalar::scalar(0.0)),
+                (q(2), AmountOrScalar::scalar(1.0)),
+            ],
+        );
         model_builder
-            .compute("ratio", "1.0 / denominator")
+            .compute("change", "pct_change(base, 1)")
             .expect("valid formula");
         model_builder.build().expect("valid model")
     };
@@ -184,8 +191,8 @@ fn test_results_include_warnings() {
     assert!(
         results.meta.warnings.iter().any(|warning| matches!(
             warning,
-            EvalWarning::DivisionByZero { node_id, period: p } if node_id == "ratio" && *p == period
+            EvalWarning::DivisionByZero { node_id, period } if node_id == "change" && *period == q(2)
         )),
-        "expected division-by-zero warning for ratio node"
+        "expected a zero-base warning for the change node"
     );
 }

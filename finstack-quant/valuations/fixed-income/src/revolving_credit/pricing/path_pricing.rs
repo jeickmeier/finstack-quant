@@ -375,7 +375,7 @@ impl RevolvingCreditPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        let schedule = CashflowEngine::deterministic(facility, market, as_of)?;
+        let schedule = CashflowEngine::deterministic(facility, market, as_of, &[])?;
         let result = Self::price_single_path(facility, market, as_of, schedule)?;
         Ok(result.pv)
     }

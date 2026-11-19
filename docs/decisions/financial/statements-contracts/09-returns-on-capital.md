@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full bundled period returns contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited catalogue uses period-end balances, separate earnings expressions and a reported-tax ROIC approximation.
+**Implementation status:** Reconciled (2026-11-17). The four bundled returns are `ratio(earnings, (lag(balance, 1) + balance) / 2)`: same-period, unannualized, over the average of the opening balance (the prior period's close) and the closing balance. ROE and ROA read the shared `fin.net_income`, after statement `tax_expense`, and ROCE and ROIC read the shared `fin.ebit`; no return keeps its own earnings expression or reads `taxes`. ROCE averages total assets less current liabilities at each endpoint. ROIC reads two explicit inputs named by owner resolution on 2026-11-17: `operating_tax` (signed; a credit raises the numerator) and `operating_invested_capital` (period-end operating assets less non-interest-bearing operating liabilities). `ratio` requires the same units on both sides and a positive base: a period without an opening balance, with a missing input or with a zero or negative average is unavailable with a reason, and a loss keeps its sign. Each return declares the `formula` rollup, so a coarser period recomputes it from its own earnings and its own opening and closing balances. The sections below the accepted decision describe the audited implementation.
 
-**Validation status:** Existing source and regression evidence mapped. Independent qualification of earnings, operating taxes and capital bases remains pending.
+**Validation status:** Qualified by hand-computed averages for the four returns, a first period without an opening balance, a signed loss, an operating tax credit, a negative average invested capital and a half-year recomputed from its own opening and closing balances.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 
@@ -54,4 +54,4 @@ The audited endpoint balances, duplicate earnings expressions and reported-tax a
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

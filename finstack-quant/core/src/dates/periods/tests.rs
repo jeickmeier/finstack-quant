@@ -891,6 +891,65 @@ fn constructors_validate_actual_gregorian_bounds() {
 }
 
 #[test]
+fn canonical_plans_are_nonempty_exact_and_contiguous() {
+    for range in [
+        "2025Q1..Q3",
+        "2024M11..2025M02",
+        "2024W51..2025W02",
+        "2024D365..2025D002",
+    ] {
+        build_periods(range, None)
+            .expect("range")
+            .validate_canonical()
+            .expect(range);
+    }
+    let fiscal = build_fiscal_periods(
+        "FY2025Q1..FY2026Q2",
+        FiscalConfig::new(10, 1).expect("config"),
+        None,
+    )
+    .expect("fiscal range");
+    fiscal.validate_canonical().expect("fiscal plan");
+
+    let plan = build_periods("2025Q1..Q4", None).expect("range");
+    let rebuilt = |periods: Vec<Period>| PeriodPlan::try_new(plan.get_calendar(), periods);
+
+    let empty = rebuilt(Vec::new())
+        .expect("an empty plan constructs")
+        .validate_canonical()
+        .expect_err("empty");
+    assert!(empty.to_string().contains("at least one period"), "{empty}");
+
+    let mut gap = plan.to_vec();
+    gap.remove(1);
+    let error = rebuilt(gap)
+        .expect("a gapped plan constructs")
+        .validate_canonical()
+        .expect_err("gap");
+    assert!(error.to_string().contains("contiguous"), "{error}");
+
+    // Order, calendar bounds and one period kind are refused at construction.
+    let mut reversed = plan.to_vec();
+    reversed.swap(0, 1);
+    rebuilt(reversed).expect_err("out of order");
+
+    let mut shifted = plan.to_vec();
+    shifted[2].end = d(2025, Month::September, 30);
+    let error = rebuilt(shifted).expect_err("bounds");
+    assert!(error.to_string().contains("calendar bounds"), "{error}");
+
+    let mut mixed = plan.to_vec();
+    mixed.push(
+        build_periods("2026M01..2026M01", None)
+            .expect("month")
+            .to_vec()
+            .remove(0),
+    );
+    let error = rebuilt(mixed).expect_err("mixed kinds");
+    assert!(error.to_string().contains("one frequency"), "{error}");
+}
+
+#[test]
 fn daily_plan_rejects_a_duplicate_substituted_for_january_second() {
     let plan = build_periods("2025D001..D365", None).unwrap();
     let mut wire = serde_json::to_value(&plan).unwrap();

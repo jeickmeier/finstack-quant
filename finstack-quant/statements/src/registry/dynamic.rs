@@ -25,7 +25,7 @@ pub struct Registry {
     metrics: IndexMap<String, StoredMetric>,
 }
 
-/// Stored metric.
+/// A registered metric with its reference bindings pinned at registration.
 #[derive(Debug, Clone)]
 pub struct StoredMetric {
     /// Namespace
@@ -33,6 +33,20 @@ pub struct StoredMetric {
 
     /// Metric definition
     pub definition: MetricDefinition,
+
+    /// The formula with every reference that bound to a metric written as
+    /// that metric's qualified identifier. A later registration does not
+    /// change it.
+    pub qualified_formula: String,
+
+    /// Qualified identifiers of the metrics the formula binds to, in order
+    /// of first reference. Historical references (`lag`, windows) are
+    /// included.
+    pub dependencies: Vec<String>,
+
+    /// References that bound to no metric: the model nodes the formula
+    /// requires.
+    pub requirements: Vec<String>,
 }
 
 impl Registry {
@@ -103,10 +117,13 @@ impl Registry {
     /// document leaves the registry unchanged, although documents loaded
     /// before it remain available.
     pub fn load_builtins(&mut self) -> Result<()> {
-        // Load from embedded JSON files
+        // Stage the whole catalogue so a rejected document leaves nothing
+        // behind.
+        let mut staged = self.clone();
         for &json in crate::registry::builtins::builtin_metric_sources() {
-            self.load_from_json_str(json)?;
+            staged.load_from_json_str(json)?;
         }
+        *self = staged;
         Ok(())
     }
 
@@ -155,9 +172,19 @@ impl Registry {
                 "Namespace cannot be empty. Provide a namespace identifier (e.g., 'fin', 'custom').",
             ));
         }
+        if !crate::dsl::signatures::is_valid_identifier(&namespace) {
+            return Err(Error::registry(format!(
+                "Invalid namespace '{namespace}': each dot-separated segment must contain only \
+                 letters, digits or underscores, and the first must not start with a digit"
+            )));
+        }
+        if namespace.split('.').next() == Some("cs") {
+            return Err(Error::registry(format!(
+                "Namespace '{namespace}' is reserved: 'cs' names capital-structure references"
+            )));
+        }
 
         // Prepare every definition once before changing the live registry.
-        // The parsed AST serves both compiler validation and dependency analysis.
         let mut prepared = IndexMap::with_capacity(registry.metrics.len());
         for metric in registry.metrics {
             let qualified_id = metric.qualified_id(&namespace);
@@ -171,42 +198,80 @@ impl Registry {
             prepared.insert(metric.id.clone(), (metric, ast));
         }
 
-        let prefix = format!("{namespace}.");
-        let all_metric_ids: IndexSet<String> = self
-            .namespace(&namespace)
-            .filter_map(|(id, _)| id.strip_prefix(&prefix).map(str::to_owned))
-            .chain(prepared.keys().cloned())
-            .collect();
-        let mut dependencies = IndexMap::with_capacity(prepared.len());
-        for (id, (_, ast)) in &prepared {
-            let mut identifiers = IndexSet::new();
-            crate::utils::formula::collect_identifiers_from_ast(ast, &mut identifiers, false);
-            identifiers.retain(|identifier| all_metric_ids.contains(identifier));
-            dependencies.insert(id.clone(), identifiers);
+        // Pin every reference against the staged and committed definitions.
+        // An unqualified reference binds in this namespace; an exact qualified
+        // reference binds in any namespace; anything else is a model input.
+        let mut staged = Vec::with_capacity(prepared.len());
+        let mut same_period = IndexMap::with_capacity(prepared.len());
+        for (id, (definition, ast)) in &prepared {
+            let mut dependencies = IndexSet::new();
+            let mut requirements = IndexSet::new();
+            let qualified_ast = ast.map_node_refs(&mut |name| {
+                let local = format!("{namespace}.{name}");
+                let bound = if !name.contains('.')
+                    && (prepared.contains_key(name) || self.metrics.contains_key(&local))
+                {
+                    Some(local)
+                } else if self.metrics.contains_key(name)
+                    || name
+                        .strip_prefix(namespace.as_str())
+                        .and_then(|rest| rest.strip_prefix('.'))
+                        .is_some_and(|rest| prepared.contains_key(rest))
+                {
+                    Some(name.to_string())
+                } else {
+                    None
+                };
+                match bound {
+                    Some(qualified) => {
+                        dependencies.insert(qualified.clone());
+                        qualified
+                    }
+                    None => {
+                        requirements.insert(name.to_string());
+                        name.to_string()
+                    }
+                }
+            });
+            // Same-period edges inside this document decide the cycle check:
+            // a `lag` or `shift` by a positive integer literal reads the past.
+            let mut current = IndexSet::new();
+            crate::utils::formula::collect_identifiers_from_ast(&qualified_ast, &mut current, true);
+            let prefix = format!("{namespace}.");
+            same_period.insert(
+                id.clone(),
+                current
+                    .into_iter()
+                    .filter_map(|name| name.strip_prefix(&prefix).map(str::to_owned))
+                    .filter(|name| prepared.contains_key(name))
+                    .collect::<IndexSet<String>>(),
+            );
+            staged.push((
+                id.clone(),
+                StoredMetric {
+                    namespace: namespace.clone(),
+                    definition: definition.clone(),
+                    qualified_formula: qualified_ast.to_string(),
+                    dependencies: dependencies.into_iter().collect(),
+                    requirements: requirements.into_iter().collect(),
+                },
+            ));
         }
-        let order = crate::utils::graph::toposort_ids(&dependencies).map_err(|remaining| {
+        let order = crate::utils::graph::toposort_ids(&same_period).map_err(|remaining| {
             Error::registry(format!(
                 "Circular dependency detected among metrics: {}",
                 remaining.join(" -> ")
             ))
         })?;
 
-        let staged = order
-            .into_iter()
-            .map(|id| {
-                let (definition, _) = prepared.swap_remove(&id).ok_or_else(|| {
-                    Error::registry(format!("internal error: prepared metric '{id}' is missing"))
-                })?;
-                Ok((
-                    definition.qualified_id(&namespace),
-                    StoredMetric {
-                        namespace: namespace.clone(),
-                        definition,
-                    },
-                ))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        self.metrics.extend(staged);
+        let mut staged: IndexMap<String, StoredMetric> = staged.into_iter().collect();
+        for id in order {
+            let metric = staged.swap_remove(&id).ok_or_else(|| {
+                Error::registry(format!("internal error: prepared metric '{id}' is missing"))
+            })?;
+            self.metrics
+                .insert(metric.definition.qualified_id(&namespace), metric);
+        }
         Ok(())
     }
 
@@ -222,7 +287,8 @@ impl Registry {
     /// registry.load_builtins()?;
     ///
     /// let metric = registry.get("fin.gross_margin")?;
-    /// assert_eq!(metric.definition.formula, "gross_profit / revenue");
+    /// assert_eq!(metric.definition.formula, "ratio(gross_profit, revenue)");
+    /// assert_eq!(metric.qualified_formula, "ratio(fin.gross_profit, revenue)");
     /// # Ok(())
     /// # }
     /// ```
@@ -292,69 +358,45 @@ impl Registry {
         self.metrics.is_empty()
     }
 
-    /// Get a metric's transitive dependencies in insertion order.
+    /// The dependency closure of a metric, in import order.
     ///
-    /// Returns fully-qualified IDs in an order suitable for constructing a
-    /// model: each dependency appears before the metric that consumes it. The
-    /// requested metric itself is not included. Only dependencies present in
-    /// the metric's namespace are returned; identifiers outside the registered
-    /// set are treated as model inputs rather than registry metrics.
+    /// Returns the qualified identifiers of every metric the formula binds
+    /// to, directly or through another metric, with each dependency before
+    /// the metric that consumes it. Qualified cross-namespace references and
+    /// historical references are included. The requested metric itself is
+    /// not. The bindings are those pinned at registration.
     ///
     /// # Errors
     ///
-    /// Returns a registry error if `qualified_id` is unknown or if a stored
-    /// formula cannot be parsed while its dependencies are being extracted.
-    /// Valid registries loaded through [`load_registry`](Self::load_registry)
-    /// normally avoid the latter case because formulas are checked at load
-    /// time.
+    /// Returns a registry error if `qualified_id` is unknown.
+    ///
     /// # Arguments
     ///
     /// * `qualified_id` - Fully qualified registry metric identifier whose
-    ///   transitive, same-namespace dependencies should be returned.
+    ///   dependency closure should be returned.
     pub fn get_dependencies(&self, qualified_id: &str) -> Result<Vec<String>> {
-        let mut all_deps = IndexSet::new();
+        let mut closure = IndexSet::new();
         let mut visited = IndexSet::new();
-        self.collect_transitive_dependencies(qualified_id, &mut all_deps, &mut visited)?;
-        Ok(all_deps.into_iter().collect())
+        self.collect_closure(qualified_id, &mut closure, &mut visited)?;
+        closure.shift_remove(qualified_id);
+        Ok(closure.into_iter().collect())
     }
 
-    /// Recursively collect transitive dependencies.
-    fn collect_transitive_dependencies(
+    /// Post-order walk: a metric is recorded after its dependencies. A
+    /// historical self- or mutual reference is visited once.
+    fn collect_closure(
         &self,
         qualified_id: &str,
-        all_deps: &mut IndexSet<String>,
+        closure: &mut IndexSet<String>,
         visited: &mut IndexSet<String>,
     ) -> Result<()> {
-        if visited.contains(qualified_id) {
+        if !visited.insert(qualified_id.to_string()) {
             return Ok(());
         }
-        visited.insert(qualified_id.to_string());
-
-        let metric = self.get(qualified_id)?;
-        let namespace = &metric.namespace;
-
-        let all_metric_ids: IndexSet<String> = self
-            .namespace(namespace)
-            .map(|(id, _)| {
-                id.strip_prefix(&format!("{}.", namespace))
-                    .unwrap_or(id)
-                    .to_string()
-            })
-            .collect();
-
-        let deps = crate::utils::formula::extract_identifiers(
-            &metric.definition.formula,
-            &all_metric_ids,
-        )?;
-
-        for dep_id in deps {
-            let dep_qualified = format!("{}.{}", namespace, dep_id);
-            if self.has(&dep_qualified) {
-                self.collect_transitive_dependencies(&dep_qualified, all_deps, visited)?;
-                all_deps.insert(dep_qualified);
-            }
+        for dependency in &self.get(qualified_id)?.dependencies {
+            self.collect_closure(dependency, closure, visited)?;
         }
-
+        closure.insert(qualified_id.to_string());
         Ok(())
     }
 }
@@ -362,6 +404,147 @@ impl Registry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Load one namespace document of `(id, formula)` metrics.
+    fn load(registry: &mut Registry, namespace: &str, metrics: &[(&str, &str)]) -> Result<()> {
+        let metrics: Vec<_> = metrics
+            .iter()
+            .map(|(id, formula)| serde_json::json!({"id": id, "name": id, "formula": formula}))
+            .collect();
+        registry
+            .load_from_json_str(
+                &serde_json::json!({"namespace": namespace, "schema_version": 1, "metrics": metrics})
+                    .to_string(),
+            )
+            .map(|_| ())
+    }
+
+    /// STATEMENTS-CONTRACTS-006 #2: references are qualified in the AST, so
+    /// a metric whose id is also a function name cannot collide with a call.
+    #[test]
+    fn a_metric_named_like_a_function_binds_without_touching_calls() {
+        let mut registry = Registry::new();
+        load(
+            &mut registry,
+            "k",
+            &[
+                ("mean", "revenue - cogs"),
+                ("ratio", "mean / mean(revenue, cogs)"),
+            ],
+        )
+        .expect("load");
+        let ratio = registry.get("k.ratio").expect("metric");
+        assert_eq!(ratio.qualified_formula, "k.mean / mean(revenue, cogs)");
+        assert_eq!(ratio.dependencies, ["k.mean"]);
+        assert_eq!(ratio.requirements, ["revenue", "cogs"]);
+    }
+
+    /// An unqualified reference binds in its own namespace, an exact
+    /// qualified reference in any namespace, and the closure follows both.
+    #[test]
+    fn closure_follows_local_qualified_and_historical_references() {
+        let mut registry = Registry::new();
+        load(&mut registry, "k", &[("mean", "revenue - cogs")]).expect("first namespace");
+        load(
+            &mut registry,
+            "other",
+            &[
+                ("uses", "k.mean * 2 + lag(local, 1)"),
+                ("local", "deep + x"),
+                ("deep", "y"),
+                ("mean", "z"),
+            ],
+        )
+        .expect("second namespace");
+        let uses = registry.get("other.uses").expect("metric");
+        assert_eq!(uses.qualified_formula, "k.mean * 2 + lag(other.local, 1)");
+        assert_eq!(uses.dependencies, ["k.mean", "other.local"]);
+        // Dependencies before dependents, in reference order.
+        assert_eq!(
+            registry.get_dependencies("other.uses").expect("closure"),
+            ["k.mean", "other.deep", "other.local"]
+        );
+        // The unqualified `mean` of another namespace is not `k.mean`.
+        assert!(
+            registry
+                .get("other.mean")
+                .expect("metric")
+                .dependencies
+                .is_empty()
+        );
+        assert!(registry.get_dependencies("nope.metric").is_err());
+    }
+
+    /// A binding is pinned at registration: a metric registered later does
+    /// not capture an earlier metric's unmatched reference.
+    #[test]
+    fn a_later_registration_does_not_rebind_an_earlier_metric() {
+        let mut registry = Registry::new();
+        load(&mut registry, "a", &[("m", "base * 2")]).expect("first document");
+        load(&mut registry, "a", &[("base", "1 + 1"), ("n", "base * 3")]).expect("second document");
+        let earlier = registry.get("a.m").expect("metric");
+        assert_eq!(earlier.qualified_formula, "base * 2");
+        assert!(earlier.dependencies.is_empty());
+        assert_eq!(earlier.requirements, ["base"]);
+        assert_eq!(
+            registry.get("a.n").expect("metric").dependencies,
+            ["a.base"]
+        );
+    }
+
+    #[test]
+    fn namespaces_follow_the_identifier_grammar_and_cs_is_reserved() {
+        for namespace in ["cs", "cs.debt", "9bad", "a..b", "a b", ".a"] {
+            let mut registry = Registry::new();
+            assert!(
+                load(&mut registry, namespace, &[("m", "x")]).is_err(),
+                "{namespace}"
+            );
+            assert!(registry.is_empty());
+        }
+        let mut registry = Registry::new();
+        load(&mut registry, "fin.adj", &[("m", "x")]).expect("dotted namespace");
+        assert!(registry.has("fin.adj.m"));
+        assert!(
+            load(&mut registry, "ok", &[("a.b", "x")]).is_err(),
+            "dotted metric id"
+        );
+    }
+
+    /// Only a same-period reference can close a cycle: a positive literal
+    /// `lag` reads the past.
+    #[test]
+    fn same_period_cycles_are_rejected_and_corkscrews_are_not() {
+        let mut registry = Registry::new();
+        load(&mut registry, "ok", &[("bal", "lag(bal, 1) + flow")]).expect("corkscrew");
+        load(&mut registry, "ok2", &[("a", "lag(b, 1)"), ("b", "a + 1")]).expect("lagged pair");
+        for cyclic in [
+            &[("x", "y"), ("y", "x")][..],
+            &[("p", "lag(q, 0)"), ("q", "p")][..],
+            &[("s", "s + 1")][..],
+        ] {
+            let mut registry = Registry::new();
+            let error = load(&mut registry, "bad", cyclic).expect_err("cycle");
+            assert!(error.to_string().contains("Circular dependency"), "{error}");
+            assert!(
+                registry.is_empty(),
+                "a rejected document leaves nothing behind"
+            );
+        }
+    }
+
+    #[test]
+    fn the_builtin_catalogue_registers_atomically() {
+        let mut registry = Registry::new();
+        // A metric that collides with a later built-in document.
+        load(&mut registry, "fin", &[("roce", "1")]).expect("custom metric");
+        assert!(registry.load_builtins().is_err());
+        assert_eq!(registry.len(), 1, "no built-in document was kept");
+        let mut registry = Registry::with_builtins().expect("catalogue");
+        let loaded = registry.len();
+        assert!(registry.load_builtins().is_err());
+        assert_eq!(registry.len(), loaded);
+    }
 
     /// Two metrics sharing an `id` inside one document must be rejected.
     ///

@@ -2,9 +2,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_core::dates::{
-    DayCount, DayCountContext, FiscalConfig, Period, build_fiscal_periods, build_periods,
-};
+use finstack_quant_core::dates::{FiscalConfig, Period, build_fiscal_periods, build_periods};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
@@ -12,6 +10,9 @@ use finstack_quant_statements::dsl::parse_and_compile;
 use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::evaluator::evaluate_formula;
+use finstack_quant_statements::evaluator::{
+    CellStatus, EvalWarning, StatementResult, UnavailableReason,
+};
 use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -78,12 +79,9 @@ fn fiscal_weekly_offsets_include_the_short_final_week() {
     close(result.get("difference", &periods[2].id).unwrap(), 11.0);
     close(result.get("nested", &periods[2].id).unwrap(), 105.0);
 
-    let sparse = offset_model(
-        vec![periods[0].clone(), periods[2].clone()],
-        &[100.0, 121.0],
-    );
-    let sparse_result = Evaluator::new().evaluate(&sparse).unwrap();
-    assert!(sparse_result.get("prior", &periods[2].id).unwrap().is_nan());
+    fixture_plan(vec![periods[0].clone(), periods[2].clone()])
+        .validate_canonical()
+        .expect_err("a plan that skips the short final week is not canonical");
 }
 
 #[test]
@@ -108,12 +106,9 @@ fn fiscal_daily_offsets_cross_leap_and_nonleap_fiscal_years() {
         close(result.get("change", &periods[2].id).unwrap(), 0.1);
         close(result.get("nested", &periods[2].id).unwrap(), 105.0);
 
-        let sparse = offset_model(
-            vec![periods[0].clone(), periods[2].clone()],
-            &[100.0, 121.0],
-        );
-        let sparse_result = Evaluator::new().evaluate(&sparse).unwrap();
-        assert!(sparse_result.get("prior", &periods[2].id).unwrap().is_nan());
+        fixture_plan(vec![periods[0].clone(), periods[2].clone()])
+            .validate_canonical()
+            .expect_err("a plan that skips a fiscal day is not canonical");
     }
 }
 
@@ -159,7 +154,7 @@ fn growth_rate_annualizes_quarterly_and_monthly_observations() {
 }
 
 #[test]
-fn daily_and_weekly_growth_use_elapsed_period_end_dates() {
+fn daily_and_weekly_growth_use_actual_365_fixed_between_period_end_dates() {
     let fiscal_weekly = build_fiscal_periods(
         "FY2024W52..FY2025W1",
         FiscalConfig::new(10, 1).expect("valid fiscal start"),
@@ -182,13 +177,9 @@ fn daily_and_weekly_growth_use_elapsed_period_end_dates() {
         let values: Vec<_> = periods
             .iter()
             .map(|period| {
-                let years = DayCount::ActAct
-                    .year_fraction(
-                        origin,
-                        period.end.previous_day().unwrap(),
-                        DayCountContext::default(),
-                    )
-                    .unwrap();
+                // Actual/365 Fixed, computed here from the day count alone.
+                let days = (period.end.previous_day().unwrap() - origin).whole_days();
+                let years = days as f64 / 365.0;
                 (
                     period.id,
                     AmountOrScalar::scalar(100.0 * 1.2_f64.powf(years)),
@@ -354,7 +345,12 @@ fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
         model_builder.build().unwrap()
     };
     let result = Evaluator::new().evaluate(&model).unwrap();
-    for (index, expected) in [(0, 1.0), (1, 3.0), (2, 4.0), (3, 12.0)] {
+    // The plan starts in FY2024Q3, so the FY2024 windows lack Q1 and Q2 and
+    // are unavailable; a partial sum would not be a year-to-date figure.
+    for index in [0, 1] {
+        assert_eq!(result.get("to_date", &periods[index].id), None);
+    }
+    for (index, expected) in [(2, 4.0), (3, 12.0)] {
         close(result.get("to_date", &periods[index].id).unwrap(), expected);
     }
 }
@@ -365,44 +361,38 @@ fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
         .unwrap()
         .into_periods();
     for business_only in [false, true] {
-        let periods: Vec<Period> = all_days
+        // The plan is every calendar day; a business-day model leaves the
+        // weekend observations out.
+        let values: Vec<_> = all_days
             .iter()
             .filter(|p| !business_only || p.start.weekday().number_days_from_monday() < 5)
-            .cloned()
-            .collect();
-        let values: Vec<_> = periods
-            .iter()
             .map(|period| (period.id, AmountOrScalar::scalar(1.0)))
             .collect();
         let mut model_builder = ModelBuilder::new("daily-ttm");
         model_builder
-            .periods_explicit(fixture_plan(periods))
+            .periods_explicit(fixture_plan(all_days.clone()))
             .unwrap();
         model_builder.value("x", &values);
         model_builder.compute("ltm", "ttm(x)").unwrap();
         let result = Evaluator::new()
             .evaluate(&model_builder.build().unwrap())
             .unwrap();
-        // A calendar-day model sums 2025's 365 days. A business-day grid is
-        // not full calendar-day coverage (absent rows do not prove weekends
-        // or holidays), so its window is incomplete (record
-        // CORE-CONVENTIONS-014 #11).
+        // A calendar-day model sums 2025's 365 days. Business-day
+        // observations are not full calendar-day coverage (absent cells do
+        // not prove weekends or holidays), so the window is incomplete
+        // (record CORE-CONVENTIONS-014 #11).
         let year_end = PeriodId::day(2025, 365).unwrap();
-        let ltm = result.get("ltm", &year_end).unwrap();
+        let ltm = result.get("ltm", &year_end);
         if business_only {
-            assert!(
-                ltm.is_nan(),
-                "business-day LTM must be incomplete, got {ltm}"
-            );
+            assert_eq!(ltm, None, "business-day LTM must be incomplete");
         } else {
-            close(ltm, 365.0);
+            close(ltm.unwrap(), 365.0);
         }
         // 2024-12-30 has one uncovered day (2023-12-31) in its window.
         assert!(
             result
                 .get("ltm", &PeriodId::day(2024, 365).unwrap())
-                .unwrap()
-                .is_nan()
+                .is_none()
         );
     }
 }
@@ -456,4 +446,242 @@ fn weekly_ttm_is_an_evaluation_error() {
             .expect_err("weekly TTM is rejected");
         assert!(err.to_string().contains("weekly"), "{err}");
     }
+}
+
+// STATEMENTS-EVALUATION-003 qualification: exact offsets, signed changes,
+// the growth domain and complete reporting windows.
+
+fn quarter(index: u8) -> PeriodId {
+    PeriodId::quarter(2025, index).unwrap()
+}
+
+fn usd(amount: &str) -> Money {
+    Money::from_decimal_str(amount, Currency::USD).unwrap()
+}
+
+/// Quarterly USD cash of 100.10, 0, -50 and 200.20, with the named formulas.
+fn cash_model(formulas: &[(&str, &str)]) -> finstack_quant_statements::Result<StatementResult> {
+    let mut builder = ModelBuilder::new("offsets");
+    builder.periods("2025Q1..Q4", None)?;
+    let cash: Vec<_> = ["100.10", "0", "-50", "200.20"]
+        .iter()
+        .zip(1..)
+        .map(|(amount, index)| (quarter(index), usd(amount)))
+        .collect();
+    builder.value_money("cash", &cash);
+    builder.value_scalar("steps", &[(quarter(1), -1.0), (quarter(2), 0.5)]);
+    for (node, formula) in formulas {
+        builder.compute(*node, *formula)?;
+    }
+    Evaluator::new().evaluate(&builder.build()?)
+}
+
+fn reason(result: &StatementResult, node: &str, period: PeriodId) -> Option<UnavailableReason> {
+    let cell = result.get_cell(node, &period).expect("cell");
+    assert_eq!(cell.status, CellStatus::Unavailable, "{node} {period}");
+    cell.reason
+}
+
+#[test]
+fn offsets_read_exact_typed_history() {
+    let result = cash_model(&[
+        ("previous", "lag(cash, 1)"),
+        ("two_back", "shift(cash, 2)"),
+        ("same", "lag(cash, 0)"),
+        ("stacked", "lag(cash, 1) + cash"),
+        ("change", "diff(cash)"),
+    ])
+    .unwrap();
+    assert_eq!(
+        result.get_money("previous", &quarter(2)),
+        Some(usd("100.10"))
+    );
+    assert_eq!(
+        result.get_money("two_back", &quarter(3)),
+        Some(usd("100.10"))
+    );
+    assert_eq!(result.get_money("same", &quarter(4)), Some(usd("200.20")));
+    assert_eq!(
+        result.get_money("stacked", &quarter(4)),
+        Some(usd("150.20"))
+    );
+    // Current minus base, in the input's units.
+    assert_eq!(result.get_money("change", &quarter(4)), Some(usd("250.20")));
+    assert_eq!(result.get_money("change", &quarter(3)), Some(usd("-50")));
+    // Missing history is unavailable, not an error and not zero.
+    for node in ["previous", "stacked", "change"] {
+        assert_eq!(
+            reason(&result, node, quarter(1)),
+            Some(UnavailableReason::MissingInput)
+        );
+    }
+    assert_eq!(
+        reason(&result, "two_back", quarter(2)),
+        Some(UnavailableReason::MissingInput)
+    );
+}
+
+#[test]
+fn fractional_and_future_offsets_are_errors() {
+    for (formula, cause) in [
+        ("lag(cash, steps)", "non-negative integer"),
+        ("shift(cash, steps)", "future period"),
+    ] {
+        // `steps` is -1 in Q1.
+        let error = cash_model(&[("bad", formula)]).expect_err(formula);
+        assert!(error.to_string().contains(cause), "{formula}: {error}");
+    }
+    // `steps` is 0.5 in Q2; Q1 must pass first, so read it only from Q2 on.
+    let error = cash_model(&[("bad", "if(steps > 0, diff(cash, steps), cash)")])
+        .expect_err("fractional offset");
+    assert!(error.to_string().contains("integer"), "{error}");
+}
+
+#[test]
+fn pct_change_is_signed_and_a_zero_base_is_unavailable() {
+    let result = cash_model(&[("change", "pct_change(cash)")]).unwrap();
+    // Q2: (0 - 100.10) / 100.10.
+    close(result.get("change", &quarter(2)).unwrap(), -1.0);
+    // Q4: (200.20 - (-50)) / (-50), signed by the negative base.
+    close(result.get("change", &quarter(4)).unwrap(), -5.004);
+    // Q3 is measured from an exactly zero base.
+    assert_eq!(
+        reason(&result, "change", quarter(3)),
+        Some(UnavailableReason::UndefinedBase)
+    );
+    assert!(result.meta.warnings.iter().any(|warning| matches!(
+        warning,
+        EvalWarning::DivisionByZero { node_id, period } if node_id == "change" && *period == quarter(3)
+    )));
+    assert_eq!(
+        reason(&result, "change", quarter(1)),
+        Some(UnavailableReason::MissingInput)
+    );
+}
+
+#[test]
+fn growth_rate_needs_a_positive_base_and_a_non_negative_ending_value() {
+    let annual = |values: [f64; 3]| {
+        let mut builder = ModelBuilder::new("growth");
+        builder.periods("2023..2025", None).unwrap();
+        let ids = [2023, 2024, 2025].map(|year| PeriodId::annual(year).unwrap());
+        builder.value_scalar(
+            "x",
+            &[
+                (ids[0], values[0]),
+                (ids[1], values[1]),
+                (ids[2], values[2]),
+            ],
+        );
+        builder.compute("one", "growth_rate(x, 1)").unwrap();
+        builder.compute("two", "growth_rate(x, 2)").unwrap();
+        (
+            Evaluator::new()
+                .evaluate(&builder.build().unwrap())
+                .unwrap(),
+            ids,
+        )
+    };
+    let (result, ids) = annual([100.0, 121.0, 0.0]);
+    close(result.get("one", &ids[1]).unwrap(), 0.21);
+    // A zero ending value is -100%, over one year or two.
+    close(result.get("one", &ids[2]).unwrap(), -1.0);
+    close(result.get("two", &ids[2]).unwrap(), -1.0);
+    assert_eq!(
+        reason(&result, "one", ids[0]),
+        Some(UnavailableReason::MissingInput)
+    );
+
+    let (result, ids) = annual([-100.0, 0.0, -5.0]);
+    // A negative base, a zero base and a negative ending value have no
+    // compound growth rate.
+    for (node, period) in [("one", ids[1]), ("one", ids[2]), ("two", ids[2])] {
+        assert_eq!(
+            reason(&result, node, period),
+            Some(UnavailableReason::UndefinedBase),
+            "{node} {period}"
+        );
+    }
+
+    let error = {
+        let mut builder = ModelBuilder::new("growth");
+        builder.periods("2023..2025", None).unwrap();
+        builder.value_scalar("x", &[(PeriodId::annual(2023).unwrap(), 1.0)]);
+        builder
+            .compute("zero", "growth_rate(x, lag(x, 0) - lag(x, 0))")
+            .unwrap();
+        Evaluator::new()
+            .evaluate(&builder.build().unwrap())
+            .expect_err("a zero lookback")
+    };
+    assert!(error.to_string().contains("positive integer"), "{error}");
+}
+
+#[test]
+fn reporting_windows_need_every_slot() {
+    let month = |index: u8| PeriodId::month(2025, index).unwrap();
+    let mut builder = ModelBuilder::new("windows");
+    builder.periods("2025M01..2025M06", None).unwrap();
+    // March has no observation: an interior gap.
+    let sales: Vec<_> = [1, 2, 4, 5, 6]
+        .map(|index| (month(index), usd(&format!("{index}.01"))))
+        .to_vec();
+    builder.value_money("sales", &sales);
+    builder.compute("year", "ytd(sales)").unwrap();
+    builder.compute("quarter", "qtd(sales)").unwrap();
+    builder.compute("fiscal", "fiscal_ytd(sales, 4)").unwrap();
+    let result = Evaluator::new()
+        .evaluate(&builder.build().unwrap())
+        .unwrap();
+
+    // Exact money sums over complete windows.
+    assert_eq!(result.get_money("year", &month(2)), Some(usd("3.02")));
+    assert_eq!(result.get_money("quarter", &month(6)), Some(usd("15.03")));
+    assert_eq!(result.get_money("fiscal", &month(5)), Some(usd("9.02")));
+    // A window that contains the March gap is unavailable.
+    for (node, index) in [("year", 3), ("year", 6), ("quarter", 3), ("fiscal", 3)] {
+        assert_eq!(
+            reason(&result, node, month(index)),
+            Some(UnavailableReason::MissingInput),
+            "{node} M{index}"
+        );
+    }
+}
+
+#[test]
+fn month_to_quarter_windows_follow_the_fiscal_quarter() {
+    let periods = build_fiscal_periods(
+        "FY2025M01..FY2025M06",
+        FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        None,
+    )
+    .unwrap()
+    .into_periods();
+    let values: Vec<_> = periods
+        .iter()
+        .zip(1..)
+        .map(|(period, value)| (period.id, AmountOrScalar::scalar(f64::from(value))))
+        .collect();
+    let build = |formula: &str| {
+        let mut builder = ModelBuilder::new("fiscal-months");
+        builder
+            .periods_explicit(fixture_plan(periods.clone()))
+            .unwrap();
+        builder.value("x", &values);
+        builder.compute("window", formula).unwrap();
+        Evaluator::new().evaluate(&builder.build().unwrap())
+    };
+    let result = build("qtd(x)").unwrap();
+    // Fiscal month 4 opens the second fiscal quarter.
+    for (index, expected) in [(0, 1.0), (2, 6.0), (3, 4.0), (5, 15.0)] {
+        close(result.get("window", &periods[index].id).unwrap(), expected);
+    }
+    let result = build("ytd(x)").unwrap();
+    close(result.get("window", &periods[5].id).unwrap(), 21.0);
+    // A fiscal plan carries its own reporting year.
+    let error = build("fiscal_ytd(x, 10)").expect_err("fiscal plan");
+    assert!(
+        error.to_string().contains("fiscal plan uses ytd()"),
+        "{error}"
+    );
 }

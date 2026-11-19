@@ -1,6 +1,7 @@
 {
   "config": {
     "target_node": "ebitda",
+    "output_node": "adjusted_ebitda",
     "adjustments": [
       {
         "id": "restructuring",
@@ -9,8 +10,14 @@
         "value": {
           "type": "fixed",
           "amounts": {
-            "2024Q1": 4500000,
-            "2024Q3": 2000000
+            "2024Q1": {
+              "amount": "4500000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "2000000",
+              "currency": "USD"
+            }
           }
         }
       },
@@ -24,8 +31,9 @@
           "percentage": 0.025
         },
         "cap": {
+          "type": "reference",
           "base_node": "ebitda",
-          "value": 0.1
+          "fraction": 0.1
         }
       },
       {
@@ -34,15 +42,30 @@
         "value": {
           "type": "fixed",
           "amounts": {
-            "2024Q1": 1200000,
-            "2024Q2": 1200000,
-            "2024Q3": 1200000,
-            "2024Q4": 1200000
+            "2024Q1": {
+              "amount": "1200000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "1200000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "1200000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "1200000",
+              "currency": "USD"
+            }
           }
         },
         "cap": {
-          "base_node": null,
-          "value": 1000000
+          "type": "absolute",
+          "amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          }
         }
       },
       {
@@ -51,13 +74,16 @@
         "value": {
           "type": "fixed",
           "amounts": {
-            "2024Q2": -3000000
+            "2024Q2": {
+              "amount": "-3000000",
+              "currency": "USD"
+            }
           }
         }
       }
     ]
   },
-  "canonical": "{\"target_node\":\"ebitda\",\"adjustments\":[{\"id\":\"restructuring\",\"name\":\"Restructuring charges\",\"category\":\"non_recurring\",\"value\":{\"type\":\"fixed\",\"amounts\":{\"2024Q1\":4500000.0,\"2024Q3\":2000000.0}}},{\"id\":\"run_rate_synergies\",\"name\":\"Run-rate synergies\",\"category\":\"synergies\",\"value\":{\"type\":\"percentage_of_node\",\"node_id\":\"revenue\",\"percentage\":0.025},\"cap\":{\"base_node\":\"ebitda\",\"value\":0.1}},{\"id\":\"management_fees\",\"name\":\"Sponsor management fees\",\"value\":{\"type\":\"fixed\",\"amounts\":{\"2024Q1\":1200000.0,\"2024Q2\":1200000.0,\"2024Q3\":1200000.0,\"2024Q4\":1200000.0}},\"cap\":{\"base_node\":null,\"value\":1000000.0}},{\"id\":\"one_time_gain\",\"name\":\"Gain on asset sale\",\"value\":{\"type\":\"fixed\",\"amounts\":{\"2024Q2\":-3000000.0}}}]}",
+  "canonical": "{\"target_node\":\"ebitda\",\"output_node\":\"adjusted_ebitda\",\"adjustments\":[{\"id\":\"restructuring\",\"name\":\"Restructuring charges\",\"category\":\"non_recurring\",\"value\":{\"type\":\"fixed\",\"amounts\":{\"2024Q1\":{\"amount\":\"4500000\",\"currency\":\"USD\"},\"2024Q3\":{\"amount\":\"2000000\",\"currency\":\"USD\"}}}},{\"id\":\"run_rate_synergies\",\"name\":\"Run-rate synergies\",\"category\":\"synergies\",\"value\":{\"type\":\"percentage_of_node\",\"node_id\":\"revenue\",\"percentage\":0.025},\"cap\":{\"type\":\"reference\",\"base_node\":\"ebitda\",\"fraction\":0.1}},{\"id\":\"management_fees\",\"name\":\"Sponsor management fees\",\"value\":{\"type\":\"fixed\",\"amounts\":{\"2024Q1\":{\"amount\":\"1200000\",\"currency\":\"USD\"},\"2024Q2\":{\"amount\":\"1200000\",\"currency\":\"USD\"},\"2024Q3\":{\"amount\":\"1200000\",\"currency\":\"USD\"},\"2024Q4\":{\"amount\":\"1200000\",\"currency\":\"USD\"}}},\"cap\":{\"type\":\"absolute\",\"amount\":{\"amount\":\"1000000\",\"currency\":\"USD\"}}},{\"id\":\"one_time_gain\",\"name\":\"Gain on asset sale\",\"value\":{\"type\":\"fixed\",\"amounts\":{\"2024Q2\":{\"amount\":\"-3000000\",\"currency\":\"USD\"}}}}]}",
   "results": [
     {
       "value_type": {
@@ -65,42 +91,96 @@
         "currency": "USD"
       },
       "period": "2024Q1",
-      "base_value": 40160000,
+      "base_value": {
+        "amount": "40160000",
+        "currency": "USD"
+      },
       "adjustments": [
         {
           "adjustment_id": "restructuring",
           "name": "Restructuring charges",
-          "raw_amount": 4500000,
-          "capped_amount": 4500000,
+          "raw_amount": {
+            "amount": "4500000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "4500000",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 44660000
+          "adjusted_value": {
+            "amount": "44660000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "run_rate_synergies",
           "name": "Run-rate synergies",
-          "raw_amount": 4560000,
-          "capped_amount": 4016000,
+          "raw_amount": {
+            "amount": "4560000",
+            "currency": "USD"
+          },
+          "cap_base": {
+            "amount": "40160000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "4016000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "4016000",
+            "currency": "USD"
+          },
           "is_capped": true,
-          "adjusted_value": 48676000
+          "adjusted_value": {
+            "amount": "48676000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "management_fees",
           "name": "Sponsor management fees",
-          "raw_amount": 1200000,
-          "capped_amount": 1000000,
+          "raw_amount": {
+            "amount": "1200000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
           "is_capped": true,
-          "adjusted_value": 49676000
+          "adjusted_value": {
+            "amount": "49676000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "one_time_gain",
           "name": "Gain on asset sale",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 49676000
+          "adjusted_value": {
+            "amount": "49676000",
+            "currency": "USD"
+          }
         }
       ],
-      "final_value": 49676000
+      "final_value": {
+        "amount": "49676000",
+        "currency": "USD"
+      }
     },
     {
       "value_type": {
@@ -108,42 +188,96 @@
         "currency": "USD"
       },
       "period": "2024Q2",
-      "base_value": 45000000,
+      "base_value": {
+        "amount": "45000000",
+        "currency": "USD"
+      },
       "adjustments": [
         {
           "adjustment_id": "restructuring",
           "name": "Restructuring charges",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 45000000
+          "adjusted_value": {
+            "amount": "45000000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "run_rate_synergies",
           "name": "Run-rate synergies",
-          "raw_amount": 4790000,
-          "capped_amount": 4500000,
+          "raw_amount": {
+            "amount": "4790000",
+            "currency": "USD"
+          },
+          "cap_base": {
+            "amount": "45000000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "4500000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "4500000",
+            "currency": "USD"
+          },
           "is_capped": true,
-          "adjusted_value": 49500000
+          "adjusted_value": {
+            "amount": "49500000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "management_fees",
           "name": "Sponsor management fees",
-          "raw_amount": 1200000,
-          "capped_amount": 1000000,
+          "raw_amount": {
+            "amount": "1200000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
           "is_capped": true,
-          "adjusted_value": 50500000
+          "adjusted_value": {
+            "amount": "50500000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "one_time_gain",
           "name": "Gain on asset sale",
-          "raw_amount": -3000000,
-          "capped_amount": -3000000,
+          "raw_amount": {
+            "amount": "-3000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "-3000000",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 47500000
+          "adjusted_value": {
+            "amount": "47500000",
+            "currency": "USD"
+          }
         }
       ],
-      "final_value": 47500000
+      "final_value": {
+        "amount": "47500000",
+        "currency": "USD"
+      }
     },
     {
       "value_type": {
@@ -151,42 +285,96 @@
         "currency": "USD"
       },
       "period": "2024Q3",
-      "base_value": 47770000,
+      "base_value": {
+        "amount": "47770000",
+        "currency": "USD"
+      },
       "adjustments": [
         {
           "adjustment_id": "restructuring",
           "name": "Restructuring charges",
-          "raw_amount": 2000000,
-          "capped_amount": 2000000,
+          "raw_amount": {
+            "amount": "2000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "2000000",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 49770000
+          "adjusted_value": {
+            "amount": "49770000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "run_rate_synergies",
           "name": "Run-rate synergies",
-          "raw_amount": 4995000,
-          "capped_amount": 4777000,
+          "raw_amount": {
+            "amount": "4995000",
+            "currency": "USD"
+          },
+          "cap_base": {
+            "amount": "47770000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "4777000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "4777000",
+            "currency": "USD"
+          },
           "is_capped": true,
-          "adjusted_value": 54547000
+          "adjusted_value": {
+            "amount": "54547000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "management_fees",
           "name": "Sponsor management fees",
-          "raw_amount": 1200000,
-          "capped_amount": 1000000,
+          "raw_amount": {
+            "amount": "1200000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
           "is_capped": true,
-          "adjusted_value": 55547000
+          "adjusted_value": {
+            "amount": "55547000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "one_time_gain",
           "name": "Gain on asset sale",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 55547000
+          "adjusted_value": {
+            "amount": "55547000",
+            "currency": "USD"
+          }
         }
       ],
-      "final_value": 55547000
+      "final_value": {
+        "amount": "55547000",
+        "currency": "USD"
+      }
     },
     {
       "value_type": {
@@ -194,42 +382,96 @@
         "currency": "USD"
       },
       "period": "2024Q4",
-      "base_value": 54370000,
+      "base_value": {
+        "amount": "54370000",
+        "currency": "USD"
+      },
       "adjustments": [
         {
           "adjustment_id": "restructuring",
           "name": "Restructuring charges",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 54370000
+          "adjusted_value": {
+            "amount": "54370000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "run_rate_synergies",
           "name": "Run-rate synergies",
-          "raw_amount": 5362500,
-          "capped_amount": 5362500,
+          "raw_amount": {
+            "amount": "5362500",
+            "currency": "USD"
+          },
+          "cap_base": {
+            "amount": "54370000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "5437000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "5362500",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 59732500
+          "adjusted_value": {
+            "amount": "59732500",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "management_fees",
           "name": "Sponsor management fees",
-          "raw_amount": 1200000,
-          "capped_amount": 1000000,
+          "raw_amount": {
+            "amount": "1200000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
           "is_capped": true,
-          "adjusted_value": 60732500
+          "adjusted_value": {
+            "amount": "60732500",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "one_time_gain",
           "name": "Gain on asset sale",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 60732500
+          "adjusted_value": {
+            "amount": "60732500",
+            "currency": "USD"
+          }
         }
       ],
-      "final_value": 60732500
+      "final_value": {
+        "amount": "60732500",
+        "currency": "USD"
+      }
     },
     {
       "value_type": {
@@ -237,42 +479,96 @@
         "currency": "USD"
       },
       "period": "2025Q1",
-      "base_value": 51380000,
+      "base_value": {
+        "amount": "51380000",
+        "currency": "USD"
+      },
       "adjustments": [
         {
           "adjustment_id": "restructuring",
           "name": "Restructuring charges",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 51380000
+          "adjusted_value": {
+            "amount": "51380000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "run_rate_synergies",
           "name": "Run-rate synergies",
-          "raw_amount": 5207500,
-          "capped_amount": 5138000,
+          "raw_amount": {
+            "amount": "5207500",
+            "currency": "USD"
+          },
+          "cap_base": {
+            "amount": "51380000",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "5138000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "5138000",
+            "currency": "USD"
+          },
           "is_capped": true,
-          "adjusted_value": 56518000
+          "adjusted_value": {
+            "amount": "56518000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "management_fees",
           "name": "Sponsor management fees",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 56518000
+          "adjusted_value": {
+            "amount": "56518000",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "one_time_gain",
           "name": "Gain on asset sale",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 56518000
+          "adjusted_value": {
+            "amount": "56518000",
+            "currency": "USD"
+          }
         }
       ],
-      "final_value": 56518000
+      "final_value": {
+        "amount": "56518000",
+        "currency": "USD"
+      }
     },
     {
       "value_type": {
@@ -280,42 +576,96 @@
         "currency": "USD"
       },
       "period": "2025Q2",
-      "base_value": 54144512.5,
+      "base_value": {
+        "amount": "54144512.5",
+        "currency": "USD"
+      },
       "adjustments": [
         {
           "adjustment_id": "restructuring",
           "name": "Restructuring charges",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 54144512.5
+          "adjusted_value": {
+            "amount": "54144512.5",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "run_rate_synergies",
           "name": "Run-rate synergies",
-          "raw_amount": 5363725,
-          "capped_amount": 5363725,
+          "raw_amount": {
+            "amount": "5363725",
+            "currency": "USD"
+          },
+          "cap_base": {
+            "amount": "54144512.5",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "5414451.25",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "5363725",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 59508237.5
+          "adjusted_value": {
+            "amount": "59508237.5",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "management_fees",
           "name": "Sponsor management fees",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 59508237.5
+          "adjusted_value": {
+            "amount": "59508237.5",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "one_time_gain",
           "name": "Gain on asset sale",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 59508237.5
+          "adjusted_value": {
+            "amount": "59508237.5",
+            "currency": "USD"
+          }
         }
       ],
-      "final_value": 59508237.5
+      "final_value": {
+        "amount": "59508237.5",
+        "currency": "USD"
+      }
     },
     {
       "value_type": {
@@ -323,42 +673,96 @@
         "currency": "USD"
       },
       "period": "2025Q3",
-      "base_value": 57183495.037499964,
+      "base_value": {
+        "amount": "57183495.037499980125",
+        "currency": "USD"
+      },
       "adjustments": [
         {
           "adjustment_id": "restructuring",
           "name": "Restructuring charges",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 57183495.037499964
+          "adjusted_value": {
+            "amount": "57183495.037499980125",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "run_rate_synergies",
           "name": "Run-rate synergies",
-          "raw_amount": 5551455.375,
-          "capped_amount": 5551455.375,
+          "raw_amount": {
+            "amount": "5551455.37499999925",
+            "currency": "USD"
+          },
+          "cap_base": {
+            "amount": "57183495.037499980125",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "5718349.5037499980125",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "5551455.37499999925",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 62734950.412499964
+          "adjusted_value": {
+            "amount": "62734950.412499979375",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "management_fees",
           "name": "Sponsor management fees",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 62734950.412499964
+          "adjusted_value": {
+            "amount": "62734950.412499979375",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "one_time_gain",
           "name": "Gain on asset sale",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 62734950.412499964
+          "adjusted_value": {
+            "amount": "62734950.412499979375",
+            "currency": "USD"
+          }
         }
       ],
-      "final_value": 62734950.412499964
+      "final_value": {
+        "amount": "62734950.412499979375",
+        "currency": "USD"
+      }
     },
     {
       "value_type": {
@@ -366,48 +770,299 @@
         "currency": "USD"
       },
       "period": "2025Q4",
-      "base_value": 61383803.27707498,
+      "base_value": {
+        "amount": "61383803.277074970125",
+        "currency": "USD"
+      },
       "adjustments": [
         {
           "adjustment_id": "restructuring",
           "name": "Restructuring charges",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 61383803.27707498
+          "adjusted_value": {
+            "amount": "61383803.277074970125",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "run_rate_synergies",
           "name": "Run-rate synergies",
-          "raw_amount": 5784616.50075,
-          "capped_amount": 5784616.50075,
+          "raw_amount": {
+            "amount": "5784616.50074999925",
+            "currency": "USD"
+          },
+          "cap_base": {
+            "amount": "61383803.277074970125",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "6138380.3277074970125",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "5784616.50074999925",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 67168419.77782498
+          "adjusted_value": {
+            "amount": "67168419.777824969375",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "management_fees",
           "name": "Sponsor management fees",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cap_limit": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 67168419.77782498
+          "adjusted_value": {
+            "amount": "67168419.777824969375",
+            "currency": "USD"
+          }
         },
         {
           "adjustment_id": "one_time_gain",
           "name": "Gain on asset sale",
-          "raw_amount": 0,
-          "capped_amount": 0,
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "is_capped": false,
-          "adjusted_value": 67168419.77782498
+          "adjusted_value": {
+            "amount": "67168419.777824969375",
+            "currency": "USD"
+          }
         }
       ],
-      "final_value": 67168419.77782498
+      "final_value": {
+        "amount": "67168419.777824969375",
+        "currency": "USD"
+      }
+    }
+  ],
+  "unavailable": [
+    {
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "period": "2024Q1",
+      "unavailable": "missing_input"
+    },
+    {
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "period": "2024Q2",
+      "unavailable": "missing_input"
+    },
+    {
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "period": "2024Q3",
+      "unavailable": "missing_input"
+    },
+    {
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "period": "2024Q4",
+      "base_value": {
+        "amount": "187300000",
+        "currency": "USD"
+      },
+      "adjustments": [
+        {
+          "adjustment_id": "restructuring",
+          "name": "Restructuring charges",
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "is_capped": false,
+          "adjusted_value": {
+            "amount": "187300000",
+            "currency": "USD"
+          }
+        }
+      ],
+      "final_value": {
+        "amount": "187300000",
+        "currency": "USD"
+      }
+    },
+    {
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "period": "2025Q1",
+      "base_value": {
+        "amount": "198520000",
+        "currency": "USD"
+      },
+      "adjustments": [
+        {
+          "adjustment_id": "restructuring",
+          "name": "Restructuring charges",
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "is_capped": false,
+          "adjusted_value": {
+            "amount": "198520000",
+            "currency": "USD"
+          }
+        }
+      ],
+      "final_value": {
+        "amount": "198520000",
+        "currency": "USD"
+      }
+    },
+    {
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "period": "2025Q2",
+      "base_value": {
+        "amount": "207664512.5",
+        "currency": "USD"
+      },
+      "adjustments": [
+        {
+          "adjustment_id": "restructuring",
+          "name": "Restructuring charges",
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "is_capped": false,
+          "adjusted_value": {
+            "amount": "207664512.5",
+            "currency": "USD"
+          }
+        }
+      ],
+      "final_value": {
+        "amount": "207664512.5",
+        "currency": "USD"
+      }
+    },
+    {
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "period": "2025Q3",
+      "base_value": {
+        "amount": "217078007.537499980125",
+        "currency": "USD"
+      },
+      "adjustments": [
+        {
+          "adjustment_id": "restructuring",
+          "name": "Restructuring charges",
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "is_capped": false,
+          "adjusted_value": {
+            "amount": "217078007.537499980125",
+            "currency": "USD"
+          }
+        }
+      ],
+      "final_value": {
+        "amount": "217078007.537499980125",
+        "currency": "USD"
+      }
+    },
+    {
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "period": "2025Q4",
+      "base_value": {
+        "amount": "224091810.81457495025",
+        "currency": "USD"
+      },
+      "adjustments": [
+        {
+          "adjustment_id": "restructuring",
+          "name": "Restructuring charges",
+          "raw_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "capped_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "is_capped": false,
+          "adjusted_value": {
+            "amount": "224091810.81457495025",
+            "currency": "USD"
+          }
+        }
+      ],
+      "final_value": {
+        "amount": "224091810.81457495025",
+        "currency": "USD"
+      }
     }
   ],
   "errors": {
     "duplicate": {
       "config": {
         "target_node": "ebitda",
+        "output_node": "adjusted_ebitda",
         "adjustments": [
           {
             "id": "restructuring",
@@ -416,8 +1071,14 @@
             "value": {
               "type": "fixed",
               "amounts": {
-                "2024Q1": 4500000,
-                "2024Q3": 2000000
+                "2024Q1": {
+                  "amount": "4500000",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "2000000",
+                  "currency": "USD"
+                }
               }
             }
           },
@@ -431,8 +1092,9 @@
               "percentage": 0.025
             },
             "cap": {
+              "type": "reference",
               "base_node": "ebitda",
-              "value": 0.1
+              "fraction": 0.1
             }
           },
           {
@@ -441,15 +1103,30 @@
             "value": {
               "type": "fixed",
               "amounts": {
-                "2024Q1": 1200000,
-                "2024Q2": 1200000,
-                "2024Q3": 1200000,
-                "2024Q4": 1200000
+                "2024Q1": {
+                  "amount": "1200000",
+                  "currency": "USD"
+                },
+                "2024Q2": {
+                  "amount": "1200000",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "1200000",
+                  "currency": "USD"
+                },
+                "2024Q4": {
+                  "amount": "1200000",
+                  "currency": "USD"
+                }
               }
             },
             "cap": {
-              "base_node": null,
-              "value": 1000000
+              "type": "absolute",
+              "amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              }
             }
           },
           {
@@ -458,7 +1135,10 @@
             "value": {
               "type": "fixed",
               "amounts": {
-                "2024Q2": -3000000
+                "2024Q2": {
+                  "amount": "-3000000",
+                  "currency": "USD"
+                }
               }
             }
           },
@@ -469,8 +1149,14 @@
             "value": {
               "type": "fixed",
               "amounts": {
-                "2024Q1": 4500000,
-                "2024Q3": 2000000
+                "2024Q1": {
+                  "amount": "4500000",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "2000000",
+                  "currency": "USD"
+                }
               }
             }
           }
@@ -480,7 +1166,8 @@
     },
     "missingTarget": {
       "config": {
-        "target_node": "adjusted_ebitda",
+        "target_node": "reported_ebitda",
+        "output_node": "adjusted_ebitda",
         "adjustments": [
           {
             "id": "restructuring",
@@ -489,8 +1176,14 @@
             "value": {
               "type": "fixed",
               "amounts": {
-                "2024Q1": 4500000,
-                "2024Q3": 2000000
+                "2024Q1": {
+                  "amount": "4500000",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "2000000",
+                  "currency": "USD"
+                }
               }
             }
           },
@@ -504,8 +1197,9 @@
               "percentage": 0.025
             },
             "cap": {
+              "type": "reference",
               "base_node": "ebitda",
-              "value": 0.1
+              "fraction": 0.1
             }
           },
           {
@@ -514,15 +1208,30 @@
             "value": {
               "type": "fixed",
               "amounts": {
-                "2024Q1": 1200000,
-                "2024Q2": 1200000,
-                "2024Q3": 1200000,
-                "2024Q4": 1200000
+                "2024Q1": {
+                  "amount": "1200000",
+                  "currency": "USD"
+                },
+                "2024Q2": {
+                  "amount": "1200000",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "1200000",
+                  "currency": "USD"
+                },
+                "2024Q4": {
+                  "amount": "1200000",
+                  "currency": "USD"
+                }
               }
             },
             "cap": {
-              "base_node": null,
-              "value": 1000000
+              "type": "absolute",
+              "amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              }
             }
           },
           {
@@ -531,74 +1240,35 @@
             "value": {
               "type": "fixed",
               "amounts": {
-                "2024Q2": -3000000
+                "2024Q2": {
+                  "amount": "-3000000",
+                  "currency": "USD"
+                }
               }
             }
           }
         ]
       },
-      "message": "Evaluation error: Target node 'adjusted_ebitda' not found in results"
+      "message": "Invalid input: Normalization target 'reported_ebitda' is not a node of the results"
     },
-    "nonFiniteBase": {
+    "wrongUnits": {
       "config": {
-        "target_node": "ltm_ebitda",
+        "target_node": "ebitda",
+        "output_node": "adjusted_ebitda",
         "adjustments": [
           {
-            "id": "restructuring",
-            "name": "Restructuring charges",
-            "category": "non_recurring",
+            "id": "scalar",
+            "name": "Scalar amount",
             "value": {
               "type": "fixed",
               "amounts": {
-                "2024Q1": 4500000,
-                "2024Q3": 2000000
-              }
-            }
-          },
-          {
-            "id": "run_rate_synergies",
-            "name": "Run-rate synergies",
-            "category": "synergies",
-            "value": {
-              "type": "percentage_of_node",
-              "node_id": "revenue",
-              "percentage": 0.025
-            },
-            "cap": {
-              "base_node": "ebitda",
-              "value": 0.1
-            }
-          },
-          {
-            "id": "management_fees",
-            "name": "Sponsor management fees",
-            "value": {
-              "type": "fixed",
-              "amounts": {
-                "2024Q1": 1200000,
-                "2024Q2": 1200000,
-                "2024Q3": 1200000,
-                "2024Q4": 1200000
-              }
-            },
-            "cap": {
-              "base_node": null,
-              "value": 1000000
-            }
-          },
-          {
-            "id": "one_time_gain",
-            "name": "Gain on asset sale",
-            "value": {
-              "type": "fixed",
-              "amounts": {
-                "2024Q2": -3000000
+                "2024Q1": 1
               }
             }
           }
         ]
       },
-      "message": "Evaluation error: Non-finite normalization base for 2024Q1"
+      "message": "Invalid input: Adjustment 'scalar' amount for 2024Q1 must be a finite amount in the units of target 'ebitda' (Monetary { currency: USD })"
     }
   }
 }

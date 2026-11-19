@@ -98,11 +98,19 @@ export interface CheckSuiteSpecWire {
   name: string;
 }
 /**
- * Verifies that Assets = Liabilities + Equity for every period.
+ * Verifies that Assets = Liabilities + Equity at every model period close.
  *
- * All configured operands must have compatible scalar/monetary units and one
- * currency. Execution rejects incompatible units or invalid numeric tolerances;
- * it performs no FX conversion.
+ * Each group names known nodes, with no identifier repeated within a group
+ * or shared between groups: the caller includes each account once, through
+ * its subtotal or its components. All operands have compatible units and
+ * one currency; the check performs no FX conversion. Signed balances and
+ * typed zeros are used as they are.
+ *
+ * Monetary balances are summed exactly and scalar balances with compensated
+ * sums. The signed difference is `assets - (liabilities + equity)`; the
+ * relative reference of the tolerance is `|assets|`. A period with a
+ * missing balance is incomplete and names the nodes without a value; the
+ * check passes only when every period is complete and within tolerance.
  */
 export interface DC7D556Ba6Ae95916518C {
   /**
@@ -118,42 +126,50 @@ export interface DC7D556Ba6Ae95916518C {
    */
   liabilities_nodes: D_695249Af9946117B99A3[];
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Absolute tolerance override in the balances' units; replaces both
+   * terms of the suite's
+   * [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   [k: string]: unknown;
 }
 /**
- * Checks that retained earnings flow correctly across periods:
- * RE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).
+ * Reconciles retained earnings in every model period:
+ * `closing = opening + net income + dividend effect + direct adjustments`.
  *
- * Every configured balance, flow, and adjustment must use the same
- * scalar/monetary units and currency. Execution rejects incompatible units or
- * invalid numeric tolerances; it performs no FX conversion.
+ * The first opening is the explicit `opening_balance` at the first period
+ * boundary; each later opening is the close of the immediately adjacent
+ * prior period. All inputs share one ownership scope, compatible units and
+ * one currency; the check performs no FX conversion.
  *
  * # Sign convention
  *
- * * `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]
- *   convention — positive values increase RE (profit), negative values
- *   decrease it (loss). No validation is emitted for NI since both signs
- *   are meaningful.
- * * `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]
- *   convention by default — the formula subtracts dividends explicitly.
- * * `other_adjustments` carry
- *   [`SignConventionPolicy::InflowPositive`] — they are signed amounts
- *   added directly.
+ * * `net_income_node` is signed: a profit increases retained earnings and
+ *   a loss decreases it.
+ * * `dividends_node` is, by default
+ *   ([`SignConventionPolicy::MagnitudePositive`]), a non-negative magnitude
+ *   that the identity subtracts; a negative magnitude is rejected. Under
+ *   [`SignConventionPolicy::InflowPositive`] it is a signed amount the
+ *   identity adds.
+ * * `other_adjustments` are signed entries recorded directly in retained
+ *   earnings, each a distinct node included once. A restatement appears
+ *   once: in an already-restated opening balance or as one such entry.
+ *
+ * Omit a dividend or adjustment series only when it does not apply; a
+ * configured series without a value makes the period coverage_finding, and a
+ * known zero is a typed zero. Monetary comparisons are exact and scalar
+ * ones compensated. The relative reference of the tolerance is
+ * `|opening retained earnings|`, with no floor. The check passes only when
+ * every period is complete and within tolerance.
  */
 export interface D_671F6D76F67F4Fafb7F3 {
   /**
-   * Optional node for dividends paid.
+   * Node for dividends recognized in retained earnings in each period.
    */
   dividends_node?: D_695249Af9946117B99A3 | null;
   /**
-   * Sign convention applied to the `dividends_node` input. Defaults
-   * to [`SignConventionPolicy::MagnitudePositive`].
-   * `net_income_node` and `other_adjustments` always use
-   * `InflowPositive` by construction.
+   * Sign convention of `dividends_node`. Defaults to
+   * [`SignConventionPolicy::MagnitudePositive`].
    */
   dividends_sign_convention?: "magnitude_positive" | "inflow_positive";
   /**
@@ -197,8 +213,9 @@ export interface D_671F6D76F67F4Fafb7F3 {
    * safely share and clone IDs with minimal synchronization overhead.
    */
   net_income_node: string;
+  opening_balance: D_7E4Df57C89Fa33D75314;
   /**
-   * Additional adjustment nodes (buybacks, AOCI, etc.).
+   * Signed direct retained-earnings entries, each a distinct node.
    */
   other_adjustments?: D_695249Af9946117B99A3[];
   /**
@@ -243,21 +260,231 @@ export interface D_671F6D76F67F4Fafb7F3 {
    */
   retained_earnings_node: string;
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Absolute tolerance override in the balance units; replaces both terms
+   * of the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   [k: string]: unknown;
 }
 /**
- * Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
- * TotalCF = CFO + CFI + CFF.
+ * Opening retained earnings at the start of the model's first period.
+ */
+export interface D_7E4Df57C89Fa33D75314 {
+  /**
+   * Date of the balance: the start of the model's first period.
+   */
+  date: string;
+  /**
+   * The balance on that date, in the units and currency of the
+   * reconciled balance node. A known zero is a typed zero.
+   */
+  value: D_598048De9D4527D8B97C | number;
+}
+/**
+ * Currency-aware amount
+ */
+export interface D_598048De9D4527D8B97C {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * Reconciles closing cash to opening cash plus classified cash flows and
+ * separately identified adjustments, and independently reconciles total
+ * classified cash flows to CFO + CFI + CFF.
  *
- * Every configured operand must have the same scalar/monetary units and
- * currency. Execution rejects incompatible units or non-finite/negative
- * tolerances; it performs no FX conversion.
+ * The roll-forward is evaluated for every model period:
+ * `closing = opening + total cash flow + adjustments`. The first opening is
+ * the explicit `opening_balance` at the first period boundary; each later
+ * opening is the close of the immediately adjacent prior period. Cash
+ * inflows are positive and outflows negative. All inputs share one cash
+ * scope, compatible units and one currency; the check performs no FX
+ * conversion.
+ *
+ * The component identity `total cash flow = CFO + CFI + CFF` runs for every
+ * period when all three component nodes are configured, and not at all when
+ * none is; configuring only some of them is an error.
+ *
+ * Monetary comparisons are exact and scalar ones compensated. The relative
+ * reference of the tolerance is `|opening cash|` for the roll-forward and
+ * `|total cash flow|` for the components, with no floor. A comparison with
+ * a missing input is incomplete; the check passes only when every enabled
+ * comparison is complete and within tolerance.
  */
 export interface D_16C0D07694C2C99E93Aa {
+  /**
+   * Signed FX and cash-scope adjustment nodes, each included once.
+   */
+  adjustment_nodes?: D_695249Af9946117B99A3[];
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -300,20 +527,22 @@ export interface D_16C0D07694C2C99E93Aa {
    */
   cash_balance_node: string;
   /**
-   * Optional node for cash from financing.
+   * Node for cash from financing.
    */
   cff_node?: D_695249Af9946117B99A3 | null;
   /**
-   * Optional node for cash from investing.
+   * Node for cash from investing.
    */
   cfi_node?: D_695249Af9946117B99A3 | null;
   /**
-   * Optional node for cash from operations.
+   * Node for cash from operations; configure all three components or
+   * none.
    */
   cfo_node?: D_695249Af9946117B99A3 | null;
+  opening_balance: D_7E4Df57C89Fa33D753141;
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Absolute tolerance override in the cash units; replaces both terms of
+   * the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   /**
@@ -360,52 +589,87 @@ export interface D_16C0D07694C2C99E93Aa {
   [k: string]: unknown;
 }
 /**
- * Flags required nodes that lack values in applicable periods.
+ * Opening cash at the start of the model's first period.
+ */
+export interface D_7E4Df57C89Fa33D753141 {
+  /**
+   * Date of the balance: the start of the model's first period.
+   */
+  date: string;
+  /**
+   * The balance on that date, in the units and currency of the
+   * reconciled balance node. A known zero is a typed zero.
+   */
+  value: D_598048De9D4527D8B97C | number;
+}
+/**
+ * Checks that every required node has a value in every period of the
+ * selected scope.
  *
- * Missing actual observations produce `Severity::Error` and fail the check.
- * Missing forecast observations produce advisory `Severity::Warning` findings.
+ * The required nodes and the period scope (actuals, forecasts or both) are
+ * stated explicitly. An observation that is missing, or unavailable for a
+ * stated reason, makes the covered scope incomplete: it is a coverage
+ * finding, and the check's outcome is `incomplete`. A typed zero is a valid
+ * observation. A scope with no required node or no period in it examines
+ * nothing and is `unevaluated`. `evaluated` counts the required cells
+ * examined; the findings list the missing and unavailable ones.
+ *
+ * A required node the model does not know, or one listed twice, is a
+ * configuration error.
  */
 export interface DB45Cf940E78A8E787A32 {
   /**
-   * Nodes that must have values in every in-scope period.
+   * Nodes that must have a value in every in-scope period.
    */
   required_nodes: D_695249Af9946117B99A3[];
   /**
-   * Which periods to inspect.
+   * Which periods are in scope: all, actuals only or forecasts only.
    */
   scope: "all_periods" | "actuals_only" | "forecast_only";
   [k: string]: unknown;
 }
 /**
- * Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).
+ * Flags finite values with an unexpected sign (revenue below zero, an
+ * expense above zero).
  *
- * **Advisory-only**: every finding is `Severity::Warning`, so this check's
- * `CheckResult::passed` is always `true` and it never fails a pipeline gate.
- * Treat its findings as review prompts, not assertions.
+ * **Advisory only**: every finding is `Severity::Warning`, so the check
+ * never fails. Zero is valid in either group, and a cell without a value is
+ * not examined: mandatory sign rules belong to the operation that owns
+ * them (the retained-earnings dividend convention, for example).
+ *
+ * A node the model does not know, a node listed twice, or a node in both
+ * groups is a configuration error.
  */
 export interface D_596Da27A7E87322Af664 {
   /**
-   * Nodes expected to carry negative values.
+   * Nodes expected to be non-positive.
    */
   negative_nodes?: D_695249Af9946117B99A3[];
   /**
-   * Nodes expected to carry positive values.
+   * Nodes expected to be non-negative.
    */
   positive_nodes?: D_695249Af9946117B99A3[];
   [k: string]: unknown;
 }
 /**
- * Detects NaN or infinite values in node results.
+ * Detects values that are not valid numbers: a NaN or an infinity.
  *
- * **Gating**: findings are `Severity::Error`, so any non-finite cell sets
- * `CheckResult::passed` to `false` and fails a pipeline gate. Non-finite
- * values poison every downstream calculation, so they are never advisory.
+ * **Gating**: findings are `Severity::Error`, so one invalid value fails
+ * the check, whether or not any other check requires the cell. A typed
+ * zero is valid, and a cell that is missing, masked or unavailable for a
+ * stated reason is not a value and is not examined: coverage belongs to
+ * [`MissingValueCheck`](super::MissingValueCheck).
+ *
+ * The covered nodes are selected explicitly: all modeled nodes, or a named
+ * list in which an unknown or repeated identifier is a configuration
+ * error. A cell in a period the model's plan does not have, and a node
+ * whose result units contradict the model's, are errors.
  */
 export interface D_2Bc9B0F4Efb33830F0A7 {
   /**
-   * Specific nodes to check; if empty, all nodes in results are inspected.
+   * The nodes to check: `"all"` or a list of node identifiers.
    */
-  nodes?: D_695249Af9946117B99A3[];
+  nodes: "all" | D_695249Af9946117B99A3[];
   [k: string]: unknown;
 }
 /**
@@ -413,25 +677,26 @@ export interface D_2Bc9B0F4Efb33830F0A7 {
  */
 export interface D_5De9F28B928C01E49782 {
   /**
-   * Default **relative** tolerance as a fraction of the reference
-   * denominator (e.g. 1e-6 ≈ "one basis point of a basis point"). Zero
-   * disables relative tolerance.
+   * **Relative** tolerance as a fraction of the identity's reference
+   * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+   * disables the relative term.
    */
   default_relative_tolerance?: number;
   /**
-   * Default **absolute** tolerance for equality comparisons, expressed in
-   * the same currency units as the node values being compared (e.g. 0.01
-   * means one cent when nodes are in whole dollars).
+   * **Absolute** tolerance for equality comparisons, in the units of the
+   * compared values (0.01 is one cent when nodes are in whole dollars).
+   * Zero, the default, requires exact equality.
    */
   default_tolerance?: number;
   /**
-   * Findings below this absolute materiality threshold are excluded from
-   * reports. Error-severity findings are exempt: materiality filters
-   * advisory noise, it never changes a check's pass/fail verdict.
+   * Advisory findings whose absolute materiality is below this threshold
+   * are left out of the report. Error-severity and coverage findings are
+   * always reported.
    */
   materiality_threshold?: number;
   /**
-   * Minimum severity a finding must have to appear in the report.
+   * Minimum severity an advisory finding must have to appear in the
+   * report. Coverage findings are always reported.
    */
   min_severity?: "info" | "warning" | "error";
 }
@@ -441,13 +706,15 @@ export interface D_5De9F28B928C01E49782 {
  * Full suite definitions (built-in + formula) can be stored as a single JSON
  * document and resolved directly with [`CheckSuiteSpec::resolve`].
  *
- * Each period ends in one of three verdicts: pass, fail (a finding with the
- * configured `severity`), or insufficient data. A period has insufficient
- * data when a same-period input is missing or non-finite, or when the
- * formula consumes a non-finite value, such as a lag or rolling window that
- * reaches before the first period. It is reported as a `warning` finding
- * naming the inputs, records no comparison, and never fails the check. A
- * division by zero over finite inputs is not missing data and still fails.
+ * The mode and the period scope are stated explicitly. In each in-scope
+ * period the check ends in one of three ways: pass, breach (a finding with
+ * the configured `severity`), or incomplete. The formula is evaluated on
+ * the typed cells of the verified run and consumes observations only on the
+ * paths it takes: an untaken branch may read a missing cell, and an
+ * explicit `coalesce` supplies a fallback. A period is incomplete (a
+ * coverage finding) when a needed observation, or the eligibility
+ * condition, is missing or unavailable. A division by zero, a domain error
+ * or an overflow is an execution error, for an advisory check too.
  */
 export interface D_270Bee76F784Bc446378 {
   /**
@@ -460,7 +727,14 @@ export interface D_270Bee76F784Bc446378 {
     | "credit_reasonableness"
     | "data_quality";
   /**
-   * Statements DSL expression to evaluate (e.g. `"revenue > 0"`).
+   * Optional Boolean formula; a period in which it is false is out of
+   * scope, and one in which it has no value is incomplete.
+   */
+  eligibility?: string | null;
+  /**
+   * Statements DSL expression to evaluate: Boolean in predicate mode
+   * (`"revenue > 0"`), a scalar or monetary amount in residual mode
+   * (`"assets - liabilities - equity"`).
    *
    * Formula checks use the same evaluator as calculated statement nodes,
    * including time-series functions and `cs.*` capital-structure references.
@@ -471,22 +745,28 @@ export interface D_270Bee76F784Bc446378 {
    */
   id: string;
   /**
-   * Template for the finding message (`{period}` is replaced at runtime).
+   * Template for the breach message (`{period}` is replaced at runtime).
    */
   message_template: string;
+  /**
+   * Whether the formula is a Boolean predicate or a residual.
+   */
+  mode: "predicate" | "residual";
   /**
    * Human-readable name shown in reports.
    */
   name: string;
   /**
-   * Severity assigned to findings when the formula fails.
+   * Which periods the check covers: all, actuals only or forecasts only.
+   */
+  scope: "all_periods" | "actuals_only" | "forecast_only";
+  /**
+   * Severity assigned to a breach.
    */
   severity: "info" | "warning" | "error";
   /**
-   * Finite, nonnegative absolute residual bound in the formula's result units.
-   * When present, the formula passes when its absolute result is at most
-   * this bound. When absent, the formula is a predicate and any finite
-   * nonzero result passes.
+   * Residual mode only: finite, non-negative absolute bound in the
+   * residual's units. Omitted means zero, an exact comparison.
    */
   tolerance?: number | null;
 }

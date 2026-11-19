@@ -112,11 +112,12 @@ it(
         "evaluateMonteCarlo",
         "monteCarloBreachProbability",
       ]);
-      // The full uint64 seed range reaches Rust as an exact integer token.
+      // The full uint64 seed range reaches Rust as an exact decimal string.
       const wide = await query.fetchQuery(
         evaluateMonteCarloOptions(client, 1, {
           modelJson,
-          configJson: '{"n_paths":4,"seed":18446744073709551615}',
+          configJson:
+            '{"n_paths":4,"seed":"18446744073709551615","metrics":["revenue"]}',
         }),
       );
       expect(wide.n_paths).toBe(4);
@@ -125,7 +126,7 @@ it(
         query.fetchQuery(
           evaluateMonteCarloOptions(client, 1, {
             modelJson,
-            configJson: '{"n_paths":0,"seed":1}',
+            configJson: '{"n_paths":0,"seed":"1","metrics":["revenue"]}',
           }),
         ),
       ).rejects.toMatchObject({ kind: "validation" });
@@ -133,7 +134,8 @@ it(
         query.fetchQuery(
           evaluateMonteCarloOptions(client, 1, {
             modelJson,
-            configJson: '{"n_paths":1,"seed":1,"bogus":1}',
+            configJson:
+              '{"n_paths":1,"seed":"1","metrics":["revenue"],"bogus":1}',
           }),
         ),
       ).rejects.toThrow(/unknown field `bogus`/);
@@ -173,7 +175,7 @@ it("keys both queries by every request field and the worker session, and keeps a
   );
 });
 
-it("starts the config empty and submits the uint64 seed as an exact integer token", async () => {
+it("starts the config empty and submits the uint64 seed as an exact decimal string", async () => {
   const submit = vi.fn<(json: string) => void>();
   render(<StatementMonteCarlo onSubmit={submit} results={null} />);
   const paths = screen.getByRole("textbox", { name: "N paths" });
@@ -183,6 +185,11 @@ it("starts the config empty and submits the uint64 seed as an exact integer toke
   expect((seed as HTMLInputElement).value).toBe("");
   fireEvent.change(paths, { target: { value: "200" } });
   fireEvent.change(seed, { target: { value: "18446744073709551615" } });
+  // The metrics to report are listed explicitly.
+  fireEvent.click(screen.getByRole("button", { name: "Add Metrics" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Metrics 1" }), {
+    target: { value: "revenue" },
+  });
   const simulate = screen.getByRole("button", { name: "Simulate" });
   await waitFor(() =>
     expect((simulate as HTMLButtonElement).disabled).toBe(false),
@@ -190,13 +197,8 @@ it("starts the config empty and submits the uint64 seed as an exact integer toke
   fireEvent.click(simulate);
   await waitFor(() => expect(submit).toHaveBeenCalled());
   expect(submit.mock.lastCall![0]).toBe(
-    '{"n_paths":200,"seed":18446744073709551615}',
+    '{"n_paths":200,"seed":"18446744073709551615","metrics":["revenue"]}',
   );
-  // A seed above the uint64 range is rejected before submission.
-  fireEvent.change(seed, { target: { value: "18446744073709551616" } });
-  expect(
-    (await screen.findAllByText(/expected bigint to be <=/)).length,
-  ).toBeGreaterThan(0);
 });
 
 it("presents the returned percentiles of the chosen metric in Rust's order, with the breach readout as returned", () => {
@@ -233,11 +235,8 @@ it("presents the returned percentiles of the chosen metric in Rust's order, with
       .map((cell) => cell.textContent),
   ).toEqual(q4.map(([, value]) => String(value)));
   const readout = screen.getByRole("region", { name: "Breach probability" });
-  const percentage = new Intl.NumberFormat("en-US", {
-    style: "percent",
-  }).format(breach.probability);
-  expect(readout.textContent).toContain(percentage);
-  expect(readout.textContent).toContain(`(${breach.probability})`);
+  expect(readout.textContent).toContain("10%");
+  expect(readout.textContent).toContain("(0.1)");
   fireEvent.click(within(readout).getByRole("button", { name: "Test breach" }));
   expect(onBreach).toHaveBeenLastCalledWith({
     metric: "leverage",

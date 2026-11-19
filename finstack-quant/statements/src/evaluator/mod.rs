@@ -31,6 +31,7 @@
 
 mod capital_structure_runtime;
 mod cashflow_export;
+pub(crate) mod cell;
 mod context;
 mod dag;
 mod engine;
@@ -40,23 +41,30 @@ pub(crate) mod formula;
 mod formula_aggregates;
 mod formula_dispatch;
 mod formula_ewm;
-pub(crate) mod formula_helpers;
 mod formula_timeseries;
 pub(crate) mod monte_carlo;
 mod period_history;
 mod precedence;
 mod results;
 mod rollup;
+pub(crate) mod value;
 
-pub use cashflow_export::{PeriodDateConvention, node_to_dated_schedule};
+pub use cashflow_export::{
+    DatedCell, FlowSign, PeriodDateConvention, PricingFlowSelection, node_to_dated_schedule,
+    node_to_pricing_flows,
+};
+pub use cell::UnavailableReason;
 pub use context::EvaluationContext;
 pub use dag::DependencyGraph;
-pub use engine::{Evaluator, PreparedEvaluation};
+pub use engine::{Evaluator, ObservationCutoff, PreparedEvaluation};
 pub use formula::evaluate_formula;
-pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
+pub use monte_carlo::{
+    MAX_MONTE_CARLO_SAMPLES, MonteCarloConfig, MonteCarloContext, MonteCarloIncomplete,
+    MonteCarloResults, PercentileSeries,
+};
 pub(crate) use period_history::PeriodHistory;
 pub use results::{
-    CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, EvalStats, EvalWarning,
-    NumericMode, StatementResult,
+    CapitalStructureWarning, CellSource, CellStatus, EvalStats, EvalWarning, ForecastStream,
+    NumericMode, ResultCell, RunProvenance, StatementResult,
 };
-pub use rollup::RollupSpec;
+pub use rollup::{RollupProvenance, RollupSpec};

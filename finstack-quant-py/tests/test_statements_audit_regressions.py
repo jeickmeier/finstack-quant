@@ -1,7 +1,6 @@
 """Binding regressions for semantic validation, units, and result persistence."""
 
 import json
-import math
 import pickle
 from typing import Any
 
@@ -43,11 +42,12 @@ def test_normalization_preserves_currency_and_rejects_foreign_adjustment() -> No
     result = s.Evaluator().evaluate(money_model())
     payload = {
         "target_node": "usd",
+        "output_node": "adjusted_usd",
         "adjustments": [
             {"id": "a", "name": "a", "value": {"type": "percentage_of_node", "node_id": "eur", "percentage": 0.1}}
         ],
     }
-    with pytest.raises(ValueError, match="incompatible units"):
+    with pytest.raises(ValueError, match="different units"):
         s.normalize(result, s.NormalizationConfig.from_json(json.dumps(payload)))
     payload["adjustments"][0]["value"]["node_id"] = "usd"
     normalized = s.normalize(result, s.NormalizationConfig.from_json(json.dumps(payload)))[0]
@@ -63,32 +63,35 @@ def test_ordinary_missing_results_survive_json_and_pickle() -> None:
     builder.value("x", [("2025Q1", 1.0), ("2025Q2", 2.0)])
     builder.compute("lagged", "lag(x, 1)")
     result = s.Evaluator().evaluate(builder.build())
-    assert json.loads(result.to_json())["nodes"]["lagged"]["2025Q1"] == "nan"
+    unavailable = {"status": "unavailable", "reason": "missing_input", "source": "formula"}
+    assert json.loads(result.to_json())["cells"]["lagged"]["2025Q1"] == unavailable
     pickled = pickle.loads(pickle.dumps(result))  # noqa: S301 - locally constructed fixture
     for restored in [s.StatementResult.from_json(result.to_json()), pickled]:
-        assert math.isnan(restored.get("lagged", "2025Q1"))
+        assert restored.get("lagged", "2025Q1") is None
+        assert restored.get_cell("lagged", "2025Q1") == unavailable
         assert restored.get("lagged", "2025Q2") == 1.0
 
 
-def test_residual_scale_warning_reports_the_applied_ratio() -> None:
+def test_capital_structure_warnings_round_trip_and_rescaling_warnings_are_rejected() -> None:
     document = json.loads(s.Evaluator().evaluate(money_model()).to_json())
     warning = {
         "capital_structure": {
             "period": "2025Q1",
-            "warning": {"kind": "residual_scale_mismatch", "applied_ratio": 10_000_000.0},
+            "warning": {"kind": "interest_shortfall", "instrument_id": "TL", "amount": 12.5},
         }
     }
     document["meta"]["warnings"] = [warning]
     restored = s.StatementResult.from_json(json.dumps(document))
     assert restored.warnings == [warning]
     assert json.loads(restored.to_json())["meta"]["warnings"] == [warning]
-    document["meta"]["warnings"][0]["capital_structure"]["warning"] = {
-        "kind": "scale_clamped",
-        "raw_ratio": 10_000_000.0,
-        "clamped_ratio": 1.0,
-    }
-    with pytest.raises(ValueError, match="scale_clamped"):
-        s.StatementResult.from_json(json.dumps(document))
+    # An opening-balance mismatch is an error, so no result carries a rescaling warning.
+    for obsolete in (
+        {"kind": "residual_scale_mismatch", "applied_ratio": 10_000_000.0},
+        {"kind": "scale_clamped", "raw_ratio": 10_000_000.0, "clamped_ratio": 1.0},
+    ):
+        document["meta"]["warnings"][0]["capital_structure"]["warning"] = obsolete
+        with pytest.raises(ValueError, match=obsolete["kind"]):
+            s.StatementResult.from_json(json.dumps(document))
 
 
 @pytest.mark.parametrize("method", ["normal", "log_normal", "mean_reverting"])
@@ -98,7 +101,7 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
         builder = s.ModelBuilder("direct-shocks")
         builder.periods("2025Q1..Q4", "2025Q1")
         builder.value("peer", [("2025Q1", 1e16 if tiny else 100.0)])
-        params = {"std_dev": 1e-20 if tiny else 0.1, "seed": 42}
+        params = {"std_dev": 1e-20 if tiny else 0.1, "seed": "42"}
         if method == "mean_reverting":
             params.update({"long_run_mean": 1e16 if tiny else 100.0, "reversion_speed": 0.1})
         else:
@@ -115,7 +118,7 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
                         "params": {
                             "mean": 0.0,
                             "std_dev": 1.0,
-                            "seed": seed,
+                            "seed": str(seed),
                             "correlation_with": peer,
                             "correlation": correlation,
                         },
@@ -123,7 +126,9 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
                 )
             )
             builder = mixed.build()
-        result = s.Evaluator().evaluate_monte_carlo(builder.build(), s.MonteCarloConfig(16, 7, [0.5], True))
+        result = s.Evaluator().evaluate_monte_carlo(
+            builder.build(), s.MonteCarloConfig(16, 7, ["peer", "follower", "child"], [0.5], True)
+        )
         return json.loads(result.to_json())
 
     def paths(result: dict[str, Any], metric: str) -> list[float]:
@@ -133,6 +138,7 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
         ]
 
     baseline, rounded = run(False), run(True)
-    assert all(v == 1e16 for v in paths(rounded, "peer"))
+    # A log-normal level is restored from its logarithm, so it is flat to rounding.
+    assert all(abs(v / 1e16 - 1.0) < 1e-12 for v in paths(rounded, "peer"))
     for metric in ["follower", "child"]:
         assert paths(rounded, metric) == paths(baseline, metric)

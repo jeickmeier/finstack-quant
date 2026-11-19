@@ -62,15 +62,19 @@ impl DependencyGraph {
                 }
             }
         }
-        Self::from_parsed(model, &parsed)
+        Self::from_parsed(model, &parsed, &mut |_| {})
     }
 
     /// Build edges from expressions already parsed during semantic validation.
+    ///
+    /// `on_node` is told the position of each node as its references are
+    /// checked, so the caller can locate an unknown reference.
     pub(crate) fn from_parsed(
         model: &FinancialModelSpec,
         parsed: &IndexMap<String, crate::dsl::ast::StmtExpr>,
+        on_node: &mut dyn FnMut(usize),
     ) -> Result<Self> {
-        Self::validate_formula_references(model, parsed)?;
+        Self::validate_formula_references(model, parsed, on_node)?;
 
         let mut dependencies = IndexMap::new();
         let mut dependents = IndexMap::new();
@@ -106,9 +110,11 @@ impl DependencyGraph {
     fn validate_formula_references(
         model: &FinancialModelSpec,
         parsed: &IndexMap<String, crate::dsl::ast::StmtExpr>,
+        on_node: &mut dyn FnMut(usize),
     ) -> Result<()> {
         let valid_identifiers: IndexSet<NodeId> = model.nodes.keys().cloned().collect();
-        for (node_id, node_spec) in &model.nodes {
+        for (index, (node_id, node_spec)) in model.nodes.iter().enumerate() {
+            on_node(index);
             if let Some(formula) = &node_spec.formula_text {
                 validate_known_identifiers(
                     formula,
@@ -566,11 +572,13 @@ mod tests {
         let model = {
             let mut model_builder_1 = ModelBuilder::new("test");
             model_builder_1.periods("2025Q1..Q2", None).unwrap();
-            model_builder_1.value("revenue", &[]);
+            model_builder_1.value_scalar("revenue", &[]);
             let mut model_builder_1 = model_builder_1.mixed("margin");
             model_builder_1.formula("1.0").unwrap();
             let mut model_builder_1 = model_builder_1.build().unwrap();
-            model_builder_1.where_clause("revenue > 0.0");
+            model_builder_1
+                .where_clause("margin", "revenue > 0.0")
+                .unwrap();
             model_builder_1.build().unwrap()
         };
 

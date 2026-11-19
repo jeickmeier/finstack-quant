@@ -1,8 +1,8 @@
 # STATEMENTS-CAPITAL-001: Instrument construction and supported capital-structure domains
 
 **Decision status:** Accepted for opt-in waterfall prepayments and explicit bond and swap construction (2026-11-15).
-**Implementation status:** The accepted prepayment contract is enforced by the default stack, waterfall validation and capital-structure validation. Removal of the Statements construction helpers and reconciliation of their callers remain pending.
-**Validation status:** Scoped Rust, Python and WASM regression checks passed for opt-in prepayments on 2026-11-15. Independent contractual schedule qualification remains open.
+**Implementation status:** The accepted prepayment contract is enforced by the default stack, waterfall validation and capital-structure validation. The Statements construction helpers `add_bond`, `add_bond_with_convention`, `add_swap` and `add_swap_with_conventions`, their Python and WASM counterparts and their parameter types and schemas are removed (2026-11-17); every caller builds the canonical Valuations instrument and attaches it through `add_debt` or `addDebt`. The sections below describe the implementation audited before reconciliation.
+**Validation status:** Scoped Rust, Python and WASM regression checks passed for opt-in prepayments on 2026-11-15. Attachment and wire replay are qualified: the model holds the canonical bond and swap unchanged, with resolved terms, elected convention and dated schedule equal before and after a round trip, in Rust, Python and WASM. Independent contractual schedule qualification remains open under the capital evidence entry.
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; [scope and file ledger](README.md).
 
 ## Choice and rationale

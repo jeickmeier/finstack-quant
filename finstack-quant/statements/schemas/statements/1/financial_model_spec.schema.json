@@ -649,6 +649,89 @@
         }
       ]
     },
+    "BootstrapParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Bootstrap`].",
+      "properties": {
+        "historical": {
+          "description": "At least 2 observations in the line's base units, oldest first.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/ForecastBootstrapMode",
+          "description": "What to resample; defaults to growth rates."
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "historical",
+        "mode",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "BoundsParams": {
+      "additionalProperties": false,
+      "description": "Parameters of a method with only the cross-cutting bounds.",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "BreakevenConfig": {
       "additionalProperties": false,
       "description": "Configuration for the breakeven calculator.",
@@ -1206,6 +1289,11 @@
         }
       ]
     },
+    "CapitalFxPolicy": {
+      "const": "period_end",
+      "description": "How capital-structure totals are converted into the reporting currency.\n\nPeriod-close conversion is the only supported policy. It must still be\nchosen explicitly before instruments of more than one currency are\nconsolidated.",
+      "type": "string"
+    },
     "CapitalStructureSpec": {
       "additionalProperties": false,
       "description": "Capital structure specification.",
@@ -1220,13 +1308,13 @@
         "fx_policy": {
           "anyOf": [
             {
-              "$ref": "#/$defs/FxConversionPolicy"
+              "$ref": "#/$defs/CapitalFxPolicy"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Optional FX conversion policy override.\n\nWhen omitted, `cs.*` cash items and balances convert on the inclusive\nperiod-end date (`FxConversionPolicy::PeriodEnd`). Conversion applies to\nthe already-aggregated period bucket, not per contractual cashflow date."
+          "description": "Optional FX conversion policy override.\n\nRequired to consolidate instruments of more than one currency: there\nis no default. `period_end` converts each period's native-currency\ntotals on the inclusive period-close date."
         },
         "meta": {
           "additionalProperties": true,
@@ -3205,6 +3293,48 @@
         }
       ]
     },
+    "CurvePctParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::CurvePct`].",
+      "properties": {
+        "curve": {
+          "description": "Growth rate per forecast period as decimals, one per period in order.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "curve"
+      ],
+      "type": "object"
+    },
     "DateWire": {
       "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
       "format": "date",
@@ -3468,6 +3598,71 @@
       ],
       "type": "object"
     },
+    "DistributionParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`].",
+      "properties": {
+        "correlation": {
+          "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "correlation_with": {
+          "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mean": {
+          "description": "Mean shock per period, as the method applies it.",
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "std_dev": {
+          "description": "Standard deviation of the shock per period; non-negative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "mean",
+        "std_dev",
+        "seed"
+      ],
+      "type": "object"
+    },
     "DividendAdjustment": {
       "description": "How dividends affect conversion terms (dividend protection).\n\nDividend protection compensates the holder for dividends paid on the\nunderlying, which otherwise leak value from the conversion option (the\nstock drifts at `r - q` under the risk-neutral measure). The variants\ncarry no threshold parameter, so protection is **full**: the entire\ncontinuous dividend yield `q` is protected.\n\n# Pricing model (continuous-yield accretion)\n\nUnder the continuous dividend yield `q` used by the tree pricer, each\nprotected dividend payment bumps the conversion ratio by the dividend\nfraction; the continuous limit is exponential accretion from the\nvaluation date:\n\n```text\nAdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)\nAdjustPrice:  K_conv(t) = K_0 * exp(-q * t)\n```\n\nSince `ratio = notional / K_conv`, the price decay is mathematically the\nsame ratio accretion — the pricer implements both variants through the\nsingle ratio-accretion mechanism. Accretion composes multiplicatively on\ntop of any anti-dilution adjustments from\n`ConvertibleBond::effective_conversion_ratio`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::instruments::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
       "oneOf": [
@@ -3683,58 +3878,117 @@
     },
     "EcfSweepSpec": {
       "additionalProperties": false,
-      "description": "Excess Cash Flow (ECF) sweep specification.\n\nDefines how to calculate ECF and what percentage to sweep to pay down debt.\n\n# ECF Calculation\n\nThe ECF formula deducts cash interest, fees and scheduled principal paid\nby payment categories ahead of the `Sweep` priority, including carried\narrears. Unpaid claims, PIK and later payment priorities are not deducted:\n\n```text\nECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid\n      - Fees Paid Ahead of Prepayment\n      - Scheduled Principal Paid Ahead of Prepayment\n  ```\n\nSet `cash_interest_node` to override the cash-interest input. If omitted,\nthe interest actually paid ahead of `Sweep` is deducted automatically.\n\n# References\n\n- Fixed-income and leverage context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`",
+      "description": "Excess Cash Flow (ECF) sweep specification.\n\nThe agreement's formula is elected in full: a cash measure, each\ndeduction and each credit. Nothing is deducted automatically.\n\n```text\nECF     = cash_measure - Σ deductions + Σ credits\nrequest = sweep_percentage × ECF   when ECF is positive, otherwise zero\n```\n\nThe request is paid at par from the cash the earlier priorities left, up\nto the eligible principal net of reserves. It is sized, paid and applied\nto principal in the same reporting period.\n\n# References\n\n- Fixed-income and leverage context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`",
       "properties": {
-        "capex_node": {
-          "description": "Formula or node reference for capital expenditures (e.g., \"capex\")",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "cash_interest_node": {
-          "description": "Formula or node reference for cash interest paid (e.g., \"cs.interest_expense_cash.total\").\n\nIf omitted, deducts cash interest actually paid by the `Interest` priority\nahead of `Sweep`, including carried coupon arrears. If `Interest` follows\n`Sweep`, this automatic deduction is zero. An explicit node overrides\nthat amount in the model's cash currency units.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "ebitda_node": {
-          "description": "Formula or node reference for EBITDA (e.g., \"ebitda\" or \"revenue - cogs - opex\")",
+        "cash_measure": {
+          "description": "Formula or node for the agreement's cash measure before deductions\n(for example `ebitda`), in the waterfall currency. Signed and finite.\nIt may not depend on a same-period `cs` component.",
           "type": "string"
         },
+        "credits": {
+          "description": "Amounts added to the cash measure, each elected explicitly.",
+          "items": {
+            "$ref": "#/$defs/EcfTerm"
+          },
+          "type": "array"
+        },
+        "deductions": {
+          "description": "Amounts subtracted from the cash measure, each elected explicitly.",
+          "items": {
+            "$ref": "#/$defs/EcfTerm"
+          },
+          "type": "array"
+        },
+        "facilities": {
+          "$ref": "#/$defs/FacilitySelection",
+          "description": "The facilities the sweep may repay."
+        },
+        "payment_lag_days": {
+          "description": "Days from the close of the measured period to the date the sweep is\ndue. When set, the amount measured in a period is a dated obligation:\nit is paid in the period that contains its due date, and what cash or\neligible principal cannot pay is carried as arrears and paid first at\nthe next sweep. `0` is due at the close of the measured period. When\nomitted the sweep is paid in the period it is measured and an unpaid\namount is reported, not carried.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "sweep_percentage": {
-          "description": "Sweep percentage (e.g., 0.5 for 50%, 0.75 for 75%)",
+          "description": "Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).",
           "format": "double",
           "type": "number"
-        },
-        "target_instrument_id": {
-          "description": "Target instrument ID for sweep payments (if None, applies to all term loans)",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "taxes_node": {
-          "description": "Formula or node reference for taxes (e.g., \"taxes\")",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "working_capital_node": {
-          "description": "Formula or node reference for working capital change (e.g., \"wc_change\")",
-          "type": [
-            "string",
-            "null"
-          ]
         }
       },
       "required": [
-        "ebitda_node",
-        "sweep_percentage"
+        "cash_measure",
+        "sweep_percentage",
+        "facilities"
       ],
       "type": "object"
+    },
+    "EcfTerm": {
+      "description": "One elected deduction from, or credit to, the excess-cash-flow measure.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A model amount: a node or formula in the waterfall currency, signed\nas the model states it. It may not depend on a same-period `cs`\ncomponent.",
+          "properties": {
+            "expression": {
+              "description": "Node id or formula.",
+              "type": "string"
+            },
+            "type": {
+              "const": "input",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "expression"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Cash interest actually paid by the priorities ahead of the sweep in\nthis period, including carried arrears. PIK and unpaid interest are\nnot cash and are not included.",
+          "properties": {
+            "type": {
+              "const": "paid_cash_interest",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fees actually paid by the priorities ahead of the sweep.",
+          "properties": {
+            "type": {
+              "const": "paid_fees",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Scheduled principal actually paid by the priorities ahead of the\nsweep, including carried arrears. Other prepayments are not included.",
+          "properties": {
+            "type": {
+              "const": "paid_scheduled_principal",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "EligibleCollateralSchedule": {
       "additionalProperties": false,
@@ -3813,6 +4067,84 @@
           "type": "string"
         }
       ]
+    },
+    "FacilitySelection": {
+      "description": "The facilities a prepayment may repay.\n\nEligibility is elected, never implied: either every eligible facility of\nthe structure (its term loans and revolvers), or the named ones.",
+      "oneOf": [
+        {
+          "const": "all_eligible",
+          "description": "Every term loan and revolver of the capital structure.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The listed instrument ids only. Each must be a term loan or revolver\nof the structure.",
+          "properties": {
+            "named": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "named"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FadeToTargetParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::FadeToTarget`].",
+      "properties": {
+        "half_life": {
+          "description": "Periods to close half the gap; required for, and legal only with, the exponential shape.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "shape": {
+          "$ref": "#/$defs/ForecastFadeShape",
+          "description": "Path to the target; defaults to linear."
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "target": {
+          "description": "Terminal level, in the line's base units.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "target",
+        "shape"
+      ],
+      "type": "object"
     },
     "FeeStep": {
       "additionalProperties": false,
@@ -4587,99 +4919,290 @@
       ],
       "type": "object"
     },
-    "ForecastMethod": {
-      "description": "Available forecast methods.",
+    "ForecastBootstrapMode": {
+      "description": "What a bootstrap resamples from its historical series.",
       "oneOf": [
         {
-          "const": "forward_fill",
-          "description": "Carry last value forward",
+          "const": "growth",
+          "description": "Period-over-period growth rates, compounded; needs a positive series.",
           "type": "string"
         },
         {
-          "const": "growth_pct",
-          "description": "Compound growth: `v[t] = v[t-1] * (1 + rate)`",
+          "const": "diff",
+          "description": "Additive level changes; works for a series crossing zero.",
+          "type": "string"
+        }
+      ]
+    },
+    "ForecastFadeShape": {
+      "description": "Path of a fade to target.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Equal steps, reaching the target at the final period.",
           "type": "string"
         },
         {
-          "const": "curve_pct",
-          "description": "Period-specific growth rates: `v[t] = v[t-1] * (1 + curve[t])`",
+          "const": "geometric",
+          "description": "Constant compound growth; base and target must be non-zero with the same sign.",
           "type": "string"
         },
         {
-          "const": "normal",
-          "description": "Sample from normal distribution (deterministic with seed)",
-          "type": "string"
-        },
-        {
-          "const": "log_normal",
-          "description": "Sample from log-normal distribution (deterministic with seed)",
-          "type": "string"
-        },
-        {
-          "const": "override",
-          "description": "Explicit period overrides",
-          "type": "string"
-        },
-        {
-          "const": "time_series",
-          "description": "Reference external time series",
-          "type": "string"
-        },
-        {
-          "const": "seasonal",
-          "description": "Seasonal pattern (additive/multiplicative)",
-          "type": "string"
-        },
-        {
-          "const": "fade_to_target",
-          "description": "Glide from the base value to a target level: linear, geometric\n(CAGR-to-terminal), or exponential (half-life) shape",
-          "type": "string"
-        },
-        {
-          "const": "mean_reverting",
-          "description": "Mean-reverting AR(1) path:\n`v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`",
-          "type": "string"
-        },
-        {
-          "const": "bootstrap",
-          "description": "Resample historical growth rates or level diffs (deterministic with seed)",
+          "const": "exponential",
+          "description": "Half-life decay toward the target; requires `half_life`.",
           "type": "string"
         }
       ]
     },
     "ForecastSpec": {
-      "additionalProperties": false,
-      "description": "Forecast method specification.\n\nDefines how to forecast future values for a node.",
-      "properties": {
-        "method": {
-          "$ref": "#/$defs/ForecastMethod",
-          "description": "Forecast method"
-        },
-        "params": {
-          "additionalProperties": true,
-          "description": "Method-specific parameters",
-          "type": "object"
-        }
-      },
-      "required": [
-        "method"
-      ],
-      "type": "object"
-    },
-    "FxConversionPolicy": {
-      "description": "Provider-selection purpose of a point-date FX query (record\nCORE-CONVENTIONS-013 #1/#2).\n\nThe policy tells a provider which source purpose the rate serves; it does\nnot calculate dates or choose spot versus forward. There is no default:\nevery query names its policy. Period averages are not point queries; an\nowner that needs one computes the oriented aggregate itself.",
+      "description": "A forecast method with its typed parameters.\n\nSerializes as `{ \"method\": ..., \"params\": { ... } }`. `params` may be\nomitted when the method needs none.",
       "oneOf": [
         {
-          "const": "cashflow_date",
-          "description": "The rate applicable on a cashflow's own date.",
+          "description": "Carry the last value forward.",
+          "properties": {
+            "method": {
+              "const": "forward_fill",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/BoundsParams"
+            }
+          },
+          "required": [
+            "method"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Compound one growth rate per period.",
+          "properties": {
+            "method": {
+              "const": "growth_pct",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/GrowthPctParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Compound a different growth rate each period.",
+          "properties": {
+            "method": {
+              "const": "curve_pct",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/CurvePctParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample an additive random walk.",
+          "properties": {
+            "method": {
+              "const": "normal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/DistributionParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample a multiplicative random walk for positive values.",
+          "properties": {
+            "method": {
+              "const": "log_normal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/DistributionParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Set exact values for chosen periods, carrying forward between them.",
+          "properties": {
+            "method": {
+              "const": "override",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/OverrideParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Project from a historical series.",
+          "properties": {
+            "method": {
+              "const": "time_series",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/TimeSeriesParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Project a repeating pattern from a historical series.",
+          "properties": {
+            "method": {
+              "const": "seasonal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SeasonalParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample a mean-reverting AR(1) process.",
+          "properties": {
+            "method": {
+              "const": "mean_reverting",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/MeanRevertingParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Resample changes from a historical series.",
+          "properties": {
+            "method": {
+              "const": "bootstrap",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/BootstrapParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Glide toward a target level over the forecast horizon.",
+          "properties": {
+            "method": {
+              "const": "fade_to_target",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/FadeToTargetParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ForecastTrendMethod": {
+      "description": "Trend model of a time-series forecast.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Least-squares linear trend.",
           "type": "string"
         },
         {
-          "const": "period_end",
-          "description": "The rate applicable on a reporting period's closing date.",
+          "const": "exponential",
+          "description": "Holt exponential smoothing; requires `alpha` and `beta`.",
+          "type": "string"
+        },
+        {
+          "const": "moving_average",
+          "description": "Moving average; requires `window`.",
           "type": "string"
         }
       ]
+    },
+    "GrowthPctParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::GrowthPct`].",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rate": {
+          "description": "Growth per period as a decimal: 0.03 = 3%.",
+          "format": "double",
+          "type": "number"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rate"
+      ],
+      "type": "object"
     },
     "Id": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
@@ -5439,6 +5962,77 @@
       ],
       "type": "object"
     },
+    "MeanRevertingParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::MeanReverting`].",
+      "properties": {
+        "correlation": {
+          "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "correlation_with": {
+          "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "long_run_mean": {
+          "description": "Long-run level the process reverts to, in the line's base units.",
+          "format": "double",
+          "type": "number"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reversion_speed": {
+          "description": "Fraction of the gap closed each period, a decimal in (0, 1].",
+          "format": "double",
+          "type": "number"
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "std_dev": {
+          "description": "Standard deviation of the shock per period; non-negative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "long_run_mean",
+        "reversion_speed",
+        "std_dev",
+        "seed"
+      ],
+      "type": "object"
+    },
     "MertonBarrierType": {
       "description": "Barrier monitoring type for default determination.",
       "oneOf": [
@@ -6017,7 +6611,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/DateWire"
           },
-          "description": "Point-in-time availability date for each explicit period value.\n\nWhen absent for a value, market-aware evaluation conservatively makes\nthat value visible on the period's exclusive end date. An explicit\nentry permits filing/release dates later than period end, or earlier\navailability for operational data known before the reporting period\ncloses.",
+          "description": "Publication date of each explicit period value.\n\nAn evaluation with an observation cutoff reads an observation only\nwhen this date is on or before the cutoff, and needs a date for every\nobservation in an actual period. An explicit value in a forecast\nperiod without a date is a forecast assumption, not a published\nobservation, and is always visible.",
           "type": "object"
         },
         "forecast": {
@@ -6067,7 +6661,7 @@
               "type": "null"
             }
           ],
-          "description": "How this line rolls up to a coarser reporting frequency. A rollup uses\nits own per-line method first, then this; a line declaring nothing is\nsummed. Tags never choose a method."
+          "description": "How this line rolls up to a coarser reporting frequency. A rollup uses\nits own per-line method first, then this; a line with neither fails\nthe rollup. Tags never choose a method."
         },
         "tags": {
           "description": "Tags for grouping/filtering",
@@ -6420,6 +7014,40 @@
         }
       ]
     },
+    "OverrideParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Override`].",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "overrides": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Exact levels by period id, in the line's base units; other periods carry forward.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "overrides"
+      ],
+      "type": "object"
+    },
     "PayReceive": {
       "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
       "oneOf": [
@@ -6613,6 +7241,39 @@
       ],
       "type": "object"
     },
+    "PikElectionSpec": {
+      "additionalProperties": false,
+      "description": "One loan's PIK authorization under a [`PikToggleSpec`].",
+      "properties": {
+        "instrument_id": {
+          "description": "Term loan authorized to elect PIK.",
+          "type": "string"
+        },
+        "min_coupon_periods": {
+          "default": 0,
+          "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. With `0` a request for cash before\nthe election starts withdraws it; with `1` an election, once made,\ncovers its first coupon period.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "notice_days": {
+          "default": 0,
+          "description": "Days of notice an election needs: it takes effect at the first coupon\nperiod that starts at least this many days after the close of the\nperiod that observed the metric. `0` is the next coupon period.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pik_fraction": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Share of each elected coupon that capitalizes, a decimal in `(0, 1]`\n(`0.4` capitalizes 40% and pays 60% in cash; `1` is full PIK)."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "pik_fraction"
+      ],
+      "type": "object"
+    },
     "PikMode": {
       "description": "Per-coupon PIK behavior for the MC engine.\n\nDetermines how each coupon payment is handled: paid in cash, accreted\nto notional (PIK), split between cash and PIK, or decided dynamically\nby a [`ToggleExerciseModel`].",
       "oneOf": [
@@ -6728,29 +7389,22 @@
     },
     "PikToggleSpec": {
       "additionalProperties": false,
-      "description": "PIK toggle specification.\n\nDefines conditions for switching between cash and PIK interest modes.\n\n# Hysteresis\n\nSet `min_periods_in_pik` to prevent oscillation when the liquidity metric\nhovers near the threshold. Once PIK is triggered, it stays active for at\nleast that many periods before it can switch back.\n\nThresholds use the same scalar units as the referenced `liquidity_metric`.",
+      "description": "PIK toggle: the modeled exercise of a borrower's PIK election.\n\nIn each forecast period the liquidity metric is compared with the\nthreshold. A metric below the threshold requests PIK and a metric at or\nabove it requests the loan's base coupon terms. The request takes effect\nat the start of each listed loan's next coupon period after the period\nclose, never on a coupon already running, and is applied through the\nloan's own coupon terms: the elected share of each covered coupon is zero\ncash and capitalizes once, on the coupon date. Overdue cash interest and\nfees stay cash claims and are never capitalized by an election.\n\nActual periods are not exercised: record a historical election on the\nloan itself (`covenants.pik_toggles`).\n\nThe threshold is in the units of `liquidity_metric`.",
       "properties": {
-        "liquidity_metric": {
-          "description": "Node reference or formula for liquidity metric (e.g., \"cash_balance\" or \"ebitda / interest_expense\")",
-          "type": "string"
-        },
-        "min_periods_in_pik": {
-          "default": 0,
-          "description": "Minimum number of periods PIK must stay active once triggered (hysteresis).\nPrevents oscillation when the metric hovers near the threshold.\nDefault: 0 (no hysteresis, PIK can toggle every period).",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "target_instrument_ids": {
-          "description": "Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.\n\nMust be a non-empty list: instrument-level PIK capability is not\nmodeled, so an empty list is rejected by [`PikToggleSpec::validate`]\nrather than meaning \"every instrument\".\nSwaps and options cannot be PIK targets.",
+        "elections": {
+          "description": "The loans authorized to elect PIK, one entry each. Must not be empty.",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/PikElectionSpec"
           },
           "minItems": 1,
           "type": "array"
         },
+        "liquidity_metric": {
+          "description": "Node reference or formula for the liquidity metric (for example\n`\"cash_balance\"` or `\"ebitda / interest_expense\"`). It must evaluate to\na finite number in every forecast period.",
+          "type": "string"
+        },
         "threshold": {
-          "description": "Threshold value: if metric < threshold, enable PIK; otherwise use cash",
+          "description": "Finite threshold in the metric's units: a metric below it requests\nPIK, a metric at or above it requests the base coupon terms.",
           "format": "double",
           "type": "number"
         }
@@ -6758,7 +7412,7 @@
       "required": [
         "liquidity_metric",
         "threshold",
-        "target_instrument_ids"
+        "elections"
       ],
       "type": "object"
     },
@@ -6776,6 +7430,25 @@
           "type": "string"
         }
       ]
+    },
+    "PrepaymentSpec": {
+      "additionalProperties": false,
+      "description": "An at-par mandatory or voluntary prepayment.",
+      "properties": {
+        "amount": {
+          "description": "Formula or node for the amount requested in the period, in the\nwaterfall currency. It must be finite and non-negative: a negative\nrequest is an error, not zero. It may not depend on a same-period\n`cs` component.",
+          "type": "string"
+        },
+        "facilities": {
+          "$ref": "#/$defs/FacilitySelection",
+          "description": "The facilities the prepayment may repay."
+        }
+      },
+      "required": [
+        "amount",
+        "facilities"
+      ],
+      "type": "object"
     },
     "PriceTrigger": {
       "additionalProperties": false,
@@ -7277,12 +7950,12 @@
       "oneOf": [
         {
           "const": "sum",
-          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing.",
+          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nMoney is summed exactly and scalars with a compensated sum. A source\ncell without a value leaves the target unavailable.",
           "type": "string"
         },
         {
           "const": "period_end",
-          "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA.",
+          "description": "Copy the last source period's cell with its status: balances such as\ncash, debt and equity, and trailing metrics such as last-twelve-month\nEBITDA.",
           "type": "string"
         },
         {
@@ -7387,6 +8060,75 @@
       "maximum": 1,
       "minimum": 1,
       "type": "integer"
+    },
+    "SeasonalMode": {
+      "description": "Seasonal decomposition mode.",
+      "oneOf": [
+        {
+          "const": "additive",
+          "description": "Additive seasonality: Y = Trend + Seasonal + Error",
+          "type": "string"
+        },
+        {
+          "const": "multiplicative",
+          "description": "Multiplicative seasonality: Y = Trend * Seasonal * Error",
+          "type": "string"
+        }
+      ]
+    },
+    "SeasonalParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Seasonal`].",
+      "properties": {
+        "growth": {
+          "description": "Trend growth per period as a decimal: 0.03 = 3%; defaults to none.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "historical": {
+          "description": "Observations in the line's base units, oldest first; at least two full cycles.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/SeasonalMode",
+          "description": "How the seasonal pattern combines with the trend."
+        },
+        "season_length": {
+          "description": "Periods per seasonal cycle.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "historical",
+        "season_length",
+        "mode"
+      ],
+      "type": "object"
     },
     "SettlementType": {
       "description": "Settlement type for options",
@@ -8105,6 +8847,78 @@
       ],
       "type": "object"
     },
+    "TimeSeriesParams": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::TimeSeries`].",
+      "properties": {
+        "alpha": {
+          "description": "Level smoothing in (0, 1); required for the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "beta": {
+          "description": "Trend smoothing in (0, 1); required for the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "historical": {
+          "description": "At least two observations in the line's base units, oldest first,\nfrom consecutive reporting slots of the model's frequency; the last\none is the slot that ends where the forecast opens.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "method": {
+          "$ref": "#/$defs/ForecastTrendMethod",
+          "description": "Trend model; required."
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "phi": {
+          "description": "Trend damping in (0, 1]; legal only with the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "window": {
+          "description": "Averaging window in periods; required for the moving-average method.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "historical",
+        "method"
+      ],
+      "type": "object"
+    },
     "ToggleExerciseModel": {
       "description": "Toggle exercise model for PIK/cash decision.",
       "oneOf": [
@@ -8348,7 +9162,7 @@
       "description": "Waterfall specification for dynamic cash flow allocation.\n\nDefines the priority of payments and sweep mechanics for capital structure.\n\nPayment priorities and optional sweep / PIK controls model common leveraged\nfinance behavior where scheduled debt service, excess cash flow sweeps, and\nequity leakage compete for the same cash pool.\n\n# Limitations\n\n- **Payment classes.** When `payment_classes` is empty, allocation within a\n  category is single-class pro-rata (today's behavior). When classes are\n  set, each category walks unique ranks and allocates pro-rata inside a\n  class before the next class sees remaining cash.\n- **Prepayment penalties, call premiums, and original issue discount (OID)\n  are unsupported.** Prepayments (sweep, mandatory, voluntary) are applied\n  at par with no penalty or premium, and no OID accretion is modeled.",
       "properties": {
         "available_cash_node": {
-          "description": "Formula or node reference for cash available to allocate in the waterfall.\n\nThis is the **pre-waterfall** cash pool: cash before fees, interest,\namortization, and prepays allocated by this waterfall. Point it at a\nstandalone cash / FCF node (`cash`, `cash_available`, `free_cash_flow`).\nDo not deduct `cs.interest_expense`, `cs.interest_expense_cash`,\n`cs.principal_payment`, or `cs.fees` here — those are allocated by the\nwaterfall, and subtracting them from the pool double-pays debt service.\n\nRequired. Without a cash pool the waterfall reports every scheduled fee,\ncoupon and amortization as paid in full regardless of whether the model\ngenerated the cash — uses exceed sources and no shortfall can ever be\nraised, so the structure cannot report insolvency.",
+          "description": "Formula or node reference for the cash available to allocate.\n\nThis is the cash pool **before debt service**: cash before the fees,\ninterest, amortization and prepayments this waterfall allocates. Point\nit at a standalone cash or free-cash-flow node (`cash`,\n`cash_available`, `free_cash_flow`). It may not depend on any\nsame-period `cs` component, directly or through the formulas and masks\nof the nodes it names: every such component is an output of this\nwaterfall. A prior period read with `lag(...)` is allowed.\n\nA negative pool is a funding shortfall: it is reported and nothing is\nallocated. The cash left after the payment stack is an equity\ndistribution when `Equity` is the terminal priority and retained cash\nwhen `Equity` is absent.",
           "type": "string"
         },
         "ecf_sweep": {
@@ -8362,12 +9176,16 @@
           ],
           "description": "Excess Cash Flow (ECF) sweep specification.\nThis specification and the `Sweep` payment priority must be supplied together."
         },
-        "mandatory_prepay_node": {
-          "description": "Formula or node for the `MandatoryPrepayment` rung.\n\nRequired when `MandatoryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and voluntary prepay buckets.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "mandatory_prepayment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrepaymentSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The at-par mandatory prepayment: its amount and eligible facilities.\n\nSupplied together with `MandatoryPrepayment` in\n`priority_of_payments`: neither is valid without the other."
         },
         "payment_classes": {
           "description": "Payment classes for intra-category seniority (e.g. 1L then 2L).\n\nEmpty means one implicit class: today's single-class pro-rata. When\nnon-empty, every contractual instrument must appear in exactly one\nclass, ranks and ids must be unique, and allocation walks rank order.",
@@ -8400,12 +9218,16 @@
           },
           "type": "array"
         },
-        "voluntary_prepay_node": {
-          "description": "Formula or node for the `VoluntaryPrepayment` rung.\n\nRequired when `VoluntaryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and mandatory prepay buckets.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "voluntary_prepayment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrepaymentSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The at-par voluntary prepayment: its amount and eligible facilities.\n\nSupplied together with `VoluntaryPrepayment` in\n`priority_of_payments`: neither is valid without the other."
         }
       },
       "required": [
@@ -8436,7 +9258,27 @@
   "examples": [
     {
       "id": "example_model",
-      "nodes": {},
+      "nodes": {
+        "gross_profit": {
+          "formula_text": "revenue * 0.4",
+          "node_id": "gross_profit",
+          "node_type": "calculated",
+          "value_type": {
+            "type": "scalar"
+          }
+        },
+        "revenue": {
+          "node_id": "revenue",
+          "node_type": "value",
+          "value_type": {
+            "type": "scalar"
+          },
+          "values": {
+            "2024Q1": 100.0,
+            "2024Q2": 110.0
+          }
+        }
+      },
       "periods": {
         "calendar": "gregorian",
         "periods": [
@@ -8492,6 +9334,13 @@
     "schema_version": {
       "$ref": "#/$defs/SchemaVersion",
       "description": "Required schema version. Only version `1` is accepted."
+    },
+    "source_snapshot": {
+      "description": "Identity of the source snapshot the explicit observations were taken\nfrom, for example `\"FY2025-10K-original\"`.\n\nRequired for an evaluation with an observation cutoff. Keep a revised\nset of observations in a model with a different snapshot identity, so\na dated evaluation can replay the information set of its day.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [

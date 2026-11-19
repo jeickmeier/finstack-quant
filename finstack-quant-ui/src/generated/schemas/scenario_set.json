@@ -18,6 +18,60 @@
   "type": "object",
   "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
   "$defs": {
+    "d_08ce974392238bd9f951": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Seasonal`].",
+      "properties": {
+        "growth": {
+          "description": "Trend growth per period as a decimal: 0.03 = 3%; defaults to none.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "historical": {
+          "description": "Observations in the line's base units, oldest first; at least two full cycles.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/d_37bdaa203daeacc7cf76",
+          "description": "How the seasonal pattern combines with the trend."
+        },
+        "season_length": {
+          "description": "Periods per seasonal cycle.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "historical",
+        "season_length",
+        "mode"
+      ],
+      "type": "object"
+    },
     "d_1aa28628f45df66f024e": {
       "additionalProperties": false,
       "description": "Definition for a single named scenario.\n\nScenarios are attached to a base [`FinancialModelSpec`] and specify an\noptional parent plus typed scalar or monetary value overrides and forecast\nspecification overrides for named nodes.\n\nThe JSON representation mirrors the design docs example:\n\n```json\n\"downside\": {\n  \"parent\": \"base\",\n  \"overrides\": { \"revenue_growth\": -0.05, \"margin\": -0.02 }\n}\n```",
@@ -56,6 +110,45 @@
       },
       "type": "object"
     },
+    "d_1b5f98440d110c152454": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::GrowthPct`].",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rate": {
+          "description": "Growth per period as a decimal: 0.03 = 3%.",
+          "format": "double",
+          "type": "number"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rate"
+      ],
+      "type": "object"
+    },
     "d_22985de49498160e6347": {
       "additionalProperties": false,
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
@@ -75,6 +168,55 @@
       ],
       "type": "object"
     },
+    "d_23aac388db4697418a04": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Override`].",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "overrides": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Exact levels by period id, in the line's base units; other periods carry forward.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "overrides"
+      ],
+      "type": "object"
+    },
+    "d_37bdaa203daeacc7cf76": {
+      "description": "Seasonal decomposition mode.",
+      "oneOf": [
+        {
+          "const": "additive",
+          "description": "Additive seasonality: Y = Trend + Seasonal + Error",
+          "type": "string"
+        },
+        {
+          "const": "multiplicative",
+          "description": "Multiplicative seasonality: Y = Trend * Seasonal * Error",
+          "type": "string"
+        }
+      ]
+    },
     "d_39fe593d8e226e27da6a": {
       "anyOf": [
         {
@@ -88,6 +230,78 @@
         }
       ],
       "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+    },
+    "d_64bfae777a8ae7e8ab2b": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::TimeSeries`].",
+      "properties": {
+        "alpha": {
+          "description": "Level smoothing in (0, 1); required for the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "beta": {
+          "description": "Trend smoothing in (0, 1); required for the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "historical": {
+          "description": "At least two observations in the line's base units, oldest first,\nfrom consecutive reporting slots of the model's frequency; the last\none is the slot that ends where the forecast opens.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "method": {
+          "$ref": "#/$defs/d_f59b39c1dff118611478",
+          "description": "Trend model; required."
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "phi": {
+          "description": "Trend damping in (0, 1]; legal only with the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "window": {
+          "description": "Averaging window in periods; required for the moving-average method.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "historical",
+        "method"
+      ],
+      "type": "object"
     },
     "d_80f981bb0b9a5ed597d5": {
       "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
@@ -905,83 +1119,563 @@
       ]
     },
     "d_8ed123e8acaef4d5eee1": {
-      "additionalProperties": false,
-      "description": "Forecast method specification.\n\nDefines how to forecast future values for a node.",
-      "properties": {
-        "method": {
-          "$ref": "#/$defs/d_e4fb825338963b5b9812",
-          "description": "Forecast method"
-        },
-        "params": {
-          "additionalProperties": true,
-          "description": "Method-specific parameters",
+      "description": "A forecast method with its typed parameters.\n\nSerializes as `{ \"method\": ..., \"params\": { ... } }`. `params` may be\nomitted when the method needs none.",
+      "oneOf": [
+        {
+          "description": "Carry the last value forward.",
+          "properties": {
+            "method": {
+              "const": "forward_fill",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_b358c7ce89d7a5feef27"
+            }
+          },
+          "required": [
+            "method"
+          ],
           "type": "object"
+        },
+        {
+          "description": "Compound one growth rate per period.",
+          "properties": {
+            "method": {
+              "const": "growth_pct",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_1b5f98440d110c152454"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Compound a different growth rate each period.",
+          "properties": {
+            "method": {
+              "const": "curve_pct",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_93aff92b5684afb10a6d"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample an additive random walk.",
+          "properties": {
+            "method": {
+              "const": "normal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_94898fbe50f273d757c5"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample a multiplicative random walk for positive values.",
+          "properties": {
+            "method": {
+              "const": "log_normal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_94898fbe50f273d757c5"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Set exact values for chosen periods, carrying forward between them.",
+          "properties": {
+            "method": {
+              "const": "override",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_23aac388db4697418a04"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Project from a historical series.",
+          "properties": {
+            "method": {
+              "const": "time_series",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_64bfae777a8ae7e8ab2b"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Project a repeating pattern from a historical series.",
+          "properties": {
+            "method": {
+              "const": "seasonal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_08ce974392238bd9f951"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample a mean-reverting AR(1) process.",
+          "properties": {
+            "method": {
+              "const": "mean_reverting",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_fb6c2b90cbcd2299d868"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Resample changes from a historical series.",
+          "properties": {
+            "method": {
+              "const": "bootstrap",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_aa6b6e2b1dab3c4d1d7e"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Glide toward a target level over the forecast horizon.",
+          "properties": {
+            "method": {
+              "const": "fade_to_target",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_ff81303313e8d987d8df"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_93aff92b5684afb10a6d": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::CurvePct`].",
+      "properties": {
+        "curve": {
+          "description": "Growth rate per forecast period as decimals, one per period in order.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
-        "method"
+        "curve"
       ],
       "type": "object"
     },
-    "d_e4fb825338963b5b9812": {
-      "description": "Available forecast methods.",
+    "d_94898fbe50f273d757c5": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`].",
+      "properties": {
+        "correlation": {
+          "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "correlation_with": {
+          "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mean": {
+          "description": "Mean shock per period, as the method applies it.",
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "std_dev": {
+          "description": "Standard deviation of the shock per period; non-negative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "mean",
+        "std_dev",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "d_978c4e1eab840443601f": {
+      "description": "Path of a fade to target.",
       "oneOf": [
         {
-          "const": "forward_fill",
-          "description": "Carry last value forward",
+          "const": "linear",
+          "description": "Equal steps, reaching the target at the final period.",
           "type": "string"
         },
         {
-          "const": "growth_pct",
-          "description": "Compound growth: `v[t] = v[t-1] * (1 + rate)`",
+          "const": "geometric",
+          "description": "Constant compound growth; base and target must be non-zero with the same sign.",
           "type": "string"
         },
         {
-          "const": "curve_pct",
-          "description": "Period-specific growth rates: `v[t] = v[t-1] * (1 + curve[t])`",
-          "type": "string"
-        },
-        {
-          "const": "normal",
-          "description": "Sample from normal distribution (deterministic with seed)",
-          "type": "string"
-        },
-        {
-          "const": "log_normal",
-          "description": "Sample from log-normal distribution (deterministic with seed)",
-          "type": "string"
-        },
-        {
-          "const": "override",
-          "description": "Explicit period overrides",
-          "type": "string"
-        },
-        {
-          "const": "time_series",
-          "description": "Reference external time series",
-          "type": "string"
-        },
-        {
-          "const": "seasonal",
-          "description": "Seasonal pattern (additive/multiplicative)",
-          "type": "string"
-        },
-        {
-          "const": "fade_to_target",
-          "description": "Glide from the base value to a target level: linear, geometric\n(CAGR-to-terminal), or exponential (half-life) shape",
-          "type": "string"
-        },
-        {
-          "const": "mean_reverting",
-          "description": "Mean-reverting AR(1) path:\n`v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`",
-          "type": "string"
-        },
-        {
-          "const": "bootstrap",
-          "description": "Resample historical growth rates or level diffs (deterministic with seed)",
+          "const": "exponential",
+          "description": "Half-life decay toward the target; requires `half_life`.",
           "type": "string"
         }
       ]
+    },
+    "d_aa6b6e2b1dab3c4d1d7e": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Bootstrap`].",
+      "properties": {
+        "historical": {
+          "description": "At least 2 observations in the line's base units, oldest first.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/d_c42ab0f6dd72707c9df1",
+          "description": "What to resample; defaults to growth rates."
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "historical",
+        "mode",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "d_b358c7ce89d7a5feef27": {
+      "additionalProperties": false,
+      "description": "Parameters of a method with only the cross-cutting bounds.",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "d_c42ab0f6dd72707c9df1": {
+      "description": "What a bootstrap resamples from its historical series.",
+      "oneOf": [
+        {
+          "const": "growth",
+          "description": "Period-over-period growth rates, compounded; needs a positive series.",
+          "type": "string"
+        },
+        {
+          "const": "diff",
+          "description": "Additive level changes; works for a series crossing zero.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_f59b39c1dff118611478": {
+      "description": "Trend model of a time-series forecast.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Least-squares linear trend.",
+          "type": "string"
+        },
+        {
+          "const": "exponential",
+          "description": "Holt exponential smoothing; requires `alpha` and `beta`.",
+          "type": "string"
+        },
+        {
+          "const": "moving_average",
+          "description": "Moving average; requires `window`.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_fb6c2b90cbcd2299d868": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::MeanReverting`].",
+      "properties": {
+        "correlation": {
+          "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "correlation_with": {
+          "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "long_run_mean": {
+          "description": "Long-run level the process reverts to, in the line's base units.",
+          "format": "double",
+          "type": "number"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reversion_speed": {
+          "description": "Fraction of the gap closed each period, a decimal in (0, 1].",
+          "format": "double",
+          "type": "number"
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "std_dev": {
+          "description": "Standard deviation of the shock per period; non-negative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "long_run_mean",
+        "reversion_speed",
+        "std_dev",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "d_ff81303313e8d987d8df": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::FadeToTarget`].",
+      "properties": {
+        "half_life": {
+          "description": "Periods to close half the gap; required for, and legal only with, the exponential shape.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "shape": {
+          "$ref": "#/$defs/d_978c4e1eab840443601f",
+          "description": "Path to the target; defaults to linear."
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "target": {
+          "description": "Terminal level, in the line's base units.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "target",
+        "shape"
+      ],
+      "type": "object"
     }
   }
 }

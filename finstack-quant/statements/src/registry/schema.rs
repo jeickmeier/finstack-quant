@@ -77,8 +77,9 @@ pub struct MetricDefinition {
 
     /// How the metric combines over the source periods of a coarser period
     /// when results are rolled up. A ratio or a multiple declares `formula`
-    /// so it is recomputed from the rolled-up inputs; a metric that leaves
-    /// this unset follows the rollup default and is summed.
+    /// so it is recomputed from the rolled-up inputs and a flow declares
+    /// `sum`; a metric that leaves this unset needs a method in the rollup
+    /// request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rollup: Option<crate::types::RollupMethod>,
 

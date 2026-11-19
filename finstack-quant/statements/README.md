@@ -40,10 +40,20 @@ Every node resolution for a `(node, period)` pair walks the same ladder
 forecast can never silently shadow a formula it was not declared alongside.
 
 The actuals boundary comes from the second argument to `ModelBuilder::periods`
-(`actuals_until`). `Evaluator::evaluate_with_market` additionally applies the
-`as_of` visibility cutoff. Explicit actuals become visible on their node-level
-availability date; when omitted, availability defaults to the period's
-exclusive end date.
+(`actuals_until`). `Evaluator::evaluate_with_market` takes an explicit
+`ObservationCutoff`: `FullSnapshot` reads every observation, and
+`Through(date)` reads an observation only when its availability date is on or
+before that date. A cutoff date needs a model that names its
+`source_snapshot` and dates every observation in an actual period; an undated
+explicit value in a forecast period is a forecast assumption and stays
+visible. Keep an original filing and its revision as two models with different
+snapshot identities to replay a past information set.
+
+Node ids are unique. The defining setters (`value`, `compute`, `insert_node`,
+`mixed().build()`, `import_observations`) reject a repeated id or a repeated
+period; change an existing node with `replace_node`, `remove_node`, or the
+atomic `FinancialModelSpec::apply_edits`. `where_clause` names its target
+node.
 
 ## Public surface
 
@@ -73,8 +83,7 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::Result;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
-use finstack_quant_statements::types::{AmountOrScalar, ForecastMethod, ForecastSpec};
-use indexmap::indexmap;
+use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
 
 fn build_and_evaluate() -> Result<StatementResult> {
     let mut builder = ModelBuilder::new("acme");
@@ -83,10 +92,7 @@ fn build_and_evaluate() -> Result<StatementResult> {
         (PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(10_000_000.0)),
         (PeriodId::quarter(2025, 2)?, AmountOrScalar::scalar(11_000_000.0)),
     ]);
-    builder.forecast("revenue", ForecastSpec {
-        method: ForecastMethod::GrowthPct,
-        params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-    });
+    builder.forecast("revenue", ForecastSpec::growth(0.05));
     builder.compute("cogs", "revenue * 0.6")?;
     builder.compute("gross_profit", "revenue - cogs")?;
     let model = builder.build()?;
@@ -147,7 +153,8 @@ crate.
 `Registry::with_builtins()` loads the bundled `fin.*` catalog, embedded at
 compile time from [`data/metrics`](data/metrics/README.md) — no runtime data
 directory is required, including in WASM builds. `ModelBuilder::with_builtin_metrics()`
-loads and inserts them all; `ModelBuilder::add_metric_from_registry(id, &registry)`
+loads and inserts them all, so the model must define every input the catalog
+reads before `build()`; `ModelBuilder::add_metric_from_registry(id, &registry)`
 adds one plus its in-registry dependencies, in dependency order, skipping any id
 the model already defines. Additional namespaces load via
 `Registry::load_from_json`, `load_from_json_str`, or `load_registry`; a registry
@@ -162,24 +169,42 @@ matches a qualified metric id shadows that metric — prefer a distinct namespac
 
 ## Capital structure (`cs.*`)
 
-A model may carry typed debt instruments (`add_bond`, `add_bond_with_convention`,
-`add_swap`, `add_swap_with_conventions`, `add_debt`) plus a reporting currency,
+A model may carry typed debt instruments, built through their canonical
+Valuations APIs and attached with `add_debt`, plus a reporting currency,
 FX policy, and an optional `WaterfallSpec`. Formulas then reference aggregated
 instrument flows through the `cs.*` namespace.
 
-Named instrument references retain the instrument's native currency. `.total`
-references use the reporting currency. When `fx_policy` is omitted, totals
-convert each already-aggregated period bucket on the inclusive period-end date
-(`PeriodEnd`), rather than each contractual cashflow date.
+A capital reference names a component and one of three scopes:
 
 ```text
-cs.<component>.<instrument_id>
-cs.<component>.total
+cs.<component>.<instrument_id>   one instrument, in its native currency
+cs.<component>.total.<CCY>       every instrument of one native currency
+cs.<component>.total             the whole structure, in the reporting currency
 ```
 
-Valid components: `interest_expense` (cash + PIK), `interest_expense_cash`,
-`interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`,
-`fees`, `accrued_interest`. Unknown components are rejected at compile time.
+Each evaluates to exact money in the scope's currency. An unknown component or
+malformed scope fails when the formula is parsed; an unknown instrument, a
+native currency no instrument uses, or a consolidated total that cannot be
+formed fails when the model is built. `total` cannot be an instrument id.
+
+Instruments in more than one currency consolidate only into an explicit
+`reporting_currency` with `fx_policy` set to `period_end`, the only policy:
+each period's native totals convert at the rate of the inclusive period-close
+date, and `CapitalStructureCashflows.fx_conversions` keeps the pair, rate, date
+and source. There is no default policy. When a quote is missing the period's
+consolidated total is unavailable (`consolidation_unavailable` gives the
+reason, and a formula reading it gets an unavailable cell); the per-instrument
+and native-currency values are unaffected.
+
+Components: `interest_expense` (cash + PIK), `interest_expense_cash`,
+`interest_expense_pik`, `interest_income`, `net_interest_expense_cash`,
+`principal_payment` and its parts `scheduled_principal`, `mandatory_prepayment`,
+`voluntary_prepayment` and `sweep_prepayment`, `scheduled_cash_interest_due`
+and `scheduled_principal_due` (scheduled service recognized once on its
+contractual due date, paid or not), `fees`, `opening_balance`,
+`debt_balance`, `accrued_interest`, `interest_arrears`, `principal_pending`,
+`principal_arrears` and `principal_advance_reserve`. An amount a period does
+not record is an error, never zero.
 
 Cash interest follows the declared instrument kind: positive bond and loan
 coupons are issuer expenses, while negative debt coupons are income. Swaps use
@@ -187,7 +212,23 @@ the holder's signed cashflows, with receipts reported as `interest_income` and
 payments as `interest_expense_cash`; both pay-fixed and receive-fixed positions
 are supported, including negative rates and zero fixed coupons. Hedge trade
 notionals size cashflows and do not count as borrowing principal. `accrued_interest`
-reports debt coupon accrual; derivative accrual valuation is outside this contract.
+is contractual cash interest earned through the period close and due after it,
+calculated from the instrument's own earning terms (accrual method and coupon
+frequency); an instrument that states none cannot be accrued. Interest already
+due and unpaid is `interest_arrears`, never part of the accrual. Derivative
+accrual valuation is outside this contract. The debt ledger must open each
+period on the principal its dated schedule carries in: a disagreement is an
+error naming the instrument, period, currency and both amounts, and no amount
+is rescaled.
+
+`debt_balance` is outstanding economic principal: a scheduled reduction takes
+effect on its contractual date whether or not its cash was paid. The cash is a
+separate dated claim. `principal_pending` is cash owed for a reduction already
+effective and not yet due, `principal_arrears` is cash due and unpaid (paid
+oldest due first, and settling it never reduces the balance again), and
+`principal_advance_reserve` is face already paid for whose reduction is still
+to come, which cannot be prepaid a second time. A waterfall needs dated claims
+for every instrument; none is synthesized from an aggregate.
 Placeholder option schedules are rejected because their contingent payouts are
 not modeled.
 
@@ -196,8 +237,8 @@ market as of the first period's start, which serves fixed-rate debt: contractual
 coupons, amortization and balances need no curves. Instruments whose cashflows
 need market data (floating coupons, swaps, caps, swaptions) fail there with a
 missing-data error naming the instrument and must be evaluated with
-`Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`, which also hides
-actuals not yet available at `as_of`.
+`Evaluator::evaluate_with_market(&model, &market_ctx, as_of, cutoff)`; `as_of`
+dates pricing and `cutoff` selects the visible observations.
 
 The evaluator owns dated principal claims and waterfall state. It retains each
 claim's cash payment date, economic principal-reduction date, and native-currency
@@ -212,14 +253,54 @@ that order. Each prepayment requires an explicit payment priority and its
 matching sizing rule. A waterfall with any prepayment priority supports
 capital structures composed solely of term loans and revolvers.
 
-Known limits (also stated in the module rustdoc): waterfall allocation is
-pro-rata inside each payment class, walking class rank (empty
-`payment_classes` is one implicit class); loan residual schedules rebuild
-interest after outstanding changes; `available_cash_node` is the pre-waterfall
-cash pool and must not deduct `cs` debt-service tokens; omitted `fx_policy` converts
-period-aggregated reporting totals on the inclusive period-end date
-(`PeriodEnd`); prepayment penalties, call premiums, and OID accretion are
-not modeled.
+Each prepayment elects its facilities: `mandatory_prepayment` and
+`voluntary_prepayment` are `{amount, facilities}`, and `facilities` is
+`"all_eligible"` or `{"named": [...]}`. A named facility must exist, and a term
+loan with a call schedule cannot be elected, because prepayments are at par.
+The ECF sweep is authored term by term: `ECF = cash_measure - deductions +
+credits`, where each term is a formula in the waterfall currency or the cash
+interest, fees or scheduled principal that earlier priorities actually paid.
+Nothing is deducted unless it is listed. `sweep_percentage` applies to positive
+ECF. A rung pays the least of its request, the remaining cash and the elected
+facilities' principal, and `CapitalStructureCashflows.prepayments` records the
+requested, paid and unpaid amounts. A negative request is an error. Sizing,
+payment and the principal reduction all fall in the period being evaluated.
+
+Waterfall allocation is exact. Senior payment classes are paid first (empty
+`payment_classes` is one implicit class). Within a class, claims are paid in
+full when the cash covers them; otherwise each pro-rata quota is floored to the
+currency's minor unit and the cents left over go to the largest fractional
+remainders, ties by instrument id. Every unpaid amount is carried, however
+small, a negative fee or interest claim is rejected, and the period reconciles
+exactly: fees, cash interest, principal, the equity distribution and retained
+cash sum to the available cash. The residual is an equity distribution when
+`Equity` is the terminal priority and `retained_cash` when it is absent. A
+negative pool is a funding shortfall and allocates nothing, and the waterfall
+runs in a debt-free period too.
+
+`available_cash_node` is the cash pool before debt service. It may not depend
+on any same-period `cs` component, directly or through the formulas and masks
+of the nodes it names: every such component is an output of the waterfall the
+pool funds. Read a prior period with `lag(...)`.
+
+After a prepayment, the term loan or revolver recompiles its schedule from its
+own terms and the dated principal changes: coupons, the contractual cash/PIK
+split, balance-based fees and later principal follow the new balance from the
+day after the period close, and interest already earned is preserved. The
+ledger and the rebuilt schedules commit together.
+
+A PIK toggle is the modeled exercise of a borrower's election. `pik_toggle` is
+`{liquidity_metric, threshold, elections}` and each election authorizes one
+term loan: `{instrument_id, pik_fraction, min_coupon_periods}`. In a forecast
+period a metric below the threshold requests PIK. The election starts with the
+loan's next coupon period, never on a coupon already running, lasts at least
+its minimum number of coupon periods, and is applied by the loan's own coupon
+terms: the elected share is zero cash and capitalizes once on the coupon date.
+Overdue cash interest and fees stay cash claims and are never capitalized.
+Actual periods are not exercised.
+
+Known limits (also stated in the module rustdoc): prepayment penalties, call
+premiums, and OID accretion are not modeled.
 
 ## Checks
 
@@ -230,12 +311,18 @@ serializable `CheckSuiteSpec` via `CheckSuiteSpec::resolve()`.
 
 Built-ins: `BalanceSheetArticulation`, `RetainedEarningsReconciliation`,
 `CashReconciliation`, `MissingValueCheck`, `NonFiniteCheck`,
-`SignConventionCheck`. `FormulaCheckSpec` evaluates an arbitrary DSL predicate per
-period. Findings carry `Severity`, `CheckCategory`, `PeriodScope`, and a
-`Materiality` tolerance. A formula-check period whose same-period input is
-missing or non-finite, or whose formula consumes a non-finite value (a `lag`
-before the first period), reports insufficient data as a warning instead of
-failing; a division by zero over finite inputs still fails.
+`SignConventionCheck`. `FormulaCheckSpec` evaluates a DSL formula per period in
+an explicit `mode`: a `predicate` is a Boolean formula that must be true, a
+`residual` is an amount compared with zero under an optional absolute
+`tolerance`. Truthiness is never inferred, so a numeric predicate, a Boolean
+residual and a tolerance on a predicate are rejected. `scope` (`PeriodScope`)
+selects all, actual or forecast periods, and the optional Boolean `eligibility`
+formula selects periods within it. Evaluation is lazy over typed cells:
+`coalesce(a, b)` uses `b` when `a` has no value and an untaken `if` branch does
+not read its inputs. A period whose formula or eligibility condition needed an
+observation without a value (a missing or unavailable cell, a `lag` before the
+first period) carries a coverage finding and makes the check incomplete; a
+division by zero or other invalid arithmetic is an execution error.
 
 Identity checks treat a missing operand and a non-finite operand the same way —
 both skip with a warning rather than passing, because `NaN > tolerance` is
@@ -246,23 +333,43 @@ are in the analytics crate.
 
 ## Adjustments
 
-`adjustments::normalize(&result, &config)` computes an adjusted metric
-(typically adjusted EBITDA) from a reported node plus an explicit catalog of
-add-backs. Each `Adjustment` carries an `AdjustmentValue` (fixed per-period
-amounts or a percentage of another node) and an optional `AdjustmentCap`. The
-returned `Vec<NormalizationResult>` keeps both the adjusted total (`final_value`)
-and the per-adjustment audit trail (`adjustments: Vec<AppliedAdjustment>`), so
-the reported-to-adjusted bridge stays explainable: each `AppliedAdjustment`
-carries its raw and capped amounts and `adjusted_value`, the target through
-that step, so a bridge chart reads every step's position without summing.
-`adjustments::merge_into_results(&mut result, &normalized, "adj_ebitda")`
-folds the adjusted series back into a `StatementResult` as a new node.
+`adjustments::normalize(&result, &config)` builds the ordered bridge from a
+reported node to a separately named adjusted metric (typically reported EBITDA
+to adjusted EBITDA). A `NormalizationConfig` names the reported `target_node`,
+the new `output_node` and the adjustments in order. Each `Adjustment` carries
+an `AdjustmentValue` (signed fixed per-period amounts in the target's units, or
+a signed decimal percentage of another node's reported value) and an optional
+`AdjustmentCap`: `Absolute { amount }`, or `Reference { base_node, fraction,
+base_mode }`, a fraction of the positive part of a base node. A cap limits its
+own adjustment's magnitude and keeps its sign; a cap on the target uses the
+reported value unless `base_mode` is `Progressive`, which adds the earlier
+applied adjustments.
+
+The whole configuration is validated before any period is calculated:
+identifiers, references, units and currencies, the period keys of fixed
+amounts and every number. Money is added and scaled exactly and scalars with a
+compensated sum, and every row is checked, so an arithmetic failure returns an
+error and no bridge. Each `NormalizationResult` holds the reported
+`base_value`, the rows (`AppliedAdjustment`: raw amount, cap base and limit,
+applied amount and `adjusted_value`, the target through that row) and the
+`final_value`, all typed. A period whose target, percentage reference or cap
+base has no value is `unavailable` with its reason.
+
+`adjustments::merge_into_results(&mut result, &config)` calculates the bridge
+and publishes `output_node` as a new node. It never overwrites a node, leaves
+the reported target and the check report as they are, and records the
+configuration in `StatementResult::normalizations` beside the result's source
+run. A ratio or covenant on the adjusted basis references the output node
+explicitly.
 
 ## Results and export
 
-`StatementResult` holds `nodes: node_id → period_id → f64`, plus
-`periods` (the periods `nodes` is keyed by), `monetary_nodes` for
-`Money`-typed nodes, `node_value_types`, optional
+`StatementResult` holds `cells: node_id → period_id → ResultCell`, the typed
+result: a cell has a `status` (`value`, `missing`, `masked`, `unavailable`), a
+finite scalar or exact `Money` when it is a value, a `reason` when it is
+unavailable, and the value `source` that was selected. It also holds `periods`
+(the plan `cells` is keyed by), `node_value_types`, `provenance` (model id and
+content hash, source snapshot, observation cutoff, valuation date, run id), optional
 `cs_cashflows`, an optional `check_report`, and `meta: EvalStats` (timings,
 graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 `get_money`, `get_scalar`, `get_node`, `get_or`, `all_periods`.
@@ -270,11 +377,17 @@ graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 `rollup(&model, &RollupSpec)` rolls results up to a coarser frequency
 (monthly or quarterly into quarterly, semi-annual or annual, or semi-annual into
 annual). Each line declares its method on the node (`NodeSpec::rollup`):
-`period_end` for balances and trailing metrics, `formula` for ratios, which
-re-evaluates the formula on the rolled-up values, and `sum` for flows. A line
-resolves as its entry in `RollupSpec::methods`, then its declaration, then
-`sum`; tags never choose a method. Every target period must be complete, and
-the result's `periods` are the targets, each actual only when every source is.
+`sum` for flows (exact money, a compensated scalar sum; a source cell without
+a value leaves the target unavailable), `period_end` for balances and trailing
+metrics, which copies the final source cell with its status, and `formula` for
+ratios, which re-evaluates the mask and formula on the rolled-up values at the
+target cadence. A line resolves as its entry in `RollupSpec::methods`, then its
+declaration; a line with neither fails the rollup, because nothing is summed
+by default and tags never choose a method. The source result must be a
+verified run of the model. Every target period must be complete, and the
+result's `periods` are the targets, each actual only when every source is. Its
+`rollup_provenance` records the source run, the method used for each node and
+the source periods of each target period.
 `RollupSpec::declared_methods(&model, frequency)` lists the declared methods so a
 host can seed its method choices.
 
@@ -282,9 +395,9 @@ Tabular export returns `finstack_quant_core::table::TableEnvelope`:
 
 | Method | Schema |
 |--------|--------|
-| `to_table_long()` | `(node_id, period_id, value, value_money, currency, value_type)` |
+| `to_table_long()` | Exact: `(node_id, period_id, status, value, amount, currency, value_type, reason, source)`, one row per node and plan period |
 | `to_table_long_filtered(&["a", "b"])` | Same, restricted to named nodes; unknown ids are ignored |
-| `to_table_wide()` | `(period_id, <node1>, <node2>, …)`, one row per period |
+| `to_table_wide()` | Approximate numeric view: `(period_id, <node1>, <node2>, …)`, one row per plan period, null for a cell without a value, units in column metadata |
 
 Wide export encodes missing node-period observations as `NaN`, not zero, so
 absence stays distinguishable from an evaluated zero. Long export preserves
@@ -301,16 +414,23 @@ changed input values only. Rebuild the plan after any structural or formula
 change — it deliberately reuses the compiled expressions captured at prepare
 time. This is what sensitivity sweeps and goal seek run on.
 
-`Evaluator::evaluate_monte_carlo(&model, &MonteCarloConfig::new(n_paths, seed))`
-runs stochastic forecast nodes across paths and returns percentile series, plus
-an optional long-format path table when `with_path_data(true)` is set. Capital
-structure is rejected in Monte Carlo mode; run instrument-level Monte Carlo in
-`finstack-quant-valuations` instead.
+`Evaluator::evaluate_monte_carlo(&model, &MonteCarloConfig::new(n_paths, seed, metrics), context)`
+replays the complete model on each path and returns R-7 quantiles of the
+requested `metrics` per forecast period, with their units and sample count,
+plus an optional long-format path table when `with_path_data(true)` is set.
+`context` is the optional market, valuation date and observation cutoff of
+`evaluate_with_market`; `None` evaluates as `evaluate` does. A capital
+structure runs on every path. When a requested sample has no value on some
+path the run is incomplete: no statistics are published and `incomplete` names
+the first such sample. `breach_probability(metric, threshold)` takes a
+threshold typed in the metric's units and counts paths with any forecast value
+strictly above it.
 
 ## Conventions that bite
 
-- **Numerics.** Node results are `f64`. `Money` appears in `monetary_nodes` and
-  in capital-structure cashflows; `NodeValueType` records whether a node is
+- **Numerics.** A scalar node's value cells are finite `f64`; a monetary
+  node's are exact `Money`, as are capital-structure cashflows. A cell without
+  a value is never a zero or a `NaN`. `NodeValueType` records whether a node is
   `Monetary { currency }` or `Scalar`. See [INVARIANTS.md](../../INVARIANTS.md) §1.
 - **Rates and ratios.** Decimal form throughout: a `GrowthPct` `rate` of `0.05`
   is 5%; a leverage metric of `4.5` is 4.5x.
@@ -325,14 +445,31 @@ structure is rejected in Monte Carlo mode; run instrument-level Monte Carlo in
   so a parallel run and a serial run at the same seed agree.
 - **Non-finite values.** Ordinary evaluation stores non-finite results (for
   example, division by zero) and surfaces them as `EvalWarning`s rather than
-  aborting; `NonFiniteCheck` is how you make them fail. Monte Carlo aggregation
-  is stricter and errors on the first non-finite path value.
+  aborting; `NonFiniteCheck` is how you make them fail. A Monte Carlo sample
+  that is not finite is an error, and a sample without a value makes the run
+  incomplete.
 - **Serde strictness.** `FinancialModelSpec`, `StatementResult`,
   `NormalizationConfig`, `MetricRegistry`, and the check/waterfall specs all
   deny unknown fields. `StatementResult.schema_version` accepts only numeric `1`.
 - **Formula size.** Formulas are capped at 256 terms. The budget exists because
   formulas are compiled on rayon workers with a 2 MiB default stack during Monte
   Carlo, and a stack overflow aborts the process rather than unwinding.
+
+## Loading a model
+
+`FinancialModelSpec::from_json(text)` is the one loading path, shared by Rust,
+Python and WASM; `from_slice_strict(bytes, &limits)` is the same path with
+explicit limits. The input may be at most 64 MiB and 96 levels deep, an object
+may not repeat a key or carry an unknown field, and `schema_version` must be
+the integer `1`. A decode failure is a `ContractError` whose diagnostic carries
+a code and, where one exists, the JSON pointer; a model that decodes but is not
+runnable fails with the typed error and its kind. Money is a decimal-string
+amount with its currency, and seeds are canonical decimal strings.
+
+`content_hash()` validates the model and returns the versioned SHA-256 of the
+validated model's canonical JSON, so a model that is not runnable has no
+identity. A run's provenance records that identity beside its own run
+identity, source snapshot and observation cutoff.
 
 ## Schemas
 

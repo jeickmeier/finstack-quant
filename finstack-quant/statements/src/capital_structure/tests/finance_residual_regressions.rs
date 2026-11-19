@@ -2,22 +2,15 @@
 
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
-use finstack_quant_cashflows::builder::{
-    CashFlowMeta, CashFlowSchedule, CouponType, FixedCouponSpec, Notional, ScheduleParams,
-};
+use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType};
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, PeriodId, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount, PeriodId, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::capital_structure::{
-    CapitalStructureState, EcfSweepSpec, PaymentPriority, PrincipalClaim, WaterfallSpec,
-};
+use finstack_quant_statements::capital_structure::{EcfSweepSpec, PaymentPriority, WaterfallSpec};
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
@@ -35,362 +28,6 @@ fn assert_close(actual: f64, expected: f64) {
         (actual - expected).abs() < 1e-9,
         "expected {expected:.12}, got {actual:.12}"
     );
-}
-
-fn split_schedule(maturity: Date) -> CashFlowSchedule {
-    let mut builder = CashFlowSchedule::builder();
-    let _ = builder
-        .principal(usd(100.0), date!(2025 - 01 - 01), maturity)
-        .fixed_cf(FixedCouponSpec {
-            coupon_type: CouponType::Split {
-                cash_fraction: Decimal::new(4, 1),
-                pik_fraction: Decimal::new(6, 1),
-            },
-            rate: Decimal::new(1, 1),
-            schedule: ScheduleParams {
-                frequency: Tenor::annual(),
-                day_count: DayCount::Act365F,
-                business_day_convention: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".into(),
-                stub: StubKind::None,
-                end_of_month: false,
-                payment_lag_days: 0,
-                adjust_accrual_dates: false,
-                roll_rule: Default::default(),
-            },
-        });
-    builder
-        .build(None)
-        .expect("canonical split-coupon schedule")
-}
-
-fn state_with_balance(schedule: CashFlowSchedule, balance: f64) -> CapitalStructureState {
-    let mut state = CapitalStructureState::new();
-    state.residual_schedules.insert(INSTRUMENT.into(), schedule);
-    state
-        .closing_balances
-        .insert(INSTRUMENT.into(), usd(balance));
-    state
-}
-
-/// A row's economic value: a PIK row's explicit capitalization (it carries no
-/// cash), any other row's cash amount.
-fn value(flow: &CashFlow) -> f64 {
-    if flow.get_kind() == CFKind::Pik {
-        flow.get_principal_delta().expect("PIK delta").amount()
-    } else {
-        flow.get_amount().amount()
-    }
-}
-
-fn amount_on(schedule: &CashFlowSchedule, kind: CFKind, payment_date: Date) -> f64 {
-    schedule
-        .get_flows()
-        .iter()
-        .filter(|flow| flow.get_kind() == kind && flow.get_date() == payment_date)
-        .map(value)
-        .sum()
-}
-
-fn assert_matures_to_zero(schedule: &CashFlowSchedule, maturity: Date) {
-    let path = schedule
-        .outstanding_by_date()
-        .expect("valid principal path");
-    let (last_date, last_balance) = path.last().expect("nonempty principal path");
-    assert_eq!(*last_date, maturity);
-    assert_close(last_balance.amount(), 0.0);
-}
-
-fn assert_repeated_rebuild_is_unchanged(state: &mut CapitalStructureState, from_date: Date) {
-    let before = serde_json::to_value(&state.residual_schedules[INSTRUMENT])
-        .expect("serializable residual schedule");
-    state
-        .rebuild_residuals(from_date)
-        .expect("repeated residual rebuild");
-    let after = serde_json::to_value(&state.residual_schedules[INSTRUMENT])
-        .expect("serializable repeated schedule");
-    assert_eq!(
-        before, after,
-        "rebuilding the same closing must be idempotent"
-    );
-}
-
-#[test]
-fn split_coupon_partial_paydown_preserves_shares_and_pik_compounding() {
-    let first_coupon = date!(2026 - 01 - 01);
-    let maturity = date!(2027 - 01 - 01);
-    let cutoff = date!(2025 - 06 - 30);
-    let original = split_schedule(maturity);
-    assert_close(amount_on(&original, CFKind::Fixed, first_coupon), 4.0);
-    assert_close(amount_on(&original, CFKind::Pik, first_coupon), 6.0);
-
-    let mut state = state_with_balance(original, 50.0);
-    state
-        .rebuild_residuals(cutoff)
-        .expect("partial repayment rebuild");
-    let rebuilt = &state.residual_schedules[INSTRUMENT];
-
-    // Jan 1--Jul 1 is 181 days; Jul 1--Jan 1 is 184 days. The first
-    // coupon retains earned interest and applies the smaller face thereafter.
-    let first_interest = 0.10 * (100.0 * 181.0 + 50.0 * 184.0) / 365.0;
-    assert_close(
-        amount_on(rebuilt, CFKind::Fixed, first_coupon),
-        first_interest * 0.4,
-    );
-    assert_close(
-        amount_on(rebuilt, CFKind::Pik, first_coupon),
-        first_interest * 0.6,
-    );
-
-    // The next annual coupon earns interest on remaining face plus only the
-    // PIK component of the first coupon; its cash component never capitalizes.
-    let second_year_face = 50.0 + first_interest * 0.6;
-    let second_interest = second_year_face * 0.10;
-    assert_close(
-        amount_on(rebuilt, CFKind::Fixed, maturity),
-        second_interest * 0.4,
-    );
-    assert_close(
-        amount_on(rebuilt, CFKind::Pik, maturity),
-        second_interest * 0.6,
-    );
-    assert_close(
-        amount_on(rebuilt, CFKind::Notional, maturity),
-        second_year_face + second_interest * 0.6,
-    );
-    assert_matures_to_zero(rebuilt, maturity);
-    assert_repeated_rebuild_is_unchanged(&mut state, cutoff);
-}
-
-#[test]
-fn split_coupon_full_paydown_preserves_earned_cash_and_pik_interest() {
-    let maturity = date!(2026 - 01 - 01);
-    let cutoff = date!(2025 - 06 - 30);
-    let mut state = state_with_balance(split_schedule(maturity), 0.0);
-    state
-        .rebuild_residuals(cutoff)
-        .expect("full repayment rebuild");
-    let rebuilt = &state.residual_schedules[INSTRUMENT];
-
-    // Paying principal does not extinguish the 181 days of earned interest.
-    // No interest accrues on the repaid face during the remaining 184 days.
-    let earned_interest = 100.0 * 0.10 * 181.0 / 365.0;
-    assert_close(
-        amount_on(rebuilt, CFKind::Fixed, maturity),
-        earned_interest * 0.4,
-    );
-    assert_close(
-        amount_on(rebuilt, CFKind::Pik, maturity),
-        earned_interest * 0.6,
-    );
-    assert_close(
-        amount_on(rebuilt, CFKind::Notional, maturity),
-        earned_interest * 0.6,
-    );
-    assert!(
-        rebuilt
-            .get_flows()
-            .iter()
-            .filter(|flow| matches!(flow.get_kind(), CFKind::Fixed | CFKind::Pik))
-            .all(|flow| value(flow) >= 0.0),
-        "repayment must not create negative positive-rate coupons"
-    );
-    assert_matures_to_zero(rebuilt, maturity);
-    assert_repeated_rebuild_is_unchanged(&mut state, cutoff);
-}
-
-#[test]
-fn zeroed_split_coupon_retains_component_rates_when_closing_is_revised() {
-    let maturity = date!(2026 - 01 - 01);
-    let cutoff = date!(2025 - 06 - 30);
-    let effective = date!(2025 - 07 - 01);
-    let mut state = state_with_balance(split_schedule(maturity), 0.0);
-    state
-        .rebuild_residuals(cutoff)
-        .expect("full repayment rebuild");
-    let zeroed = &state.residual_schedules[INSTRUMENT];
-    for kind in [CFKind::Fixed, CFKind::Pik] {
-        let future_component: f64 = zeroed
-            .get_flows()
-            .iter()
-            .filter(|flow| {
-                flow.get_kind() == kind
-                    && flow
-                        .get_accrual()
-                        .as_ref()
-                        .is_some_and(|accrual| accrual.get_start() == effective)
-            })
-            .map(value)
-            .sum();
-        assert_close(future_component, 0.0);
-    }
-
-    // Correct the same closing snapshot from a full payoff to a 75 repayment.
-    // The zeroed rows must still carry their individual coupon sensitivity.
-    state.closing_balances.insert(INSTRUMENT.into(), usd(25.0));
-    state
-        .rebuild_residuals(cutoff)
-        .expect("a revised closing must restore each zeroed coupon component");
-    let rebuilt = &state.residual_schedules[INSTRUMENT];
-    let earned_interest = 100.0 * 0.10 * 181.0 / 365.0;
-    let remaining_interest = 25.0 * 0.10 * 184.0 / 365.0;
-    for (kind, share) in [(CFKind::Fixed, 0.4), (CFKind::Pik, 0.6)] {
-        let earned_component: f64 = rebuilt
-            .get_flows()
-            .iter()
-            .filter(|flow| {
-                flow.get_kind() == kind
-                    && flow
-                        .get_accrual()
-                        .as_ref()
-                        .is_some_and(|accrual| accrual.get_end() == effective)
-            })
-            .map(value)
-            .sum();
-        assert_close(earned_component, earned_interest * share);
-        assert_close(
-            amount_on(rebuilt, kind, maturity),
-            (earned_interest + remaining_interest) * share,
-        );
-    }
-    assert_close(
-        amount_on(rebuilt, CFKind::Notional, maturity),
-        25.0 + (earned_interest + remaining_interest) * 0.6,
-    );
-    assert_matures_to_zero(rebuilt, maturity);
-    assert_repeated_rebuild_is_unchanged(&mut state, cutoff);
-}
-
-fn assert_separate_principal_and_settlement_dates(
-    economic_date: Date,
-    payment_date: Date,
-    closing_at_cutoff: f64,
-) {
-    let cutoff = date!(2025 - 03 - 31);
-    let maturity = date!(2026 - 01 - 01);
-    let mut builder = CashFlowSchedule::builder();
-    let _ = builder
-        .principal(usd(100.0), date!(2025 - 01 - 01), maturity)
-        .add_principal_event(
-            economic_date,
-            payment_date,
-            usd(-10.0),
-            Some(usd(10.0)),
-            CFKind::Amortization,
-        );
-    let original = builder.build(None).expect("dated principal schedule");
-    assert_close(amount_on(&original, CFKind::Notional, maturity), 90.0);
-    let mut state = state_with_balance(original, closing_at_cutoff);
-    state
-        .rebuild_residuals(cutoff)
-        .expect("dated principal rebuild");
-    let rebuilt = &state.residual_schedules[INSTRUMENT];
-
-    // Cash and economic movement each survive once, irrespective of which
-    // side of the reporting cutoff contains the contractual settlement.
-    let amortization: Vec<_> = rebuilt
-        .get_flows()
-        .iter()
-        .filter(|flow| flow.get_kind() == CFKind::Amortization)
-        .collect();
-    assert_eq!(amortization.len(), 1);
-    assert_eq!(amortization[0].get_date(), payment_date);
-    assert_eq!(
-        amortization[0]
-            .get_balance_date()
-            .expect("principal row balance date"),
-        economic_date
-    );
-    assert_close(amortization[0].get_amount().amount(), 10.0);
-    assert_close(
-        amortization[0]
-            .get_principal_delta()
-            .expect("explicit principal delta")
-            .amount(),
-        -10.0,
-    );
-
-    // Original face 100 less contractual amortization 10 less the additional
-    // period-end repayment 20 leaves exactly 70 for maturity redemption.
-    assert_close(amount_on(rebuilt, CFKind::Notional, maturity), 70.0);
-    assert_matures_to_zero(rebuilt, maturity);
-    assert_repeated_rebuild_is_unchanged(&mut state, cutoff);
-}
-
-#[test]
-fn principal_effective_before_later_settlement_is_not_replayed_twice() {
-    assert_separate_principal_and_settlement_dates(
-        date!(2025 - 03 - 31),
-        date!(2025 - 04 - 02),
-        70.0,
-    );
-}
-
-#[test]
-fn principal_effective_after_earlier_settlement_is_replayed_once() {
-    assert_separate_principal_and_settlement_dates(
-        date!(2025 - 04 - 02),
-        date!(2025 - 03 - 28),
-        80.0,
-    );
-}
-
-#[test]
-fn full_paydown_preserves_paid_cash_and_suppresses_its_later_principal_movement() {
-    let cutoff = date!(2025 - 03 - 31);
-    let payment_date = date!(2025 - 03 - 28);
-    let economic_date = date!(2025 - 04 - 02);
-    let maturity = date!(2026 - 01 - 01);
-    let mut builder = CashFlowSchedule::builder();
-    let _ = builder
-        .principal(usd(100.0), date!(2025 - 01 - 01), maturity)
-        .add_principal_event(
-            economic_date,
-            payment_date,
-            usd(-10.0),
-            Some(usd(10.0)),
-            CFKind::Amortization,
-        );
-    let mut state = state_with_balance(
-        builder
-            .build(None)
-            .expect("early-settled principal schedule"),
-        0.0,
-    );
-    state
-        .rebuild_residuals(cutoff)
-        .expect("full repayment rebuild");
-    let rebuilt = &state.residual_schedules[INSTRUMENT];
-    let paid_amortization = rebuilt
-        .get_flows()
-        .iter()
-        .find(|flow| flow.get_kind() == CFKind::Amortization)
-        .expect("historical cash payment remains in the schedule");
-    assert_eq!(paid_amortization.get_date(), payment_date);
-    assert_eq!(
-        paid_amortization
-            .get_balance_date()
-            .expect("principal row balance date"),
-        economic_date
-    );
-    assert_close(paid_amortization.get_amount().amount(), 10.0);
-    assert_close(
-        paid_amortization
-            .get_principal_delta()
-            .expect("explicit capped principal delta")
-            .amount(),
-        0.0,
-    );
-    assert_close(amount_on(rebuilt, CFKind::Notional, maturity), 0.0);
-    assert_matures_to_zero(rebuilt, maturity);
-    assert!(
-        rebuilt
-            .outstanding_by_date()
-            .expect("valid principal path")
-            .iter()
-            .all(|(_, balance)| balance.amount() >= 0.0)
-    );
-    assert_repeated_rebuild_is_unchanged(&mut state, cutoff);
 }
 
 #[test]
@@ -479,13 +116,18 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
                     PaymentPriority::Equity,
                 ],
                 ecf_sweep: Some(EcfSweepSpec {
-                    ebitda_node: "ebitda".into(),
-                    taxes_node: None,
-                    capex_node: None,
-                    working_capital_node: None,
-                    cash_interest_node: None,
+                    cash_measure: "ebitda".into(),
+                    deductions: vec![
+                        crate::capital_structure::EcfTerm::PaidCashInterest,
+                        crate::capital_structure::EcfTerm::PaidFees,
+                        crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                    ],
+                    credits: Vec::new(),
                     sweep_percentage: 0.5,
-                    target_instrument_id: Some(INSTRUMENT.into()),
+                    facilities: crate::capital_structure::FacilitySelection::Named(vec![
+                        INSTRUMENT.into(),
+                    ]),
+                    payment_lag_days: None,
                 }),
                 ..Default::default()
             });
@@ -505,7 +147,12 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
                 .expect("canonical amortizing-loan model")
         };
         let result = Evaluator::new()
-            .evaluate_with_market(&model, &market, issue)
+            .evaluate_with_market(
+                &model,
+                &market,
+                issue,
+                crate::evaluator::ObservationCutoff::FullSnapshot,
+            )
             .expect("amortizing-loan model evaluation");
 
         // March/June economic amortization belongs to Q1/Q2 respectively,
@@ -538,72 +185,6 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
     }
 }
 
-#[test]
-fn previously_paid_redemption_cannot_extinguish_later_pik_principal() {
-    let issue = date!(2025 - 03 - 01);
-    let payment_date = date!(2025 - 03 - 28);
-    let cutoff = date!(2025 - 03 - 31);
-    let economic_date = date!(2025 - 04 - 02);
-    let schedule = CashFlowSchedule::from_flows(
-        vec![
-            CashFlowParams::new(payment_date, None, usd(100.0), CFKind::Notional, 0.0, None)
-                .with_principal_delta(usd(-100.0))
-                .with_principal_date(economic_date)
-                .build()
-                .expect("valid cashflow"),
-        ],
-        Notional::par(100.0, Currency::USD).expect("initial principal"),
-        DayCount::Act365F,
-        CashFlowMeta {
-            issue_date: Some(issue),
-            ..Default::default()
-        },
-    );
-    // Redemption cash of 100 was already paid. A subsequent PIK toggle adds
-    // 10 to closing principal before that redemption becomes economic.
-    let mut state = state_with_balance(schedule, 110.0);
-    state.principal_advance_payments.insert(
-        INSTRUMENT.into(),
-        vec![PrincipalClaim {
-            payment_date,
-            balance_date: economic_date,
-            amount: usd(100.0),
-        }],
-    );
-    state
-        .rebuild_residuals(cutoff)
-        .expect("new PIK principal rebuild");
-    let rebuilt = &state.residual_schedules[INSTRUMENT];
-    let redemption = rebuilt
-        .get_flows()
-        .iter()
-        .find(|flow| flow.get_kind() == CFKind::Notional)
-        .expect("historical redemption cash remains");
-    assert_eq!(redemption.get_date(), payment_date);
-    assert_eq!(
-        redemption
-            .get_balance_date()
-            .expect("principal row balance date"),
-        economic_date
-    );
-    assert_close(redemption.get_amount().amount(), 100.0);
-    assert_close(
-        redemption
-            .get_principal_delta()
-            .expect("original economic repayment")
-            .amount(),
-        -100.0,
-    );
-    let path = rebuilt.outstanding_by_date().expect("principal path");
-    let balance = path
-        .iter()
-        .find(|(date, _)| *date == economic_date)
-        .expect("redemption economic date")
-        .1;
-    assert_close(balance.amount(), 10.0);
-    assert_repeated_rebuild_is_unchanged(&mut state, cutoff);
-}
-
 /// A balance opened by this period's funding closes on the economic clock,
 /// exactly like a balance carried in from the prior period.
 #[test]
@@ -632,7 +213,7 @@ fn newly_funded_balance_closes_on_economic_principal_dates() {
                 CFKind::Amortization,
             );
         let instrument = ScheduleInstrument::new(builder.build(None).expect("schedule"));
-        let (_, closing, funding, _) = calculate_period_flows(
+        let (_, closing, funding) = calculate_period_flows(
             &instrument,
             &periods[0],
             usd(0.0),
@@ -719,7 +300,12 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
                 .expect("principal formula");
             let model = builder.build().expect("amortizing-loan model");
             let result = Evaluator::new()
-                .evaluate_with_market(&model, &market, as_of)
+                .evaluate_with_market(
+                    &model,
+                    &market,
+                    as_of,
+                    crate::evaluator::ObservationCutoff::FullSnapshot,
+                )
                 .expect("amortizing-loan model evaluation");
             let mut total_principal = 0.0;
             for (period, (balance, principal)) in
@@ -735,4 +321,1064 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
             assert_close(total_principal, 100.0);
         }
     }
+}
+
+/// A mandatory prepayment under `all_eligible` is paid across a real term
+/// loan and a real revolver through the evaluator, the rung's requested, paid
+/// and unpaid amounts are recorded, and a sizing input that reaches a
+/// same-period `cs` output through another node is rejected before the run.
+#[test]
+fn evaluator_prepays_a_term_loan_and_a_revolver_and_records_the_outcome() {
+    use finstack_quant_statements::capital_structure::{FacilitySelection, PrepaymentSpec};
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
+        DrawRepaySpec, RevolvingCredit,
+    };
+
+    let issue = date!(2023 - 12 - 31);
+    let maturity = date!(2024 - 12 - 31);
+    let mut loan = TermLoan::example().expect("canonical term loan");
+    loan.id = INSTRUMENT.into();
+    loan.notional_limit = usd(100.0);
+    loan.issue_date = issue;
+    loan.maturity = maturity;
+    loan.rate = RateSpec::Fixed { rate: 0.10 };
+    loan.frequency = Tenor::quarterly();
+    loan.day_count = DayCount::Act365F;
+    loan.business_day_convention = BusinessDayConvention::Following;
+    loan.calendar_id = Some("weekends_only".into());
+    loan.amortization = AmortizationSpec::None;
+    let mut revolver = RevolvingCredit::example().expect("canonical revolver");
+    revolver.id = "RCF".into();
+    revolver.commitment = usd(200.0);
+    revolver.drawn = usd(100.0);
+    revolver.issue_date = issue;
+    revolver.maturity = maturity;
+    revolver.rate = RateSpec::Fixed { rate: 0.08 };
+    revolver.draw_repay_spec = DrawRepaySpec::Deterministic(Vec::new());
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (2.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .expect("discount curve");
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
+
+    let quarters: Vec<_> = (1..=4)
+        .map(|quarter| PeriodId::quarter(2024, quarter).expect("valid quarter"))
+        .collect();
+    let series = |amount: fn(usize) -> f64| -> Vec<_> {
+        quarters
+            .iter()
+            .enumerate()
+            .map(|(index, period)| (*period, AmountOrScalar::scalar(amount(index))))
+            .collect()
+    };
+    let model = |amount: &str| {
+        let mut builder = ModelBuilder::new("mixed-prepayment");
+        builder
+            .periods("2024Q1..2024Q4", None)
+            .expect("reporting quarters");
+        builder.value("cash", &series(|_| 1_000.0));
+        builder.value(
+            "request",
+            &series(|index| if index == 0 { 60.0 } else { 0.0 }),
+        );
+        builder
+            .compute("interest_alias", "cs.interest_expense_cash.total")
+            .expect("alias of a waterfall output");
+        builder.add_debt(
+            INSTRUMENT,
+            FinancialStatementInstrument::TermLoan(loan.clone()),
+        );
+        builder.add_debt(
+            "RCF",
+            FinancialStatementInstrument::RevolvingCredit(revolver.clone()),
+        );
+        builder.waterfall(WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::MandatoryPrepayment,
+                PaymentPriority::Equity,
+            ],
+            mandatory_prepayment: Some(PrepaymentSpec {
+                amount: amount.into(),
+                facilities: FacilitySelection::AllEligible,
+            }),
+            ..Default::default()
+        });
+        builder.build()
+    };
+    let evaluate = |amount: &str| {
+        Evaluator::new().evaluate_with_market(
+            &model(amount).expect("mixed capital structure"),
+            &market,
+            issue,
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
+    };
+
+    let result = evaluate("request").expect("mixed prepayment evaluation");
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    let first = &cashflows.prepayments[&quarters[0]];
+    assert_eq!(first.len(), 1);
+    assert_eq!(first[0].kind, PaymentPriority::MandatoryPrepayment);
+    assert_eq!(first[0].requested, usd(60.0));
+    assert_eq!(first[0].paid, usd(60.0));
+    assert_eq!(first[0].unpaid, usd(0.0));
+    // Equal principal, one class: the request is shared equally.
+    for id in [INSTRUMENT, "RCF"] {
+        assert_eq!(
+            cashflows.by_instrument[id][&quarters[0]].mandatory_prepayment,
+            Some(usd(30.0))
+        );
+        assert_close(
+            cashflows
+                .get_component("debt_balance", id, &quarters[0])
+                .expect("closing balance"),
+            70.0,
+        );
+    }
+    assert_eq!(cashflows.prepayments[&quarters[1]][0].requested, usd(0.0));
+
+    let error = evaluate("interest_alias")
+        .expect_err("a request sized from this period's interest")
+        .to_string();
+    assert!(error.contains("mandatory_prepayment"), "{error}");
+    assert!(error.contains("interest_alias"), "{error}");
+}
+
+// Residual coupon rebuilding through the instrument owner (STATEMENTS-CAPITAL-005)
+
+/// A 10% loan of 100 on 30/360 with semiannual coupons, issued 1 January 2025.
+fn semiannual_loan(coupon_type: CouponType) -> TermLoan {
+    let mut loan = TermLoan::example().expect("canonical term loan");
+    loan.id = INSTRUMENT.into();
+    loan.notional_limit = usd(100.0);
+    loan.issue_date = date!(2025 - 01 - 01);
+    loan.maturity = date!(2026 - 01 - 01);
+    loan.rate = RateSpec::Fixed { rate: 0.10 };
+    loan.frequency = Tenor::semi_annual();
+    loan.day_count = DayCount::Thirty360;
+    loan.business_day_convention = BusinessDayConvention::Unadjusted;
+    loan.amortization = AmortizationSpec::None;
+    loan.coupon_type = coupon_type;
+    loan
+}
+
+fn prepay_then_equity(amount: &str) -> WaterfallSpec {
+    WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::MandatoryPrepayment,
+            PaymentPriority::Equity,
+        ],
+        mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+            amount: amount.into(),
+            facilities: crate::capital_structure::FacilitySelection::AllEligible,
+        }),
+        ..Default::default()
+    }
+}
+
+/// Evaluate `periods` of 2025 with `instrument`, ample cash and a `request`
+/// node that is `first` in the first period and zero afterwards.
+fn evaluate_2025(
+    periods: &str,
+    instrument: FinancialStatementInstrument,
+    waterfall: WaterfallSpec,
+    first: f64,
+    extra: &[(&str, f64)],
+) -> crate::Result<crate::evaluator::StatementResult> {
+    evaluate_2025_with(
+        periods,
+        instrument,
+        waterfall,
+        &|_| 1_000.0,
+        &|index| if index == 0 { first } else { 0.0 },
+        extra,
+        &MarketContext::new(),
+    )
+}
+
+/// As [`evaluate_2025`], with the cash pool and the request stated per
+/// period (by index) and an explicit market.
+fn evaluate_2025_with(
+    periods: &str,
+    instrument: FinancialStatementInstrument,
+    waterfall: WaterfallSpec,
+    cash: &dyn Fn(usize) -> f64,
+    request: &dyn Fn(usize) -> f64,
+    extra: &[(&str, f64)],
+    market: &MarketContext,
+) -> crate::Result<crate::evaluator::StatementResult> {
+    evaluate_2025_configured(
+        periods,
+        instrument,
+        waterfall,
+        cash,
+        request,
+        extra,
+        market,
+        &|_| {},
+    )
+}
+
+/// As [`evaluate_2025_with`], with `configure` adding formula nodes before
+/// the model is built.
+#[allow(clippy::too_many_arguments)]
+fn evaluate_2025_configured(
+    periods: &str,
+    instrument: FinancialStatementInstrument,
+    waterfall: WaterfallSpec,
+    cash: &dyn Fn(usize) -> f64,
+    request: &dyn Fn(usize) -> f64,
+    extra: &[(&str, f64)],
+    market: &MarketContext,
+    configure: &dyn Fn(&mut ModelBuilder),
+) -> crate::Result<crate::evaluator::StatementResult> {
+    let mut builder = ModelBuilder::new("residual-rebuild");
+    builder.periods(periods, None).expect("periods");
+    let model_periods: Vec<PeriodId> = if periods.contains('M') {
+        (1..=6)
+            .map(|month| PeriodId::month(2025, month).expect("month"))
+            .collect()
+    } else {
+        (1..=4)
+            .map(|quarter| PeriodId::quarter(2025, quarter).expect("quarter"))
+            .collect()
+    };
+    let series = |value: &dyn Fn(usize) -> f64| -> Vec<_> {
+        model_periods
+            .iter()
+            .enumerate()
+            .map(|(index, period)| (*period, AmountOrScalar::scalar(value(index))))
+            .collect()
+    };
+    builder.value("cash", &series(cash));
+    builder.value("request", &series(request));
+    for (name, value) in extra {
+        builder.value(*name, &series(&|_| *value));
+    }
+    let id = match &instrument {
+        FinancialStatementInstrument::RevolvingCredit(_) => "RCF",
+        _ => INSTRUMENT,
+    };
+    builder.add_debt(id, instrument);
+    builder.waterfall(waterfall);
+    configure(&mut builder);
+    let model = builder.build()?;
+    Evaluator::new().evaluate_with_market(
+        &model,
+        market,
+        date!(2025 - 01 - 01),
+        crate::evaluator::ObservationCutoff::FullSnapshot,
+    )
+}
+
+fn component(
+    result: &crate::evaluator::StatementResult,
+    name: &str,
+    id: &str,
+    period: &str,
+) -> f64 {
+    let period: PeriodId = period.parse().expect("period id");
+    result
+        .cs_cashflows
+        .as_ref()
+        .expect("capital cash flows")
+        .get_component(name, id, &period)
+        .expect("component")
+}
+
+/// The record's example: 10% on 100 for an exact quarter and on 60 for the
+/// next earns 2.50 and 1.50 inside one coupon, and the interest earned
+/// before the sweep is preserved at each close.
+#[test]
+fn a_sweep_inside_a_coupon_earns_on_the_dated_principal() {
+    let result = evaluate_2025(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(semiannual_loan(CouponType::Cash)),
+        prepay_then_equity("request"),
+        40.0,
+        &[],
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    assert_close(get("debt_balance", "2025Q1"), 60.0);
+    // Earned at the first close on 100, before the sweep takes effect.
+    assert_close(get("accrued_interest", "2025Q1"), 2.5);
+    // 2.50 on 100 and 89 of the second quarter's 90 days on 60.
+    assert_close(get("accrued_interest", "2025Q2"), 2.5 + 1.5 * 89.0 / 90.0);
+    // The 1 July coupon pays 2.50 + 1.50.
+    assert_close(get("interest_expense_cash", "2025Q3"), 4.0);
+    assert_close(get("debt_balance", "2025Q4"), 60.0);
+}
+
+/// The contractual 75% cash and 25% PIK split applies once to the rebuilt
+/// coupon: 3 of cash and 1 capitalized on the coupon date.
+#[test]
+fn the_contractual_split_applies_once_to_a_rebuilt_coupon() {
+    let result = evaluate_2025(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(semiannual_loan(CouponType::Split {
+            cash_fraction: Decimal::new(75, 2),
+            pik_fraction: Decimal::new(25, 2),
+        })),
+        prepay_then_equity("request"),
+        40.0,
+        &[],
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    assert_close(get("interest_expense_cash", "2025Q3"), 3.0);
+    assert_close(get("interest_expense_pik", "2025Q3"), 1.0);
+    // Scheduled cash service excludes the capitalized share and the sweep.
+    assert_close(get("scheduled_cash_interest_due", "2025Q3"), 3.0);
+    assert_close(get("scheduled_principal_due", "2025Q1"), 0.0);
+    assert_close(get("debt_balance", "2025Q2"), 60.0);
+    assert_close(get("debt_balance", "2025Q3"), 61.0);
+}
+
+fn pik_toggle(fraction: Decimal, min_coupon_periods: usize) -> WaterfallSpec {
+    WaterfallSpec {
+        pik_toggle: Some(crate::capital_structure::PikToggleSpec {
+            liquidity_metric: "liquidity".into(),
+            threshold: 100.0,
+            elections: vec![crate::capital_structure::PikElectionSpec {
+                instrument_id: INSTRUMENT.into(),
+                pik_fraction: fraction,
+                min_coupon_periods,
+                notice_days: 0,
+            }],
+        }),
+        ..Default::default()
+    }
+}
+
+/// An 8% quarterly loan of 100 on 30/360: 2.00 a quarter.
+fn quarterly_loan() -> TermLoan {
+    let mut loan = semiannual_loan(CouponType::Cash);
+    loan.frequency = Tenor::quarterly();
+    loan.rate = RateSpec::Fixed { rate: 0.08 };
+    loan
+}
+
+/// A PIK request takes effect at the start of the next coupon period, never
+/// on a coupon already running, and capitalizes once on each coupon date.
+#[test]
+fn a_pik_election_starts_with_the_next_coupon_period() {
+    let result = evaluate_2025(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(quarterly_loan()),
+        pik_toggle(Decimal::ONE, 0),
+        0.0,
+        &[("liquidity", 10.0)],
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    // The first quarter's request covers coupon periods from 1 April. The
+    // January to March coupon, paid on 1 April, stays cash.
+    assert_close(get("interest_expense_cash", "2025Q2"), 2.0);
+    assert_close(get("interest_expense_pik", "2025Q2"), 0.0);
+    assert_close(get("debt_balance", "2025Q2"), 100.0);
+    // The April to June coupon capitalizes on 1 July, the next on 1 October.
+    assert_close(get("interest_expense_cash", "2025Q3"), 0.0);
+    assert_close(get("interest_expense_pik", "2025Q3"), 2.0);
+    assert_close(get("debt_balance", "2025Q3"), 102.0);
+    assert_close(get("interest_expense_pik", "2025Q4"), 2.04);
+    assert_close(get("debt_balance", "2025Q4"), 104.04);
+}
+
+/// A 200 commitment with 100 drawn at 8% on ACT/360, a 50 bp commitment fee
+/// and a 25 bp usage fee, quarterly.
+fn fee_revolver(
+    events: Vec<
+        finstack_quant_valuations::instruments::fixed_income::revolving_credit::DrawRepayEvent,
+    >,
+) -> FinancialStatementInstrument {
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
+        DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    };
+    let mut facility = RevolvingCredit::example().expect("canonical revolver");
+    facility.id = "RCF".into();
+    facility.commitment = usd(200.0);
+    facility.drawn = usd(100.0);
+    facility.issue_date = date!(2025 - 01 - 01);
+    facility.maturity = date!(2026 - 01 - 01);
+    facility.rate = RateSpec::Fixed { rate: 0.08 };
+    facility.day_count = DayCount::Act360;
+    facility.frequency = Tenor::quarterly();
+    facility.fees = RevolvingCreditFees::flat(50.0, 25.0, 0.0).expect("fees");
+    facility.draw_repay_spec = DrawRepaySpec::Deterministic(events);
+    FinancialStatementInstrument::RevolvingCredit(facility)
+}
+
+/// A swept revolver's interest, usage fee and commitment fee follow the
+/// drawn and undrawn balances from the day after the sweep, on actual days.
+#[test]
+fn a_swept_revolver_rebuilds_interest_and_fees_on_actual_days() {
+    let result = evaluate_2025(
+        "2025M01..2025M06",
+        fee_revolver(Vec::new()),
+        prepay_then_equity("request"),
+        40.0,
+        &[],
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, "RCF", period);
+    assert_close(get("debt_balance", "2025M01"), 60.0);
+    // The quarter's rows are paid in April: 31 days on 100 drawn, then 59 on
+    // 60 drawn and 140 undrawn.
+    let paid: f64 = ["2025M04"]
+        .iter()
+        .map(|period| get("interest_expense_cash", period))
+        .sum();
+    assert_close(paid, 0.08 * (100.0 * 31.0 + 60.0 * 59.0) / 360.0);
+    assert_close(
+        get("fees", "2025M04"),
+        (0.005 * (100.0 * 31.0 + 140.0 * 59.0) + 0.0025 * (100.0 * 31.0 + 60.0 * 59.0)) / 360.0,
+    );
+    // Fees are not scheduled debt service.
+    assert_close(get("scheduled_cash_interest_due", "2025M04"), paid);
+    assert!(get("fees", "2025M04") > 0.0);
+    assert_close(get("scheduled_principal_due", "2025M01"), 0.0);
+    // Interest earned in January on 100 is preserved at the January close.
+    assert_close(
+        get("accrued_interest", "2025M01"),
+        100.0 * 0.08 * 30.0 / 360.0,
+    );
+    // At the February close: 31 days on 100 and 27 on 60.
+    assert_close(
+        get("accrued_interest", "2025M02"),
+        0.08 * (100.0 * 31.0 + 60.0 * 27.0) / 360.0,
+    );
+}
+
+/// The facility's terms survive a zero balance: a contractual redraw after a
+/// full sweep earns the facility's rate again.
+#[test]
+fn a_fully_swept_revolver_earns_again_on_a_contractual_redraw() {
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::DrawRepayEvent;
+    let result = evaluate_2025(
+        "2025Q1..2025Q4",
+        fee_revolver(vec![DrawRepayEvent {
+            date: date!(2025 - 07 - 01),
+            amount: usd(80.0),
+            is_draw: true,
+        }]),
+        prepay_then_equity("request"),
+        100.0,
+        &[],
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, "RCF", period);
+    assert_close(get("debt_balance", "2025Q1"), 0.0);
+    assert_close(get("debt_balance", "2025Q2"), 0.0);
+    assert_close(get("debt_balance", "2025Q3"), 80.0);
+    // Nothing was drawn in the second quarter; the third (92 days) earns 8%
+    // on the 80 redrawn and is paid on 1 October.
+    assert_close(get("interest_expense_cash", "2025Q3"), 0.0);
+    assert_close(
+        get("interest_expense_cash", "2025Q4"),
+        80.0 * 0.08 * 92.0 / 360.0,
+    );
+}
+
+/// Unpaid scheduled principal is carried as arrears while the schedule keeps
+/// its dated reductions, and a later sweep is posted on top: the loan repays
+/// its face exactly once.
+#[test]
+fn arrears_and_a_later_sweep_repay_the_face_once() {
+    let mut loan = semiannual_loan(CouponType::Cash);
+    loan.issue_date = date!(2024 - 12 - 31);
+    loan.maturity = date!(2025 - 12 - 31);
+    loan.frequency = Tenor::quarterly();
+    loan.day_count = DayCount::Act365F;
+    loan.business_day_convention = BusinessDayConvention::Following;
+    loan.calendar_id = Some("weekends_only".into());
+    loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.10 };
+    // No cash in the second quarter, when the 30 June installment falls due;
+    // a sweep of 20 in the third.
+    let result = evaluate_2025_with(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(loan),
+        prepay_then_equity("request"),
+        &|index| if index == 1 { 0.0 } else { 1_000.0 },
+        &|index| if index == 2 { 20.0 } else { 0.0 },
+        &[],
+        &MarketContext::new(),
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    let quarters = ["2025Q1", "2025Q2", "2025Q3", "2025Q4"];
+    let balances: Vec<f64> = quarters.iter().map(|q| get("debt_balance", q)).collect();
+    let paid: Vec<f64> = quarters
+        .iter()
+        .map(|q| get("principal_payment", q))
+        .collect();
+    let arrears: Vec<f64> = quarters
+        .iter()
+        .map(|q| get("principal_arrears", q))
+        .collect();
+    // Economic principal follows the contract dates and the sweep.
+    assert_eq!(balances, vec![90.0, 80.0, 50.0, 0.0], "{balances:?}");
+    // The installment due on 30 June is unpaid in the second quarter and
+    // settled with the 30 September installment and the sweep in the third.
+    assert_eq!(arrears, vec![0.0, 10.0, 0.0, 0.0], "{arrears:?}");
+    assert_eq!(paid[1], 0.0);
+    assert_close(paid[2], 40.0);
+    assert_close(paid.iter().sum::<f64>(), 100.0);
+
+    // Scheduled service is recognized once, on its contractual due date
+    // (STATEMENTS-CONTRACTS-008): the missed 30 June installment is due in
+    // the second quarter although nothing is paid, and the third quarter's
+    // due amount excludes both the arrears it settles and the sweep.
+    let due: Vec<f64> = quarters
+        .iter()
+        .map(|q| get("scheduled_principal_due", q))
+        .collect();
+    assert_eq!(due, vec![10.0, 10.0, 10.0, 50.0], "{due:?}");
+    // What falls due over the life is the face less the 20 swept.
+    assert_close(due.iter().sum::<f64>(), 80.0);
+    let interest_due: Vec<f64> = quarters
+        .iter()
+        .map(|q| get("scheduled_cash_interest_due", q))
+        .collect();
+    let interest_paid: Vec<f64> = quarters
+        .iter()
+        .map(|q| get("interest_expense_cash", q))
+        .collect();
+    // The 30 June coupon is due and unpaid; the third quarter pays it with
+    // its own coupon but only its own coupon falls due then.
+    assert!(interest_due[1] > 0.0 && interest_paid[1] == 0.0);
+    assert_close(interest_paid[2], interest_due[1] + interest_due[2]);
+}
+
+#[test]
+fn an_election_with_no_coupon_period_left_changes_nothing() {
+    // The loan matures on 1 July: requests made in the third and fourth
+    // quarters, after the full payoff, have no coupon period to cover.
+    let mut loan = quarterly_loan();
+    loan.maturity = date!(2025 - 07 - 01);
+    let result = evaluate_2025_with(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(loan),
+        pik_toggle(Decimal::ONE, 0),
+        &|_| 1_000.0,
+        &|_| 0.0,
+        &[("liquidity", 10.0)],
+        &MarketContext::new(),
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    // The first quarter's request covers the April to June coupon, which
+    // capitalizes at maturity and is redeemed with the principal.
+    assert_close(get("interest_expense_pik", "2025Q3"), 2.0);
+    assert_close(get("principal_payment", "2025Q3"), 102.0);
+    assert_close(get("debt_balance", "2025Q3"), 0.0);
+    assert_close(get("debt_balance", "2025Q4"), 0.0);
+    assert_close(get("interest_expense_pik", "2025Q4"), 0.0);
+}
+
+/// A floating coupon rebuilt after a sweep keeps its locked observation: the
+/// 5% fixing set before the run, not the 3% forward curve, and only the
+/// principal it earns on changes.
+#[test]
+fn a_floating_coupon_keeps_its_rate_when_rebuilt_after_a_sweep() {
+    let mut loan = semiannual_loan(CouponType::Cash);
+    loan.frequency = Tenor::quarterly();
+    loan.day_count = DayCount::Act360;
+    loan.rate = TermLoan::example_floating_with_ddtl()
+        .expect("floating loan")
+        .rate;
+    let market = MarketContext::new()
+        .try_insert(
+            finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
+                "USD-SOFR-3M",
+                date!(2025 - 01 - 01),
+                0.03,
+                DayCount::Act360,
+            )
+            .expect("forward curve"),
+        )
+        .expect("insert market curve");
+    use finstack_quant_core::market_data::scalars::{
+        ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+    };
+    let market = market.insert_series(
+        ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-3M",
+            vec![(date!(2024 - 12 - 30), 0.05)],
+            None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
+        )
+        .expect("fixing history"),
+    );
+    let april_coupon = |swept: f64| {
+        let result = evaluate_2025_with(
+            "2025M01..2025M06",
+            FinancialStatementInstrument::TermLoan(loan.clone()),
+            prepay_then_equity("request"),
+            &|_| 1_000.0,
+            &|index| if index == 0 { swept } else { 0.0 },
+            &[],
+            &market,
+        )
+        .expect("evaluation");
+        component(&result, "interest_expense_cash", INSTRUMENT, "2025M04")
+    };
+    let plain = april_coupon(0.0);
+    // The locked 5% fixing plus the 400 bp margin for 90 days on 100.
+    assert_close(plain, 100.0 * 0.09 * 90.0 / 360.0);
+    // 31 days on 100 and 59 on 60, at the same projected rate.
+    assert_close(
+        april_coupon(40.0),
+        plain * (100.0 * 31.0 + 60.0 * 59.0) / (100.0 * 90.0),
+    );
+}
+
+// Contractual PIK elections (STATEMENTS-CAPITAL-008)
+
+/// The record's example: a 10 coupon with a 40% PIK election pays 6 in cash
+/// and capitalizes 4 on the coupon date. Overdue cash interest of 3 stays a
+/// cash claim: 9 of cash interest is due and nothing more capitalizes.
+#[test]
+fn an_elected_split_capitalizes_its_share_and_leaves_arrears_in_cash() {
+    // 40% on 100 with quarterly coupons: 10 a coupon.
+    let mut loan = quarterly_loan();
+    loan.rate = RateSpec::Fixed { rate: 0.40 };
+    // Cash covers only 7 of the first coupon, paid on 1 April, so 3 is
+    // overdue; the first quarter's request covers the coupon from 1 April.
+    let result = evaluate_2025_with(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(loan),
+        pik_toggle(Decimal::new(4, 1), 0),
+        &|index| if index == 1 { 7.0 } else { 1_000.0 },
+        &|_| 0.0,
+        &[("liquidity", 10.0)],
+        &MarketContext::new(),
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    assert_close(get("interest_expense_cash", "2025Q2"), 7.0);
+    assert_close(get("interest_arrears", "2025Q2"), 3.0);
+    assert_close(get("debt_balance", "2025Q2"), 100.0);
+    // The elected coupon, paid on 1 July: 6 in cash plus the 3 overdue, and
+    // 4 capitalized once.
+    assert_close(get("interest_expense_cash", "2025Q3"), 9.0);
+    assert_close(get("interest_expense_pik", "2025Q3"), 4.0);
+    assert_close(get("interest_arrears", "2025Q3"), 0.0);
+    assert_close(get("debt_balance", "2025Q3"), 104.0);
+}
+
+/// A PIK election lasts at least its minimum number of coupon periods,
+/// counted in coupon periods of the loan and not in reporting periods.
+#[test]
+fn a_pik_election_lasts_its_minimum_number_of_coupon_periods() {
+    // Liquidity is short in January only, in a monthly model of a
+    // quarterly-coupon loan.
+    let run = |min_coupon_periods: usize| {
+        let mut builder_periods = Vec::new();
+        for month in 1..=12 {
+            builder_periods.push(PeriodId::month(2025, month).expect("month"));
+        }
+        let mut loan = quarterly_loan();
+        loan.maturity = date!(2026 - 01 - 01);
+        let mut builder = ModelBuilder::new("pik-duration");
+        builder.periods("2025M01..2025M12", None).expect("periods");
+        let series = |value: &dyn Fn(usize) -> f64| -> Vec<_> {
+            builder_periods
+                .iter()
+                .enumerate()
+                .map(|(index, period)| (*period, AmountOrScalar::scalar(value(index))))
+                .collect()
+        };
+        builder.value("cash", &series(&|_| 1_000.0));
+        builder.value(
+            "liquidity",
+            &series(&|index| if index == 0 { 10.0 } else { 500.0 }),
+        );
+        builder.add_debt(INSTRUMENT, FinancialStatementInstrument::TermLoan(loan));
+        builder.waterfall(pik_toggle(Decimal::ONE, min_coupon_periods));
+        let model = builder.build().expect("model");
+        let result = Evaluator::new()
+            .evaluate_with_market(
+                &model,
+                &MarketContext::new(),
+                date!(2025 - 01 - 01),
+                crate::evaluator::ObservationCutoff::FullSnapshot,
+            )
+            .expect("evaluation");
+        // PIK capitalized on the 1 July, 1 October and 1 January coupons.
+        ["2025M07", "2025M10"]
+            .map(|period| component(&result, "interest_expense_pik", INSTRUMENT, period))
+    };
+    // January's request covers the coupon period from 1 April. February's
+    // request for cash ends it at once when no minimum applies: the election
+    // is replaced before its first period begins.
+    assert_eq!(run(0), [0.0, 0.0]);
+    // With a minimum of one coupon period the April to June coupon is PIK
+    // and the next is cash; with two, both are PIK.
+    assert_eq!(run(1), [2.0, 0.0]);
+    let two = run(2);
+    assert_close(two[0], 2.0);
+    assert_close(two[1], 2.04);
+}
+
+/// Actual periods are not exercised: a historical election is recorded on
+/// the loan itself.
+#[test]
+fn the_toggle_is_not_exercised_in_actual_periods() {
+    let mut builder = ModelBuilder::new("pik-actuals");
+    builder
+        .periods("2025Q1..2025Q4", Some("2025Q2"))
+        .expect("periods");
+    let quarters: Vec<PeriodId> = (1..=4)
+        .map(|quarter| PeriodId::quarter(2025, quarter).expect("quarter"))
+        .collect();
+    let series = |value: f64| -> Vec<_> {
+        quarters
+            .iter()
+            .map(|period| (*period, AmountOrScalar::scalar(value)))
+            .collect()
+    };
+    builder.value("cash", &series(1_000.0));
+    builder.value("liquidity", &series(10.0));
+    let mut loan = quarterly_loan();
+    loan.maturity = date!(2026 - 04 - 01);
+    builder.add_debt(INSTRUMENT, FinancialStatementInstrument::TermLoan(loan));
+    builder.waterfall(pik_toggle(Decimal::ONE, 0));
+    let model = builder.build().expect("model");
+    let result = Evaluator::new()
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
+        .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    // The first forecast period is the third quarter; its request covers
+    // coupon periods from 1 October, so nothing capitalizes in 2025 except
+    // nothing at all: the 1 October coupon was earned before the election.
+    for period in ["2025Q2", "2025Q3", "2025Q4"] {
+        assert_close(get("interest_expense_pik", period), 0.0);
+        assert_close(get("interest_expense_cash", period), 2.0);
+    }
+    assert_close(get("debt_balance", "2025Q4"), 100.0);
+}
+
+/// A historical PIK toggle recorded on the loan is PIK in force for the
+/// forecast exercise: a recovered metric ends it, after its minimum number
+/// of coupon periods counted from the toggle's own date.
+#[test]
+fn a_contractual_toggle_in_force_is_ended_by_a_recovered_metric() {
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+        PikToggle, TermLoanCovenantEvents,
+    };
+    let run = |min_coupon_periods: usize| {
+        let mut loan = quarterly_loan();
+        loan.covenants = Some(TermLoanCovenantEvents {
+            pik_toggles: vec![PikToggle {
+                date: date!(2025 - 01 - 01),
+                enable_pik: true,
+            }],
+            ..Default::default()
+        });
+        // Liquidity is above the threshold in every period: base terms are
+        // requested throughout.
+        let result = evaluate_2025(
+            "2025Q1..2025Q4",
+            FinancialStatementInstrument::TermLoan(loan),
+            pik_toggle(Decimal::ONE, min_coupon_periods),
+            0.0,
+            &[("liquidity", 500.0)],
+        )
+        .expect("evaluation");
+        ["2025Q2", "2025Q3", "2025Q4"]
+            .map(|period| component(&result, "interest_expense_pik", INSTRUMENT, period))
+    };
+    // The January to March coupon was already PIK and capitalizes on 1 April.
+    // With no minimum the first quarter's request restores cash from 1 April.
+    let none = run(0);
+    assert_close(none[0], 2.0);
+    assert_close(none[1], 0.0);
+    assert_close(none[2], 0.0);
+    // A minimum of two coupon periods holds PIK through June.
+    let two = run(2);
+    assert_close(two[0], 2.0);
+    assert_close(two[1], 2.04);
+    assert_close(two[2], 0.0);
+}
+
+/// An election needs its notice: with 60 days, a request observed at the
+/// 31 March close cannot start the 1 April coupon period and starts the
+/// 1 July one.
+#[test]
+fn a_pik_election_waits_for_its_notice_period() {
+    let run = |notice_days: u32| {
+        let mut waterfall = pik_toggle(Decimal::ONE, 0);
+        waterfall.pik_toggle.as_mut().expect("toggle").elections[0].notice_days = notice_days;
+        let result = evaluate_2025(
+            "2025Q1..2025Q4",
+            FinancialStatementInstrument::TermLoan(quarterly_loan()),
+            waterfall,
+            0.0,
+            &[("liquidity", 10.0)],
+        )
+        .expect("evaluation");
+        ["2025Q3", "2025Q4"]
+            .map(|period| component(&result, "interest_expense_pik", INSTRUMENT, period))
+    };
+    // No notice: the April to June coupon capitalizes on 1 July.
+    let none = run(0);
+    assert_close(none[0], 2.0);
+    // Sixty days: that coupon stays cash and the next one capitalizes.
+    let sixty = run(60);
+    assert_close(sixty[0], 0.0);
+    assert_close(sixty[1], 2.0);
+}
+
+/// A sweep with a payment lag is a dated obligation: 20 measured in the
+/// first quarter is due 45 days after its close, in the second quarter,
+/// where 10 of cash is left after interest. 10 is paid, 10 is carried as
+/// arrears and paid first in the third quarter.
+#[test]
+fn a_lagged_sweep_is_paid_when_due_and_its_arrears_are_carried() {
+    let waterfall = WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+            PaymentPriority::Equity,
+        ],
+        ecf_sweep: Some(EcfSweepSpec {
+            cash_measure: "request".into(),
+            deductions: Vec::new(),
+            credits: Vec::new(),
+            sweep_percentage: 0.5,
+            facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            payment_lag_days: Some(45),
+        }),
+        ..Default::default()
+    };
+    let result = evaluate_2025_with(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(quarterly_loan()),
+        waterfall,
+        // The second quarter has 12 of cash: 2 of interest and 10 for the
+        // sweep.
+        &|index| if index == 1 { 12.0 } else { 1_000.0 },
+        &|index| if index == 0 { 40.0 } else { 0.0 },
+        &[],
+        &MarketContext::new(),
+    )
+    .expect("evaluation");
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    let sweep = |period: &str| {
+        let id: PeriodId = period.parse().expect("period");
+        let outcome = &cashflows.prepayments[&id][0];
+        [
+            outcome.requested.amount(),
+            outcome.paid.amount(),
+            outcome.unpaid.amount(),
+            outcome.carried.amount(),
+        ]
+    };
+    assert_eq!(sweep("2025Q1"), [0.0, 0.0, 0.0, 0.0]);
+    assert_eq!(sweep("2025Q2"), [20.0, 10.0, 10.0, 10.0]);
+    assert_eq!(sweep("2025Q3"), [10.0, 10.0, 0.0, 0.0]);
+    assert_eq!(sweep("2025Q4"), [0.0, 0.0, 0.0, 0.0]);
+    let balance = |period: &str| component(&result, "debt_balance", INSTRUMENT, period);
+    assert_close(balance("2025Q1"), 100.0);
+    assert_close(balance("2025Q2"), 90.0);
+    assert_close(balance("2025Q3"), 80.0);
+}
+
+// Capital-state orchestration and period snapshots (STATEMENTS-EVALUATION-012)
+
+/// The record's example: 20 of cash interest is due and 12 of cash is
+/// eligible, so 12 is paid and 8 is in arrears. A lag in the next period
+/// reads the committed 12, and a formula that reads the final amount is
+/// evaluated once, after the allocation.
+#[test]
+fn a_short_paid_coupon_is_committed_and_read_by_the_next_period() {
+    let mut loan = quarterly_loan();
+    loan.notional_limit = usd(1_000.0);
+    let result = evaluate_2025_configured(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(loan),
+        WaterfallSpec::default(),
+        &|index| if index == 1 { 12.0 } else { 1_000.0 },
+        &|_| 0.0,
+        &[],
+        &MarketContext::new(),
+        &|builder| {
+            builder
+                .compute("paid", "cs.interest_expense_cash.total")
+                .expect("post-allocation formula");
+            builder
+                .compute("paid_last_period", "lag(cs.interest_expense_cash.total, 1)")
+                .expect("lagged capital reference");
+            builder
+                .compute("arrears", "cs.interest_arrears.total")
+                .expect("arrears formula");
+        },
+    )
+    .expect("evaluation");
+    let quarter = |n: u8| PeriodId::quarter(2025, n).expect("quarter");
+    // The 20 coupon falls due on 1 April, in the second quarter.
+    assert_close(
+        component(&result, "scheduled_cash_interest_due", INSTRUMENT, "2025Q2"),
+        20.0,
+    );
+    assert_eq!(result.get_money("paid", &quarter(2)), Some(usd(12.0)));
+    assert_eq!(result.get_money("arrears", &quarter(2)), Some(usd(8.0)));
+    // The third quarter reads the committed snapshot of the second, and
+    // pays its own 20 coupon plus the 8 carried.
+    assert_close(
+        result.get("paid_last_period", &quarter(3)).expect("lag"),
+        12.0,
+    );
+    assert_eq!(result.get_money("paid", &quarter(3)), Some(usd(28.0)));
+    assert_eq!(result.get_money("arrears", &quarter(3)), Some(usd(0.0)));
+}
+
+/// A cash and debt bridge built by hand for an amortizing loan with a sweep:
+/// every period opens on the prior close, debt moves only by principal paid,
+/// and the pool is fully used. 10% on 100 with 10 of amortization a quarter,
+/// a sweep of 20 in the second quarter and a pool of 100 each quarter.
+#[test]
+fn the_cash_and_debt_bridge_reconciles_across_periods() {
+    let mut loan = quarterly_loan();
+    loan.issue_date = date!(2024 - 12 - 31);
+    loan.maturity = date!(2025 - 12 - 31);
+    loan.rate = RateSpec::Fixed { rate: 0.10 };
+    loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.10 };
+    let evaluate = || {
+        evaluate_2025_with(
+            "2025Q1..2025Q4",
+            FinancialStatementInstrument::TermLoan(loan.clone()),
+            prepay_then_equity("request"),
+            &|_| 100.0,
+            &|index| if index == 1 { 20.0 } else { 0.0 },
+            &[],
+            &MarketContext::new(),
+        )
+        .expect("evaluation")
+    };
+    let result = evaluate();
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    // (opening, interest, principal, closing, equity) by hand. Interest is a
+    // 30/360 quarter on the balance after the prior coupon date's
+    // amortization. The sweep is posted at the 30 June close and earns from
+    // 1 July, so the coupon period that starts on 30 June carries one day at
+    // the pre-sweep 80: 60 for 89 days and 80 for one.
+    let third = 0.10 * (60.0 * 89.0 + 80.0) / 360.0;
+    let ledger = [
+        ("2025Q1", 100.0, 2.5, 10.0, 90.0, 87.5),
+        ("2025Q2", 90.0, 2.25, 30.0, 60.0, 67.75),
+        ("2025Q3", 60.0, third, 10.0, 50.0, 90.0 - third),
+        ("2025Q4", 50.0, 1.25, 50.0, 0.0, 48.75),
+    ];
+    for (period, opening, interest, principal, closing, equity) in ledger {
+        assert_close(get("opening_balance", period), opening);
+        assert_close(get("interest_expense_cash", period), interest);
+        assert_close(get("principal_payment", period), principal);
+        assert_close(get("debt_balance", period), closing);
+        let id: PeriodId = period.parse().expect("period");
+        assert_close(cashflows.equity_distribution[&id].amount(), equity);
+        assert_eq!(cashflows.available_cash[&id], usd(100.0));
+        // Debt moves only by principal paid, and the pool is fully used.
+        assert_close(opening - principal, closing);
+        assert_close(interest + principal + equity, 100.0);
+    }
+
+    // The same model evaluated again gives the same result, cell for cell.
+    // Elapsed time is the one field that differs between runs.
+    let comparable = |mut result: crate::evaluator::StatementResult| {
+        result.meta.eval_time_ms = None;
+        serde_json::to_value(&result).expect("serialize")
+    };
+    assert_eq!(comparable(result.clone()), comparable(evaluate()));
+}
+
+/// A loan issued on a period boundary belongs to the period it starts:
+/// nothing is outstanding before it, and its first coupon accrues from the
+/// boundary.
+#[test]
+fn a_loan_issued_on_a_period_boundary_starts_in_that_period() {
+    let mut loan = quarterly_loan();
+    loan.issue_date = date!(2025 - 04 - 01);
+    loan.maturity = date!(2026 - 04 - 01);
+    let result = evaluate_2025(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(loan),
+        WaterfallSpec::default(),
+        0.0,
+        &[],
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    assert_close(get("debt_balance", "2025Q1"), 0.0);
+    assert_close(get("interest_expense_cash", "2025Q1"), 0.0);
+    assert_close(get("opening_balance", "2025Q2"), 0.0);
+    assert_close(get("debt_balance", "2025Q2"), 100.0);
+    // The first coupon, for April to June, is paid on 1 July.
+    assert_close(get("interest_expense_cash", "2025Q2"), 0.0);
+    assert_close(get("interest_expense_cash", "2025Q3"), 2.0);
+    // The waterfall ran in the first quarter with no claim to pay.
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    assert_eq!(
+        cashflows.equity_distribution[&PeriodId::quarter(2025, 1).expect("quarter")],
+        usd(1_000.0)
+    );
+}
+
+/// The PIK metric is an input of the stage it decides: it may not read a
+/// same-period capital output, directly or through another node.
+#[test]
+fn a_pik_metric_may_not_read_this_periods_capital_outputs() {
+    let run = |metric: &str| {
+        let mut waterfall = pik_toggle(Decimal::ONE, 0);
+        waterfall
+            .pik_toggle
+            .as_mut()
+            .expect("toggle")
+            .liquidity_metric = metric.into();
+        evaluate_2025_configured(
+            "2025Q1..2025Q4",
+            FinancialStatementInstrument::TermLoan(quarterly_loan()),
+            waterfall,
+            &|_| 1_000.0,
+            &|_| 0.0,
+            &[],
+            &MarketContext::new(),
+            &|builder| {
+                builder
+                    .compute("interest_alias", "cs.interest_expense_cash.total")
+                    .expect("alias");
+            },
+        )
+    };
+    let error = run("interest_alias")
+        .expect_err("metric reads the stage output")
+        .to_string();
+    assert!(error.contains("pik_toggle.liquidity_metric"), "{error}");
+    assert!(error.contains("interest_alias"), "{error}");
+    // A prior period is committed; the first period has none, so the metric
+    // states its own fallback.
+    run("coalesce(lag(cs.interest_expense_cash.total, 1), 0)")
+        .expect("a prior period is committed");
 }

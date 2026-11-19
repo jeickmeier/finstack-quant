@@ -15,13 +15,13 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-type Instruments = IndexMap<String, Arc<dyn finstack_quant_valuations::instruments::Instrument>>;
+pub(super) type Instruments =
+    IndexMap<String, Arc<dyn finstack_quant_valuations::instruments::Instrument>>;
 type DynamicPeriodEvaluation = (
-    IndexMap<String, f64>,
-    Vec<Option<f64>>,
+    IndexMap<String, crate::evaluator::ResultCell>,
+    crate::evaluator::engine::PeriodRow,
     Vec<EvalWarning>,
     crate::capital_structure::CapitalStructureCashflows,
-    IndexMap<String, crate::evaluator::CellSource>,
 );
 
 /// Capital-structure inputs of [`Evaluator::evaluate_period_dynamic`].
@@ -49,6 +49,17 @@ impl Evaluator {
         let Some(cs_spec) = &model.capital_structure else {
             return Ok(None);
         };
+        // Once per run: the cash pool may not depend, through any chain of
+        // formulas and masks, on a same-period output of its own waterfall.
+        if let Some(waterfall) = &cs_spec.waterfall {
+            for (setting, expression) in waterfall.sizing_expressions() {
+                crate::capital_structure::reject_pool_output_dependence(
+                    &model.nodes,
+                    setting,
+                    expression,
+                )?;
+            }
+        }
         let mut instruments = Instruments::new();
 
         for debt_spec in &cs_spec.debt_instruments {
@@ -76,24 +87,39 @@ impl Evaluator {
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         >,
         cs: CapitalStructureRun<'_>,
-        mut mc: Option<(u64, &mut super::engine::McZCache)>,
+        mut mc: Option<(
+            crate::forecast::stream::PathId,
+            &mut super::engine::McZCache,
+        )>,
     ) -> Result<DynamicPeriodEvaluation> {
         let PeriodEval { model, period, .. } = eval;
         let CapitalStructureRun {
             market_ctx,
             as_of,
             instruments,
-            state: cs_state,
+            state: committed_state,
             affected_nodes: cs_affected_nodes,
         } = cs;
         let period_id = period.id;
+        // The period works on a staged copy of the debt state. It replaces
+        // the committed state only after the statement cells that read the
+        // final capital amounts have evaluated, so a period that fails
+        // anywhere leaves the state of the last committed period.
+        let mut staged_state = committed_state.clone();
+        let cs_state = &mut staged_state;
 
-        let (contractual_flows, mut contractual_warnings) =
-            compute_contractual_flows(instruments, cs_state, period, market_ctx, as_of)?;
+        let ContractualFlows {
+            flows: contractual_flows,
+            distress: distress_cash,
+        } = compute_contractual_flows(instruments, cs_state, period, market_ctx, as_of)?;
+        let mut waterfall_warnings = Vec::new();
 
         let fx_ctx = build_fx_context(model, market_ctx, period)?;
         let mut cs_cashflows = crate::capital_structure::CapitalStructureCashflows::new();
         merge_updated_flows(&mut cs_cashflows, &contractual_flows, period_id);
+        if !distress_cash.is_empty() {
+            cs_cashflows.distress_cash.insert(period_id, distress_cash);
+        }
         recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
 
         let mut context = EvaluationContext::new_with_history(
@@ -112,35 +138,50 @@ impl Evaluator {
         )?;
 
         let mut waterfall_replaced_flows = false;
-        if let Some(cs_spec) = &model.capital_structure {
-            if let Some(waterfall_spec) = &cs_spec.waterfall {
-                if let Some(node) = model.nodes.get(&crate::types::NodeId::new(
-                    &waterfall_spec.available_cash_node,
-                )) && let Some(formula) = &node.formula_text
-                {
-                    crate::capital_structure::reject_available_cash_debt_service(formula)?;
-                }
-                let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
-                    &context,
-                    waterfall_spec,
-                    cs_state,
-                    &contractual_flows,
-                )?;
+        if let Some(cs_spec) = &model.capital_structure
+            && let Some(waterfall_spec) = &cs_spec.waterfall
+        {
+            // The debt ledger and the schedules the owners rebuild from
+            // this period's principal changes live on the staged state, so
+            // they commit together or not at all.
+            let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
+                &context,
+                waterfall_spec,
+                cs_state,
+                &contractual_flows,
+                model.capital_structure_currency()?,
+            )?;
+            settle_postings(
+                cs_state,
+                instruments,
+                waterfall_spec.pik_toggle.as_ref(),
+                period,
+                (market_ctx, as_of),
+                PeriodChanges {
+                    postings: &waterfall_result.postings,
+                    pik_request: waterfall_result.pik_request,
+                },
+            )?;
 
-                merge_updated_flows(&mut cs_cashflows, &waterfall_result.flows, period_id);
-                recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
-                if let Some(equity) = waterfall_result.equity_distribution {
-                    cs_cashflows.equity_distribution.insert(period_id, equity);
-                }
-                if let Some(cash) = waterfall_result.available_cash {
-                    cs_cashflows.available_cash.insert(period_id, cash);
-                }
-                contractual_warnings.extend(waterfall_result.warnings);
-                context.set_capital_structure_cashflows(cs_cashflows);
-                waterfall_replaced_flows = true;
+            merge_updated_flows(&mut cs_cashflows, &waterfall_result.flows, period_id);
+            recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
+            if let Some(equity) = waterfall_result.equity_distribution {
+                cs_cashflows.equity_distribution.insert(period_id, equity);
             }
-            let from_date = crate::capital_structure::period_flows::period_snapshot_date(period);
-            cs_state.rebuild_residuals(from_date)?;
+            if !waterfall_result.prepayments.is_empty() {
+                cs_cashflows
+                    .prepayments
+                    .insert(period_id, waterfall_result.prepayments);
+            }
+            if let Some(retained) = waterfall_result.retained_cash {
+                cs_cashflows.retained_cash.insert(period_id, retained);
+            }
+            if let Some(cash) = waterfall_result.available_cash {
+                cs_cashflows.available_cash.insert(period_id, cash);
+            }
+            waterfall_warnings = waterfall_result.warnings;
+            context.set_capital_structure_cashflows(cs_cashflows);
+            waterfall_replaced_flows = true;
         }
 
         if waterfall_replaced_flows && !cs_affected_nodes.is_empty() {
@@ -157,17 +198,16 @@ impl Evaluator {
             .capital_structure_cashflows
             .take()
             .unwrap_or_default();
-        let row = context.current_values.clone();
-        let sources = context.cell_sources();
-        let (values, mut warnings) = context.into_results();
+        let (values, row, mut warnings) = context.into_results();
         // The second `evaluate_nodes_in_order` pass re-evaluates cs-affected
         // nodes into the same context, so node-level warnings (e.g.
         // DivisionByZero) can be pushed twice for the same node/period.
         // Deduplicate while preserving first-occurrence order.
         let mut seen: HashSet<String> = HashSet::with_capacity(warnings.len());
         warnings.retain(|w| seen.insert(format!("{w:?}")));
-        warnings.append(&mut contractual_warnings);
-        Ok((values, row, warnings, period_cs_cashflows, sources))
+        warnings.append(&mut waterfall_warnings);
+        *committed_state = staged_state;
+        Ok((values, row, warnings, period_cs_cashflows))
     }
 }
 
@@ -191,6 +231,218 @@ pub(crate) fn dependent_closure(
     visited
 }
 
+/// What one period's waterfall changed: its principal postings and the PIK
+/// toggle's request.
+struct PeriodChanges<'a> {
+    /// Net principal change per instrument, in exact money.
+    postings: &'a IndexMap<String, Money>,
+    /// `Some(true)` asks for PIK, `Some(false)` for the base coupon terms.
+    pik_request: Option<bool>,
+}
+
+/// Rebuild the schedule of every instrument whose principal the waterfall
+/// changed this period or whose coupon election the PIK toggle changed.
+///
+/// Each principal change is appended to the instrument's posting ledger,
+/// effective the day after the period close. In a forecast period the PIK
+/// toggle's request becomes a dated coupon election at the start of each
+/// authorized loan's next coupon period; an election lasts at least its
+/// minimum number of coupon periods, counted from the election dates, so a
+/// period evaluated again decides the same thing. The owner recompiles the
+/// schedule from the contract and both ledgers. A schedule is accepted only
+/// when the principal it carries into the next period equals the ledger's
+/// closing balance. `state` is the period's staged copy: on an error the
+/// caller discards it, so nothing here needs its own staging.
+fn settle_postings(
+    state: &mut crate::capital_structure::CapitalStructureState,
+    instruments: &Instruments,
+    pik_toggle: Option<&crate::capital_structure::PikToggleSpec>,
+    period: &Period,
+    (market_ctx, as_of): (
+        &finstack_quant_core::market_data::context::MarketContext,
+        Date,
+    ),
+    changes: PeriodChanges<'_>,
+) -> Result<()> {
+    use crate::capital_structure::period_flows::scheduled_opening_principal;
+    use finstack_quant_cashflows::builder::CouponType;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
+        CouponElection, PrincipalPosting,
+    };
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+    use rust_decimal::Decimal;
+
+    let find = |instrument_id: &str| {
+        instruments.get(instrument_id).ok_or_else(|| {
+            crate::error::Error::capital_structure(format!(
+                "'{instrument_id}' is not an instrument of the capital structure"
+            ))
+        })
+    };
+
+    let mut changed: indexmap::IndexSet<String> = indexmap::IndexSet::new();
+    for (instrument_id, delta) in changes.postings {
+        state
+            .postings
+            .entry(instrument_id.clone())
+            .or_default()
+            .push(PrincipalPosting {
+                effective_date: period.end,
+                delta: *delta,
+            });
+        changed.insert(instrument_id.clone());
+    }
+
+    if let (Some(pik), Some(request), false) = (pik_toggle, changes.pik_request, period.is_actual) {
+        for election in &pik.elections {
+            let instrument = find(&election.instrument_id)?;
+            let loan = instrument
+                .as_any()
+                .downcast_ref::<TermLoan>()
+                .ok_or_else(|| {
+                    crate::error::Error::capital_structure(format!(
+                        "`pik_toggle.elections` names '{}', which is not a term loan and has \
+                         no PIK coupon terms to elect",
+                        election.instrument_id
+                    ))
+                })?;
+            // The election takes effect at the start of the next coupon
+            // period; a loan with none left has nothing to elect.
+            let starts = loan.coupon_period_starts()?;
+            // Notice runs from the close of the period that observed the
+            // metric.
+            let earliest = period.end + time::Duration::days(i64::from(election.notice_days));
+            let Some(effective) = starts.iter().copied().find(|start| *start >= earliest) else {
+                continue;
+            };
+            let current = state
+                .coupon_elections
+                .get(&election.instrument_id)
+                .cloned()
+                .unwrap_or_default();
+            // Elections are made in period order, so nothing is dated after
+            // this one; deciding from the dates alone means a period
+            // evaluated again reaches the same decision.
+            let mut ledger: Vec<CouponElection> = current
+                .iter()
+                .copied()
+                .filter(|made| made.effective_date <= effective)
+                .collect();
+            // The loan's own dated toggles and the elections share one
+            // timeline of coupon terms; an election replaces a toggle of its
+            // date, as the schedule builder applies them.
+            let terms = |ledger: &[CouponElection]| -> Vec<(Date, CouponType)> {
+                let mut dated = std::collections::BTreeMap::new();
+                for toggle in loan
+                    .covenants
+                    .iter()
+                    .flat_map(|covenants| &covenants.pik_toggles)
+                    .filter(|toggle| toggle.date <= effective)
+                {
+                    dated.insert(
+                        toggle.date,
+                        if toggle.enable_pik {
+                            CouponType::Pik
+                        } else {
+                            CouponType::Cash
+                        },
+                    );
+                }
+                for made in ledger {
+                    dated.insert(made.effective_date, made.coupon_type);
+                }
+                dated.into_iter().collect()
+            };
+            // PIK is in force since the start of the latest run of terms
+            // other than the loan's base terms, whoever set them.
+            let in_pik_since = terms(&ledger)
+                .iter()
+                .rev()
+                .take_while(|(_, coupon_type)| *coupon_type != loan.coupon_type)
+                .last()
+                .map(|(date, _)| *date);
+            let elected = match (request, in_pik_since) {
+                (true, None) => Some(if election.pik_fraction == Decimal::ONE {
+                    CouponType::Pik
+                } else {
+                    CouponType::Split {
+                        cash_fraction: Decimal::ONE - election.pik_fraction,
+                        pik_fraction: election.pik_fraction,
+                    }
+                }),
+                // A PIK election ends only after its minimum number of
+                // coupon periods, counting the first elected one. With no
+                // minimum, one that has not started is simply withdrawn.
+                (false, Some(since)) => {
+                    let elapsed = starts
+                        .iter()
+                        .filter(|start| **start >= since && **start < effective)
+                        .count();
+                    (elapsed >= election.min_coupon_periods).then_some(loan.coupon_type)
+                }
+                _ => None,
+            };
+            if let Some(coupon_type) = elected {
+                // One election per coupon period: a later request replaces
+                // an election that has not started, and an election that
+                // restores the terms already in force is no election.
+                ledger.retain(|made| made.effective_date != effective);
+                let in_force = terms(&ledger)
+                    .iter()
+                    .rev()
+                    .find(|(date, _)| *date < effective)
+                    .map_or(loan.coupon_type, |(_, coupon_type)| *coupon_type);
+                if coupon_type != in_force {
+                    ledger.push(CouponElection {
+                        effective_date: effective,
+                        coupon_type,
+                    });
+                }
+            }
+            if ledger != current {
+                state
+                    .coupon_elections
+                    .insert(election.instrument_id.clone(), ledger);
+                changed.insert(election.instrument_id.clone());
+            }
+        }
+    }
+
+    for instrument_id in changed {
+        let instrument = find(&instrument_id)?;
+        let schedule = crate::capital_structure::residual_schedule::rebuild_from_postings(
+            instrument.as_ref(),
+            market_ctx,
+            as_of,
+            state
+                .postings
+                .get(&instrument_id)
+                .map_or(&[][..], Vec::as_slice),
+            state
+                .coupon_elections
+                .get(&instrument_id)
+                .map_or(&[][..], Vec::as_slice),
+        )?;
+        let carried = scheduled_opening_principal(&schedule, period.end)?;
+        let closing = state
+            .closing_balances
+            .get(&instrument_id)
+            .copied()
+            .unwrap_or(carried);
+        // Half a minor unit is the dust bound the ledger itself uses.
+        let bound = crate::capital_structure::period_flows::half_minor_unit(carried.currency());
+        if (carried.amount() - closing.amount()).abs() > bound {
+            return Err(crate::error::Error::capital_structure(format!(
+                "instrument '{instrument_id}', period {}: the rebuilt schedule carries {} into \
+                 the next period but the debt ledger closes at {}",
+                period.id, carried, closing
+            )));
+        }
+        state.residual_schedules.insert(instrument_id, schedule);
+    }
+    Ok(())
+}
+
 pub(crate) fn resolve_opening_balance(
     instrument: &(dyn finstack_quant_cashflows::CashflowProvider + Send + Sync),
     market_ctx: &finstack_quant_core::market_data::context::MarketContext,
@@ -198,49 +450,15 @@ pub(crate) fn resolve_opening_balance(
     period_start: Date,
 ) -> Result<Money> {
     let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
-    let outstanding_path = schedule.outstanding_by_date()?;
+    crate::capital_structure::period_flows::scheduled_opening_principal(&schedule, period_start)
+}
 
-    // Same half-open rule as `calculate_period_flows`: a coupon/amort dated
-    // exactly on `period_start` belongs to this period, so opening is the
-    // balance strictly before that date.
-    if let Some((_, m)) = outstanding_path.iter().rfind(|(d, _)| *d < period_start) {
-        return Ok(m.abs());
-    }
-
-    // Initial funding dated on the first period boundary belongs to that
-    // period. Its opening is zero: `calculate_period_flows` records the funding
-    // and the waterfall adds it at close. Bonds without an initial funding leg
-    // still use face value below.
-    let funding_at_start = schedule.get_meta().issue_date == Some(period_start)
-        && schedule.get_flows().iter().any(|flow| {
-            flow.get_balance_date() == Some(period_start)
-                && crate::capital_structure::period_flows::funding_principal(flow)
-                    .is_some_and(|principal| principal.amount() > 0.0)
-        });
-    if funding_at_start {
-        return Ok(Money::from((
-            0_i64,
-            schedule.get_notional().initial.currency(),
-        )));
-    }
-
-    // A forward-dated instrument has no opening principal before issuance,
-    // including a schedule that omits the issuance cash leg entirely.
-    let pre_issuance = schedule
-        .get_meta()
-        .issue_date
-        .is_some_and(|issue| issue > period_start);
-    if pre_issuance {
-        return Ok(Money::from((
-            0_i64,
-            schedule.get_notional().initial.currency(),
-        )));
-    }
-
-    // Before the first event, principal is the schedule's initial notional.
-    // The first path row is an after-event balance, so using it here would
-    // apply boundary amortization or even a future redemption too early.
-    Ok(schedule.get_notional().initial.abs())
+/// One period's contractual capital-structure reading.
+struct ContractualFlows {
+    /// Debt-service breakdown per instrument.
+    flows: IndexMap<String, crate::capital_structure::CashflowBreakdown>,
+    /// Distress cash rows of the period, outside debt service.
+    distress: Vec<crate::capital_structure::DistressCashflow>,
 }
 
 fn compute_contractual_flows(
@@ -249,58 +467,76 @@ fn compute_contractual_flows(
     period: &Period,
     market_ctx: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
-) -> Result<(
-    IndexMap<String, crate::capital_structure::CashflowBreakdown>,
-    Vec<EvalWarning>,
-)> {
-    use crate::capital_structure::period_flows::calculate_period_flows;
+) -> Result<ContractualFlows> {
+    use crate::capital_structure::period_flows::{
+        SuppliedSchedule, calculate_period_flows, is_debt_kind, period_distress_cash,
+    };
 
+    // The period is validated before any schedule is read.
+    crate::capital_structure::period_flows::validate_period(period)?;
     let mut flows = IndexMap::new();
-    let mut warnings = Vec::new();
+    let mut distress = Vec::new();
     for (instrument_id, instrument) in instruments {
-        let opening_balance =
-            if let Some(balance) = cs_state.opening_balances.get(instrument_id).copied() {
-                balance
-            } else {
-                let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
-                Money::from((0_i64, schedule.get_notional().initial.currency()))
-            };
-
-        if crate::capital_structure::period_flows::is_debt_kind(instrument.key())?
-            && !cs_state.residual_schedules.contains_key(instrument_id)
-        {
+        // The run seeds every opening balance and each period carries its
+        // close forward, so a missing one is a broken invariant.
+        let opening_balance = cs_state
+            .opening_balances
+            .get(instrument_id)
+            .copied()
+            .ok_or_else(|| {
+                crate::error::Error::capital_structure(format!(
+                    "instrument '{instrument_id}' has no opening balance in period {}",
+                    period.id
+                ))
+            })?;
+        let is_debt = is_debt_kind(instrument.key())?;
+        if is_debt && !cs_state.residual_schedules.contains_key(instrument_id) {
             let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
             cs_state
                 .residual_schedules
                 .insert(instrument_id.clone(), schedule);
         }
-        let residual = cs_state.residual_schedules.get(instrument_id.as_str());
-        let (breakdown, closing_balance, net_new_funding, period_warnings) =
-            calculate_period_flows(
-                instrument.as_ref(),
-                period,
-                opening_balance,
-                market_ctx,
-                as_of,
-                residual,
-            )?;
-        let principal_claims = residual.map(|schedule| {
+        // A residual schedule is rebuilt from the instrument's own rows and
+        // keeps their holder perspective.
+        let residual = cs_state
+            .residual_schedules
+            .get(instrument_id.as_str())
+            .map(SuppliedSchedule::holder);
+        let (breakdown, closing_balance, _) = calculate_period_flows(
+            instrument.as_ref(),
+            period,
+            opening_balance,
+            market_ctx,
+            as_of,
+            residual,
+        )?;
+        let raw;
+        let source = match residual {
+            Some(supplied) => supplied,
+            None => {
+                raw = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
+                SuppliedSchedule::holder(&raw)
+            }
+        };
+        distress.extend(period_distress_cash(
+            instrument_id.as_str(),
+            is_debt,
+            source,
+            period,
+        )?);
+        let residual = residual.map(|supplied| supplied.schedule);
+        // Every instrument has dated principal claims for the period: a
+        // borrowing's scheduled repayments, and none for a hedge, whose
+        // notional is not borrowed principal.
+        let principal_claims = residual.map_or_else(Vec::new, |schedule| {
             crate::capital_structure::period_flows::period_principal_claims(schedule, period)
         });
-        if let Some(claims) = principal_claims {
-            cs_state.set_period_principal_flows(instrument_id.clone(), period, claims)?;
-        }
-        warnings.extend(period_warnings);
+        cs_state.set_period_principal_flows(instrument_id.clone(), period, principal_claims)?;
 
-        flows.insert(instrument_id.to_string(), breakdown.clone());
+        flows.insert(instrument_id.to_string(), breakdown);
         cs_state.set_closing_balance(instrument_id.to_string(), closing_balance);
-        // Record the period's draws so the waterfall can recover the payable
-        // balance and draw-aware closing (overwritten each period).
-        cs_state
-            .period_new_funding
-            .insert(instrument_id.to_string(), net_new_funding);
     }
-    Ok((flows, warnings))
+    Ok(ContractualFlows { flows, distress })
 }
 
 /// Build the reporting-FX context for one period's `cs.*` totals.
@@ -333,7 +569,7 @@ fn build_fx_context<'a>(
 struct CsTotalsContext<'a> {
     reporting_currency: Option<finstack_quant_core::currency::Currency>,
     fx_matrix: Option<&'a std::sync::Arc<finstack_quant_core::money::fx::FxMatrix>>,
-    fx_policy: Option<finstack_quant_core::money::fx::FxConversionPolicy>,
+    fx_policy: Option<crate::types::CapitalFxPolicy>,
     snapshot_date: finstack_quant_core::dates::Date,
 }
 
@@ -342,7 +578,6 @@ fn recompute_cs_totals(
     period_id: PeriodId,
     fx_ctx: Option<&CsTotalsContext<'_>>,
 ) -> crate::error::Result<()> {
-    use crate::capital_structure::integration::convert_to_reporting;
     use finstack_quant_core::currency::Currency;
 
     let mut totals_by_currency: IndexMap<Currency, crate::capital_structure::CashflowBreakdown> =
@@ -378,17 +613,70 @@ fn recompute_cs_totals(
         return Ok(());
     }
 
-    if let Some(ctx) = fx_ctx
-        && let Some(rc) = ctx.reporting_currency
-    {
-        let mut converted_total = crate::capital_structure::CashflowBreakdown::with_currency(rc);
-        for breakdown in totals_by_currency.values() {
-            accumulate(&mut converted_total, breakdown, |money| {
-                convert_to_reporting(money, ctx.snapshot_date, rc, ctx.fx_matrix, ctx.fx_policy)
-            })?;
+    cashflows.fx_conversions.shift_remove(&period_id);
+    cashflows.consolidation_unavailable.shift_remove(&period_id);
+    let Some(ctx) = fx_ctx else {
+        return Ok(());
+    };
+    let Some(rc) = ctx.reporting_currency else {
+        // More than one native currency and no target currency: only the
+        // per-instrument and native-currency scopes exist.
+        let reason = if totals_by_currency.is_empty() {
+            "the capital structure has no instrument and no reporting currency is set"
+        } else {
+            "the instruments are in more than one currency and no reporting currency is set"
+        };
+        cashflows
+            .consolidation_unavailable
+            .insert(period_id, reason.to_string());
+        return Ok(());
+    };
+    cashflows.reporting_currency = Some(rc);
+
+    // One period-close rate per native currency. A missing quote leaves the
+    // consolidated scope unavailable; the native scopes are already stored.
+    let mut rates: IndexMap<Currency, f64> = IndexMap::new();
+    let mut records = Vec::new();
+    for &currency in totals_by_currency.keys() {
+        if currency == rc {
+            continue;
         }
-        cashflows.reporting_currency = Some(rc);
-        cashflows.totals.insert(period_id, converted_total);
+        if ctx.fx_policy.is_none() {
+            return Err(crate::error::Error::capital_structure(format!(
+                "Cannot convert {currency} to reporting currency {rc}: \
+                 capital_structure.fx_policy is not set. Choose `period_end` explicitly."
+            )));
+        }
+        match crate::capital_structure::integration::period_close_rate(
+            currency,
+            rc,
+            ctx.snapshot_date,
+            ctx.fx_matrix,
+        ) {
+            Ok(record) => {
+                rates.insert(currency, record.rate);
+                records.push(record);
+            }
+            Err(reason) => {
+                cashflows
+                    .consolidation_unavailable
+                    .insert(period_id, reason);
+                return Ok(());
+            }
+        }
+    }
+    let mut converted_total = crate::capital_structure::CashflowBreakdown::with_currency(rc);
+    for (currency, breakdown) in &totals_by_currency {
+        match rates.get(currency) {
+            None => accumulate(&mut converted_total, breakdown, Ok)?,
+            Some(&rate) => accumulate(&mut converted_total, breakdown, |money| {
+                Ok(Money::new(money.amount() * rate, rc)?)
+            })?,
+        }
+    }
+    cashflows.totals.insert(period_id, converted_total);
+    if !records.is_empty() {
+        cashflows.fx_conversions.insert(period_id, records);
     }
 
     Ok(())
@@ -625,7 +913,6 @@ mod fx_policy_tests {
     use crate::types::{CapitalStructureSpec, FinancialModelSpec};
     use finstack_quant_core::dates::{Date, Period, PeriodId};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::money::fx::FxConversionPolicy;
     use time::Month;
 
     #[test]
@@ -662,41 +949,283 @@ mod fx_policy_tests {
             ctx.fx_policy, None,
             "an omitted fx_policy is not replaced by PeriodEnd"
         );
+    }
+}
 
-        // A cross-currency conversion then fails instead of inferring a policy;
-        // same-currency amounts still pass through.
-        let fx = std::sync::Arc::new(finstack_quant_core::money::fx::FxMatrix::new(
-            std::sync::Arc::new(finstack_quant_core::money::fx::SimpleFxProvider::new()),
-            None,
-        ));
-        let eur = finstack_quant_core::money::Money::from((
-            100_i64,
-            finstack_quant_core::currency::Currency::EUR,
-        ));
-        let usd = finstack_quant_core::currency::Currency::USD;
-        let error = crate::capital_structure::integration::convert_to_reporting(
-            eur,
-            ctx.snapshot_date,
-            usd,
-            Some(&fx),
-            ctx.fx_policy,
+#[cfg(test)]
+mod election_tests {
+    use super::{Instruments, settle_postings};
+    use crate::capital_structure::{CapitalStructureState, PikElectionSpec, PikToggleSpec};
+    use finstack_quant_cashflows::builder::CouponType;
+    use finstack_quant_core::dates::{Date, Period, PeriodId};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+    use std::sync::Arc;
+    use time::macros::date;
+
+    /// An election's duration is counted from its dates, so settling a
+    /// period again, in any number of retries, counts each coupon period
+    /// once and reaches the same decision.
+    #[test]
+    fn a_period_settled_again_makes_the_same_election() {
+        // The example loan pays quarterly from 1 January 2024.
+        let mut loan = TermLoan::example().expect("term loan");
+        loan.id = "TL".into();
+        let mut instruments = Instruments::new();
+        instruments.insert("TL".into(), Arc::new(loan));
+        let toggle = PikToggleSpec {
+            liquidity_metric: "liquidity".into(),
+            threshold: 1.0,
+            elections: vec![PikElectionSpec {
+                instrument_id: "TL".into(),
+                pik_fraction: rust_decimal::Decimal::ONE,
+                min_coupon_periods: 2,
+                notice_days: 0,
+            }],
+        };
+        let market = MarketContext::new();
+        let mut state = CapitalStructureState::new();
+        let mut settle = |quarter: u8, start: Date, end: Date, request: bool| {
+            let period = Period {
+                id: PeriodId::quarter(2024, quarter).expect("quarter"),
+                start,
+                end,
+                is_actual: false,
+            };
+            for _ in 0..3 {
+                settle_postings(
+                    &mut state,
+                    &instruments,
+                    Some(&toggle),
+                    &period,
+                    (&market, date!(2024 - 01 - 01)),
+                    super::PeriodChanges {
+                        postings: &indexmap::IndexMap::new(),
+                        pik_request: Some(request),
+                    },
+                )
+                .expect("settlement");
+            }
+            state
+                .coupon_elections
+                .get("TL")
+                .map(|ledger| {
+                    ledger
+                        .iter()
+                        .map(|made| (made.effective_date, made.coupon_type))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        };
+        let pik = (date!(2024 - 04 - 01), CouponType::Pik);
+        // A request for PIK in the first quarter covers periods from 1 April.
+        assert_eq!(
+            settle(1, date!(2024 - 01 - 01), date!(2024 - 04 - 01), true),
+            vec![pik]
+        );
+        // One coupon period has run by 1 July: the minimum of two holds.
+        assert_eq!(
+            settle(2, date!(2024 - 04 - 01), date!(2024 - 07 - 01), false),
+            vec![pik]
+        );
+        // Two have run by 1 October: the election ends there.
+        assert_eq!(
+            settle(3, date!(2024 - 07 - 01), date!(2024 - 10 - 01), false),
+            vec![pik, (date!(2024 - 10 - 01), CouponType::Cash)]
+        );
+    }
+}
+
+#[cfg(test)]
+mod consolidation_tests {
+    use super::{CsTotalsContext, recompute_cs_totals};
+    use crate::capital_structure::{
+        CapitalStructureCashflows, CashflowBreakdown, CsComponent, CsScope,
+    };
+    use crate::types::CapitalFxPolicy;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+    use std::sync::Arc;
+    use time::macros::date;
+
+    fn money(amount: i64, currency: Currency) -> Money {
+        Money::from((amount, currency))
+    }
+
+    /// EUR 40 of scheduled and EUR 10 of sweep principal on one loan, USD 20
+    /// of scheduled principal on another.
+    fn two_currency_period(period: PeriodId) -> CapitalStructureCashflows {
+        let mut cashflows = CapitalStructureCashflows::new();
+        let mut euro = CashflowBreakdown::with_currency(Currency::EUR);
+        euro.principal_payment = money(50, Currency::EUR);
+        euro.scheduled_principal = Some(money(40, Currency::EUR));
+        euro.sweep_prepayment = Some(money(10, Currency::EUR));
+        let mut dollar = CashflowBreakdown::with_currency(Currency::USD);
+        dollar.principal_payment = money(20, Currency::USD);
+        dollar.scheduled_principal = Some(money(20, Currency::USD));
+        dollar.sweep_prepayment = Some(money(0, Currency::USD));
+        for (id, breakdown) in [("EUR-TL", euro), ("USD-TL", dollar)] {
+            cashflows
+                .by_instrument
+                .entry(id.into())
+                .or_default()
+                .insert(period, breakdown);
+        }
+        cashflows
+    }
+
+    fn matrix(quotes: &[(Currency, Currency, f64)]) -> Arc<FxMatrix> {
+        let provider = SimpleFxProvider::new();
+        provider.set_quotes(quotes).expect("quotes");
+        Arc::new(FxMatrix::new(Arc::new(provider), None))
+    }
+
+    /// The record's example: at USD 1.20 per EUR the structure consolidates
+    /// to USD 80 of principal, USD 68 scheduled and USD 12 of sweep, and the
+    /// conversion is retained with its pair, rate, date and source.
+    #[test]
+    fn native_totals_consolidate_at_the_period_close_rate() {
+        let period = PeriodId::quarter(2025, 1).expect("quarter");
+        let close = date!(2025 - 03 - 31);
+        let fx = matrix(&[(Currency::EUR, Currency::USD, 1.2)]);
+        let mut cashflows = two_currency_period(period);
+        recompute_cs_totals(
+            &mut cashflows,
+            period,
+            Some(&CsTotalsContext {
+                reporting_currency: Some(Currency::USD),
+                fx_matrix: Some(&fx),
+                fx_policy: Some(CapitalFxPolicy::PeriodEnd),
+                snapshot_date: close,
+            }),
         )
-        .expect_err("no policy for a cross-currency conversion");
-        assert!(
-            error.to_string().contains("fx_policy is not set"),
-            "{error}"
+        .expect("consolidation");
+
+        let read = |component, scope: CsScope| {
+            cashflows
+                .get_money(component, &scope, &period)
+                .expect("reported amount")
+        };
+        // Per-instrument and native-currency scopes are in their own currency.
+        assert_eq!(
+            read(
+                CsComponent::PrincipalPayment,
+                CsScope::Instrument("EUR-TL".into())
+            ),
+            money(50, Currency::EUR)
         );
         assert_eq!(
-            crate::capital_structure::integration::convert_to_reporting(
-                eur,
-                ctx.snapshot_date,
-                finstack_quant_core::currency::Currency::EUR,
-                Some(&fx),
-                ctx.fx_policy,
-            )
-            .expect("same currency"),
-            eur
+            read(
+                CsComponent::SweepPrepayment,
+                CsScope::NativeTotal(Currency::EUR)
+            ),
+            money(10, Currency::EUR)
         );
-        let _ = FxConversionPolicy::PeriodEnd;
+        assert_eq!(
+            read(
+                CsComponent::PrincipalPayment,
+                CsScope::NativeTotal(Currency::USD)
+            ),
+            money(20, Currency::USD)
+        );
+        // The consolidated scope reconciles: 68 + 12 = 80.
+        assert_eq!(
+            read(CsComponent::PrincipalPayment, CsScope::Consolidated),
+            money(80, Currency::USD)
+        );
+        assert_eq!(
+            read(CsComponent::ScheduledPrincipal, CsScope::Consolidated),
+            money(68, Currency::USD)
+        );
+        assert_eq!(
+            read(CsComponent::SweepPrepayment, CsScope::Consolidated),
+            money(12, Currency::USD)
+        );
+        // A component no breakdown recorded is unknown, not zero.
+        assert!(
+            cashflows
+                .get_money(
+                    CsComponent::MandatoryPrepayment,
+                    &CsScope::Consolidated,
+                    &period
+                )
+                .is_err()
+        );
+        let records = &cashflows.fx_conversions[&period];
+        assert_eq!(records.len(), 1);
+        assert_eq!(
+            (
+                records[0].from,
+                records[0].to,
+                records[0].rate,
+                records[0].date
+            ),
+            (Currency::EUR, Currency::USD, 1.2, close)
+        );
+        assert_eq!(records[0].source, "direct");
+        assert!(cashflows.consolidation_unavailable.is_empty());
+    }
+
+    /// A missing quote leaves the consolidated scope unavailable, with the
+    /// reason, while the native scopes are reported as usual.
+    #[test]
+    fn a_missing_quote_makes_only_the_consolidated_scope_unavailable() {
+        let period = PeriodId::quarter(2025, 1).expect("quarter");
+        let fx = matrix(&[(Currency::GBP, Currency::USD, 1.3)]);
+        let mut cashflows = two_currency_period(period);
+        recompute_cs_totals(
+            &mut cashflows,
+            period,
+            Some(&CsTotalsContext {
+                reporting_currency: Some(Currency::USD),
+                fx_matrix: Some(&fx),
+                fx_policy: Some(CapitalFxPolicy::PeriodEnd),
+                snapshot_date: date!(2025 - 03 - 31),
+            }),
+        )
+        .expect("native totals still form");
+        assert!(cashflows.totals.is_empty());
+        assert!(cashflows.fx_conversions.is_empty());
+        assert_eq!(cashflows.reporting_currency, Some(Currency::USD));
+        let reason = &cashflows.consolidation_unavailable[&period];
+        assert!(reason.contains("EUR/USD"), "{reason}");
+        let error = cashflows
+            .get_money(
+                CsComponent::PrincipalPayment,
+                &CsScope::Consolidated,
+                &period,
+            )
+            .expect_err("unavailable consolidated total")
+            .to_string();
+        assert!(error.contains("unavailable"), "{error}");
+        assert_eq!(
+            cashflows
+                .get_money(
+                    CsComponent::PrincipalPayment,
+                    &CsScope::NativeTotal(Currency::EUR),
+                    &period
+                )
+                .expect("native total"),
+            money(50, Currency::EUR)
+        );
+
+        // Without an explicit policy a cross-currency consolidation is an
+        // error, never a default.
+        let mut cashflows = two_currency_period(period);
+        let error = recompute_cs_totals(
+            &mut cashflows,
+            period,
+            Some(&CsTotalsContext {
+                reporting_currency: Some(Currency::USD),
+                fx_matrix: Some(&fx),
+                fx_policy: None,
+                snapshot_date: date!(2025 - 03 - 31),
+            }),
+        )
+        .expect_err("no policy")
+        .to_string();
+        assert!(error.contains("fx_policy is not set"), "{error}");
     }
 }

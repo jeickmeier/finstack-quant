@@ -41,54 +41,66 @@ def _mixed_result() -> StatementResult:
     mixed.formula("123")
     builder = mixed.build()
     builder.compute("masked", "42")
-    builder.where_clause("0")
+    builder.where_clause("masked", "1 == 0")
     return Evaluator().evaluate(builder.build())
 
 
-def test_node_sources_report_value_formula_forecast_and_where_mask() -> None:
+def test_cells_report_status_source_and_value() -> None:
     result = _mixed_result()
-    sources = result.node_sources
+    cells = result.cells
 
-    assert sources["revenue"] == {Q1: "value", Q2: "formula", Q3: "forecast"}
-    assert sources["masked"] == {Q1: "where_masked", Q2: "where_masked", Q3: "where_masked"}
+    assert {period: cell["source"] for period, cell in cells["revenue"].items()} == {
+        Q1: "value",
+        Q2: "formula",
+        Q3: "forecast",
+    }
+    assert cells["masked"] == {Q1: {"status": "masked"}, Q2: {"status": "masked"}, Q3: {"status": "masked"}}
     assert result.get("revenue", Q1) == 100.0
     assert result.get("revenue", Q2) == 123.0
-    assert result.get("masked", Q1) == 0.0
+    assert result.get("masked", Q1) is None, "a masked cell has no value"
+    assert result.get_cell("masked", Q1) == {"status": "masked"}
 
 
-def test_node_sources_cover_every_cell_and_round_trip() -> None:
+def test_cells_cover_every_period_and_round_trip() -> None:
     result = _mixed_result()
     document = json.loads(result.to_json())
 
-    assert set(document["node_sources"]) == set(document["nodes"])
-    for node_id, values in document["nodes"].items():
-        assert list(document["node_sources"][node_id]) == list(values)
-    assert StatementResult.from_json(result.to_json()).node_sources == result.node_sources
+    for cells in document["cells"].values():
+        assert list(cells) == [Q1, Q2, Q3]
+    assert StatementResult.from_json(result.to_json()).cells == result.cells
+    assert result.provenance["model_id"] == document["provenance"]["model_id"]
+    assert result.provenance["observation_cutoff"] == "full_snapshot"
 
 
-def test_long_dataframe_carries_the_source_column() -> None:
+def test_long_dataframe_carries_status_reason_and_source() -> None:
     frame = _mixed_result().to_dataframe("long")
 
     assert list(frame.columns) == [
         "node_id",
         "period",
+        "status",
         "value",
-        "value_money",
+        "amount",
         "currency",
         "value_type",
+        "reason",
         "source",
     ]
     revenue = frame[frame["node_id"] == "revenue"].set_index("period")["source"]
     assert revenue.to_dict() == {Q1: "value", Q2: "formula", Q3: "forecast"}
+    masked = frame[frame["node_id"] == "masked"]
+    assert masked["status"].tolist() == ["masked"] * 3
+    assert masked["value"].isna().all()
 
 
-def test_result_without_recorded_sources_exports_null_source() -> None:
+def test_hand_built_result_exports_null_source() -> None:
     document = json.loads(_mixed_result().to_json())
-    del document["node_sources"]
-    legacy = StatementResult.from_json(json.dumps(document))
+    for cells in document["cells"].values():
+        for cell in cells.values():
+            cell.pop("source", None)
+    hand_built = StatementResult.from_json(json.dumps(document))
 
-    assert legacy.node_sources == {}
-    assert legacy.to_dataframe("long")["source"].isna().all()
+    assert hand_built.to_dataframe("long")["source"].isna().all()
 
 
 def _balance_sheet_report() -> CheckReport:
@@ -130,17 +142,19 @@ def test_failed_finding_reports_actual_expected_and_tolerance() -> None:
         "period": Q1,
         "actual": 1000.0,
         "expected": 900.0,
-        "tolerance": 0.01,
+        "difference": 100.0,
+        "tolerance": 0.0,
     }
     # The numbers reconcile with the reported materiality and the verdict.
-    difference = abs(comparison["actual"] - comparison["expected"])
+    difference = abs(comparison["difference"])
+    assert difference == abs(comparison["actual"] - comparison["expected"])
     assert difference == finding.materiality_absolute
     assert difference > comparison["tolerance"]
 
     row = report.to_findings_dataframe().iloc[0]
     assert row["comparison_actual"] == 1000.0
     assert row["comparison_expected"] == 900.0
-    assert row["comparison_tolerance"] == 0.01
+    assert row["comparison_tolerance"] == 0.0
 
 
 def test_comparisons_dataframe_lists_passing_periods_too() -> None:
@@ -156,6 +170,7 @@ def test_comparisons_dataframe_lists_passing_periods_too() -> None:
         "expected",
         "difference",
         "tolerance",
+        "currency",
         "within_tolerance",
     ]
     by_period = frame.set_index("period")
@@ -170,8 +185,18 @@ def test_comparisons_dataframe_lists_passing_periods_too() -> None:
 def test_report_without_comparisons_yields_typed_empty_frame() -> None:
     report = CheckReport.from_json(
         json.dumps({
+            "outcome": "unevaluated",
             "results": [],
-            "summary": {"total_checks": 0, "passed": 0, "failed": 0, "errors": 0, "warnings": 0, "infos": 0},
+            "summary": {
+                "total_checks": 0,
+                "passed": 0,
+                "failed": 0,
+                "incomplete": 0,
+                "unevaluated": 0,
+                "errors": 0,
+                "warnings": 0,
+                "infos": 0,
+            },
         })
     )
     frame = report.to_comparisons_dataframe()
@@ -213,7 +238,7 @@ def _cashflows(*, with_detail: bool) -> CapitalStructureCashflows:
 
 def test_principal_sources_sum_to_principal_payment() -> None:
     frame = _cashflows(with_detail=True).to_dataframe()
-    amounts = frame.set_index("flow_type")["amount"]
+    amounts = frame.set_index("flow_type")["value"]
 
     sources = ["scheduled_principal", "mandatory_prepayment", "sweep_prepayment", "voluntary_prepayment"]
     assert amounts[sources].sum() == amounts["principal_payment"] == 465.0
@@ -222,7 +247,7 @@ def test_principal_sources_sum_to_principal_payment() -> None:
 
 def test_available_cash_reconciles_the_period_uses() -> None:
     cashflows = _cashflows(with_detail=True)
-    amounts = cashflows.to_dataframe().set_index("flow_type")["amount"]
+    amounts = cashflows.to_dataframe().set_index("flow_type")["value"]
     available = cashflows.available_cash[Q1]
     equity = cashflows.equity_distribution[Q1]
 

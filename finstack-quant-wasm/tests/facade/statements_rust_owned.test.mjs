@@ -77,6 +77,11 @@ function lboModel() {
         node_type: 'value',
         values: series([300, 300, 300, 300, 200]),
       },
+      equity: {
+        node_id: 'equity',
+        node_type: 'value',
+        values: series([-200, -200, -200, -200, -80]),
+      },
     },
   };
 }
@@ -96,9 +101,9 @@ const LBO_CHECK_MAPPINGS = {
   three_statement: {
     assets_nodes: ['ebitda'],
     liabilities_nodes: ['net_debt'],
-    equity_nodes: ['ebitda'],
+    equity_nodes: ['equity'],
     cash_node: 'net_debt',
-    retained_earnings_node: 'ebitda',
+    retained_earnings_node: 'equity',
     net_income_node: 'ebitda',
   },
   credit: { debt_node: 'net_debt', ebitda_node: 'ebitda', interest_expense_node: 'ebitda' },
@@ -144,7 +149,8 @@ test('goalSeek returns the Rust GoalSeekResult with the model as an object', () 
   assert.ok(Math.abs(updated.model.nodes.revenue.values['2025Q1'] - 120) < 1e-6);
   // The updated model chains straight back into another call.
   assert.ok(
-    Math.abs(new statements.Evaluator().evaluate(updated.model).nodes.profit['2025Q1'] - 60) < 1e-6
+    Math.abs(new statements.Evaluator().evaluate(updated.model).cells.profit['2025Q1'].value - 60) <
+      1e-6
   );
 
   const bare = sa.goalSeek(
@@ -257,14 +263,19 @@ test('capital-structure validators run the Rust validate()', () => {
   const invertedWaterfall = {
     priority_of_payments: ['fees', 'interest', 'amortization', 'equity', 'sweep'],
     available_cash_node: 'cash',
-    ecf_sweep: { ebitda_node: 'cash', sweep_percentage: 0.5 },
+    ecf_sweep: { cash_measure: 'cash', sweep_percentage: 0.5, facilities: 'all_eligible' },
   };
   assert.throws(
     () => statements.validateCapitalStructureSpecJson({ waterfall: invertedWaterfall }),
     (e) => e.kind === 'validation' && /last entry/.test(e.message)
   );
   assert.throws(
-    () => statements.validateEcfSweepSpecJson({ ebitda_node: 'ebitda', sweep_percentage: 5.0 }),
+    () =>
+      statements.validateEcfSweepSpecJson({
+        cash_measure: 'ebitda',
+        sweep_percentage: 5.0,
+        facilities: 'all_eligible',
+      }),
     (e) => e.kind === 'validation' && /sweep_percentage/.test(e.message)
   );
   assert.throws(
@@ -272,12 +283,16 @@ test('capital-structure validators run the Rust validate()', () => {
       statements.validatePikToggleSpecJson({
         liquidity_metric: 'cash',
         threshold: 1.0,
-        target_instrument_ids: [],
+        elections: [],
       }),
-    (e) => e.kind === 'validation' && /target_instrument_ids/.test(e.message)
+    (e) => e.kind === 'validation' && /elections/.test(e.message)
   );
   const ok = JSON.parse(
-    statements.validateEcfSweepSpecJson({ ebitda_node: 'ebitda', sweep_percentage: 0.5 })
+    statements.validateEcfSweepSpecJson({
+      cash_measure: 'ebitda',
+      sweep_percentage: 0.5,
+      facilities: 'all_eligible',
+    })
   );
   assert.equal(ok.sweep_percentage, 0.5);
 });
@@ -312,8 +327,12 @@ test('non-finite forecast and explanation values are JavaScript numbers', () => 
   const results = new statements.Evaluator().evaluate(model);
   const explanation = sa.explainFormula(model, JSON.stringify(results), 'lagged', '2025Q1');
   assert.ok(Number.isNaN(explanation.final_value));
-  // The statement result itself keeps the JSON sentinel for its nested node map.
-  assert.equal(results.nodes.lagged['2025Q1'], 'nan');
+  // The statement result states the cell as unavailable instead of a number.
+  assert.deepEqual(results.cells.lagged['2025Q1'], {
+    status: 'unavailable',
+    reason: 'missing_input',
+    source: 'formula',
+  });
 });
 
 test('mappings and variance config reject unknown keys', () => {
@@ -362,20 +381,33 @@ test('evaluateScenarioSet returns the ScenarioResults map', () => {
     scenarios: { base: {}, up: { overrides: { revenue: 200 } } },
   });
   assert.deepEqual(Object.keys(out), ['base', 'up']);
-  assert.equal(out.up.nodes.profit['2025Q1'], 100);
+  assert.equal(out.up.cells.profit['2025Q1'].value, 100);
 });
 
-test('PIK target lists are required and nonempty', () => {
-  for (const targets of [undefined, null, []]) {
+test('PIK elections are required and nonempty', () => {
+  for (const elections of [undefined, null, []]) {
     const spec = { liquidity_metric: 'cash', threshold: 1 };
-    if (targets !== undefined) spec.target_instrument_ids = targets;
+    if (elections !== undefined) spec.elections = elections;
     assert.throws(
       () => statements.validatePikToggleSpecJson(spec),
       (e) => e.kind === 'validation'
     );
   }
-  const spec = { liquidity_metric: 'cash', threshold: 1, target_instrument_ids: ['TL'] };
-  assert.deepEqual(JSON.parse(statements.validatePikToggleSpecJson(spec)).target_instrument_ids, [
-    'TL',
+  assert.throws(
+    () =>
+      statements.validatePikToggleSpecJson({
+        liquidity_metric: 'cash',
+        threshold: 1,
+        elections: [{ instrument_id: 'TL', pik_fraction: '1.5' }],
+      }),
+    (e) => e.kind === 'validation' && /pik_fraction/.test(e.message)
+  );
+  const spec = {
+    liquidity_metric: 'cash',
+    threshold: 1,
+    elections: [{ instrument_id: 'TL', pik_fraction: '0.4' }],
+  };
+  assert.deepEqual(JSON.parse(statements.validatePikToggleSpecJson(spec)).elections, [
+    { instrument_id: 'TL', pik_fraction: '0.4', notice_days: 0, min_coupon_periods: 0 },
   ]);
 });

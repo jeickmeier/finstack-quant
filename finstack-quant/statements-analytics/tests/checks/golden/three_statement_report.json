@@ -1,15 +1,17 @@
 {
+  "outcome": "fail",
   "results": [
     {
       "check_id": "balance_sheet_articulation",
       "check_name": "Balance Sheet Articulation",
       "category": "accounting_identity",
-      "passed": false,
+      "outcome": "fail",
+      "evaluated": 4,
       "findings": [
         {
           "check_id": "balance_sheet_articulation",
           "severity": "error",
-          "message": "Balance sheet does not articulate in 2025Q4: assets (1150.00) != liabilities (690.00) + equity (455.00), imbalance = 5.00",
+          "message": "Balance sheet does not articulate in 2025Q4: assets (1150.00) != liabilities + equity (1145.00), difference = 5.00",
           "period": "2025Q4",
           "materiality": {
             "absolute": 5.0,
@@ -27,7 +29,8 @@
             "period": "2025Q4",
             "actual": 1150.0,
             "expected": 1145.0,
-            "tolerance": 0.01
+            "difference": 5.0,
+            "tolerance": 0.0
           }
         }
       ],
@@ -37,28 +40,32 @@
           "period": "2025Q1",
           "actual": 1000.0,
           "expected": 1000.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         },
         {
           "identity": "balance_sheet_articulation",
           "period": "2025Q2",
           "actual": 1050.0,
           "expected": 1050.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         },
         {
           "identity": "balance_sheet_articulation",
           "period": "2025Q3",
           "actual": 1100.0,
           "expected": 1100.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         },
         {
           "identity": "balance_sheet_articulation",
           "period": "2025Q4",
           "actual": 1150.0,
           "expected": 1145.0,
-          "tolerance": 0.01
+          "difference": 5.0,
+          "tolerance": 0.0
         }
       ]
     },
@@ -66,29 +73,41 @@
       "check_id": "retained_earnings_reconciliation",
       "check_name": "Retained Earnings Reconciliation",
       "category": "accounting_identity",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 4,
       "findings": [],
       "comparisons": [
+        {
+          "identity": "retained_earnings_roll_forward",
+          "period": "2025Q1",
+          "actual": 200.0,
+          "expected": 200.0,
+          "difference": 0.0,
+          "tolerance": 0.0
+        },
         {
           "identity": "retained_earnings_roll_forward",
           "period": "2025Q2",
           "actual": 220.0,
           "expected": 220.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         },
         {
           "identity": "retained_earnings_roll_forward",
           "period": "2025Q3",
           "actual": 240.0,
           "expected": 240.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         },
         {
           "identity": "retained_earnings_roll_forward",
           "period": "2025Q4",
           "actual": 255.0,
           "expected": 255.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         }
       ]
     },
@@ -96,29 +115,41 @@
       "check_id": "cash_reconciliation",
       "check_name": "Cash Reconciliation",
       "category": "accounting_identity",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 4,
       "findings": [],
       "comparisons": [
+        {
+          "identity": "cash_roll_forward",
+          "period": "2025Q1",
+          "actual": 100.0,
+          "expected": 100.0,
+          "difference": 0.0,
+          "tolerance": 0.0
+        },
         {
           "identity": "cash_roll_forward",
           "period": "2025Q2",
           "actual": 120.0,
           "expected": 120.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         },
         {
           "identity": "cash_roll_forward",
           "period": "2025Q3",
           "actual": 135.0,
           "expected": 135.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         },
         {
           "identity": "cash_roll_forward",
           "period": "2025Q4",
           "actual": 150.0,
           "expected": 150.0,
-          "tolerance": 0.01
+          "difference": 0.0,
+          "tolerance": 0.0
         }
       ]
     },
@@ -126,35 +157,40 @@
       "check_id": "growth_rate_consistency",
       "check_name": "Growth Rate Consistency",
       "category": "internal_consistency",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 4,
       "findings": []
     },
     {
       "check_id": "non_finite",
       "check_name": "Non-Finite Value",
       "category": "data_quality",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 32,
       "findings": []
     },
     {
       "check_id": "missing_value",
       "check_name": "Missing Value",
       "category": "data_quality",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 12,
       "findings": []
     },
     {
-      "check_id": "non_finite",
-      "check_name": "Non-Finite Value",
+      "check_id": "credit_inputs_non_finite",
+      "check_name": "Credit Inputs Non-Finite",
       "category": "data_quality",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 12,
       "findings": []
     },
     {
       "check_id": "leverage_range",
       "check_name": "Leverage Range",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 4,
       "findings": [
         {
           "check_id": "leverage_range",
@@ -163,7 +199,7 @@
           "period": "2025Q4",
           "materiality": {
             "absolute": 7.0,
-            "relative_pct": 0.0,
+            "relative_pct": null,
             "reference_value": 317.0,
             "reference_label": "ttm_ebitda"
           },
@@ -178,24 +214,27 @@
       "check_id": "coverage_floor",
       "check_name": "Coverage Floor",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 4,
       "findings": []
     },
     {
-      "check_id": "trend",
+      "check_id": "trend_ebitda",
       "check_name": "Trend",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 4,
       "findings": []
     },
     {
-      "check_id": "trend",
+      "check_id": "trend_total_debt",
       "check_name": "Trend",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 4,
       "findings": [
         {
-          "check_id": "trend",
+          "check_id": "trend_total_debt",
           "severity": "warning",
           "message": "'total_debt' deteriorating for 3 consecutive periods as of 2025Q4 (current = 2219.00)",
           "period": "2025Q4",
@@ -210,6 +249,8 @@
     "total_checks": 11,
     "passed": 10,
     "failed": 1,
+    "incomplete": 0,
+    "unevaluated": 0,
     "errors": 1,
     "warnings": 2,
     "infos": 0

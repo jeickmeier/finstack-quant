@@ -53,12 +53,13 @@ class Registry:
         """
         Load the library's built-in statement metrics into this registry.
 
-        Existing entries with the same names are replaced by the built-in
-        definitions.
+        The whole catalogue is registered atomically: if any built-in
+        identifier is already registered, nothing is added.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If a built-in identifier is already registered.
         """
         ...
 
@@ -144,7 +145,12 @@ class Registry:
         ...
 
     def get_dependencies(self, qualified_id: str) -> list[str]:
-        """List transitive registry dependencies in construction order.
+        """List a metric's dependency closure in import order.
+
+        The closure follows the references pinned when each metric was
+        registered: unqualified references in the metric's own namespace,
+        exact qualified references in any namespace, and historical
+        references such as ``lag``.
 
         Parameters
         ----------
@@ -271,7 +277,7 @@ class MetricDefinition:
         ``"formula"`` recomputes the metric from the rolled-up inputs (ratios
         and multiples), ``"period_end"`` takes the last source period and
         ``"sum"`` adds the source periods. ``None`` means the metric declares
-        nothing and follows the rollup default, which sums.
+        nothing and needs a method in the rollup request.
 
         Returns
         -------

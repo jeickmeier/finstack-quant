@@ -2,7 +2,8 @@
   "name": "Acme quarterly review",
   "builtin_checks": [
     {
-      "type": "non_finite"
+      "type": "non_finite",
+      "nodes": "all"
     }
   ],
   "formula_checks": [
@@ -11,6 +12,8 @@
       "name": "Gross leverage <= 3.50x",
       "category": "credit_reasonableness",
       "severity": "error",
+      "mode": "predicate",
+      "scope": "all_periods",
       "formula": "leverage <= 3.5",
       "message_template": "Leverage above 3.50x in {period}",
       "tolerance": null
@@ -20,6 +23,8 @@
       "name": "Interest coverage >= 3.00x",
       "category": "credit_reasonableness",
       "severity": "error",
+      "mode": "predicate",
+      "scope": "all_periods",
       "formula": "interest_coverage >= 3.0",
       "message_template": "Coverage below 3.00x in {period}",
       "tolerance": null
@@ -29,6 +34,8 @@
       "name": "Gross margin between 55% and 75%",
       "category": "internal_consistency",
       "severity": "warning",
+      "mode": "predicate",
+      "scope": "all_periods",
       "formula": "gross_margin_pct > 0.55 and gross_margin_pct < 0.75",
       "message_template": "Gross margin outside band in {period}",
       "tolerance": null
@@ -38,6 +45,8 @@
       "name": "Free cash flow positive",
       "category": "credit_reasonableness",
       "severity": "warning",
+      "mode": "predicate",
+      "scope": "all_periods",
       "formula": "free_cash_flow > 0 * free_cash_flow",
       "message_template": "Negative free cash flow in {period}",
       "tolerance": null
@@ -47,7 +56,9 @@
       "name": "Opening + draws - repayments = closing",
       "category": "accounting_identity",
       "severity": "error",
-      "formula": "debt_opening + debt_draws - debt_repayments == total_debt",
+      "mode": "residual",
+      "scope": "all_periods",
+      "formula": "debt_opening + debt_draws - debt_repayments - total_debt",
       "message_template": "Debt corkscrew does not tie in {period}",
       "tolerance": 1
     }

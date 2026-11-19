@@ -1,13 +1,9 @@
 //! Capital Structure Integration Logic
 //!
-//! Aggregation driver that walks every instrument in a
-//! [`crate::types::CapitalStructureSpec`], pulls per-instrument cashflows via
-//! [`finstack_quant_valuations::instruments::Instrument`], classifies them using
-//! `CFKind` and the declared instrument kind into
-//! the [`CashflowBreakdown`] buckets, and rolls them into per-period totals
-//! both per-currency and (when FX is available) in the reporting currency.
-//!
-//! The single-instrument / single-period extraction lives in
+//! Builds the typed instruments of a [`crate::types::CapitalStructureSpec`].
+//! Period aggregation and consolidation run in the evaluator's
+//! capital-structure runtime; the single-instrument / single-period
+//! extraction lives in
 //! [`crate::capital_structure::period_flows`]. The optional JSON-spec →
 //! instrument constructor `build_instrument_from_spec()` resolves the typed
 //! instrument payload through the valuations registry.
@@ -47,48 +43,40 @@ pub fn build_instrument_from_spec(
     })
 }
 
-/// Convert a money amount into the reporting currency `rc`.
+/// The period-close FX rate from `from` into the reporting currency `to`.
 ///
-/// Same-currency amounts are returned unchanged. A cross-currency conversion
-/// requires both an FX matrix and the explicit `fx_policy` of the capital
-/// structure (record CORE-CONVENTIONS-013, resolution O9): there is no
-/// default policy.
-pub(crate) fn convert_to_reporting(
-    money: finstack_quant_core::money::Money,
+/// # Errors
+///
+/// Returns the reason consolidation is unavailable: no FX matrix in the
+/// market, or no quote for the pair on `on`.
+pub(crate) fn period_close_rate(
+    from: Currency,
+    to: Currency,
     on: Date,
-    rc: Currency,
     fx_matrix: Option<&Arc<finstack_quant_core::money::fx::FxMatrix>>,
-    fx_policy: Option<finstack_quant_core::money::fx::FxConversionPolicy>,
-) -> Result<finstack_quant_core::money::Money> {
-    if rc == money.currency() {
-        return Ok(money);
-    }
-    let Some(fx_policy) = fx_policy else {
-        return Err(crate::error::Error::capital_structure(format!(
-            "Cannot convert {} to reporting currency {} on {}: capital_structure.fx_policy \
-             is not set. Choose the conversion policy explicitly (period_end converts the \
-             period aggregates on the inclusive period-end date).",
-            money.currency(),
-            rc,
-            on
-        )));
-    };
-
+) -> std::result::Result<crate::capital_structure::FxConversionRecord, String> {
     let Some(fx) = fx_matrix else {
-        return Err(crate::error::Error::capital_structure(format!(
-            "Cannot convert {} to reporting currency {} on {}: no FX matrix present. \
-             Supply FX in MarketContext (or remove reporting_currency / keep single-currency portfolios).",
-            money.currency(),
-            rc,
-            on
-        )));
+        return Err(format!(
+            "no FX matrix in the market to convert {from} to {to} on {on}"
+        ));
     };
-
-    let rate = fx
-        .rate(FxQuery::new(money.currency(), rc, on, fx_policy))?
-        .rate;
-    Ok(finstack_quant_core::money::Money::new(
-        money.amount() * rate,
-        rc,
-    )?)
+    let quote = fx
+        .rate(FxQuery::new(
+            from,
+            to,
+            on,
+            finstack_quant_core::money::fx::FxConversionPolicy::PeriodEnd,
+        ))
+        .map_err(|error| format!("no {from}/{to} quote on {on}: {error}"))?;
+    Ok(crate::capital_structure::FxConversionRecord {
+        from,
+        to,
+        rate: quote.rate,
+        date: on,
+        source: if quote.triangulated {
+            "triangulated".to_string()
+        } else {
+            "direct".to_string()
+        },
+    })
 }

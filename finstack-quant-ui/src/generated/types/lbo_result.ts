@@ -52,25 +52,25 @@ export interface LboResultWire {
    * [`LboConfig::check_mappings`] was supplied.
    */
   checks?: D_69Ed1D0Fd3Aee296Bce5 | null;
-  debt_total: DF0101272Ae2F9A75933D;
-  entry_enterprise_value: DF0101272Ae2F9A75933D1;
+  debt_total: DF0101272Ae2F9A75933D1;
+  entry_enterprise_value: DF0101272Ae2F9A75933D2;
   /**
    * Entry metric value read from the model at the first period.
    */
   entry_metric: number;
-  equity_check: DF0101272Ae2F9A75933D2;
-  exit_enterprise_value: DF0101272Ae2F9A75933D3;
-  exit_equity_proceeds: DF0101272Ae2F9A75933D4;
+  equity_check: DF0101272Ae2F9A75933D3;
+  exit_enterprise_value: DF0101272Ae2F9A75933D4;
+  exit_equity_proceeds: DF0101272Ae2F9A75933D5;
   /**
    * Exit metric value read from the model at `exit_period`.
    */
   exit_metric: number;
-  exit_net_debt: DF0101272Ae2F9A75933D5;
+  exit_net_debt: DF0101272Ae2F9A75933D6;
   /**
    * Multiple of invested capital: `exit_equity_proceeds / equity_check`.
    */
   moic: number;
-  sources_total: DF0101272Ae2F9A75933D6;
+  sources_total: DF0101272Ae2F9A75933D7;
   /**
    * `true` when sources reconcile to uses within a relative tolerance of
    * `1e-9` scaled by deal size. False signals a
@@ -79,7 +79,7 @@ export interface LboResultWire {
    * loses all significance).
    */
   sources_uses_balanced: boolean;
-  uses_total: DF0101272Ae2F9A75933D7;
+  uses_total: DF0101272Ae2F9A75933D8;
   [k: string]: unknown;
 }
 /**
@@ -87,7 +87,14 @@ export interface LboResultWire {
  */
 export interface D_69Ed1D0Fd3Aee296Bce5 {
   /**
-   * Individual results for each check.
+   * Verdict of the suite from the unfiltered check outcomes: `fail` when
+   * any check failed, else `incomplete` when any check is incomplete,
+   * else `pass` when at least one check passed, else `unevaluated` (an
+   * empty suite, or one with no applicable check).
+   */
+  outcome: "pass" | "fail" | "incomplete" | "unevaluated";
+  /**
+   * Individual results for each check, in declared order.
    */
   results: DA64E478Bd80B60331435[];
   summary: D_8Cf6A34771F30E7523Cf;
@@ -125,36 +132,50 @@ export interface DA64E478Bd80B60331435 {
    */
   comparisons?: DE423Eb660D927A5Db922[];
   /**
-   * Individual findings produced by the check.
+   * Number of periods or cells the check examined.
+   */
+  evaluated: number;
+  /**
+   * Findings produced by the check. The suite's `min_severity` and
+   * `materiality_threshold` filters remove advisory findings only: an
+   * error-severity or coverage finding is always retained.
    */
   findings: DAb7Ac1A2678059460E09[];
   /**
-   * Whether the check passed (no error-severity findings).
+   * Verdict of the check, decided from all of its findings before the
+   * suite's reporting filters: `fail` on an error-severity finding, else
+   * `incomplete` on a coverage finding, else `unevaluated` when
+   * `evaluated` is zero, else `pass`.
    */
-  passed: boolean;
+  outcome: "pass" | "fail" | "incomplete" | "unevaluated";
   [k: string]: unknown;
 }
 /**
- * The two numbers a check compared, and the tolerance it allowed.
+ * The two values a check compared, their difference and the tolerance it
+ * allowed.
  *
- * Recorded for every numeric comparison a check performs — whether it passed
- * or failed — so the verdict can be reconstructed from exported data:
- * the comparison fails exactly when `|actual - expected| > tolerance`.
+ * Recorded for every numeric comparison a check performs, whether it passed
+ * or failed, so the verdict can be reconstructed from exported data: the
+ * comparison fails exactly when `|difference| > tolerance`.
  *
- * `actual`, `expected` and `tolerance` are all in the units of the compared
- * nodes (currency units for monetary nodes, the same units as
- * [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
- * a fraction or percentage.
+ * Every value is typed in the units of the compared nodes: exact money in
+ * their currency, or a scalar. `difference` is the one exact residual the
+ * check computed (an exact sum for money), not a difference of the two
+ * recorded sides; `tolerance` is an absolute amount in the same units.
  */
 export interface DE423Eb660D927A5Db922 {
   /**
    * Observed (left-hand) value, in the compared nodes' units.
    */
-  actual: number;
+  actual: DF0101272Ae2F9A75933D | number;
+  /**
+   * Signed residual `actual - expected`, in the same units.
+   */
+  difference: DF0101272Ae2F9A75933D | number;
   /**
    * Value the identity requires (right-hand side), in the same units.
    */
-  expected: number;
+  expected: DF0101272Ae2F9A75933D | number;
   /**
    * Stable snake_case name of the identity that was tested (for example
    * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
@@ -166,107 +187,16 @@ export interface DE423Eb660D927A5Db922 {
    */
   period?: string | null;
   /**
-   * Absolute tolerance applied to `|actual - expected|`, in the same units.
-   * This is the effective tolerance: the per-check override when one is
+   * Absolute tolerance applied to `|difference|`, in the same units. This
+   * is the effective tolerance: the per-check override when one is
    * configured, otherwise
    * `max(default_tolerance, default_relative_tolerance * |reference|)`.
    */
-  tolerance: number;
+  tolerance: DF0101272Ae2F9A75933D | number;
   [k: string]: unknown;
 }
 /**
- * A single finding produced by a check for a specific period or node.
- */
-export interface DAb7Ac1A2678059460E09 {
-  /**
-   * Identifier of the check that produced this finding.
-   */
-  check_id: string;
-  /**
-   * The failed numeric comparison behind this finding (actual, expected and
-   * tolerance). `None` for findings that do not compare two numbers:
-   * skipped periods, missing or non-finite inputs, sign-convention
-   * warnings, and formula checks without a tolerance (a formula check
-   * with a tolerance compares its value against zero).
-   */
-  comparison?: DE423Eb660D927A5Db922 | null;
-  /**
-   * Materiality context, if applicable.
-   */
-  materiality?: D_60E7F94Bf13Dea34E179 | null;
-  /**
-   * Human-readable description of the issue.
-   */
-  message: string;
-  /**
-   * Node identifiers involved in the finding.
-   */
-  nodes?: D_0A9D916A9Dc49D94Bba5[];
-  /**
-   * Period the finding relates to, if applicable.
-   */
-  period?: string | null;
-  /**
-   * Severity of the finding.
-   */
-  severity: "info" | "warning" | "error";
-  [k: string]: unknown;
-}
-/**
- * Materiality context attached to a finding, describing its quantitative
- * significance.
- */
-export interface D_60E7F94Bf13Dea34E179 {
-  /**
-   * Absolute amount of the discrepancy.
-   */
-  absolute: number;
-  /**
-   * Human-readable label for the reference (e.g. "total_assets").
-   */
-  reference_label: string;
-  /**
-   * The reference (denominator) value used when computing `relative_pct`.
-   */
-  reference_value: number;
-  /**
-   * Discrepancy as a percentage of the reference value.
-   */
-  relative_pct: number;
-  [k: string]: unknown;
-}
-/**
- * Aggregate summary.
- */
-export interface D_8Cf6A34771F30E7523Cf {
-  /**
-   * Total number of error-severity findings across all checks.
-   */
-  errors: number;
-  /**
-   * Number of checks that failed (at least one error-severity finding).
-   */
-  failed: number;
-  /**
-   * Total number of info-severity findings across all checks.
-   */
-  infos: number;
-  /**
-   * Number of checks that passed.
-   */
-  passed: number;
-  /**
-   * Total number of checks executed.
-   */
-  total_checks: number;
-  /**
-   * Total number of warning-severity findings across all checks.
-   */
-  warnings: number;
-  [k: string]: unknown;
-}
-/**
- * Total funded debt at close (sum of [`LboConfig::sources`]).
+ * Currency-aware amount
  */
 export interface DF0101272Ae2F9A75933D {
   /**
@@ -443,7 +373,114 @@ export interface DF0101272Ae2F9A75933D {
     | "ZWL";
 }
 /**
- * Entry enterprise value: `entry_multiple × entry metric`.
+ * A single finding produced by a check for a specific period or node.
+ */
+export interface DAb7Ac1A2678059460E09 {
+  /**
+   * Identifier of the check that produced this finding.
+   */
+  check_id: string;
+  /**
+   * The failed numeric comparison behind this finding (actual, expected and
+   * tolerance). `None` for findings that do not compare two numbers:
+   * skipped periods, missing or non-finite inputs, sign-convention
+   * warnings, and formula checks without a tolerance (a formula check
+   * with a tolerance compares its value against zero).
+   */
+  comparison?: DE423Eb660D927A5Db922 | null;
+  /**
+   * True for a coverage finding: required data was missing or unavailable,
+   * so the check could not evaluate the period or cell it names. A
+   * coverage finding makes its check incomplete and is never removed by
+   * the reporting filters.
+   */
+  coverage?: boolean;
+  /**
+   * Materiality context, if applicable.
+   */
+  materiality?: D_60E7F94Bf13Dea34E179 | null;
+  /**
+   * Human-readable description of the issue.
+   */
+  message: string;
+  /**
+   * Node identifiers involved in the finding.
+   */
+  nodes?: D_0A9D916A9Dc49D94Bba5[];
+  /**
+   * Period the finding relates to, if applicable.
+   */
+  period?: string | null;
+  /**
+   * Severity of the finding.
+   */
+  severity: "info" | "warning" | "error";
+  [k: string]: unknown;
+}
+/**
+ * Materiality context attached to a finding, describing its quantitative
+ * significance.
+ */
+export interface D_60E7F94Bf13Dea34E179 {
+  /**
+   * Absolute amount of the discrepancy.
+   */
+  absolute: number;
+  /**
+   * Human-readable label for the reference (e.g. "total_assets").
+   */
+  reference_label: string;
+  /**
+   * The reference (denominator) value used when computing `relative_pct`.
+   */
+  reference_value: number;
+  /**
+   * Discrepancy as a percentage of the reference value; `None` when the
+   * percentage is undefined (a zero reference) or does not apply.
+   */
+  relative_pct?: number | null;
+  [k: string]: unknown;
+}
+/**
+ * Aggregate summary.
+ */
+export interface D_8Cf6A34771F30E7523Cf {
+  /**
+   * Total number of error-severity findings across all checks.
+   */
+  errors: number;
+  /**
+   * Number of checks whose outcome is `fail` (an error-severity finding).
+   */
+  failed: number;
+  /**
+   * Number of checks whose outcome is `incomplete` (a coverage finding).
+   */
+  incomplete: number;
+  /**
+   * Total number of info-severity findings across all checks.
+   */
+  infos: number;
+  /**
+   * Number of checks whose outcome is `pass`.
+   */
+  passed: number;
+  /**
+   * Total number of checks executed.
+   */
+  total_checks: number;
+  /**
+   * Number of checks whose outcome is `unevaluated` (nothing examined).
+   */
+  unevaluated: number;
+  /**
+   * Total number of warning-severity findings across all checks.
+   */
+  warnings: number;
+  [k: string]: unknown;
+}
+/**
+ * Total funded debt at close (sum of [`LboConfig::sources`]).
  */
 export interface DF0101272Ae2F9A75933D1 {
   /**
@@ -620,7 +657,7 @@ export interface DF0101272Ae2F9A75933D1 {
     | "ZWL";
 }
 /**
- * Sponsor equity required to close: `uses_total − debt_total`.
+ * Entry enterprise value: `entry_multiple × entry metric`.
  */
 export interface DF0101272Ae2F9A75933D2 {
   /**
@@ -797,7 +834,7 @@ export interface DF0101272Ae2F9A75933D2 {
     | "ZWL";
 }
 /**
- * Exit enterprise value: `exit_multiple × exit metric`.
+ * Sponsor equity required to close: `uses_total − debt_total`.
  */
 export interface DF0101272Ae2F9A75933D3 {
   /**
@@ -974,7 +1011,7 @@ export interface DF0101272Ae2F9A75933D3 {
     | "ZWL";
 }
 /**
- * Equity proceeds at exit: `exit_enterprise_value − exit_net_debt`.
+ * Exit enterprise value: `exit_multiple × exit metric`.
  */
 export interface DF0101272Ae2F9A75933D4 {
   /**
@@ -1151,7 +1188,7 @@ export interface DF0101272Ae2F9A75933D4 {
     | "ZWL";
 }
 /**
- * Net debt outstanding at `exit_period`.
+ * Equity proceeds at exit: `exit_enterprise_value − exit_net_debt`.
  */
 export interface DF0101272Ae2F9A75933D5 {
   /**
@@ -1328,7 +1365,7 @@ export interface DF0101272Ae2F9A75933D5 {
     | "ZWL";
 }
 /**
- * Total sources: funded debt plus the sponsor equity check.
+ * Net debt outstanding at `exit_period`.
  */
 export interface DF0101272Ae2F9A75933D6 {
   /**
@@ -1505,9 +1542,186 @@ export interface DF0101272Ae2F9A75933D6 {
     | "ZWL";
 }
 /**
- * Total uses: entry enterprise value plus transaction fees.
+ * Total sources: funded debt plus the sponsor equity check.
  */
 export interface DF0101272Ae2F9A75933D7 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * Total uses: entry enterprise value plus transaction fees.
+ */
+export interface DF0101272Ae2F9A75933D8 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with

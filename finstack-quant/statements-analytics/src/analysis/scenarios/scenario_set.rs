@@ -293,7 +293,12 @@ impl ScenarioSet {
         as_of: Date,
     ) -> Result<ScenarioResults> {
         self.evaluate_each(base_model, |evaluator, model| {
-            evaluator.evaluate_with_market(model, market, as_of)
+            evaluator.evaluate_with_market(
+                model,
+                market,
+                as_of,
+                finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            )
         })
     }
 
@@ -702,7 +707,7 @@ impl ScenarioResults {
         let mut pct_values: Vec<Vec<Option<f64>>> = vec![Vec::new(); non_baseline_names.len()];
 
         for metric in metrics {
-            let metric_nodes = baseline_results.nodes.get(*metric).ok_or_else(|| {
+            let metric_nodes = baseline_results.get_node(metric).ok_or_else(|| {
                 Error::missing_data(format!(
                     "Metric '{}' not found in baseline scenario '{}'",
                     metric, baseline_name
@@ -713,11 +718,11 @@ impl ScenarioResults {
                 periods_col.push(period.to_string());
                 metrics_col.push((*metric).to_string());
 
-                let baseline_value = baseline_results.get(metric, &period);
+                let baseline_value = crate::cell_value(baseline_results, metric, &period);
 
                 for (idx, scenario_name) in scenario_names.iter().enumerate() {
                     if let Some(results) = self.scenarios.get(*scenario_name) {
-                        let value = results.get(metric, &period);
+                        let value = crate::cell_value(results, metric, &period);
                         scenario_values[idx].push(value);
                     } else {
                         scenario_values[idx].push(None);
@@ -726,7 +731,7 @@ impl ScenarioResults {
 
                 for (pct_idx, scenario_name) in non_baseline_names.iter().enumerate() {
                     if let Some(results) = self.scenarios.get(*scenario_name) {
-                        let value = results.get(metric, &period);
+                        let value = crate::cell_value(results, metric, &period);
 
                         // Percent change is undefined on a (near-)zero
                         // baseline; emit a null instead of a misleading 0%

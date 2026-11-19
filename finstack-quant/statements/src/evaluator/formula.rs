@@ -1,38 +1,18 @@
 //! Evaluate compiled formulas against an evaluation context.
 //!
-//! Arithmetic operators are handled locally for performance and separation of
-//! concerns, while statistical/time-series functions delegate to the shared
-//! `finstack-quant-core` helpers.
-//!
-//! # Numerical Behavior
-//!
-//! ## NaN Handling
-//! - Division by zero → NaN (with log warning)
-//! - Missing historical values in lag/shift → NaN
-//! - Insufficient data for variance (< 2 values) → NaN
-//! - pct_change with near-zero denominator → NaN (with log warning)
-//!
-//! ## Overflow Protection
-//! - Compound growth (`growth_pct`) errors on overflow
-//! - Growth rates > 100% produce warnings
-//!
-//! ## Precision
-//! - Equality comparisons use [`finstack_quant_core::math::ZERO_TOLERANCE`]
-//! - Suitable for rate comparisons (0.01 bp precision)
-//! - Monetary comparisons should use the `Money` type for currency safety
+//! [`evaluate_value`] is the typed evaluator: checked scalar arithmetic,
+//! exact money, Boolean controls and unavailable values (see
+//! [`crate::evaluator::value`]). History kernels (`lag`, rolling windows,
+//! cumulative and exponentially weighted statistics) still read the float
+//! view of their operands through [`evaluate_formula`], where an unavailable
+//! value is `NaN`.
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::formula_helpers::{
-    collect_cs_values_sorted, collect_historical_values_sorted, collect_rolling_window_values,
-    is_truthy,
-};
-use crate::evaluator::results::EvalWarning;
+use crate::evaluator::value::{self, At, Value};
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_core::expr::{Expr, ExprNode, Function};
-use finstack_quant_core::math::ZERO_TOLERANCE;
-use std::collections::{BTreeMap, BTreeSet};
-use std::rc::Rc;
+use finstack_quant_core::expr::Expr;
+use std::collections::BTreeSet;
 
 fn annotate_error(err: Error, node_id: Option<&str>) -> Error {
     match (node_id, err) {
@@ -59,12 +39,6 @@ where
     E: Into<Error>,
 {
     res.map_err(|err| annotate_error(err.into(), node_id))
-}
-
-/// Convert boolean to f64 (1.0 for true, 0.0 for false).
-#[inline]
-fn bool_to_f64(b: bool) -> f64 {
-    if b { 1.0 } else { 0.0 }
 }
 
 /// Validate that a function has exactly the expected number of arguments.
@@ -125,7 +99,7 @@ pub(crate) fn evaluate_non_negative_integer_arg(
             format!("{func_name}() requires a finite integer argument"),
         ));
     }
-    if value.fract().abs() > ZERO_TOLERANCE {
+    if value.fract() != 0.0 {
         return Err(eval_error(
             node_id,
             format!("{func_name}() requires an integer argument"),
@@ -155,7 +129,7 @@ pub(crate) fn evaluate_integer_arg(
             format!("{func_name}() requires a finite integer argument"),
         ));
     }
-    if value.fract().abs() > ZERO_TOLERANCE {
+    if value.fract() != 0.0 {
         return Err(eval_error(
             node_id,
             format!("{func_name}() requires an integer argument"),
@@ -201,8 +175,12 @@ pub(crate) fn build_context_for_period(
         // used to re-evaluate an expression and read back a single value, so
         // skipping `set_value`'s warning bookkeeping is intentional.
         period_context.current_values = context.current_values.clone();
+        period_context.current_cells = context.current_cells.clone();
     } else if let Some(row) = context.history.row(&target_period) {
         period_context.current_values = row.to_vec();
+        if let Some(cells) = context.history.cell_row(&target_period) {
+            period_context.current_cells = cells.to_vec();
+        }
     }
 
     period_context
@@ -221,168 +199,12 @@ pub(super) fn expression_periods(context: &EvaluationContext) -> BTreeSet<Period
         .collect()
 }
 
-/// Collect expression values over all available periods in chronological order.
+/// Evaluate a compiled expression to its float view.
 ///
-/// Complex expressions (not a simple column or literal) are re-evaluated once
-/// per historical period (O(P)); nested aggregates make this O(P²).
-pub(crate) fn collect_expression_values_sorted(
-    expr: &Expr,
-    context: &EvaluationContext,
-    node_id: Option<&str>,
-) -> Result<Rc<BTreeMap<PeriodId, f64>>> {
-    match &expr.node {
-        ExprNode::Column(name) => return Ok(collect_historical_values_sorted(name, context)),
-        ExprNode::CsRef {
-            component,
-            instrument_or_total,
-        } => return collect_cs_values_sorted(component, instrument_or_total, context),
-        ExprNode::Literal(value) => {
-            let values = expression_periods(context)
-                .into_iter()
-                .map(|period| (period, *value))
-                .collect();
-            return Ok(Rc::new(values));
-        }
-        _ => {}
-    }
-
-    let mut values = BTreeMap::new();
-    for period in expression_periods(context) {
-        let mut period_context = build_context_for_period(period, context);
-        let value = evaluate_formula(expr, &mut period_context, node_id)?;
-        values.insert(period, value);
-    }
-
-    Ok(Rc::new(values))
-}
-
-/// Evaluate only the expression observations inside a closed period range.
-///
-/// Filtering must precede evaluation: an instrument absent from an old,
-/// unrelated quarter must not invalidate its current-quarter cashflow sum.
-pub(crate) fn collect_expression_range_values(
-    expr: &Expr,
-    context: &EvaluationContext,
-    start: PeriodId,
-    end: PeriodId,
-    node_id: Option<&str>,
-) -> Result<Vec<f64>> {
-    if let ExprNode::Column(name) = &expr.node {
-        let sorted = collect_historical_values_sorted(name, context);
-        return Ok(sorted.range(start..=end).map(|(_, value)| *value).collect());
-    }
-    let periods = expression_periods(context);
-    periods
-        .range(start..=end)
-        .map(|period| {
-            let mut historical = build_context_for_period(*period, context);
-            evaluate_formula(expr, &mut historical, node_id)
-        })
-        .collect()
-}
-
-/// Returns `true` if the expression tree contains any time-series or
-/// aggregate functions that depend on historical values (lag, rolling,
-/// cumulative, etc.). Point-wise arithmetic on columns and literals is
-/// safe to evaluate period-by-period without full history.
-fn has_aggregate(expr: &Expr) -> bool {
-    match &expr.node {
-        ExprNode::Column(_) | ExprNode::CsRef { .. } | ExprNode::Literal(_) => false,
-        ExprNode::Call(func, args) => {
-            matches!(
-                func,
-                Function::Lag
-                    | Function::Lead
-                    | Function::Diff
-                    | Function::PctChange
-                    | Function::CumSum
-                    | Function::CumProd
-                    | Function::CumMin
-                    | Function::CumMax
-                    | Function::RollingMean
-                    | Function::RollingSum
-                    | Function::RollingStd
-                    | Function::RollingVar
-                    | Function::RollingMedian
-                    | Function::RollingMin
-                    | Function::RollingMax
-                    | Function::RollingCount
-                    | Function::EwmMean
-                    | Function::EwmStd
-                    | Function::EwmVar
-                    | Function::Std
-                    | Function::Var
-                    | Function::Median
-                    | Function::Rank
-                    | Function::Quantile
-                    | Function::Shift
-                    | Function::Ttm
-                    | Function::Ytd
-                    | Function::Qtd
-                    | Function::FiscalYtd
-                    | Function::GrowthRate
-            ) || args.iter().any(has_aggregate)
-        }
-        ExprNode::BinOp { left, right, .. } => has_aggregate(left) || has_aggregate(right),
-        ExprNode::UnaryOp { operand, .. } => has_aggregate(operand),
-        ExprNode::IfThenElse {
-            condition,
-            then_expr,
-            else_expr,
-        } => has_aggregate(condition) || has_aggregate(then_expr) || has_aggregate(else_expr),
-    }
-}
-
-/// Collect expression values for a rolling window in chronological order.
-///
-/// Uses an optimized reverse-walk when the expression contains no aggregate
-/// functions, evaluating only the last `window_size` periods instead of all.
-pub(crate) fn collect_expression_window_values(
-    expr: &Expr,
-    context: &EvaluationContext,
-    window_size: usize,
-    node_id: Option<&str>,
-) -> Result<Vec<f64>> {
-    if window_size == 0 {
-        return Ok(Vec::new());
-    }
-
-    match &expr.node {
-        ExprNode::Column(name) => {
-            return Ok(collect_rolling_window_values(name, context, window_size));
-        }
-        ExprNode::Literal(value) => {
-            let total = expression_periods(context).len();
-            return Ok(vec![*value; window_size.min(total)]);
-        }
-        _ => {}
-    }
-
-    if !has_aggregate(expr) {
-        let periods = expression_periods(context);
-
-        let mut values = Vec::with_capacity(window_size);
-        for period in periods.iter().rev().take(window_size) {
-            let mut period_context = build_context_for_period(*period, context);
-            let value = evaluate_formula(expr, &mut period_context, node_id)?;
-            values.push(value);
-        }
-        values.reverse();
-        return Ok(values);
-    }
-
-    let sorted = collect_expression_values_sorted(expr, context, node_id)?;
-    let skip_count = sorted.len().saturating_sub(window_size);
-    Ok(sorted.values().skip(skip_count).copied().collect())
-}
-
-/// Evaluate a compiled expression.
-///
-/// Handles both basic arithmetic operations (evaluated directly) and
-/// advanced financial/statistical functions (delegated to specialized handlers).
-/// Evaluation reads the current period and historical values from `context`;
-/// `node_id`, when supplied, is incorporated into diagnostics so formula
-/// failures can be traced back to the owning statement node.
+/// The float view is the typed result of the formula with an unavailable
+/// value as `NaN`, a Boolean as `1.0` or `0.0` and money as its nearest
+/// float. History kernels and callers that have not moved to typed values
+/// read it; the evaluator itself publishes typed cells.
 ///
 /// # Arguments
 ///
@@ -395,165 +217,115 @@ pub(crate) fn collect_expression_window_values(
 ///
 /// # Errors
 ///
-/// Returns an evaluation error when an expression needs a missing node or
-/// capital-structure value, a function receives invalid arguments (for
-/// example, a non-integral lag window), a historical lookup is unavailable, or
-/// a delegated function cannot evaluate. IEEE non-finite arithmetic may still
-/// return `NaN` with a warning rather than an error where the DSL defines that
-/// as a propagating numerical result.
+/// Returns an evaluation error naming the node and period when an expression
+/// needs an unknown node or capital-structure value, a function receives
+/// invalid arguments, a control is not Boolean, units or currencies are
+/// mixed, a value is outside a function's domain, a division or remainder is
+/// by zero, or a result overflows.
 pub fn evaluate_formula(
     expr: &Expr,
     context: &mut EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<f64> {
+    evaluate_value(expr, context, node_id).map(Value::float)
+}
+
+/// Evaluate a compiled expression to a typed value.
+///
+/// `if`, `and` and `or` evaluate only the operands they need. `and` and
+/// `or` use strong three-valued logic: a false operand decides `and` and a
+/// true operand decides `or` even when the other is unavailable; otherwise an
+/// unavailable operand makes the result unavailable. An unavailable `if`
+/// condition makes the result unavailable.
+pub(crate) fn evaluate_value(
+    expr: &Expr,
+    context: &mut EvaluationContext,
+    node_id: Option<&str>,
+) -> Result<Value> {
     use finstack_quant_core::expr::{BinOp, ExprNode, UnaryOp};
 
+    let at = At {
+        node_id,
+        period: context.period_id,
+    };
     match &expr.node {
-        ExprNode::Literal(val) => Ok(*val),
+        ExprNode::Literal(val) => Ok(Value::Scalar(*val)),
         ExprNode::CsRef {
             component,
             instrument_or_total,
-        } => map_err_with_node(
-            context.get_cs_value(component, instrument_or_total),
-            node_id,
-        ),
-        ExprNode::Column(name) => map_err_with_node(context.get_value(name), node_id),
+        } => map_err_with_node(context.get_cs(component, instrument_or_total), node_id),
+        ExprNode::Column(name) => map_err_with_node(context.get_operand(name), node_id),
         ExprNode::Call(func, args) => {
             crate::evaluator::formula_dispatch::evaluate_function(func, args, context, node_id)
         }
-        ExprNode::BinOp { op, left, right } => {
-            let left_val = evaluate_formula(left, context, node_id)?;
-
-            // Short-circuit logical operators before touching the right-hand
-            // side. DSL boolean semantics (`is_truthy`) treat non-finite and
-            // zero as false, so an AND whose left is false cannot become true
-            // and an OR whose left is true cannot become false. Skipping the
-            // right side avoids triggering its side effects (division-by-zero
-            // warnings, lookup errors, etc.) whenever the result is already
-            // determined.
-            let is_boolean_op = matches!(
-                op,
-                BinOp::Eq
-                    | BinOp::Ne
-                    | BinOp::Lt
-                    | BinOp::Le
-                    | BinOp::Gt
-                    | BinOp::Ge
-                    | BinOp::And
-                    | BinOp::Or
-            );
-            if is_boolean_op && !left_val.is_finite() {
-                context.non_finite_operand = true;
-            }
-            if matches!(op, BinOp::And) && !is_truthy(left_val) {
-                return Ok(bool_to_f64(false));
-            }
-            if matches!(op, BinOp::Or) && is_truthy(left_val) {
-                return Ok(bool_to_f64(true));
-            }
-
-            let right_val = evaluate_formula(right, context, node_id)?;
-            if is_boolean_op && !right_val.is_finite() {
-                context.non_finite_operand = true;
-            }
-
-            let result = match op {
-                BinOp::Add => left_val + right_val,
-                BinOp::Sub => left_val - right_val,
-                BinOp::Mul => left_val * right_val,
-                BinOp::Div => {
-                    // Division by zero yields NaN rather than an error so a
-                    // single bad cell does not abort the whole evaluation.
-                    // NaN then propagates through every downstream formula
-                    // (NaN + x = NaN, comparisons are false). Callers that
-                    // need to surface this must run `NonFiniteCheck` — it is
-                    // included in the standard `three_statement_checks` and
-                    // `credit_underwriting_checks` suites — or inspect the
-                    // `DivisionByZero` warning pushed below.
-                    if right_val == 0.0 {
-                        tracing::warn!(
-                            "Division by zero in formula evaluation (period: {:?})",
-                            context.period_id
-                        );
-                        if let Some(id) = node_id {
-                            context.warnings.push(EvalWarning::DivisionByZero {
-                                node_id: id.to_string(),
-                                period: context.period_id,
-                            });
-                        }
-                        f64::NAN
-                    } else {
-                        left_val / right_val
-                    }
+        ExprNode::BinOp { op, left, right } => match op {
+            BinOp::And | BinOp::Or => {
+                let what = if *op == BinOp::And { "and" } else { "or" };
+                // `and` is decided by a false operand, `or` by a true one.
+                let deciding = *op == BinOp::Or;
+                let left_val = evaluate_value(left, context, node_id)?;
+                let left_flag = value::control(left_val, what, at)?;
+                if left_flag == Some(deciding) {
+                    return Ok(Value::Bool(deciding));
                 }
-                BinOp::Mod => {
-                    if right_val == 0.0 {
-                        tracing::warn!(
-                            "Modulo by zero in formula evaluation (period: {:?})",
-                            context.period_id
-                        );
-                        if let Some(id) = node_id {
-                            context.warnings.push(EvalWarning::DivisionByZero {
-                                node_id: id.to_string(),
-                                period: context.period_id,
-                            });
-                        }
-                        f64::NAN
-                    } else {
-                        left_val % right_val
-                    }
-                }
-
-                // Comparison operations (use approximate equality for == and !=)
-                BinOp::Eq => bool_to_f64((left_val - right_val).abs() <= ZERO_TOLERANCE),
-                BinOp::Ne => bool_to_f64((left_val - right_val).abs() > ZERO_TOLERANCE),
-                BinOp::Lt => bool_to_f64(left_val < right_val),
-                BinOp::Le => bool_to_f64(left_val <= right_val),
-                BinOp::Gt => bool_to_f64(left_val > right_val),
-                BinOp::Ge => bool_to_f64(left_val >= right_val),
-
-                // Logical operations
-                BinOp::And => bool_to_f64(is_truthy(left_val) && is_truthy(right_val)),
-                BinOp::Or => bool_to_f64(is_truthy(left_val) || is_truthy(right_val)),
-            };
-            Ok(result)
-        }
+                // The right operand is needed. With an unavailable left it
+                // can still decide the result; otherwise the result is
+                // unavailable.
+                let right_val = evaluate_value(right, context, node_id)?;
+                Ok(match (left_flag, value::control(right_val, what, at)?) {
+                    (_, Some(flag)) if flag == deciding => Value::Bool(deciding),
+                    (Some(_), Some(flag)) => Value::Bool(flag),
+                    (None, _) => left_val,
+                    (Some(_), None) => right_val,
+                })
+            }
+            BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
+                let left_val = evaluate_value(left, context, node_id)?;
+                let right_val = evaluate_value(right, context, node_id)?;
+                value::compare(*op, left_val, right_val, at)
+            }
+            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
+                let left_val = evaluate_value(left, context, node_id)?;
+                let right_val = evaluate_value(right, context, node_id)?;
+                value::arithmetic(*op, left_val, right_val, at)
+            }
+        },
         ExprNode::UnaryOp { op, operand } => {
-            let val = evaluate_formula(operand, context, node_id)?;
-            let result = match op {
-                UnaryOp::Neg => -val,
-                UnaryOp::Not => {
-                    if !val.is_finite() {
-                        context.non_finite_operand = true;
-                    }
-                    bool_to_f64(!is_truthy(val))
-                }
-            };
-            Ok(result)
+            let val = evaluate_value(operand, context, node_id)?;
+            match op {
+                UnaryOp::Neg => value::negate(val, at),
+                UnaryOp::Not => Ok(match value::control(val, "not", at)? {
+                    Some(flag) => Value::Bool(!flag),
+                    None => val,
+                }),
+            }
         }
         ExprNode::IfThenElse {
             condition,
             then_expr,
             else_expr,
         } => {
-            let cond_val = evaluate_formula(condition, context, node_id)?;
-            if !cond_val.is_finite() {
-                context.non_finite_operand = true;
-            }
-            if is_truthy(cond_val) {
-                evaluate_formula(then_expr, context, node_id)
-            } else {
-                evaluate_formula(else_expr, context, node_id)
+            let cond_val = evaluate_value(condition, context, node_id)?;
+            match value::control(cond_val, "if condition", at)? {
+                Some(true) => evaluate_value(then_expr, context, node_id),
+                Some(false) => evaluate_value(else_expr, context, node_id),
+                None => Ok(cond_val),
             }
         }
     }
 }
 
-// `evaluate_function` lives in [`crate::evaluator::formula_dispatch`].
-// Local tests below use the dispatch module's re-export to keep call sites
-// concise while still exercising the same code path used by `evaluate_formula`.
+/// Float view of one function call, for the kernel tests below.
 #[cfg(test)]
-use crate::evaluator::formula_dispatch::evaluate_function;
+fn evaluate_function(
+    func: &finstack_quant_core::expr::Function,
+    args: &[Expr],
+    context: &mut EvaluationContext,
+    node_id: Option<&str>,
+) -> Result<f64> {
+    crate::evaluator::formula_dispatch::evaluate_function(func, args, context, node_id)
+        .map(Value::float)
+}
 
 #[cfg(test)]
 mod tests {
@@ -646,6 +418,16 @@ mod tests {
             mandatory_prepayment: None,
             sweep_prepayment: None,
             voluntary_prepayment: None,
+            interest_arrears: None,
+            principal_pending: None,
+            principal_arrears: None,
+            principal_advance_reserve: None,
+            scheduled_cash_interest_due: None,
+            scheduled_principal_due: None,
+            fee_rebates: None,
+            repayment_refunds: None,
+            funding_proceeds: None,
+            funding_principal: None,
         };
         let mut totals = IndexMap::new();
         totals.insert(period, breakdown);
@@ -746,12 +528,6 @@ mod tests {
         let value = evaluate_function(&Function::EwmMean, &args, &mut context, None)
             .expect("current overlay");
         assert_eq!(value, 2.0);
-
-        context.current_values[0] = None;
-        context.invalidate_sorted_cache("series");
-        let value = evaluate_function(&Function::EwmMean, &args, &mut context, None)
-            .expect("historical values only");
-        assert_eq!(value, 1.0);
     }
 
     #[test]
@@ -901,12 +677,14 @@ mod tests {
             &mut context,
         );
         assert!((v - 6.25).abs() < 1e-12);
-        let v = eval(
+        let fails = |func: Function, args: &[Expr], context: &mut EvaluationContext| {
+            evaluate_function(&func, args, context, Some("elementwise")).is_err()
+        };
+        assert!(fails(
             Function::Pow,
             &[Expr::literal(-1.0), Expr::literal(0.5)],
             &mut context,
-        );
-        assert!(v.is_nan());
+        ));
 
         // round: ties away from zero, optional digits (negative allowed)
         let v = eval(Function::Round, &[Expr::column("x")], &mut context);
@@ -950,9 +728,9 @@ mod tests {
             2.0
         );
 
-        // ln / exp / log10 / sqrt (IEEE semantics)
+        // ln / exp / log10 / sqrt: a value outside the domain is an error
         assert_eq!(eval(Function::Ln, &[Expr::literal(1.0)], &mut context), 0.0);
-        assert!(eval(Function::Ln, &[Expr::literal(-1.0)], &mut context).is_nan());
+        assert!(fails(Function::Ln, &[Expr::literal(-1.0)], &mut context));
         let v = eval(Function::Exp, &[Expr::literal(1.0)], &mut context);
         assert!((v - std::f64::consts::E).abs() < 1e-12);
         let v = eval(Function::Log10, &[Expr::literal(100.0)], &mut context);
@@ -961,9 +739,9 @@ mod tests {
             eval(Function::Sqrt, &[Expr::literal(4.0)], &mut context),
             2.0
         );
-        assert!(eval(Function::Sqrt, &[Expr::literal(-4.0)], &mut context).is_nan());
+        assert!(fails(Function::Sqrt, &[Expr::literal(-4.0)], &mut context));
 
-        // Clamp checks finite bounds after propagating missing values.
+        // clamp: inclusive bounds; an inverted range is an error
         let clamp_args =
             |x: f64, lo: f64, hi: f64| [Expr::literal(x), Expr::literal(lo), Expr::literal(hi)];
         assert_eq!(
@@ -978,44 +756,22 @@ mod tests {
             eval(Function::Clamp, &clamp_args(15.0, 0.0, 10.0), &mut context),
             10.0
         );
-        assert!(
-            evaluate_function(
-                &Function::Clamp,
-                &clamp_args(5.0, 10.0, 0.0),
-                &mut context,
-                None
-            )
-            .is_err()
-        );
-        assert!(
-            eval(
-                Function::Clamp,
-                &clamp_args(f64::NAN, 10.0, 0.0),
-                &mut context
-            )
-            .is_nan()
-        );
-        assert!(
-            evaluate_function(
-                &Function::Clamp,
-                &clamp_args(f64::NAN, f64::INFINITY, 1.0),
-                &mut context,
-                None
-            )
-            .is_err()
-        );
+        assert!(fails(
+            Function::Clamp,
+            &clamp_args(5.0, 10.0, 0.0),
+            &mut context
+        ));
 
-        // is_missing: non-finite (NaN or ±inf) → 1, finite → 0
+        // is_missing: true only for an unavailable operand
         assert_eq!(
             eval(Function::IsMissing, &[Expr::literal(1.0)], &mut context),
             0.0
         );
-        let div_by_zero = Expr::bin_op(
-            finstack_quant_core::expr::BinOp::Div,
-            Expr::literal(1.0),
-            Expr::literal(0.0),
+        let before_history = Expr::call(Function::Lag, vec![Expr::column("x"), Expr::literal(5.0)]);
+        assert_eq!(
+            eval(Function::IsMissing, &[before_history], &mut context),
+            1.0
         );
-        assert_eq!(eval(Function::IsMissing, &[div_by_zero], &mut context), 1.0);
     }
 
     #[test]
@@ -1174,7 +930,9 @@ mod tests {
         ];
         let sum_value = evaluate_function(&Function::Sum, &args, &mut context, Some("sum_test"))
             .expect("sum evaluation should succeed");
-        let reference = kahan_sum([1e16, 1.0, -1e16]).unwrap();
+        let reference =
+            finstack_quant_core::math::summation::neumaier_sum([1e16, 1.0, -1e16]).unwrap();
+        assert!((reference - 1.0).abs() < f64::EPSILON);
         assert!(
             (sum_value - reference).abs() < 1e-12,
             "sum_value={sum_value}, reference={reference}"
@@ -1348,45 +1106,6 @@ mod tests {
         )
         .expect("sign zero");
         assert_eq!(sign_zero, 0.0);
-
-        let sign_nan = evaluate_function(
-            &Function::Sign,
-            &[Expr::literal(f64::NAN)],
-            &mut context,
-            Some("sign"),
-        )
-        .expect("sign nan");
-        assert!(sign_nan.is_nan());
-    }
-
-    #[test]
-    fn nan_conditions_are_falsey_in_formula_logic() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let mut context = EvaluationContext::new(
-            period,
-            &finstack_quant_core::dates::PeriodPlan::try_new(
-                finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                Vec::new(),
-            )
-            .expect("empty plan"),
-            std::sync::Arc::new(IndexMap::new()),
-            std::sync::Arc::new(IndexMap::new()),
-        );
-
-        let if_expr = crate::dsl::parse_and_compile("if(0 / 0, 1, 2)").expect("compile if expr");
-        let if_value =
-            evaluate_formula(&if_expr, &mut context, Some("if_nan")).expect("evaluate if expr");
-        assert_eq!(if_value, 2.0);
-
-        let and_expr = crate::dsl::parse_and_compile("(0 / 0) and 1").expect("compile and expr");
-        let and_value =
-            evaluate_formula(&and_expr, &mut context, Some("and_nan")).expect("evaluate and expr");
-        assert_eq!(and_value, 0.0);
-
-        let not_expr = crate::dsl::parse_and_compile("not (0 / 0)").expect("compile not expr");
-        let not_value =
-            evaluate_formula(&not_expr, &mut context, Some("not_nan")).expect("evaluate not expr");
-        assert_eq!(not_value, 1.0);
     }
 
     #[test]
@@ -1410,10 +1129,10 @@ mod tests {
 
         let expression = crate::dsl::parse_and_compile("cs.debt_balance.total")
             .expect("capital-structure reference should compile");
-        let values =
-            collect_expression_values_sorted(&expression, &context, None).expect("cs history");
-        assert_eq!(values.get(&p1), Some(&100.0));
-        assert_eq!(values.get(&p2), Some(&90.0));
+        // The full-history sum reads the past snapshot and the current one.
+        let total = evaluate_function(&Function::CumSum, &[expression], &mut context, None)
+            .expect("cs history");
+        assert_eq!(total, 190.0);
     }
 
     #[test]

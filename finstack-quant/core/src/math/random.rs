@@ -108,6 +108,45 @@ impl Pcg64Rng {
     }
 }
 
+impl Pcg64Rng {
+    /// Draw an index uniformly from `0..len` without modulo or rounding bias.
+    ///
+    /// Takes 64-bit words from the generator and rejects those in the
+    /// incomplete final block of `len` values, so every index is exactly
+    /// equally likely and the result is the same on 32-bit and 64-bit
+    /// targets.
+    ///
+    /// # Arguments
+    ///
+    /// * `len` - Number of equally likely outcomes; must be at least 1. The
+    ///   result is in `0..len`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::math::random::Pcg64Rng;
+    ///
+    /// let mut rng = Pcg64Rng::new(42);
+    /// assert!(rng.index(3) < 3);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics when `len` is zero.
+    pub fn index(&mut self, len: usize) -> usize {
+        assert!(len > 0, "cannot draw an index from an empty range");
+        let len = len as u64;
+        // The number of words in the incomplete final block: 2^64 mod len.
+        let excess = (u64::MAX % len + 1) % len;
+        loop {
+            let word = self.inner.next_u64();
+            if word <= u64::MAX - excess {
+                return (word % len) as usize;
+            }
+        }
+    }
+}
+
 impl RandomNumberGenerator for Pcg64Rng {
     #[inline]
     fn uniform(&mut self) -> f64 {

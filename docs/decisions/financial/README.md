@@ -220,8 +220,8 @@ of term loans and revolvers. [STATEMENTS-CAPITAL-001](statements-capital/01-inst
 Explicit bond and swap construction was accepted on 2026-11-15. Callers
 construct instruments through canonical Valuations with authored terms or a
 deliberately selected qualified dated convention, then attach them through
-`add_debt` or `addDebt`. Removal of the four Statements helpers remains
-pending. [STATEMENTS-CAPITAL-001](statements-capital/01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
+`add_debt` or `addDebt`. The four Statements helpers are removed and their
+callers reconciled; attachment and replay are qualified. [STATEMENTS-CAPITAL-001](statements-capital/01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
 
 Statements per-instrument coupon netting was accepted on 2026-11-15.
 Signed coupon settlements net within each instrument and reporting period.
@@ -236,240 +236,261 @@ Implementation remains pending. [STATEMENTS-CAPITAL-002](statements-capital/02-c
 The full Statements cashflow classification contract was accepted on
 2026-11-15. It covers period admission, native currency and source perspective,
 dated cash and principal effects, and contract-based fee and hedge
-classification. Implementation reconciliation and independent qualification
-remain pending.
+classification. Period admission, the stated perspective, exhaustive signed
+classification, separate dated distress cash, fee rebates, repayment refunds
+and separate funding proceeds are implemented and qualified;
+company-perspective schedules, hedge settlement cash, distress totals and
+ledger qualification remain.
 [STATEMENTS-CAPITAL-002](statements-capital/02-cashflow-classification.md#accepted-decision-for-period-admission-and-cashflow-classification).
 
 Statements opening principal reconciliation was accepted on 2026-11-15. The
 canonical debt schedule and stateful ledger must agree at the same economic
 boundary and currency before calculating debt service for carried debt.
-Implementation remains pending. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
+It is implemented and qualified: a mismatch is an error and nothing is rescaled. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
 
 Statements contractual accrued cash interest was accepted on 2026-11-15. It
 covers interest earned through period close and due afterward. Overdue arrears
 and issue-discount amortization are reported separately from this measure.
-Implementation remains pending. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
+It is implemented and qualified on the instrument's own earning terms, with
+arrears reported as `interest_arrears`. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
 
 The Statements dated principal contract was accepted on 2026-11-15. It covers
 stable dated claims, separate reporting of economic principal and unsettled
 payments, advance reserves, scheduled principal priority and exact atomic
-reconciliation. Implementation and independent qualification remain pending.
+reconciliation. It is implemented and qualified; exact payment sizing belongs
+to the waterfall allocation contract.
 [STATEMENTS-CAPITAL-004](statements-capital/04-dated-principal.md#accepted-decision-for-dated-principal-claims).
 
 The Statements residual coupon rebuilding contract was accepted on 2026-11-15.
 It uses canonical terms to rebuild affected coupon parents, principal and fees
 after dated balance changes while preserving earned interest, settled cash and
-dated claims. Implementation and independent qualification remain pending.
+dated claims. It is implemented and qualified: term loans and revolvers
+recompile their schedules from the waterfall's dated principal postings.
 [STATEMENTS-CAPITAL-005](statements-capital/05-residual-coupons.md#accepted-decision-for-residual-coupon-rebuilding).
 
 The Statements waterfall allocation and conservation contract was accepted on
 2026-11-15. It covers pre-debt-service cash, priority and seniority, exact or
 authorized-quantum payments, arrears, and terminal distributions or retained
-cash. Implementation and independent qualification remain pending.
+cash. It is implemented and qualified, with the currency minor unit as the
+payment quantum.
 [STATEMENTS-CAPITAL-006](statements-capital/06-priority-allocation.md#accepted-decision-for-waterfall-cash-allocation-and-conservation).
 
 The Statements prepayment and ECF sweep contract was accepted on 2026-11-15.
 It covers explicit agreement terms and eligible facilities, dated sizing,
-payment limits and requested, paid and unpaid reporting. Implementation and
-independent qualification remain pending.
+payment limits and requested, paid and unpaid reporting. The same-period
+contract is implemented and qualified; the separately elected measurement,
+trigger, payment and principal-effective dates remain open.
 [STATEMENTS-CAPITAL-007](statements-capital/07-prepayments-and-ecf.md#accepted-decision-for-agreement-defined-prepayments-and-ecf-sweeps).
 
 The Statements PIK election and carried-claims contract was accepted on
 2026-11-15. It covers contractual coupon elections, threshold and duration
 rules, dated capitalization, separate arrears and atomic replay.
-Implementation and independent qualification remain pending.
+The modeled forecast exercise is implemented and qualified; notice dates,
+amendments and authorized capitalization of arrears remain open.
 [STATEMENTS-CAPITAL-008](statements-capital/08-pik-and-carry-state.md#accepted-decision-for-contractual-pik-elections-and-carried-claims).
 
 The Statements capital reporting and FX contract was accepted on 2026-11-15.
 It covers native and consolidated views, explicit period-close FX, component
 totals, exact chronological exports and atomic period replacement.
-Implementation and independent qualification remain pending.
+It is implemented and qualified, including exact-decimal table exports and
+typed host accessors. The capital contracts are also reconciled to
+independent hand ledgers over eight quarters and across dated FX.
 [STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 The Statements model timeline, explicit value and readiness contract was
 accepted on 2026-11-15. It covers canonical reporting plans, typed observations,
 missing cells and the common validation boundary for runnable models.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-CONTRACTS-001](statements-contracts/01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
 
 The Statements authoring, import and observation availability contract was
 accepted on 2026-11-15. It covers named atomic edits, validated period-label
-imports, dated publication snapshots and full-snapshot mode. Implementation
-and independent qualification remain pending.
+imports, dated publication snapshots and full-snapshot mode. It is
+implemented and qualified.
 [STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
 
 The Statements typed forecast and validation staging contract was accepted
 on 2026-11-15. It covers explicit method parameters, shared static checks,
 runtime history and horizon checks, and exact stochastic seeds.
-Implementation and independent qualification remain pending.
+The typed specification, static and runtime checks and exact seeds,
+including a JavaScript `bigint`, are implemented and qualified.
 [STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
 
 The Statements formula grammar and dispatch contract was accepted on
 2026-11-15. It covers canonical syntax and rendering, shared identifiers,
 checked signatures and bounded validation of text and caller-built trees.
-Implementation and independent qualification remain pending.
+These are implemented and qualified, including the typed `cs` selectors.
 [STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation).
 
 The Statements formula units and currency contract was accepted on
 2026-11-15. It covers resolved dimensions, monetary and scalar operations,
 decimal scales, the forecast boundary and capital reporting currencies.
-Implementation and independent qualification remain pending.
+Unit resolution, the unit rules and the capital reporting scopes are
+implemented and qualified; exact monetary arithmetic remains pending.
 [STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
 
 The Statements metric registry and model import contract was accepted on
 2026-11-15. It covers atomic registration, pinned formula bindings,
 historical dependencies, same-period cycle checks and atomic model import.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-CONTRACTS-006](statements-contracts/06-registry-and-dependencies.md#accepted-decision-for-metric-registration-and-dependencies).
 
 The Statements bundled earnings and margin contract was accepted on
 2026-11-15. It covers reported costs, the included D&A add-back, signed
 expenses, revenue eligibility and recomputed ratios at coarser periods.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-CONTRACTS-007](statements-contracts/07-earnings-and-margins.md#accepted-decision-for-reported-cost-earnings-and-margins).
 
 The Statements bundled leverage and coverage contract was accepted on
 2026-11-15. It covers gross debt, reported-cost EBITDA, complete TTM windows,
 positive denominators and scheduled cash service on contractual due dates.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-CONTRACTS-008](statements-contracts/08-leverage-and-coverage.md#accepted-decision-for-bundled-leverage-and-coverage).
 
 The Statements bundled period returns contract was accepted on 2026-11-15.
 It covers same-period earnings, average comparable capital, explicit
 operating tax and invested capital, and coarser-period recomputation.
-Implementation and independent qualification remain pending.
+It is implemented and qualified; ROIC reads the explicit `operating_tax` and
+`operating_invested_capital` inputs.
 [STATEMENTS-CONTRACTS-009](statements-contracts/09-returns-on-capital.md#accepted-decision-for-bundled-period-returns-on-capital).
 
 The Statements balance-sheet articulation contract was accepted on
 2026-11-15. It covers disjoint account groups, checked arithmetic,
 explicit tolerance and completeness at every model close.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-CONTRACTS-010](statements-contracts/10-balance-sheet-articulation.md#accepted-decision-for-balance-sheet-articulation).
 
 The Statements cash roll-forward and component reconciliation contract was
 accepted on 2026-11-15. It covers first-period opening cash, sourced adjustments,
 independent component checks and complete comparisons across periods.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-CONTRACTS-011](statements-contracts/11-cash-reconciliation.md#accepted-decision-for-cash-roll-forward-and-component-reconciliation).
 
 The Statements retained-earnings reconciliation contract was accepted on
 2026-11-15. It covers dated opening balances, same-scope net income, dividend
-signs, direct movements and completeness. Implementation and independent
-qualification remain pending.
+signs, direct movements and completeness. It is implemented and
+qualified.
 [STATEMENTS-CONTRACTS-012](statements-contracts/12-retained-earnings-reconciliation.md#accepted-decision-for-retained-earnings-reconciliation).
 
 The Statements data-quality contract was accepted on 2026-11-15. It covers
 required observation scope, missing and unavailable values, invalid inputs
-and advisory sign diagnostics. Implementation and independent qualification
-remain pending.
+and advisory sign diagnostics. It is implemented and qualified.
 [STATEMENTS-CONTRACTS-013](statements-contracts/13-data-quality-checks.md#accepted-decision-for-data-quality-coverage-and-validity).
 
 The Statements numerical comparison and check-suite contract was accepted on
 2026-11-15. It covers typed tolerances, unfiltered coverage verdicts, advisory
 filters, ordered suites and supplied-result provenance.
-Implementation and independent qualification remain pending.
+The tolerance rule, four-state verdicts, advisory-only filters, unique ordered
+identifiers, compatible merges, verified result provenance, typed comparison
+values and coverage findings in the analytics checks are implemented and
+qualified.
 [STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 
 The Statements formula-check contract was accepted on 2026-11-15.
 It covers explicit modes and scope, typed residual comparisons, eligibility,
-lazy observation consumption and execution errors. Implementation and
-independent qualification remain pending.
+lazy observation consumption and execution errors. It is implemented and
+qualified; the residual and its tolerance are recorded as floats until
+comparison values are typed.
 [STATEMENTS-CONTRACTS-015](statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage).
 
 The Statements wire admission, schema and error contract was accepted on
 2026-11-15. It covers bounded loading, exact wire values, validated model
-identity, canonical schemas and structured errors. Implementation and
-independent qualification remain pending.
+identity, canonical schemas and structured errors. It is reconciled and
+qualified across Rust, Python and WASM on one shared document set.
 [STATEMENTS-CONTRACTS-016](statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
 
 The Statements dependency graph, cell precedence and prepared evaluation
 contract was accepted on 2026-11-15. It covers closed dependencies, distinct
 mask states, explicit snapshots, forecast eligibility and checked plan reuse.
-Implementation and independent qualification remain pending.
+Cell states, dependency edges, plan reuse, published run provenance and the
+check suite at finalization are implemented and qualified.
 [STATEMENTS-EVALUATION-001](statements-evaluation/01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation).
 
 The Statements scalar formulas and unavailable-value contract was accepted on
 2026-11-15. It covers checked arithmetic, exact comparisons, lazy Boolean
 controls, complete aggregates, rounding and explicit annualization.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-002](statements-evaluation/02-scalar-formulas-and-undefined-values.md#accepted-decision-for-scalar-formulas-and-unavailable-values).
 
 The Statements historical offsets, growth and reporting-window contract was
 accepted on 2026-11-15. It covers exact calendar offsets, signed changes,
-Actual/365 Fixed dated growth and complete additive windows. Implementation
-and independent qualification remain pending.
+Actual/365 Fixed dated growth and complete additive windows. It is
+implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-003](statements-evaluation/03-temporal-operators-and-period-windows.md#accepted-decision-for-historical-offsets-growth-and-reporting-windows).
 
 The Statements historical statistics and EWM contract was accepted on
 2026-11-15. It covers canonical slot windows, available samples, exact
 rank ties, cumulative prefixes and slot-based EWM decay.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-004](statements-evaluation/04-historical-statistics-and-ewm.md#accepted-decision-for-historical-statistics-and-ewm).
 
 The Statements forecast segment, anchoring and bounds contract was accepted
 on 2026-11-15. It covers one forecast suffix per node and run or path,
 method-specific anchors and history, and output-only bounds.
-Implementation and independent qualification remain pending.
+The suffix, the start level or preceding-slot base, the typed unavailable
+forecast and recorded output clipping are implemented and qualified.
 [STATEMENTS-EVALUATION-005](statements-evaluation/05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
 
 The Statements deterministic forecast and fade contract was accepted on
 2026-11-15. It covers signed per-slot growth, keyed carry, stable fade
-domains and validation on empty horizons. Implementation and independent
-qualification remain pending.
+domains and validation on empty horizons. It is implemented and
+qualified.
 [STATEMENTS-EVALUATION-006](statements-evaluation/06-deterministic-forecasts-and-fades.md#accepted-decision-for-deterministic-forecasts-and-fades).
 
 The Statements stochastic forecast kernel contract was accepted on
 2026-11-15. It covers checked per-step kernels, unclipped lognormal
-restoration, explicit bootstrap and versioned PCG64 replay. Implementation
-and independent qualification remain pending.
+restoration, explicit bootstrap and versioned PCG64 replay. It is
+implemented and qualified; recording the stream version on a Monte Carlo
+result is tracked with the Monte Carlo contract.
 [STATEMENTS-EVALUATION-007](statements-evaluation/07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay).
 
 The Statements latent one-peer correlation contract was accepted on
 2026-11-15. It covers active Monte Carlo eligibility, exact zero and endpoint
-behavior, deterministic peer ordering and latent-shock replay.
-Implementation and independent qualification remain pending.
+behavior, deterministic peer ordering and latent-shock replay. It is
+implemented and qualified; the reason on a follower whose peer is unavailable
+is qualified with typed Monte Carlo samples.
 [STATEMENTS-EVALUATION-008](statements-evaluation/08-correlated-shocks.md#accepted-decision-for-latent-one-peer-correlation).
 
 The Statements trend extrapolation contract was accepted on 2026-11-15.
 It covers aligned supplied history, centered linear trend, damped Holt
-and centered moving-average forecasts. Implementation and independent
-qualification remain pending.
+and centered moving-average forecasts. It is implemented and qualified.
 [STATEMENTS-EVALUATION-009](statements-evaluation/09-trend-extrapolation.md#accepted-decision-for-trend-extrapolation).
 
 The Statements seasonal decomposition and projection contract was accepted
 on 2026-11-15. It covers aligned seasonal history, centered trend estimates,
 additive and multiplicative phase effects and per-slot projection.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-EVALUATION-010](statements-evaluation/10-seasonal-decomposition.md#accepted-decision-for-seasonal-decomposition-and-projection).
 
 The Statements Monte Carlo path, quantile and breach contract was accepted on
 2026-11-15. It covers bounded complete paths, typed metric samples, exact R-7
 quantiles, path export and strict-upper breach probability.
-Implementation and independent qualification remain pending.
+It is implemented and qualified, with one entry point that takes the
+evaluation context.
 [STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
 
 The Statements capital-state orchestration contract was accepted on
 2026-11-15. It covers dated obligations, dependency validation, one waterfall
 allocation, native and consolidated reporting, and atomic period snapshots.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-EVALUATION-012](statements-evaluation/12-capital-state-orchestration.md#accepted-decision-for-capital-state-orchestration-and-period-snapshots).
 
 The Statements typed result and export contract was accepted on 2026-11-15.
 It covers exact money, distinct cell states, long and wide tables,
 dated anchors, pricing admission and replay provenance.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-013](statements-evaluation/13-result-units-and-exports.md#accepted-decision-for-typed-results-and-exports).
 
 The Statements period rollup contract was accepted on 2026-11-15. It covers
 explicit methods, complete coarser periods, typed flow sums, closing cells,
 formula reevaluation and source provenance.
-Implementation and independent qualification remain pending.
+It is implemented and qualified, including check suites over a rolled result.
 [STATEMENTS-EVALUATION-014](statements-evaluation/14-period-rollup.md#accepted-decision-for-period-rollup).
 
 The Statements normalization bridge contract was accepted on 2026-11-15.
 It covers ordered signed adjustments, individual caps, checked bridge
 arithmetic and separate publication of adjusted metrics.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-015](statements-evaluation/15-normalization-adjustments.md#accepted-decision-for-normalization-bridges).
 
 The Statements corporate DCF contract was accepted on 2026-11-15. It covers

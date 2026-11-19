@@ -5,10 +5,15 @@
 //! credit-reasonableness checks.
 
 use finstack_quant_statements::checks::builtins::{
-    BalanceSheetArticulation, CashReconciliation, MissingValueCheck, NonFiniteCheck,
+    BalanceSheetArticulation, CashReconciliation, MissingValueCheck, NodeSelection, NonFiniteCheck,
     RetainedEarningsReconciliation,
 };
-use finstack_quant_statements::checks::{CheckSuite, PeriodScope, Severity, SignConventionPolicy};
+use finstack_quant_statements::checks::{
+    Check, CheckCategory, CheckContext, CheckResult, CheckSuite, PeriodScope, Severity,
+    SignConventionPolicy,
+};
+
+use finstack_quant_statements::types::NodeId;
 
 use super::consistency::{EffectiveTaxRateCheck, GrowthRateConsistency, WorkingCapitalConsistency};
 use super::credit::{
@@ -46,8 +51,10 @@ const RUNWAY_ERROR_MONTHS: f64 = 6.0;
 ///
 /// Includes:
 /// - **BalanceSheetArticulation** (always)
-/// - **RetainedEarningsReconciliation** (always)
-/// - **CashReconciliation** (if `total_cf_node` is provided)
+/// - **RetainedEarningsReconciliation** (if `opening_retained_earnings` is
+///   provided)
+/// - **CashReconciliation** (if `total_cf_node` and `opening_cash` are both
+///   provided)
 /// - **DepreciationReconciliation** (if `ppe_node`, `depreciation_node`, and
 ///   `capex_node` are all provided)
 /// - **CapexReconciliation** (if `capex_node` and at least one of
@@ -68,7 +75,10 @@ const RUNWAY_ERROR_MONTHS: f64 = 6.0;
 ///
 /// * `mapping` - Three-statement node mapping that identifies balance-sheet,
 ///   cash-flow, and optional depreciation-reconciliation source nodes.
-pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
+pub fn three_statement_checks(
+    mapping: ThreeStatementMapping,
+) -> finstack_quant_statements::Result<CheckSuite> {
+    let config = mapping.config.clone();
     let mut builder = CheckSuite::builder("Three-Statement Checks")
         .description("Structural and data-quality checks for a three-statement model");
 
@@ -80,21 +90,29 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
         tolerance: None,
     });
 
-    // Retained earnings reconciliation.
-    builder = builder.add_check(RetainedEarningsReconciliation {
-        retained_earnings_node: mapping.retained_earnings_node.clone(),
-        net_income_node: mapping.net_income_node.clone(),
-        dividends_node: mapping.dividends_node.clone(),
-        other_adjustments: vec![],
-        tolerance: None,
-        dividends_sign_convention: SignConventionPolicy::default(),
-    });
+    // Retained earnings reconciliation (requires an explicit opening).
+    if let Some(opening) = mapping.opening_retained_earnings.clone() {
+        builder = builder.add_check(RetainedEarningsReconciliation {
+            retained_earnings_node: mapping.retained_earnings_node.clone(),
+            net_income_node: mapping.net_income_node.clone(),
+            opening_balance: opening,
+            dividends_node: mapping.dividends_node.clone(),
+            other_adjustments: vec![],
+            tolerance: None,
+            dividends_sign_convention: SignConventionPolicy::default(),
+        });
+    }
 
-    // Cash reconciliation (requires total_cf_node).
-    if let Some(ref total_cf_node) = mapping.total_cf_node {
+    // Cash reconciliation (requires total_cf_node and an explicit opening).
+    // CFO, CFI and CFF are passed as mapped: the check rejects a partial set.
+    if let (Some(total_cf_node), Some(opening)) =
+        (&mapping.total_cf_node, mapping.opening_cash.clone())
+    {
         builder = builder.add_check(CashReconciliation {
             cash_balance_node: mapping.cash_node.clone(),
             total_cash_flow_node: total_cf_node.clone(),
+            opening_balance: opening,
+            adjustment_nodes: vec![],
             cfo_node: mapping.cfo_node.clone(),
             cfi_node: mapping.cfi_node.clone(),
             cff_node: mapping.cff_node.clone(),
@@ -187,30 +205,74 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
     });
 
     // Data quality: NaN/Inf detection.
+    // A node may serve several mapping roles; the check names it once.
+    let mapped: indexmap::IndexSet<NodeId> = mapping.all_nodes().into_iter().collect();
     builder = builder.add_check(NonFiniteCheck {
-        nodes: mapping.all_nodes(),
+        nodes: NodeSelection::named(mapped.into_iter().collect()),
     });
 
     // Data quality: required nodes present.
-    let required = vec![
+    let required: indexmap::IndexSet<NodeId> = [
         mapping.cash_node,
         mapping.retained_earnings_node,
         mapping.net_income_node,
-    ];
+    ]
+    .into_iter()
+    .collect();
     builder = builder.add_check(MissingValueCheck {
-        required_nodes: required,
+        required_nodes: required.into_iter().collect(),
         scope: PeriodScope::AllPeriods,
     });
 
-    builder.build()
+    builder.config(config).build()
 }
 
 // Credit underwriting suite
 
+/// The non-finite data-quality check scoped to the credit ratio inputs.
+///
+/// It has its own identifier so the credit suite can be merged with a suite
+/// that runs the general `non_finite` check over other nodes: a check
+/// identifier names exactly one check of a suite.
+struct CreditInputsFinite(NonFiniteCheck);
+
+impl Check for CreditInputsFinite {
+    fn id(&self) -> &str {
+        "credit_inputs_non_finite"
+    }
+
+    fn name(&self) -> &str {
+        "Credit Inputs Non-Finite"
+    }
+
+    fn category(&self) -> CheckCategory {
+        CheckCategory::DataQuality
+    }
+
+    fn execute(&self, context: &CheckContext) -> finstack_quant_statements::Result<CheckResult> {
+        let inner = self.0.execute(context)?;
+        let findings = inner
+            .findings
+            .into_iter()
+            .map(|mut finding| {
+                finding.check_id = self.id().to_string();
+                finding
+            })
+            .collect();
+        Ok(CheckResult::new(
+            self,
+            inner.evaluated,
+            findings,
+            inner.comparisons,
+        ))
+    }
+}
+
 /// Build a check suite for credit underwriting analysis.
 ///
 /// Includes:
-/// - **NonFiniteCheck** over the credit ratio inputs (always)
+/// - **NonFiniteCheck** over the credit ratio inputs, under the identifier
+///   `credit_inputs_non_finite` (always)
 /// - **LeverageRangeCheck** (always)
 /// - **CoverageFloorCheck** (always)
 /// - **FcfSignCheck** (if `fcf_node` is provided)
@@ -223,10 +285,13 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
 ///
 /// * `mapping` - Credit-analysis node mapping that identifies debt, EBITDA,
 ///   interest, and optional free-cash-flow inputs plus warning thresholds.
-pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
+pub fn credit_underwriting_checks(
+    mapping: CreditMapping,
+) -> finstack_quant_statements::Result<CheckSuite> {
     let warn = mapping.leverage_warn.unwrap_or((0.0, 6.0));
     let cov_warn = mapping.coverage_min_warn.unwrap_or(1.5);
 
+    let config = mapping.config.clone();
     let mut builder = CheckSuite::builder("Credit Underwriting Checks")
         .description("Leverage, coverage, cash-flow, and trend checks for credit analysis");
 
@@ -241,9 +306,10 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
     if let Some(ref fcf_node) = mapping.fcf_node {
         credit_nodes.push(fcf_node.clone());
     }
-    builder = builder.add_check(NonFiniteCheck {
-        nodes: credit_nodes,
-    });
+    let credit_nodes: indexmap::IndexSet<NodeId> = credit_nodes.into_iter().collect();
+    builder = builder.add_check(CreditInputsFinite(NonFiniteCheck {
+        nodes: NodeSelection::named(credit_nodes.into_iter().collect()),
+    }));
 
     builder = builder.add_check(LeverageRangeCheck {
         debt_node: mapping.debt_node.clone(),
@@ -280,6 +346,7 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
     // Trend checks — use EBITDA as a proxy for coverage direction and
     // debt/EBITDA leverage direction.
     builder = builder.add_check(TrendCheck {
+        id: format!("trend_{}", mapping.ebitda_node),
         node: mapping.ebitda_node.clone(),
         direction: TrendDirection::IncreasingIsGood,
         lookback_periods: 3,
@@ -287,13 +354,14 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
     });
 
     builder = builder.add_check(TrendCheck {
+        id: format!("trend_{}", mapping.debt_node),
         node: mapping.debt_node,
         direction: TrendDirection::DecreasingIsGood,
         lookback_periods: 3,
         severity: Severity::Warning,
     });
 
-    builder.build()
+    builder.config(config).build()
 }
 
 // LBO suite
@@ -309,15 +377,19 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
 /// * `mapping` - Three-statement node mapping used to construct structural and
 ///   data-quality checks.
 /// * `credit` - Credit-underwriting node mapping; its leverage warning range
-///   is replaced with the LBO-specific range.
-pub fn lbo_model_checks(mapping: ThreeStatementMapping, credit: CreditMapping) -> CheckSuite {
-    let ts_suite = three_statement_checks(mapping);
+///   is replaced with the LBO-specific range. Its `config` must equal
+///   `mapping.config`: the two suites merge only under one policy.
+pub fn lbo_model_checks(
+    mapping: ThreeStatementMapping,
+    credit: CreditMapping,
+) -> finstack_quant_statements::Result<CheckSuite> {
+    let ts_suite = three_statement_checks(mapping)?;
 
     let credit_override = CreditMapping {
         leverage_warn: Some((0.0, 8.0)),
         ..credit
     };
-    let credit_suite = credit_underwriting_checks(credit_override);
+    let credit_suite = credit_underwriting_checks(credit_override)?;
 
     ts_suite.merge(credit_suite)
 }

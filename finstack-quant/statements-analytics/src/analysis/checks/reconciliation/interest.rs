@@ -45,20 +45,26 @@ impl Check for InterestExpenseReconciliation {
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let tol = self.tolerance_pct.unwrap_or(0.05);
         let mut findings = Vec::new();
-        let periods = &context.model.periods;
+        let periods = context.periods();
 
         for (period_idx, period_spec) in periods.iter().enumerate() {
             let pid = &period_spec.id;
 
-            let Some(interest) =
-                get_finite_node_value(context.results, &self.interest_expense_node, pid)
-            else {
+            let Some(interest) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.interest_expense_node,
+                pid,
+                &mut findings,
+            ) else {
                 continue;
             };
 
             // Path 1: direct comparison with CS interest node.
             if let Some(ref cs_node) = self.cs_interest_node {
-                let Some(cs_interest) = get_finite_node_value(context.results, cs_node, pid) else {
+                let Some(cs_interest) =
+                    crate::analysis::checks::required(context, self, cs_node, pid, &mut findings)
+                else {
                     continue;
                 };
 
@@ -78,12 +84,13 @@ impl Check for InterestExpenseReconciliation {
                         period: Some(*pid),
                         materiality: Some(Materiality {
                             absolute: diff,
-                            relative_pct: relative * 100.0,
+                            relative_pct: Some(relative * 100.0),
                             reference_value: cs_interest,
                             reference_label: "cs_interest".to_string(),
                         }),
                         nodes: vec![self.interest_expense_node.clone(), cs_node.clone()],
                         comparison: None,
+                        coverage: false,
                     });
                 }
                 continue;
@@ -113,8 +120,13 @@ impl Check for InterestExpenseReconciliation {
                 .map(|p| p.id);
 
             for (balance_node, rate_node) in &self.debt_balance_nodes {
-                let Some(balance) = get_finite_node_value(context.results, balance_node, pid)
-                else {
+                let Some(balance) = crate::analysis::checks::required(
+                    context,
+                    self,
+                    balance_node,
+                    pid,
+                    &mut findings,
+                ) else {
                     continue;
                 };
                 let effective_balance = match prev_pid {
@@ -126,7 +138,8 @@ impl Check for InterestExpenseReconciliation {
                     None => balance,
                 };
                 if let Some(rn) = rate_node
-                    && let Some(rate) = get_finite_node_value(context.results, rn, pid)
+                    && let Some(rate) =
+                        crate::analysis::checks::required(context, self, rn, pid, &mut findings)
                 {
                     total_implied_interest += effective_balance * rate;
                     has_rate = true;
@@ -153,26 +166,19 @@ impl Check for InterestExpenseReconciliation {
                         period: Some(*pid),
                         materiality: Some(Materiality {
                             absolute: diff,
-                            relative_pct: relative * 100.0,
+                            relative_pct: Some(relative * 100.0),
                             reference_value: total_implied_interest,
                             reference_label: "implied_interest".to_string(),
                         }),
                         nodes,
                         comparison: None,
+                        coverage: false,
                     });
                 }
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        let evaluated = context.periods().len();
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

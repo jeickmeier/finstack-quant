@@ -57,6 +57,7 @@ function builtModel() {
 
 test('statements matches the cross-host golden', () => {
   const result = evaluate(MODEL);
+  const stochastic = evaluate(INPUTS.stochastic_model);
   const built = builtModel();
   const builtResult = evaluate(built);
 
@@ -71,11 +72,11 @@ test('statements matches the cross-host golden', () => {
     name: 'Synergies',
     value: { type: 'percentage_of_node', node_id: 'revenue', percentage: 0.1 },
   };
-  let extended = { target_node: 'profit', adjustments: [] };
+  let extended = { target_node: 'profit', output_node: 'adjusted_profit', adjustments: [] };
   extended = statements.normalizationConfigAddAdjustment(extended, oneOff);
   extended = statements.normalizationConfigAddAdjustment(extended, {
     ...synergy,
-    cap: { base_node: 'revenue', value: 0.05 },
+    cap: { type: 'reference', base_node: 'revenue', fraction: 0.05 },
   });
 
   const evaluator = new statements.Evaluator();
@@ -97,24 +98,26 @@ test('statements matches the cross-host golden', () => {
 
   const actual = {
     'rollup.declared_methods': rollupSpec,
-    'rollup.annual': rolledUp.nodes,
+    'rollup.annual': rolledUp.cells,
     'rollup.empty_spec': statements.statementResultRollup(
       evaluate(INPUTS.rollup_model),
       INPUTS.rollup_model,
       { frequency: 'annual' }
-    ).nodes,
+    ).cells,
     'rollup.spec_overrides': statements.statementResultRollup(
       evaluate(INPUTS.rollup_model),
       INPUTS.rollup_model,
       { frequency: 'annual', methods: { cash: 'sum' } }
-    ).nodes.cash,
+    ).cells.cash,
     'rollup.periods': rolledUp.periods,
     'result.get': orNull(statements.statementResultGet(result, 'profit', Q2)),
     'result.get_missing': orNull(statements.statementResultGet(result, 'nope', Q2)),
-    'result.get_or': statements.statementResultGetOr(result, 'nope', Q2, -1.0),
+    'result.get_or': statements.statementResultGetOr(result, 'profit', Q2, -1.0),
+    'result.get_cell': statements.statementResultGetCell(result, 'profit', Q2),
+    'result.get_cell_missing': orNull(statements.statementResultGetCell(result, 'nope', Q2)),
     'result.all_periods': statements.statementResultAllPeriods(result, 'profit'),
-    'result.get_node': orNull(statements.statementResultGetNode(result, 'profit')),
-    'result.get_node_missing': orNull(statements.statementResultGetNode(result, 'nope')),
+    'result.get_node': orNull(statements.statementResultNumericSeries(result, 'profit')),
+    'result.get_node_missing': orNull(statements.statementResultNumericSeries(result, 'nope')),
     'result.node_ids': statements.statementResultNodeIds(result),
     'result.get_scalar': orNull(statements.statementResultGetScalar(result, 'margin', Q1)),
     'result.get_money': money(statements.statementResultGetMoney(builtResult, 'cash', Q2)),
@@ -139,30 +142,44 @@ test('statements matches the cross-host golden', () => {
       statements.statementResultGet(builtResult, 'capex', Q2),
     ],
     normalize: statements.normalize(result, config),
+    'stochastic.values': Object.fromEntries(
+      statements
+        .statementResultNodeIds(stochastic)
+        .map((node) => [
+          node,
+          ['2025Q2', '2025Q3', '2025Q4'].map((period) =>
+            statements.statementResultGet(stochastic, node, period)
+          ),
+        ])
+    ),
+    'stochastic.streams': stochastic.provenance.forecast_streams,
     forecast_specs: [
       { method: 'forward_fill' },
       { method: 'growth_pct', params: { rate: 0.05 } },
       { method: 'curve_pct', params: { curve: [0.05, 0.04] } },
-      { method: 'normal', params: { mean: 100.0, std_dev: 10.0, seed: 7 } },
-      { method: 'log_normal', params: { mean: 0.0, std_dev: 0.2, seed: 7 } },
+      { method: 'normal', params: { mean: 100.0, std_dev: 10.0, seed: '7' } },
+      { method: 'log_normal', params: { mean: 0.0, std_dev: 0.2, seed: '7' } },
       { method: 'override', params: { overrides: { [Q2]: 125.0 } } },
       {
         method: 'seasonal',
         params: { historical: [1.0, 2.0, 3.0, 4.0], season_length: 4, mode: 'additive' },
       },
-      { method: 'time_series', params: { historical: [1.0, 2.0, 3.0] } },
-      { method: 'fade_to_target', params: { target: 50.0 } },
+      { method: 'time_series', params: { historical: [1.0, 2.0, 3.0], method: 'linear' } },
+      { method: 'fade_to_target', params: { target: 50.0, shape: 'linear' } },
       {
         method: 'mean_reverting',
-        params: { long_run_mean: 100.0, reversion_speed: 0.5, std_dev: 5.0, seed: 11 },
+        params: { long_run_mean: 100.0, reversion_speed: 0.5, std_dev: 5.0, seed: '11' },
       },
-      { method: 'bootstrap', params: { historical: [1.0, 2.0, 3.0], seed: 13 } },
+      {
+        method: 'bootstrap',
+        params: { historical: [1.0, 2.0, 3.0], mode: 'growth', seed: '13' },
+      },
     ],
     adjustments: [
       oneOff,
       synergy,
-      { ...synergy, cap: { base_node: 'revenue', value: 0.05 } },
-      { ...synergy, cap: { base_node: null, value: 3.0, base_mode: 'progressive' } },
+      { ...synergy, cap: { type: 'reference', base_node: 'revenue', fraction: 0.05 } },
+      { ...synergy, cap: { type: 'absolute', amount: 3.0 } },
       { ...oneOff, category: 'non_recurring' },
     ],
     'normalization_config.add_adjustment': extended,
@@ -248,7 +265,7 @@ test('statements matches the cross-host golden', () => {
 test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes a PeriodPlan', () => {
   const resumed = statements.ModelBuilder.fromSpec(MODEL);
   resumed.compute('double', 'revenue * 2');
-  resumed.whereClause('revenue > 0');
+  resumed.whereClause('double', 'revenue > 0');
   assert.deepEqual(statements.modelNodeIds(resumed.build()), [
     'revenue',
     'cogs',
@@ -313,44 +330,47 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
   builder.periods('2025Q1..Q4');
   builder.valueScalar('revenue', { [Q1]: 100.0 });
   builder.addMetricFromRegistry('custom.half', registry);
-  builder.addBond(
-    'BOND-1',
-    { amount: '1000000', currency: 'USD' },
-    0.05,
-    '2025-01-15',
-    '2030-01-15',
-    'USD-OIS'
-  );
-  builder.addBondWithConvention({
-    id: 'BOND-2',
+  // Instruments come from the Valuations API; Statements has no bond or swap
+  // construction helpers.
+  const { core, valuations } = facade;
+  const usd = new core.Currency('USD');
+  const bond = (id, convention, coupon) =>
+    valuations.instruments.Bond.withConvention(
+      id,
+      new core.Money(1_000_000, usd),
+      new core.Rate(coupon),
+      '2025-01-15',
+      '2030-01-15',
+      convention,
+      'USD-OIS'
+    );
+  const swap = valuations.instruments.InterestRateSwap.fromConventions({
+    id: 'SWAP-1',
     notional: { amount: '1000000', currency: 'USD' },
-    coupon_rate: 0.03,
-    issue_date: '2025-01-15',
-    maturity_date: '2030-01-15',
-    convention: 'us_treasury',
-    discount_curve_id: 'USD-OIS',
-  });
-  const swap = (id) => ({
-    id,
-    notional: { amount: '1000000', currency: 'USD' },
+    side: 'pay',
     fixed_rate: 0.04,
     start_date: '2025-01-15',
-    maturity_date: '2030-01-15',
+    maturity: '2030-01-15',
+    index_id: 'USD-SOFR-3M',
     discount_curve_id: 'USD-OIS',
     forward_curve_id: 'USD-SOFR-3M',
   });
-  builder.addSwap(swap('SWAP-1'));
-  builder.addSwapWithConventions(swap('SWAP-2'), {
-    fixed_frequency: { count: 1, unit: 'years' },
-    fixed_day_count: 'act_360',
-    float_frequency: { count: 3, unit: 'months' },
-    float_day_count: 'act_360',
-    business_day_convention: 'modified_following',
-  });
+  const treasury = bond('BOND-2', 'us_treasury', 0.03);
+  builder.addDebt('BOND-1', bond('BOND-1', 'us_corporate', 0.05).toJson());
+  builder.addDebt('BOND-2', treasury.toJson());
+  builder.addDebt('SWAP-1', swap.toJson());
+  for (const helper of ['addBond', 'addBondWithConvention', 'addSwap', 'addSwapWithConventions'])
+    assert.equal(builder[helper], undefined);
   const model = builder.build();
   registry.free();
   const ids = model.capital_structure.debt_instruments.map((instrument) => instrument.id);
-  assert.deepEqual(ids, ['BOND-1', 'BOND-2', 'SWAP-1', 'SWAP-2']);
+  assert.deepEqual(ids, ['BOND-1', 'BOND-2', 'SWAP-1']);
+  // The model holds the canonical instrument unchanged: resolved terms and
+  // the elected convention survive attachment.
+  assert.deepEqual(
+    model.capital_structure.debt_instruments[1].spec,
+    JSON.parse(treasury.toJson()).instrument
+  );
   assert.equal(model.capital_structure.reporting_currency, 'USD');
   assert.equal(model.capital_structure.fx_policy, 'period_end');
   assert.ok(statements.modelNodeIds(model).includes('custom.half'));
@@ -366,41 +386,26 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
     priority_of_payments: ['fees', 'interest', 'amortization', 'equity'],
     available_cash_node: 'cash',
   });
-  withDebt.withBuiltinMetrics();
-  assert.equal(withDebt.build().capital_structure.debt_instruments[0].id, 'BOND-3');
+  const debtModel = withDebt.build();
+  assert.equal(debtModel.capital_structure.debt_instruments[0].id, 'BOND-3');
+  // The whole catalogue reads inputs this model does not define, and build
+  // resolves every formula reference.
+  const wholeCatalogue = new statements.ModelBuilder('whole-catalogue');
+  wholeCatalogue.periods('2025Q1..Q4');
+  wholeCatalogue.valueScalar('revenue', { [Q1]: 100.0 });
+  wholeCatalogue.withBuiltinMetrics();
+  assert.throws(() => wholeCatalogue.build(), /Unknown identifier/);
 
   const bad = new statements.ModelBuilder('bad');
   assert.throws(
     () => bad.fxPolicy('sometimes'),
     (e) => e.kind === 'validation'
   );
-  assert.throws(
-    () =>
-      bad.addBondWithConvention({
-        id: 'B',
-        notional: { amount: '1', currency: 'USD' },
-        coupon_rate: 0.01,
-        issue_date: '2025-01-15',
-        maturity_date: '2030-01-15',
-        convention: 'martian',
-        discount_curve_id: 'USD-OIS',
-      }),
-    (e) => e.kind === 'validation'
-  );
-
   // A capital-structure call rejected by Rust leaves the builder usable.
   assert.throws(
     () =>
-      bad.addSwap({
-        id: 'SEK-SWAP',
-        notional: { amount: '1000000', currency: 'SEK' },
-        fixed_rate: 0.03,
-        start_date: '2025-01-15',
-        maturity_date: '2030-01-15',
-        discount_curve_id: 'SEK-OIS',
-        forward_curve_id: 'SEK-STIBOR-3M',
-      }),
-    (e) => /no standard rates calendar/.test(e.message)
+      bad.addDebt('B', { schema: 'finstack_quant.instrument/1', instrument: { type: 'martian' } }),
+    (e) => e.kind === 'validation'
   );
   bad.periods('2025Q1..Q2');
   bad.valueScalar('revenue', { [Q1]: 1.0 });
@@ -429,6 +434,7 @@ test('builder lines roll up with their declared method under an empty spec', () 
   const builder = new statements.ModelBuilder('declared');
   builder.periods('2025Q1..Q4');
   builder.value('flow', quarters);
+  builder.rollup('flow', 'sum');
   builder.value('balance', quarters);
   builder.rollup('balance', 'period_end');
   assert.throws(
@@ -441,26 +447,30 @@ test('builder lines roll up with their declared method under an empty spec', () 
   const model = mixed.build().build();
   assert.equal(model.nodes.mixed_balance.rollup, 'period_end');
   const annual = statements.statementResultRollup(evaluate(model), model, { frequency: 'annual' });
-  assert.equal(annual.nodes.flow['2025'], 100);
-  assert.equal(annual.nodes.balance['2025'], 40);
-  assert.equal(annual.nodes.mixed_balance['2025'], 40);
+  assert.equal(annual.cells.flow['2025'].value, 100);
+  assert.equal(annual.cells.balance['2025'].value, 40);
+  assert.equal(annual.cells.mixed_balance['2025'].value, 40);
 });
 
 test('Evaluator.evaluateWithMarket and evaluateMonteCarlo keep their Rust twins', () => {
   const evaluator = new statements.Evaluator();
   assert.throws(
-    () => evaluator.evaluateWithMarket(MODEL, {}, 'not-a-date'),
+    () => evaluator.evaluateWithMarket(MODEL, {}, 'not-a-date', 'full_snapshot'),
     (e) => e.kind === 'validation'
   );
   assert.throws(
-    () => evaluator.evaluateMonteCarlo(MODEL, { n_paths: 0, seed: 1 }),
+    () => evaluator.evaluateMonteCarlo(MODEL, { n_paths: 0, seed: '1', metrics: ['revenue'] }),
     (e) => e.kind === 'validation'
   );
   assert.throws(
     () => evaluator.withChecks({ name: 'x', unknown_key: 1 }),
     (e) => e.kind === 'validation'
   );
-  const results = evaluator.evaluateMonteCarlo(MODEL, { n_paths: 4, seed: 1 });
+  const results = evaluator.evaluateMonteCarlo(MODEL, {
+    n_paths: 4,
+    seed: '1',
+    metrics: ['revenue'],
+  });
   assert.equal(results.n_paths, 4);
   evaluator.free();
 });
@@ -510,26 +520,38 @@ test('normalization validation and duplicate adjustments are rejected in Rust', 
     () =>
       statements.validateNormalizationConfigJson({
         target_node: 'profit',
+        output_node: 'adjusted_profit',
         adjustments: [config.adjustments[0], config.adjustments[0]],
       }),
     (e) => e.kind === 'validation'
   );
 });
 
-test('mergeIntoResults writes normalized values back as a node', () => {
+test('mergeIntoResults publishes the adjusted metric under a new node', () => {
   const result = evaluate(MODEL);
-  const normalized = statements.normalize(result, INPUTS.normalization_config);
-  const merged = statements.mergeIntoResults(result, normalized, 'adjusted_profit');
+  const config = INPUTS.normalization_config;
+  const normalized = statements.normalize(result, config);
+  const merged = statements.mergeIntoResults(result, config);
   for (const row of normalized) {
     assert.equal(
       statements.statementResultGet(merged, 'adjusted_profit', row.period),
       row.final_value
     );
   }
+  // The reported node is untouched and the result records the bridge.
+  assert.deepEqual(merged.cells.profit, result.cells.profit);
+  assert.deepEqual(merged.normalizations.adjusted_profit, config);
   assert.equal(statements.statementResultGet(result, 'adjusted_profit', Q1), undefined);
+  // An existing node, a second publication and the target itself are rejected.
+  for (const output of ['revenue', 'profit']) {
+    assert.throws(
+      () => statements.mergeIntoResults(result, { ...config, output_node: output }),
+      (e) => e.name === 'FinstackError' && e.kind === 'validation'
+    );
+  }
   assert.throws(
-    () => statements.mergeIntoResults(result, [normalized[0], normalized[0]], 'x'),
-    (e) => e.name === 'FinstackError'
+    () => statements.mergeIntoResults(merged, config),
+    (e) => e.kind === 'validation' && /already hold/.test(e.message)
   );
 });
 
@@ -599,4 +621,66 @@ test('component lookup covers all flows and scopes', () => {
       ),
     (e) => e.kind === 'validation'
   );
+});
+
+test('named edits, snapshot identity and the observation cutoff replay a revision', () => {
+  const snapshot = () => {
+    const builder = new statements.ModelBuilder('replay');
+    builder.periods('2025Q1..Q2', '2025Q1');
+    builder.valueScalar('revenue', { '2025Q1': 100.0, '2025Q2': 125.0 });
+    builder.availabilityDates('revenue', { '2025Q1': '2025-04-25' });
+    builder.sourceSnapshot('original');
+    return builder.build();
+  };
+  const original = snapshot();
+  assert.equal(original.source_snapshot, 'original');
+  const revised = statements.applyModelEdits(original, [
+    {
+      edit: 'set_observation',
+      node_id: 'revenue',
+      period: '2025Q1',
+      value: 110.0,
+      availability_date: '2025-05-15',
+    },
+  ]);
+  assert.equal(original.nodes.revenue.values['2025Q1'], 100.0);
+
+  const read = (model, cutoff) => {
+    const evaluator = new statements.Evaluator();
+    try {
+      return evaluator.evaluateWithMarket(
+        model,
+        INPUTS.capital_structure_market,
+        '2025-06-30',
+        cutoff
+      ).cells.revenue['2025Q1'];
+    } finally {
+      evaluator.free();
+    }
+  };
+  const hidden = { status: 'unavailable', reason: 'hidden_by_cutoff' };
+  assert.equal(read(original, '2025-04-25').value, 100.0);
+  assert.deepEqual(read(original, '2025-04-24'), hidden);
+  assert.equal(read(revised, '2025-05-15').value, 110.0);
+  assert.deepEqual(read(revised, '2025-05-14'), hidden);
+  assert.deepEqual(read(revised, 'full_snapshot'), {
+    status: 'value',
+    value: 110.0,
+    source: 'value',
+  });
+
+  assert.throws(
+    () => statements.applyModelEdits(original, [{ edit: 'remove_node', node_id: 'absent' }]),
+    /unknown node 'absent'/
+  );
+  const duplicate = new statements.ModelBuilder('duplicates');
+  duplicate.periods('2025Q1..Q1');
+  duplicate.valueScalar('revenue', { '2025Q1': 1.0 });
+  duplicate.valueScalar('revenue', { '2025Q1': 2.0 });
+  assert.throws(() => duplicate.build(), /defined more than once/);
+  const edited = statements.ModelBuilder.fromSpec(original);
+  edited.removeNode('revenue');
+  edited.valueScalar('revenue', { '2025Q1': 1.0 });
+  edited.replaceNode({ node_id: 'revenue', node_type: 'value', values: { '2025Q1': 2.0 } });
+  assert.equal(edited.build().nodes.revenue.values['2025Q1'], 2.0);
 });

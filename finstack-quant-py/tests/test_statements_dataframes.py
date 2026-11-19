@@ -29,7 +29,8 @@ CHECK_RESULT_COLUMNS = [
     "check_id",
     "check_name",
     "category",
-    "passed",
+    "outcome",
+    "evaluated",
     "finding_count",
 ]
 
@@ -48,6 +49,7 @@ CHECK_FINDING_COLUMNS = [
     "comparison_actual",
     "comparison_expected",
     "comparison_tolerance",
+    "comparison_currency",
 ]
 
 PATH_COLUMNS = ["path_id", "period", "metric", "value"]
@@ -56,11 +58,14 @@ PATH_COLUMNS = ["path_id", "period", "metric", "value"]
 def _empty_report() -> CheckReport:
     """A report from a suite that ran no checks at all."""
     payload = {
+        "outcome": "unevaluated",
         "results": [],
         "summary": {
             "total_checks": 0,
             "passed": 0,
             "failed": 0,
+            "incomplete": 0,
+            "unevaluated": 0,
             "errors": 0,
             "warnings": 0,
             "infos": 0,
@@ -72,12 +77,14 @@ def _empty_report() -> CheckReport:
 def _populated_report() -> CheckReport:
     """Two check results carrying three findings (1 error, 1 warning, 1 info)."""
     payload = {
+        "outcome": "fail",
         "results": [
             {
                 "check_id": "balance_sheet_articulation",
                 "check_name": "Balance Sheet Articulation",
                 "category": "accounting_identity",
-                "passed": False,
+                "outcome": "fail",
+                "evaluated": 1,
                 "findings": [
                     {
                         "check_id": "balance_sheet_articulation",
@@ -106,7 +113,8 @@ def _populated_report() -> CheckReport:
                 "check_id": "missing_values",
                 "check_name": "Missing Values",
                 "category": "data_quality",
-                "passed": True,
+                "outcome": "pass",
+                "evaluated": 1,
                 "findings": [
                     {
                         "check_id": "missing_values",
@@ -123,6 +131,8 @@ def _populated_report() -> CheckReport:
             "total_checks": 2,
             "passed": 1,
             "failed": 1,
+            "incomplete": 0,
+            "unevaluated": 0,
             "errors": 1,
             "warnings": 1,
             "infos": 1,
@@ -138,7 +148,7 @@ def _monte_carlo_results(*, include_path_data: bool, n_paths: int = 16) -> Monte
     builder.value("revenue", [("2025Q1", 100.0)])
     builder.forecast("revenue", ForecastSpec.normal(0.0, 5.0, 42))
     model = builder.build()
-    config = MonteCarloConfig(n_paths, 7, [0.05, 0.5, 0.95], include_path_data)
+    config = MonteCarloConfig(n_paths, 7, ["revenue"], [0.05, 0.5, 0.95], include_path_data)
     return Evaluator().evaluate_monte_carlo(model, config)
 
 
@@ -172,9 +182,9 @@ def test_check_report_to_dataframe_has_one_row_per_check() -> None:
 
     by_id = df.set_index("check_id")
     assert by_id.loc["balance_sheet_articulation", "category"] == "accounting_identity"
-    assert bool(by_id.loc["balance_sheet_articulation", "passed"]) is False
+    assert by_id.loc["balance_sheet_articulation", "outcome"] == "fail"
     assert int(by_id.loc["balance_sheet_articulation", "finding_count"]) == 2
-    assert bool(by_id.loc["missing_values", "passed"]) is True
+    assert by_id.loc["missing_values", "outcome"] == "pass"
     assert int(by_id.loc["missing_values", "finding_count"]) == 1
 
 

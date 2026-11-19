@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from finstack_quant.statements import CheckReport
+from finstack_quant.statements import CheckConfig, CheckReport
 
 class CreditMapping:
     """
@@ -40,6 +40,9 @@ class CreditMapping:
         Rust default ``(0.0, 6.0)``.
     coverage_min_warn : float | None
         Minimum EBITDA/interest coverage in turns before a warning.
+    config : CheckConfig | dict | None
+        Comparison and reporting policy of the suite. ``None`` compares
+        identities exactly; state a tolerance for floating-point models.
 
     Examples
     --------
@@ -63,6 +66,7 @@ class CreditMapping:
         cash_burn_node: str | None = None,
         leverage_warn: tuple[float, float] | None = None,
         coverage_min_warn: float | None = None,
+        config: CheckConfig | dict[str, Any] | None = None,
     ) -> None: ...
     @property
     def debt_node(self) -> str:
@@ -147,6 +151,19 @@ class CreditMapping:
         -------
         tuple[float, float] | None
             ``(min, max)`` leverage warning band in turns, or ``None``.
+        """
+    @property
+    def config(self) -> CheckConfig:
+        """
+        Comparison and reporting policy of the suite.
+
+        This property does not raise.
+
+        Returns
+        -------
+        CheckConfig
+            The policy the suite built from this mapping runs under.
+            Identities are compared exactly unless it states a tolerance.
         """
     @property
     def coverage_min_warn(self) -> float | None:
@@ -277,6 +294,17 @@ class ThreeStatementMapping:
         Current-asset nodes for the working-capital check. Default ``[]``.
     current_liabilities_nodes : list[str]
         Current-liability nodes for the working-capital check. Default ``[]``.
+    opening_cash : dict | None
+        Opening cash at the start of the first period, as
+        ``{"date": "2025-01-01", "value": 80.0}`` (``value`` is a number, or
+        ``{"amount", "currency"}`` for money). The cash roll-forward runs only
+        when it and ``total_cf_node`` are both given.
+    opening_retained_earnings : dict | None
+        Opening retained earnings at the start of the first period, in the
+        same form. The retained-earnings reconciliation runs only when given.
+    config : CheckConfig | dict | None
+        Comparison and reporting policy of the suite. ``None`` compares
+        identities exactly; state a tolerance for floating-point models.
 
     Examples
     --------
@@ -320,6 +348,9 @@ class ThreeStatementMapping:
         wc_change_cf_node: str | None = None,
         current_assets_nodes: list[str] = ...,
         current_liabilities_nodes: list[str] = ...,
+        opening_cash: dict[str, Any] | None = None,
+        opening_retained_earnings: dict[str, Any] | None = None,
+        config: CheckConfig | dict[str, Any] | None = None,
     ) -> None: ...
     @property
     def cash_node(self) -> str:
@@ -610,6 +641,46 @@ class ThreeStatementMapping:
             Current-asset nodes.
         """
     @property
+    def config(self) -> CheckConfig:
+        """
+        Comparison and reporting policy of the suite.
+
+        This property does not raise.
+
+        Returns
+        -------
+        CheckConfig
+            The policy the suite built from this mapping runs under.
+            Identities are compared exactly unless it states a tolerance.
+        """
+    @property
+    def opening_cash(self) -> dict[str, Any] | None:
+        """
+        Opening cash at the first period boundary, or ``None``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``{"date", "value"}``: the ISO date of the balance and its value,
+            a number or ``{"amount", "currency"}``. ``None`` leaves the cash
+            roll-forward out of the suite.
+        """
+    @property
+    def opening_retained_earnings(self) -> dict[str, Any] | None:
+        """
+        Opening retained earnings at the first period boundary, or ``None``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``{"date", "value"}`` as for :attr:`opening_cash`. ``None``
+            leaves the retained-earnings reconciliation out of the suite.
+        """
+    @property
     def current_liabilities_nodes(self) -> list[str]:
         """
         Current-liability nodes.
@@ -743,8 +814,9 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
         Typed ``finstack_quant.statements.CheckSuiteSpec``, its serde dict, or
         JSON string.
     results : StatementResult | str | None
-        Pre-computed evaluation results; when provided the model is not
-        re-evaluated. Accounting identity checks require supplied node-unit
+        Pre-computed evaluation results, or a rollup of them
+        (``StatementResult.rollup``), which is checked at its target periods;
+        when provided the model is not re-evaluated. Accounting identity checks require supplied node-unit
         metadata to agree with the model's declarations or explicit monetary values.
 
     Returns
@@ -778,6 +850,8 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
     ...             "name": "positive",
     ...             "category": "internal_consistency",
     ...             "severity": "error",
+    ...             "mode": "predicate",
+    ...             "scope": "all_periods",
     ...             "formula": "revenue > 0",
     ...             "message_template": "bad {period}",
     ...         }

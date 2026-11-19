@@ -4,11 +4,9 @@
 //! `ForecastSpec`, `Adjustment`, `NormalizationConfig`, `CheckConfig` and `CheckSuiteSpec`
 //! is a function that returns (or takes) the plain object.
 
-use crate::utils::input::{from_js_json, js_string};
+use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_statements::adjustments::{
-    Adjustment, NormalizationConfig, NormalizationResult,
-};
+use finstack_quant_statements::adjustments::{Adjustment, NormalizationConfig};
 use finstack_quant_statements::checks::{BuiltinCheckSpec, CheckConfig};
 use finstack_quant_statements::evaluator::StatementResult;
 use wasm_bindgen::prelude::*;
@@ -56,18 +54,28 @@ pub fn validate_normalization_config_json(
     crate::utils::input::validated_json(&json, NormalizationConfig::validate)
 }
 
-/// Normalize a target metric by applying an adjustment catalog period by period.
+/// Build the ordered bridge from a reported node to its adjusted value for every period.
 ///
-/// Twin of Python `normalize` (Rust `adjustments::normalize`).
-/// @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
-/// @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-/// @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.
+/// Twin of Python `normalize` (Rust `adjustments::normalize`). The whole
+/// configuration is validated before any period is calculated. Each period
+/// starts from the reported target value and applies the adjustments in
+/// declaration order: a signed fixed amount (zero for a period not listed)
+/// or a signed decimal percentage of a reference node's reported value. Each
+/// cap limits its own adjustment's magnitude and keeps its sign. Money is
+/// exact and nothing is converted between currencies. Nothing is written to
+/// the results.
+/// @param results - Evaluated or rolled-up `StatementResult` holding the target node and any reference nodes, with its period plan (object or JSON).
+/// @param config - `NormalizationConfig`: the reported `target_node`, the new `output_node` and the ordered adjustments. A fixed amount and an absolute cap are in the target's units: a number for a scalar target, `{amount, currency}` for a monetary one (object or JSON).
+/// @returns One `NormalizationResult` per period of the plan, in timeline order: the reported `base_value`, each row (raw amount, cap base and limit, applied amount and `adjusted_value`, the target through that row) and the `final_value`. A period whose target, percentage reference or cap base has no value carries `unavailable` with the reason and no rows.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if an input is malformed, the target node or
-/// a referenced node is absent from the results, the configuration is
-/// invalid, or the target and a reference node have incompatible units.
+/// Throws with kind `validation` if an input is malformed, the results carry
+/// no period plan, the output node is empty or equals the target, an
+/// adjustment id repeats, the target or a referenced node is absent or has no
+/// recorded units, units or currencies differ, a fixed amount names a period
+/// outside the plan, a number is non-finite or a cap negative, or any row's
+/// arithmetic cannot be represented.
 #[wasm_bindgen(js_name = normalize, unchecked_return_type = "generated.statements.NormalizationResult[]")]
 pub fn normalize(
     #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
@@ -81,44 +89,35 @@ pub fn normalize(
     )
 }
 
-/// Write normalized values back into statement results as a node.
+/// Publish the adjusted metric of a normalization configuration as a new node.
 ///
 /// Twin of Python `merge_into_results` (Rust
-/// `adjustments::merge_into_results`). Each period's `final_value`
-/// becomes node `outputNodeId` with the shared unit (and currency for monetary
-/// values), replacing any existing node of that name across all periods. The
-/// attached check report is cleared because it describes the values before the
-/// merge. Rust updates its argument in place; here the merged copy is returned.
-/// @param results - Evaluated `StatementResult` to merge into (object or JSON); left unchanged.
-/// @param normalizationResults - `NormalizationResult` array from `normalize`, all with the same unit and currency (object or JSON); an empty array returns an unchanged copy.
-/// @param outputNodeId - Node to create or replace, e.g. `"adjusted_ebitda"`.
-/// @returns The merged `StatementResult`.
+/// `adjustments::merge_into_results`). The bridge is calculated from
+/// `config`, so the published values always agree with the configuration
+/// recorded for them in the result's `normalizations`. The new node is
+/// `config.output_node`; a period without an adjusted value is published as
+/// an unavailable cell. The reported target, every other node and the check
+/// report are left as they are. Rust updates its argument in place; here the
+/// updated copy is returned.
+/// @param results - `StatementResult` of an evaluation run, or a rollup of one (object or JSON); left unchanged.
+/// @param config - `NormalizationConfig` to calculate and publish (object or JSON).
+/// @returns The `StatementResult` holding the new node, its units and the configuration under `normalizations`.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if an input is malformed, and the kind of the
-/// Rust error if the results mix units or currencies, repeat a period or hold a
-/// non-finite value.
+/// Throws with kind `validation` if an input is malformed, the results record
+/// no source run, they already hold a node named `config.output_node`, or
+/// `normalize` rejects the configuration. Nothing is published on error.
 #[wasm_bindgen(js_name = mergeIntoResults, unchecked_return_type = "StatementResult")]
 pub fn merge_into_results(
     #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
-    #[wasm_bindgen(
-        js_name = "normalizationResults",
-        unchecked_param_type = "generated.statements.NormalizationResult[] | string"
-    )]
-    normalization_results: JsValue,
-    #[wasm_bindgen(js_name = "outputNodeId", unchecked_param_type = "string")]
-    output_node_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.NormalizationConfig | string")]
+    config: JsValue,
 ) -> Result<JsValue, JsValue> {
     let mut results: StatementResult = from_js_json(&results, "results")?;
-    let normalization_results: Vec<NormalizationResult> =
-        from_js_json(&normalization_results, "normalizationResults")?;
-    finstack_quant_statements::adjustments::merge_into_results(
-        &mut results,
-        &normalization_results,
-        &js_string(&output_node_id, "outputNodeId")?,
-    )
-    .map_err(to_js_err)?;
+    let config: NormalizationConfig = from_js_json(&config, "config")?;
+    finstack_quant_statements::adjustments::merge_into_results(&mut results, &config)
+        .map_err(to_js_err)?;
     to_js_value(&results)
 }
 

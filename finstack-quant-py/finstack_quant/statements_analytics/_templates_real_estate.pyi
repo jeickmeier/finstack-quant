@@ -1593,6 +1593,7 @@ def add_rent_roll(
     >>> from finstack_quant.statements import FinancialModelSpec, ModelBuilder
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
+    >>> _ = builder.value("other_income", [("2025Q1", 5.0)])
     >>> model = builder.build()
     >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
     >>> add_rent_roll(model, [lease]).has_node("rent_effective")
@@ -1646,6 +1647,7 @@ def add_property_operating_statement(
     >>> from finstack_quant.statements import FinancialModelSpec, ModelBuilder
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
+    >>> _ = builder.value("other_income", [("2025Q1", 5.0)])
     >>> model = builder.build()
     >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
     >>> updated = add_property_operating_statement(model, [lease], [], [], [])

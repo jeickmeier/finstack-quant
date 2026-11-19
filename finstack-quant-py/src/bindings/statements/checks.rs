@@ -7,21 +7,22 @@ use crate::bindings::pandas_utils::{ColumnSchema, serde_to_py};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{serde_json_to_py, statements_to_py, value_error};
 use finstack_quant_statements::checks::{
-    BuiltinCheckSpec, CheckCategory, CheckConfig, CheckFinding, FormulaCheckSpec, Severity,
+    BuiltinCheckSpec, CheckConfig, CheckFinding, FormulaCheckSpec, Severity,
 };
 use pyo3::prelude::*;
 
 /// Columns emitted by [`PyCheckReport::to_dataframe`].
-const CHECK_RESULT_COLUMNS: [ColumnSchema<'static>; 5] = [
+const CHECK_RESULT_COLUMNS: [ColumnSchema<'static>; 6] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
-    ("passed", "bool"),
+    ("outcome", "str"),
+    ("evaluated", "int64"),
     ("finding_count", "int64"),
 ];
 
 /// Columns emitted by [`PyCheckReport::to_findings_dataframe`].
-const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 14] = [
+const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 15] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
@@ -36,10 +37,11 @@ const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 14] = [
     ("comparison_actual", "float64"),
     ("comparison_expected", "float64"),
     ("comparison_tolerance", "float64"),
+    ("comparison_currency", "str"),
 ];
 
 /// Columns emitted by [`PyCheckReport::to_comparisons_dataframe`].
-const CHECK_COMPARISON_COLUMNS: [ColumnSchema<'static>; 10] = [
+const CHECK_COMPARISON_COLUMNS: [ColumnSchema<'static>; 11] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
@@ -49,25 +51,25 @@ const CHECK_COMPARISON_COLUMNS: [ColumnSchema<'static>; 10] = [
     ("expected", "float64"),
     ("difference", "float64"),
     ("tolerance", "float64"),
+    ("currency", "str"),
     ("within_tolerance", "bool"),
 ];
+
+/// ISO code of a comparison's currency; `None` for a scalar comparison.
+fn comparison_currency(
+    comparison: &finstack_quant_statements::checks::CheckComparison,
+) -> Option<String> {
+    comparison
+        .difference
+        .as_money()
+        .map(|money| money.currency().to_string())
+}
 
 /// Parse a severity discriminant (``"info"`` / ``"warning"`` / ``"error"``).
 fn parse_severity(severity: &str) -> PyResult<Severity> {
     finstack_quant_core::wire::serde_parse(severity).map_err(|e| {
         value_error(format!(
             "invalid severity {severity:?}: {e}; expected info, warning, or error"
-        ))
-    })
-}
-
-/// Parse a check category discriminant.
-fn parse_category(category: &str) -> PyResult<CheckCategory> {
-    finstack_quant_core::wire::serde_parse(category).map_err(|e| {
-        value_error(format!(
-            "invalid check category {category:?}: {e}; expected accounting_identity, \
-             cross_statement_reconciliation, internal_consistency, credit_reasonableness, \
-             or data_quality"
         ))
     })
 }
@@ -90,6 +92,13 @@ pub struct PyCheckConfig {
     pub(super) inner: CheckConfig,
 }
 
+impl PyCheckConfig {
+    /// Wrap a Rust check configuration.
+    pub(crate) fn from_inner(inner: CheckConfig) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyCheckConfig {
     /// Build a check configuration.
@@ -101,11 +110,11 @@ impl PyCheckConfig {
     /// ----------
     /// default_tolerance : float | None
     ///     Absolute equality tolerance in the compared nodes' own units
-    ///     (Rust default ``0.01``, one cent when nodes are in whole dollars);
+    ///     (default ``0.0``: identities must hold exactly);
     ///     finite and non-negative.
     /// default_relative_tolerance : float | None
     ///     Relative tolerance as a decimal fraction of the reference
-    ///     magnitude (Rust default ``1e-9``); finite and non-negative, with
+    ///     magnitude (default ``0.0``: no relative term); finite and non-negative, with
     ///     zero disabling the relative component.
     /// materiality_threshold : float | None
     ///     Advisory (info/warning) findings whose absolute materiality is
@@ -233,62 +242,16 @@ wire_methods!(PyFormulaCheckSpec, FormulaCheckSpec, "FormulaCheckSpec");
 
 #[pymethods]
 impl PyFormulaCheckSpec {
-    /// Build a formula check.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique identifier for this check instance.
-    /// name : str
-    ///     Human-readable name shown in reports.
-    /// formula : str
-    ///     Statements DSL predicate (``"revenue > 0"``,
-    ///     ``"cs.debt_balance.total <= 5 * ebitda"``). Uses the same
-    ///     evaluator as calculated nodes, including time-series functions.
-    /// message_template : str
-    ///     Finding message; ``{period}`` is replaced at run time.
-    /// category : str
-    ///     One of ``accounting_identity``, ``cross_statement_reconciliation``,
-    ///     ``internal_consistency``, ``credit_reasonableness``,
-    ///     ``data_quality``. Required, as in the Rust/JSON form.
-    /// severity : str
-    ///     Severity of findings: ``"info"``, ``"warning"`` or ``"error"``.
-    ///     Only error findings fail a report. Required, as in the Rust/JSON
-    ///     form.
-    /// tolerance : float | None
-    ///     Optional finite, non-negative absolute residual bound in the formula's
-    ///     result units. With ``None``, finite nonzero predicate outputs pass;
-    ///     with a bound, absolute outputs at or below it pass. Validated at execution.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``category`` or ``severity`` is not a known discriminant.
-    ///     Formula syntax is validated when the suite runs against a model.
+    #[doc = pydoc!("finstack_quant.statements._checks", "FormulaCheckSpec.__init__")]
     #[new]
-    #[pyo3(
-        signature = (id, name, formula, message_template, category, severity, tolerance=None),
-        text_signature = "(id, name, formula, message_template, category, severity, tolerance=None)"
-    )]
-    fn new(
-        id: String,
-        name: String,
-        formula: String,
-        message_template: String,
-        category: &str,
-        severity: &str,
-        tolerance: Option<f64>,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (spec), text_signature = "(spec)")]
+    fn new(spec: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: FormulaCheckSpec {
-                id,
-                name,
-                category: parse_category(category)?,
-                severity: parse_severity(severity)?,
-                formula,
-                message_template,
-                tolerance,
-            },
+            inner: crate::bindings::module_utils::spec_from_py(
+                spec.py(),
+                spec,
+                "formula check spec",
+            )?,
         })
     }
 
@@ -328,6 +291,24 @@ impl PyFormulaCheckSpec {
         crate::bindings::extract::label(&self.inner.severity)
     }
 
+    #[doc = pydoc!("finstack_quant.statements._checks", "FormulaCheckSpec.mode")]
+    #[getter]
+    fn mode(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.mode)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._checks", "FormulaCheckSpec.scope")]
+    #[getter]
+    fn scope(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.scope)
+    }
+
+    /// Optional Boolean eligibility formula, or ``None``.
+    #[getter]
+    fn eligibility(&self) -> Option<&str> {
+        self.inner.eligibility.as_deref()
+    }
+
     /// Optional absolute tolerance, or ``None``.
     #[getter]
     fn tolerance(&self) -> Option<f64> {
@@ -362,7 +343,7 @@ impl PyCheckSuiteSpec {
     /// builtin_checks : list[dict] | None
     ///     Built-in checks to run, each the Rust ``BuiltinCheckSpec`` serde
     ///     form: a dict with the check's ``type`` tag plus its fields, e.g.
-    ///     ``{"type": "non_finite"}`` or ``{"type":
+    ///     ``{"type": "non_finite", "nodes": "all"}`` or ``{"type":
     ///     "balance_sheet_articulation", "assets_nodes": ["assets"],
     ///     "liabilities_nodes": ["liabilities"], "equity_nodes":
     ///     ["equity"]}``. See :meth:`builtin_check_names` for the catalog.
@@ -605,7 +586,7 @@ impl PyCheckFinding {
     /// reference value, or ``None``.
     #[getter]
     fn materiality_relative_pct(&self) -> Option<f64> {
-        self.inner.materiality.as_ref().map(|m| m.relative_pct)
+        self.inner.materiality.as_ref().and_then(|m| m.relative_pct)
     }
 
     /// Reference (denominator) value used for the relative measure, or
@@ -629,13 +610,16 @@ impl PyCheckFinding {
     /// Returns
     /// -------
     /// dict | None
-    ///     ``{"identity", "period", "actual", "expected", "tolerance"}``:
+    ///     ``{"identity", "period", "actual", "expected", "difference",
+    ///     "tolerance"}``:
     ///     ``identity`` names the tested identity (e.g.
     ///     ``"balance_sheet_articulation"``), ``period`` is the period id
     ///     (omitted when not period-specific), ``actual`` and ``expected``
-    ///     are the two compared values and ``tolerance`` is the absolute
-    ///     tolerance applied to ``|actual - expected|`` — all three in the
-    ///     compared nodes' own units (currency amounts for monetary nodes).
+    ///     are the two compared values, ``difference`` the exact residual
+    ///     and ``tolerance`` the absolute tolerance applied to
+    ///     ``|difference|``. Each is typed in the compared nodes' units: a
+    ///     number for a scalar, ``{"amount": "<decimal>", "currency": "<ISO>"}``
+    ///     for money.
     ///     ``None`` for findings that do not compare two numbers (skipped
     ///     periods, missing or non-finite inputs, sign-convention warnings,
     ///     formula checks without a tolerance) and for findings serialized
@@ -693,16 +677,16 @@ wire_methods!(
 
 #[pymethods]
 impl PyCheckReport {
-    /// Whether the whole report passed: no error-severity finding was
-    /// retained by any check.
-    ///
-    /// Warnings and info findings do not fail a report. A suite's
-    /// materiality threshold never suppresses error findings, so it cannot
-    /// flip this to ``True``. Delegates to the canonical Rust
-    /// ``CheckReport::has_errors``.
+    #[doc = pydoc!("finstack_quant.statements._checks", "CheckReport.outcome")]
+    #[getter]
+    fn outcome(&self) -> &'static str {
+        self.inner.outcome.as_str()
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._checks", "CheckReport.passed")]
     #[getter]
     fn passed(&self) -> bool {
-        !self.inner.has_errors()
+        self.inner.outcome == finstack_quant_statements::checks::CheckOutcome::Pass
     }
 
     /// Number of checks that ran, one per row of :meth:`to_dataframe`.
@@ -806,7 +790,8 @@ impl PyCheckReport {
                     "check_id": result.check_id,
                     "check_name": result.check_name,
                     "category": result.category,
-                    "passed": result.passed,
+                    "outcome": result.outcome.as_str(),
+                    "evaluated": result.evaluated,
                     "finding_count": result.findings.len(),
                 })
             })
@@ -863,13 +848,14 @@ impl PyCheckReport {
                             .collect::<Vec<_>>()
                             .join(","),
                         "materiality_absolute": materiality.map(|m| m.absolute),
-                        "materiality_relative_pct": materiality.map(|m| m.relative_pct),
+                        "materiality_relative_pct": materiality.and_then(|m| m.relative_pct),
                         "materiality_reference_value": materiality.map(|m| m.reference_value),
                         "materiality_reference_label": materiality
                             .map(|m| m.reference_label.clone()),
-                        "comparison_actual": comparison.map(|c| c.actual),
-                        "comparison_expected": comparison.map(|c| c.expected),
-                        "comparison_tolerance": comparison.map(|c| c.tolerance),
+                        "comparison_actual": comparison.map(|c| c.actual.value()),
+                        "comparison_expected": comparison.map(|c| c.expected.value()),
+                        "comparison_tolerance": comparison.map(|c| c.tolerance.value()),
+                        "comparison_currency": comparison.and_then(comparison_currency),
                     })
                 })
             })
@@ -890,11 +876,12 @@ impl PyCheckReport {
     /// ``cash_flow_components``), ``period`` (period identifier string,
     /// ``None`` when not period-specific), ``actual`` (observed value),
     /// ``expected`` (value the identity requires), ``difference``
-    /// (``actual - expected``), ``tolerance`` (absolute tolerance applied to
-    /// ``|difference|``) and ``within_tolerance`` (``True`` when
-    /// ``|difference| <= tolerance``). ``actual``, ``expected``,
-    /// ``difference`` and ``tolerance`` are in the compared nodes' own units
-    /// (currency amounts for monetary nodes).
+    /// (the exact residual the check computed), ``tolerance`` (absolute
+    /// tolerance applied to ``|difference|``), ``currency`` (ISO code of the
+    /// compared amounts, ``None`` for a scalar comparison) and
+    /// ``within_tolerance`` (``True`` when ``|difference| <= tolerance``,
+    /// judged on the exact values). ``actual``, ``expected``, ``difference``
+    /// and ``tolerance`` are float views in the compared nodes' own units.
     ///
     /// Checks that do not compare two numbers, and periods a check skipped
     /// for missing inputs, contribute no rows. A report with no comparisons
@@ -913,10 +900,11 @@ impl PyCheckReport {
                         "category": result.category,
                         "identity": comparison.identity,
                         "period": comparison.period.map(|p| p.to_string()),
-                        "actual": comparison.actual,
-                        "expected": comparison.expected,
-                        "difference": comparison.difference(),
-                        "tolerance": comparison.tolerance,
+                        "actual": comparison.actual.value(),
+                        "expected": comparison.expected.value(),
+                        "difference": comparison.difference.value(),
+                        "tolerance": comparison.tolerance.value(),
+                        "currency": comparison_currency(comparison),
                         "within_tolerance": comparison.within_tolerance(),
                     })
                 })

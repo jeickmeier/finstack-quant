@@ -1,6 +1,6 @@
 //! Mutable runtime state for waterfall evaluation.
 //!
-//! [`CapitalStructureState`] tracks opening/closing balances, PIK mode, and
+//! [`CapitalStructureState`] tracks opening/closing balances, coupon elections, and
 //! dated unpaid or advance claims across periods. It is mutated by the waterfall engine during
 //! sequential evaluation and is therefore the runtime counterpart to the
 //! static [`WaterfallSpec`](super::WaterfallSpec).
@@ -9,17 +9,19 @@ use crate::capital_structure::CashflowBreakdown;
 use crate::capital_structure::principal::{
     PeriodPrincipalFlows, PrincipalAllocation, PrincipalClaim,
 };
-use crate::capital_structure::residual_schedule::rebuild_residual_interest;
 use crate::error::Result;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Period};
+use finstack_quant_core::dates::Period;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
+    CouponElection, PrincipalPosting,
+};
 use indexmap::IndexMap;
 
 /// Capital structure state tracking for dynamic evaluation.
 ///
-/// Maintains balances, PIK mode, and dated unpaid or advance claims across periods.
+/// Maintains balances, coupon elections, and dated unpaid or advance claims across periods.
 ///
 /// This state is mutated by the waterfall engine during sequential evaluation
 /// and is therefore the runtime counterpart to the static [`WaterfallSpec`](super::WaterfallSpec).
@@ -31,12 +33,16 @@ pub(crate) struct CapitalStructureState {
     /// Closing balances by instrument ID at the end of the current period
     pub(crate) closing_balances: IndexMap<String, Money>,
 
-    /// Current PIK mode by instrument (true = PIK enabled, false = cash)
-    pub(crate) pik_mode: IndexMap<String, bool>,
+    /// Dated coupon elections the PIK toggle has made per loan, in effective
+    /// order. The owner recompiles the schedule from its terms and this
+    /// ledger; an election's duration is counted from these dates, so a
+    /// period evaluated again changes nothing.
+    pub(crate) coupon_elections: IndexMap<String, Vec<CouponElection>>,
 
-    /// Number of consecutive periods each instrument has been in PIK mode.
-    /// Used for hysteresis: PIK stays active until `min_periods_in_pik` is met.
-    pub(crate) pik_periods_active: IndexMap<String, usize>,
+    /// Dated sweep obligations not yet paid in full, oldest first: the due
+    /// date of each and what remains of it. An obligation whose due date has
+    /// passed is arrears.
+    pub(crate) sweep_obligations: Vec<(finstack_quant_core::dates::Date, Money)>,
 
     /// Unpaid interest/fee shortfall per instrument from the prior period's
     /// available-cash cap. Carried forward as a claim in the next period's
@@ -59,18 +65,15 @@ pub(crate) struct CapitalStructureState {
     /// are not demoted into the interest rung) and re-recorded if unpaid.
     pub(crate) fee_shortfall: IndexMap<String, Money>,
 
-    /// Newly funded principal (draws plus explicit or implicit issuance face) per
-    /// instrument for the *current* period, computed by
-    /// `calculate_period_flows`. Explicit principal deltas keep withheld OID
-    /// separate from cash proceeds. The waterfall consumes it to recover the
-    /// payable balance (`opening + funding`) and the draw-aware closing
-    /// balance. Overwritten each period; instruments with no draw record zero.
-    pub(crate) period_new_funding: IndexMap<String, Money>,
-
-    /// Residual cashflow schedule per instrument, rebuilt after each period's
-    /// outstanding change so the next coupon is `outstanding × rate ×
-    /// accrual_factor` rather than a scale of the original schedule.
+    /// Schedule per instrument as it stands: the contractual schedule, then
+    /// the owner's recompilation after each principal change the waterfall
+    /// posts.
     pub(crate) residual_schedules: IndexMap<String, CashFlowSchedule>,
+
+    /// Every principal change the waterfall has posted to an instrument
+    /// (prepayments and sweeps), each effective the day after its period
+    /// close. The owner recompiles the schedule from its terms and this ledger.
+    pub(crate) postings: IndexMap<String, Vec<PrincipalPosting>>,
 
     /// Dated current-period claims, supplied by market-aware evaluation or
     /// explicitly by callers allocating schedules with separate cash dates.
@@ -96,15 +99,6 @@ impl CapitalStructureState {
         self.closing_balances.insert(instrument_id, balance);
     }
 
-    /// Net new funding recorded for an instrument in the current period,
-    /// defaulting to zero if not present.
-    pub(crate) fn get_period_new_funding(&self, instrument_id: &str, currency: Currency) -> Money {
-        self.period_new_funding
-            .get(instrument_id)
-            .copied()
-            .unwrap_or_else(|| Money::from((0_i64, currency)))
-    }
-
     /// Advance state to next period: closing balances become opening balances.
     ///
     /// Closing balances are cleared after promotion so matured instruments
@@ -117,10 +111,10 @@ impl CapitalStructureState {
     /// Set dated principal claims for the current waterfall period.
     ///
     /// Market-aware evaluation supplies these from the residual schedule.
-    /// Aggregate-only `execute_waterfall` callers may omit this input only
-    /// when cash settlement and economic principal movements belong to the
-    /// same allocation period. When supplied, the contractual breakdown's
-    /// debt balance must be its economic closing balance before cash allocation.
+    /// Every instrument in a waterfall needs them, including an empty list
+    /// when nothing is due: no claim is synthesized from aggregate principal.
+    /// The contractual breakdown's debt balance must be its economic closing
+    /// balance before cash allocation.
     ///
     /// # Arguments
     ///
@@ -151,11 +145,19 @@ impl CapitalStructureState {
         instrument_id: &str,
         contractual: &CashflowBreakdown,
     ) -> Result<PrincipalAllocation> {
-        let currency = contractual.debt_balance.currency();
+        // Scheduled principal is always dated: no claim is synthesized from
+        // the period's aggregate principal.
+        let period = self
+            .period_principal_flows
+            .get(instrument_id)
+            .ok_or_else(|| {
+                crate::error::Error::capital_structure(format!(
+                    "instrument '{instrument_id}' has no dated principal claims for the period; \
+                 supply each scheduled principal payment with its due and effective dates"
+                ))
+            })?;
         let allocation = PrincipalAllocation::new(
-            self.period_principal_flows.get(instrument_id),
-            self.get_opening_balance(instrument_id, currency),
-            self.get_period_new_funding(instrument_id, currency),
+            period,
             contractual,
             self.principal_shortfall
                 .get(instrument_id)
@@ -169,44 +171,5 @@ impl CapitalStructureState {
         self.principal_shortfall.shift_remove(instrument_id);
         self.principal_advance_payments.shift_remove(instrument_id);
         Ok(allocation)
-    }
-
-    /// Reproject future interest only when closing outstanding differs from
-    /// the contractual schedule. Preserve all interest earned before the change.
-    ///
-    /// # Arguments
-    ///
-    /// * `from_date` - Inclusive period-end snapshot (`period.end - 1 day`).
-    ///   Principal changes affect accrual from the following day. Past flows
-    ///   remain as accrual anchors; future coupons retain dated amortization,
-    ///   draw, and PIK effects. Repayments cannot exceed remaining principal.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when a residual rate cannot be
-    /// inferred or a schedule currency does not match the closing balance.
-    pub(crate) fn rebuild_residuals(&mut self, from_date: Date) -> Result<()> {
-        let updates: Vec<(String, Money)> = self
-            .closing_balances
-            .iter()
-            .filter(|(id, _)| self.residual_schedules.contains_key(*id))
-            .map(|(id, closing)| (id.clone(), *closing))
-            .collect();
-        for (id, closing) in updates {
-            if let Some(schedule) = self.residual_schedules.get(&id) {
-                let preserved_claims: Vec<_> = self
-                    .principal_advance_payments
-                    .get(&id)
-                    .into_iter()
-                    .chain(self.principal_shortfall.get(&id))
-                    .flatten()
-                    .cloned()
-                    .collect();
-                let rebuilt =
-                    rebuild_residual_interest(schedule, closing, from_date, &preserved_claims)?;
-                self.residual_schedules.insert(id, rebuilt);
-            }
-        }
-        Ok(())
     }
 }

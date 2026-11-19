@@ -1,0 +1,119 @@
+{
+  "cases": [
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
+      "expect": {
+        "content_hash": "sha256:ad1d56f187ddc6a232b6bd1ea7ce4aa55c35f3198762989102dfc9eef3fe1558"
+      },
+      "name": "valid"
+    },
+    {
+      "document": "{\"id\":\"shadow\",\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
+      "expect": {
+        "code": "contract/parse-error",
+        "kind": "validation",
+        "pointer": "/id"
+      },
+      "name": "duplicate_key"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1,\"surprise\":1}",
+      "expect": {
+        "code": "contract/structure-invalid",
+        "kind": "validation",
+        "pointer": null
+      },
+      "name": "unknown_field"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":\"1\"}",
+      "expect": {
+        "code": "contract/structure-invalid",
+        "kind": "validation",
+        "pointer": "/schema_version"
+      },
+      "name": "version_as_string"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1.0}",
+      "expect": {
+        "code": "contract/structure-invalid",
+        "kind": "validation",
+        "pointer": "/schema_version"
+      },
+      "name": "version_as_float"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]}}",
+      "expect": {
+        "code": "contract/version-missing",
+        "kind": "validation",
+        "pointer": "/schema_version"
+      },
+      "name": "missing_version"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"meta\":{\"deep\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]},\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
+      "expect": {
+        "code": "limit_exceeded",
+        "kind": "validation",
+        "pointer": null
+      },
+      "name": "depth_97"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":100.0,\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
+      "expect": {
+        "code": "contract/structure-invalid",
+        "kind": "validation",
+        "pointer": null
+      },
+      "name": "numeric_money_amount"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"meta\":{\"big\":1e999},\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
+      "expect": {
+        "code": "contract/parse-error",
+        "kind": "validation",
+        "pointer": null
+      },
+      "name": "number_out_of_range"
+    },
+    {
+      "document": "{\"id\": ",
+      "expect": {
+        "code": "contract/parse-error",
+        "kind": "validation",
+        "pointer": null
+      },
+      "name": "malformed_json"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"missing * 2\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
+      "expect": {
+        "code": "statements/eval",
+        "kind": "validation",
+        "pointer": "/nodes/profit"
+      },
+      "name": "unknown_node_reference"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"profit + revenue\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
+      "expect": {
+        "code": "statements/circular_dependency",
+        "kind": "validation",
+        "pointer": "/nodes/profit"
+      },
+      "name": "dependency_cycle"
+    },
+    {
+      "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[]},\"schema_version\":1}",
+      "expect": {
+        "code": "statements/build",
+        "kind": "validation",
+        "pointer": "/periods"
+      },
+      "name": "empty_timeline"
+    }
+  ]
+}

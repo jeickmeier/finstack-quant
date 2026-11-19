@@ -1219,6 +1219,17 @@ impl finstack_quant_valuations_core::instruments::Instrument for RevolvingCredit
         crate::FIXED_INCOME
     );
 
+    fn contractual_accrual_config(
+        &self,
+    ) -> Option<finstack_quant_cashflows::accrual::AccrualConfig> {
+        Some(finstack_quant_cashflows::accrual::AccrualConfig {
+            method: finstack_quant_cashflows::accrual::AccrualMethod::Linear,
+            ex_coupon: None,
+            include_pik: false,
+            frequency: Some(self.frequency),
+        })
+    }
+
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()
     }
@@ -1299,8 +1310,48 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RevolvingCredit {
             });
         }
 
+        self.cashflow_schedule_with_postings(curves, as_of, &[])
+    }
+}
+
+impl RevolvingCredit {
+    /// Recompile the deterministic contractual schedule with principal
+    /// postings applied.
+    ///
+    /// The schedule is rebuilt from the facility's own terms: interest
+    /// accrues on the dated drawn balance, commitment and usage fees follow
+    /// the changed drawn and undrawn amounts, and the terminal repayment is
+    /// what remains drawn. The commitment is untouched, so a repaid amount
+    /// can be redrawn under the facility's own draw events. With no postings
+    /// this is the facility's ordinary deterministic schedule.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market the facility's floating coupons and fixings are
+    ///   read from; a fixed-rate facility needs none of it.
+    /// * `as_of` - Valuation date. `drawn` is the balance at the later of
+    ///   this date and the commitment date, and cashflows paid on or before
+    ///   it are excluded.
+    /// * `postings` - Principal changes already settled outside the
+    ///   schedule, in the facility currency. Each takes effect at the start
+    ///   of its `effective_date`, which must be after the later of `as_of`
+    ///   and the commitment date, and appears as a zero-cash `PrePayment`
+    ///   row carrying the principal change.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a stochastic facility, a posting in
+    /// another currency, a posting effective on or before the balance
+    /// anchor, a repayment above the drawn balance or a capitalization above
+    /// the commitment in force, and propagates schedule errors.
+    pub fn cashflow_schedule_with_postings(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        postings: &[crate::loan_terms::PrincipalPosting],
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         use crate::revolving_credit::cashflow_engine::CashflowEngine;
-        let path_schedule = CashflowEngine::deterministic(self, curves, as_of)?;
+        let path_schedule = CashflowEngine::deterministic(self, market, as_of, postings)?;
         Ok(path_schedule.schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

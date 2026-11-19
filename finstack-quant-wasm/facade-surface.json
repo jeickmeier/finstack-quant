@@ -3926,7 +3926,9 @@
       "MixedNodeBuilder",
       "ModelBuilder",
       "Registry",
+      "applyModelEdits",
       "capitalStructureCashflowsGetComponent",
+      "capitalStructureCashflowsGetMoney",
       "checkConfigValidate",
       "checkReportFindingsBySeverity",
       "checkReportHasErrors",
@@ -3940,6 +3942,7 @@
       "monteCarloBreachProbability",
       "monteCarloPercentileByPeriod",
       "nodeToDatedSchedule",
+      "nodeToPricingFlows",
       "normalizationConfigAddAdjustment",
       "normalize",
       "parseAndCompile",
@@ -3948,11 +3951,12 @@
       "schema",
       "statementResultAllPeriods",
       "statementResultGet",
+      "statementResultGetCell",
       "statementResultGetMoney",
-      "statementResultGetNode",
       "statementResultGetOr",
       "statementResultGetScalar",
       "statementResultNodeIds",
+      "statementResultNumericSeries",
       "statementResultRollup",
       "statementResultToTableLong",
       "statementResultToTableWide",
@@ -3992,12 +3996,8 @@
     "constructor": true,
     "statics": ["fromSpec"],
     "methods": [
-      "addBond",
-      "addBondWithConvention",
       "addDebt",
       "addMetricFromRegistry",
-      "addSwap",
-      "addSwapWithConventions",
       "availabilityDates",
       "build",
       "compute",
@@ -4008,8 +4008,11 @@
       "mixed",
       "periods",
       "periodsExplicit",
+      "removeNode",
+      "replaceNode",
       "reportingCurrency",
       "rollup",
+      "sourceSnapshot",
       "value",
       "valueMoney",
       "valueScalar",
@@ -4033,6 +4036,9 @@
   "statements.modelNodeIds": {
     "kind": "function"
   },
+  "statements.applyModelEdits": {
+    "kind": "function"
+  },
   "statements.validateCheckSuiteSpecJson": {
     "kind": "function"
   },
@@ -4049,6 +4055,9 @@
     "kind": "function"
   },
   "statements.nodeToDatedSchedule": {
+    "kind": "function"
+  },
+  "statements.nodeToPricingFlows": {
     "kind": "function"
   },
   "statements.monteCarloBreachProbability": {
@@ -4078,6 +4087,9 @@
   "statements.statementResultGetMoney": {
     "kind": "function"
   },
+  "statements.statementResultGetCell": {
+    "kind": "function"
+  },
   "statements.statementResultGetScalar": {
     "kind": "function"
   },
@@ -4093,7 +4105,7 @@
   "statements.rollupSpecDeclaredMethods": {
     "kind": "function"
   },
-  "statements.statementResultGetNode": {
+  "statements.statementResultNumericSeries": {
     "kind": "function"
   },
   "statements.statementResultNodeIds": {
@@ -4115,6 +4127,9 @@
     "kind": "function"
   },
   "statements.capitalStructureCashflowsGetComponent": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetMoney": {
     "kind": "function"
   },
   "statements.normalizationConfigAddAdjustment": {

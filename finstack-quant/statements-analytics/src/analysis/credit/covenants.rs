@@ -35,7 +35,7 @@ impl<'a> StatementsAdapter<'a> {
 
 impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
     fn get_scalar(&self, node_id: &str, period: &PeriodId) -> Option<f64> {
-        self.results.get(node_id, period)
+        crate::cell_float(self.results, node_id, period)
     }
 
     fn period_end_date(&self, period: &PeriodId) -> Result<Date> {
@@ -114,18 +114,19 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut builder = ModelBuilder::new("borrower");
 /// builder.periods("2025Q1..Q2", None)?;
+/// builder.value_scalar("revenue", &[]);
 /// let model = builder.build()?;
-/// let results = StatementResult {
+/// let mut results = StatementResult {
 ///     periods: Some(model.periods.clone()),
-///     nodes: IndexMap::from([(
-///         "leverage".to_string(),
-///         IndexMap::from([
-///             (PeriodId::quarter(2025, 1)?, 3.0),
-///             (PeriodId::quarter(2025, 2)?, 4.2),
-///         ]),
-///     )]),
 ///     ..StatementResult::default()
 /// };
+/// results.set_series(
+///     "leverage",
+///     IndexMap::from([
+///         (PeriodId::quarter(2025, 1)?, 3.0),
+///         (PeriodId::quarter(2025, 2)?, 4.2),
+///     ]),
+/// )?;
 /// let mut engine = CovenantEngine::new();
 /// engine.add_spec(CovenantSpec::with_metric(
 ///     Covenant::new(
@@ -212,6 +213,7 @@ mod tests {
     fn calendar() -> finstack_quant_core::dates::PeriodPlan {
         let mut model_builder = finstack_quant_statements::builder::ModelBuilder::new("calendar");
         model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().unwrap().periods
     }
 
@@ -221,7 +223,13 @@ mod tests {
         use time::macros::date;
         let id: PeriodId = "FY2025Q1".parse().unwrap();
         let results = StatementResult {
-            nodes: IndexMap::from([("leverage".into(), IndexMap::from([(id, 3.)]))]),
+            cells: IndexMap::from([(
+                "leverage".into(),
+                IndexMap::from([(
+                    id,
+                    finstack_quant_statements::evaluator::ResultCell::scalar(3.).expect("finite"),
+                )]),
+            )]),
             periods: Some(
                 finstack_quant_core::dates::PeriodPlan::try_new(
                     finstack_quant_core::dates::PeriodCalendar::Fiscal(
@@ -295,7 +303,13 @@ mod tests {
         };
         let periods = [period.id];
         let results = StatementResult {
-            nodes: IndexMap::from([("leverage".into(), IndexMap::from([(periods[0], 3.0)]))]),
+            cells: IndexMap::from([(
+                "leverage".into(),
+                IndexMap::from([(
+                    periods[0],
+                    finstack_quant_statements::evaluator::ResultCell::scalar(3.0).expect("finite"),
+                )]),
+            )]),
             periods: Some(
                 finstack_quant_core::dates::PeriodPlan::try_new(
                     finstack_quant_core::dates::PeriodCalendar::Gregorian,
@@ -358,20 +372,18 @@ mod tests {
         let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
-        let mut nodes = IndexMap::new();
-        // The covenant metric only covers p1 (breaching).
-        nodes.insert("NetDebtEbitda".to_string(), IndexMap::from([(p1, 4.5)]));
-        // Another node extends the period union to p2.
-        nodes.insert(
-            "revenue".to_string(),
-            IndexMap::from([(p1, 100.0), (p2, 110.0)]),
-        );
-
-        let results = StatementResult {
-            nodes,
+        let mut results = StatementResult {
             periods: Some(calendar()),
             ..StatementResult::default()
         };
+        // The covenant metric only covers p1 (breaching).
+        results
+            .set_series("NetDebtEbitda", IndexMap::from([(p1, 4.5)]))
+            .expect("finite fixture values");
+        // Another node extends the period union to p2.
+        results
+            .set_series("revenue", IndexMap::from([(p1, 100.0), (p2, 110.0)]))
+            .expect("finite fixture values");
 
         assert!(forecast_breaches(&results, &engine, CovenantForecastConfig::default()).is_err());
     }
@@ -395,17 +407,16 @@ mod tests {
         let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
-        let mut nodes = IndexMap::new();
         let mut net_debt_ebitda = IndexMap::new();
         net_debt_ebitda.insert(p1, 3.0); // Pass
         net_debt_ebitda.insert(p2, 4.5); // Fail
-        nodes.insert("NetDebtEbitda".to_string(), net_debt_ebitda);
-
-        let results = StatementResult {
-            nodes,
+        let mut results = StatementResult {
             periods: Some(calendar()),
             ..StatementResult::default()
         };
+        results
+            .set_series("NetDebtEbitda", net_debt_ebitda)
+            .expect("finite fixture values");
 
         let config = CovenantForecastConfig::default();
         let breaches =

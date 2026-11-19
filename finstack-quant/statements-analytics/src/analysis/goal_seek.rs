@@ -46,6 +46,7 @@
 //! # }
 //! ```
 
+use finstack_quant_core::contract::{LoadLimits, parse_json_value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_statements::evaluator::Evaluator;
@@ -138,9 +139,9 @@ pub struct GoalSeekResult {
 impl GoalSeekResult {
     /// Load a goal-seek result from its canonical JSON, validating the model.
     ///
-    /// The embedded model goes through [`FinancialModelSpec::from_value`], so a
-    /// persisted or hand-edited result cannot carry a model that
-    /// [`FinancialModelSpec::from_json`] would reject.
+    /// The document is parsed under the default [`LoadLimits`] with duplicate
+    /// keys rejected, and the embedded model is validated, so a persisted or
+    /// hand-edited result cannot carry a model that is not runnable.
     ///
     /// # Arguments
     ///
@@ -150,34 +151,20 @@ impl GoalSeekResult {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Serde`] for malformed JSON, a missing field or an
-    /// unknown field, and the model's validation error when the embedded model
-    /// is invalid.
+    /// Returns [`Error::Serde`] for malformed or oversized JSON, a duplicate,
+    /// missing or unknown field, or an embedded model of the wrong shape or
+    /// version, and the model's validation error when the embedded model is
+    /// not runnable.
     pub fn from_json(json: &str) -> Result<Self> {
-        #[derive(serde::Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct Wire {
-            solved_value: f64,
-            model: Option<serde_json::Value>,
-            #[serde(default)]
-            residual: f64,
-            #[serde(default)]
-            tolerance: f64,
-            #[serde(default)]
-            evaluations: usize,
-            #[serde(default)]
-            converged: bool,
-        }
-        let wire: Wire = serde_json::from_str(json)
+        // Limits and key uniqueness are checked on a JSON value; the result
+        // is decoded from the text so the model keeps its node order.
+        parse_json_value(json.as_bytes(), &LoadLimits::default())?;
+        let mut result: Self = serde_json::from_str(json)
             .map_err(|e| Error::Serde(format!("invalid GoalSeekResult JSON: {e}")))?;
-        Ok(Self {
-            solved_value: wire.solved_value,
-            model: wire.model.map(FinancialModelSpec::from_value).transpose()?,
-            residual: wire.residual,
-            tolerance: wire.tolerance,
-            evaluations: wire.evaluations,
-            converged: wire.converged,
-        })
+        if let Some(model) = result.model.as_mut() {
+            model.validate_semantics()?;
+        }
+        Ok(result)
     }
 }
 
@@ -320,11 +307,22 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
         })
         .unwrap_or(1.0);
 
+    // The solver writes the driver cell on every iteration. Give it an
+    // observation slot before preparing, so each iteration is a payload
+    // change in an existing slot and can reuse the plan.
+    let mut working = model.clone();
+    if let Some(node) = working.nodes.get_mut(driver_node) {
+        let amount = amount_for_node(node, initial_guess)?;
+        node.values
+            .get_or_insert_with(Default::default)
+            .entry(driver_period)
+            .or_insert(amount);
+    }
     let mut evaluator = Evaluator::new();
-    let Ok(prepared) = evaluator.prepare(model) else {
-        return Err(Error::eval("Goal seek: failed to prepare evaluator"));
-    };
-    let eval_cell = RefCell::new((evaluator, model.clone()));
+    let prepared = evaluator
+        .prepare(&working)
+        .map_err(|error| Error::eval(format!("Goal seek: failed to prepare evaluator: {error}")))?;
+    let eval_cell = RefCell::new((evaluator, working));
 
     // Counts every model evaluation, reported as `GoalSeekResult::evaluations`.
     let evaluations = Cell::new(0_usize);
@@ -354,7 +352,7 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
                 "evaluation failed at driver value {driver_value}: {e}"
             ))
         })?;
-        match results.get(target_node, &target_period) {
+        match crate::cell_float(&results, target_node, &target_period) {
             Some(actual_value) => Ok(actual_value - target_value),
             None => Err(finstack_quant_core::Error::Validation(format!(
                 "target node '{target_node}' produced no value for period \
@@ -578,6 +576,30 @@ mod tests {
         assert!(
             GoalSeekResult::from_json(r#"{"solved_value": 1.0, "model": null, "x": 1}"#).is_err()
         );
+        // The embedded model is held to the model loader's rules: the exact
+        // version, and no repeated key.
+        let model = {
+            let mut builder = finstack_quant_statements::builder::ModelBuilder::new("m");
+            builder.periods("2025Q1..Q1", None).expect("periods");
+            builder.value_scalar("revenue", &[]);
+            serde_json::to_string(&builder.build().expect("model")).expect("json")
+        };
+        let document = |model: &str| format!(r#"{{"solved_value": 1.0, "model": {model}}}"#);
+        GoalSeekResult::from_json(&document(&model)).expect("a runnable embedded model");
+        for version in ["2", "\"1\"", "1.0"] {
+            let wrong = model.replace(
+                "\"schema_version\":1",
+                &format!("\"schema_version\":{version}"),
+            );
+            assert_ne!(wrong, model);
+            assert!(
+                GoalSeekResult::from_json(&document(&wrong)).is_err(),
+                "{version}"
+            );
+        }
+        let repeated = model.replacen("{\"id\":", "{\"id\":\"shadow\",\"id\":", 1);
+        assert_ne!(repeated, model);
+        assert!(GoalSeekResult::from_json(&document(&repeated)).is_err());
     }
 
     #[test]

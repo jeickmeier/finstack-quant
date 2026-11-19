@@ -88,13 +88,21 @@ test('statements.statementResultRollup rolls quarters into a year', () => {
   const quarterly = new statements.Evaluator().evaluate(model);
   const annual = statements.statementResultRollup(quarterly, model, {
     frequency: 'annual',
-    methods: { cash: 'period_end', margin: 'formula' },
+    methods: { revenue: 'sum', cash: 'period_end', ebitda: 'sum', margin: 'formula' },
   });
 
-  assert.equal(annual.nodes.revenue['2025'], 460);
-  assert.equal(annual.nodes.cash['2025'], 40);
-  assert.ok(Math.abs(annual.nodes.ebitda['2025'] - 138) < 1e-9);
-  assert.ok(Math.abs(annual.nodes.margin['2025'] - 0.3) < 1e-12);
+  assert.equal(annual.cells.revenue['2025'].value, 460);
+  assert.equal(annual.cells.cash['2025'].value, 40);
+  assert.ok(Math.abs(annual.cells.ebitda['2025'].value - 138) < 1e-9);
+  assert.ok(Math.abs(annual.cells.margin['2025'].value - 0.3) < 1e-12);
+  // Nothing is summed by default, and the result names how it was produced.
+  assert.throws(
+    () => statements.statementResultRollup(quarterly, model, { frequency: 'annual' }),
+    (e) => e.kind === 'validation' && /no rollup method/.test(e.message)
+  );
+  assert.equal(annual.rollup_provenance.methods.revenue, 'sum');
+  assert.deepEqual(annual.rollup_provenance.source_periods['2025'].length, 4);
+  assert.deepEqual(annual.rollup_provenance.source_run, quarterly.provenance);
   assert.throws(
     () => statements.statementResultRollup(quarterly, model, { frequency: 'monthly' }),
     (e) => e.kind === 'validation' && /Cannot roll/.test(e.message)
@@ -117,9 +125,9 @@ test('statements_analytics scenario forecast overrides replace the forecast spec
   const priced = sa.evaluateScenarioSetWithMarket(model, scenarioSet, EMPTY_MARKET, '2025-07-01');
 
   for (const results of [plain, priced]) {
-    const curve = QUARTERS.map(([id]) => results.curve.nodes.revenue[id]);
+    const curve = QUARTERS.map(([id]) => results.curve.cells.revenue[id].value);
     curve.forEach((value, i) => assert.ok(Math.abs(value - [100, 110, 110, 99][i]) < 1e-9));
-    assert.ok(Math.abs(results.base.nodes.revenue['2025Q4'] - 100 * 1.05 ** 3) < 1e-9);
+    assert.ok(Math.abs(results.base.cells.revenue['2025Q4'].value - 100 * 1.05 ** 3) < 1e-9);
   }
   assert.throws(
     () => sa.evaluateScenarioSetWithMarket(model, scenarioSet, EMPTY_MARKET, 'not-a-date'),

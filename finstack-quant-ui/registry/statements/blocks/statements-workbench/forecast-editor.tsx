@@ -141,7 +141,7 @@ function HistoricalField({
 
 /**
  * Configure the native forecast method and its parameters. The parameter form
- * is Rust's ForecastParameters schema; WASM validates and evaluates the result.
+ * is Rust's ForecastSpec schema; WASM validates and evaluates the result.
  */
 export function ForecastEditor({
   model,
@@ -292,7 +292,7 @@ export function ForecastEditor({
           defaultValues={startingParams(
             method,
             method === node.forecast?.method
-              ? (node.forecast.params ?? {})
+              ? ((node.forecast.params ?? {}) as Record<string, unknown>)
               : {},
             periods,
           )}

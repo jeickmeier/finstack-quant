@@ -296,7 +296,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1277227
+            "bytes": 1277444
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -2223,7 +2223,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1161667
+            "bytes": 1161884
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2334,95 +2334,102 @@
         "schema_index_version": 1,
         "artifacts": [
           {
-            "path": "schemas/statements/1/bond_convention_params.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/bond_convention_params.schema.json",
-            "type_name": "BondConventionParams",
-            "kind": "input",
-            "bytes": 26097
-          },
-          {
             "path": "schemas/statements/1/check_suite_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 22797
+            "bytes": 50985
+          },
+          {
+            "path": "schemas/statements/1/dated_cell.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
+            "type_name": "DatedCell",
+            "kind": "output",
+            "bytes": 28369
           },
           {
             "path": "schemas/statements/1/financial_model_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 394686
+            "bytes": 420121
           },
           {
-            "path": "schemas/statements/1/forecast_parameters.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
-            "type_name": "ForecastParameters",
+            "path": "schemas/statements/1/forecast_method.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_method.schema.json",
+            "type_name": "ForecastMethod",
+            "kind": "component",
+            "bytes": 1931
+          },
+          {
+            "path": "schemas/statements/1/forecast_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_spec.schema.json",
+            "type_name": "ForecastSpec",
             "kind": "input",
-            "bytes": 20392
+            "bytes": 22004
           },
           {
             "path": "schemas/statements/1/metric_registry.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
             "type_name": "MetricRegistry",
             "kind": "input",
-            "bytes": 5807
+            "bytes": 5912
+          },
+          {
+            "path": "schemas/statements/1/model_edit.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
+            "type_name": "ModelEdit",
+            "kind": "input",
+            "bytes": 58483
           },
           {
             "path": "schemas/statements/1/monte_carlo_config.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
             "type_name": "MonteCarloConfig",
             "kind": "input",
-            "bytes": 1364
+            "bytes": 1905
           },
           {
             "path": "schemas/statements/1/monte_carlo_results.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 34568
+            "bytes": 46152
           },
           {
             "path": "schemas/statements/1/normalization_config.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
             "type_name": "NormalizationConfig",
             "kind": "component",
-            "bytes": 5883
+            "bytes": 29517
           },
           {
             "path": "schemas/statements/1/normalization_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
             "type_name": "NormalizationResult",
             "kind": "output",
-            "bytes": 23930
+            "bytes": 29741
+          },
+          {
+            "path": "schemas/statements/1/pricing_flow_selection.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/pricing_flow_selection.schema.json",
+            "type_name": "PricingFlowSelection",
+            "kind": "input",
+            "bytes": 22332
           },
           {
             "path": "schemas/statements/1/rollup_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3958
+            "bytes": 4046
           },
           {
             "path": "schemas/statements/1/statement_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 76275
-          },
-          {
-            "path": "schemas/statements/1/swap_conventions.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/swap_conventions.schema.json",
-            "type_name": "SwapConventions",
-            "kind": "input",
-            "bytes": 22717
-          },
-          {
-            "path": "schemas/statements/1/swap_params.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/swap_params.schema.json",
-            "type_name": "SwapParams",
-            "kind": "input",
-            "bytes": 23357
+            "bytes": 111286
           }
         ]
       },
@@ -2452,6 +2459,8 @@
           "Bond",
           "BondQuoteInput",
           "BondRiskBasis",
+          "BootstrapParams",
+          "BoundsParams",
           "BreakevenConfig",
           "BreakevenMode",
           "BreakevenTarget",
@@ -2463,6 +2472,7 @@
           "CallPutSchedule",
           "CapFloor",
           "CapFloorVolType",
+          "CapitalFxPolicy",
           "CapitalStructureSpec",
           "CashFlow",
           "CashFlowAccrual",
@@ -2488,6 +2498,7 @@
           "CreditStateVariable",
           "CsaSpec",
           "Currency",
+          "CurvePctParams",
           "DateWire",
           "DayCount",
           "DayCountContextState",
@@ -2495,6 +2506,7 @@
           "DebtInstrumentSpec",
           "DecimalWire",
           "DilutionEvent",
+          "DistributionParams",
           "DividendAdjustment",
           "DrawEvent",
           "DrawRepayEvent",
@@ -2502,9 +2514,12 @@
           "DynamicRecoveryModel",
           "DynamicRecoverySpec",
           "EcfSweepSpec",
+          "EcfTerm",
           "EligibleCollateralSchedule",
           "EndogenousHazardSpec",
           "ExerciseStyle",
+          "FacilitySelection",
+          "FadeToTargetParams",
           "FeeStep",
           "FeeTier",
           "FinancialStatementInstrument",
@@ -2516,9 +2531,11 @@
           "FloatingLegCompounding",
           "FloatingRateFallback",
           "FloatingRateSpec",
-          "ForecastMethod",
+          "ForecastBootstrapMode",
+          "ForecastFadeShape",
           "ForecastSpec",
-          "FxConversionPolicy",
+          "ForecastTrendMethod",
+          "GrowthPctParams",
           "Id",
           "ImMethodology",
           "ImParameters",
@@ -2539,6 +2556,7 @@
           "MarketQuoteOverrides",
           "MaturityConstraints",
           "McConfig",
+          "MeanRevertingParams",
           "MertonBarrierType",
           "MertonMcCalibrationSpec",
           "MertonMcConfig",
@@ -2560,6 +2578,7 @@
           "OvernightCouponConvention",
           "OvernightIndexConstraintApplication",
           "OvernightSpreadCompounding",
+          "OverrideParams",
           "PayReceive",
           "PaymentClassSpec",
           "PaymentPriority",
@@ -2568,11 +2587,13 @@
           "PeriodId",
           "PeriodPlan",
           "PiecewiseConstantCurve",
+          "PikElectionSpec",
           "PikMode",
           "PikSchedule",
           "PikToggle",
           "PikToggleSpec",
           "PoolGranularity",
+          "PrepaymentSpec",
           "PriceTrigger",
           "ProjectedFixing",
           "ProtectionWindow",
@@ -2588,6 +2609,8 @@
           "ScenarioPricingOverrides",
           "ScheduledFee",
           "SchemaVersion",
+          "SeasonalMode",
+          "SeasonalParams",
           "SettlementType",
           "ShortRateTreeModel",
           "SimmCreditClassification",
@@ -2604,6 +2627,7 @@
           "ThetaDayBasis",
           "ThresholdDirection",
           "ThresholdToggle",
+          "TimeSeriesParams",
           "ToggleExerciseModel",
           "UpfrontFee",
           "UtilizationProcess",
@@ -2642,6 +2666,8 @@
           "Bond",
           "BondQuoteInput",
           "BondRiskBasis",
+          "BootstrapParams",
+          "BoundsParams",
           "BreakevenConfig",
           "BreakevenMode",
           "BreakevenTarget",
@@ -2653,6 +2679,7 @@
           "CallPutSchedule",
           "CapFloor",
           "CapFloorVolType",
+          "CapitalFxPolicy",
           "CapitalStructureSpec",
           "CashFlow",
           "CashFlowAccrual",
@@ -2678,6 +2705,7 @@
           "CreditStateVariable",
           "CsaSpec",
           "Currency",
+          "CurvePctParams",
           "DateWire",
           "DayCount",
           "DayCountContextState",
@@ -2685,6 +2713,7 @@
           "DebtInstrumentSpec",
           "DecimalWire",
           "DilutionEvent",
+          "DistributionParams",
           "DividendAdjustment",
           "DrawEvent",
           "DrawRepayEvent",
@@ -2692,9 +2721,12 @@
           "DynamicRecoveryModel",
           "DynamicRecoverySpec",
           "EcfSweepSpec",
+          "EcfTerm",
           "EligibleCollateralSchedule",
           "EndogenousHazardSpec",
           "ExerciseStyle",
+          "FacilitySelection",
+          "FadeToTargetParams",
           "FeeStep",
           "FeeTier",
           "FinancialStatementInstrument",
@@ -2706,9 +2738,11 @@
           "FloatingLegCompounding",
           "FloatingRateFallback",
           "FloatingRateSpec",
-          "ForecastMethod",
+          "ForecastBootstrapMode",
+          "ForecastFadeShape",
           "ForecastSpec",
-          "FxConversionPolicy",
+          "ForecastTrendMethod",
+          "GrowthPctParams",
           "Id",
           "ImMethodology",
           "ImParameters",
@@ -2729,6 +2763,7 @@
           "MarketQuoteOverrides",
           "MaturityConstraints",
           "McConfig",
+          "MeanRevertingParams",
           "MertonBarrierType",
           "MertonMcCalibrationSpec",
           "MertonMcConfig",
@@ -2750,6 +2785,7 @@
           "OvernightCouponConvention",
           "OvernightIndexConstraintApplication",
           "OvernightSpreadCompounding",
+          "OverrideParams",
           "PayReceive",
           "PaymentClassSpec",
           "PaymentPriority",
@@ -2758,11 +2794,13 @@
           "PeriodId",
           "PeriodPlan",
           "PiecewiseConstantCurve",
+          "PikElectionSpec",
           "PikMode",
           "PikSchedule",
           "PikToggle",
           "PikToggleSpec",
           "PoolGranularity",
+          "PrepaymentSpec",
           "PriceTrigger",
           "ProjectedFixing",
           "ProtectionWindow",
@@ -2778,6 +2816,8 @@
           "ScenarioPricingOverrides",
           "ScheduledFee",
           "SchemaVersion",
+          "SeasonalMode",
+          "SeasonalParams",
           "SettlementType",
           "ShortRateTreeModel",
           "SimmCreditClassification",
@@ -2794,6 +2834,7 @@
           "ThetaDayBasis",
           "ThresholdDirection",
           "ThresholdToggle",
+          "TimeSeriesParams",
           "ToggleExerciseModel",
           "UpfrontFee",
           "UtilizationProcess",
@@ -2993,7 +3034,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1018113
+            "bytes": 1018330
           },
           {
             "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -3175,7 +3216,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1025960
+            "bytes": 1026177
           },
           {
             "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
@@ -3329,7 +3370,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1024937
+            "bytes": 1025154
           },
           {
             "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
@@ -3546,7 +3587,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1116870
+            "bytes": 1117087
           },
           {
             "path": "schemas/instruments/1/rates/basis_swap.schema.json",
@@ -3700,7 +3741,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1027568
+            "bytes": 1027785
           },
           {
             "path": "schemas/results/1/convertible_greeks.schema.json",
@@ -4161,7 +4202,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1277227
+            "bytes": 1277444
           },
           {
             "domain": "attribution",
@@ -5065,7 +5106,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1161667
+            "bytes": 1161884
           },
           {
             "domain": "scenarios",
@@ -5109,19 +5150,19 @@
           },
           {
             "domain": "statements",
-            "path": "schemas/statements/1/bond_convention_params.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/bond_convention_params.schema.json",
-            "type_name": "BondConventionParams",
-            "kind": "input",
-            "bytes": 26097
-          },
-          {
-            "domain": "statements",
             "path": "schemas/statements/1/check_suite_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 22797
+            "bytes": 50985
+          },
+          {
+            "domain": "statements",
+            "path": "schemas/statements/1/dated_cell.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
+            "type_name": "DatedCell",
+            "kind": "output",
+            "bytes": 28369
           },
           {
             "domain": "statements",
@@ -5129,15 +5170,23 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 394686
+            "bytes": 420121
           },
           {
             "domain": "statements",
-            "path": "schemas/statements/1/forecast_parameters.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
-            "type_name": "ForecastParameters",
+            "path": "schemas/statements/1/forecast_method.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_method.schema.json",
+            "type_name": "ForecastMethod",
+            "kind": "component",
+            "bytes": 1931
+          },
+          {
+            "domain": "statements",
+            "path": "schemas/statements/1/forecast_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_spec.schema.json",
+            "type_name": "ForecastSpec",
             "kind": "input",
-            "bytes": 20392
+            "bytes": 22004
           },
           {
             "domain": "statements",
@@ -5145,7 +5194,15 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
             "type_name": "MetricRegistry",
             "kind": "input",
-            "bytes": 5807
+            "bytes": 5912
+          },
+          {
+            "domain": "statements",
+            "path": "schemas/statements/1/model_edit.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
+            "type_name": "ModelEdit",
+            "kind": "input",
+            "bytes": 58483
           },
           {
             "domain": "statements",
@@ -5153,7 +5210,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
             "type_name": "MonteCarloConfig",
             "kind": "input",
-            "bytes": 1364
+            "bytes": 1905
           },
           {
             "domain": "statements",
@@ -5161,7 +5218,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 34568
+            "bytes": 46152
           },
           {
             "domain": "statements",
@@ -5169,7 +5226,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
             "type_name": "NormalizationConfig",
             "kind": "component",
-            "bytes": 5883
+            "bytes": 29517
           },
           {
             "domain": "statements",
@@ -5177,7 +5234,15 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
             "type_name": "NormalizationResult",
             "kind": "output",
-            "bytes": 23930
+            "bytes": 29741
+          },
+          {
+            "domain": "statements",
+            "path": "schemas/statements/1/pricing_flow_selection.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/pricing_flow_selection.schema.json",
+            "type_name": "PricingFlowSelection",
+            "kind": "input",
+            "bytes": 22332
           },
           {
             "domain": "statements",
@@ -5185,7 +5250,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3958
+            "bytes": 4046
           },
           {
             "domain": "statements",
@@ -5193,23 +5258,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 76275
-          },
-          {
-            "domain": "statements",
-            "path": "schemas/statements/1/swap_conventions.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/swap_conventions.schema.json",
-            "type_name": "SwapConventions",
-            "kind": "input",
-            "bytes": 22717
-          },
-          {
-            "domain": "statements",
-            "path": "schemas/statements/1/swap_params.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/swap_params.schema.json",
-            "type_name": "SwapParams",
-            "kind": "input",
-            "bytes": 23357
+            "bytes": 111286
           },
           {
             "domain": "valuations",
@@ -5393,7 +5442,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1018113
+            "bytes": 1018330
           },
           {
             "domain": "valuations",
@@ -5601,7 +5650,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1025960
+            "bytes": 1026177
           },
           {
             "domain": "valuations",
@@ -5777,7 +5826,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1024937
+            "bytes": 1025154
           },
           {
             "domain": "valuations",
@@ -6025,7 +6074,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1116870
+            "bytes": 1117087
           },
           {
             "domain": "valuations",
@@ -6201,7 +6250,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1027568
+            "bytes": 1027785
           },
           {
             "domain": "valuations",

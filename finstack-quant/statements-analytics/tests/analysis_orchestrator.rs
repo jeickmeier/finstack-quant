@@ -38,8 +38,11 @@ fn flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCu
 
 fn non_finite_suite() -> CheckSuite {
     CheckSuite::builder("corporate-test")
-        .add_check(NonFiniteCheck { nodes: vec![] })
+        .add_check(NonFiniteCheck {
+            nodes: finstack_quant_statements::checks::builtins::NodeSelection::all(),
+        })
         .build()
+        .expect("unique check ids")
 }
 
 #[test]
@@ -78,16 +81,17 @@ fn test_full_lbo_analysis() {
         model_builder
             .compute("ufcf", "ebitda * 0.6")
             .expect("ufcf formula");
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "SENIOR-BOND",
+            fixed_bond(
                 "SENIOR-BOND",
                 Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.06,
                 time::macros::date!(2025 - 01 - 01),
                 time::macros::date!(2030 - 01 - 01),
                 "USD-OIS",
-            )
-            .expect("valid bond");
+            ),
+        );
         model_builder.with_meta("currency", serde_json::json!("USD"));
         model_builder.build().expect("valid model")
     };
@@ -213,27 +217,29 @@ fn test_mixed_currency_capital_structure_requires_reporting_fx() {
                 ),
             ],
         );
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "USD-BOND",
+            fixed_bond(
                 "USD-BOND",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 as_of,
                 time::macros::date!(2030 - 01 - 01),
                 "USD-OIS",
-            )
-            .expect("usd bond");
-        model_builder
-            .add_bond(
+            ),
+        );
+        model_builder.add_debt(
+            "EUR-BOND",
+            fixed_bond(
                 "EUR-BOND",
                 Money::new(8_000_000.0, Currency::EUR).expect("valid money fixture"),
                 0.04,
                 as_of,
                 time::macros::date!(2030 - 01 - 01),
                 "EUR-OIS",
-            )
-            .expect("eur bond");
-        model_builder.fx_policy(finstack_quant_core::money::fx::FxConversionPolicy::PeriodEnd);
+            ),
+        );
+        model_builder.fx_policy(finstack_quant_statements::types::CapitalFxPolicy::PeriodEnd);
         model_builder.with_meta("currency", serde_json::json!("USD"));
         model_builder.build().expect("valid model")
     };
@@ -244,16 +250,50 @@ fn test_mixed_currency_capital_structure_requires_reporting_fx() {
         .try_insert(flat_discount_curve(0.03, as_of, "EUR-OIS"))
         .expect("insert market curve");
     let mut evaluator = Evaluator::new();
-    let error = evaluator
-        .evaluate_with_market(&model, &market, as_of)
-        .expect_err("USD reporting requires FX for the EUR debt");
-    // Reporting currency is explicit through metadata. Missing conversion inputs
-    // must return a typed error, without panicking or summing unlike currencies.
-    assert!(matches!(
-        error,
-        finstack_quant_statements::Error::CapitalStructure(ref message)
-            if message.contains("EUR")
-                && message.contains("USD")
-                && message.contains("no FX matrix present")
-    ));
+    let result = evaluator
+        .evaluate_with_market(
+            &model,
+            &market,
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
+        .expect("native values do not need FX");
+    // Reporting currency is explicit through metadata. Without an FX matrix
+    // the consolidated total is unavailable, with its reason, and unlike
+    // currencies are never summed; each native total is still reported.
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    assert!(cashflows.totals.is_empty());
+    for quarter in 1..=2 {
+        let period = PeriodId::quarter(2025, quarter).expect("valid period fixture");
+        let reason = &cashflows.consolidation_unavailable[&period];
+        assert!(reason.contains("no FX matrix"), "{reason}");
+        assert!(reason.contains("EUR") && reason.contains("USD"), "{reason}");
+        assert!(cashflows.totals_by_currency[&Currency::EUR].contains_key(&period));
+        assert!(cashflows.totals_by_currency[&Currency::USD].contains_key(&period));
+    }
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

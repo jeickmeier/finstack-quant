@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use finstack_quant_statements::Result;
-use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity,
 };
@@ -45,10 +44,16 @@ impl Check for FcfSignCheck {
         let mut findings = Vec::new();
         let mut consecutive_negative: usize = 0;
 
-        for period_spec in &context.model.periods {
+        for period_spec in context.periods() {
             let pid = &period_spec.id;
 
-            let Some(fcf) = get_finite_node_value(context.results, &self.fcf_node, pid) else {
+            let Some(fcf) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.fcf_node,
+                pid,
+                &mut findings,
+            ) else {
                 consecutive_negative = 0;
                 continue;
             };
@@ -80,19 +85,12 @@ impl Check for FcfSignCheck {
                     materiality: None,
                     nodes: vec![self.fcf_node.clone()],
                     comparison: None,
+                    coverage: false,
                 });
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        let evaluated = context.periods().len();
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

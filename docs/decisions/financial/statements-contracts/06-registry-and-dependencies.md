@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full metric registration, dependency and model import contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The current builder uses the stored namespace for dotted paths. Textual qualification and registration and import gaps remain.
+**Implementation status:** Reconciled (2026-11-17). A custom document and the whole built-in catalogue each register atomically; namespaces and metric IDs follow the shared identifier grammar, `cs` is reserved and qualified IDs are unique; each formula's references are bound at registration against staged and committed definitions (unqualified in its own namespace, exact qualified in any namespace, otherwise a model requirement) and stored as a qualified formula, its dependencies and its requirements, which later registrations leave intact; references are qualified in the AST (`StmtExpr::map_node_refs`) and the textual rewriter is deleted; a same-period cycle in a document is rejected while a positive literal `lag` or `shift` reads the past; the dependency closure follows local, qualified and historical references in a deterministic order; a model import adds the metric and its closure atomically, shares a node holding the same unchanged template and rejects a conflicting definition, with overrides made by `replace_node` after import. `requires`, `unit_type` and tags remain descriptive.
 
-**Validation status:** Existing source and regression evidence mapped. Independent registration, dependency and import qualification remains pending.
+**Validation status:** Qualified by a metric ID that is also a function name, a qualified cross-namespace reference in the closure, a later registration that does not rebind an earlier metric, two imports sharing an unchanged template, a conflicting import that adds nothing, and atomic catalogue registration.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 
@@ -16,6 +16,8 @@
 4. Import the requested metric and its dependency closure into the model atomically. Share an existing node that uses the same unchanged template, and reject conflicting definitions. Apply intentional overrides through an explicit named edit and the normal model revalidation boundary. [Named atomic edits](02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability) · [Runnable model validation](01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
 
 ## Audited input domain
+
+The sections below describe the implementation audited before reconciliation.
 
 Registry stores reusable formulas under namespace.metric_id. Loading one JSON document is transactional: no definition is committed until all definitions and the document's dependency graph validate. Built-in loading repeats that process over four embedded files, so earlier documents survive a later document failure.
 
@@ -48,4 +50,4 @@ Registry contract gaps are distinct from the numerical correctness of each store
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

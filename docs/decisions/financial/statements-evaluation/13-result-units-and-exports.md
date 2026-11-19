@@ -1,6 +1,6 @@
 # STATEMENTS-EVALUATION-013 — Result units, Money views, tables and dated flow exports
 
-Decision status: **Accepted for the full typed results and export contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full typed results and export contract (2026-11-15)**. Implementation status: **Reconciled (2026-11-17)**: `StatementResult.cells` is the one typed result, a `ResultCell` per node and plan period with status (`value`, `missing`, `masked`, `unavailable`), an exact `Money` or finite scalar value, a reason and a source; `get_or` substitutes only for a missing cell at a known node and period; the long table carries every node and plan period with exact decimal text, currency, status, reason and source, and the wide table is a nullable float view with per-column units; `node_to_dated_schedule` takes the result's period plan and an explicit anchor and keeps gaps; `node_to_pricing_flows` requires the monetary node, expected currency, sign convention and complete requested periods, and negates an outflow magnitude once; `RunProvenance` carries model identity and content hash, source snapshot, observation cutoff, valuation date and run identity. Python and WASM publish the same contract. Validation status: **Qualified by the record's worked example** (USD 125.01 March CapEx, a visible missing April, pricing failure when April is required), an amount unrepresentable as `Money`, long-table round trips and chronological order under a different insertion order. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
 ## Accepted decision for typed results and exports
 
@@ -12,6 +12,8 @@ Decision status: **Accepted for the full typed results and export contract (2026
 For example, monthly March CapEx of USD 125.01 exports as exact `125.01` on March 31 when the period close is selected. A positive outflow magnitude is negated once at the pricing boundary. A missing April observation stays visible, and pricing fails when the requested schedule requires April.
 
 ## Audited data domain
+
+The sections below describe the implementation audited on 2026-11-05, before reconciliation.
 
 `StatementResult` retains raw `f64` node-period values as canonical computational output, with separate value-type metadata, monetary views, per-cell source and diagnostics. It can represent undefined results. Table and dated-schedule exports are projections of those values, not recalculations or automatic investor/issuer perspective conversions. The unit/sign boundary remains governed by the model and [financial perspective policy](../conventions/0044-financial-perspectives-and-boundary-conversions.md).
 
@@ -36,4 +38,4 @@ The accepted contract requires authoritative typed results, explicit unavailable
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-evaluation-forecasts-and-reporting).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

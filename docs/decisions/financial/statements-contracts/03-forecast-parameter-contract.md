@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full typed forecast and validation staging contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited path stores a free-form parameter map, applies some method defaults and defers static checks.
+**Implementation status:** Reconciled (2026-11-18). A JavaScript `bigint` in a plain-object Statements input (a model, a node, a forecast specification or a Monte Carlo configuration) is read as the seed's decimal wire text; the published TypeScript type of a seed is its wire text. The evaluation-time checks run where each method runs: a base that a multiplicative or geometric method cannot use, a history a trend or bootstrap cannot use, and an active correlation in a single run are refused or leave the cell unavailable with its reason. `ForecastSpec` is one closed typed enum, a method with its typed parameters, replacing the free-form parameter map; it is what a model stores and every method runs on. An unknown, duplicate, `null` or method-inapplicable field is rejected when a document is read or a parameter is set. The time-series method, bootstrap mode, seasonal mode and fade shape have no default. A seed is admitted only for a stochastic method and is an exact `u64`: a canonical decimal string in JSON, an integer in Rust and Python. Static requirements are checked at build and load even when observations cover every forecast period: finite numbers, ordered bounds, non-negative standard deviations, conditional parameters (a `half_life` only with the exponential fade, smoothing factors only with the exponential trend, a `window` only with the moving average), a growth curve that covers the model's forecast periods, override keys that are periods of the plan and a correlation peer that is another stochastic forecast.
 
-**Validation status:** Existing source and regression evidence mapped. Independent admission, forecast and cross-host seed qualification remain pending.
+**Validation status:** Qualified by a linear fade carrying `half_life`, an unknown, a `null` and a duplicate field, a forecast that never runs but is still checked, and seed `9007199254740993` round-tripped through Rust, Python and the JSON wire.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 
@@ -18,6 +18,8 @@
 A linear fade with a `half_life` fails static validation. A geometric fade checks its eligible anchor when the forecast runs.
 
 ## Audited input domain
+
+The sections below describe the implementation audited before reconciliation.
 
 ForecastSpec persists a method plus a free-form JSON parameter map. parameters() decodes that map to a closed ForecastParameters variant; validate() performs this decoding only. Forecast mathematics and numerical/domain validation belong to the forecast/evaluation scope.
 
@@ -48,4 +50,4 @@ Successful parameter decoding does not certify forecast-domain validity, history
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

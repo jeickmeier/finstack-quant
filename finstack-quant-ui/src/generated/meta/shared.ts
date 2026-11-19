@@ -18086,13 +18086,13 @@ export default [
     "path": "#/$defs/Function/oneOf/25",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/25",
     "const": "sum",
-    "description": "Sum multiple values, skipping NaN values."
+    "description": "Sum of the arguments. Evaluated in the `statements` layer, where every\nargument must be available."
   },
   {
     "path": "#/$defs/Function/oneOf/26",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/26",
     "const": "mean",
-    "description": "Average of multiple values, skipping NaN values."
+    "description": "Mean of the arguments. Evaluated in the `statements` layer, where every\nargument must be available."
   },
   {
     "path": "#/$defs/Function/oneOf/27",
@@ -18140,43 +18140,43 @@ export default [
     "path": "#/$defs/Function/oneOf/33",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/33",
     "const": "coalesce",
-    "description": "Return first non-NaN/non-zero value (coalesce)."
+    "description": "First available argument, including zero (coalesce). Evaluated in the\n`statements` layer."
   },
   {
     "path": "#/$defs/Function/oneOf/34",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/34",
-    "const": "min",
-    "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer. NaN handling\nis order-dependent and follows IEEE 754 comparison semantics: with a\nleft-to-right fold of `if acc < arg { acc } else { arg }`, a leading\n`NaN` is dropped in favor of a finite peer while a trailing `NaN`\npropagates."
+    "const": "ratio",
+    "description": "Decimal ratio of a numerator to a strictly positive base\n(`ratio(numerator, base)`). Evaluated in the `statements` layer, where\na zero or negative base makes the result unavailable instead of an\nerror."
   },
   {
     "path": "#/$defs/Function/oneOf/35",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/35",
-    "const": "max",
-    "description": "Maximum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer. NaN handling\nis order-dependent and follows IEEE 754 comparison semantics (see\n[`Function::Min`])."
+    "const": "min",
+    "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer over operands\nthat must all be available and in the same units."
   },
   {
     "path": "#/$defs/Function/oneOf/36",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/36",
-    "const": "abs",
-    "description": "Absolute value helper (`abs(expr)`)."
+    "const": "max",
+    "description": "Maximum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer (see\n[`Function::Min`])."
   },
   {
     "path": "#/$defs/Function/oneOf/37",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/37",
-    "const": "sign",
-    "description": "Sign helper returning -1, 0, or 1 (`sign(expr)`)."
+    "const": "abs",
+    "description": "Absolute value helper (`abs(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/38",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/38",
-    "const": "growth_rate",
-    "description": "Compound annual growth rate between the current period and one a\nrequired number of periods back: `growth_rate(series, periods)`.\n\nEvaluated in the statements layer where period spacing is known."
+    "const": "sign",
+    "description": "Sign helper returning -1, 0, or 1 (`sign(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/39",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/39",
-    "const": "pow",
-    "description": "Exponentiation (`pow(base, exponent)`). Core rejects domain and overflow errors."
+    "const": "growth_rate",
+    "description": "Compound annual growth rate between the current period and one a\nrequired number of periods back: `growth_rate(series, periods)`.\n\nEvaluated in the statements layer where period spacing is known."
   },
   {
     "path": "#/$defs/Function/oneOf/4",
@@ -18187,54 +18187,60 @@ export default [
   {
     "path": "#/$defs/Function/oneOf/40",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/40",
-    "const": "round",
-    "description": "Quantize the represented value to a decimal place, with ties away from zero.\nDigits default to zero. Core requires a direct, integral i32 literal."
+    "const": "pow",
+    "description": "Exponentiation (`pow(base, exponent)`). Core rejects domain and overflow errors."
   },
   {
     "path": "#/$defs/Function/oneOf/41",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/41",
-    "const": "floor",
-    "description": "Largest integer less than or equal to the value (`floor(expr)`)."
+    "const": "round",
+    "description": "Quantize the represented value to a decimal place, with ties away from zero.\nDigits default to zero. Core requires a direct, integral i32 literal."
   },
   {
     "path": "#/$defs/Function/oneOf/42",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/42",
-    "const": "ceil",
-    "description": "Smallest integer greater than or equal to the value (`ceil(expr)`)."
+    "const": "floor",
+    "description": "Largest integer less than or equal to the value (`floor(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/43",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/43",
-    "const": "ln",
-    "description": "Natural logarithm of a positive operand (`ln(expr)`)."
+    "const": "ceil",
+    "description": "Smallest integer greater than or equal to the value (`ceil(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/44",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/44",
-    "const": "exp",
-    "description": "Natural exponential (`exp(expr)`)."
+    "const": "ln",
+    "description": "Natural logarithm of a positive operand (`ln(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/45",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/45",
-    "const": "log10",
-    "description": "Base-10 logarithm of a positive operand (`log10(expr)`)."
+    "const": "exp",
+    "description": "Natural exponential (`exp(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/46",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/46",
-    "const": "sqrt",
-    "description": "Square root of a nonnegative operand (`sqrt(expr)`)."
+    "const": "log10",
+    "description": "Base-10 logarithm of a positive operand (`log10(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/47",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/47",
-    "const": "clamp",
-    "description": "Restrict a value to ordered, inclusive finite bounds (`clamp(expr, lo, hi)`).\nMissing operands propagate and infinite operands fail."
+    "const": "sqrt",
+    "description": "Square root of a nonnegative operand (`sqrt(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/48",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/48",
+    "const": "clamp",
+    "description": "Restrict a value to ordered, inclusive finite bounds (`clamp(expr, lo, hi)`).\nMissing operands propagate and infinite operands fail."
+  },
+  {
+    "path": "#/$defs/Function/oneOf/49",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/49",
     "const": "is_missing",
     "description": "Missing-value predicate (`is_missing(expr)`); core admits NaN as its missing sentinel."
   },

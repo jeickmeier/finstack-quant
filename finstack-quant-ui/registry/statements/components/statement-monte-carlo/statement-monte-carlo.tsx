@@ -6,6 +6,7 @@ import { scalePoint } from "@tanstack/charts/scales/point";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { MonteCarloResults } from "finstack-quant-wasm";
+import type { core as wire } from "finstack-quant-wasm/types";
 import { Button } from "@/components/ui/button";
 import { formatPercent, formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
@@ -51,7 +52,8 @@ function warningText(warning: unknown): string {
 /** A metric's breach test, as requested from the caller. */
 export interface BreachRequest {
   metric: string;
-  threshold: number;
+  /** A number for a scalar metric; money in the metric's currency for a monetary one. */
+  threshold: number | wire.Money;
 }
 export interface StatementMonteCarloProps {
   /** Initial MonteCarloConfig; remount to load another. Omitted starts empty. */
@@ -77,7 +79,7 @@ export interface StatementMonteCarloProps {
 }
 /**
  * Edits a Rust MonteCarloConfig with the schema form over the generated
- * contract (the uint64 seed stays an exact integer) and presents native
+ * contract (the uint64 seed is an exact decimal string) and presents native
  * MonteCarloResults as returned: for the chosen metric, a fan of bands
  * between the returned percentiles paired from the outside in, with the
  * unpaired middle percentile as a line, across the forecast periods, the percentile table, the breach
@@ -103,7 +105,11 @@ export function StatementMonteCarlo({
   const [chosen, setChosen] = useState(defaultBreach?.metric ?? "");
   const metric = metrics.includes(chosen) ? chosen : (metrics[0] ?? "");
   const [threshold, setThreshold] = useState(
-    defaultBreach === undefined ? "" : String(defaultBreach.threshold),
+    defaultBreach === undefined
+      ? ""
+      : typeof defaultBreach.threshold === "number"
+        ? String(defaultBreach.threshold)
+        : defaultBreach.threshold.amount,
   );
   const [showWarnings, setShowWarnings] = useState(false);
   const series = results?.percentile_results[metric];
@@ -296,11 +302,17 @@ export function StatementMonteCarlo({
                   onClick={() =>
                     onBreach({
                       metric,
-                      // A cleared threshold is NaN, never 0, so Rust rejects it.
+                      // Typed in the metric's units. A cleared threshold is
+                      // NaN or an empty amount, never 0, so Rust rejects it.
                       threshold:
-                        threshold.trim() === ""
-                          ? Number.NaN
-                          : Number(threshold),
+                        series?.value_type.type === "monetary"
+                          ? {
+                              amount: threshold.trim(),
+                              currency: series.value_type.currency,
+                            }
+                          : threshold.trim() === ""
+                            ? Number.NaN
+                            : Number(threshold),
                     })
                   }
                 >

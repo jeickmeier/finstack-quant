@@ -966,7 +966,7 @@ impl PyCorporateAnalysis {
     fn __repr__(&self) -> String {
         format!(
             "CorporateAnalysis(statement_nodes={}, equity={}, credit_instruments={}, ev_suppressed_non_positive={})",
-            self.inner.statement.nodes.len(),
+            self.inner.statement.cells.len(),
             if self.inner.equity.is_some() {
                 "CorporateValuationResult(...)"
             } else {

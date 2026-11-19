@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use finstack_quant_statements::Result;
-use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
     Severity, SignConventionPolicy,
@@ -51,44 +50,25 @@ impl Check for DividendReconciliation {
         let mut findings = Vec::new();
         let mut comparisons = Vec::new();
 
-        for period_spec in &context.model.periods {
+        for period_spec in context.periods() {
             let pid = &period_spec.id;
 
-            // `get_finite_node_value`: a NaN/Inf operand poisons the diff
-            // (`NaN > tolerance` is false ⇒ silent pass), so it is skipped like
-            // a missing one — but, unlike a missing value, it is reported.
-            let div_cf = get_finite_node_value(context.results, &self.dividends_cf_node, pid);
-            let div_eq = get_finite_node_value(context.results, &self.dividends_equity_node, pid);
+            // Both sides are read so a period missing either names each gap.
+            let div_cf = crate::analysis::checks::required(
+                context,
+                self,
+                &self.dividends_cf_node,
+                pid,
+                &mut findings,
+            );
+            let div_eq = crate::analysis::checks::required(
+                context,
+                self,
+                &self.dividends_equity_node,
+                pid,
+                &mut findings,
+            );
             let (Some(div_cf), Some(div_eq)) = (div_cf, div_eq) else {
-                let non_finite: Vec<NodeId> =
-                    [&self.dividends_cf_node, &self.dividends_equity_node]
-                        .into_iter()
-                        .filter(|n| {
-                            context
-                                .results
-                                .get(n.as_str(), pid)
-                                .is_some_and(|v| !v.is_finite())
-                        })
-                        .cloned()
-                        .collect();
-                if !non_finite.is_empty() {
-                    findings.push(CheckFinding {
-                        check_id: self.id().to_string(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "Dividend reconciliation skipped for {pid}: non-finite value(s) in {}",
-                            non_finite
-                                .iter()
-                                .map(|n| n.as_str())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
-                        period: Some(*pid),
-                        materiality: None,
-                        nodes: non_finite,
-                        comparison: None,
-                    });
-                }
                 continue;
             };
 
@@ -111,13 +91,12 @@ impl Check for DividendReconciliation {
             }
 
             let diff = div_cf - div_eq;
-            let comparison = CheckComparison {
-                identity: "dividends_reconciliation".to_string(),
-                period: Some(*pid),
-                actual: div_cf,
-                expected: div_eq,
-                tolerance,
-            };
+            let comparison = CheckComparison::from_floats(
+                "dividends_reconciliation",
+                *pid,
+                crate::analysis::checks::currency_of(context, &self.dividends_cf_node, pid),
+                (div_cf, div_eq, tolerance),
+            )?;
             comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
@@ -134,7 +113,7 @@ impl Check for DividendReconciliation {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: diff.abs(),
-                        relative_pct: relative,
+                        relative_pct: Some(relative),
                         reference_value: div_eq,
                         reference_label: "equity_dividends".to_string(),
                     }),
@@ -143,19 +122,12 @@ impl Check for DividendReconciliation {
                         self.dividends_equity_node.clone(),
                     ],
                     comparison: Some(comparison),
+                    coverage: false,
                 });
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons,
-        })
+        let evaluated = context.periods().len();
+        Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

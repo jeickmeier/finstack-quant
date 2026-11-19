@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full bundled earnings and margin contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited catalogue assumes ex-D&A operating expense and uses separate D&A deductions.
+**Implementation status:** Reconciled (2026-11-17). The bundled catalogue reads reported `cogs` and `opex` with their D&A included and follows the accepted table by reference: gross profit, operating income, EBIT as operating income, EBITDA as EBIT plus the included depreciation and amortization, EBT and net income. The four margins and two cost ratios use the new `ratio(numerator, base)` function, which gives a decimal ratio over a strictly positive base, is unavailable with reason `undefined_base` for a zero or negative base and propagates a missing input; a loss keeps its sign on positive revenue. Ratios roll up by recomputing the formula on aggregated inputs. The bundled return ratios no longer deduct D&A a second time.
 
-**Validation status:** Existing source and regression evidence mapped. Independent qualification of reported-cost earnings and margin calculations remains pending.
+**Validation status:** Qualified by a hand-worked income statement that separates the D&A included in COGS and OPEX from the single add-back, a negative expense credit, margins without positive revenue, a missing add-back and recomputation of a ratio from aggregated annual inputs.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 
@@ -24,6 +24,8 @@ Use reported COGS and OPEX with their depreciation and amortization included. Us
 The four margins use gross profit, operating income, EBITDA and net income as numerators. The two cost ratios use reported COGS and OPEX. Divide each by same-period revenue and report a decimal ratio. The ratio is unavailable with a reason when revenue is missing, zero or negative. For positive revenue, preserve the signed numerator. For a coarser reporting period, recompute the ratio using the aggregated numerator and revenue.
 
 ## Audited input domain
+
+The sections below describe the implementation audited before reconciliation.
 
 The embedded fin namespace contains six income-statement metrics and six revenue-normalized margin/cost ratios. They are ordinary statement DSL formulas evaluated with the model's observations, units, periods and missing-data behavior.
 
@@ -66,4 +68,4 @@ The original audit did not locate a standalone ADR for the prior reported-cost d
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

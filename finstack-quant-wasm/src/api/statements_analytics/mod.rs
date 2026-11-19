@@ -29,13 +29,7 @@ use crate::utils::input::{
     json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
-
-/// Parse and semantically validate a `FinancialModelSpec` argument (object or JSON).
-pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue> {
-    FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)
-}
 
 /// Run a sensitivity analysis on a financial model.
 ///
@@ -69,7 +63,7 @@ pub fn run_sensitivity(
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
 
     let config: finstack_quant_statements_analytics::analysis::SensitivityConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
@@ -146,7 +140,7 @@ pub fn evaluate_scenario_set(
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let scenario_set_json: &str = &json_text(&scenario_set_json, "scenarioSetJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
 
     let scenario_set: finstack_quant_statements_analytics::analysis::ScenarioSet =
         serde_json::from_str(scenario_set_json).map_err(to_js_err)?;
@@ -187,8 +181,7 @@ pub fn evaluate_scenario_set_with_market(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] market: JsValue,
     #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model =
-        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model(&model_json, "modelJson")?;
     let scenario_set: finstack_quant_statements_analytics::analysis::ScenarioSet =
         serde_json::from_str(&json_text(&scenario_set_json, "scenarioSetJson")?)
             .map_err(to_js_err)?;
@@ -350,7 +343,7 @@ pub fn dcf_sensitivity(
     let ufcf_node = js_opt_string(ufcf_node.as_ref(), "ufcfNode")?;
     let options_json = opt_json_text(options_json.as_ref(), "optionsJson")?;
 
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
     let terminal_value: finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec =
         serde_json::from_str(terminal_value_json).map_err(to_js_err)?;
     let options: DcfOptions = options_json
@@ -402,7 +395,7 @@ pub fn evaluate_lbo(
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
     let config: finstack_quant_statements_analytics::analysis::LboConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
 
@@ -460,7 +453,7 @@ pub fn goal_seek(
     spec: JsValue,
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
     let spec: finstack_quant_statements_analytics::analysis::GoalSeekSpec =
         from_js_json(&spec, "spec")?;
     let result = finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec)
@@ -472,8 +465,8 @@ pub fn goal_seek(
 /// object out).
 ///
 /// Returns the Rust `Explanation` as a structured object: `source` names the
-/// layer that produced the value (`value`, `forecast`, `formula` or
-/// `where_masked`), `forecast` carries the node's forecast spec for a
+/// value source selected for the cell (`value`, `forecast` or `formula`; absent
+/// for a masked or missing cell), `forecast` carries the node's forecast spec for a
 /// forecast cell, and `breakdown` lists the formula's components (including
 /// `cs.*` references) when the formula produced the value. A non-finite
 /// `final_value` or breakdown `value` (for example a `lag` node at the first
@@ -502,7 +495,7 @@ pub fn explain_formula(
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
     let node_id: &str = &js_string(&node_id, "nodeId")?;
     let period: &str = &js_string(&period, "period")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
@@ -542,7 +535,7 @@ pub fn explain_formula_text(
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
     let node_id: &str = &js_string(&node_id, "nodeId")?;
     let period: &str = &js_string(&period, "period")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
@@ -671,7 +664,7 @@ pub fn credit_assessment(
 /// @returns Structured check report with individual results and aggregate summary.
 /// @param modelJson - Financial-model specification JSON.
 /// @param suiteSpecJson - Check-suite specification JSON.
-/// @param resultsJson - Evaluated statement-result JSON.
+/// @param resultsJson - Evaluated statement-result JSON, or a rollup of it (`statementResultRollup`), which is checked at its target periods.
 #[wasm_bindgen(js_name = runChecks, unchecked_return_type = "CheckReport")]
 pub fn run_checks(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
@@ -685,13 +678,17 @@ pub fn run_checks(
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let suite_spec_json: &str = &json_text(&suite_spec_json, "suiteSpecJson")?;
     let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
     let spec: finstack_quant_statements::checks::CheckSuiteSpec =
         serde_json::from_str(suite_spec_json).map_err(to_js_err)?;
     let suite = spec.resolve().map_err(to_js_err)?;
     let results = parse_optional_results(results_json)?;
     let report = suite
-        .run_model(&model, results.as_ref())
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            results.as_ref(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&report)
 }
@@ -726,13 +723,18 @@ pub fn run_three_statement_checks(
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let mapping_json: &str = &json_text(&mapping_json, "mappingJson")?;
     let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
     let mapping: finstack_quant_statements_analytics::analysis::ThreeStatementMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
-    let suite = finstack_quant_statements_analytics::analysis::three_statement_checks(mapping);
+    let suite = finstack_quant_statements_analytics::analysis::three_statement_checks(mapping)
+        .map_err(to_js_err)?;
     let results = parse_optional_results(results_json)?;
     let report = suite
-        .run_model(&model, results.as_ref())
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            results.as_ref(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&report)
 }
@@ -764,13 +766,18 @@ pub fn run_credit_underwriting_checks(
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let mapping_json: &str = &json_text(&mapping_json, "mappingJson")?;
     let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model_text(model_json)?;
     let mapping: finstack_quant_statements_analytics::analysis::CreditMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
-    let suite = finstack_quant_statements_analytics::analysis::credit_underwriting_checks(mapping);
+    let suite = finstack_quant_statements_analytics::analysis::credit_underwriting_checks(mapping)
+        .map_err(to_js_err)?;
     let results = parse_optional_results(results_json)?;
     let report = suite
-        .run_model(&model, results.as_ref())
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            results.as_ref(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&report)
 }

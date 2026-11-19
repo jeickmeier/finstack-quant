@@ -34,6 +34,78 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
+/// A coupon payment election taking effect at the start of a coupon period.
+///
+/// From `effective_date` the loan's coupons are paid as `coupon_type` (all
+/// cash, all PIK, or a cash/PIK split), until the next election. It is the
+/// dated form of a borrower's PIK election under a toggle provision.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_cashflows::builder::CouponType;
+/// use finstack_quant_valuations_fixed_income::loan_terms::CouponElection;
+/// use rust_decimal_macros::dec;
+/// use time::macros::date;
+///
+/// // 40% of each coupon capitalizes from the period starting 1 April.
+/// let election = CouponElection {
+///     effective_date: date!(2025 - 04 - 01),
+///     coupon_type: CouponType::Split {
+///         cash_fraction: dec!(0.6),
+///         pik_fraction: dec!(0.4),
+///     },
+/// };
+/// assert_eq!(election.effective_date, date!(2025 - 04 - 01));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CouponElection {
+    /// Start of the first coupon period the election applies to. It must be
+    /// a coupon-period start of the loan.
+    pub effective_date: Date,
+    /// How coupons are paid from that period on: cash, PIK, or a split whose
+    /// fractions are decimals summing to one.
+    pub coupon_type: finstack_quant_cashflows::builder::CouponType,
+}
+
+/// A principal change posted to a loan outside its contractual schedule.
+///
+/// A posting is a change in outstanding principal that has already been
+/// settled elsewhere, for example a prepayment paid by a borrower's cash
+/// waterfall or interest capitalized by an election. The loan recompiles its
+/// contractual schedule from its own terms with the posting applied: coupons
+/// and balance-based fees accrue on the changed principal from
+/// `effective_date`, later amortization and the maturity redemption are
+/// sized on what remains, and the posting itself is a zero-cash principal
+/// row, because its cash is not a cashflow of the schedule.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::currency::Currency;
+/// use finstack_quant_core::money::Money;
+/// use finstack_quant_valuations_fixed_income::loan_terms::PrincipalPosting;
+/// use time::macros::date;
+///
+/// // 40 of principal repaid at the close of 31 March: the lower balance
+/// // earns from 1 April.
+/// let posting = PrincipalPosting {
+///     effective_date: date!(2025 - 04 - 01),
+///     delta: Money::new(-40.0, Currency::USD)?,
+/// };
+/// assert!(posting.delta.amount() < 0.0);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PrincipalPosting {
+    /// First day the changed principal earns interest and fees. A change
+    /// posted at the close of a day is effective on the following day.
+    pub effective_date: Date,
+    /// Signed change in outstanding principal, in the loan currency:
+    /// negative for a repayment, positive for a capitalization.
+    pub delta: Money,
+}
+
 /// A scheduled draw `{date, amount}` on a committed facility.
 ///
 /// A delayed-draw term loan funds on `date` (inside its availability

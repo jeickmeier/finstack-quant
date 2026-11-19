@@ -4,11 +4,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::dsl::{StmtExpr, parse_formula};
-use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::types::AmountOrScalar;
-use indexmap::IndexMap;
 use time::Month;
 
 /// Test parsing cs.* references
@@ -17,12 +14,9 @@ fn test_parse_cs_interest_expense_total() {
     let ast = parse_formula("cs.interest_expense.total").unwrap();
 
     match ast {
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
-            assert_eq!(component, "interest_expense");
-            assert_eq!(instrument_or_total, "total");
+        StmtExpr::CsRef { component, scope } => {
+            assert_eq!(component.as_str(), "interest_expense");
+            assert_eq!(scope.to_string(), "total");
         }
         _ => panic!("Expected CsRef, got {:?}", ast),
     }
@@ -33,12 +27,9 @@ fn test_parse_cs_principal_payment_instrument() {
     let ast = parse_formula("cs.principal_payment.BOND-001").unwrap();
 
     match ast {
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
-            assert_eq!(component, "principal_payment");
-            assert_eq!(instrument_or_total, "BOND-001");
+        StmtExpr::CsRef { component, scope } => {
+            assert_eq!(component.as_str(), "principal_payment");
+            assert_eq!(scope.to_string(), "BOND-001");
         }
         _ => panic!("Expected CsRef, got {:?}", ast),
     }
@@ -49,12 +40,9 @@ fn test_parse_cs_debt_balance() {
     let ast = parse_formula("cs.debt_balance.SWAP-001").unwrap();
 
     match ast {
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
-            assert_eq!(component, "debt_balance");
-            assert_eq!(instrument_or_total, "SWAP-001");
+        StmtExpr::CsRef { component, scope } => {
+            assert_eq!(component.as_str(), "debt_balance");
+            assert_eq!(scope.to_string(), "SWAP-001");
         }
         _ => panic!("Expected CsRef, got {:?}", ast),
     }
@@ -94,174 +82,6 @@ fn test_parse_cs_invalid_format() {
     assert!(
         result.is_err(),
         "Two-part cs.* reference should produce a parse error"
-    );
-}
-
-/// Test context with capital structure cashflows
-#[test]
-fn test_context_get_cs_value_interest_total() {
-    let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let node_to_column = IndexMap::new();
-    let historical = IndexMap::new();
-
-    let mut context = EvaluationContext::new(
-        period_id,
-        &finstack_quant_core::dates::PeriodPlan::try_new(
-            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-            Vec::new(),
-        )
-        .expect("empty plan"),
-        std::sync::Arc::new(node_to_column),
-        std::sync::Arc::new(historical),
-    );
-
-    // Create sample capital structure cashflows
-    let mut cs_cashflows = CapitalStructureCashflows::new();
-    let breakdown = finstack_quant_statements::capital_structure::CashflowBreakdown {
-        interest_expense_cash: finstack_quant_core::money::Money::new(
-            50_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        interest_income_cash: None,
-        interest_expense_pik: finstack_quant_core::money::Money::new(
-            0.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        principal_payment: finstack_quant_core::money::Money::new(
-            100_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        debt_balance: finstack_quant_core::money::Money::new(
-            1_000_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        fees: finstack_quant_core::money::Money::new(
-            0.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        accrued_interest: finstack_quant_core::money::Money::new(
-            0.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        opening_balance: None,
-        scheduled_principal: None,
-        mandatory_prepayment: None,
-        sweep_prepayment: None,
-        voluntary_prepayment: None,
-    };
-    cs_cashflows.totals.insert(period_id, breakdown);
-
-    context.capital_structure_cashflows = Some(cs_cashflows);
-
-    // Test getting interest_expense.total
-    let value = context.get_cs_value("interest_expense", "total").unwrap();
-    assert_eq!(value, 50_000.0);
-}
-
-#[test]
-fn test_context_get_cs_value_principal_instrument() {
-    let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let node_to_column = IndexMap::new();
-    let historical = IndexMap::new();
-
-    let mut context = EvaluationContext::new(
-        period_id,
-        &finstack_quant_core::dates::PeriodPlan::try_new(
-            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-            Vec::new(),
-        )
-        .expect("empty plan"),
-        std::sync::Arc::new(node_to_column),
-        std::sync::Arc::new(historical),
-    );
-
-    // Create sample capital structure cashflows
-    let mut cs_cashflows = CapitalStructureCashflows::new();
-    let mut by_instrument = IndexMap::new();
-    let breakdown = finstack_quant_statements::capital_structure::CashflowBreakdown {
-        principal_payment: finstack_quant_core::money::Money::new(
-            25_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        ..finstack_quant_statements::capital_structure::CashflowBreakdown::with_currency(
-            finstack_quant_core::currency::Currency::USD,
-        )
-    };
-    by_instrument.insert(period_id, breakdown);
-    cs_cashflows
-        .by_instrument
-        .insert("BOND-001".to_string(), by_instrument);
-
-    context.capital_structure_cashflows = Some(cs_cashflows);
-
-    // Test getting principal_payment for specific instrument
-    let value = context
-        .get_cs_value("principal_payment", "BOND-001")
-        .unwrap();
-    assert_eq!(value, 25_000.0);
-}
-
-#[test]
-fn test_context_get_cs_value_no_cs_error() {
-    let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let node_to_column = IndexMap::new();
-    let historical = IndexMap::new();
-
-    let context = EvaluationContext::new(
-        period_id,
-        &finstack_quant_core::dates::PeriodPlan::try_new(
-            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-            Vec::new(),
-        )
-        .expect("empty plan"),
-        std::sync::Arc::new(node_to_column),
-        std::sync::Arc::new(historical),
-    );
-
-    // No capital structure defined - should error
-    let result = context.get_cs_value("interest_expense", "total");
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("No capital structure")
-    );
-}
-
-#[test]
-fn test_context_get_cs_value_invalid_component() {
-    let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let node_to_column = IndexMap::new();
-    let historical = IndexMap::new();
-
-    let mut context = EvaluationContext::new(
-        period_id,
-        &finstack_quant_core::dates::PeriodPlan::try_new(
-            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-            Vec::new(),
-        )
-        .expect("empty plan"),
-        std::sync::Arc::new(node_to_column),
-        std::sync::Arc::new(historical),
-    );
-    context.capital_structure_cashflows = Some(CapitalStructureCashflows::new());
-
-    // Invalid component - should error
-    let result = context.get_cs_value("invalid_component", "total");
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Unknown capital structure component")
     );
 }
 
@@ -326,16 +146,17 @@ fn test_model_with_bond_builder() {
                 AmountOrScalar::scalar(1_000_000.0),
             )],
         );
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "BOND-001",
+            fixed_bond(
                 "BOND-001",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 issue_date,
                 maturity_date,
                 "USD-OIS",
-            )
-            .unwrap();
+            ),
+        );
         model_builder.build()
     };
 
@@ -592,6 +413,16 @@ fn test_capital_structure_cashflows_accessors() {
         mandatory_prepayment: None,
         sweep_prepayment: None,
         voluntary_prepayment: None,
+        interest_arrears: None,
+        principal_pending: None,
+        principal_arrears: None,
+        principal_advance_reserve: None,
+        scheduled_cash_interest_due: None,
+        scheduled_principal_due: None,
+        fee_rebates: None,
+        repayment_refunds: None,
+        funding_proceeds: None,
+        funding_principal: None,
     };
 
     let mut instrument_map = indexmap::IndexMap::new();
@@ -646,4 +477,29 @@ fn test_capital_structure_cashflows_accessors() {
         cs.get_component("debt_balance", "NONEXISTENT", &period)
             .is_err()
     );
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

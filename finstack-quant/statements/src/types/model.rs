@@ -1,11 +1,12 @@
 //! Financial model specification types.
 
 use crate::error::{Error, Result};
-use crate::types::{NodeId, NodeSpec, NodeType};
+use crate::types::{ForecastSpec, NodeId, NodeSpec, NodeType};
 use finstack_quant_core::contract::{
-    ContractDescriptor, ContractError, LoadLimits, ValidationReport,
+    ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase, Severity,
+    ValidationReport,
 };
-use finstack_quant_core::dates::PeriodPlan;
+use finstack_quant_core::dates::{PeriodId, PeriodPlan};
 use finstack_quant_core::wire::SchemaVersion;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
@@ -21,7 +22,7 @@ use serde::{Deserialize, Serialize};
 /// Products of one semantic-validation pass; consumed by evaluation preparation.
 pub(crate) struct SemanticAnalysis {
     pub(crate) compiled: IndexMap<NodeId, finstack_quant_core::expr::Expr>,
-    pub(crate) graph: Result<crate::evaluator::DependencyGraph>,
+    pub(crate) graph: crate::evaluator::DependencyGraph,
 }
 
 /// Parse each source once within this validation run.
@@ -65,6 +66,15 @@ pub struct FinancialModelSpec {
     /// Map of node_id → NodeSpec
     pub nodes: IndexMap<NodeId, NodeSpec>,
 
+    /// Identity of the source snapshot the explicit observations were taken
+    /// from, for example `"FY2025-10K-original"`.
+    ///
+    /// Required for an evaluation with an observation cutoff. Keep a revised
+    /// set of observations in a model with a different snapshot identity, so
+    /// a dated evaluation can replay the information set of its day.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_snapshot: Option<String>,
+
     /// Capital structure specification (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capital_structure: Option<CapitalStructureSpec>,
@@ -93,7 +103,13 @@ impl FinancialModelSpec {
                 )));
             }
             if let Some(values) = &node.values {
-                for period_id in values.keys() {
+                for (period_id, value) in values {
+                    if !value.value().is_finite() {
+                        return Err(Error::build(format!(
+                            "Node '{node_id}' has a non-finite explicit value for period \
+                             {period_id}; leave a missing cell out of the series"
+                        )));
+                    }
                     if !periods.contains(period_id) {
                         return Err(Error::build(format!(
                             "Node '{node_id}' has an explicit value for period {period_id}, \
@@ -125,6 +141,37 @@ impl FinancialModelSpec {
             }
         }
         Ok(inferred_types)
+    }
+
+    /// Check that the model can be evaluated at an observation cutoff.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error if the model names no source snapshot, or an
+    /// explicit observation in an actual period has no availability date.
+    pub(crate) fn validate_point_in_time(&self) -> Result<()> {
+        if self.source_snapshot.is_none() {
+            return Err(Error::build(
+                "An evaluation with an observation cutoff needs an identified source snapshot: \
+                 set the model's source_snapshot",
+            ));
+        }
+        for (node_id, node) in &self.nodes {
+            let Some(values) = &node.values else { continue };
+            for period in self.periods.iter().filter(|period| period.is_actual) {
+                if values.contains_key(&period.id)
+                    && !node.availability_dates.contains_key(&period.id)
+                {
+                    return Err(Error::build(format!(
+                        "Node '{node_id}' has no availability date for its {} observation; an \
+                         evaluation with an observation cutoff needs an explicit publication \
+                         date for every observation in an actual period",
+                        period.id
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Resolve explicit reporting currency, or infer one unambiguous monetary currency.
@@ -207,33 +254,29 @@ impl FinancialModelSpec {
             id: id.into(),
             periods,
             nodes: IndexMap::new(),
+            source_snapshot: None,
             capital_structure: None,
             meta: IndexMap::new(),
             schema_version: SchemaVersion::CURRENT,
         }
     }
 
-    /// Parse a model from JSON text and run [`Self::validate_semantics`].
+    /// Load a model from JSON text with the default [`LoadLimits`].
     ///
-    /// This is the one entry point host bindings use to ingest a model, so a
-    /// JSON document is accepted or rejected identically from Python and
-    /// JavaScript. Unknown fields are rejected and `schema_version` must be
-    /// `1`. Semantic validation may fill in `value_type` on nodes whose
-    /// explicit values determine it.
+    /// This is [`Self::from_slice_strict`] under the shared limits (64 MiB of
+    /// input, JSON nesting depth 96, 256 retained diagnostics). Rust, Python
+    /// and JavaScript all ingest a model here, so a document is accepted or
+    /// rejected identically from every host.
     ///
     /// # Arguments
     ///
     /// * `json` - Complete JSON encoding of a financial model in its serde
     ///   wire form (`id`, ordered `periods`, `nodes`, optional
-    ///   `capital_structure` and `meta`, and `schema_version`).
+    ///   `capital_structure` and `meta`, and the integer `schema_version: 1`).
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Serde`] when `json` is malformed or does not match the
-    /// model schema, and the [`Self::validate_semantics`] error (an empty or
-    /// out-of-order period timeline, reserved node ids, incompatible node
-    /// fields or value types, invalid formulas, or an invalid capital
-    /// structure) otherwise.
+    /// The [`Self::from_slice_strict`] errors.
     ///
     /// # Examples
     ///
@@ -246,48 +289,19 @@ impl FinancialModelSpec {
     /// .expect_err("a model needs at least one period");
     /// assert!(err.to_string().contains("at least one period"));
     /// ```
-    pub fn from_json(json: &str) -> Result<Self> {
-        let mut model: Self = serde_json::from_str(json)
-            .map_err(|e| Error::Serde(format!("invalid FinancialModelSpec JSON: {e}")))?;
-        model.validate_semantics()?;
-        Ok(model)
+    pub fn from_json(json: &str) -> std::result::Result<Self, ContractError> {
+        Self::from_slice_strict(json.as_bytes(), &LoadLimits::default())
     }
 
-    /// Load and validate a financial model already parsed into a JSON value.
+    /// Load a model from its JSON bytes: the one admission path.
     ///
-    /// Same contract as [`Self::from_json`] for a model embedded in a larger
-    /// document (a scenario application or goal-seek result): serde plus
-    /// [`Self::validate_semantics`], so an embedded model is never handed out
-    /// unvalidated.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The model's serde form (`{"id", "periods", "nodes", ...}`).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Serde`] when `value` does not match the model schema,
-    /// and the [`Self::validate_semantics`] error otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_statements::types::FinancialModelSpec;
-    ///
-    /// let value = serde_json::json!({"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1});
-    /// assert!(FinancialModelSpec::from_value(value).is_err());
-    /// ```
-    pub fn from_value(value: serde_json::Value) -> Result<Self> {
-        let mut model: Self = serde_json::from_value(value)
-            .map_err(|e| Error::Serde(format!("invalid FinancialModelSpec JSON: {e}")))?;
-        model.validate_semantics()?;
-        Ok(model)
-    }
-
-    /// Load and validate a persisted financial model.
-    ///
-    /// This strict entry point requires `schema_version: 1` and runs
-    /// [`Self::validate_semantics`] before returning the model.
+    /// Decoding is bounded and exact: the input may not exceed the byte and
+    /// nesting limits, an object may not repeat a key, a closed object may
+    /// not carry an unknown field, and `schema_version` must be the integer
+    /// `1` (not `"1"`, `1.0` or another version). The decoded model then
+    /// passes [`Self::validate_semantics`], which may fill in `value_type` on
+    /// nodes whose explicit values determine it, before it is returned, so a
+    /// loaded model is always runnable.
     ///
     /// # Arguments
     ///
@@ -297,27 +311,83 @@ impl FinancialModelSpec {
     ///
     /// # Errors
     ///
-    /// Returns [`ContractError`] for malformed JSON, resource-limit failures,
-    /// missing or unsupported versions, invalid model shape, or semantic
-    /// validation failures.
+    /// * [`ContractError::LimitExceeded`] when the input is longer or more
+    ///   deeply nested than `limits` allows.
+    /// * [`ContractError::Report`] for malformed JSON, a duplicate key, an
+    ///   absent or different `schema_version`, or a document that does not
+    ///   match the model shape. Its first diagnostic carries the failure
+    ///   code and, where one exists, the JSON pointer of the offending field.
+    /// * [`ContractError::Report`] in the semantic phase when the decoded
+    ///   model fails [`Self::validate_semantics`]: its diagnostic code is
+    ///   `statements/<failure>` (for example `statements/build`,
+    ///   `statements/node_not_found` or `statements/circular_dependency`), its
+    ///   pointer the node, period plan or capital-structure field concerned,
+    ///   and its message the validation error.
     pub fn from_slice_strict(
         bytes: &[u8],
         limits: &LoadLimits,
-    ) -> std::result::Result<(Self, ValidationReport), ContractError> {
-        let mut model: Self = FINANCIAL_MODEL_CONTRACT.decode_versioned(bytes, limits)?;
-        model
-            .validate_semantics()
-            .map_err(|error| FINANCIAL_MODEL_CONTRACT.semantic_error(error, limits))?;
-        Ok((model, ValidationReport::default()))
+    ) -> std::result::Result<Self, ContractError> {
+        // The bounded pass checks the limits, key uniqueness and the version
+        // on a JSON value, which does not keep key order. Node order is part
+        // of a model, so the model itself is decoded from the bytes.
+        FINANCIAL_MODEL_CONTRACT.decode_versioned::<serde::de::IgnoredAny>(bytes, limits)?;
+        let mut model: Self = serde_json::from_slice(bytes).map_err(|error| {
+            let mut report = ValidationReport::default();
+            report.push_bounded(
+                limits,
+                Diagnostic::new(
+                    "contract/structure-invalid",
+                    LoadPhase::Structure,
+                    Severity::Error,
+                    error.to_string(),
+                )
+                .with_contract(FINANCIAL_MODEL_CONTRACT.id),
+            );
+            ContractError::Report(Box::new(report))
+        })?;
+        model.validate_located().map_err(|(pointer, error)| {
+            let mut diagnostic = Diagnostic::new(
+                format!("statements/{}", error.code()),
+                LoadPhase::Semantic,
+                Severity::Error,
+                error.to_string(),
+            )
+            .with_contract(FINANCIAL_MODEL_CONTRACT.id);
+            if !pointer.is_empty() {
+                diagnostic = diagnostic.with_pointer(pointer);
+            }
+            let mut report = ValidationReport::default();
+            report.push_bounded(limits, diagnostic);
+            ContractError::Report(Box::new(report))
+        })?;
+        Ok(model)
     }
 
-    /// Compute the versioned SHA-256 hash of this model's canonical JSON.
+    /// Compute the content identity of this model after validating it.
+    ///
+    /// The model is validated first ([`Self::validate_semantics`] on a copy,
+    /// which also fills in inferred `value_type` fields), and the identity is
+    /// the versioned SHA-256 of that validated model's canonical JSON. A model
+    /// that is not runnable therefore has no identity, and a model hashes the
+    /// same before and after it has been validated.
     ///
     /// # Errors
     ///
-    /// Returns an error if the model contains a non-finite number or cannot be
-    /// serialized to the core canonical JSON representation.
+    /// Returns the validation error (converted to the core error, keeping its
+    /// kind) when the model is not runnable, and an error if it contains a
+    /// non-finite number or cannot be serialized to canonical JSON.
     pub fn content_hash(&self) -> finstack_quant_core::Result<String> {
+        let mut validated = self.clone();
+        validated.validate_semantics()?;
+        validated.canonical_hash()
+    }
+
+    /// Hash this model's canonical JSON without validating it.
+    ///
+    /// For a model already in its validated form: [`Self::content_hash`]
+    /// after validating, and the evaluator after filling in the value types
+    /// its `prepare` inferred.
+    pub(crate) fn canonical_hash(&self) -> finstack_quant_core::Result<String> {
         finstack_quant_core::canonical::content_hash(self)
     }
 
@@ -353,81 +423,26 @@ impl FinancialModelSpec {
         self.nodes.contains_key(node_id)
     }
 
-    /// Validate that periods are chronological and actuals form a prefix.
+    /// Validate that the plan is canonical and actuals form a prefix.
     ///
-    /// Both rules exist to prevent look-ahead, and neither is enforced by the
-    /// types: `periods_explicit` and raw JSON both accept an arbitrary `Vec`.
+    /// The plan must be nonempty, hold one period kind, give each period its
+    /// calendar bounds and be contiguous
+    /// ([`PeriodPlan::validate_canonical`]). All-actual and all-forecast
+    /// plans are valid.
     ///
     /// Forecasting anchors on the **last** actual period. With actuals
-    /// interleaved among forecast periods — say `[A 2024Q1, F 2024Q2,
-    /// A 2024Q3, F 2024Q4]`, a "fill in the gap quarter" layout — the forecast
-    /// covering 2024Q2 would be anchored on the 2024Q3 actual, a value from
-    /// *after* the period being forecast, and the random-walk recurrence would
-    /// then carry that future information forward. Positional seasonal and
-    /// time-series indexing assumes contiguous forecast periods for the same
-    /// reason.
+    /// interleaved among forecast periods, a forecast would be anchored on a
+    /// value from after the period being forecast.
     ///
     /// # Errors
     ///
-    /// Returns an error if period identifiers are not strictly increasing,
-    /// intervals are empty, reversed or overlapping, or an actual period
-    /// appears after any forecast period. Gaps between intervals are allowed.
-    fn validate_period_timeline(periods: &[finstack_quant_core::dates::Period]) -> Result<()> {
-        // `PeriodId` order is structural, not chronological across kinds or
-        // calendars, so a model holds one kind in one calendar context
-        // (record CORE-CONVENTIONS-014 #8).
-        if let Some(first) = periods.first() {
-            for period in periods {
-                if period.id.kind() != first.id.kind()
-                    || period.id.is_fiscal() != first.id.is_fiscal()
-                {
-                    return Err(Error::build(format!(
-                        "Model periods must share one period kind and calendar context, but {} \
-                         ({}, {}) follows {} ({}, {})",
-                        period.id,
-                        period.id.kind(),
-                        if period.id.is_fiscal() {
-                            "fiscal"
-                        } else {
-                            "Gregorian"
-                        },
-                        first.id,
-                        first.id.kind(),
-                        if first.id.is_fiscal() {
-                            "fiscal"
-                        } else {
-                            "Gregorian"
-                        },
-                    )));
-                }
-            }
-        }
-        for period in periods {
-            if period.end <= period.start {
-                return Err(Error::build(format!(
-                    "Model period {} must have start before end, got [{}, {})",
-                    period.id, period.start, period.end
-                )));
-            }
-        }
-        for window in periods.windows(2) {
-            let [prev, next] = window else { continue };
-            if next.id <= prev.id || next.start <= prev.start {
-                return Err(Error::build(format!(
-                    "Model periods must be in strictly increasing chronological order, but \
-                     {} appears after {}. Forecasts anchor on the last actual period, so an \
-                     out-of-order timeline can silently anchor a forecast on a later value.",
-                    next.id, prev.id
-                )));
-            }
-            if next.start < prev.end {
-                return Err(Error::build(format!(
-                    "Model period {} starts at {} before the preceding period {} ends at {}; \
-                     period intervals must not overlap",
-                    next.id, next.start, prev.id, prev.end
-                )));
-            }
-        }
+    /// Returns an error for an empty plan, mixed period kinds, bounds that
+    /// differ from the identifier's calendar bounds, a gap or disorder between
+    /// periods, or an actual period after any forecast period.
+    fn validate_period_timeline(periods: &PeriodPlan) -> Result<()> {
+        periods
+            .validate_canonical()
+            .map_err(|error| Error::build(format!("Model timeline is not canonical: {error}")))?;
 
         if let Some(first_forecast) = periods.iter().position(|p| !p.is_actual)
             && let Some(stray) = periods
@@ -454,43 +469,85 @@ impl FinancialModelSpec {
 
     /// Validate model semantics that serde alone cannot enforce.
     ///
-    /// This mirrors the terminal validation performed by the builder so JSON
-    /// entry points reject structurally invalid models before evaluation. It
-    /// infers omitted node value types from explicit values, validates formula
-    /// syntax and known monetary/scalar dimensions, and validates the optional
+    /// This is the one validation path for a runnable model: the builder, every
+    /// JSON loader and the evaluator all run it. It requires a canonical
+    /// contiguous period plan with actuals as a prefix, checks each node kind
+    /// against its permitted sources, infers omitted node value types from
+    /// explicit values, validates formula syntax and known monetary/scalar
+    /// dimensions, resolves every formula and `where` reference, rejects
+    /// same-period dependency cycles and validates the optional
     /// capital-structure waterfall. This method may populate `value_type` on
     /// nodes that have explicit values and no declared type.
     ///
     /// # Errors
     ///
-    /// Returns a build error for an empty or invalid period set, reserved node IDs,
-    /// a node ID that differs from its map key, values outside the timeline,
-    /// incompatible node-type fields (such as a calculated node with values),
-    /// mixed scalar/monetary values or currencies within a node, invalid
-    /// forecasts, formulas or known dimensions, or an invalid waterfall. Unknown formula
-    /// references are warned about and deferred to evaluation to allow optional
-    /// registry metrics; callers should treat that warning as a likely model
-    /// authoring error and resolve it before production use.
+    /// Returns a build error for an empty, gapped, misordered or mixed-kind
+    /// period plan or one whose bounds differ from its identifiers; a model
+    /// with no node and no capital-structure instrument; an invalid or
+    /// reserved node ID, or one that differs from its map key; a Value node
+    /// with a formula or forecast, or a Calculated node without a formula or
+    /// with values or a forecast; a non-finite observation, a value outside
+    /// the timeline, or mixed scalar/monetary values or currencies within a
+    /// node; invalid forecasts, formulas or known dimensions; or an invalid
+    /// waterfall. Returns an evaluation error for a reference to an unknown
+    /// node or a same-period dependency cycle.
     pub fn validate_semantics(&mut self) -> Result<()> {
         self.analyze_semantics().map(|_| ())
     }
 
     /// Validate the mutable model and retain expressions and the dependency graph.
     pub(crate) fn analyze_semantics(&mut self) -> Result<SemanticAnalysis> {
+        self.analyze_semantics_at(&mut SemanticLocation::Field(""))
+    }
+
+    /// Validate the model and, when it is not runnable, report the JSON
+    /// pointer of the field the failure concerns with its error.
+    fn validate_located(&mut self) -> std::result::Result<(), (String, Error)> {
+        let mut at = SemanticLocation::Field("");
+        self.analyze_semantics_at(&mut at)
+            .map(|_| ())
+            .map_err(|error| (at.pointer(self), error))
+    }
+
+    /// [`Self::analyze_semantics`], keeping `at` on the field being checked
+    /// so a failure can be located without an allocation on the success path.
+    fn analyze_semantics_at(&mut self, at: &mut SemanticLocation) -> Result<SemanticAnalysis> {
         let mut parsed = IndexMap::new();
         let mut compiled = IndexMap::new();
+        *at = SemanticLocation::Field("/periods");
         if self.periods.is_empty() {
             return Err(Error::build("Model must have at least one period"));
         }
-
         Self::validate_period_timeline(&self.periods)?;
+        *at = SemanticLocation::Field("/source_snapshot");
+        if self
+            .source_snapshot
+            .as_ref()
+            .is_some_and(|id| id.trim().is_empty())
+        {
+            return Err(Error::build(
+                "Model source_snapshot must be a nonempty identifier when set",
+            ));
+        }
+        *at = SemanticLocation::Field("/nodes");
+        let evaluable_capital_structure = self
+            .capital_structure
+            .as_ref()
+            .is_some_and(|cs| !cs.debt_instruments.is_empty());
+        if self.nodes.is_empty() && !evaluable_capital_structure {
+            return Err(Error::build(
+                "Model must have at least one node or a capital structure with an instrument",
+            ));
+        }
         let inferred_explicit_types = self.validate_explicit_values()?;
 
-        for node_id in self.nodes.keys() {
+        for (index, node_id) in self.nodes.keys().enumerate() {
+            *at = SemanticLocation::Node(index);
             crate::builder::validate_node_id(node_id.as_str())?;
         }
 
-        for (node_id, node) in &self.nodes {
+        for (index, (node_id, node)) in self.nodes.iter().enumerate() {
+            *at = SemanticLocation::Node(index);
             if node.node_id != *node_id {
                 return Err(Error::build(format!(
                     "Node map key '{node_id}' does not match its embedded node_id '{}'",
@@ -498,7 +555,7 @@ impl FinancialModelSpec {
                 )));
             }
             if let Some(forecast) = &node.forecast {
-                forecast.validate()?;
+                self.validate_forecast(node_id, forecast)?;
             }
             match node.node_type {
                 NodeType::Value => {
@@ -508,8 +565,19 @@ impl FinancialModelSpec {
                             node_id
                         )));
                     }
+                    if node.forecast.is_some() {
+                        return Err(Error::build(format!(
+                            "Value node '{node_id}' cannot have a forecast — use Mixed type (a \
+                             Value node takes explicit observations only)"
+                        )));
+                    }
                 }
                 NodeType::Calculated => {
+                    if node.formula_text.is_none() {
+                        return Err(Error::build(format!(
+                            "Calculated node '{node_id}' needs a formula"
+                        )));
+                    }
                     if node.forecast.is_some() {
                         return Err(Error::build(format!(
                             "Calculated node '{}' cannot have a forecast — use Mixed type (a \
@@ -529,6 +597,38 @@ impl FinancialModelSpec {
             }
         }
 
+        // References and cycles first: an unknown node or a cycle would
+        // otherwise surface as an unresolved unit.
+        for (index, (node_id, node)) in self.nodes.iter().enumerate() {
+            *at = SemanticLocation::Node(index);
+            for (label, source) in [
+                ("formula", &node.formula_text),
+                ("where clause", &node.where_text),
+            ] {
+                if let Some(source) = source {
+                    parse_cached(&mut parsed, source).map_err(|error| {
+                        Error::build(format!("Invalid {label} on node '{node_id}': {error}"))
+                    })?;
+                }
+            }
+        }
+        *at = SemanticLocation::Field("/nodes");
+        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed, &mut |index| {
+            *at = SemanticLocation::Node(index);
+        })?;
+        *at = SemanticLocation::Field("/nodes");
+        // A cycle is located at the first node of the reported loop.
+        graph.detect_cycles().inspect_err(|error| {
+            if let Error::CircularDependency(path) = error
+                && let Some(index) = path
+                    .first()
+                    .and_then(|id| self.nodes.get_index_of(id.as_str()))
+            {
+                *at = SemanticLocation::Node(index);
+            }
+        })?;
+
+        *at = SemanticLocation::Field("/capital_structure");
         let capital_structure_currency = self.capital_structure_currency()?;
         let instrument_currencies = self.capital_structure_instrument_currencies()?;
         let mut node_value_types: IndexMap<NodeId, crate::types::NodeValueType> = self
@@ -549,6 +649,10 @@ impl FinancialModelSpec {
             let mut next = Vec::new();
             let mut progress = false;
             for node_id in unresolved {
+                *at = self
+                    .nodes
+                    .get_index_of(&node_id)
+                    .map_or(SemanticLocation::Field("/nodes"), SemanticLocation::Node);
                 let inferred = {
                     let node = self.nodes.get(&node_id).ok_or_else(|| {
                         Error::build(format!("Formula node '{node_id}' disappeared"))
@@ -561,10 +665,16 @@ impl FinancialModelSpec {
                     })?;
                     crate::dsl::compiler::infer_value_type(
                         ast,
-                        &node_value_types,
-                        capital_structure_currency,
-                        &instrument_currencies,
-                    )?
+                        crate::dsl::compiler::UnitContext {
+                            node_types: &node_value_types,
+                            capital_structure_currency,
+                            instrument_currencies: &instrument_currencies,
+                            provisional: true,
+                        },
+                    )
+                    .map_err(|error| {
+                        Error::build(format!("Invalid formula on node '{node_id}': {error}"))
+                    })?
                 };
                 if let Some(value_type) = inferred {
                     self.nodes
@@ -593,26 +703,79 @@ impl FinancialModelSpec {
             unresolved = next;
         }
 
-        for (node_id, node) in &self.nodes {
+        // Every unit is now resolved or provably unresolvable. Check each
+        // formula against the resolved node types, with no provisional
+        // unification.
+        let units = crate::dsl::compiler::UnitContext {
+            node_types: &node_value_types,
+            capital_structure_currency,
+            instrument_currencies: &instrument_currencies,
+            provisional: false,
+        };
+        let has_capital_structure = self.capital_structure.is_some();
+        *at = SemanticLocation::Field("/capital_structure");
+        // Consolidating more than one native currency needs the conversion
+        // policy chosen explicitly, and `total` is the consolidated scope.
+        if let Some(cs) = &self.capital_structure {
+            if let Some(reserved) = cs
+                .debt_instruments
+                .iter()
+                .find(|debt| debt.id == crate::capital_structure::CsScope::TOTAL)
+            {
+                return Err(Error::build(format!(
+                    "capital structure: instrument id '{}' is reserved for the consolidated \
+                     total (`cs.<component>.total`)",
+                    reserved.id
+                )));
+            }
+            if let Some(reporting) = cs.reporting_currency
+                && cs.fx_policy.is_none()
+                && let Some((id, native)) = instrument_currencies
+                    .iter()
+                    .find(|(_, native)| **native != reporting)
+            {
+                return Err(Error::build(format!(
+                    "capital structure: instrument '{id}' is in {native} and the reporting \
+                     currency is {reporting}, but `fx_policy` is not set. Choose `period_end` \
+                     explicitly to consolidate at the period-close rate."
+                )));
+            }
+        }
+        for (index, (node_id, node)) in self.nodes.iter().enumerate() {
+            *at = SemanticLocation::Node(index);
+            if node.formula_text.is_none() && node.value_type.is_none() {
+                return Err(Error::build(format!(
+                    "Cannot resolve the units of node '{node_id}': it has no observations; \
+                     declare its value type (for example with value_scalar or value_money)"
+                )));
+            }
             if let Some(formula) = &node.formula_text {
                 let ast = parse_cached(&mut parsed, formula).map_err(|e| {
                     Error::build(format!("Invalid formula on node '{}': {}", node_id, e))
                 })?;
-                if let Some(inferred) = crate::dsl::compiler::infer_value_type(
-                    ast,
-                    &node_value_types,
-                    capital_structure_currency,
-                    &instrument_currencies,
-                )
-                .map_err(|error| {
+                crate::dsl::compiler::check_capital_references(ast, units, has_capital_structure)
+                    .map_err(|error| {
                     Error::build(format!("Invalid formula on node '{node_id}': {error}"))
-                })? && node.value_type != Some(inferred)
-                {
-                    return Err(Error::build(format!(
-                        "Formula node '{node_id}' declares {:?} but its expression returns \
+                })?;
+                let inferred =
+                    crate::dsl::compiler::infer_value_type(ast, units).map_err(|error| {
+                        Error::build(format!("Invalid formula on node '{node_id}': {error}"))
+                    })?;
+                match inferred {
+                    Some(inferred) if node.value_type != Some(inferred) => {
+                        return Err(Error::build(format!(
+                            "Formula node '{node_id}' declares {:?} but its expression returns \
                              {:?}",
-                        node.value_type, inferred
-                    )));
+                            node.value_type, inferred
+                        )));
+                    }
+                    Some(_) => {}
+                    None => {
+                        return Err(Error::build(format!(
+                            "Cannot resolve the units of formula node '{node_id}' ('{formula}'): \
+                             declare the value type of the node, or of the inputs it reads"
+                        )));
+                    }
                 }
                 let expression = crate::dsl::compile(ast).map_err(|e| {
                     Error::build(format!("Invalid formula on node '{}': {}", node_id, e))
@@ -624,18 +787,17 @@ impl FinancialModelSpec {
                 let ast = parse_cached(&mut parsed, where_text).map_err(|e| {
                     Error::build(format!("Invalid where clause on node '{}': {}", node_id, e))
                 })?;
-                let where_type = crate::dsl::compiler::infer_value_type(
-                    ast,
-                    &node_value_types,
-                    capital_structure_currency,
-                    &instrument_currencies,
-                )
-                .map_err(|error| {
+                crate::dsl::compiler::check_capital_references(ast, units, has_capital_structure)
+                    .map_err(|error| {
                     Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
                 })?;
-                if where_type != Some(crate::types::NodeValueType::Scalar) {
+                let boolean = crate::dsl::compiler::is_boolean(ast, units).map_err(|error| {
+                    Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
+                })?;
+                if !boolean {
                     return Err(Error::build(format!(
-                        "Where clause on node '{node_id}' must return a scalar condition"
+                        "Where clause on node '{node_id}' must be a Boolean condition (a \
+                         comparison, a logical operator or is_missing)"
                     )));
                 }
                 let expression = crate::dsl::compile(ast).map_err(|e| {
@@ -645,32 +807,37 @@ impl FinancialModelSpec {
             }
         }
 
+        *at = SemanticLocation::Field("/capital_structure");
         if let Some(cs) = &self.capital_structure {
             cs.validate()?;
         }
 
-        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed);
-        match &graph {
-            Ok(graph) => graph.detect_cycles()?,
-            Err(e) => {
-                // The graph fails to build when a formula references an unknown
-                // identifier (which also means cycle detection is skipped for
-                // this model). This is tolerated rather than fatal because
-                // `with_builtin_metrics` intentionally registers `fin.*` metrics
-                // that reference user nodes which may not all be present. Surface
-                // it at `warn` (not `debug`) so a genuine typo — and the skipped
-                // cycle check — is visible rather than silent.
-                tracing::warn!(
-                    model_id = %self.id,
-                    error = %e,
-                    "Skipping cycle detection: dependency graph could not be built \
-                     (a formula references an unknown identifier). Verify node references; \
-                     cycles will only be caught later, at evaluation."
-                );
-            }
-        }
-
         Ok(SemanticAnalysis { compiled, graph })
+    }
+}
+
+/// The model field semantic validation is checking.
+#[derive(Clone, Copy)]
+enum SemanticLocation {
+    /// A fixed JSON pointer; empty for the whole document.
+    Field(&'static str),
+    /// The node at this position of the node map.
+    Node(usize),
+}
+
+impl SemanticLocation {
+    /// The JSON pointer (RFC 6901) of this location in `model`.
+    fn pointer(self, model: &FinancialModelSpec) -> String {
+        match self {
+            Self::Field(pointer) => pointer.to_string(),
+            Self::Node(index) => match model.nodes.get_index(index) {
+                Some((node_id, _)) => format!(
+                    "/nodes/{}",
+                    node_id.as_str().replace('~', "~0").replace('/', "~1")
+                ),
+                None => "/nodes".to_string(),
+            },
+        }
     }
 }
 
@@ -723,11 +890,11 @@ pub struct CapitalStructureSpec {
 
     /// Optional FX conversion policy override.
     ///
-    /// When omitted, `cs.*` cash items and balances convert on the inclusive
-    /// period-end date (`FxConversionPolicy::PeriodEnd`). Conversion applies to
-    /// the already-aggregated period bucket, not per contractual cashflow date.
+    /// Required to consolidate instruments of more than one currency: there
+    /// is no default. `period_end` converts each period's native-currency
+    /// totals on the inclusive period-close date.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fx_policy: Option<finstack_quant_core::money::fx::FxConversionPolicy>,
+    pub fx_policy: Option<CapitalFxPolicy>,
 
     /// Optional waterfall specification for dynamic cash flow allocation
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -748,29 +915,33 @@ impl CapitalStructureSpec {
     ///
     /// # Errors
     ///
-    /// Returns a build error for an invalid waterfall, a hedge or option named
-    /// as a PIK target, or a bond or derivative instrument alongside a
-    /// prepayment rung.
+    /// Returns a build error for an invalid waterfall, a PIK election naming
+    /// anything but a term loan of the structure, or a bond or derivative
+    /// instrument alongside a prepayment rung.
     pub fn validate(&self) -> Result<()> {
         if let Some(waterfall) = &self.waterfall {
             waterfall.validate()?;
+            // An election is applied through a term loan's own coupon
+            // terms, so only a term loan of this structure can be authorized.
             if let Some(pik) = &waterfall.pik_toggle {
-                for debt in &self.debt_instruments {
-                    let selected = pik
-                        .target_instrument_ids
+                for election in &pik.elections {
+                    let Some(debt) = self
+                        .debt_instruments
                         .iter()
-                        .any(|target| target == &debt.id);
-                    if selected
-                        && matches!(
-                            debt.spec,
-                            FinancialStatementInstrument::InterestRateSwap(_)
-                                | FinancialStatementInstrument::CapFloor(_)
-                                | FinancialStatementInstrument::Swaption(_)
-                        )
-                    {
+                        .find(|debt| debt.id == election.instrument_id)
+                    else {
                         return Err(Error::build(format!(
-                            "WaterfallSpec: PIK target '{}' is a hedge or option; only borrowing debt coupons can capitalize into principal",
-                            debt.id
+                            "WaterfallSpec: `pik_toggle.elections` names '{}', which is not \
+                             a debt instrument of the capital structure.",
+                            election.instrument_id
+                        )));
+                    };
+                    if !matches!(debt.spec, FinancialStatementInstrument::TermLoan(_)) {
+                        return Err(Error::build(format!(
+                            "WaterfallSpec: `pik_toggle.elections` names '{}', which is not \
+                             a term loan. A PIK election is applied through a term loan's \
+                             coupon terms; no other instrument can elect PIK.",
+                            election.instrument_id
                         )));
                     }
                 }
@@ -812,8 +983,73 @@ impl CapitalStructureSpec {
                     }
                 }
             }
+            // Each prepayment names its eligible facilities. A named facility
+            // must exist, and a facility whose agreement prices a payoff (a
+            // call schedule with a premium or make-whole) cannot be repaid at
+            // par here.
+            for (_, name, facilities) in waterfall.prepayments() {
+                if let crate::capital_structure::FacilitySelection::Named(ids) = facilities {
+                    for id in ids {
+                        if !self.debt_instruments.iter().any(|debt| &debt.id == id) {
+                            return Err(Error::build(format!(
+                                "WaterfallSpec: `{name}.facilities` names '{id}', which is \
+                                 not a debt instrument of the capital structure."
+                            )));
+                        }
+                    }
+                }
+                for debt in &self.debt_instruments {
+                    if facilities.includes(&debt.id)
+                        && matches!(
+                            &debt.spec,
+                            FinancialStatementInstrument::TermLoan(loan)
+                                if loan.call_schedule.is_some()
+                        )
+                    {
+                        return Err(Error::build(format!(
+                            "WaterfallSpec: `{name}` would repay '{}' at par, but that loan \
+                             has a call schedule with its own payoff terms, which the \
+                             waterfall does not price. Exclude it from `{name}.facilities`.",
+                            debt.id
+                        )));
+                    }
+                }
+            }
         }
         Ok(())
+    }
+}
+
+/// How capital-structure totals are converted into the reporting currency.
+///
+/// Period-close conversion is the only supported policy. It must still be
+/// chosen explicitly before instruments of more than one currency are
+/// consolidated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CapitalFxPolicy {
+    /// Convert each period's native-currency totals at the rate of the
+    /// inclusive period-close date.
+    PeriodEnd,
+}
+
+impl std::fmt::Display for CapitalFxPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("period_end")
+    }
+}
+
+impl std::str::FromStr for CapitalFxPolicy {
+    type Err = Error;
+
+    fn from_str(label: &str) -> Result<Self> {
+        match label {
+            "period_end" => Ok(Self::PeriodEnd),
+            other => Err(Error::build(format!(
+                "unknown capital-structure FX policy '{other}': the only policy is 'period_end'"
+            ))),
+        }
     }
 }
 
@@ -894,6 +1130,129 @@ pub struct DebtInstrumentSpec {
     pub id: String,
     /// Tagged instrument payload: `{"type": "...", "spec": {...}}`.
     pub spec: FinancialStatementInstrument,
+}
+
+impl FinancialModelSpec {
+    /// Static checks of one node's forecast: the method's own requirements,
+    /// then the ones that need the model. They apply even when explicit
+    /// observations cover every forecast period.
+    fn validate_forecast(&self, node_id: &NodeId, forecast: &ForecastSpec) -> Result<()> {
+        use crate::types::{DistributionParams, MeanRevertingParams};
+
+        forecast
+            .validate()
+            .map_err(|error| Error::build(format!("Node '{node_id}': {error}")))?;
+        let peer = match forecast {
+            // A growth curve covers exactly the model's forecast periods.
+            ForecastSpec::CurvePct(params) => {
+                let horizon = self.periods.iter().filter(|p| !p.is_actual).count();
+                if params.curve.len() != horizon {
+                    return Err(Error::build(format!(
+                        "Node '{node_id}': the growth curve has {} rates but the model has \
+                         {horizon} forecast periods",
+                        params.curve.len()
+                    )));
+                }
+                None
+            }
+            // Override keys are periods of this model's plan.
+            ForecastSpec::Override(params) => {
+                for key in params.overrides.keys() {
+                    let in_plan = key
+                        .parse::<PeriodId>()
+                        .is_ok_and(|id| self.periods.iter().any(|period| period.id == id));
+                    if !in_plan {
+                        return Err(Error::build(format!(
+                            "Node '{node_id}': forecast override key '{key}' is not a period of \
+                             the model"
+                        )));
+                    }
+                }
+                None
+            }
+            ForecastSpec::Normal(DistributionParams {
+                correlation_with, ..
+            })
+            | ForecastSpec::LogNormal(DistributionParams {
+                correlation_with, ..
+            })
+            | ForecastSpec::MeanReverting(MeanRevertingParams {
+                correlation_with, ..
+            }) => correlation_with.as_deref(),
+            _ => None,
+        };
+        // A correlation peer is another stochastic forecast of the model.
+        let Some(peer) = peer else {
+            return Ok(());
+        };
+        let stochastic_peer = peer != node_id.as_str()
+            && self
+                .get_node(peer)
+                .and_then(|node| node.forecast.as_ref())
+                .is_some_and(|peer| {
+                    matches!(
+                        peer,
+                        ForecastSpec::Normal(_)
+                            | ForecastSpec::LogNormal(_)
+                            | ForecastSpec::MeanReverting(_)
+                    )
+                });
+        if !stochastic_peer {
+            return Err(Error::build(format!(
+                "Node '{node_id}': correlation peer '{peer}' is not another node with a normal, \
+                 log_normal or mean_reverting forecast"
+            )));
+        }
+        // An active (non-zero) correlation mixes standardized shocks, so
+        // both nodes need positive volatility and the peer chain must end.
+        fn active(forecast: &ForecastSpec) -> Option<(&str, f64)> {
+            let (peer, rho, std_dev) = match forecast {
+                ForecastSpec::Normal(p) | ForecastSpec::LogNormal(p) => {
+                    (p.correlation_with.as_deref(), p.correlation, p.std_dev)
+                }
+                ForecastSpec::MeanReverting(p) => {
+                    (p.correlation_with.as_deref(), p.correlation, p.std_dev)
+                }
+                _ => return None,
+            };
+            peer.filter(|_| rho.is_some_and(|rho| rho != 0.0))
+                .map(|peer| (peer, std_dev))
+        }
+        let Some((mut next, std_dev)) = active(forecast) else {
+            return Ok(());
+        };
+        if std_dev == 0.0 {
+            return Err(Error::build(format!(
+                "Node '{node_id}': a non-zero correlation needs a positive 'std_dev'"
+            )));
+        }
+        for _ in 0..self.nodes.len() {
+            if next == node_id.as_str() {
+                return Err(Error::build(format!(
+                    "Node '{node_id}': its correlation peers form a cycle"
+                )));
+            }
+            let peer_forecast = self.get_node(next).and_then(|node| node.forecast.as_ref());
+            let std_dev = match peer_forecast {
+                Some(ForecastSpec::Normal(p) | ForecastSpec::LogNormal(p)) => p.std_dev,
+                Some(ForecastSpec::MeanReverting(p)) => p.std_dev,
+                _ => 0.0,
+            };
+            if std_dev == 0.0 {
+                return Err(Error::build(format!(
+                    "Node '{node_id}': correlation peer '{next}' needs a positive 'std_dev' to \
+                     supply shocks"
+                )));
+            }
+            match peer_forecast.and_then(active) {
+                Some((peer, _)) => next = peer,
+                None => return Ok(()),
+            }
+        }
+        // A chain longer than the node count has a cycle that does not pass
+        // through this node; the nodes on it report it.
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1079,13 +1438,16 @@ mod period_timeline_tests {
                 PaymentPriority::Equity,
             ],
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: None,
-                capex_node: None,
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: None,
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                payment_lag_days: None,
             }),
             ..default_waterfall
         });
@@ -1097,6 +1459,134 @@ mod period_timeline_tests {
             err.to_string().contains("bond"),
             "expected the Bond+sweep diagnostic: {err}"
         );
+    }
+
+    /// A prepayment names facilities of the capital structure, and cannot
+    /// repay at par a loan whose agreement prices its own payoff.
+    #[test]
+    fn prepayment_facilities_must_exist_and_be_repayable_at_par() {
+        use crate::capital_structure::{
+            FacilitySelection, PaymentPriority, PrepaymentSpec, WaterfallSpec,
+        };
+
+        let loan = |id: &str, callable: bool| {
+            let mut loan = if callable {
+                TermLoan::example_callable().expect("callable loan")
+            } else {
+                TermLoan::example().expect("loan")
+            };
+            loan.id = finstack_quant_core::types::InstrumentId::new(id);
+            DebtInstrumentSpec {
+                id: id.to_string(),
+                spec: FinancialStatementInstrument::TermLoan(loan),
+            }
+        };
+        let capital = |facilities: FacilitySelection| CapitalStructureSpec {
+            debt_instruments: vec![loan("TL-PAR", false), loan("TL-CALL", true)],
+            meta: IndexMap::new(),
+            reporting_currency: None,
+            fx_policy: None,
+            waterfall: Some(WaterfallSpec {
+                priority_of_payments: vec![
+                    PaymentPriority::Fees,
+                    PaymentPriority::Interest,
+                    PaymentPriority::Amortization,
+                    PaymentPriority::VoluntaryPrepayment,
+                    PaymentPriority::Equity,
+                ],
+                voluntary_prepayment: Some(PrepaymentSpec {
+                    amount: "prepay".into(),
+                    facilities,
+                }),
+                ..WaterfallSpec::default()
+            }),
+        };
+
+        capital(FacilitySelection::Named(vec!["TL-PAR".into()]))
+            .validate()
+            .expect("a loan without payoff terms is repaid at par");
+
+        let error = capital(FacilitySelection::Named(vec!["TL-GHOST".into()]))
+            .validate()
+            .expect_err("unknown facility")
+            .to_string();
+        assert!(error.contains("'TL-GHOST'"), "{error}");
+        assert!(error.contains("voluntary_prepayment"), "{error}");
+
+        for facilities in [
+            FacilitySelection::AllEligible,
+            FacilitySelection::Named(vec!["TL-CALL".into()]),
+        ] {
+            let error = capital(facilities)
+                .validate()
+                .expect_err("callable loan repaid at par")
+                .to_string();
+            assert!(error.contains("'TL-CALL'"), "{error}");
+            assert!(error.contains("call schedule"), "{error}");
+        }
+    }
+
+    /// A PIK election is applied through a term loan's coupon terms, so it
+    /// may only name a term loan of the structure.
+    #[test]
+    fn pik_elections_may_only_name_term_loans() {
+        use crate::capital_structure::{PikElectionSpec, PikToggleSpec, WaterfallSpec};
+
+        let bond = Bond::fixed(
+            finstack_quant_core::types::InstrumentId::new("BOND-PIK"),
+            finstack_quant_core::money::Money::from((
+                1_000_000_i64,
+                finstack_quant_core::currency::Currency::USD,
+            )),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+            Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
+            Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            finstack_quant_core::types::CurveId::new("USD-OIS"),
+        )
+        .expect("bond");
+        let mut loan = TermLoan::example().expect("loan");
+        loan.id = finstack_quant_core::types::InstrumentId::new("TL-PIK");
+        let capital = |target: &str| CapitalStructureSpec {
+            debt_instruments: vec![
+                DebtInstrumentSpec {
+                    id: "BOND-PIK".to_string(),
+                    spec: FinancialStatementInstrument::Bond(bond.clone()),
+                },
+                DebtInstrumentSpec {
+                    id: "TL-PIK".to_string(),
+                    spec: FinancialStatementInstrument::TermLoan(loan.clone()),
+                },
+            ],
+            meta: IndexMap::new(),
+            reporting_currency: None,
+            fx_policy: None,
+            waterfall: Some(WaterfallSpec {
+                pik_toggle: Some(PikToggleSpec {
+                    liquidity_metric: "cash".into(),
+                    threshold: 1.0,
+                    elections: vec![PikElectionSpec {
+                        instrument_id: target.into(),
+                        pik_fraction: rust_decimal::Decimal::ONE,
+                        min_coupon_periods: 0,
+                        notice_days: 0,
+                    }],
+                }),
+                ..WaterfallSpec::default()
+            }),
+        };
+        capital("TL-PIK").validate().expect("a term loan target");
+        let error = capital("TL-GHOST")
+            .validate()
+            .expect_err("an unknown loan")
+            .to_string();
+        assert!(error.contains("'TL-GHOST'"), "{error}");
+        let error = capital("BOND-PIK")
+            .validate()
+            .expect_err("a bond target")
+            .to_string();
+        assert!(error.contains("'BOND-PIK'"), "{error}");
+        assert!(error.contains("pik_toggle"), "{error}");
     }
 
     /// The supported `Pay` side must continue to pass validation.
@@ -1151,20 +1641,25 @@ mod period_timeline_tests {
         spec.validate().expect("Receive swaps are supported");
     }
 
-    /// `from_json` is serde plus `validate_semantics`: a document serde
-    /// accepts but the semantic rules reject fails, and a valid one parses.
+    /// `from_json` decodes and then validates: a document that decodes but
+    /// is not runnable fails with its validation kind, and a valid one loads.
     #[test]
     fn from_json_runs_semantic_validation() {
         let err = FinancialModelSpec::from_json(
             r#"{"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}"#,
         )
         .expect_err("empty timeline is rejected");
-        assert!(matches!(err, Error::Build(_)), "{err:?}");
+        let ContractError::Report(report) = &err else {
+            panic!("expected a located diagnostic, got {err:?}");
+        };
+        assert_eq!(report.diagnostics[0].code, "statements/build");
+        assert_eq!(report.diagnostics[0].pointer.as_deref(), Some("/periods"));
+        assert!(err.to_string().contains("at least one period"), "{err}");
 
         let err =
             FinancialModelSpec::from_json("{\"id\": ").expect_err("malformed JSON is rejected");
         assert!(
-            matches!(&err, Error::Serde(message) if message.starts_with("invalid FinancialModelSpec JSON")),
+            matches!(&err, ContractError::Report(report) if report.diagnostics[0].code == "contract/parse-error"),
             "{err:?}"
         );
 

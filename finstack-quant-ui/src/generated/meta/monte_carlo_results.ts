@@ -10,10 +10,17 @@ export default [
           "2025Q1",
           "2025Q2"
         ],
+        "metrics": [
+          "revenue"
+        ],
         "n_paths": 1000,
         "percentile_results": {
           "revenue": {
             "metric": "revenue",
+            "sample_count": 1000,
+            "value_type": {
+              "type": "scalar"
+            },
             "values": {
               "2025Q1": [
                 [
@@ -50,10 +57,44 @@ export default [
           0.05,
           0.5,
           0.95
-        ]
+        ],
+        "seed": "42",
+        "stream_version": 1
       }
     ],
     "title": "MonteCarloResults"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType",
+    "description": "Node value type classification.\n\nDetermines whether a node represents monetary values (with a specific currency)\nor scalar values (ratios, percentages, counts, etc.)."
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/0",
+    "description": "Monetary value with a specific currency (e.g., revenue, costs, balance sheet items)"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/0/properties/currency",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/0/properties/currency",
+    "description": "Currency of the monetary value",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/0/properties/type",
+    "const": "monetary"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/1",
+    "description": "Unitless scalar value (e.g., ratios, percentages, counts)"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/1/properties/type",
+    "const": "scalar"
   },
   {
     "path": "#/$defs/d_090e21e61cdf3e0563e2",
@@ -309,10 +350,40 @@ export default [
     ]
   },
   {
-    "path": "#/$defs/d_6ebc05ff50e5cef14048",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/DateWire",
-    "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-    "format": "date"
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete",
+    "description": "Why a Monte Carlo run published no statistics.\n\nA run is complete only when every path has a value for every requested\nmetric in every forecast period."
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/metric",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/metric",
+    "description": "First metric, in the requested order, with a sample without a value."
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/missing_samples",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/missing_samples",
+    "description": "Number of samples without a value across the run.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/path",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/path",
+    "description": "Lowest path with such a sample for that metric and period.",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/period",
+    "description": "First forecast period of that metric with such a sample.",
+    "ref": "#/$defs/PeriodId",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PeriodId"
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/reason",
+    "description": "Why that cell had no value: `missing`, `masked`, or the reason an\nunavailable cell gives (for example `missing_peer_shock`)."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3",
@@ -322,153 +393,85 @@ export default [
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0",
-    "description": "The residual schedule opening differs from the stateful opening balance."
+    "description": "A negative available-cash pool was floored to zero before allocation."
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/applied_ratio",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/applied_ratio",
-    "description": "Actual ratio of stateful to scheduled opening applied to the cashflows.",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/amount",
+    "description": "Negative amount that was floored, in the waterfall currency.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
-    "const": "residual_scale_mismatch"
+    "const": "negative_available_cash_floored"
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/node_id",
+    "description": "Statement node supplying the available-cash amount."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
-    "description": "A contractual cashflow kind is not represented in statement debt service."
+    "description": "Available cash was insufficient to pay a cash-interest claim."
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/cashflow_date",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/cashflow_date",
-    "description": "Original contractual payment date.",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/DateWire"
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
+    "description": "Unpaid amount in the waterfall currency.",
+    "format": "double"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/cashflow_kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/cashflow_kind",
-    "description": "Canonical cashflow classification that was excluded.",
-    "ref": "#/$defs/CFKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind"
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
-    "const": "cashflow_ignored"
+    "const": "interest_shortfall"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
-    "description": "A negative creditor claim was neutralized instead of reducing other claims."
+    "description": "Available cash was insufficient to pay a fee claim."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/amount",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
-    "description": "Negative claim amount in the waterfall currency.",
+    "description": "Unpaid amount in the waterfall currency.",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/category",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/category",
-    "description": "Payment category containing the invalid negative claim.",
-    "ref": "#/$defs/CapitalStructureClaimCategory",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureClaimCategory"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/instrument_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/instrument_id",
-    "description": "Instrument whose claim was neutralized."
+    "description": "Instrument carrying the unpaid claim forward."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
-    "const": "negative_claim_neutralized"
+    "const": "fee_shortfall"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
-    "description": "A negative available-cash pool was floored to zero before allocation."
+    "description": "Available cash was insufficient to pay scheduled principal."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/amount",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/amount",
-    "description": "Negative amount that was floored, in the waterfall currency.",
+    "description": "Unpaid amount in the waterfall currency.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
-    "const": "negative_available_cash_floored"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/node_id",
-    "description": "Statement node supplying the available-cash amount."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/4",
-    "description": "Available cash was insufficient to pay a cash-interest claim."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/kind",
-    "const": "interest_shortfall"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5",
-    "description": "Available cash was insufficient to pay a fee claim."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/kind",
-    "const": "fee_shortfall"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/6",
-    "description": "Available cash was insufficient to pay scheduled principal."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/6/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/6/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/6/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/kind",
     "const": "principal_shortfall"
   },
   {
@@ -511,9 +514,23 @@ export default [
     "description": "Metric / node identifier."
   },
   {
+    "path": "#/$defs/d_9ebf84cf8414d0c617ec/properties/sample_count",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PercentileSeries/properties/sample_count",
+    "description": "Number of samples behind each quantile: the path count.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_9ebf84cf8414d0c617ec/properties/value_type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PercentileSeries/properties/value_type",
+    "description": "Units of every value: scalar, or money in one currency.",
+    "ref": "#/$defs/NodeValueType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType"
+  },
+  {
     "path": "#/$defs/d_9ebf84cf8414d0c617ec/properties/values",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PercentileSeries/properties/values",
-    "description": "Period → ordered list of `(percentile, value)` pairs."
+    "description": "Period → `(probability, value)` pairs in ascending probability. The\nvalue is the R-7 sample quantile, in `value_type` units."
   },
   {
     "path": "#/$defs/d_9ebf84cf8414d0c617ec/properties/values/additionalProperties",
@@ -593,7 +610,7 @@ export default [
   {
     "path": "#/$defs/d_cf776b61125046d84b45/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/0",
-    "description": "Division by zero encountered"
+    "description": "A percentage change or growth rate was measured from a zero base, so\nits cell is unavailable. A division by zero in a formula is an error,\nnot this warning."
   },
   {
     "path": "#/$defs/d_cf776b61125046d84b45/oneOf/0/properties/division_by_zero",
@@ -659,223 +676,1042 @@ export default [
   {
     "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3",
-    "description": "One or more non-finite inputs were skipped by a skip-NaN aggregate\n(`sum`, `mean`, ...).\n\nThe aggregate's skip-NaN policy is intentional, but silently dropping a\nbroken line item can mask upstream problems (e.g. a division by zero in\none argument), so the drop is surfaced here."
+    "description": "A forecast's published level was clipped to its `min` / `max` bound.\nThe raw level still drives the forecast's later steps."
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/non_finite_skipped",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped"
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped"
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/non_finite_skipped/properties/count",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/count",
-    "description": "Number of non-finite inputs dropped.",
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/node_id",
+    "description": "Identifier of the forecast node."
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/period",
+    "description": "Period whose published level was clipped."
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped/properties/published",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/published",
+    "description": "Level published after the bound, in the node's units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped/properties/raw",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/raw",
+    "description": "Level the forecast generated, in the node's units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4",
+    "description": "A full-history statistic (`std`, `var`, `median`) was computed over a\nhistory with gaps, so its sample is smaller than its slot count."
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample"
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/function",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/function",
+    "description": "Name of the statistic."
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/node_id",
+    "description": "Identifier of the node whose statistic has gaps."
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/observations",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/observations",
+    "description": "Observations that had a value.",
     "format": "uint",
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/non_finite_skipped/properties/function",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/function",
-    "description": "Name of the aggregate function that dropped values."
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/period",
+    "description": "Period the statistic was computed for."
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/non_finite_skipped/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/node_id",
-    "description": "Identifier of the node whose aggregate dropped inputs."
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/slots",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/slots",
+    "description": "Plan slots from the model start through the period.",
+    "format": "uint",
+    "minimum": 0
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/non_finite_skipped/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/period",
-    "description": "Period in which the drop occurred."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency",
+    "description": "ISO 4217 currency enumeration"
   },
   {
-    "path": "#/$defs/d_d823a4e2fcad0a8791f3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureClaimCategory",
-    "description": "Cash claim category affected by a capital-structure warning."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/0",
+    "const": "AED",
+    "description": "UAE Dirham (784)"
   },
   {
-    "path": "#/$defs/d_d823a4e2fcad0a8791f3/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureClaimCategory/oneOf/0",
-    "const": "fees",
-    "description": "Fee claims such as commitment or facility fees."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/1",
+    "const": "AFN",
+    "description": "Afghani (971)"
   },
   {
-    "path": "#/$defs/d_d823a4e2fcad0a8791f3/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureClaimCategory/oneOf/1",
-    "const": "interest",
-    "description": "Cash-interest claims."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/10",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/10",
+    "const": "BAM",
+    "description": "Convertible Mark (977)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind",
-    "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `Floating`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.\n\n# Labels\n\n`Display`, `FromStr`, and serde share one snake_case label per kind\n(`\"fixed\"`, `\"floating\"`, `\"pre_payment\"`). `FromStr` is ASCII\ncase-insensitive and ignores surrounding whitespace; serde accepts only\nthe canonical label."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/100",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/100",
+    "const": "NIO",
+    "description": "Cordoba Oro (558)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/0",
-    "const": "fixed",
-    "description": "Fixed-rate coupon cash-flow.\n\nPeriodic interest payment calculated as: `notional × rate × accrual_factor`.\nThe `rate` field on [`CashFlow`] stores the coupon rate used."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/101",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/101",
+    "const": "NOK",
+    "description": "Norwegian Krone (578)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/1",
-    "const": "floating",
-    "description": "Floating-rate coupon cash settlement.\n\nInterest payment based on a reference rate (e.g., SOFR, EURIBOR) plus\nspread; never a standalone fixing event. The `reset_date` field on\n[`CashFlow`] is the index observation date (metadata, not the payment\ndate). The `rate` field stores the all-in rate (index + spread) if known."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/102",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/102",
+    "const": "NPR",
+    "description": "Nepalese Rupee (524)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/10",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/10",
-    "const": "pik",
-    "description": "Payment-in-kind interest capitalization.\n\nInterest that is added to the outstanding principal rather than paid in cash.\nCreates a new notional amount: `new_notional = old_notional + PIK_interest`.\nThe amount field represents the interest capitalized."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/103",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/103",
+    "const": "NZD",
+    "description": "New Zealand Dollar (554)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/11",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/11",
-    "const": "amortization",
-    "description": "Scheduled amortization (principal repayment).\n\nReduces the outstanding principal per the amortization schedule.\nAmount is positive from holder perspective (principal returned).\nAfter amortization: `remaining_notional = previous_notional - amortization`."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/104",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/104",
+    "const": "OMR",
+    "description": "Rial Omani (512)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/12",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/12",
-    "const": "pre_payment",
-    "description": "Prepayment of principal (unscheduled early repayment).\n\nVoluntary or mandatory early return of principal, common in:\n- Mortgage-backed securities (borrower refinancing)\n- CLO/CDO structures (collateral prepayments)\n- Callable bonds (issuer exercise)"
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/105",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/105",
+    "const": "PAB",
+    "description": "Balboa (590)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/13",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/13",
-    "const": "revolving_draw",
-    "description": "Revolving facility draw (borrowing).\n\nIncrease in outstanding principal when borrower draws on a revolving facility.\nFrom holder (lender) view: negative (cash out to borrower).\nIncreases the drawn balance used for interest calculations."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/106",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/106",
+    "const": "PEN",
+    "description": "Sol (604)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/14",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/14",
-    "const": "revolving_repayment",
-    "description": "Revolving facility repayment.\n\nDecrease in outstanding principal when borrower repays revolving facility.\nFrom holder (lender) view: positive (cash in from borrower).\nRestores availability under the commitment."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/107",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/107",
+    "const": "PGK",
+    "description": "Kina (598)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/15",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/15",
-    "const": "defaulted_notional",
-    "description": "Defaulted notional (principal written down due to credit event).\n\nRepresents the portion of principal that has experienced a credit event\n(failure to pay, bankruptcy, restructuring). Amount reflects the\nwrite-down from par."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/108",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/108",
+    "const": "PHP",
+    "description": "Philippine Peso (608)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/16",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/16",
-    "const": "recovery",
-    "description": "Recovery cashflow from defaulted principal.\n\nAmount recovered through workout, liquidation, or settlement of defaulted\ndebt. Typically expressed as a percentage of defaulted notional\n(recovery rate × defaulted amount)."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/109",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/109",
+    "const": "PKR",
+    "description": "Pakistan Rupee (586)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/17",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/17",
-    "const": "accrued_on_default",
-    "description": "Accrued-on-default interest (ISDA standard for CDS).\n\nInterest accrued but unpaid at the time of a credit event.\nUnder ISDA standard conventions, the protection buyer pays\nthe accrued premium from the last payment date to the default date."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/11",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/11",
+    "const": "BBD",
+    "description": "Barbados Dollar (52)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/18",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/18",
-    "const": "protection_payment",
-    "description": "Credit protection payment.\n\nActual cash paid by the protection seller on a credit event (for\nexample a CDS default leg settlement). Distinct from asset recovery\ncash ([`Self::Recovery`]) and from a noncash principal write-down\n([`Self::DefaultedNotional`])."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/110",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/110",
+    "const": "PLN",
+    "description": "Zloty (985)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/19",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/19",
-    "const": "stub",
-    "description": "Irregular stub period interest.\n\nInterest payment for a non-standard accrual period at the beginning (front stub)\nor end (back stub) of a schedule. May be short stub (< regular period) or\nlong stub (> regular period). Accrual factor reflects actual period length."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/111",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/111",
+    "const": "PYG",
+    "description": "Guarani (600)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/2",
-    "const": "inflation_coupon",
-    "description": "Inflation-linked coupon cash-flow.\n\nPeriodic coupon payment on an inflation-linked bond or swap leg where the\nreal coupon is multiplied by an index ratio (e.g., CPI / base CPI).\nThe `rate` field stores the real coupon rate when known."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/112",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/112",
+    "const": "QAR",
+    "description": "Qatari Rial (634)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/20",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/20",
-    "const": "initial_margin_post",
-    "description": "Initial margin posting (collateral transfer out to counterparty).\n\nRepresents the posting of initial margin collateral under CSA or clearing\nhouse rules. The amount is typically calculated using SIMM, schedule-based,\nor haircut methodologies."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/113",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/113",
+    "const": "RON",
+    "description": "Romanian Leu (946)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/21",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/21",
-    "const": "initial_margin_return",
-    "description": "Initial margin return (collateral returned from counterparty).\n\nRepresents the return of previously posted initial margin when exposure\ndecreases or trade is terminated."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/114",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/114",
+    "const": "RSD",
+    "description": "Serbian Dinar (941)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/22",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/22",
-    "const": "variation_margin_receive",
-    "description": "Variation margin received (positive VM payment to us).\n\nDaily or periodic mark-to-market payment received when exposure moves\nin our favor. Governed by CSA threshold, MTA, and rounding rules."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/115",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/115",
+    "const": "RUB",
+    "description": "Russian Ruble (643)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/23",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/23",
-    "const": "variation_margin_pay",
-    "description": "Variation margin paid (negative VM payment from us).\n\nDaily or periodic mark-to-market payment made when exposure moves\nagainst us. Governed by CSA threshold, MTA, and rounding rules."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/116",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/116",
+    "const": "RWF",
+    "description": "Rwanda Franc (646)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/24",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/24",
-    "const": "margin_interest",
-    "description": "Interest accrued on posted margin collateral.\n\nRepresents interest paid or received on cash collateral posted as margin.\nRate typically defined in CSA (e.g., Fed Funds, EONIA, SONIA)."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/117",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/117",
+    "const": "SAR",
+    "description": "Saudi Riyal (682)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/25",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/25",
-    "const": "collateral_substitution_in",
-    "description": "Collateral substitution inflow (replacement collateral received).\n\nWhen a counterparty substitutes one form of eligible collateral for another,\nthis represents the incoming replacement asset."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/118",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/118",
+    "const": "SBD",
+    "description": "Solomon Islands Dollar (90)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/26",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/26",
-    "const": "collateral_substitution_out",
-    "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/119",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/119",
+    "const": "SCR",
+    "description": "Seychelles Rupee (690)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/27",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/27",
-    "const": "derivative_settlement",
-    "description": "Net contractual derivative payoff settled in cash without exchanging principal."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/12",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/12",
+    "const": "BDT",
+    "description": "Taka (50)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/3",
-    "const": "fee",
-    "description": "Up-front fee or cost paid at inception.\n\nOne-time fee paid at trade date or settlement date, such as origination fees,\narrangement fees, or underwriting fees."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/120",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/120",
+    "const": "SDG",
+    "description": "Sudanese Pound (938)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/4",
-    "const": "commitment_fee",
-    "description": "Commitment fee on undrawn balance.\n\nPeriodic fee charged on the undrawn portion of a revolving facility.\nTypically quoted in basis points per annum on the unused commitment."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/121",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/121",
+    "const": "SEK",
+    "description": "Swedish Krona (752)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/5",
-    "const": "usage_fee",
-    "description": "Usage fee on drawn balance.\n\nAdditional fee charged when facility utilization exceeds a threshold,\ncommon in leveraged loan facilities."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/122",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/122",
+    "const": "SGD",
+    "description": "Singapore Dollar (702)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/6",
-    "const": "facility_fee",
-    "description": "Facility fee on total commitment.\n\nFee charged on the entire committed amount regardless of utilization,\ncovering the lender's cost of keeping the facility available."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/123",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/123",
+    "const": "SHP",
+    "description": "Saint Helena Pound (654)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/7",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/7",
-    "const": "lc_fee",
-    "description": "Letter-of-credit fee.\n\nPeriodic fee on the face of letters of credit issued under a revolving\nfacility's LC sublimit, typically at the drawn margin."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/124",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/124",
+    "const": "SLE",
+    "description": "Leone (925)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/8",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/8",
-    "const": "fronting_fee",
-    "description": "Fronting fee.\n\nPeriodic fee paid to the issuing bank on the face of letters of credit\noutstanding under a revolving facility."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/125",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/125",
+    "const": "SLL",
+    "description": "Leone (694)"
   },
   {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/9",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/9",
-    "const": "notional",
-    "description": "Principal exchange or notional flow.\n\nUsed for initial notional payment (at inception), final notional repayment\n(at maturity), or intermediate notional exchanges in cross-currency swaps.\nFor bonds: initial = purchase price, final = par redemption."
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/126",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/126",
+    "const": "SOS",
+    "description": "Somali Shilling (706)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/127",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/127",
+    "const": "SRD",
+    "description": "Surinam Dollar (968)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/128",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/128",
+    "const": "SSP",
+    "description": "South Sudanese Pound (728)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/129",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/129",
+    "const": "STN",
+    "description": "Dobra (930)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/13",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/13",
+    "const": "BGN",
+    "description": "Bulgarian Lev (975)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/130",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/130",
+    "const": "SYP",
+    "description": "Syrian Pound (760)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/131",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/131",
+    "const": "SZL",
+    "description": "Lilangeni (748)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/132",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/132",
+    "const": "THB",
+    "description": "Baht (764)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/133",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/133",
+    "const": "TJS",
+    "description": "Somoni (972)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/134",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/134",
+    "const": "TMT",
+    "description": "Turkmenistan New Manat (934)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/135",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/135",
+    "const": "TND",
+    "description": "Tunisian Dinar (788)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/136",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/136",
+    "const": "TOP",
+    "description": "Pa'anga (776)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/137",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/137",
+    "const": "TRY",
+    "description": "Turkish Lira (949)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/138",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/138",
+    "const": "TTD",
+    "description": "Trinidad and Tobago Dollar (780)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/139",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/139",
+    "const": "TWD",
+    "description": "New Taiwan Dollar (901)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/14",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/14",
+    "const": "BHD",
+    "description": "Bahraini Dinar (48)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/140",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/140",
+    "const": "TZS",
+    "description": "Tanzanian Shilling (834)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/141",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/141",
+    "const": "UAH",
+    "description": "Hryvnia (980)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/142",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/142",
+    "const": "UGX",
+    "description": "Uganda Shilling (800)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/143",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/143",
+    "const": "USD",
+    "description": "US Dollar (840)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/144",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/144",
+    "const": "UYU",
+    "description": "Peso Uruguayo (858)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/145",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/145",
+    "const": "UZS",
+    "description": "Uzbekistan Sum (860)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/146",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/146",
+    "const": "VED",
+    "description": "Bolívar Soberano (926)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/147",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/147",
+    "const": "VES",
+    "description": "Bolívar Soberano (928)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/148",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/148",
+    "const": "VND",
+    "description": "Dong (704)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/149",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/149",
+    "const": "VUV",
+    "description": "Vatu (548)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/15",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/15",
+    "const": "BIF",
+    "description": "Burundi Franc (108)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/150",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/150",
+    "const": "WST",
+    "description": "Tala (882)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/151",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/151",
+    "const": "XAF",
+    "description": "CFA Franc BEAC (950)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/152",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/152",
+    "const": "XCD",
+    "description": "East Caribbean Dollar (951)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/153",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/153",
+    "const": "XCG",
+    "description": "Caribbean Guilder (532)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/154",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/154",
+    "const": "XOF",
+    "description": "CFA Franc BCEAO (952)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/155",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/155",
+    "const": "XPF",
+    "description": "CFP Franc (953)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/156",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/156",
+    "const": "YER",
+    "description": "Yemeni Rial (886)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/157",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/157",
+    "const": "ZAR",
+    "description": "Rand (710)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/158",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/158",
+    "const": "ZMW",
+    "description": "Zambian Kwacha (967)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/159",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/159",
+    "const": "ZWG",
+    "description": "Zimbabwe Gold (924)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/16",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/16",
+    "const": "BMD",
+    "description": "Bermudian Dollar (60)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/160",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/160",
+    "const": "ZWL",
+    "description": "Zimbabwe Dollar (932)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/17",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/17",
+    "const": "BND",
+    "description": "Brunei Dollar (96)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/18",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/18",
+    "const": "BOB",
+    "description": "Boliviano (68)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/19",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/19",
+    "const": "BRL",
+    "description": "Brazilian Real (986)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/2",
+    "const": "ALL",
+    "description": "Lek (8)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/20",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/20",
+    "const": "BSD",
+    "description": "Bahamian Dollar (44)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/21",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/21",
+    "const": "BTN",
+    "description": "Ngultrum (64)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/22",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/22",
+    "const": "BWP",
+    "description": "Pula (72)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/23",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/23",
+    "const": "BYN",
+    "description": "Belarusian Ruble (933)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/24",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/24",
+    "const": "BZD",
+    "description": "Belize Dollar (84)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/25",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/25",
+    "const": "CAD",
+    "description": "Canadian Dollar (124)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/26",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/26",
+    "const": "CDF",
+    "description": "Congolese Franc (976)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/27",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/27",
+    "const": "CHF",
+    "description": "Swiss Franc (756)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/28",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/28",
+    "const": "CLF",
+    "description": "Unidad de Fomento (990)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/29",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/29",
+    "const": "CLP",
+    "description": "Chilean Peso (152)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/3",
+    "const": "AMD",
+    "description": "Armenian Dram (51)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/30",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/30",
+    "const": "CNY",
+    "description": "Yuan Renminbi (156)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/31",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/31",
+    "const": "COP",
+    "description": "Colombian Peso (170)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/32",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/32",
+    "const": "CRC",
+    "description": "Costa Rican Colon (188)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/33",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/33",
+    "const": "CUC",
+    "description": "Peso Convertible (931)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/34",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/34",
+    "const": "CUP",
+    "description": "Cuban Peso (192)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/35",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/35",
+    "const": "CVE",
+    "description": "Cabo Verde Escudo (132)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/36",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/36",
+    "const": "CZK",
+    "description": "Czech Koruna (203)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/37",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/37",
+    "const": "DJF",
+    "description": "Djibouti Franc (262)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/38",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/38",
+    "const": "DKK",
+    "description": "Danish Krone (208)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/39",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/39",
+    "const": "DOP",
+    "description": "Dominican Peso (214)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/4",
+    "const": "ANG",
+    "description": "Netherlands Antillean Guilder (532)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/40",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/40",
+    "const": "DZD",
+    "description": "Algerian Dinar (12)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/41",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/41",
+    "const": "EGP",
+    "description": "Egyptian Pound (818)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/42",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/42",
+    "const": "ERN",
+    "description": "Nakfa (232)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/43",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/43",
+    "const": "ETB",
+    "description": "Ethiopian Birr (230)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/44",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/44",
+    "const": "EUR",
+    "description": "Euro (978)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/45",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/45",
+    "const": "FJD",
+    "description": "Fiji Dollar (242)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/46",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/46",
+    "const": "FKP",
+    "description": "Falkland Islands Pound (238)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/47",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/47",
+    "const": "GBP",
+    "description": "Pound Sterling (826)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/48",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/48",
+    "const": "GEL",
+    "description": "Lari (981)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/49",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/49",
+    "const": "GHS",
+    "description": "Ghana Cedi (936)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/5",
+    "const": "AOA",
+    "description": "Kwanza (973)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/50",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/50",
+    "const": "GIP",
+    "description": "Gibraltar Pound (292)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/51",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/51",
+    "const": "GMD",
+    "description": "Dalasi (270)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/52",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/52",
+    "const": "GNF",
+    "description": "Guinean Franc (324)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/53",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/53",
+    "const": "GTQ",
+    "description": "Quetzal (320)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/54",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/54",
+    "const": "GYD",
+    "description": "Guyana Dollar (328)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/55",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/55",
+    "const": "HKD",
+    "description": "Hong Kong Dollar (344)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/56",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/56",
+    "const": "HNL",
+    "description": "Lempira (340)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/57",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/57",
+    "const": "HRK",
+    "description": "Kuna (191)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/58",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/58",
+    "const": "HTG",
+    "description": "Gourde (332)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/59",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/59",
+    "const": "HUF",
+    "description": "Forint (348)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/6",
+    "const": "ARS",
+    "description": "Argentine Peso (32)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/60",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/60",
+    "const": "IDR",
+    "description": "Rupiah (360)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/61",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/61",
+    "const": "ILS",
+    "description": "New Israeli Sheqel (376)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/62",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/62",
+    "const": "INR",
+    "description": "Indian Rupee (356)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/63",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/63",
+    "const": "IQD",
+    "description": "Iraqi Dinar (368)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/64",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/64",
+    "const": "IRR",
+    "description": "Iranian Rial (364)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/65",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/65",
+    "const": "ISK",
+    "description": "Iceland Krona (352)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/66",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/66",
+    "const": "JMD",
+    "description": "Jamaican Dollar (388)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/67",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/67",
+    "const": "JOD",
+    "description": "Jordanian Dinar (400)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/68",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/68",
+    "const": "JPY",
+    "description": "Yen (392)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/69",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/69",
+    "const": "KES",
+    "description": "Kenyan Shilling (404)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/7",
+    "const": "AUD",
+    "description": "Australian Dollar (36)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/70",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/70",
+    "const": "KGS",
+    "description": "Som (417)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/71",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/71",
+    "const": "KHR",
+    "description": "Riel (116)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/72",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/72",
+    "const": "KMF",
+    "description": "Comorian Franc (174)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/73",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/73",
+    "const": "KPW",
+    "description": "North Korean Won (408)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/74",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/74",
+    "const": "KRW",
+    "description": "Won (410)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/75",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/75",
+    "const": "KWD",
+    "description": "Kuwaiti Dinar (414)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/76",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/76",
+    "const": "KYD",
+    "description": "Cayman Islands Dollar (136)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/77",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/77",
+    "const": "KZT",
+    "description": "Tenge (398)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/78",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/78",
+    "const": "LAK",
+    "description": "Lao Kip (418)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/79",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/79",
+    "const": "LBP",
+    "description": "Lebanese Pound (422)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/8",
+    "const": "AWG",
+    "description": "Aruban Florin (533)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/80",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/80",
+    "const": "LKR",
+    "description": "Sri Lanka Rupee (144)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/81",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/81",
+    "const": "LRD",
+    "description": "Liberian Dollar (430)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/82",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/82",
+    "const": "LSL",
+    "description": "Loti (426)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/83",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/83",
+    "const": "LYD",
+    "description": "Libyan Dinar (434)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/84",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/84",
+    "const": "MAD",
+    "description": "Moroccan Dirham (504)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/85",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/85",
+    "const": "MDL",
+    "description": "Moldovan Leu (498)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/86",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/86",
+    "const": "MGA",
+    "description": "Malagasy Ariary (969)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/87",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/87",
+    "const": "MKD",
+    "description": "Denar (807)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/88",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/88",
+    "const": "MMK",
+    "description": "Kyat (104)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/89",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/89",
+    "const": "MNT",
+    "description": "Tugrik (496)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/9",
+    "const": "AZN",
+    "description": "Azerbaijan Manat (944)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/90",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/90",
+    "const": "MOP",
+    "description": "Pataca (446)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/91",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/91",
+    "const": "MRU",
+    "description": "Ouguiya (929)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/92",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/92",
+    "const": "MUR",
+    "description": "Mauritius Rupee (480)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/93",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/93",
+    "const": "MVR",
+    "description": "Rufiyaa (462)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/94",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/94",
+    "const": "MWK",
+    "description": "Malawi Kwacha (454)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/95",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/95",
+    "const": "MXN",
+    "description": "Mexican Peso (484)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/96",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/96",
+    "const": "MYR",
+    "description": "Malaysian Ringgit (458)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/97",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/97",
+    "const": "MZN",
+    "description": "Mozambique Metical (943)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/98",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/98",
+    "const": "NAD",
+    "description": "Namibia Dollar (516)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/99",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/99",
+    "const": "NGN",
+    "description": "Naira (566)"
   },
   {
     "path": "#/properties/forecast_periods",
@@ -887,6 +1723,30 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/forecast_periods/items",
     "ref": "#/$defs/PeriodId",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PeriodId"
+  },
+  {
+    "path": "#/properties/incomplete",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/incomplete",
+    "description": "Why no statistics were published, when a requested sample had no\nvalue on some path. `None` for a complete run."
+  },
+  {
+    "path": "#/properties/incomplete/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/incomplete/anyOf/0",
+    "ref": "#/$defs/MonteCarloIncomplete",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete"
+  },
+  {
+    "path": "#/properties/incomplete/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/incomplete/anyOf/1"
+  },
+  {
+    "path": "#/properties/metrics",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/metrics",
+    "description": "The metrics requested, in order."
+  },
+  {
+    "path": "#/properties/metrics/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/metrics/items"
   },
   {
     "path": "#/properties/n_paths",
@@ -913,7 +1773,7 @@ export default [
   {
     "path": "#/properties/percentile_results",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/percentile_results",
-    "description": "Aggregated percentile results: `metric → PercentileSeries`."
+    "description": "Aggregated percentile results: `metric → PercentileSeries`, in the\nrequested metric order. Empty when the run is incomplete."
   },
   {
     "path": "#/properties/percentile_results/additionalProperties",
@@ -930,6 +1790,18 @@ export default [
     "path": "#/properties/percentiles/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/percentiles/items",
     "format": "double"
+  },
+  {
+    "path": "#/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/seed",
+    "description": "The run's exact base seed, a decimal string in JSON: an unsigned\n64-bit value does not fit a JavaScript number."
+  },
+  {
+    "path": "#/properties/stream_version",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/stream_version",
+    "description": "Version of the mapping from the seed, path and node to a random\nstream. With the seed it replays any path from the result alone.",
+    "format": "uint32",
+    "minimum": 0
   },
   {
     "path": "#/properties/warnings",

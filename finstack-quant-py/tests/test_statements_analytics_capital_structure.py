@@ -17,6 +17,7 @@ from finstack_quant.statements_analytics import (
     MaturityWallBucket,
     capital_structure_summary,
 )
+from finstack_quant.valuations.instruments import Bond
 
 QUARTERS = ["2025Q1", "2025Q2", "2025Q3", "2025Q4"]
 FULL_YEAR = {"period": "2025Q4", "ebitda_node": "ebitda", "cash_node": "cash"}
@@ -29,9 +30,18 @@ def _model() -> tuple[FinancialModelSpec, StatementResult]:
     builder.value("ebitda", list(zip(QUARTERS, [100_000.0, 110_000.0, 120_000.0, 130_000.0], strict=True)))
     builder.value("cash", [(quarter, 150_000.0) for quarter in QUARTERS])
     usd = Currency("USD")
-    builder.add_bond("SUB", Money(420_000.0, usd), 0.08, date(2024, 1, 1), date(2031, 3, 1), "USD-OIS")
-    builder.add_bond("SR-A", Money(400_000.0, usd), 0.05, date(2024, 1, 1), date(2029, 6, 1), "USD-OIS")
-    builder.add_bond("SR-B", Money(100_000.0, usd), 0.05, date(2024, 1, 1), date(2029, 1, 1), "USD-OIS")
+    builder.add_debt(
+        "SUB",
+        Bond.fixed("SUB", Money(420_000.0, usd), 0.08, date(2024, 1, 1), date(2031, 3, 1), "short_front", "USD-OIS"),
+    )
+    builder.add_debt(
+        "SR-A",
+        Bond.fixed("SR-A", Money(400_000.0, usd), 0.05, date(2024, 1, 1), date(2029, 6, 1), "short_front", "USD-OIS"),
+    )
+    builder.add_debt(
+        "SR-B",
+        Bond.fixed("SR-B", Money(100_000.0, usd), 0.05, date(2024, 1, 1), date(2029, 1, 1), "short_front", "USD-OIS"),
+    )
     document = json.loads(builder.build().to_json())
     document["capital_structure"]["waterfall"] = {
         "available_cash_node": "cash",

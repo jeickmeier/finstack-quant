@@ -531,9 +531,9 @@ impl CreditScorecardExtension {
                 continue;
             }
             let mut period_values = indexmap::IndexMap::new();
-            for (node_id, node_periods) in &results.nodes {
-                if let Some(value) = node_periods.get(&period.id) {
-                    period_values.insert(node_id.clone(), *value);
+            for (node_id, node_periods) in &results.cells {
+                if let Some(cell) = node_periods.get(&period.id) {
+                    period_values.insert(node_id.clone(), cell.numeric().unwrap_or(f64::NAN));
                 }
             }
             if !period_values.is_empty() {
@@ -552,11 +552,11 @@ impl CreditScorecardExtension {
             eval_context.capital_structure_cashflows = Some(cs.clone());
         }
 
-        for (node_id, node_values) in &results.nodes {
-            if let Some(value) = node_values.get(&target_period.id)
+        for (node_id, node_values) in &results.cells {
+            if let Some(cell) = node_values.get(&target_period.id)
                 && eval_context.node_to_column.contains_key(node_id.as_str())
             {
-                eval_context.set_value(node_id, *value)?;
+                eval_context.set_value(node_id, cell.numeric().unwrap_or(f64::NAN))?;
             }
         }
 

@@ -22,23 +22,34 @@ const tables = (resultJson) => ({
 });
 const analyst = await read("analyst-result.json");
 const model = JSON.parse(await read("analyst-model.json"));
+// A model node id is a formula identifier, so it never needs CSV quoting.
+// The export still has to quote arbitrary column names: evaluate a valid
+// node, then rename it in the native tables.
 const quotedId = 'adjusted, "core" revenue';
+const validId = "adjusted_core_revenue";
 const quoted = evaluate(
   native.validateFinancialModelJson(
     JSON.stringify({
       ...model,
       nodes: {
         ...model.nodes,
-        [quotedId]: { ...model.nodes.revenue, node_id: quotedId },
+        [validId]: { ...model.nodes.revenue, node_id: validId },
       },
     }),
   ),
 );
+const renamed = (value) =>
+  JSON.parse(
+    JSON.stringify(value).replaceAll(
+      JSON.stringify(validId),
+      JSON.stringify(quotedId),
+    ),
+  );
 await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({
     analyst: tables(analyst),
     quotedId,
-    quoted: tables(quoted),
+    quoted: renamed(tables(quoted)),
   }),
 );

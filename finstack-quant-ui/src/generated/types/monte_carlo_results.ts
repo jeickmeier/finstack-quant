@@ -66,70 +66,6 @@ export type DCf776B61125046D84B45 =
         warning:
           | {
               /**
-               * Actual ratio of stateful to scheduled opening applied to the cashflows.
-               */
-              applied_ratio: number;
-              kind: "residual_scale_mismatch";
-              [k: string]: unknown;
-            }
-          | {
-              /**
-               * Original contractual payment date.
-               */
-              cashflow_date: string;
-              /**
-               * Canonical cashflow classification that was excluded.
-               */
-              cashflow_kind:
-                | "fixed"
-                | "floating"
-                | "inflation_coupon"
-                | "fee"
-                | "commitment_fee"
-                | "usage_fee"
-                | "facility_fee"
-                | "lc_fee"
-                | "fronting_fee"
-                | "notional"
-                | "pik"
-                | "amortization"
-                | "pre_payment"
-                | "revolving_draw"
-                | "revolving_repayment"
-                | "defaulted_notional"
-                | "recovery"
-                | "accrued_on_default"
-                | "protection_payment"
-                | "stub"
-                | "initial_margin_post"
-                | "initial_margin_return"
-                | "variation_margin_receive"
-                | "variation_margin_pay"
-                | "margin_interest"
-                | "collateral_substitution_in"
-                | "collateral_substitution_out"
-                | "derivative_settlement";
-              kind: "cashflow_ignored";
-              [k: string]: unknown;
-            }
-          | {
-              /**
-               * Negative claim amount in the waterfall currency.
-               */
-              amount: number;
-              /**
-               * Payment category containing the invalid negative claim.
-               */
-              category: "fees" | "interest";
-              /**
-               * Instrument whose claim was neutralized.
-               */
-              instrument_id: string;
-              kind: "negative_claim_neutralized";
-              [k: string]: unknown;
-            }
-          | {
-              /**
                * Negative amount that was floored, in the waterfall currency.
                */
               amount: number;
@@ -180,23 +116,48 @@ export type DCf776B61125046D84B45 =
       };
     }
   | {
-      non_finite_skipped: {
+      forecast_clipped: {
         /**
-         * Number of non-finite inputs dropped.
-         */
-        count: number;
-        /**
-         * Name of the aggregate function that dropped values.
-         */
-        function: string;
-        /**
-         * Identifier of the node whose aggregate dropped inputs.
+         * Identifier of the forecast node.
          */
         node_id: string;
         /**
-         * Period in which the drop occurred.
+         * Period whose published level was clipped.
          */
         period: string;
+        /**
+         * Level published after the bound, in the node's units.
+         */
+        published: number;
+        /**
+         * Level the forecast generated, in the node's units.
+         */
+        raw: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      gapped_sample: {
+        /**
+         * Name of the statistic.
+         */
+        function: string;
+        /**
+         * Identifier of the node whose statistic has gaps.
+         */
+        node_id: string;
+        /**
+         * Observations that had a value.
+         */
+        observations: number;
+        /**
+         * Period the statistic was computed for.
+         */
+        period: string;
+        /**
+         * Plan slots from the model start through the period.
+         */
+        slots: number;
         [k: string]: unknown;
       };
     };
@@ -210,6 +171,15 @@ export interface MonteCarloResultsWire {
    */
   forecast_periods: DB888A5Be75073Df7B251[];
   /**
+   * Why no statistics were published, when a requested sample had no
+   * value on some path. `None` for a complete run.
+   */
+  incomplete?: D_6Dbdf0Cc2Ba8Afa48229 | null;
+  /**
+   * The metrics requested, in order.
+   */
+  metrics: string[];
+  /**
    * Number of Monte Carlo paths simulated.
    */
   n_paths: number;
@@ -218,7 +188,8 @@ export interface MonteCarloResultsWire {
    */
   path_data?: DCe059E1E5Fd8531C74Da | null;
   /**
-   * Aggregated percentile results: `metric → PercentileSeries`.
+   * Aggregated percentile results: `metric → PercentileSeries`, in the
+   * requested metric order. Empty when the run is incomplete.
    */
   percentile_results: {
     [k: string]: D_9Ebf84Cf8414D0C617Ec;
@@ -228,6 +199,16 @@ export interface MonteCarloResultsWire {
    */
   percentiles: number[];
   /**
+   * The run's exact base seed, a decimal string in JSON: an unsigned
+   * 64-bit value does not fit a JavaScript number.
+   */
+  seed: string;
+  /**
+   * Version of the mapping from the seed, path and node to a random
+   * stream. With the seed it replays any path from the result alone.
+   */
+  stream_version: number;
+  /**
    * Distinct warnings raised in the simulated forecast periods, each
    * reported once however many paths raised it, in a canonical sorted
    * order. Warnings in actual periods are omitted: those periods are not
@@ -235,6 +216,36 @@ export interface MonteCarloResultsWire {
    */
   warnings?: DCf776B61125046D84B45[];
   [k: string]: unknown;
+}
+/**
+ * Why a Monte Carlo run published no statistics.
+ *
+ * A run is complete only when every path has a value for every requested
+ * metric in every forecast period.
+ */
+export interface D_6Dbdf0Cc2Ba8Afa48229 {
+  /**
+   * First metric, in the requested order, with a sample without a value.
+   */
+  metric: string;
+  /**
+   * Number of samples without a value across the run.
+   */
+  missing_samples: number;
+  /**
+   * Lowest path with such a sample for that metric and period.
+   */
+  path: number;
+  /**
+   * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
+   * `FY2025W53`.
+   */
+  period: string;
+  /**
+   * Why that cell had no value: `missing`, `masked`, or the reason an
+   * unavailable cell gives (for example `missing_peer_shock`).
+   */
+  reason: string;
 }
 /**
  * Serializable columnar table envelope.
@@ -328,7 +339,189 @@ export interface D_9Ebf84Cf8414D0C617Ec {
    */
   metric: string;
   /**
-   * Period → ordered list of `(percentile, value)` pairs.
+   * Number of samples behind each quantile: the path count.
+   */
+  sample_count: number;
+  /**
+   * Units of every value: scalar, or money in one currency.
+   */
+  value_type:
+    | {
+        /**
+         * Currency of the monetary value
+         */
+        currency:
+          | "AED"
+          | "AFN"
+          | "ALL"
+          | "AMD"
+          | "ANG"
+          | "AOA"
+          | "ARS"
+          | "AUD"
+          | "AWG"
+          | "AZN"
+          | "BAM"
+          | "BBD"
+          | "BDT"
+          | "BGN"
+          | "BHD"
+          | "BIF"
+          | "BMD"
+          | "BND"
+          | "BOB"
+          | "BRL"
+          | "BSD"
+          | "BTN"
+          | "BWP"
+          | "BYN"
+          | "BZD"
+          | "CAD"
+          | "CDF"
+          | "CHF"
+          | "CLF"
+          | "CLP"
+          | "CNY"
+          | "COP"
+          | "CRC"
+          | "CUC"
+          | "CUP"
+          | "CVE"
+          | "CZK"
+          | "DJF"
+          | "DKK"
+          | "DOP"
+          | "DZD"
+          | "EGP"
+          | "ERN"
+          | "ETB"
+          | "EUR"
+          | "FJD"
+          | "FKP"
+          | "GBP"
+          | "GEL"
+          | "GHS"
+          | "GIP"
+          | "GMD"
+          | "GNF"
+          | "GTQ"
+          | "GYD"
+          | "HKD"
+          | "HNL"
+          | "HRK"
+          | "HTG"
+          | "HUF"
+          | "IDR"
+          | "ILS"
+          | "INR"
+          | "IQD"
+          | "IRR"
+          | "ISK"
+          | "JMD"
+          | "JOD"
+          | "JPY"
+          | "KES"
+          | "KGS"
+          | "KHR"
+          | "KMF"
+          | "KPW"
+          | "KRW"
+          | "KWD"
+          | "KYD"
+          | "KZT"
+          | "LAK"
+          | "LBP"
+          | "LKR"
+          | "LRD"
+          | "LSL"
+          | "LYD"
+          | "MAD"
+          | "MDL"
+          | "MGA"
+          | "MKD"
+          | "MMK"
+          | "MNT"
+          | "MOP"
+          | "MRU"
+          | "MUR"
+          | "MVR"
+          | "MWK"
+          | "MXN"
+          | "MYR"
+          | "MZN"
+          | "NAD"
+          | "NGN"
+          | "NIO"
+          | "NOK"
+          | "NPR"
+          | "NZD"
+          | "OMR"
+          | "PAB"
+          | "PEN"
+          | "PGK"
+          | "PHP"
+          | "PKR"
+          | "PLN"
+          | "PYG"
+          | "QAR"
+          | "RON"
+          | "RSD"
+          | "RUB"
+          | "RWF"
+          | "SAR"
+          | "SBD"
+          | "SCR"
+          | "SDG"
+          | "SEK"
+          | "SGD"
+          | "SHP"
+          | "SLE"
+          | "SLL"
+          | "SOS"
+          | "SRD"
+          | "SSP"
+          | "STN"
+          | "SYP"
+          | "SZL"
+          | "THB"
+          | "TJS"
+          | "TMT"
+          | "TND"
+          | "TOP"
+          | "TRY"
+          | "TTD"
+          | "TWD"
+          | "TZS"
+          | "UAH"
+          | "UGX"
+          | "USD"
+          | "UYU"
+          | "UZS"
+          | "VED"
+          | "VES"
+          | "VND"
+          | "VUV"
+          | "WST"
+          | "XAF"
+          | "XCD"
+          | "XCG"
+          | "XOF"
+          | "XPF"
+          | "YER"
+          | "ZAR"
+          | "ZMW"
+          | "ZWG"
+          | "ZWL";
+        type: "monetary";
+        [k: string]: unknown;
+      }
+    | {
+        type: "scalar";
+        [k: string]: unknown;
+      };
+  /**
+   * Period → `(probability, value)` pairs in ascending probability. The
+   * value is the R-7 sample quantile, in `value_type` units.
    */
   values: {
     [k: string]: [number, number][];

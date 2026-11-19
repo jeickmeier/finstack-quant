@@ -484,10 +484,7 @@ fn bench_forecast_methods(c: &mut Criterion) {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Seasonal,
-                params: seasonal_params,
-            },
+            ForecastSpec::from_params(ForecastMethod::Seasonal, seasonal_params).unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -775,10 +772,7 @@ fn bench_end_to_end(c: &mut Criterion) {
                 );
                 model_builder.forecast(
                     "revenue",
-                    ForecastSpec {
-                        method: ForecastMethod::Seasonal,
-                        params: seasonal_params,
-                    },
+                    ForecastSpec::from_params(ForecastMethod::Seasonal, seasonal_params).unwrap(),
                 );
                 model_builder.compute("cogs", "revenue * 0.6").unwrap();
                 model_builder

@@ -88,21 +88,6 @@ pub(super) fn node_unit_at(
 ) -> Result<Option<NodeValueType>> {
     let declared = results.node_value_types.get(node).copied();
     if let Some(amount) = results.get_money(node, period) {
-        if let Some(value) = results.get(node, period) {
-            // Evaluated numeric cells may precede currency rounding. Exact
-            // typed projections also cover full-precision Decimal amounts.
-            if value.partial_cmp(&amount.amount()) != Some(std::cmp::Ordering::Equal) {
-                let projected = finstack_quant_core::money::Money::new(value, amount.currency())
-                    .map_err(|error| Error::eval(error.to_string()))?;
-                if projected.amount().partial_cmp(&amount.amount())
-                    != Some(std::cmp::Ordering::Equal)
-                {
-                    return Err(Error::eval(format!(
-                        "Node '{node}' has contradictory numeric and monetary values at {period}"
-                    )));
-                }
-            }
-        }
         let actual = NodeValueType::Monetary {
             currency: amount.currency(),
         };
@@ -114,7 +99,7 @@ pub(super) fn node_unit_at(
         return Ok(Some(actual));
     }
     if matches!(declared, Some(NodeValueType::Monetary { .. }))
-        && results.get(node, period).is_some()
+        && crate::cell_float(results, node, period).is_some()
     {
         return Err(Error::invalid_input(format!(
             "Monetary node '{node}' is missing its typed amount at {period}"

@@ -18,9 +18,11 @@ use indexmap::IndexMap;
 /// - linear: `v[t] = base + (target - base) * t / N`, where `N` is the
 ///   number of forecast periods. Reaches the target exactly at the final
 ///   period.
-/// - geometric: `v[t] = base * (target / base)^(t / N)` — constant
-///   compound growth (CAGR) interpolation. Requires `base_value` and
-///   `target` to be non-zero and share the same sign.
+/// - geometric: `|v[t]| = exp((1 - t/N) ln|base| + (t/N) ln|target|)` with the
+///   endpoints' common sign — constant compound growth (CAGR) interpolation
+///   on the logarithms of the magnitudes, which reaches the target exactly at
+///   the final period. Requires `base_value` and `target` to be non-zero and
+///   share the same sign.
 /// - exponential: `v[t] = target + (base - target) * 2^(-t / half_life)`
 ///   — asymptotic half-life decay toward the target; never reaches it
 ///   exactly. Requires `half_life`.
@@ -67,6 +69,38 @@ pub(super) fn fade_to_target(
         )));
     }
 
+    if shape == ForecastFadeShape::Geometric
+        && (base_value == 0.0 || target == 0.0 || (base_value < 0.0) != (target < 0.0))
+    {
+        return Err(Error::forecast(format!(
+            "FadeToTarget geometric shape requires base_value and target to be \
+             non-zero and share the same sign, got base_value = {base_value} and \
+             target = {target}. Use shape = \"linear\" for sign-crossing or \
+             zero-anchored fades."
+        )));
+    }
+    let half_life = match (shape, params.half_life) {
+        (ForecastFadeShape::Exponential, Some(half_life))
+            if half_life.is_finite() && half_life > 0.0 =>
+        {
+            half_life
+        }
+        (ForecastFadeShape::Exponential, Some(half_life)) => {
+            return Err(Error::forecast(format!(
+                "FadeToTarget 'half_life' must be a positive finite number of \
+                 periods, got {half_life}"
+            )));
+        }
+        (ForecastFadeShape::Exponential, None) => {
+            return Err(Error::forecast(
+                "FadeToTarget exponential shape requires a numeric 'half_life' \
+                 parameter (number of periods to close half the remaining gap, \
+                 e.g. 4.0 for a one-year half-life in a quarterly model).",
+            ));
+        }
+        _ => 0.0,
+    };
+
     let mut results = IndexMap::new();
     if forecast_periods.is_empty() {
         return Ok(results);
@@ -75,11 +109,16 @@ pub(super) fn fade_to_target(
 
     match shape {
         ForecastFadeShape::Linear => {
+            let last = forecast_periods.len() - 1;
             for (i, period_id) in forecast_periods.iter().enumerate() {
                 let weight = (i + 1) as f64 / n;
                 // Convex weights avoid overflowing target - base for finite
                 // endpoints with opposite signs.
-                let value = (1.0 - weight) * base_value + weight * target;
+                let value = if i == last {
+                    target
+                } else {
+                    (1.0 - weight) * base_value + weight * target
+                };
                 if !value.is_finite() {
                     return Err(Error::forecast(format!(
                         "FadeToTarget linear forecast produced a non-finite value at period {period_id:?}"
@@ -89,21 +128,23 @@ pub(super) fn fade_to_target(
             }
         }
         ForecastFadeShape::Geometric => {
-            if base_value == 0.0 || target == 0.0 || (base_value < 0.0) != (target < 0.0) {
-                return Err(Error::forecast(format!(
-                    "FadeToTarget geometric shape requires base_value and target to be \
-                     non-zero and share the same sign, got base_value = {base_value} and \
-                     target = {target}. Use shape = \"linear\" for sign-crossing or \
-                     zero-anchored fades."
-                )));
-            }
-            let ratio = target / base_value;
+            // Interpolate the logarithms of the magnitudes: every level lies
+            // between the endpoints, so it is representable even when the
+            // endpoint ratio overflows or underflows.
+            let (log_base, log_target) = (base_value.abs().ln(), target.abs().ln());
+            let last = forecast_periods.len() - 1;
             for (i, period_id) in forecast_periods.iter().enumerate() {
-                let t = (i + 1) as f64;
-                let value = base_value * ratio.powf(t / n);
-                if !value.is_finite() {
+                let value = if i == last {
+                    target
+                } else {
+                    let weight = (i + 1) as f64 / n;
+                    ((1.0 - weight) * log_base + weight * log_target)
+                        .exp()
+                        .copysign(target)
+                };
+                if !value.is_finite() || value == 0.0 {
                     return Err(Error::forecast(format!(
-                        "FadeToTarget geometric forecast produced a non-finite value at \
+                        "FadeToTarget geometric forecast produced an unrepresentable value at \
                          period {period_id:?}"
                     )));
                 }
@@ -111,19 +152,6 @@ pub(super) fn fade_to_target(
             }
         }
         ForecastFadeShape::Exponential => {
-            let half_life = params.half_life.ok_or_else(|| {
-                Error::forecast(
-                    "FadeToTarget exponential shape requires a numeric 'half_life' \
-                     parameter (number of periods to close half the remaining gap, \
-                     e.g. 4.0 for a one-year half-life in a quarterly model).",
-                )
-            })?;
-            if !half_life.is_finite() || half_life <= 0.0 {
-                return Err(Error::forecast(format!(
-                    "FadeToTarget 'half_life' must be a positive finite number of \
-                     periods, got {half_life}"
-                )));
-            }
             for (i, period_id) in forecast_periods.iter().enumerate() {
                 let t = (i + 1) as f64;
                 let weight = (-t / half_life).exp2();
@@ -154,6 +182,7 @@ mod tests {
 
     fn params(target: f64, shape: ForecastFadeShape, half_life: Option<f64>) -> FadeToTargetParams {
         FadeToTargetParams {
+            start: None,
             target,
             shape,
             half_life,
@@ -257,5 +286,42 @@ mod tests {
     fn empty_periods_return_empty_map() {
         let results = fade_to_target(50.0, &[], &linear(100.0)).expect("empty periods valid");
         assert!(results.is_empty());
+    }
+
+    /// Every level lies between the endpoints, so the path is representable
+    /// even though `target / base` overflows or underflows.
+    #[test]
+    fn geometric_path_survives_an_unrepresentable_endpoint_ratio() {
+        let periods = quarters(4);
+        for (base, target) in [(1e-200, 1e200), (1e200, 1e-200), (-1e-200, -1e200)] {
+            let p = params(target, ForecastFadeShape::Geometric, None);
+            let results = fade_to_target(base, &periods, &p).expect("representable path");
+            // Independent reference: the geometric mean of the endpoints is
+            // 1 in magnitude, reached at the midpoint.
+            assert!((results[&periods[1]].abs() - 1.0).abs() < 1e-12);
+            assert_eq!(results[&periods[1]].signum(), target.signum());
+            assert_eq!(results[&periods[3]].to_bits(), target.to_bits());
+            let quarter_point = results[&periods[0]].abs().log10();
+            assert!((quarter_point - base.abs().log10() / 2.0).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn linear_and_geometric_return_the_exact_target_in_the_final_slot() {
+        let periods = quarters(3);
+        for shape in [ForecastFadeShape::Linear, ForecastFadeShape::Geometric] {
+            let p = params(0.3, shape, None);
+            let results = fade_to_target(0.1, &periods, &p).expect("fade");
+            assert_eq!(results[&periods[2]].to_bits(), 0.3_f64.to_bits());
+        }
+    }
+
+    /// Shape checks run even when there is no period to forecast.
+    #[test]
+    fn shape_checks_run_for_an_empty_horizon() {
+        let geometric = params(-50.0, ForecastFadeShape::Geometric, None);
+        assert!(fade_to_target(100.0, &[], &geometric).is_err());
+        let exponential = params(50.0, ForecastFadeShape::Exponential, Some(0.0));
+        assert!(fade_to_target(100.0, &[], &exponential).is_err());
     }
 }

@@ -5,15 +5,16 @@ use std::sync::Arc;
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
 
-use super::helpers::get_finite_node_value;
 use super::{
-    Check, CheckComparison, CheckContext, CheckFinding, CheckResult, FormulaCheckSpec, Severity,
+    Check, CheckComparison, CheckContext, CheckFinding, CheckResult, FormulaCheckMode,
+    FormulaCheckSpec, PeriodScope, Severity,
 };
 use crate::Result;
+use crate::evaluator::value::Value;
 use crate::evaluator::{
-    EvalWarning, EvaluationContext, PeriodHistory, StatementResult, formula::evaluate_formula,
+    EvaluationContext, PeriodHistory, StatementResult, formula::evaluate_value,
 };
-use crate::types::NodeId;
+use crate::types::{AmountOrScalar, NodeId};
 
 impl Check for FormulaCheckSpec {
     fn id(&self) -> &str {
@@ -30,65 +31,69 @@ impl Check for FormulaCheckSpec {
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         context.config.validate()?;
-        if self.tolerance.is_some_and(|t| !t.is_finite() || t < 0.0) {
-            return Err(crate::Error::invalid_input(
-                "Formula-check tolerance must be finite and nonnegative",
-            ));
+        let unit_context = self.unit_context(context)?;
+        let formula = self.compile(&self.formula, &unit_context, "formula")?;
+        let boolean = formula.1;
+        match (self.mode, boolean, self.tolerance) {
+            (FormulaCheckMode::Predicate, false, _) => {
+                return Err(crate::Error::invalid_input(format!(
+                    "formula check '{}': a predicate needs a Boolean formula such as a \
+                     comparison; use the residual mode for an amount",
+                    self.id
+                )));
+            }
+            (FormulaCheckMode::Predicate, true, Some(_)) => {
+                return Err(crate::Error::invalid_input(format!(
+                    "formula check '{}': a tolerance applies only to the residual mode",
+                    self.id
+                )));
+            }
+            (FormulaCheckMode::Residual, true, _) => {
+                return Err(crate::Error::invalid_input(format!(
+                    "formula check '{}': a residual needs a scalar or monetary formula, not a \
+                     Boolean one; use the predicate mode",
+                    self.id
+                )));
+            }
+            (FormulaCheckMode::Residual, false, Some(tolerance))
+                if !tolerance.is_finite() || tolerance < 0.0 =>
+            {
+                return Err(crate::Error::invalid_input(
+                    "Formula-check tolerance must be finite and nonnegative",
+                ));
+            }
+            _ => {}
         }
-        let ast = crate::dsl::parse_formula(&self.formula)?;
-        let mut value_types = IndexMap::new();
-        for node in context
-            .model
-            .nodes
-            .keys()
-            .map(NodeId::as_str)
-            .chain(context.results.nodes.keys().map(String::as_str))
-        {
-            value_types.insert(
-                NodeId::new(node),
-                super::helpers::validated_input_value_type(self.id(), context, node)?,
-            );
-        }
-        let (reporting_currency, instrument_currencies) =
-            super::helpers::validated_capital_structure_currencies(self.id(), context)?;
-        let _ = crate::dsl::compiler::infer_value_type(
-            &ast,
-            &value_types,
-            reporting_currency,
-            &instrument_currencies,
-        )?;
-        let expression = crate::dsl::compiler::compile(&ast)?;
-        let history = Arc::new(period_history(context.results, context.model));
-        let historical_cashflows = Arc::new(period_cashflows(context.results, context.model));
-        // Same-period node inputs. Unknown identifiers are left to evaluation,
-        // which rejects them as a configuration error.
-        let current_inputs: Vec<NodeId> = crate::utils::formula::extract_direct_dependencies(&ast)
-            .into_iter()
-            .filter(|node| {
-                !node.as_str().starts_with("cs.")
-                    && (context.results.nodes.contains_key(node.as_str())
-                        || context.model.has_node(node.as_str()))
-            })
-            .collect();
+        let eligibility = match &self.eligibility {
+            Some(text) => {
+                let (expression, boolean) = self.compile(text, &unit_context, "eligibility")?;
+                if !boolean {
+                    return Err(crate::Error::invalid_input(format!(
+                        "formula check '{}': the eligibility condition must be Boolean",
+                        self.id
+                    )));
+                }
+                Some(expression)
+            }
+            None => None,
+        };
+
+        let history = Arc::new(period_history(context.results, context.periods()));
+        let historical_cashflows = Arc::new(period_cashflows(context.results, context.periods()));
+        let tolerance = self.tolerance.unwrap_or(0.0);
         let mut findings = Vec::new();
         let mut comparisons = Vec::new();
+        let mut evaluated = 0_usize;
 
-        for period in &context.model.periods {
-            let unusable: Vec<NodeId> = current_inputs
-                .iter()
-                .filter(|node| get_finite_node_value(context.results, node, &period.id).is_none())
-                .cloned()
-                .collect();
-            if !unusable.is_empty() {
-                let names: Vec<&str> = unusable.iter().map(NodeId::as_str).collect();
-                findings.push(self.insufficient_data(
-                    period.id,
-                    format!("missing or non-finite inputs [{}]", names.join(", ")),
-                    unusable,
-                ));
+        for period in context.periods() {
+            let in_scope = match self.scope {
+                PeriodScope::AllPeriods => true,
+                PeriodScope::ActualsOnly => period.is_actual,
+                PeriodScope::ForecastOnly => !period.is_actual,
+            };
+            if !in_scope {
                 continue;
             }
-
             let mut evaluation = EvaluationContext::new_with_history(
                 period.id,
                 Arc::clone(&history),
@@ -99,115 +104,180 @@ impl Check for FormulaCheckSpec {
                 .cs_cashflows
                 .as_ref()
                 .map(|cashflows| cashflows.period_snapshot(period.id));
+            // The typed cells of the run: a cell without a value stays
+            // without one, and is consumed only if evaluation reaches it.
+            for (node_id, cells) in &context.results.cells {
+                let cell = cells
+                    .get(&period.id)
+                    .map_or(crate::evaluator::cell::Cell::Missing, |cell| cell.to_cell());
+                evaluation.set_cell(node_id, cell)?;
+            }
 
-            for (node_id, values) in &context.results.nodes {
-                if let Some(value) = values.get(&period.id) {
-                    evaluation.set_value(node_id, *value)?;
+            if let Some(eligibility) = &eligibility {
+                match evaluate_value(eligibility, &mut evaluation, Some(&self.id))? {
+                    Value::Bool(true) => {}
+                    Value::Bool(false) => continue,
+                    _ => {
+                        evaluated += 1;
+                        findings.push(
+                            self.incomplete(period.id, "the eligibility condition has no value"),
+                        );
+                        continue;
+                    }
                 }
             }
+            evaluated += 1;
 
-            let value = evaluate_formula(&expression, &mut evaluation, Some(&self.id))?;
-            // A division by zero over finite inputs is a real defect in the
-            // checked figures, so it still fails below. Any other non-finite
-            // value reached the formula as data it could not judge: a lag or
-            // window reaching before the first period, or a non-finite value
-            // from history.
-            let divided_by_zero = evaluation
-                .warnings
-                .iter()
-                .any(|warning| matches!(warning, EvalWarning::DivisionByZero { .. }));
-            if !divided_by_zero && (!value.is_finite() || evaluation.non_finite_operand) {
-                findings.push(
-                    self.insufficient_data(
+            // An invalid formula (division by zero, an undefined domain, an
+            // overflow) is an execution error. An unavailable result means
+            // the formula needed an observation that has no value.
+            let value = evaluate_value(&formula.0, &mut evaluation, Some(&self.id))?;
+            let breach_comparison = match (self.mode, value) {
+                (_, Value::Unavailable(_)) => {
+                    findings.push(self.incomplete(
                         period.id,
-                        "the formula consumed a non-finite value (for example a lag or rolling \
-                     window reaching before the first period)"
-                            .to_string(),
-                        current_inputs.clone(),
-                    ),
-                );
-                continue;
-            }
-            let passes = if !value.is_finite() {
-                false
-            } else if let Some(tolerance) = self.tolerance {
-                value.abs() <= tolerance
-            } else {
-                value != 0.0
+                        "the formula needed an observation that has no value (a missing or \
+                         unavailable cell, or a lag or window reaching before the first period)",
+                    ));
+                    continue;
+                }
+                (FormulaCheckMode::Predicate, Value::Bool(true)) => continue,
+                (FormulaCheckMode::Predicate, Value::Bool(false)) => None,
+                (FormulaCheckMode::Residual, residual) => {
+                    // The residual and its tolerance keep the formula's
+                    // units: exact money, or a scalar.
+                    let typed = |value: f64| match residual {
+                        Value::Money(money) => AmountOrScalar::amount(value, money.currency()),
+                        _ => Ok(AmountOrScalar::scalar(value)),
+                    };
+                    let comparison = CheckComparison {
+                        identity: self.id.clone(),
+                        period: Some(period.id),
+                        actual: match residual {
+                            Value::Money(money) => AmountOrScalar::Amount(money),
+                            other => AmountOrScalar::scalar(other.float()),
+                        },
+                        expected: typed(0.0)?,
+                        difference: match residual {
+                            Value::Money(money) => AmountOrScalar::Amount(money),
+                            other => AmountOrScalar::scalar(other.float()),
+                        },
+                        tolerance: typed(tolerance)?,
+                    };
+                    comparisons.push(comparison.clone());
+                    if comparison.within_tolerance() {
+                        continue;
+                    }
+                    Some(comparison)
+                }
+                (FormulaCheckMode::Predicate, other) => {
+                    return Err(crate::Error::eval(format!(
+                        "formula check '{}': the predicate evaluated to a non-Boolean value \
+                         ({other:?})",
+                        self.id
+                    )));
+                }
             };
-
-            // A tolerance turns the formula into a numeric comparison against
-            // zero; without one it is a boolean test with nothing to compare.
-            // A non-finite value always fails and is not a comparable number
-            // (it would not survive a JSON round trip), so it is not recorded.
-            let comparison = self
-                .tolerance
-                .filter(|_| value.is_finite())
-                .map(|tolerance| CheckComparison {
-                    identity: self.id.clone(),
-                    period: Some(period.id),
-                    actual: value,
-                    expected: 0.0,
-                    tolerance,
-                });
-            comparisons.extend(comparison.clone());
-
-            if !passes {
-                findings.push(CheckFinding {
-                    check_id: self.id.clone(),
-                    severity: self.severity,
-                    message: self
-                        .message_template
-                        .replace("{period}", &period.id.to_string()),
-                    period: Some(period.id),
-                    materiality: None,
-                    nodes: vec![],
-                    comparison,
-                });
-            }
+            findings.push(CheckFinding {
+                check_id: self.id.clone(),
+                severity: self.severity,
+                message: self
+                    .message_template
+                    .replace("{period}", &period.id.to_string()),
+                period: Some(period.id),
+                materiality: None,
+                nodes: vec![],
+                comparison: breach_comparison,
+                coverage: false,
+            });
         }
 
-        let passed = !findings
-            .iter()
-            .any(|finding| finding.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id.clone(),
-            check_name: self.name.clone(),
-            category: self.category,
-            passed,
-            findings,
-            comparisons,
-        })
+        Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }
 
+/// The resolved units of every node and capital-structure scope a formula
+/// check may reference.
+struct CheckUnits {
+    node_types: IndexMap<NodeId, crate::types::NodeValueType>,
+    reporting_currency: Option<finstack_quant_core::currency::Currency>,
+    instrument_currencies: IndexMap<String, finstack_quant_core::currency::Currency>,
+}
+
 impl FormulaCheckSpec {
-    /// Warning for a period the formula cannot judge. It never fails the
-    /// check and carries no comparison, like the skipped periods of the
-    /// built-in identity checks.
-    fn insufficient_data(
+    fn unit_context(&self, context: &CheckContext) -> Result<CheckUnits> {
+        let mut node_types = IndexMap::new();
+        for node in context
+            .model
+            .nodes
+            .keys()
+            .map(NodeId::as_str)
+            .chain(context.results.node_ids())
+        {
+            node_types.insert(
+                NodeId::new(node),
+                super::helpers::validated_input_value_type(self.id(), context, node)?,
+            );
+        }
+        let (reporting_currency, instrument_currencies) =
+            super::helpers::validated_capital_structure_currencies(self.id(), context)?;
+        Ok(CheckUnits {
+            node_types,
+            reporting_currency,
+            instrument_currencies,
+        })
+    }
+
+    /// Parse, validate over the whole AST (every branch, identifier and
+    /// unit) and compile `text`; also report whether it is Boolean.
+    fn compile(
         &self,
-        period: PeriodId,
-        reason: String,
-        nodes: Vec<NodeId>,
-    ) -> CheckFinding {
+        text: &str,
+        units: &CheckUnits,
+        what: &str,
+    ) -> Result<(finstack_quant_core::expr::Expr, bool)> {
+        let ast = crate::dsl::parse_formula(text)?;
+        // Every identifier, including one read only through `lag` or `shift`.
+        let mut references = indexmap::IndexSet::new();
+        crate::utils::formula::collect_identifiers_from_ast(&ast, &mut references, false);
+        for node in references {
+            if !node.starts_with("cs.") && !units.node_types.contains_key(node.as_str()) {
+                return Err(crate::Error::invalid_input(format!(
+                    "formula check '{}': the {what} references '{node}', which is not a node \
+                     of the model",
+                    self.id
+                )));
+            }
+        }
+        let unit_context = || crate::dsl::compiler::UnitContext {
+            node_types: &units.node_types,
+            capital_structure_currency: units.reporting_currency,
+            instrument_currencies: &units.instrument_currencies,
+            provisional: false,
+        };
+        let _ = crate::dsl::compiler::infer_value_type(&ast, unit_context())?;
+        let boolean = crate::dsl::compiler::is_boolean(&ast, unit_context())?;
+        Ok((crate::dsl::compiler::compile(&ast)?, boolean))
+    }
+
+    /// Coverage finding for a period the formula could not judge.
+    fn incomplete(&self, period: PeriodId, reason: &str) -> CheckFinding {
         CheckFinding {
             check_id: self.id.clone(),
             severity: Severity::Warning,
-            message: format!("{}: insufficient data for {period}: {reason}", self.name),
+            message: format!("{}: incomplete for {period}: {reason}", self.name),
             period: Some(period),
             materiality: None,
-            nodes,
+            nodes: vec![],
             comparison: None,
+            coverage: true,
         }
     }
 }
 
 fn node_columns(results: &StatementResult) -> IndexMap<NodeId, usize> {
     results
-        .nodes
-        .keys()
+        .node_ids()
         .enumerate()
         .map(|(index, node_id)| (NodeId::new(node_id), index))
         .collect()
@@ -215,30 +285,33 @@ fn node_columns(results: &StatementResult) -> IndexMap<NodeId, usize> {
 
 fn period_history(
     results: &StatementResult,
-    model: &crate::types::FinancialModelSpec,
+    periods: &finstack_quant_core::dates::PeriodPlan,
 ) -> PeriodHistory {
-    let mut history = PeriodHistory::with_periods(Arc::new(node_columns(results)), &model.periods);
-    for period in &model.periods {
-        let row = results
-            .nodes
+    let mut history = PeriodHistory::with_periods(Arc::new(node_columns(results)), periods);
+    for period in periods {
+        let cells: Vec<Option<crate::evaluator::cell::Cell>> = results
+            .cells
             .values()
-            .map(|series| series.get(&period.id).copied())
+            .map(|cells| cells.get(&period.id).map(|cell| cell.to_cell()))
             .collect();
-        history.push_row(period.id, row);
+        let row = cells
+            .iter()
+            .map(|cell| cell.map(|cell| cell.numeric().unwrap_or(f64::NAN)))
+            .collect();
+        history.push_typed_row(period.id, row, cells);
     }
     history
 }
 
 fn period_cashflows(
     results: &StatementResult,
-    model: &crate::types::FinancialModelSpec,
+    periods: &finstack_quant_core::dates::PeriodPlan,
 ) -> IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows> {
     let Some(cashflows) = results.cs_cashflows.as_ref() else {
         return IndexMap::new();
     };
 
-    model
-        .periods
+    periods
         .iter()
         .map(|period| (period.id, cashflows.period_snapshot(period.id)))
         .collect()

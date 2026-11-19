@@ -37,7 +37,7 @@ function evaluateModel(input) {
 function evaluateModelWithMarket(input, market, asOf) {
   const evaluator = new statements.Evaluator();
   try {
-    return evaluator.evaluateWithMarket(input, market, asOf);
+    return evaluator.evaluateWithMarket(input, market, asOf, 'full_snapshot');
   } finally {
     evaluator.free();
   }
@@ -82,8 +82,8 @@ test('monetary quantile preserves USD through the published facade', () => {
     combined: formula('combined', 'lower + cash'),
   });
   const result = evaluateModel(JSON.stringify(input));
-  assert.equal(result.nodes.lower['2025Q3'], 150);
-  assert.equal(result.nodes.combined['2025Q3'], 350);
+  assert.deepEqual(result.cells.lower['2025Q3'].value, { amount: '150', currency: 'USD' });
+  assert.deepEqual(result.cells.combined['2025Q3'].value, { amount: '350', currency: 'USD' });
   assert.equal(result.node_value_types.lower.currency, 'USD');
 });
 
@@ -95,21 +95,21 @@ test('formula round preserves large integers and extreme decimal places', () => 
     coarse: formula('coarse', 'round(balance, -324)'),
   });
   const result = evaluateModel(JSON.stringify(input));
-  assert.equal(result.nodes.tenths['2025Q3'], value);
-  assert.equal(result.nodes.coarse['2025Q3'], 0);
+  assert.equal(result.cells.tenths['2025Q3'].value, value);
+  assert.equal(result.cells.coarse['2025Q3'].value, 0);
 });
 
-test('coalesce skips infinite values and ranks honor direction', () => {
+test('coalesce skips unavailable values and ranks honor direction', () => {
   const input = model({
     observation: values('observation', [20, 30, 10]),
-    fallback: formula('fallback', 'coalesce(exp(1000), -exp(1000), 7)'),
+    fallback: formula('fallback', 'coalesce(lag(observation, 9), 7)'),
     ascending: formula('ascending', 'rank(observation, 1)'),
     descending: formula('descending', 'rank(observation, 0)'),
   });
   const result = evaluateModel(JSON.stringify(input));
-  assert.equal(result.nodes.fallback['2025Q3'], 7);
-  assert.equal(result.nodes.ascending['2025Q3'], 1);
-  assert.equal(result.nodes.descending['2025Q3'], 3);
+  assert.equal(result.cells.fallback['2025Q3'].value, 7);
+  assert.equal(result.cells.ascending['2025Q3'].value, 1);
+  assert.equal(result.cells.descending['2025Q3'].value, 3);
   input.nodes.ascending.formula_text = 'rank(observation, 1, 2)';
   assert.throws(() => evaluateModel(JSON.stringify(input)), /1 or 2 arguments/);
 });
@@ -173,13 +173,13 @@ test('waterfall validation requires funded prepayment and sweep priorities', () 
   };
   const defaults = JSON.parse(statements.validateWaterfallSpecJson(JSON.stringify(waterfall)));
   assert.deepEqual(defaults.priority_of_payments, ['fees', 'interest', 'amortization', 'equity']);
-  waterfall.mandatory_prepay_node = 'prepay';
+  waterfall.mandatory_prepayment = { amount: 'prepay', facilities: 'all_eligible' };
   assert.throws(
     () => statements.validateWaterfallSpecJson(JSON.stringify(waterfall)),
     /MandatoryPrepayment|mandatory_prepay/i
   );
-  delete waterfall.mandatory_prepay_node;
-  waterfall.ecf_sweep = { sweep_percentage: 0.5, ebitda_node: 'cash' };
+  delete waterfall.mandatory_prepayment;
+  waterfall.ecf_sweep = { sweep_percentage: 0.5, cash_measure: 'cash', facilities: 'all_eligible' };
   assert.throws(
     () => statements.validateWaterfallSpecJson(JSON.stringify(waterfall)),
     /Sweep|sweep/i
@@ -222,7 +222,7 @@ for (const [name, side, fixedRate, forwardRate] of [
       assert.equal(Number(flow[key].amount), 0);
     }
     assert.ok(income > 0);
-    assert.equal(result.nodes.income['2025'], income);
+    assert.equal(statements.statementResultGet(result, 'income', '2025'), income);
   });
 }
 
@@ -233,11 +233,15 @@ test('model validation rejects PIK capitalization of a swap payment', () => {
   fixture.model.capital_structure.waterfall = {
     priority_of_payments: ['fees', 'interest', 'amortization', 'equity'],
     available_cash_node: 'cash',
-    pik_toggle: { liquidity_metric: 'cash', threshold: 20, target_instrument_ids: ['IRS'] },
+    pik_toggle: {
+      liquidity_metric: 'cash',
+      threshold: 20,
+      elections: [{ instrument_id: 'IRS', pik_fraction: '1' }],
+    },
   };
   assert.throws(
     () => statements.validateFinancialModelJson(JSON.stringify(fixture.model)),
-    /only borrowing debt coupons/
+    /not a term loan/
   );
 });
 
@@ -338,12 +342,100 @@ test('accounting overflow fails without publishing invalid numbers', () => {
       },
     ],
   };
-  const report = statements_analytics.runChecks(input, suite);
-  assert.equal(report.summary.failed, 1);
-  const result = report.results[0];
-  assert.equal(result.passed, false);
-  assert.equal(result.comparisons.length, 2);
-  assert.equal(result.findings[0].severity, 'error');
-  assert.equal(result.findings[0].comparison ?? null, null);
-  assert.equal(result.findings[0].materiality ?? null, null);
+  // An unrepresentable sum is an execution error: no verdict and no
+  // non-finite number is published.
+  assert.throws(
+    () => statements_analytics.runChecks(input, suite),
+    (e) => /cannot be represented/.test(e.message)
+  );
+});
+
+test('bundled earnings use reported costs and add D&A back once', () => {
+  // Hand-worked statement: COGS 400 and OPEX 300 include 80 of D&A between them.
+  const registry = statements.Registry.withBuiltins();
+  const builder = new statements.ModelBuilder('income');
+  try {
+    builder.periods('2025Q1..Q1');
+    for (const [node, value] of [
+      ['revenue', 1000],
+      ['cogs', 400],
+      ['opex', 300],
+      ['depreciation', 50],
+      ['amortization', 30],
+      ['interest_expense', 40],
+      ['tax_expense', 65],
+    ]) {
+      builder.valueScalar(node, { '2025Q1': value });
+    }
+    builder.addMetricFromRegistry('fin.ebitda_margin', registry);
+    builder.addMetricFromRegistry('fin.net_margin', registry);
+    const result = evaluateModel(builder.build());
+    const expected = {
+      'fin.operating_income': 300,
+      'fin.ebit': 300,
+      'fin.ebitda': 380,
+      'fin.net_income': 195,
+      'fin.ebitda_margin': 0.38,
+      'fin.net_margin': 0.195,
+    };
+    for (const [node, value] of Object.entries(expected)) {
+      assert.equal(statements.statementResultGet(result, node, '2025Q1'), value, node);
+    }
+  } finally {
+    registry.free();
+  }
+});
+
+test('a bundled margin is unavailable without positive revenue', () => {
+  const registry = statements.Registry.withBuiltins();
+  const builder = new statements.ModelBuilder('no-revenue');
+  try {
+    builder.periods('2025Q1..Q1');
+    builder.valueScalar('revenue', { '2025Q1': 0 });
+    builder.valueScalar('cogs', { '2025Q1': 40 });
+    builder.addMetricFromRegistry('fin.gross_margin', registry);
+    const result = evaluateModel(builder.build());
+    assert.deepEqual(result.cells['fin.gross_margin']['2025Q1'], {
+      status: 'unavailable',
+      reason: 'undefined_base',
+      source: 'formula',
+    });
+  } finally {
+    registry.free();
+  }
+});
+
+test('forecast seeds are exact decimal text and method choices are explicit', () => {
+  const model = (forecast) =>
+    JSON.stringify({
+      id: 'seeded',
+      schema_version: 1,
+      periods: {
+        calendar: 'gregorian',
+        periods: [
+          { id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: true },
+          { id: '2025Q2', start: '2025-04-01', end: '2025-07-01', is_actual: false },
+        ],
+      },
+      nodes: {
+        x: { node_id: 'x', node_type: 'mixed', values: { '2025Q1': 100 }, forecast },
+      },
+    });
+  const normal = (seed) => ({ method: 'normal', params: { mean: 0, std_dev: 1, seed } });
+  // 9007199254740993 is not a JavaScript number; as text it is exact.
+  const path = (seed) => evaluateModel(model(normal(seed))).cells.x['2025Q2'].value;
+  assert.notEqual(path('9007199254740992'), path('9007199254740993'));
+  assert.equal(path('9007199254740993'), path('9007199254740993'));
+
+  for (const forecast of [
+    normal(42),
+    { method: 'fade_to_target', params: { target: 1 } },
+    { method: 'fade_to_target', params: { target: 1, shape: 'linear', half_life: 2 } },
+    { method: 'growth_pct', params: { rate: 0.1, seed: '1' } },
+  ]) {
+    assert.throws(
+      () => evaluateModel(model(forecast)),
+      (e) => e.kind === 'validation'
+    );
+  }
 });

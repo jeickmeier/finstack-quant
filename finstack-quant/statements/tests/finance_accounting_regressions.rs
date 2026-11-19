@@ -6,7 +6,7 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
-use finstack_quant_statements::adjustments::{Adjustment, NormalizationConfig, normalize};
+use finstack_quant_statements::adjustments::{Adjustment, NormalizationConfig};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::builtins::BalanceSheetArticulation;
@@ -31,6 +31,13 @@ fn formula_check(formula: &str, tolerance: Option<f64>) -> FormulaCheckSpec {
         severity: Severity::Error,
         formula: formula.into(),
         message_template: "Identity failed in {period}".into(),
+        mode: if tolerance.is_some() {
+            finstack_quant_statements::checks::FormulaCheckMode::Residual
+        } else {
+            finstack_quant_statements::checks::FormulaCheckMode::Predicate
+        },
+        scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+        eligibility: None,
         tolerance,
     }
 }
@@ -107,7 +114,7 @@ fn formula_checks_recover_missing_type_metadata_from_the_model() {
             formula_check(formula, tolerance)
                 .execute(&CheckContext::new(&model, &results))
                 .unwrap()
-                .passed
+                .passed()
         );
     }
 }
@@ -127,7 +134,7 @@ fn formula_checks_validate_capital_structure_reporting_units() {
         formula_check("cs.interest_expense.total == usd", None)
             .execute(&CheckContext::new(&model, &results))
             .unwrap()
-            .passed
+            .passed()
     );
     assert!(
         formula_check("cs.interest_expense.total == eur", None)
@@ -137,7 +144,7 @@ fn formula_checks_validate_capital_structure_reporting_units() {
 
     let mut usd_model = model;
     usd_model.nodes.shift_remove(&NodeId::new("eur"));
-    results.nodes.shift_remove("eur");
+    results.cells.shift_remove("eur");
     results.node_value_types.shift_remove("eur");
     results.cs_cashflows.as_mut().unwrap().reporting_currency = Some(Currency::EUR);
     let error = formula_check("cs.interest_expense.total == usd", None)
@@ -192,7 +199,7 @@ fn formula_checks_keep_native_instrument_units_distinct_from_reporting_totals() 
                 formula_check(formula, None)
                     .execute(&CheckContext::new(check_model, &results))
                     .unwrap()
-                    .passed
+                    .passed()
             );
         }
         let error = formula_check(
@@ -238,71 +245,58 @@ fn checked_balance_sheet() -> (FinancialModelSpec, StatementResult, CheckSuite) 
             equity_nodes: vec![NodeId::new("equity")],
             tolerance: None,
         })
-        .build();
+        .build()
+        .expect("unique check ids");
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     results.check_report = Some(suite.run(&model, &results).unwrap());
     (model, results, suite)
 }
 
 #[test]
-fn normalization_merge_clears_the_report_for_the_previous_financial_values() {
+fn publishing_an_adjusted_metric_keeps_the_reported_values_and_their_report() {
     let (model, mut results, suite) = checked_balance_sheet();
-    assert_eq!(results.check_report.as_ref().unwrap().summary.passed, 1);
-    let config = NormalizationConfig::new("assets")
+    let original_report = results.check_report.clone();
+    let config = NormalizationConfig::new("assets", "adjusted_assets")
         .add_adjustment(Adjustment::fixed(
             "asset_adjustment",
             "Asset adjustment",
-            [(q1(), 50.0)].into_iter().collect(),
+            [(q1(), AmountOrScalar::scalar(50.0))].into_iter().collect(),
         ))
         .unwrap();
-    let normalized = normalize(&results, &config).unwrap();
 
-    finstack_quant_statements::adjustments::merge_into_results(&mut results, &normalized, "assets")
-        .unwrap();
+    finstack_quant_statements::adjustments::merge_into_results(&mut results, &config).unwrap();
 
-    assert_eq!(results.get("assets", &q1()), Some(150.0));
-    assert!(results.check_report.is_none());
-    assert_eq!(suite.run(&model, &results).unwrap().summary.failed, 1);
+    assert_eq!(results.get("adjusted_assets", &q1()), Some(150.0));
+    // The reported line and the checks that describe it are untouched.
+    assert_eq!(results.get("assets", &q1()), Some(100.0));
+    assert_eq!(results.check_report, original_report);
+    assert_eq!(suite.run(&model, &results).unwrap().summary.passed, 1);
 }
 
 #[test]
-fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values() {
+fn a_failed_publication_leaves_the_results_as_they_were() {
     let (_, mut results, _) = checked_balance_sheet();
-    let original_report = results.check_report.clone();
-    let original_values = results.nodes.clone();
-    finstack_quant_statements::adjustments::merge_into_results(&mut results, &[], "assets")
-        .unwrap();
-    assert_eq!(results.check_report, original_report);
-
-    let normalized = normalize(&results, &NormalizationConfig::new("assets")).unwrap();
-    let duplicated = vec![normalized[0].clone(), normalized[0].clone()];
+    let original = results.clone();
+    // An existing node is never overwritten.
+    let collision = NormalizationConfig::new("assets", "liabilities");
     assert!(
-        finstack_quant_statements::adjustments::merge_into_results(
-            &mut results,
-            &duplicated,
-            "assets"
-        )
-        .is_err()
+        finstack_quant_statements::adjustments::merge_into_results(&mut results, &collision)
+            .is_err()
     );
-    assert_eq!(results.nodes, original_values);
-    assert_eq!(results.check_report, original_report);
+    let same = NormalizationConfig::new("assets", "assets");
+    assert!(
+        finstack_quant_statements::adjustments::merge_into_results(&mut results, &same).is_err()
+    );
+    assert_eq!(results.cells, original.cells);
+    assert_eq!(results.check_report, original.check_report);
+    assert!(results.normalizations.is_empty());
 }
 
-fn assert_arithmetic_failure(result: &finstack_quant_statements::checks::CheckResult) {
-    assert!(!result.passed);
-    assert!(result.findings.iter().any(|finding| {
-        finding.severity == Severity::Error
-            && finding.message.contains("Arithmetic overflow")
-            && finding.materiality.is_none()
-            && finding.comparison.is_none()
-    }));
-    assert!(
-        result
-            .comparisons
-            .iter()
-            .all(|c| c.actual.is_finite() && c.expected.is_finite() && c.tolerance.is_finite())
-    );
-    serde_json::to_string(result).expect("all published numbers are finite");
+fn scalar_opening(value: f64) -> finstack_quant_statements::checks::DatedOpening {
+    finstack_quant_statements::checks::DatedOpening {
+        date: time::macros::date!(2025 - 01 - 01),
+        value: finstack_quant_statements::types::AmountOrScalar::scalar(value),
+    }
 }
 
 #[test]
@@ -334,17 +328,19 @@ fn balance_sheet_arithmetic_overflow_fails_without_publishing_nonfinite_numbers(
             equity_nodes: vec!["e".into()],
             tolerance: None,
         };
-        let result = check.execute(&context).unwrap();
-        assert_arithmetic_failure(&result);
-        assert_eq!(result.comparisons.len(), 1);
-        assert_eq!(result.comparisons[0].period, Some(p2));
+        // An unrepresentable sum or tolerance is an execution error: no
+        // verdict and no non-finite number is published.
+        let error = check.execute(&context).unwrap_err();
+        assert!(
+            error.to_string().contains("cannot be represented"),
+            "{error}"
+        );
         let suite = CheckSuite::builder("overflow")
             .config(context.config.clone())
             .add_check(check)
-            .build();
-        let report = suite.run(&model, &results).unwrap();
-        assert!(report.has_errors());
-        assert_eq!(report.summary.failed, 1);
+            .build()
+            .expect("unique check ids");
+        assert!(suite.run(&model, &results).is_err());
     }
 }
 
@@ -368,20 +364,19 @@ fn cash_identities_reject_intermediate_overflow() {
     let check = CashReconciliation {
         cash_balance_node: "cash".into(),
         total_cash_flow_node: "flow".into(),
+        opening_balance: scalar_opening(1e308),
+        adjustment_nodes: Vec::new(),
         cfo_node: Some("cfo".into()),
         cfi_node: Some("cfi".into()),
         cff_node: Some("cff".into()),
         tolerance: None,
     };
-    let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
-    assert_arithmetic_failure(&result);
-    assert_eq!(
-        result
-            .findings
-            .iter()
-            .filter(|f| f.severity == Severity::Error)
-            .count(),
-        2
+    let error = check
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("cannot be represented"),
+        "{error}"
     );
 }
 
@@ -403,12 +398,17 @@ fn retained_earnings_rejects_intermediate_overflow() {
     let check = RetainedEarningsReconciliation {
         retained_earnings_node: "re".into(),
         net_income_node: "ni".into(),
+        opening_balance: scalar_opening(1e308),
         dividends_node: Some("div".into()),
         other_adjustments: Vec::new(),
         tolerance: None,
         dividends_sign_convention: Default::default(),
     };
-    let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
-    assert_arithmetic_failure(&result);
-    assert!(result.comparisons.is_empty());
+    let error = check
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("cannot be represented"),
+        "{error}"
+    );
 }

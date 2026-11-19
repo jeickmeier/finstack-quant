@@ -27,11 +27,9 @@ pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) ->
     // excluded: the formula parser reads `roi-ttm` as the subtraction
     // `roi - ttm`, so a hyphenated metric id would be unreferenceable (and
     // invisible to dependency extraction). Allow only `[A-Za-z_][A-Za-z0-9_]*`.
-    let mut chars = metric.id.chars();
-    let valid = chars
-        .next()
-        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_');
+    // One segment of the shared formula identifier grammar: a dotted id
+    // would read as a qualified reference into another namespace.
+    let valid = crate::dsl::signatures::is_valid_identifier(&metric.id) && !metric.id.contains('.');
     if !valid {
         return Err(Error::registry(format!(
             "Invalid metric ID '{}': must start with a letter or underscore and contain only \

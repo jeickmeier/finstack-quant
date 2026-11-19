@@ -4,105 +4,7 @@
 //! instruments to a financial model.
 
 use crate::builder::ModelBuilder;
-use crate::error::Result;
 use crate::types::{CapitalStructureSpec, DebtInstrumentSpec, FinancialStatementInstrument};
-use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
-use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
-use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
-use rust_decimal::Decimal;
-
-/// Inputs for appending a bond with a regional market convention.
-///
-/// The serde form is the host input of `ModelBuilder.add_bond_with_convention`:
-/// every field is required and an unknown field is rejected.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct BondConventionParams {
-    /// Capital-structure identifier; market-aware evaluation rejects duplicates.
-    pub id: String,
-    /// Principal in the tagged currency's major units.
-    pub notional: Money,
-    /// Typed annual decimal coupon rate, such as 0.03 for 3%.
-    #[cfg_attr(feature = "json-schema", schemars(with = "f64"))]
-    pub coupon_rate: Rate,
-    /// Bond issue date (ISO `YYYY-MM-DD`), strictly before maturity.
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub issue_date: Date,
-    /// Final contractual bond maturity date (ISO `YYYY-MM-DD`).
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub maturity_date: Date,
-    /// Regional preset controlling coupon frequency, day count, and calendar.
-    pub convention: finstack_quant_valuations::instruments::BondConvention,
-    /// Discount-curve lookup identifier used during market-aware evaluation.
-    pub discount_curve_id: String,
-}
-
-/// Financial terms for appending a pay-fixed, zero-spread interest-rate swap.
-///
-/// The serde form is the host input of `ModelBuilder.add_swap` and
-/// `ModelBuilder.add_swap_with_conventions`: every field is required and an
-/// unknown field is rejected.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct SwapParams {
-    /// Capital-structure identifier; market-aware evaluation rejects duplicates.
-    pub id: String,
-    /// Swap notional in the tagged currency's major units.
-    pub notional: Money,
-    /// Finite annual fixed-leg decimal rate, such as 0.04 for 4%.
-    pub fixed_rate: f64,
-    /// Effective accrual start date (ISO `YYYY-MM-DD`), strictly before maturity.
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub start_date: Date,
-    /// Final contractual swap maturity date (ISO `YYYY-MM-DD`).
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub maturity_date: Date,
-    /// Discount-curve lookup identifier used at evaluation.
-    pub discount_curve_id: String,
-    /// Floating forward-curve identifier, coherent with simple term-index compounding.
-    pub forward_curve_id: String,
-}
-
-/// Schedule and accrual conventions for a simple-compounding swap.
-///
-/// The serde form is the host input of `ModelBuilder.add_swap_with_conventions`.
-/// Tenors use their wire form `{"count": 6, "unit": "months"}`; day counts and
-/// the business-day convention use their snake_case labels (`"act_360"`,
-/// `"30_360"`, `"modified_following"`). An unknown field is rejected.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct SwapConventions {
-    /// Contractual fixed-leg payment cadence.
-    pub fixed_frequency: Tenor,
-    /// Fixed-leg accrual year-fraction convention.
-    pub fixed_day_count: DayCount,
-    /// Contractual floating-leg payment and fixing cadence.
-    pub float_frequency: Tenor,
-    /// Floating-leg accrual year-fraction convention.
-    pub float_day_count: DayCount,
-    /// Schedule-date rolling rule on the currency's settlement calendar.
-    /// Required: there is no default convention.
-    pub business_day_convention: BusinessDayConvention,
-}
 
 /// Helper to ensure capital structure exists and return mutable reference.
 ///
@@ -132,237 +34,13 @@ fn push_debt(
 }
 
 impl ModelBuilder {
-    /// Append a fixed-rate bond only after its construction succeeds.
-    ///
-    /// A rejected instrument leaves every accumulated builder field intact.
-    /// Uses US corporate conventions: 30/360 with semi-annual coupons.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Instrument identifier recorded in the capital structure; market-aware evaluation rejects duplicate identifiers.
-    /// * `notional` - Principal in the tagged currency's major units.
-    /// * `coupon_rate` - Annual coupon as a finite decimal fraction, such as 0.05 for 5%.
-    /// * `issue_date` - Bond issue date, strictly before maturity.
-    /// * `maturity_date` - Final contractual maturity date.
-    /// * `discount_curve_id` - Discount-curve lookup identifier used during market-aware evaluation.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation or construction error for an invalid rate, schedule,
-    /// notional, or identifier, without changing the builder.
-    pub fn add_bond(
-        &mut self,
-        id: impl Into<String>,
-        notional: Money,
-        coupon_rate: f64,
-        issue_date: Date,
-        maturity_date: Date,
-        discount_curve_id: impl Into<String>,
-    ) -> Result<&mut Self> {
-        let id_str: String = id.into();
-
-        let bond = Bond::fixed(
-            InstrumentId::new(&id_str),
-            notional,
-            Rate::from_decimal(coupon_rate)?,
-            issue_date,
-            maturity_date,
-            finstack_quant_core::dates::StubKind::ShortFront,
-            CurveId::new(discount_curve_id),
-        )
-        .map_err(|e| {
-            crate::error::Error::build(format!("Failed to create bond '{}': {}", id_str, e))
-        })?;
-
-        push_debt(
-            &mut self.capital_structure,
-            id_str,
-            FinancialStatementInstrument::Bond(bond),
-        );
-        Ok(self)
-    }
-
-    /// Append a bond with regional conventions without changing state on failure.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Bond identity, tagged notional, annual decimal coupon,
-    ///   contractual dates, regional convention, and discount-curve lookup identifier.
-    ///
-    /// # Errors
-    ///
-    /// Returns a bond construction error for an invalid schedule, notional, or
-    /// identifier; the accumulated model remains unchanged.
-    pub fn add_bond_with_convention(&mut self, params: BondConventionParams) -> Result<&mut Self> {
-        let BondConventionParams {
-            id: id_str,
-            notional,
-            coupon_rate,
-            issue_date,
-            maturity_date,
-            convention,
-            discount_curve_id,
-        } = params;
-
-        let bond = Bond::with_convention(
-            InstrumentId::new(&id_str),
-            notional,
-            coupon_rate,
-            issue_date,
-            maturity_date,
-            convention,
-            CurveId::new(discount_curve_id),
-        )
-        .map_err(|e| {
-            crate::error::Error::build(format!("Failed to create bond '{}': {}", id_str, e))
-        })?;
-
-        push_debt(
-            &mut self.capital_structure,
-            id_str,
-            FinancialStatementInstrument::Bond(bond),
-        );
-        Ok(self)
-    }
-
-    /// Append a US-convention swap only after its construction succeeds.
-    ///
-    /// Uses pay-fixed, zero-spread, simple compounding with semi-annual 30/360
-    /// fixed coupons and quarterly ACT/360 floating coupons. Rejected inputs
-    /// leave the builder intact.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Swap identity, tagged notional, annual fixed decimal rate,
-    ///   contractual dates, and discount/forward curve lookup identifiers.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation or construction error for an invalid rate, schedule,
-    /// index convention, or identifier without changing the builder.
-    pub fn add_swap(&mut self, params: SwapParams) -> Result<&mut Self> {
-        self.add_swap_with_conventions(
-            params,
-            SwapConventions {
-                fixed_frequency: Tenor::semi_annual(),
-                fixed_day_count: DayCount::Thirty360,
-                float_frequency: Tenor::quarterly(),
-                float_day_count: DayCount::Act360,
-                business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            },
-        )
-    }
-
-    /// Append a custom-convention swap without changing state on failure.
-    ///
-    /// Builds a pay-fixed, zero-spread swap with simple floating compounding
-    /// and the caller's payment and day-count conventions.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Swap identity, tagged notional, annual fixed decimal rate,
-    ///   contractual dates, and discount/forward curve lookup identifiers.
-    /// * `conventions` - Fixed/floating payment frequencies and day counts plus
-    ///   the business-day rolling rule; floating compounding remains simple.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation or construction error for an invalid rate,
-    /// schedule, index convention, or identifier without changing the builder.
-    pub fn add_swap_with_conventions(
-        &mut self,
-        params: SwapParams,
-        conventions: SwapConventions,
-    ) -> Result<&mut Self> {
-        let SwapParams {
-            id: id_str,
-            notional,
-            fixed_rate,
-            start_date,
-            maturity_date,
-            discount_curve_id,
-            forward_curve_id,
-        } = params;
-        let SwapConventions {
-            fixed_frequency,
-            fixed_day_count,
-            float_frequency,
-            float_day_count,
-            business_day_convention,
-        } = conventions;
-        use finstack_quant_valuations::instruments::PayReceive;
-
-        let rate_decimal = finstack_quant_core::decimal::f64_to_decimal(fixed_rate)?;
-
-        // The swap rolls on its currency's standard rates calendar. A currency
-        // without one is rejected rather than silently rolled on US holidays.
-        let currency = notional.currency();
-        let calendar_id =
-            finstack_quant_valuations::instruments::pricing::default_rate_calendar_id(currency)
-                .ok_or_else(|| {
-                    crate::error::Error::build(format!(
-                        "swap '{id_str}': no standard rates calendar is defined for {currency}; \
-                         add the swap with `add_debt` and explicit leg calendars"
-                    ))
-                })?
-                .to_string();
-
-        let discount_curve_id = CurveId::new(discount_curve_id);
-        let forward_curve_id = CurveId::new(forward_curve_id);
-
-        let fixed = FixedLegSpec {
-            discount_curve_id: discount_curve_id.clone(),
-            rate: rate_decimal,
-            frequency: fixed_frequency,
-            day_count: fixed_day_count,
-            business_day_convention,
-            calendar_id: Some(calendar_id.clone().into()),
-            stub: StubKind::None,
-            start: start_date,
-            end: maturity_date,
-
-            payment_lag_days: 0,
-            end_of_month: false,
-        };
-
-        let float = FloatLegSpec {
-            discount_curve_id,
-            index_id: forward_curve_id.as_str().into(),
-            forward_curve_id,
-            spread_bp: Decimal::ZERO,
-            frequency: float_frequency,
-            day_count: float_day_count,
-            business_day_convention,
-            calendar_id: Some(calendar_id.into()),
-            stub: StubKind::None,
-            reset_lag_days: 0,
-            fixing_calendar_id: None,
-            start: start_date,
-            end: maturity_date,
-            compounding: FloatingLegCompounding::Simple,
-            payment_lag_days: 0,
-            end_of_month: false,
-        };
-
-        let swap = InterestRateSwap::builder()
-            .id(InstrumentId::new(&id_str))
-            .notional(notional)
-            .side(PayReceive::Pay)
-            .fixed_leg(fixed)
-            .float_leg(float)
-            .build()?;
-        push_debt(
-            &mut self.capital_structure,
-            id_str,
-            FinancialStatementInstrument::InterestRateSwap(swap),
-        );
-        Ok(self)
-    }
-
     /// Add a typed debt instrument.
     ///
-    /// This is the path for any instrument type not covered by the convenience
-    /// methods (`add_bond`, `add_swap`).
+    /// This is the one way an instrument enters the capital structure.
+    /// Construct bonds, swaps and loans through their canonical Valuations
+    /// APIs, with fully authored terms or a deliberately selected dated
+    /// convention; the instrument keeps its resolved terms and contractual
+    /// schedule in the model.
     ///
     /// # Example
     /// ```no_run
@@ -414,15 +92,11 @@ impl ModelBuilder {
     ///
     /// # Arguments
     ///
-    /// * `policy` - Provider-selection purpose for each reporting-currency
-    ///   conversion of a period-aggregated `cs.*` bucket. Every conversion is
-    ///   queried on the inclusive period-end snapshot date; `period_end` is the
-    ///   period-close choice, and `cashflow_date` does not recover individual
-    ///   flow dates, which aggregation has already removed.
-    pub fn fx_policy(
-        &mut self,
-        policy: finstack_quant_core::money::fx::FxConversionPolicy,
-    ) -> &mut Self {
+    /// * `policy` - How each period's native-currency totals are converted
+    ///   into the reporting currency. `PeriodEnd`, the only policy, reads the
+    ///   rate of the inclusive period-close date. It must be set before
+    ///   instruments of more than one currency are consolidated.
+    pub fn fx_policy(&mut self, policy: crate::types::CapitalFxPolicy) -> &mut Self {
         ensure_capital_structure(&mut self.capital_structure).fx_policy = Some(policy);
         self
     }
@@ -433,13 +107,18 @@ impl ModelBuilder {
     ///
     /// * `waterfall_spec` - Priority-of-payments, pre-waterfall cash node,
     ///   optional ECF sweep / PIK toggle, payment classes, and optional
-    ///   mandatory / voluntary prepay nodes.
+    ///   mandatory / voluntary prepayment requests.
     ///
     /// # Example
     /// ```
-    /// use finstack_quant_statements::capital_structure::{EcfSweepSpec, PaymentPriority, WaterfallSpec};
+    /// use finstack_quant_statements::capital_structure::{
+    ///     EcfSweepSpec, EcfTerm, FacilitySelection, PaymentPriority, WaterfallSpec,
+    /// };
     /// use finstack_quant_statements::builder::ModelBuilder;
     ///
+    /// let input = |expression: &str| EcfTerm::Input {
+    ///     expression: expression.to_string(),
+    /// };
     /// let waterfall = WaterfallSpec {
     ///     priority_of_payments: vec![
     ///         PaymentPriority::Fees,
@@ -449,13 +128,17 @@ impl ModelBuilder {
     ///         PaymentPriority::Equity,
     ///     ],
     ///     ecf_sweep: Some(EcfSweepSpec {
-    ///         ebitda_node: "ebitda".to_string(),
-    ///         taxes_node: Some("taxes".to_string()),
-    ///         capex_node: Some("capex".to_string()),
-    ///         working_capital_node: Some("wc_change".to_string()),
-    ///         cash_interest_node: None,
-    ///         sweep_percentage: 0.5,  // 50% sweep
-    ///         target_instrument_id: Some("TL-A".to_string()),
+    ///         cash_measure: "ebitda".to_string(),
+    ///         deductions: vec![
+    ///             input("taxes"),
+    ///             input("capex"),
+    ///             input("wc_change"),
+    ///             EcfTerm::PaidCashInterest,
+    ///             EcfTerm::PaidScheduledPrincipal,
+    ///         ],
+    ///         credits: Vec::new(),
+    ///         sweep_percentage: 0.5, // 50% sweep
+    ///         facilities: FacilitySelection::Named(vec!["TL-A".to_string()]),
     ///     }),
     ///     ..WaterfallSpec::default()
     /// };

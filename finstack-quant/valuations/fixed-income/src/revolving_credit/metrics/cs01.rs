@@ -48,7 +48,7 @@ impl ZSpreadCs01 for RevolvingCredit {
             DrawRepaySpec::Deterministic(_) => {
                 // Reuse the pricer's deterministic schedule (same fixings path)
                 // so PV_z(0) reproduces the no-credit-curve base PV.
-                let schedule = CashflowEngine::deterministic(self, curves, as_of)?;
+                let schedule = CashflowEngine::deterministic(self, curves, as_of, &[])?;
 
                 // `price_single_path` discounts every scheduled flow on/after
                 // `as_of`; flows exactly on `as_of` carry t = 0 (zero spread

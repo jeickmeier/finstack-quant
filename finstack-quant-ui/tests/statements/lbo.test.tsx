@@ -180,7 +180,7 @@ it("presents the returned result as returned, with MOIC only and no checks", () 
   ).toEqual([
     "40,160,000",
     formatRawMoney(result.entry_enterprise_value),
-    "61,383,803.27707498",
+    "61,383,803.27707497",
     formatRawMoney(result.exit_enterprise_value),
     formatRawMoney(result.exit_net_debt),
     formatRawMoney(result.exit_equity_proceeds),

@@ -425,6 +425,36 @@ pub fn js_string_seq(value: &JsValue, label: &str) -> Result<Vec<String>, JsValu
 /// string nor a plain object/array, or when it contains a value JSON cannot
 /// represent exactly.
 pub fn json_text(value: &JsValue, label: &str) -> Result<String, JsValue> {
+    json_text_as(value, label, BigIntAs::Number)
+}
+
+/// [`json_text`] for a wire whose exact unsigned integers are decimal
+/// strings (a Statements seed): a `BigInt` is written as that wire text, so
+/// `{ seed: 9007199254740993n }` and `{ seed: "9007199254740993" }` are the
+/// same document.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument.
+/// * `label` - The camelCase argument name, used in the error message.
+///
+/// # Errors
+///
+/// As [`json_text`].
+pub fn json_text_exact(value: &JsValue, label: &str) -> Result<String, JsValue> {
+    json_text_as(value, label, BigIntAs::Text)
+}
+
+/// How a `BigInt` is written to JSON text.
+#[derive(Clone, Copy)]
+enum BigIntAs {
+    /// Bare digits: an exact JSON integer.
+    Number,
+    /// A quoted decimal string: the exact-integer wire text.
+    Text,
+}
+
+fn json_text_as(value: &JsValue, label: &str, bigint: BigIntAs) -> Result<String, JsValue> {
     if let Some(text) = value.as_string() {
         return Ok(text);
     }
@@ -435,7 +465,8 @@ pub fn json_text(value: &JsValue, label: &str) -> Result<String, JsValue> {
         ));
     }
     let mut out = String::new();
-    write_json(value, &mut out, label, 0).map_err(|problem| invalid_type(label, &problem))?;
+    write_json(value, &mut out, label, 0, bigint)
+        .map_err(|problem| invalid_type(label, &problem))?;
     Ok(out)
 }
 
@@ -456,7 +487,8 @@ pub fn json_text(value: &JsValue, label: &str) -> Result<String, JsValue> {
 /// nested in it) is `undefined`, non-finite, or not JSON-representable.
 pub fn js_json_value(value: &JsValue, label: &str) -> Result<serde_json::Value, JsValue> {
     let mut out = String::new();
-    write_json(value, &mut out, label, 0).map_err(|problem| invalid_type(label, &problem))?;
+    write_json(value, &mut out, label, 0, BigIntAs::Number)
+        .map_err(|problem| invalid_type(label, &problem))?;
     serde_json::from_str(&out).map_err(|error| {
         super::to_js_err(finstack_quant_core::Error::Validation(format!(
             "{label}: {error}"
@@ -479,6 +511,26 @@ pub fn js_json_value(value: &JsValue, label: &str) -> Result<serde_json::Value, 
 /// validation error naming `label` when the JSON does not match `T`.
 pub fn from_js_json<T: DeserializeOwned>(value: &JsValue, label: &str) -> Result<T, JsValue> {
     let text = json_text(value, label)?;
+    serde_json::from_str(&text).map_err(|error| {
+        super::to_js_err(finstack_quant_core::Error::Validation(format!(
+            "{label}: {error}"
+        )))
+    })
+}
+
+/// [`from_js_json`] for a wire whose exact unsigned integers are decimal
+/// strings: a `BigInt` is read as that wire text (see [`json_text_exact`]).
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument.
+/// * `label` - The camelCase argument name, used in the error message.
+///
+/// # Errors
+///
+/// As [`from_js_json`].
+pub fn from_js_json_exact<T: DeserializeOwned>(value: &JsValue, label: &str) -> Result<T, JsValue> {
+    let text = json_text_exact(value, label)?;
     serde_json::from_str(&text).map_err(|error| {
         super::to_js_err(finstack_quant_core::Error::Validation(format!(
             "{label}: {error}"
@@ -821,7 +873,13 @@ fn write_number(number: f64, path: &str, out: &mut String) -> Result<(), String>
     Ok(())
 }
 
-fn write_json(value: &JsValue, out: &mut String, path: &str, depth: usize) -> Result<(), String> {
+fn write_json(
+    value: &JsValue,
+    out: &mut String,
+    path: &str,
+    depth: usize,
+    bigint: BigIntAs,
+) -> Result<(), String> {
     if depth > MAX_DEPTH {
         return Err(format!("{path} nests deeper than {MAX_DEPTH} levels"));
     }
@@ -836,7 +894,14 @@ fn write_json(value: &JsValue, out: &mut String, path: &str, depth: usize) -> Re
     } else if value.is_bigint() {
         let digits = bigint_digits(value)
             .ok_or_else(|| format!("{path} is a BigInt that could not be formatted"))?;
-        out.push_str(&digits);
+        match bigint {
+            BigIntAs::Number => out.push_str(&digits),
+            BigIntAs::Text => {
+                out.push('"');
+                out.push_str(&digits);
+                out.push('"');
+            }
+        }
     } else if Array::is_array(value) || js_sys::ArrayBuffer::is_view(value) {
         let items = Array::from(value);
         out.push('[');
@@ -850,7 +915,7 @@ fn write_json(value: &JsValue, out: &mut String, path: &str, depth: usize) -> Re
                     "{item_path} is undefined (array holes are not JSON)"
                 ));
             }
-            write_json(&item, out, &item_path, depth + 1)?;
+            write_json(&item, out, &item_path, depth + 1, bigint)?;
         }
         out.push(']');
     } else if is_plain_object(value) {
@@ -870,7 +935,7 @@ fn write_json(value: &JsValue, out: &mut String, path: &str, depth: usize) -> Re
             first = false;
             out.push_str(&serde_json::to_string(&name).map_err(|e| e.to_string())?);
             out.push(':');
-            write_json(&item, out, &format!("{path}.{name}"), depth + 1)?;
+            write_json(&item, out, &format!("{path}.{name}"), depth + 1, bigint)?;
         }
         out.push('}');
     } else {

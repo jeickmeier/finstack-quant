@@ -16,39 +16,55 @@
 //!
 //! ### Logical
 //! - `and`, `or`
-//! - `not expr` / `!expr`
+//! - `!expr` binds like unary minus: `!a > b` is `(!a) > b`
+//! - `not expr` binds outside a comparison: `not a > b` is `not (a > b)`
+//! - A comparison does not chain; write `(a > b) == (c > d)` with parentheses
+//!
+//! ### Values and Errors
+//!
+//! A formula evaluates to a finite scalar, an exact amount of money, a
+//! Boolean or an unavailable value. Arithmetic is checked: division or
+//! remainder by zero, an undefined domain, an overflow and mixed units or
+//! currencies are evaluation errors naming the node and period. An
+//! unavailable operand makes the result unavailable. `==` and `!=` compare
+//! the represented values with no tolerance; same-currency money compares as
+//! exact decimals. `and`, `or` and `not` need Boolean operands. `and` and
+//! `or` evaluate their right operand only when the left does not decide the
+//! result, and use strong three-valued logic: a false operand decides `and`
+//! and a true operand decides `or` even when the other is unavailable. A node whose formula is Boolean is published as `1` or `0`.
 //!
 //! ### Function Reference
 //!
 //! | Function | Arity | Behavior |
 //! | --- | --- | --- |
-//! | `if(condition, then_expr, else_expr)` | 3 | Conditional expression; finite non-zero values are truthy. |
-//! | `min(a, b, ...)`, `max(a, b, ...)` | 1+ | Min/max over arguments from left to right. A leading NaN yields to a finite peer; a trailing NaN propagates. |
-//! | `abs(expr)`, `sign(expr)` | 1 | Absolute value and sign indicator (`-1`, `0`, `1`, or NaN). |
-//! | `pow(base, exp)` | 2 | Exponentiation with IEEE 754 semantics (`pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf). |
-//! | `round(expr[, digits])` | 1-2 | Round to `digits` decimal places (default 0), ties half away from zero (Excel convention). Negative `digits` rounds to tens/hundreds. Non-finite values pass through. |
-//! | `floor(expr)`, `ceil(expr)` | 1 | Largest/smallest integer at or below/above the value. |
-//! | `ln(expr)`, `exp(expr)`, `log10(expr)`, `sqrt(expr)` | 1 | Natural log, exponential, base-10 log, and square root with IEEE 754 semantics (`ln(0)` is -inf; `ln`/`sqrt` of negatives are NaN). |
-//! | `clamp(expr, lo, hi)` | 3 | Clamp to the inclusive range `[lo, hi]`. NaN in any argument or `lo > hi` returns NaN. |
-//! | `is_missing(expr)` | 1 | `1` when the value is non-finite (NaN or ±inf), `0` otherwise — the same "finite" convention as `coalesce`. |
-//! | `sum(...)`, `mean(...)` | 1+ | Aggregate finite argument values; non-finite values are skipped. |
-//! | `coalesce(expr, default, ...)` | 2+ | First finite argument, or NaN when every argument is non-finite. |
-//! | `lag(expr, n)`, `shift(expr, n)` | 2 | Historical expression lookup by calendar-period offset, preserving missing slots. `lag` requires a non-negative offset; negative `shift` returns NaN to prohibit forward-looking reads. Fiscal daily and weekly model timelines are supported, including leap days and shortened fiscal weeks. |
-//! | `diff(expr[, n])`, `pct_change(expr[, n])` | 1-2 | Difference or percentage change versus `n` periods ago, defaulting to 1. Missing or near-zero denominators return NaN. |
-//! | `growth_rate(expr, periods)` | 2 | Compound annual growth rate in decimal units, `(current / prior)^(1 / years) - 1`, over a required positive integer calendar-period offset (no default lookback). Missing observations or a non-positive prior value return NaN. Monthly/quarterly/semiannual/annual years equal the offset divided by the periods in a year (12, 4, 2, 1); daily/weekly years use Actual/Actual ISDA between the final included dates of the two periods. |
-//! | `cumsum(expr)`, `cumprod(expr)`, `cummin(expr)`, `cummax(expr)` | 1 | Cumulative aggregate through the current period, skipping non-finite values. |
-//! | `rolling_mean(expr, window[, min_periods])`, `rolling_sum(expr, window[, min_periods])`, `rolling_std(expr, window[, min_periods])`, `rolling_var(expr, window[, min_periods])`, `rolling_median(expr, window[, min_periods])`, `rolling_min(expr, window[, min_periods])`, `rolling_max(expr, window[, min_periods])`, `rolling_count(expr, window[, min_periods])` | 2-3 | Rolling-window aggregate over finite observations. `min_periods` defaults to `window` (pandas parity): a window with fewer finite observations returns NaN. Pass a smaller `min_periods` for expanding-until-full behavior. |
-//! | `std(expr)`, `var(expr)`, `median(expr)` | 1 | Historical distribution statistic over finite observations available through the current period. |
-//! | `rank(node[, ascending])` | 1-2 | Historical rank of a statement-node or `cs.*` reference over finite observations; ties share the minimum rank. The finite scalar direction flag defaults to `1` (ascending); `0` selects descending and any non-zero value selects ascending. |
-//! | `quantile(node, q)` | 2 | Historical linear quantile of a statement-node or `cs.*` reference over finite observations, retaining the series' units and currency. `q` is a scalar level in `[0, 1]`. |
-//! | `ewm_mean(expr, alpha)` | 2 | Exponentially weighted moving mean over the expression's historical series (pandas `adjust=False, ignore_na=False`: decay advances across NaN gaps). Requires `0 < alpha <= 1`. |
-//! | `ewm_std(expr, alpha[, unbiased])`, `ewm_var(expr, alpha[, unbiased])` | 2-3 | Exponentially weighted variance or standard deviation (pandas `adjust=False, ignore_na=False`). The optional `unbiased` flag is pandas' `bias` toggle: nonzero (default) applies the `bias=False` correction, `0` returns the biased variance. Requires `0 < alpha <= 1`. |
+//! | `if(condition, then_expr, else_expr)` | 3 | Conditional expression. `condition` must be Boolean (a comparison, a logical operator or `is_missing`); only the selected branch is evaluated, and an unavailable condition makes the result unavailable. |
+//! | `min(a, b, ...)`, `max(a, b, ...)` | 1+ | Smallest or largest argument. Every argument must be available and in the same units; an unavailable argument makes the result unavailable. |
+//! | `abs(expr)`, `sign(expr)` | 1 | Absolute value (exact for money) and sign indicator (`-1`, `0` or `1`). |
+//! | `pow(base, exp)` | 2 | Exponentiation of unitless numbers. An undefined or overflowing result (`pow(-1, 0.5)`, `pow(0, -1)`) is an error. |
+//! | `round(expr[, digits])` | 1-2 | Round to `digits` decimal places (default 0 for a scalar), midpoint ties away from zero. Negative `digits` rounds a scalar to tens/hundreds. Money needs `digits` stated and non-negative; one-argument `round` of money is rejected at build. `digits` must be an exact integer. |
+//! | `floor(expr)`, `ceil(expr)` | 1 | Largest/smallest integer at or below/above a unitless value. Money is rejected at build: use `round(value, digits)`. |
+//! | `ln(expr)`, `exp(expr)`, `log10(expr)`, `sqrt(expr)` | 1 | Natural log, exponential, base-10 log and square root of a unitless number. A value outside the domain (`ln(0)`, `sqrt(-1)`) or an overflow is an error. |
+//! | `clamp(expr, lo, hi)` | 3 | Clamp to the inclusive range `[lo, hi]` in the same units. `lo > hi` is an error; an unavailable argument makes the result unavailable. |
+//! | `is_missing(expr)` | 1 | Boolean: true when the value is missing, masked or unavailable. An error in `expr` still propagates. |
+//! | `sum(...)`, `mean(...)` | 1+ | Sum or mean of the arguments, exact for money. Every argument must be available and in the same units; an unavailable argument makes the result unavailable. |
+//! | `ratio(numerator, base)` | 2 | Decimal ratio of two values in the same units over a strictly positive base. A zero or negative base is unavailable (`undefined_base`), not an error; an unavailable operand makes the result unavailable. Use it for margins, returns and coverage, where `/` would fail the run on a zero denominator. |
+//! | `coalesce(expr, default, ...)` | 2+ | First available argument, including zero; later arguments are not evaluated. Unavailable when no argument is available. An error is not recovered. |
+//! | `lag(expr, n)`, `shift(expr, n)` | 2 | The expression's typed value `n` periods back in the model plan's calendar; `n` is an exact non-negative integer and `0` is the current value. A slot the run has not evaluated is unavailable. A fractional offset or a future read is an error. Fiscal daily and weekly model timelines are supported, including leap days and shortened fiscal weeks. |
+//! | `diff(expr[, n])`, `pct_change(expr[, n])` | 1-2 | `diff` is current minus the value `n` periods back (default 1), in the input's units and exact for money. `pct_change` is the signed decimal `(current - base) / base`, also for a negative base; an exactly zero base is unavailable (`undefined_base`). Missing history is unavailable. |
+//! | `growth_rate(expr, periods)` | 2 | Compound annual growth rate in decimal units, `(ending / base)^(1 / years) - 1`, over a required exact positive integer offset (no default lookback). The base must be strictly positive and the ending value non-negative, otherwise the result is unavailable (`undefined_base`); a zero ending value is -100%. Monthly/quarterly/semiannual/annual years equal the offset divided by the reporting slots in a year (12, 4, 2, 1); daily/weekly years use Actual/365 Fixed between the periods' final included dates. |
+//! | `cumsum(expr)`, `cumprod(expr)`, `cummin(expr)`, `cummax(expr)` | 1 | Cumulative aggregate over every slot from the model start through the current period. A slot without a value makes the result unavailable. `cumsum` is exact for money; `cumprod` takes unitless numbers and an overflow is an error. |
+//! | `rolling_mean(expr, window[, min_periods])`, `rolling_sum(expr, window[, min_periods])`, `rolling_std(expr, window[, min_periods])`, `rolling_var(expr, window[, min_periods])`, `rolling_median(expr, window[, min_periods])`, `rolling_min(expr, window[, min_periods])`, `rolling_max(expr, window[, min_periods])`, `rolling_count(expr, window[, min_periods])` | 2-3 | Statistic over the last `window` calendar slots through the current period (slots, not observations). `window` is an exact positive integer; `min_periods` is an exact integer from 1 through the window and defaults to the window. The result is unavailable with fewer available observations. `std` and `var` are sample statistics (`n - 1`) and need two observations. Sums and means are exact for money, and `std` keeps the currency. |
+//! | `std(expr)`, `var(expr)`, `median(expr)` | 1 | Sample statistic over the observations available from the model start through the current period; a `gapped_sample` warning reports the sample count when slots are missing. `std` and `var` use `n - 1` and need two observations. |
+//! | `rank(node[, ascending])` | 1-2 | Rank of the current value among the available observations of a statement-node or `cs.*` reference, with exact competition ties (tied values share the lowest rank). Ascending by default; a direction flag of exactly `0` selects descending. Unavailable when the current value is. |
+//! | `quantile(node, q)` | 2 | R-7 (linear interpolation) quantile of the available observations of a statement-node or `cs.*` reference, in the series' units and currency. `q` is a finite level in `[0, 1]`. |
+//! | `ewm_mean(expr, alpha)` | 2 | Exponentially weighted mean with weights decayed once per calendar slot from the model start (pandas `adjust=False, ignore_na=False`). A slot without a value ages the weights and carries the previous estimate. Requires `0 < alpha <= 1`. |
+//! | `ewm_std(expr, alpha[, unbiased])`, `ewm_var(expr, alpha[, unbiased])` | 2-3 | Exponentially weighted standard deviation or variance on the same slot decay. The squared-weight correction `1 / (1 - sum(w^2))` is on by default; the optional toggle is a Boolean, or exactly `0` or `1`. The corrected statistic is unavailable with fewer than two observations. |
 //! | `ttm(expr)` | 1 | Trailing-twelve-month sum over twelve calendar months (`ltm_window`). Quarterly models require 4 quarters, monthly models 12 months; daily models sum every model day (calendar or business) in the year and need a daily grid reaching back a full year. |
-//! | `ytd(expr)` | 1 | Calendar year-to-date finite sum. |
-//! | `qtd(expr)` | 1 | Quarter-to-date finite sum for monthly models. |
-//! | `fiscal_ytd(expr, start_month)` | 2 | Fiscal year-to-date finite sum using a 1-12 fiscal start month. |
+//! | `ytd(expr)` | 1 | Year-to-date sum over the plan's reporting year, including a fiscal plan's own year. Every slot of the window must hold a value; otherwise the result is unavailable. Exact for money. |
+//! | `qtd(expr)` | 1 | Quarter-to-date sum for monthly models, over the Gregorian or fiscal quarter the month belongs to. Every slot must hold a value. |
+//! | `fiscal_ytd(expr, start_month)` | 2 | Fiscal year-to-date sum on a Gregorian monthly plan, using an integer fiscal start month from 1 to 12. Every slot must hold a value. A fiscal plan uses `ytd`. |
 //! | `annualize(expr, annualization_factor)` | 2 | Scale a period value to an annual amount by a required positive annualization factor; none is inferred from the period frequency. |
-//! | `annualize_rate(rate, periods_per_year, compounding)` | 3 | Annualize a periodic decimal rate using the supplied positive periods per year. `compounding = 0` multiplies the rate by periods per year; any non-zero flag computes `(1 + rate)^periods_per_year - 1`. |
+//! | `annualize_rate(rate, periods_per_year, compounding)` | 3 | Annualize a periodic decimal rate using the supplied positive finite periods per year. `compounding = 0` computes `rate × periods_per_year`; `compounding = 1` computes `(1 + rate)^periods_per_year - 1` and rejects a rate below -100%. Any other value is an error. |
 //!
 //! `lead(...)` is intentionally not available because forward-looking formulas
 //! can leak future values into historical periods.
@@ -77,6 +93,8 @@
 pub(crate) mod ast;
 pub(crate) mod compiler;
 mod parser;
+pub(crate) mod signatures;
+mod validate;
 
 pub use crate::utils::formula::extract_all_identifiers;
 pub use ast::StmtExpr;
@@ -143,5 +161,28 @@ mod stack_safety {
             .join()
             .expect("compiling a budget-sized formula must not overflow a 512 KiB stack");
         assert!(compiled, "a budget-sized formula must compile successfully");
+    }
+
+    /// The deepest tree the preflight accepts must lower, render and drop
+    /// on the same small stack.
+    #[test]
+    fn tree_at_depth_limit_compiles_on_a_small_stack() {
+        use crate::dsl::StmtExpr;
+        use finstack_quant_core::expr::UnaryOp;
+
+        let compiled = std::thread::Builder::new()
+            .stack_size(512 * 1024)
+            .spawn(|| {
+                let tree = (1..crate::dsl::validate::MAX_AST_DEPTH)
+                    .fold(StmtExpr::node_ref("a"), |acc, _| {
+                        StmtExpr::unary_op(UnaryOp::Neg, acc)
+                    });
+                let _ = tree.to_string();
+                crate::dsl::compile(&tree).is_ok()
+            })
+            .expect("probe thread should spawn")
+            .join()
+            .expect("a depth-limit tree must not overflow a 512 KiB stack");
+        assert!(compiled, "a depth-limit tree must compile successfully");
     }
 }

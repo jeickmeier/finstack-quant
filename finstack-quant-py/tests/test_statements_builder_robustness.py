@@ -77,8 +77,9 @@ class TestBuilderSurvivesBadInput:
 
 class TestMalformedJsonRaisesValueError:
     def test_model_from_json(self) -> None:
-        with pytest.raises(ValueError, match="expected ident"):
+        with pytest.raises(ValueError, match="validation failed") as malformed:
             statements.FinancialModelSpec.from_json("not json")
+        assert "expected ident" in malformed.value.report[0]["message"]
 
     def test_registry_load_from_json_str(self) -> None:
         # Previously raised RuntimeError (Serde was mapped as operational),

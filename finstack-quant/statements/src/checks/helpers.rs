@@ -106,7 +106,7 @@ pub(crate) fn validate_identity_inputs<'a>(
     let mut reference = None;
     for node in nodes {
         // Missing nodes keep the check's existing missing-input diagnostics.
-        if !context.results.nodes.contains_key(node.as_str()) {
+        if !context.results.has_node(node.as_str()) {
             continue;
         }
         let value_type = validated_input_value_type(check_id, context, node.as_str())?;
@@ -159,29 +159,4 @@ pub fn sum_nodes(results: &StatementResult, nodes: &[NodeId], period: &PeriodId)
         .iter()
         .filter_map(|n| results.get(n.as_str(), period))
         .sum()
-}
-
-/// A failed identity whose intermediate arithmetic cannot be represented.
-///
-/// # Arguments
-///
-/// * `check_id` - Identifier of the accounting identity whose arithmetic overflowed.
-/// * `period` - Reporting period affected by the unrepresentable calculation.
-/// * `nodes` - Operand node identifiers attached to the diagnostic.
-pub(crate) fn arithmetic_failure(
-    check_id: &str,
-    period: finstack_quant_core::dates::PeriodId,
-    nodes: Vec<crate::types::NodeId>,
-) -> crate::checks::CheckFinding {
-    crate::checks::CheckFinding {
-        check_id: check_id.to_string(),
-        severity: crate::checks::Severity::Error,
-        message: format!(
-            "Arithmetic overflow while evaluating {check_id} in {period}; the identity could not be compared."
-        ),
-        period: Some(period),
-        materiality: None,
-        nodes,
-        comparison: None,
-    }
 }

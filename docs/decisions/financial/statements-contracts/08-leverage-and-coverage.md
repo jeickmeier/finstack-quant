@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full bundled leverage and coverage contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited catalogue uses aggregate interest expense and principal-payment inputs for debt service.
+**Implementation status:** Reconciled (2026-11-17). All six bundled metrics use `ratio`, so a missing input and a zero or negative denominator are unavailable with a reason and never a division error; zero gross debt is a valid zero and a negative EBITDA gives signed coverage over a positive denominator. The balance ratios read period-end values; debt to EBITDA, interest coverage and debt-service coverage read `ttm(...)`, which is unavailable for an incomplete or gapped window. Interest coverage divides by statement `interest_expense`, including recognized PIK. Debt-service coverage divides by `scheduled_cash_interest_due + scheduled_principal_due`: explicit inputs for the scheduled cash interest and scheduled principal recognized once on their contractual due dates. A capital structure reports both as components (`cs.scheduled_cash_interest_due.<scope>` and `cs.scheduled_principal_due.<scope>`), taken from each borrowing's contractual schedule before the waterfall allocates cash, so a missed installment is recognized on its due date and arrears settlements, advance payments, prepayments, sweeps, PIK, fees and hedge flows are excluded. The `principal_payment` input is no longer read. The descriptions make no threshold claim. The sections below the accepted decision describe the audited catalogue.
 
-**Validation status:** Existing source and regression evidence mapped. Independent qualification of ratios and contractual due-date service remains pending.
+**Validation status:** Qualified by hand-summed values in the [registry tests](../../../../finstack-quant/statements/tests/spec/registry_tests.rs): balance ratios at each close, a complete trailing year (EBITDA 160, interest 40, scheduled service 80) and the three incomplete quarters before it, a gapped window, zero gross debt, negative EBITDA with positive and negative denominators, and a zero denominator. Due-date service is qualified through the evaluator in the [residual regressions](../../../../finstack-quant/statements/src/capital_structure/tests/finance_residual_regressions.rs): an installment and coupon missed for lack of cash are due once in their own quarter, the quarter that settles them reports only its own due amounts, and a sweep, a capitalized coupon share and revolver fees are excluded.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 
@@ -58,4 +58,4 @@ EBIT-based interest cover, cash-only debt service, net-debt ratios and agreement
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

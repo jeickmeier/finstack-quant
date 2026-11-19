@@ -1,20 +1,20 @@
 //! Main evaluator implementation.
 
 use crate::error::{Error, Result};
+use crate::evaluator::cell::{Cell, UnavailableReason};
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::dag::{DependencyGraph, evaluate_order};
 use crate::evaluator::forecast_eval;
-use crate::evaluator::formula::evaluate_formula;
-use crate::evaluator::formula_helpers::is_truthy;
-use crate::evaluator::monte_carlo::{
-    MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
-};
-use crate::evaluator::precedence::{HiddenObservation, NodeValueSource, resolve_node_value};
+use crate::evaluator::formula::evaluate_value;
+use crate::evaluator::monte_carlo::{MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults};
+use crate::evaluator::precedence::{NodeValueSource, resolve_node_value};
 use crate::evaluator::results::{CellSource, EvalStats, EvalWarning, StatementResult};
+use crate::evaluator::value::{self, At};
 use crate::evaluator::{
     PeriodHistory, capital_structure_runtime, capital_structure_runtime::dependent_closure,
 };
-use crate::types::{FinancialModelSpec, NodeId, NodeValueType};
+use crate::forecast::stream::PathId;
+use crate::types::{AmountOrScalar, FinancialModelSpec, NodeId, NodeValueType};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::Expr;
 use indexmap::IndexMap;
@@ -22,11 +22,13 @@ use std::collections::HashSet;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
+/// One period's float values and typed cells, in column order.
+pub(crate) type PeriodRow = (Vec<Option<f64>>, Vec<Option<Cell>>);
+
 type PeriodEvaluation = (
-    IndexMap<String, f64>,
-    Vec<Option<f64>>,
+    IndexMap<String, crate::evaluator::ResultCell>,
+    PeriodRow,
     Vec<EvalWarning>,
-    IndexMap<String, CellSource>,
 );
 
 /// Per-path cache of Monte Carlo z-scores, keyed by node then period.
@@ -46,6 +48,27 @@ pub(crate) struct PeriodEval<'a> {
     pub(crate) eval_order: &'a [NodeId],
 }
 
+/// What one run fixes before any period is evaluated, shared by every
+/// Monte Carlo path.
+struct RunSetup {
+    /// Empty period history carrying the model's timeline.
+    history: PeriodHistory,
+    /// Capital-structure state of the run; `None` without a capital
+    /// structure or a market to generate it from.
+    capital: Option<CapitalSetup>,
+}
+
+/// The path-invariant capital-structure state of a run.
+struct CapitalSetup {
+    /// The model's instruments, built once.
+    instruments: capital_structure_runtime::Instruments,
+    /// Capital state holding each instrument's opening balance at the first
+    /// period.
+    opening_state: crate::capital_structure::CapitalStructureState,
+    /// Nodes that read `cs.*`, with their dependents.
+    affected_nodes: HashSet<NodeId>,
+}
+
 /// Cached structural analysis from [`Evaluator::prepare`], allowing repeated
 /// evaluations of the same model structure without recompilation.
 pub struct PreparedEvaluation {
@@ -63,7 +86,41 @@ pub struct PreparedEvaluation {
     /// this plan was compiled from, rejecting changes beyond input values.
     formula_fingerprint: u64,
     /// Canonical units inferred and validated when the plan was prepared.
-    pub(super) node_value_types: IndexMap<NodeId, NodeValueType>,
+    pub(super) node_value_types: std::sync::Arc<IndexMap<NodeId, NodeValueType>>,
+    /// The `value_type` validation recorded on each node of the validated
+    /// model, so a run can hash the validated form of the caller's model.
+    validated_value_types: IndexMap<NodeId, NodeValueType>,
+}
+
+impl PreparedEvaluation {
+    /// The content identity of `model` in its validated form.
+    ///
+    /// Validation only adds inferred `value_type`s, so the caller's model with
+    /// those filled in is the validated model, without a second analysis.
+    fn model_content_hash(&self, model: &FinancialModelSpec) -> Result<String> {
+        let inferred = |id: &NodeId, node: &crate::types::NodeSpec| {
+            node.value_type
+                .is_none()
+                .then(|| self.validated_value_types.get(id).copied())
+                .flatten()
+        };
+        let hash = if model
+            .nodes
+            .iter()
+            .any(|(id, node)| inferred(id, node).is_some())
+        {
+            let mut validated = model.clone();
+            for (id, node) in &mut validated.nodes {
+                if let Some(value_type) = inferred(id, node) {
+                    node.value_type = Some(value_type);
+                }
+            }
+            validated.canonical_hash()
+        } else {
+            model.canonical_hash()
+        };
+        hash.map_err(super::results::hash_error)
+    }
 }
 
 /// Fingerprint the evaluation timeline and each node's calculation structure.
@@ -92,13 +149,19 @@ fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
         spec.node_type.hash(&mut hasher);
         spec.formula_text.hash(&mut hasher);
         spec.where_text.hash(&mut hasher);
+        // The set of observation slots is structure; only the payload in an
+        // existing slot may differ between prepare and evaluate.
+        for period in spec.values.iter().flat_map(|values| values.keys()) {
+            period.hash(&mut hasher);
+        }
+        spec.values.is_some().hash(&mut hasher);
         for (period, date) in &spec.availability_dates {
             period.hash(&mut hasher);
             date.hash(&mut hasher);
         }
         if let Some(forecast) = &spec.forecast {
-            forecast.method.hash(&mut hasher);
-            for (parameter, value) in &forecast.params {
+            forecast.method().hash(&mut hasher);
+            for (parameter, value) in &forecast.params() {
                 parameter.hash(&mut hasher);
                 value.hash(&mut hasher);
             }
@@ -112,6 +175,12 @@ fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
             }
         }
     }
+    model.periods.get_calendar().hash(&mut hasher);
+    // The capital structure has no cheap structural hash; its canonical JSON
+    // covers instruments, waterfall, reporting currency and FX policy.
+    serde_json::to_string(&model.capital_structure)
+        .unwrap_or_default()
+        .hash(&mut hasher);
     hasher.finish()
 }
 
@@ -184,8 +253,12 @@ pub struct Evaluator {
     /// Cached compiled expressions (Arc-shared across Monte Carlo path clones)
     compiled_cache: std::sync::Arc<IndexMap<NodeId, Expr>>,
 
+    /// Resolved units of the prepared model's nodes (Arc-shared like the
+    /// compiled expressions); they type each computed cell.
+    node_value_types: std::sync::Arc<IndexMap<NodeId, NodeValueType>>,
+
     /// Cached forecast results: node_id → (period_id → value)
-    forecast_cache: IndexMap<NodeId, IndexMap<PeriodId, f64>>,
+    forecast_cache: IndexMap<NodeId, forecast_eval::ForecastRun>,
 
     /// Optional check suite run after evaluation to produce inline validation
     check_suite: Option<std::sync::Arc<crate::checks::CheckSuite>>,
@@ -202,6 +275,7 @@ impl Evaluator {
     pub fn new() -> Self {
         Self {
             compiled_cache: std::sync::Arc::new(IndexMap::new()),
+            node_value_types: std::sync::Arc::new(IndexMap::new()),
             forecast_cache: IndexMap::new(),
             check_suite: None,
             visibility_cutoff: None,
@@ -226,16 +300,19 @@ impl Evaluator {
     /// be cut off at an as-of date. [`Evaluator::evaluate`] also evaluates the
     /// capital structure, but from an empty market with every value visible.
     ///
-    /// # As-of visibility
+    /// # Observation cutoff
     ///
-    /// The `as_of` date is also the explicit-value visibility cutoff:
+    /// `cutoff` selects which explicit observations the evaluation may read.
+    /// It is separate from `as_of`, which dates pricing only.
     ///
-    /// - A value with a declared availability date is visible only when that
-    ///   date is on or before `as_of`, in any period.
-    /// - A value without one in an actual period becomes visible at the
-    ///   period's exclusive end date.
-    /// - A value without one in a forecast period is an assumption, not an
-    ///   observation, and is always visible.
+    /// - [`ObservationCutoff::FullSnapshot`] reads every observation in the
+    ///   model.
+    /// - [`ObservationCutoff::Through`] reads an observation only when its
+    ///   availability date is on or before the cutoff date, inclusive through
+    ///   the end of that day. The model must name its source snapshot and
+    ///   give an availability date to every observation in an actual period.
+    ///   An undated explicit value in a forecast period is a forecast
+    ///   assumption and is always visible.
     ///
     /// A hidden value keeps its place in the model timeline, but the node
     /// resolves through forecast or formula fallbacks under normal precedence.
@@ -248,7 +325,9 @@ impl Evaluator {
     ///
     /// * `model` - The financial model specification
     /// * `market_ctx` - Market context for pricing instruments
-    /// * `as_of` - Valuation date for pricing and explicit-value visibility
+    /// * `as_of` - Valuation date for pricing the capital structure
+    /// * `cutoff` - Explicit observations the evaluation may read: the full
+    ///   snapshot, or those published on or before a date
     ///
     /// # Returns
     ///
@@ -262,27 +341,41 @@ impl Evaluator {
     /// Returns an error if model formulas cannot be parsed or compiled, its
     /// dependency graph is invalid or cyclic, a required value or forecast
     /// cannot be resolved, capital-structure instruments cannot be built or
-    /// priced from `market_ctx`, or final checks fail. Explicit values not yet
-    /// available at `as_of` are intentionally hidden rather than used as known
-    /// data.
+    /// priced from `market_ctx`, or final checks fail. Under a cutoff date it
+    /// also returns an error if the model names no source snapshot, an
+    /// observation in an actual period has no availability date, or a hidden
+    /// observation has no forecast or formula to fall back on.
     pub fn evaluate_with_market(
         &mut self,
         model: &FinancialModelSpec,
         market_ctx: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        cutoff: ObservationCutoff,
     ) -> Result<StatementResult> {
-        self.evaluate_inner(model, Some((market_ctx, as_of)), Some(as_of))
-            .inspect_err(|err| {
-                tracing::error!(
-                    model_id = %model.id,
-                    periods = model.periods.len(),
-                    nodes = model.nodes.len(),
-                    has_market = true,
-                    %as_of,
-                    error = %err,
-                    "statement evaluation (with market) failed"
-                );
-            })
+        let visibility_cutoff = match cutoff {
+            ObservationCutoff::FullSnapshot => None,
+            ObservationCutoff::Through(date) => {
+                model.validate_point_in_time()?;
+                Some(date)
+            }
+        };
+        self.evaluate_inner(
+            model,
+            Some((market_ctx, as_of)),
+            visibility_cutoff,
+            Some(as_of),
+        )
+        .inspect_err(|err| {
+            tracing::error!(
+                model_id = %model.id,
+                periods = model.periods.len(),
+                nodes = model.nodes.len(),
+                has_market = true,
+                %as_of,
+                error = %err,
+                "statement evaluation (with market) failed"
+            );
+        })
     }
 
     /// Internal evaluation implementation shared by [`Evaluator::evaluate`] and
@@ -300,6 +393,7 @@ impl Evaluator {
             finstack_quant_core::dates::Date,
         )>,
         visibility_cutoff: Option<finstack_quant_core::dates::Date>,
+        valuation_date: Option<finstack_quant_core::dates::Date>,
     ) -> Result<StatementResult> {
         let _span = tracing::info_span!(
             "statements.evaluate",
@@ -315,8 +409,9 @@ impl Evaluator {
 
         let prepared = self.prepare(model)?;
         self.visibility_cutoff = visibility_cutoff;
+        let setup = self.run_setup(model, &prepared, capital_structure)?;
         let (mut results, all_warnings) =
-            self.evaluate_periods(model, &prepared, capital_structure, None)?;
+            self.evaluate_periods(model, &prepared, &setup, capital_structure, None)?;
 
         self.finalize_results(
             &mut results,
@@ -333,16 +428,87 @@ impl Evaluator {
                 parallel: false,
                 warnings: all_warnings,
             },
+            valuation_date,
         )?;
 
         Ok(results)
     }
 
-    /// Run every period in timeline order on a prepared plan.
+    /// Everything a run needs that does not vary by Monte Carlo path.
     ///
     /// `capital_structure` is the market and cashflow date the model's
     /// instruments are generated from; `None` skips the capital structure.
-    /// `mc_seed` is a Monte Carlo path's seed offset (`None` for a single
+    fn run_setup(
+        &self,
+        model: &FinancialModelSpec,
+        prepared: &PreparedEvaluation,
+        capital_structure: Option<(
+            &finstack_quant_core::market_data::context::MarketContext,
+            finstack_quant_core::dates::Date,
+        )>,
+    ) -> Result<RunSetup> {
+        let history = PeriodHistory::with_periods(
+            std::sync::Arc::clone(&prepared.node_to_column),
+            &model.periods,
+        );
+        let Some((market_ctx, as_of)) = capital_structure else {
+            return Ok(RunSetup {
+                history,
+                capital: None,
+            });
+        };
+
+        // Only nodes whose formula or where clause reaches `cs.*` (and their
+        // dependents) need the capital-structure pass.
+        let mut cs_seed_nodes = HashSet::new();
+        for (node_id, spec) in &model.nodes {
+            for text in [spec.formula_text.as_deref(), spec.where_text.as_deref()]
+                .into_iter()
+                .flatten()
+            {
+                if crate::utils::formula::contains_capital_structure_reference(text)? {
+                    cs_seed_nodes.insert(node_id.clone());
+                }
+            }
+        }
+        let affected_nodes = dependent_closure(&prepared.dag, &cs_seed_nodes);
+
+        let Some(instruments) = self.build_instruments(model)? else {
+            return Ok(RunSetup {
+                history,
+                capital: None,
+            });
+        };
+        let mut opening_state = crate::capital_structure::CapitalStructureState::new();
+        if let Some(first_period) = model.periods.first() {
+            for (instrument_id, instrument) in &instruments {
+                let opening_balance = instrument_opening_balance(
+                    instrument.as_ref(),
+                    market_ctx,
+                    as_of,
+                    first_period.start,
+                )
+                .map_err(|err| missing_market_data(instrument_id, err))?;
+                opening_state
+                    .opening_balances
+                    .insert(instrument_id.clone(), opening_balance);
+            }
+        }
+        Ok(RunSetup {
+            history,
+            capital: Some(CapitalSetup {
+                instruments,
+                opening_state,
+                affected_nodes,
+            }),
+        })
+    }
+
+    /// Run every period in timeline order on a prepared plan.
+    ///
+    /// `setup` is the run's path-invariant state and `capital_structure` the
+    /// market and cashflow date its instruments were generated from.
+    /// `mc_path` is the Monte Carlo path (`None` for a single
     /// deterministic run); each path runs this same loop, capital-structure
     /// waterfall included. Shared by [`evaluate_inner`](Self::evaluate_inner),
     /// [`evaluate_prepared_inner`](Self::evaluate_prepared_inner) and
@@ -351,78 +517,19 @@ impl Evaluator {
         &mut self,
         model: &FinancialModelSpec,
         prepared: &PreparedEvaluation,
+        setup: &RunSetup,
         capital_structure: Option<(
             &finstack_quant_core::market_data::context::MarketContext,
             finstack_quant_core::dates::Date,
         )>,
-        mc_seed: Option<u64>,
+        mc_path: Option<PathId>,
     ) -> Result<(StatementResult, Vec<EvalWarning>)> {
         let mut mc_z_cache = McZCache::new();
-        let market_ctx = capital_structure.map(|(market, _)| market);
-        let as_of = capital_structure.map(|(_, as_of)| as_of);
+        let capital = capital_structure.zip(setup.capital.as_ref());
+        // Each run, and each path, starts from the seeded opening state.
+        let mut cs_state = capital.map(|(_, capital)| capital.opening_state.clone());
 
-        // Only nodes whose formula or where clause reaches `cs.*` (and their
-        // dependents) need the capital-structure pass.
-        let mut cs_seed_nodes = HashSet::new();
-        for (node_id, spec) in model.nodes.iter().filter(|_| capital_structure.is_some()) {
-            let formula_references_cs = spec
-                .formula_text
-                .as_deref()
-                .map(crate::utils::formula::contains_capital_structure_reference)
-                .transpose()?
-                .unwrap_or(false);
-            let predicate_references_cs = spec
-                .where_text
-                .as_deref()
-                .map(crate::utils::formula::contains_capital_structure_reference)
-                .transpose()?
-                .unwrap_or(false);
-            if formula_references_cs || predicate_references_cs {
-                cs_seed_nodes.insert(node_id.clone());
-            }
-        }
-
-        let cs_affected_nodes = dependent_closure(&prepared.dag, &cs_seed_nodes);
-
-        let mut cs_state = if let (Some(_market_ctx), Some(_as_of)) = (market_ctx, as_of) {
-            Some(crate::capital_structure::CapitalStructureState::new())
-        } else {
-            None
-        };
-
-        // Pre-compute instruments if market context is available
-        let instruments = if let (Some(_market_ctx), Some(_as_of)) = (market_ctx, as_of) {
-            self.build_instruments(model)?
-        } else {
-            None
-        };
-
-        if let (Some(state), Some(insts), Some(market_ctx), Some(as_of_date), Some(first_period)) = (
-            cs_state.as_mut(),
-            instruments.as_ref(),
-            market_ctx,
-            as_of,
-            model.periods.first(),
-        ) {
-            for (instrument_id, instrument) in insts {
-                let opening_balance = instrument_opening_balance(
-                    instrument.as_ref(),
-                    market_ctx,
-                    as_of_date,
-                    first_period.start,
-                )
-                .map_err(|err| missing_market_data(instrument_id, err))?;
-
-                state
-                    .opening_balances
-                    .insert(instrument_id.clone(), opening_balance);
-            }
-        }
-
-        let mut historical = std::sync::Arc::new(PeriodHistory::with_periods(
-            std::sync::Arc::clone(&prepared.node_to_column),
-            &model.periods,
-        ));
+        let mut historical = std::sync::Arc::new(setup.history.clone());
         let mut historical_cs: std::sync::Arc<
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         > = std::sync::Arc::new(IndexMap::new());
@@ -434,11 +541,11 @@ impl Evaluator {
         let mut has_cs = false;
 
         for period in &model.periods {
-            let (period_results, period_row, period_warnings, period_sources) =
-                if let (Some(market_ctx), Some(as_of), Some(ref mut state), Some(insts)) =
-                    (market_ctx, as_of, cs_state.as_mut(), instruments.as_ref())
+            let (period_results, period_row, period_warnings) =
+                if let (Some(((market_ctx, as_of), capital)), Some(state)) =
+                    (capital, cs_state.as_mut())
                 {
-                    let (vals, row, warns, period_cs, sources) = self.evaluate_period_dynamic(
+                    let (vals, row, warns, period_cs) = self.evaluate_period_dynamic(
                         PeriodEval {
                             model,
                             period,
@@ -450,17 +557,17 @@ impl Evaluator {
                         capital_structure_runtime::CapitalStructureRun {
                             market_ctx,
                             as_of,
-                            instruments: insts,
+                            instruments: &capital.instruments,
                             state,
-                            affected_nodes: &cs_affected_nodes,
+                            affected_nodes: &capital.affected_nodes,
                         },
-                        mc_seed.map(|seed| (seed, &mut mc_z_cache)),
+                        mc_path.map(|path| (path, &mut mc_z_cache)),
                     )?;
 
-                    cs_cashflows_accum.set_period(period_cs);
+                    cs_cashflows_accum.set_period(period_cs)?;
                     has_cs = true;
 
-                    (vals, row, warns, sources)
+                    (vals, row, warns)
                 } else {
                     self.evaluate_period(
                         PeriodEval {
@@ -471,23 +578,22 @@ impl Evaluator {
                         },
                         &historical,
                         &historical_cs,
-                        mc_seed.map(|seed| (seed, &mut mc_z_cache)),
+                        mc_path.map(|path| (path, &mut mc_z_cache)),
                     )?
                 };
 
             all_warnings.extend(period_warnings);
 
-            for (node_id, value) in &period_results {
-                results
-                    .nodes
-                    .entry(node_id.to_owned())
-                    .or_default()
-                    .insert(period.id, *value);
+            for (node_id, cell) in period_results {
+                results.set_cell(&node_id, period.id, cell);
             }
-            results.record_sources(period.id, period_sources);
 
             // Add to historical context for next period (move, not clone)
-            std::sync::Arc::make_mut(&mut historical).push_row(period.id, period_row);
+            std::sync::Arc::make_mut(&mut historical).push_typed_row(
+                period.id,
+                period_row.0,
+                period_row.1,
+            );
             if has_cs {
                 let period_snapshot = cs_cashflows_accum.period_snapshot(period.id);
                 std::sync::Arc::make_mut(&mut historical_cs).insert(period.id, period_snapshot);
@@ -505,6 +611,31 @@ impl Evaluator {
         }
 
         Ok((results, all_warnings))
+    }
+
+    /// Evaluate the model without a market under an observation cutoff.
+    ///
+    /// The contractual capital structure is read as in [`Self::evaluate`];
+    /// a cutoff date hides observations published after it.
+    pub(crate) fn evaluate_under_cutoff(
+        &mut self,
+        model: &FinancialModelSpec,
+        cutoff: &ObservationCutoff,
+    ) -> Result<StatementResult> {
+        let visibility_cutoff = match cutoff {
+            ObservationCutoff::FullSnapshot => None,
+            ObservationCutoff::Through(date) => {
+                model.validate_point_in_time()?;
+                Some(*date)
+            }
+        };
+        let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
+        self.evaluate_inner(
+            model,
+            contractual_capital_structure(model, &empty_market),
+            visibility_cutoff,
+            None,
+        )
     }
 
     /// Evaluate a financial model over all periods without market context.
@@ -541,6 +672,7 @@ impl Evaluator {
         self.evaluate_inner(
             model,
             contractual_capital_structure(model, &empty_market),
+            None,
             None,
         )
         .inspect_err(|err| {
@@ -582,7 +714,7 @@ impl Evaluator {
         self.compiled_cache = std::sync::Arc::new(analysis.compiled);
         self.forecast_cache.clear();
         self.visibility_cutoff = None;
-        let dag = analysis.graph?;
+        let dag = analysis.graph;
         let eval_order = evaluate_order(&dag)?;
         let node_to_column = std::sync::Arc::new(
             eval_order
@@ -591,17 +723,26 @@ impl Evaluator {
                 .map(|(i, node_id)| (node_id.clone(), i))
                 .collect(),
         );
+        let node_value_types: IndexMap<NodeId, NodeValueType> = validated
+            .nodes
+            .iter()
+            .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
+            .collect();
+        let node_value_types = std::sync::Arc::new(node_value_types);
+        self.node_value_types = std::sync::Arc::clone(&node_value_types);
+        let validated_value_types = validated
+            .nodes
+            .iter()
+            .filter_map(|(id, node)| Some((id.clone(), node.value_type?)))
+            .collect();
         Ok(PreparedEvaluation {
             eval_order,
             node_to_column,
             dag,
             compiled_cache: std::sync::Arc::clone(&self.compiled_cache),
             formula_fingerprint: formula_fingerprint(model),
-            node_value_types: validated
-                .nodes
-                .iter()
-                .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
-                .collect(),
+            node_value_types,
+            validated_value_types,
         })
     }
 
@@ -669,6 +810,7 @@ impl Evaluator {
         // a different model sharing node ids would otherwise leak its formulas
         // into this prepared evaluation).
         self.compiled_cache = std::sync::Arc::clone(&prepared.compiled_cache);
+        self.node_value_types = std::sync::Arc::clone(&prepared.node_value_types);
 
         // Structural guard: the prepared plan must cover exactly the model's
         // nodes. A node present in the model but absent from the plan would be
@@ -700,7 +842,8 @@ impl Evaluator {
         // plan was built from and return a well-formed but wrong result.
         if formula_fingerprint(model) != prepared.formula_fingerprint {
             return Err(Error::eval(
-                "evaluate_prepared: a formula, where clause, declared value type, period, or forecast differs from the model the \
+                "evaluate_prepared: a formula, where clause, declared value type, period, observation slot, \
+                 availability date, forecast or capital structure differs from the model the \
                  prepared plan was built for. The plan holds compiled expressions, so \
                  evaluating would silently use the old formula. Rebuild the plan with \
                  `prepare` (only node *values* may differ between prepare and evaluate).",
@@ -719,12 +862,10 @@ impl Evaluator {
         }
 
         let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
-        let (mut results, all_warnings) = self.evaluate_periods(
-            model,
-            prepared,
-            contractual_capital_structure(model, &empty_market),
-            None,
-        )?;
+        let capital_structure = contractual_capital_structure(model, &empty_market);
+        let setup = self.run_setup(model, prepared, capital_structure)?;
+        let (mut results, all_warnings) =
+            self.evaluate_periods(model, prepared, &setup, capital_structure, None)?;
 
         self.finalize_results(
             &mut results,
@@ -738,6 +879,7 @@ impl Evaluator {
                 parallel: false,
                 warnings: all_warnings,
             },
+            None,
         )?;
 
         Ok(results)
@@ -745,32 +887,48 @@ impl Evaluator {
 
     /// Evaluate a financial model in Monte Carlo mode.
     ///
-    /// This method replays the model `n_paths` times with independent, but
-    /// deterministic, seeds for stochastic forecast methods and aggregates
-    /// the resulting distribution into percentile bands.
+    /// The model is replayed `config.n_paths` times on the ordinary period
+    /// engine, each path with fresh state and its own deterministic random
+    /// streams, and the requested metrics are aggregated into R-7 sample
+    /// quantiles per forecast period. A model with a capital structure has
+    /// its instruments and waterfall evaluated on every path, so each `cs.*`
+    /// reference sees that path's own debt service and balances. The same
+    /// seed replays the same paths, serially or in parallel.
     ///
-    /// Each path runs the deterministic period loop of [`Evaluator::evaluate`]
-    /// on its sampled forecasts, so a model with a capital structure has its
-    /// instruments and waterfall evaluated per path (from an empty market as
-    /// of the first period's start, as in [`Evaluator::evaluate`]), and every
-    /// `cs.*` reference sees that path's own debt service and balances.
-    /// The same configuration seed produces reproducible path draws across
-    /// runs. The returned distribution aggregates node-by-period results into
-    /// percentile bands rather than returning every raw path.
+    /// # Arguments
+    ///
+    /// * `model` - The model to simulate. It needs at least one forecast
+    ///   period.
+    /// * `config` - Path count, exact seed, the metrics to report and the
+    ///   probability levels.
+    /// * `context` - The market, valuation date and observation cutoff the
+    ///   paths evaluate in, as for
+    ///   [`evaluate_with_market`](Self::evaluate_with_market). `None`
+    ///   evaluates as [`evaluate`](Self::evaluate) does: the full snapshot,
+    ///   with the capital structure projected on an empty market as of the
+    ///   first period's start.
+    ///
+    /// # Returns
+    ///
+    /// Quantiles for a complete run. When a requested sample has no value on
+    /// some path the run is incomplete: no statistics are published and
+    /// `incomplete` names the first such sample.
     ///
     /// # Errors
     ///
-    /// Returns an evaluation error when `config.n_paths` is zero, model
-    /// compilation or dependency analysis fails, a capital-structure
-    /// instrument needs market data to generate its cashflows, or any
-    /// simulated path cannot resolve a required formula, input, forecast or
-    /// waterfall step.
+    /// Returns an evaluation error when the configuration is invalid (a path
+    /// count of zero or beyond the path-identifier domain, no or unknown or
+    /// repeated metrics, repeated or out-of-range percentiles, a run larger
+    /// than the sample limit), the model has no forecast period, the model
+    /// cannot be prepared, or a path fails; of several failing paths the
+    /// lowest-numbered one is reported.
     pub fn evaluate_monte_carlo(
         &mut self,
         model: &FinancialModelSpec,
         config: &MonteCarloConfig,
+        context: Option<crate::evaluator::MonteCarloContext<'_>>,
     ) -> Result<MonteCarloResults> {
-        self.evaluate_monte_carlo_inner(model, config)
+        self.evaluate_monte_carlo_inner(model, config, context)
             .inspect_err(|err| {
                 tracing::error!(
                     model_id = %model.id,
@@ -788,6 +946,7 @@ impl Evaluator {
         &mut self,
         model: &FinancialModelSpec,
         config: &MonteCarloConfig,
+        context: Option<crate::evaluator::MonteCarloContext<'_>>,
     ) -> Result<MonteCarloResults> {
         let _span = tracing::info_span!(
             "statements.evaluate_monte_carlo",
@@ -797,38 +956,44 @@ impl Evaluator {
             nodes = model.nodes.len()
         )
         .entered();
-        if config.n_paths == 0 {
-            return Err(Error::eval(
-                "Monte Carlo configuration requires n_paths > 0",
-            ));
-        }
 
         let prepared = self.prepare(model)?;
+        // Size and requests are checked before any path runs.
+        let accumulator_seed =
+            MonteCarloAccumulator::new(model, config, &prepared.node_value_types)?;
         let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
-        let capital_structure = contractual_capital_structure(model, &empty_market);
+        let capital_structure = match context {
+            Some(context) => {
+                self.visibility_cutoff = match context.cutoff {
+                    ObservationCutoff::FullSnapshot => None,
+                    ObservationCutoff::Through(date) => {
+                        model.validate_point_in_time()?;
+                        Some(date)
+                    }
+                };
+                model
+                    .capital_structure
+                    .as_ref()
+                    .map(|_| (context.market, context.as_of))
+            }
+            None => contractual_capital_structure(model, &empty_market),
+        };
 
         // Run paths — parallel via rayon on native targets, serial on wasm32
         // (rayon's thread pool is unavailable in single-threaded wasm).
         // Both paths are deterministic for a given seed, and both report the
         // lowest-index failing path when several paths fail.
-        let run_single_path = |path_idx: usize| -> Result<PathResult> {
+        let setup = self.run_setup(model, &prepared, capital_structure)?;
+        let run_single_path = |path_idx: usize| -> Result<(StatementResult, Vec<EvalWarning>)> {
             let mut path_eval = self.clone();
             path_eval.forecast_cache.clear();
 
-            let seed_offset = config
-                .seed
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(path_idx as u64);
-            let (results, warnings) = path_eval.evaluate_periods(
-                model,
-                &prepared,
-                capital_structure,
-                Some(seed_offset),
-            )?;
-            Ok((results.nodes, warnings))
+            let path = PathId {
+                run_seed: config.seed,
+                path: path_idx as u64,
+            };
+            path_eval.evaluate_periods(model, &prepared, &setup, capital_structure, Some(path))
         };
-
-        let accumulator_seed = MonteCarloAccumulator::new(model, config)?;
 
         // Native: each rayon split folds its paths in increasing index order and
         // stops at its first failure, carrying `(path_idx, error)`; the reduce
@@ -848,7 +1013,7 @@ impl Evaluator {
                         let mut acc = state?;
                         run_single_path(path_idx)
                             .and_then(|(path_results, warnings)| {
-                                acc.push_path(path_idx, path_results, warnings)
+                                acc.push_path(path_idx, &path_results, warnings)
                             })
                             .map_err(|error| (path_idx, error))?;
                         Ok(acc)
@@ -874,7 +1039,7 @@ impl Evaluator {
             let mut acc = accumulator_seed.empty_like();
             for path_idx in 0..config.n_paths {
                 let (path_results, warnings) = run_single_path(path_idx)?;
-                acc.push_path(path_idx, path_results, warnings)?;
+                acc.push_path(path_idx, &path_results, warnings)?;
             }
             acc
         };
@@ -889,10 +1054,18 @@ impl Evaluator {
         model: &FinancialModelSpec,
         prepared: &PreparedEvaluation,
         meta: EvalStats,
+        valuation_date: Option<finstack_quant_core::dates::Date>,
     ) -> Result<()> {
         results.meta = meta;
         results.periods = Some(model.periods.clone());
         results.populate_value_types(&prepared.node_value_types);
+        results.provenance = Some(crate::evaluator::RunProvenance::with_model_hash(
+            model,
+            prepared.model_content_hash(model)?,
+            self.visibility_cutoff
+                .map_or(ObservationCutoff::FullSnapshot, ObservationCutoff::Through),
+            valuation_date,
+        )?);
         if let Some(suite) = &self.check_suite {
             results.check_report = Some(suite.run(model, results)?);
         }
@@ -908,7 +1081,7 @@ impl Evaluator {
         &mut self,
         eval: PeriodEval<'_>,
         context: &mut EvaluationContext,
-        seed_offset: Option<u64>,
+        mc_path: Option<PathId>,
         node_filter: Option<&HashSet<NodeId>>,
         mut mc_z_cache: Option<&mut McZCache>,
     ) -> Result<()> {
@@ -936,52 +1109,91 @@ impl Evaluator {
                 .get_node(node_id.as_str())
                 .ok_or_else(|| Error::eval(format!("Node '{}' not found in model", node_id)))?;
 
+            // The mask is evaluated before any value source. A false mask is a
+            // masked cell with no numeric value; a mask with no value leaves
+            // the cell unavailable; an invalid mask is an error.
             if node_spec.where_text.is_some() {
                 let where_key = NodeId::new(format!("__where__{}", node_id));
                 if let Some(where_expr) = self.compiled_cache.get(&where_key) {
-                    let where_result =
-                        evaluate_formula(where_expr, context, Some(node_id.as_str()))?;
-                    if !is_truthy(where_result) {
-                        context.set_value(node_id.as_str(), 0.0)?;
-                        context.set_source(node_id.as_str(), CellSource::WhereMasked);
+                    let at = At {
+                        node_id: Some(node_id.as_str()),
+                        period: *period_id,
+                    };
+                    let mask = evaluate_value(where_expr, context, Some(node_id.as_str()))?;
+                    let masked = match value::control(mask, "where clause", at)? {
+                        Some(true) => None,
+                        Some(false) => Some(Cell::Masked),
+                        None => Some(Cell::Unavailable(UnavailableReason::MissingMask)),
+                    };
+                    if let Some(cell) = masked {
+                        context.set_cell(node_id.as_str(), cell)?;
                         continue;
                     }
                 }
             }
-            let hidden = visibility_cutoff.and_then(|as_of| {
+            let hidden = visibility_cutoff.is_some_and(|cutoff| {
                 node_spec
                     .explicit_value_available_on(period)
-                    .filter(|available_on| *available_on > as_of)
-                    .map(|available_on| HiddenObservation {
-                        available_on,
-                        as_of,
-                    })
+                    .is_some_and(|available_on| available_on > cutoff)
             });
-            let source =
-                resolve_node_value(node_spec, period_id, is_actual && hidden.is_none(), hidden)?;
+            // A forecast is eligible only in a forecast period: an actual
+            // hidden by the cutoff is not forecast.
+            let source = resolve_node_value(node_spec, period_id, is_actual, hidden)?;
             let cell_source = match source {
-                NodeValueSource::Value(_) => CellSource::Value,
-                NodeValueSource::Forecast => CellSource::Forecast,
-                NodeValueSource::Formula => CellSource::Formula,
+                NodeValueSource::Value(_) => Some(CellSource::Value),
+                NodeValueSource::Forecast => Some(CellSource::Forecast),
+                NodeValueSource::Formula => Some(CellSource::Formula),
+                NodeValueSource::Missing | NodeValueSource::Hidden => None,
             };
-            let value = {
+            let value_type = self.node_value_types.get(node_id).copied();
+            let cell = {
                 let mut mc_z_wrapper: Option<&mut McZCache> = mc_z_cache.as_deref_mut();
                 match source {
-                    NodeValueSource::Value(v) => Ok(v),
+                    NodeValueSource::Value(observation) => Ok(match observation {
+                        AmountOrScalar::Amount(money) => Cell::Money(money),
+                        AmountOrScalar::Scalar(value) => Cell::Scalar(value),
+                    }),
+                    NodeValueSource::Missing => Ok(Cell::Missing),
+                    NodeValueSource::Hidden => {
+                        Ok(Cell::Unavailable(UnavailableReason::HiddenByCutoff))
+                    }
                     NodeValueSource::Forecast => forecast_eval::evaluate_forecast(
                         node_spec,
                         eval,
                         context,
                         &mut self.forecast_cache,
-                        seed_offset,
+                        mc_path,
                         &mut mc_z_wrapper,
-                        visibility_cutoff,
-                    ),
+                    )
+                    .and_then(|forecast| match forecast {
+                        forecast_eval::ForecastCell::Unavailable(reason) => {
+                            Ok(Cell::Unavailable(reason))
+                        }
+                        forecast_eval::ForecastCell::Value {
+                            value,
+                            clipped_from,
+                        } => {
+                            if let Some(raw) = clipped_from {
+                                context.warnings.push(EvalWarning::ForecastClipped {
+                                    node_id: node_id.as_str().to_string(),
+                                    period: *period_id,
+                                    raw,
+                                    published: value,
+                                });
+                            }
+                            computed_cell(value, value_type, node_id, period_id)
+                        }
+                    }),
                     NodeValueSource::Formula => {
                         let expr = self.compiled_cache.get(node_id).ok_or_else(|| {
                             Error::eval(format!("No compiled formula for node '{}'", node_id))
                         })?;
-                        evaluate_formula(expr, context, Some(node_id.as_str()))
+                        let at = At {
+                            node_id: Some(node_id.as_str()),
+                            period: *period_id,
+                        };
+                        evaluate_value(expr, context, Some(node_id.as_str()))
+                            .and_then(|result| value::into_cell(result, value_type, at))
                     }
                 }
             }
@@ -995,8 +1207,17 @@ impl Evaluator {
                 e
             })?;
 
-            context.set_value(node_id.as_str(), value)?;
-            context.set_source(node_id.as_str(), cell_source);
+            if matches!(cell, Cell::Unavailable(UnavailableReason::MissingInput)) {
+                context.warnings.push(EvalWarning::NonFiniteValue {
+                    node_id: node_id.as_str().to_string(),
+                    period: *period_id,
+                    value: f64::NAN,
+                });
+            }
+            context.set_cell(node_id.as_str(), cell)?;
+            if let Some(cell_source) = cell_source {
+                context.set_source(node_id.as_str(), cell_source);
+            }
         }
 
         Ok(())
@@ -1004,7 +1225,7 @@ impl Evaluator {
 
     /// Evaluate a single period.
     ///
-    /// `mc` carries the Monte Carlo seed offset and per-path z-score cache;
+    /// `mc` carries the Monte Carlo path identity and per-path z-score cache;
     /// `None` is the single-run path.
     fn evaluate_period(
         &mut self,
@@ -1013,7 +1234,7 @@ impl Evaluator {
         historical_cs: &std::sync::Arc<
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         >,
-        mc: Option<(u64, &mut McZCache)>,
+        mc: Option<(PathId, &mut McZCache)>,
     ) -> Result<PeriodEvaluation> {
         let mut context = EvaluationContext::new_with_history(
             eval.period.id,
@@ -1021,16 +1242,47 @@ impl Evaluator {
             std::sync::Arc::clone(historical_cs),
         );
 
-        let (seed_offset, mc_z_cache) = match mc {
-            Some((seed_offset, cache)) => (Some(seed_offset), Some(cache)),
+        let (mc_path, mc_z_cache) = match mc {
+            Some((path, cache)) => (Some(path), Some(cache)),
             None => (None, None),
         };
-        self.evaluate_nodes_in_order(eval, &mut context, seed_offset, None, mc_z_cache)?;
+        self.evaluate_nodes_in_order(eval, &mut context, mc_path, None, mc_z_cache)?;
 
-        let row = context.current_values.clone();
-        let sources = context.cell_sources();
-        let (results, warnings) = context.into_results();
-        Ok((results, row, warnings, sources))
+        Ok(context.into_results())
+    }
+}
+
+/// Type a forecast or formula result as a cell.
+///
+/// A result with no defined value leaves the cell unavailable. A monetary
+/// node's result is converted to an exact amount here, the one boundary
+/// where a floating-point calculation returns to money.
+///
+/// # Errors
+///
+/// Returns an evaluation error naming the node, period and cause when a
+/// monetary result cannot be represented as `Money`.
+fn computed_cell(
+    value: f64,
+    value_type: Option<NodeValueType>,
+    node_id: &NodeId,
+    period_id: &PeriodId,
+) -> Result<Cell> {
+    if !value.is_finite() {
+        return Ok(Cell::Unavailable(UnavailableReason::MissingInput));
+    }
+    match value_type {
+        Some(NodeValueType::Monetary { currency }) => {
+            finstack_quant_core::money::Money::from_model_value(value, currency)
+                .map(Cell::Money)
+                .map_err(|cause| {
+                    Error::eval(format!(
+                        "Node '{node_id}' in period {period_id}: result {value} cannot be \
+                         represented as {currency} money: {cause}"
+                    ))
+                })
+        }
+        Some(NodeValueType::Scalar) | None => Ok(Cell::Scalar(value)),
     }
 }
 
@@ -1058,10 +1310,32 @@ impl Default for Evaluator {
     }
 }
 
+/// Which explicit observations an evaluation may read.
+///
+/// On the wire: `"full_snapshot"`, or `{"through": "2025-04-25"}`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ObservationCutoff {
+    /// Read every observation in the model's snapshot, with no publication
+    /// cutoff.
+    FullSnapshot,
+    /// Read an observation only when its availability date is on or before
+    /// this date, inclusive through the end of the day.
+    Through(
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        finstack_quant_core::dates::Date,
+    ),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::builder::ModelBuilder;
+    use crate::evaluator::CellStatus;
     use crate::types::{AmountOrScalar, NodeSpec, NodeType};
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::dates::PeriodId;
@@ -1069,42 +1343,65 @@ mod tests {
     use indexmap::IndexMap;
     use time::Month;
 
+    /// STATEMENTS-EVALUATION-001 #2: a false mask is a masked cell with no
+    /// numeric value, and a mask with no value leaves the cell unavailable.
+    /// Neither is a zero, here or downstream.
     #[test]
-    fn where_clause_treats_nan_as_false() {
+    fn masked_and_unmaskable_cells_have_no_value() {
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = {
-            let mut model_builder_1 = ModelBuilder::new("nan-where");
-            model_builder_1
-                .periods("2025Q1..Q1", None)
-                .expect("valid period range");
-            model_builder_1
-                .compute("guarded_metric", "42")
-                .expect("valid formula");
-            model_builder_1.where_clause("0 / 0");
-            model_builder_1.build().expect("valid model")
+            let mut builder = ModelBuilder::new("mask-states");
+            builder.periods("2025Q1..Q1", None).expect("periods");
+            builder.value_scalar("flag", &[]);
+            builder.value_scalar("off", &[(q1, 0.0)]);
+            builder.compute("unknown_mask", "42").expect("formula");
+            builder
+                .where_clause("unknown_mask", "flag > 0")
+                .expect("predicate");
+            builder.compute("masked", "42").expect("formula");
+            builder
+                .where_clause("masked", "off > 0")
+                .expect("predicate");
+            builder
+                .compute("downstream", "masked + 1")
+                .expect("formula");
+            builder.compute("kept", "42").expect("formula");
+            builder.where_clause("kept", "off == 0").expect("predicate");
+            builder.build().expect("valid model")
         };
 
-        let mut evaluator = Evaluator::new();
-        let results = evaluator
-            .evaluate(&model)
-            .expect("evaluation should succeed");
+        let results = Evaluator::new().evaluate(&model).expect("evaluation");
+        let cell = |node: &str| *results.get_cell(node, &q1).expect("cell");
 
+        assert_eq!(cell("masked").status, CellStatus::Masked);
         assert_eq!(
-            results.get(
-                "guarded_metric",
-                &PeriodId::quarter(2025, 1).expect("valid period fixture")
-            ),
-            Some(0.0)
+            results.get("masked", &q1),
+            None,
+            "a masked cell is not zero"
+        );
+        assert_eq!(cell("masked").source, None);
+        assert_eq!(
+            cell("downstream").status,
+            CellStatus::Unavailable,
+            "a masked input is not read as zero downstream"
+        );
+        assert_eq!(cell("downstream").source, Some(CellSource::Formula));
+        assert_eq!(
+            cell("unknown_mask"),
+            crate::evaluator::ResultCell::unavailable(UnavailableReason::MissingMask)
+        );
+        assert_eq!(results.get("kept", &q1), Some(42.0));
+        assert_eq!(cell("kept").source, Some(CellSource::Formula));
+        assert_eq!(cell("flag").status, CellStatus::Missing);
+        assert_eq!(
+            cell("off"),
+            crate::evaluator::ResultCell::scalar(0.0)
+                .expect("finite")
+                .with_source(Some(CellSource::Value)),
+            "a known zero is a value"
         );
     }
 
-    /// Reusing a prepared plan after editing a formula must fail loudly.
-    ///
-    /// `PreparedEvaluation` snapshots the compiled expressions, and the
-    /// structural guard only compared the node *set*. Editing a formula and
-    /// re-using the plan therefore kept evaluating the stale compiled
-    /// expression and returned a well-formed result built from code the model
-    /// no longer contains — the exact misuse the guard exists for, but silent
-    /// and numerically wrong instead of an error.
     #[test]
     fn evaluate_prepared_rejects_a_model_whose_formula_changed() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
@@ -1167,7 +1464,7 @@ mod tests {
                 .with_formula("123"),
         );
         let mut masked = NodeSpec::new("masked", NodeType::Calculated).with_formula("42");
-        masked.where_text = Some("0".to_string());
+        masked.where_text = Some("1 == 0".to_string());
         model.add_node(masked);
 
         let results = Evaluator::new().evaluate(&model).expect("evaluation");
@@ -1189,74 +1486,72 @@ mod tests {
             Some(CellSource::Forecast)
         );
         for quarter in 1..=3 {
-            assert_eq!(results.get("masked", &q(quarter)), Some(0.0));
-            assert_eq!(
-                results.get_source("masked", &q(quarter)),
-                Some(CellSource::WhereMasked)
-            );
+            let cell = results.get_cell("masked", &q(quarter)).expect("cell");
+            assert_eq!(cell.status, CellStatus::Masked);
+            assert_eq!(cell.source, None);
         }
 
-        // Every value cell has a source, and nothing else does.
-        for (node_id, values) in &results.nodes {
-            let sources = &results.node_sources[node_id];
-            assert_eq!(
-                values.keys().collect::<Vec<_>>(),
-                sources.keys().collect::<Vec<_>>()
-            );
-        }
-        assert_eq!(results.nodes.len(), results.node_sources.len());
-
-        // The sources survive the wire format and reach the long table.
-        let json = serde_json::to_value(&results).expect("serialize");
-        assert_eq!(json["node_sources"]["revenue"]["2025Q3"], "forecast");
-        assert_eq!(json["node_sources"]["masked"]["2025Q1"], "where_masked");
-        let back: StatementResult = serde_json::from_value(json).expect("deserialize");
-        assert_eq!(back.node_sources, results.node_sources);
-
-        let table = results.to_table_long().expect("long table");
-        let source_column = table
-            .columns
-            .iter()
-            .find(|column| column.name == "source")
-            .expect("source column");
-        let finstack_quant_core::table::TableColumnData::NullableString(labels) =
-            &source_column.data
-        else {
-            panic!("source column must be a nullable string column");
-        };
-        // Rows follow the result's node order, so pair each label with its
-        // node and period rather than relying on that order.
-        let finstack_quant_core::table::TableColumnData::String(node_ids) = &table.columns[0].data
-        else {
-            panic!("node_id column must be a string column");
-        };
-        let mut expected: Vec<Option<String>> = Vec::new();
-        for (node_id, values) in &results.nodes {
-            for period in values.keys() {
-                expected.push(
-                    results
-                        .get_source(node_id, period)
-                        .map(|source| source.as_str().to_string()),
-                );
+        // Every node has a cell in every period, and each value cell records
+        // the source that produced it.
+        for cells in results.cells.values() {
+            assert_eq!(cells.len(), 3);
+            for cell in cells.values() {
+                assert_eq!(cell.status == CellStatus::Value, cell.source.is_some());
             }
         }
-        assert_eq!(labels, &expected);
-        assert_eq!(labels.len(), node_ids.len());
-        assert!(labels.contains(&Some("forecast".to_string())));
-        assert!(labels.contains(&Some("where_masked".to_string())));
+
+        // Status and source survive the wire format and reach the long table.
+        let json = serde_json::to_value(&results).expect("serialize");
+        assert_eq!(json["cells"]["revenue"]["2025Q3"]["source"], "forecast");
+        assert_eq!(json["cells"]["revenue"]["2025Q1"]["value"], 100.0);
+        assert_eq!(
+            json["cells"]["masked"]["2025Q1"],
+            serde_json::json!({ "status": "masked" })
+        );
+        let back: StatementResult = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(back.cells, results.cells);
+
+        let table = results.to_table_long().expect("long table");
+        let labels = |name: &str| match &table.column(name).expect("column").data {
+            finstack_quant_core::table::TableColumnData::NullableString(labels) => labels.clone(),
+            finstack_quant_core::table::TableColumnData::String(labels) => {
+                labels.iter().cloned().map(Some).collect()
+            }
+            other => panic!("{name} must be a string column: {other:?}"),
+        };
+        let expected_sources: Vec<Option<String>> = results
+            .cells
+            .values()
+            .flat_map(|cells| cells.values())
+            .map(|cell| cell.source.map(|source| source.as_str().to_string()))
+            .collect();
+        assert_eq!(labels("source"), expected_sources);
+        assert!(labels("source").contains(&Some("forecast".to_string())));
+        assert!(labels("status").contains(&Some("masked".to_string())));
     }
 
-    /// A result serialized before `node_sources` existed still deserializes,
-    /// with no sources recorded.
+    /// The wire form of a cell is closed: a status must agree with its
+    /// value and reason.
     #[test]
-    fn statement_result_without_node_sources_deserializes() {
-        let mut json = serde_json::to_value(StatementResult::new()).expect("serialize");
-        assert!(json.get("node_sources").is_none(), "empty map is skipped");
-        json["nodes"] = serde_json::json!({ "revenue": { "2025Q1": 1.0 } });
-        let back: StatementResult = serde_json::from_value(json).expect("deserialize");
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        assert_eq!(back.get("revenue", &period), Some(1.0));
-        assert_eq!(back.get_source("revenue", &period), None);
+    fn result_cells_reject_inconsistent_wire_forms() {
+        for invalid in [
+            serde_json::json!({ "status": "value" }),
+            serde_json::json!({ "status": "masked", "value": 1.0 }),
+            serde_json::json!({ "status": "unavailable" }),
+            serde_json::json!({ "status": "missing", "reason": "missing_mask" }),
+            serde_json::json!({ "status": "value", "value": 1.0, "extra": true }),
+        ] {
+            serde_json::from_value::<crate::evaluator::ResultCell>(invalid.clone())
+                .expect_err(&invalid.to_string());
+        }
+        let money = serde_json::json!({
+            "status": "value",
+            "value": { "amount": "125.01", "currency": "USD" },
+            "source": "formula"
+        });
+        let cell: crate::evaluator::ResultCell =
+            serde_json::from_value(money.clone()).expect("money cell");
+        assert_eq!(serde_json::to_value(cell).expect("serialize"), money);
     }
 
     #[test]
@@ -1291,8 +1586,14 @@ mod tests {
                     .with_availability_dates(availability)
                     .with_formula("123"),
             );
+            model.source_snapshot = Some("original".to_string());
             Evaluator::new()
-                .evaluate_with_market(&model, &MarketContext::new(), as_of)
+                .evaluate_with_market(
+                    &model,
+                    &MarketContext::new(),
+                    as_of,
+                    crate::evaluator::ObservationCutoff::Through(as_of),
+                )
                 .expect("evaluation")
                 .get("revenue", &q2)
         };
@@ -1327,17 +1628,29 @@ mod tests {
         model.add_node(
             NodeSpec::new("revenue", NodeType::Mixed)
                 .with_values(values)
-                .with_availability_dates(IndexMap::from([(
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    Date::from_calendar_date(2025, Month::January, 1).expect("date"),
-                )]))
+                .with_availability_dates(IndexMap::from([
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        Date::from_calendar_date(2025, Month::July, 1).expect("date"),
+                    ),
+                ]))
                 .with_formula("123"),
         );
+        model.source_snapshot = Some("original".to_string());
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let mut evaluator = Evaluator::new();
         let results = evaluator
-            .evaluate_with_market(&model, &MarketContext::new(), as_of)
+            .evaluate_with_market(
+                &model,
+                &MarketContext::new(),
+                as_of,
+                crate::evaluator::ObservationCutoff::Through(as_of),
+            )
             .expect("evaluation");
 
         assert_eq!(

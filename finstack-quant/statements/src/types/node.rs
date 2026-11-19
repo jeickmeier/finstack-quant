@@ -1,6 +1,6 @@
 //! Node specification and types.
 
-use crate::types::{AmountOrScalar, ForecastParameters};
+use crate::types::{AmountOrScalar, ForecastSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
@@ -48,13 +48,13 @@ pub struct NodeSpec {
         schemars(with = "Option<IndexMap<String, AmountOrScalar>>")
     )]
     pub values: Option<IndexMap<PeriodId, AmountOrScalar>>,
-    /// Point-in-time availability date for each explicit period value.
+    /// Publication date of each explicit period value.
     ///
-    /// When absent for a value, market-aware evaluation conservatively makes
-    /// that value visible on the period's exclusive end date. An explicit
-    /// entry permits filing/release dates later than period end, or earlier
-    /// availability for operational data known before the reporting period
-    /// closes.
+    /// An evaluation with an observation cutoff reads an observation only
+    /// when this date is on or before the cutoff, and needs a date for every
+    /// observation in an actual period. An explicit value in a forecast
+    /// period without a date is a forecast assumption, not a published
+    /// observation, and is always visible.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(
         feature = "json-schema",
@@ -83,8 +83,8 @@ pub struct NodeSpec {
     pub value_type: Option<NodeValueType>,
 
     /// How this line rolls up to a coarser reporting frequency. A rollup uses
-    /// its own per-line method first, then this; a line declaring nothing is
-    /// summed. Tags never choose a method.
+    /// its own per-line method first, then this; a line with neither fails
+    /// the rollup. Tags never choose a method.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rollup: Option<RollupMethod>,
 
@@ -138,9 +138,9 @@ impl NodeSpec {
 
     /// Set point-in-time availability dates for explicit observations.
     ///
-    /// Dates are keyed by the same periods as [`Self::values`]. During
-    /// market-aware evaluation an explicit value is visible only when its
-    /// availability date is on or before the requested `as_of` date.
+    /// Dates are keyed by the same periods as [`Self::values`]. Under an
+    /// observation cutoff an explicit value is visible only when its
+    /// availability date is on or before the cutoff.
     ///
     /// # Arguments
     ///
@@ -157,30 +157,15 @@ impl NodeSpec {
 
     /// Date from which the explicit observation for `period` is visible.
     ///
-    /// A declared availability date always applies, in any period. Without
-    /// one, an actual becomes visible at its period's exclusive end, and a
-    /// value in a forecast period is an assumption rather than an observation:
-    /// it has no availability date (`None`) and is always visible.
+    /// A declared availability date always applies, in any period. A value
+    /// without one is a forecast assumption rather than a published
+    /// observation and is always visible; point-in-time evaluation rejects an
+    /// undated observation in an actual period before it reaches this.
     pub(crate) fn explicit_value_available_on(
         &self,
         period: &finstack_quant_core::dates::Period,
     ) -> Option<finstack_quant_core::dates::Date> {
-        self.availability_dates
-            .get(&period.id)
-            .copied()
-            .or_else(|| period.is_actual.then_some(period.end))
-    }
-
-    /// Return whether an explicit observation is visible at the cutoff.
-    pub(crate) fn explicit_value_is_visible(
-        &self,
-        period: &finstack_quant_core::dates::Period,
-        cutoff: Option<finstack_quant_core::dates::Date>,
-    ) -> bool {
-        cutoff.is_none_or(|as_of| {
-            self.explicit_value_available_on(period)
-                .is_none_or(|available_on| available_on <= as_of)
-        })
+        self.availability_dates.get(&period.id).copied()
     }
 
     /// Set the formula text.
@@ -231,10 +216,12 @@ impl NodeSpec {
 #[serde(rename_all = "snake_case")]
 pub enum RollupMethod {
     /// Sum the source periods: flows such as revenue, expenses and cash flows.
-    /// A missing source value leaves the target value missing.
+    /// Money is summed exactly and scalars with a compensated sum. A source
+    /// cell without a value leaves the target unavailable.
     Sum,
-    /// Take the last source period's value: balances such as cash, debt and
-    /// equity, and trailing metrics such as last-twelve-month EBITDA.
+    /// Copy the last source period's cell with its status: balances such as
+    /// cash, debt and equity, and trailing metrics such as last-twelve-month
+    /// EBITDA.
     PeriodEnd,
     /// Re-evaluate the node's formula (and `where` clause) on the rolled-up
     /// values: ratios such as margins, leverage and coverage. Time-series
@@ -259,318 +246,6 @@ pub enum NodeType {
     Calculated,
     /// Value OR Forecast OR Formula (precedence: Value > Forecast > Formula)
     Mixed,
-}
-
-/// Forecast method specification.
-///
-/// Defines how to forecast future values for a node.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct ForecastSpec {
-    /// Forecast method
-    pub method: ForecastMethod,
-
-    /// Method-specific parameters
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    pub params: IndexMap<String, serde_json::Value>,
-}
-
-impl ForecastSpec {
-    /// Create a forward-fill forecast (carry last value forward).
-    pub fn forward_fill() -> Self {
-        Self {
-            method: ForecastMethod::ForwardFill,
-            params: IndexMap::new(),
-        }
-    }
-
-    /// Create a growth percentage forecast.
-    ///
-    /// # Arguments
-    /// * `rate` - Growth rate (e.g., 0.05 for 5% growth)
-    pub fn growth(rate: f64) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("rate".into(), serde_json::json!(rate));
-        Self {
-            method: ForecastMethod::GrowthPct,
-            params,
-        }
-    }
-
-    /// Create a curve percentage forecast.
-    ///
-    /// # Arguments
-    /// * `curve` - Vector of growth rates per period
-    pub fn curve(curve: Vec<f64>) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("curve".into(), serde_json::json!(curve));
-        Self {
-            method: ForecastMethod::CurvePct,
-            params,
-        }
-    }
-
-    /// Create an additive normal random-walk forecast.
-    ///
-    /// Forecasted values follow `value[t] = value[t-1] + mean + std_dev * z[t]`,
-    /// where `z[t]` is a deterministic standard-normal draw derived from `seed`.
-    /// Use this for additive level changes such as absolute EBITDA deltas or
-    /// working-capital movements. `std_dev` is the per-period volatility and must
-    /// be non-negative.
-    ///
-    /// # Arguments
-    /// * `mean` - Per-period additive drift
-    /// * `std_dev` - Per-period additive volatility
-    /// * `seed` - Random seed for deterministic results
-    ///
-    /// # References
-    ///
-    /// - Monte Carlo simulation practice: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
-    pub fn normal(mean: f64, std_dev: f64, seed: u64) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("mean".into(), serde_json::json!(mean));
-        params.insert("std_dev".into(), serde_json::json!(std_dev));
-        params.insert("seed".into(), serde_json::json!(seed));
-        Self {
-            method: ForecastMethod::Normal,
-            params,
-        }
-    }
-
-    /// Create a multiplicative log-normal path forecast.
-    ///
-    /// The base value must be finite and strictly positive. Forecasted values follow
-    /// `value[t] = value[t-1] * exp(mean - 0.5 * std_dev^2 + std_dev * z[t])`.
-    /// The `-0.5 * std_dev^2` term is the standard log-normal drift adjustment
-    /// so the expected one-period growth factor is `exp(mean)`, while the
-    /// expected log return is `mean - 0.5 * std_dev^2`. Zero and negative
-    /// bases are rejected; use an additive Normal forecast for such series.
-    ///
-    /// # Arguments
-    /// * `mean` - Per-period continuously compounded expected-growth drift;
-    ///   the expected log return is this value minus half the variance
-    /// * `std_dev` - Per-period log-return volatility
-    /// * `seed` - Random seed for deterministic results
-    ///
-    /// # References
-    ///
-    /// - Monte Carlo simulation practice: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
-    pub fn log_normal(mean: f64, std_dev: f64, seed: u64) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("mean".into(), serde_json::json!(mean));
-        params.insert("std_dev".into(), serde_json::json!(std_dev));
-        params.insert("seed".into(), serde_json::json!(seed));
-        Self {
-            method: ForecastMethod::LogNormal,
-            params,
-        }
-    }
-
-    /// Create an explicit per-period override forecast.
-    ///
-    /// Forecast periods listed in `overrides` take the supplied value; any
-    /// forecast period without an entry inherits the most recent value
-    /// (forward fill), so a sparse map is enough to pin a few anchor periods.
-    ///
-    /// # Arguments
-    /// * `overrides` - Period-keyed values in the node's own units (a
-    ///   currency amount for monetary nodes, a decimal ratio for scalar
-    ///   nodes); periods must belong to the model timeline
-    pub fn overrides(overrides: IndexMap<PeriodId, f64>) -> Self {
-        let mut params = IndexMap::new();
-        let map: serde_json::Map<String, serde_json::Value> = overrides
-            .into_iter()
-            .map(|(period, value)| (period.to_string(), serde_json::json!(value)))
-            .collect();
-        params.insert("overrides".into(), serde_json::Value::Object(map));
-        Self {
-            method: ForecastMethod::Override,
-            params,
-        }
-    }
-
-    /// Create a seasonal-decomposition forecast.
-    ///
-    /// The history is decomposed into trend and a repeating seasonal pattern of
-    /// `season_length` periods, then projected forward. At least two full
-    /// seasons of history are required when the forecast runs.
-    ///
-    /// # Arguments
-    /// * `historical` - Historical values in the node's own units, oldest
-    ///   first; must cover at least `2 * season_length` periods
-    /// * `season_length` - Length of one seasonal cycle counted in model
-    ///   periods (4 for quarterly, 12 for monthly data); must be positive
-    /// * `mode` - Additive (constant seasonal swings) or multiplicative
-    ///   (swings scale with the level) decomposition
-    pub fn seasonal(historical: Vec<f64>, season_length: usize, mode: SeasonalMode) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("historical".into(), serde_json::json!(historical));
-        params.insert("season_length".into(), serde_json::json!(season_length));
-        params.insert("mode".into(), serde_json::json!(mode));
-        Self {
-            method: ForecastMethod::Seasonal,
-            params,
-        }
-    }
-
-    /// Create a trend-detection time-series forecast over an external history.
-    ///
-    /// Uses the default linear trend method; set `method` (`"linear"`,
-    /// `"exponential"`, `"moving_average"`) and its tuning parameters
-    /// (`alpha`, `beta`, `phi`, `window`) through raw params for other shapes.
-    ///
-    /// # Arguments
-    /// * `historical` - At least 2 historical values in the node's own units,
-    ///   oldest first, from which the trend is estimated
-    pub fn time_series(historical: Vec<f64>) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("historical".into(), serde_json::json!(historical));
-        Self {
-            method: ForecastMethod::TimeSeries,
-            params,
-        }
-    }
-
-    /// Read the parameter map as the typed parameters of [`Self::method`].
-    ///
-    /// This is the form every forecast method runs on. Value ranges (positive
-    /// `season_length`, non-negative `std_dev`, enough history) and
-    /// conditional rules (`half_life` only with the exponential shape) are
-    /// checked when the forecast runs, not here.
-    ///
-    /// # Errors
-    ///
-    /// Returns a forecast error naming the offending key when a parameter is
-    /// unknown to the method, missing, `null`, or of the wrong JSON type (for
-    /// example a string where a number is required).
-    pub fn parameters(&self) -> crate::error::Result<ForecastParameters> {
-        fn read<T: serde::de::DeserializeOwned>(spec: &ForecastSpec) -> crate::error::Result<T> {
-            let method = spec.method;
-            if let Some((key, _)) = spec.params.iter().find(|(_, value)| value.is_null()) {
-                return Err(crate::error::Error::forecast(format!(
-                    "{method:?} forecast parameter '{key}' is null; omit it instead"
-                )));
-            }
-            let params: serde_json::Map<String, serde_json::Value> = spec
-                .params
-                .iter()
-                .map(|(key, value)| (key.clone(), value.clone()))
-                .collect();
-            serde_path_to_error::deserialize(serde_json::Value::Object(params)).map_err(|error| {
-                let path = error.path().to_string();
-                let inner = error.into_inner();
-                crate::error::Error::forecast(if path == "." {
-                    format!("Invalid {method:?} forecast parameters: {inner}")
-                } else {
-                    format!("Invalid {method:?} forecast parameter '{path}': {inner}")
-                })
-            })
-        }
-
-        Ok(match self.method {
-            ForecastMethod::ForwardFill => ForecastParameters::ForwardFill(read(self)?),
-            ForecastMethod::GrowthPct => ForecastParameters::GrowthPct(read(self)?),
-            ForecastMethod::CurvePct => ForecastParameters::CurvePct(read(self)?),
-            ForecastMethod::Normal => ForecastParameters::Normal(read(self)?),
-            ForecastMethod::LogNormal => ForecastParameters::LogNormal(read(self)?),
-            ForecastMethod::Override => ForecastParameters::Override(read(self)?),
-            ForecastMethod::TimeSeries => ForecastParameters::TimeSeries(read(self)?),
-            ForecastMethod::Seasonal => ForecastParameters::Seasonal(read(self)?),
-            ForecastMethod::FadeToTarget => ForecastParameters::FadeToTarget(read(self)?),
-            ForecastMethod::MeanReverting => ForecastParameters::MeanReverting(read(self)?),
-            ForecastMethod::Bootstrap => ForecastParameters::Bootstrap(read(self)?),
-        })
-    }
-
-    /// Check that the parameter map reads as the typed parameters of
-    /// [`Self::method`], without running the forecast.
-    ///
-    /// # Errors
-    ///
-    /// Returns the error of [`Self::parameters`].
-    pub fn validate(&self) -> crate::error::Result<()> {
-        self.parameters().map(drop)
-    }
-
-    /// Create a linear fade-to-target forecast.
-    ///
-    /// Values glide from the last observed value to `target` in equal steps,
-    /// reaching the target exactly at the final forecast period:
-    /// `v[t] = base + (target - base) * t / N`. Use raw
-    /// [`ForecastSpec`] params (`shape` = `"geometric"` / `"exponential"`,
-    /// `half_life`) for the non-linear shapes.
-    ///
-    /// # Arguments
-    /// * `target` - Terminal level in the node's own units (a currency amount
-    ///   for monetary nodes, a decimal ratio for scalar nodes such as margins)
-    pub fn fade_to_target(target: f64) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("target".into(), serde_json::json!(target));
-        Self {
-            method: ForecastMethod::FadeToTarget,
-            params,
-        }
-    }
-
-    /// Create a mean-reverting AR(1) forecast.
-    ///
-    /// Forecasted values follow
-    /// `v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`,
-    /// where `z[t]` is a deterministic standard-normal draw derived from
-    /// `seed`. Use this for autocorrelated series such as spreads, charge-off
-    /// rates, or net interest margins that revert toward a through-the-cycle
-    /// level.
-    ///
-    /// # Arguments
-    /// * `long_run_mean` - Level the series reverts toward, in the node's own
-    ///   units (currency amount for monetary nodes, decimal ratio for scalars)
-    /// * `reversion_speed` - Fraction of the gap closed each period, in
-    ///   `(0, 1]`; 1.0 reverts fully every period
-    /// * `std_dev` - Per-period additive shock volatility in the node's own
-    ///   units; must be non-negative
-    /// * `seed` - Random seed for deterministic results
-    ///
-    /// # References
-    ///
-    /// - Monte Carlo simulation practice: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
-    pub fn mean_reverting(
-        long_run_mean: f64,
-        reversion_speed: f64,
-        std_dev: f64,
-        seed: u64,
-    ) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("long_run_mean".into(), serde_json::json!(long_run_mean));
-        params.insert("reversion_speed".into(), serde_json::json!(reversion_speed));
-        params.insert("std_dev".into(), serde_json::json!(std_dev));
-        params.insert("seed".into(), serde_json::json!(seed));
-        Self {
-            method: ForecastMethod::MeanReverting,
-            params,
-        }
-    }
-
-    /// Create a historical-bootstrap forecast in growth mode.
-    ///
-    /// Resamples period-over-period growth rates from `historical` (which must
-    /// be strictly positive in growth mode) and compounds them from the base
-    /// value. Set `"mode": "diff"` via raw [`ForecastSpec`] params to resample
-    /// additive level changes instead (works for series crossing zero).
-    ///
-    /// # Arguments
-    /// * `historical` - At least 2 historical values in the node's own units,
-    ///   oldest first; consecutive pairs define the resampled growth rates
-    /// * `seed` - Random seed for deterministic resampling
-    pub fn bootstrap(historical: Vec<f64>, seed: u64) -> Self {
-        let mut params = IndexMap::new();
-        params.insert("historical".into(), serde_json::json!(historical));
-        params.insert("seed".into(), serde_json::json!(seed));
-        Self {
-            method: ForecastMethod::Bootstrap,
-            params,
-        }
-    }
 }
 
 /// Available forecast methods.

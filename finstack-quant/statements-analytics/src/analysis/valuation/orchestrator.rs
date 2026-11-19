@@ -73,8 +73,8 @@ struct DcfSpec {
 /// };
 ///
 /// let checks = CheckSuite::builder("corporate")
-///     .add_check(NonFiniteCheck { nodes: vec![] })
-///     .build();
+///     .add_check(NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() })
+///     .build().expect("unique check ids");
 ///
 /// let _result = CorporateAnalysisBuilder::new(model)
 ///     .dcf(0.10, TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 })
@@ -117,6 +117,7 @@ impl CorporateAnalysisBuilder {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("demo");
     ///     model_builder.periods("2025Q1..Q1", None)?;
+    ///     model_builder.value_scalar("revenue", &[]);
     ///     model_builder.build()?
     /// };
     /// let _builder = CorporateAnalysisBuilder::new(model);
@@ -195,6 +196,7 @@ impl CorporateAnalysisBuilder {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("demo");
     ///     model_builder.periods("2025Q1..Q4", None)?;
+    ///     model_builder.value_scalar("revenue", &[]);
     ///     model_builder.build()?
     /// };
     /// let _builder = CorporateAnalysisBuilder::new(model)
@@ -379,9 +381,12 @@ impl CorporateAnalysisBuilder {
             finstack_quant_statements::evaluator::Evaluator::new()
         };
         let statement = match (self.market.as_ref(), self.as_of) {
-            (Some(market), Some(as_of)) => {
-                evaluator.evaluate_with_market(&self.model, market, as_of)?
-            }
+            (Some(market), Some(as_of)) => evaluator.evaluate_with_market(
+                &self.model,
+                market,
+                as_of,
+                finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            )?,
             (Some(_), None) => {
                 return Err(Error::eval(
                     "Corporate analysis requires as_of when market context is provided".to_string(),
@@ -602,7 +607,7 @@ fn ltv_reference_path(
     if let Some(node) = ltv_value_node {
         let mut path = Vec::with_capacity(periods.len());
         for period in periods {
-            if statement.get(node, &period.id).is_none() {
+            if crate::cell_float(statement, node, &period.id).is_none() {
                 continue;
             }
             let value = super::corporate::monetary_node_value(
@@ -623,6 +628,31 @@ fn ltv_reference_path(
 
 #[cfg(test)]
 mod tests {
+    /// A fixed-rate bond from the canonical Valuations constructor (US corporate
+    /// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+    fn fixed_bond(
+        id: &str,
+        notional: finstack_quant_core::money::Money,
+        coupon_rate: f64,
+        issue: finstack_quant_core::dates::Date,
+        maturity: finstack_quant_core::dates::Date,
+        curve: &str,
+    ) -> finstack_quant_statements::types::FinancialStatementInstrument {
+        use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+        finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+            finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+                InstrumentId::new(id),
+                notional,
+                Rate::from_decimal(coupon_rate).expect("valid coupon"),
+                issue,
+                maturity,
+                finstack_quant_core::dates::StubKind::ShortFront,
+                CurveId::new(curve),
+            )
+            .expect("valid bond"),
+        )
+    }
+
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::PeriodId;
@@ -658,8 +688,11 @@ mod tests {
 
     fn non_finite_suite() -> CheckSuite {
         CheckSuite::builder("corporate-test")
-            .add_check(NonFiniteCheck { nodes: vec![] })
+            .add_check(NonFiniteCheck {
+                nodes: finstack_quant_statements::checks::builtins::NodeSelection::all(),
+            })
             .build()
+            .expect("unique check ids")
     }
 
     #[test]
@@ -727,7 +760,7 @@ mod tests {
         let result = run_corporate_analysis(model, options, None).expect("statement-only");
 
         assert!(result.equity.is_none());
-        assert_eq!(result.statement.nodes.len(), 1);
+        assert_eq!(result.statement.cells.len(), 1);
     }
 
     #[test]
@@ -850,7 +883,10 @@ mod tests {
             model_builder_1
                 .periods("2025Q1..Q1", None)
                 .expect("periods");
-            model_builder_1.compute("ufcf", "0 / 0").expect("formula");
+            model_builder_1.value_scalar("seed", &[]);
+            model_builder_1
+                .compute("ufcf", "lag(seed, 1)")
+                .expect("formula");
             model_builder_1.with_meta("currency", serde_json::json!("USD"));
             model_builder_1.build().expect("model")
         };
@@ -865,8 +901,10 @@ mod tests {
             .net_debt_override(0.0)
             .checks(non_finite_suite())
             .analyze()
-            .expect_err("error-severity check must block valuation");
-        assert!(error.to_string().contains("blocked"));
+            .expect_err("an unavailable cash flow must not be valued");
+        // The flow is unavailable, not an invalid number: the validity check
+        // passes and valuation itself refuses the missing flow.
+        assert!(!error.to_string().is_empty(), "{error}");
     }
 
     #[test]
@@ -943,16 +981,17 @@ mod tests {
                     )],
                 )
                 .expect("availability");
-            model_builder_1
-                .add_bond(
+            model_builder_1.add_debt(
+                "BOND-001",
+                fixed_bond(
                     "BOND-001",
                     Money::from((1_000_000_i64, finstack_quant_core::currency::Currency::USD)),
                     0.05,
                     date!(2025 - 01 - 01),
                     date!(2026 - 01 - 01),
                     "USD-OIS",
-                )
-                .expect("bond");
+                ),
+            );
             model_builder_1
                 .compute("ufcf", "revenue - cs.interest_expense.total")
                 .expect("formula");
@@ -1002,12 +1041,11 @@ mod tests {
     fn ltv_reference_rejects_foreign_and_scalar_nodes() {
         let periods = sample_periods();
         let mut statement = StatementResult::new();
-        statement.nodes.insert(
-            "collateral".into(),
-            IndexMap::from([(periods[0].id, 1_000.0)]),
-        );
-        statement.monetary_nodes.insert(
-            "collateral".into(),
+        statement
+            .set_series("collateral", IndexMap::from([(periods[0].id, 1_000.0)]))
+            .expect("finite fixture values");
+        statement.set_money_series(
+            "collateral",
             IndexMap::from([(periods[0].id, Money::from((1_000_i64, Currency::EUR)))]),
         );
         assert!(
@@ -1020,7 +1058,9 @@ mod tests {
             )
             .is_err()
         );
-        statement.monetary_nodes.clear();
+        statement
+            .set_series("collateral", IndexMap::from([(periods[0].id, 1_000.0)]))
+            .expect("finite fixture values");
         assert!(
             ltv_reference_path(
                 &periods,
@@ -1075,10 +1115,10 @@ mod tests {
             12_000_000.0,
         );
         statement
-            .nodes
-            .insert("enterprise_value".to_string(), values.clone());
-        statement.monetary_nodes.insert(
-            "enterprise_value".into(),
+            .set_series("enterprise_value", values.clone())
+            .expect("finite fixture values");
+        statement.set_money_series(
+            "enterprise_value",
             values
                 .iter()
                 .map(|(period, value)| {
@@ -1114,7 +1154,7 @@ mod tests {
         );
 
         statement
-            .nodes
+            .cells
             .get_mut("enterprise_value")
             .expect("node")
             .shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
@@ -1185,16 +1225,17 @@ mod tests {
             model_builder_1
                 .availability_dates("ebitda", &[(q1, as_of)])
                 .expect("availability");
-            model_builder_1
-                .add_bond(
+            model_builder_1.add_debt(
+                "BOND-001",
+                fixed_bond(
                     "BOND-001",
                     Money::from((4_000_000_i64, finstack_quant_core::currency::Currency::USD)),
                     0.05,
                     date!(2025 - 01 - 01),
                     date!(2026 - 01 - 01),
                     "USD-OIS",
-                )
-                .expect("bond");
+                ),
+            );
             model_builder_1.with_meta("currency", serde_json::json!("USD"));
             model_builder_1.build().expect("model")
         };

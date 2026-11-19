@@ -132,14 +132,8 @@ pub struct CreditNumeratorNodes<'a> {
 ///     is_actual: false,
 /// };
 /// let mut statement = StatementResult::new();
-/// statement.nodes.insert(
-///     "cfads".to_string(),
-///     IndexMap::from([(period.id, 250_000.0)]),
-/// );
-/// statement.nodes.insert(
-///     "ebitda".to_string(),
-///     IndexMap::from([(period.id, 300_000.0)]),
-/// );
+/// statement.set_series("cfads", IndexMap::from([(period.id, 250_000.0)]))?;
+/// statement.set_series("ebitda", IndexMap::from([(period.id, 300_000.0)]))?;
 /// let mut cashflows = CapitalStructureCashflows::new();
 /// cashflows.by_instrument.insert(
 ///     "TLB".to_string(),
@@ -158,6 +152,12 @@ pub struct CreditNumeratorNodes<'a> {
 ///             mandatory_prepayment: None,
 ///             sweep_prepayment: None,
 ///             voluntary_prepayment: None,
+///             interest_arrears: None,
+///             principal_pending: None,
+///             principal_arrears: None,
+///             principal_advance_reserve: None,
+///             scheduled_cash_interest_due: None,
+///             scheduled_principal_due: None,
 ///         },
 ///     )]),
 /// );
@@ -272,7 +272,7 @@ pub fn compute_credit_context(
             dscr_incl_fees.len(),
             interest_coverage.len(),
         );
-        if let Some(cfads) = statement.get(numerators.cfads, &period.id) {
+        if let Some(cfads) = crate::cell_float(statement, numerators.cfads, &period.id) {
             if !cfads.is_finite() {
                 return Err(Error::eval(format!(
                     "Credit context CFADS node '{}' is non-finite in period {}",
@@ -293,7 +293,9 @@ pub fn compute_credit_context(
             }
         }
 
-        if let Some(numerator) = statement.get(numerators.interest_coverage, &period.id) {
+        if let Some(numerator) =
+            crate::cell_float(statement, numerators.interest_coverage, &period.id)
+        {
             if !numerator.is_finite() {
                 return Err(Error::eval(format!(
                     "Credit context interest-coverage node '{}' is non-finite in period {}",
@@ -405,11 +407,10 @@ mod tests {
             )
         };
         assert!(calculate(&result, &cs, Some(&[(periods[0].id, 1e-320)])).is_err());
-        result
-            .nodes
-            .get_mut("cfads")
-            .unwrap()
-            .insert(periods[0].id, f64::MAX);
+        result.cells.get_mut("cfads").unwrap().insert(
+            periods[0].id,
+            finstack_quant_statements::evaluator::ResultCell::scalar(f64::MAX).expect("finite"),
+        );
         let cf = cs
             .by_instrument
             .get_mut("BOND-001")
@@ -419,29 +420,6 @@ mod tests {
         cf.interest_expense_cash = Money::new(0.1, Currency::USD).unwrap();
         cf.principal_payment = Money::from((0_i64, Currency::USD));
         assert!(calculate(&result, &cs, None).is_err());
-    }
-
-    #[test]
-    fn rejects_contradictory_monetary_numerator_projection() {
-        let (mut result, cs, periods) = make_result_and_cs();
-        result.monetary_nodes.insert(
-            "cfads".into(),
-            IndexMap::from([(periods[0].id, Money::from((1_i64, Currency::USD)))]),
-        );
-        let error = compute_credit_context(
-            &result,
-            &cs,
-            "BOND-001",
-            CreditNumeratorNodes {
-                cfads: "cfads",
-                interest_coverage: "ebitda",
-            },
-            Currency::USD,
-            &periods,
-            None,
-        )
-        .unwrap_err();
-        assert!(error.to_string().contains("contradictory"));
     }
 
     fn make_result_and_cs() -> (StatementResult, CapitalStructureCashflows, Vec<Period>) {
@@ -471,7 +449,9 @@ mod tests {
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
             500_000.0,
         );
-        result.nodes.insert("ebitda".to_string(), ebitda_map);
+        result
+            .set_series("ebitda", ebitda_map)
+            .expect("finite fixture values");
 
         // CFADS = 450k per quarter, distinct from EBITDA.
         let mut cfads_map = IndexMap::new();
@@ -483,7 +463,9 @@ mod tests {
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
             450_000.0,
         );
-        result.nodes.insert("cfads".to_string(), cfads_map);
+        result
+            .set_series("cfads", cfads_map)
+            .expect("finite fixture values");
 
         // CS cashflows: Bond with 50k interest, 100k principal per period
         let mut cs = CapitalStructureCashflows::new();
@@ -504,6 +486,16 @@ mod tests {
                     mandatory_prepayment: None,
                     sweep_prepayment: None,
                     voluntary_prepayment: None,
+                    interest_arrears: None,
+                    principal_pending: None,
+                    principal_arrears: None,
+                    principal_advance_reserve: None,
+                    scheduled_cash_interest_due: None,
+                    scheduled_principal_due: None,
+                    fee_rebates: None,
+                    repayment_refunds: None,
+                    funding_proceeds: None,
+                    funding_principal: None,
                 },
             );
         }
@@ -632,10 +624,10 @@ mod tests {
     #[test]
     fn test_missing_coverage_period_is_skipped_not_treated_as_zero() {
         let (mut result, cs, periods) = make_result_and_cs();
-        if let Some(ebitda) = result.nodes.get_mut("ebitda") {
+        if let Some(ebitda) = result.cells.get_mut("ebitda") {
             ebitda.shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         }
-        if let Some(cfads) = result.nodes.get_mut("cfads") {
+        if let Some(cfads) = result.cells.get_mut("cfads") {
             cfads.shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         }
 
@@ -667,10 +659,10 @@ mod tests {
     #[test]
     fn test_missing_coverage_period_still_computes_ltv() {
         let (mut result, cs, periods) = make_result_and_cs();
-        if let Some(ebitda) = result.nodes.get_mut("ebitda") {
+        if let Some(ebitda) = result.cells.get_mut("ebitda") {
             ebitda.shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         }
-        if let Some(cfads) = result.nodes.get_mut("cfads") {
+        if let Some(cfads) = result.cells.get_mut("cfads") {
             cfads.shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         }
 
@@ -717,11 +709,12 @@ mod tests {
     #[test]
     fn test_non_finite_numerator_is_rejected() {
         let (mut result, cs, periods) = make_result_and_cs();
-        result
-            .nodes
-            .get_mut("cfads")
-            .expect("cfads")
-            .insert(periods[0].id, f64::NAN);
+        result.cells.get_mut("cfads").expect("cfads").insert(
+            periods[0].id,
+            finstack_quant_statements::evaluator::ResultCell::unavailable(
+                finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+            ),
+        );
 
         let error = compute_credit_context(
             &result,

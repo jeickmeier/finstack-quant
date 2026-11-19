@@ -1,46 +1,60 @@
 {
   "$defs": {
-    "BondConvention": {
-      "description": "Standard bond market conventions by region/issuer.\n\nEach variant provides market-standard defaults for day count, frequency,\nsettlement days, and other conventions. Use [`BondConvention::settlement_days`]\nto get the standard settlement lag for each market.\n\n# Market Standards Reference\n\n| Convention | Day Count | Frequency | Settlement | Source |\n|------------|-----------|-----------|------------|--------|\n| US Treasury | ACT/ACT ICMA | Semi-annual | T+1 | Treasury Direct |\n| US Agency | 30/360 | Semi-annual | T+1 | SIFMA |\n| US Corporate | 30/360 | Semi-annual | T+1 | SIFMA (May 2024) |\n| EUR Corporate | ACT/ACT ICMA | Annual | T+2 | ICMA / TARGET2 |\n| German Bund | ACT/ACT ICMA | Annual | T+2 | Eurex |\n| UK Gilt | ACT/ACT ICMA | Semi-annual | T+1 | DMO |\n| French OAT | ACT/ACT ICMA | Annual | T+2 | AFT |\n| JGB | ACT/365F | Semi-annual | T+2 | JSCC (cross-border) |",
+    "AmountOrScalar": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Money",
+          "description": "Currency-aware amount"
+        },
+        {
+          "description": "Unitless scalar (ratio, percentage, count, etc.)",
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+    },
+    "CellSource": {
+      "description": "Which value source produced a statement cell (one node in one period).\n\nThe evaluator resolves every unmasked cell by the precedence\n`Value > Forecast > Formula`. The selected source is recorded on the cell,\nincluding when that source's result is unavailable.",
       "oneOf": [
         {
-          "const": "us_treasury",
-          "description": "US Treasury: Semi-annual, ACT/ACT ICMA, T+1 settlement",
+          "const": "value",
+          "description": "The explicit observation stored on the node for this period (and\nvisible under the observation cutoff).",
           "type": "string"
         },
         {
-          "const": "us_agency",
-          "description": "US Agency (FNMA, FHLMC, FHLB): Semi-annual, 30/360, T+1 settlement",
+          "const": "forecast",
+          "description": "The node's forecast method (forecast periods only).",
           "type": "string"
         },
         {
-          "const": "german_bund",
-          "description": "German Bund: Annual, ACT/ACT ICMA, T+2 settlement",
+          "const": "formula",
+          "description": "The node's formula.",
+          "type": "string"
+        }
+      ]
+    },
+    "CellStatus": {
+      "description": "Whether a cell has a value, and if not, which kind of absence it is.",
+      "oneOf": [
+        {
+          "const": "value",
+          "description": "The cell has a value, which may be a known zero.",
           "type": "string"
         },
         {
-          "const": "uk_gilt",
-          "description": "UK Gilt: Semi-annual, ACT/ACT ICMA, T+1 settlement, 7-day ex-coupon",
+          "const": "missing",
+          "description": "No observation, forecast or formula supplies the period.",
           "type": "string"
         },
         {
-          "const": "french_oat",
-          "description": "French OAT: Annual, ACT/ACT ICMA, T+2 settlement",
+          "const": "masked",
+          "description": "The node's `where` predicate is false for the period.",
           "type": "string"
         },
         {
-          "const": "jgb",
-          "description": "Japanese Government Bond (cross-border): Semi-annual, ACT/365F, T+2.\n\nDomestic JGB settlement moved to T+1 in May 2018 (JSCC). Cross-border\ntransactions settle T+2 (BOJ). This variant uses T+2 as the safer\ndefault for international participants.\n\nTokyo quotes the bond on **Japanese simple yield**\n(`japanese_simple_yield`, 単利). Street [`crate::metrics::MetricId::Ytm`]\nremains the secondary-market IRR and is **not** switched for `Jgb`.",
-          "type": "string"
-        },
-        {
-          "const": "us_corporate",
-          "description": "US corporate cash: Semi-annual, 30/360, T+1 settlement (SIFMA May 2024).",
-          "type": "string"
-        },
-        {
-          "const": "eur_corporate",
-          "description": "EUR corporate: Annual, ACT/ACT ICMA, T+2 settlement, TARGET2.",
+          "const": "unavailable",
+          "description": "The cell has no value for the reason the cell states.",
           "type": "string"
         }
       ]
@@ -855,11 +869,6 @@
         }
       ]
     },
-    "DateWire": {
-      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-      "format": "date",
-      "type": "string"
-    },
     "DecimalWire": {
       "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
       "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
@@ -883,66 +892,136 @@
         "currency"
       ],
       "type": "object"
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    },
+    "ResultCell": {
+      "additionalProperties": false,
+      "description": "One published cell: a node in a period.\n\nA `value` cell carries a finite scalar or an exact [`Money`]; every other\nstatus carries no value. An `unavailable` cell carries its reason.",
+      "properties": {
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UnavailableReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why an `unavailable` cell has no value. Absent otherwise."
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CellSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The value source selected for the cell. Absent for a masked cell, a\nmissing cell, a cell left unavailable before a source was selected,\nand cells of hand-built results."
+        },
+        "status": {
+          "$ref": "#/$defs/CellStatus",
+          "description": "Whether the cell has a value."
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AmountOrScalar"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The value of a `value` cell: a finite number for a scalar node, or\nexact tagged money for a monetary node. Absent otherwise."
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "type": "object"
+    },
+    "UnavailableReason": {
+      "description": "Why a cell has no value although its node and period are valid.\n\nAn unavailable cell is not an error: the model is well formed and the run\ncontinues. Invalid arithmetic, an invalid mask and unrepresentable money\nare errors instead and fail the run.",
+      "oneOf": [
+        {
+          "const": "missing_mask",
+          "description": "The node's `where` predicate had no value for the period, so whether\nthe cell is masked is unknown.",
+          "type": "string"
+        },
+        {
+          "const": "hidden_by_cutoff",
+          "description": "The explicit observation was published after the observation cutoff\nand the node has no forecast or formula for the period.",
+          "type": "string"
+        },
+        {
+          "const": "missing_input",
+          "description": "The formula or forecast that supplies the cell had no defined result,\nbecause an input it needs is missing, masked or itself unavailable.",
+          "type": "string"
+        },
+        {
+          "const": "undefined_base",
+          "description": "A change, growth rate or ratio has no defined value for its base: an\nexactly zero base for a percentage change, a non-positive base or a\nnegative ending value for a growth rate, and a non-positive base for\n`ratio`.",
+          "type": "string"
+        },
+        {
+          "const": "missing_forecast_base",
+          "description": "A forecast has no base: no start level is selected and the slot\nimmediately before the forecast suffix has no value.",
+          "type": "string"
+        },
+        {
+          "const": "missing_peer_shock",
+          "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path.",
+          "type": "string"
+        },
+        {
+          "const": "missing_fx_quote",
+          "description": "A consolidated capital-structure value needs a period-close FX quote\nthat the market does not hold. Native-currency values are unaffected.",
+          "type": "string"
+        }
+      ]
     }
   },
-  "$id": "https://finstack_quant.dev/schemas/statements/1/bond_convention_params.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Identity, notional, decimal coupon, dates, regional convention and discount curve of a capital-structure bond.",
+  "description": "One period of a dated statement export: the anchor date, the period and its typed cell.",
   "examples": [
     {
-      "convention": "us_treasury",
-      "coupon_rate": 0.03,
-      "discount_curve_id": "USD-OIS",
-      "id": "UST-5Y",
-      "issue_date": "2025-01-15",
-      "maturity_date": "2030-01-15",
-      "notional": {
-        "amount": "1000000",
-        "currency": "USD"
-      }
+      "cell": {
+        "source": "value",
+        "status": "value",
+        "value": {
+          "amount": "125.01",
+          "currency": "USD"
+        }
+      },
+      "date": "2025-03-31",
+      "period_id": "2025M03"
     }
   ],
   "properties": {
-    "convention": {
-      "$ref": "#/$defs/BondConvention",
-      "description": "Regional preset controlling coupon frequency, day count, and calendar."
+    "cell": {
+      "$ref": "#/$defs/ResultCell",
+      "description": "The typed cell: an exact amount or scalar, or its missing, masked or\nunavailable state."
     },
-    "coupon_rate": {
-      "description": "Typed annual decimal coupon rate, such as 0.03 for 3%.",
-      "format": "double",
-      "type": "number"
-    },
-    "discount_curve_id": {
-      "description": "Discount-curve lookup identifier used during market-aware evaluation.",
+    "date": {
+      "description": "Anchor date selected by the export's [`PeriodDateConvention`].",
       "type": "string"
     },
-    "id": {
-      "description": "Capital-structure identifier; market-aware evaluation rejects duplicates.",
-      "type": "string"
-    },
-    "issue_date": {
-      "$ref": "#/$defs/DateWire",
-      "description": "Bond issue date (ISO `YYYY-MM-DD`), strictly before maturity."
-    },
-    "maturity_date": {
-      "$ref": "#/$defs/DateWire",
-      "description": "Final contractual bond maturity date (ISO `YYYY-MM-DD`)."
-    },
-    "notional": {
-      "$ref": "#/$defs/Money",
-      "description": "Principal in the tagged currency's major units."
+    "period_id": {
+      "$ref": "#/$defs/PeriodId",
+      "description": "Period the cell belongs to."
     }
   },
   "required": [
-    "id",
-    "notional",
-    "coupon_rate",
-    "issue_date",
-    "maturity_date",
-    "convention",
-    "discount_curve_id"
+    "date",
+    "period_id",
+    "cell"
   ],
-  "title": "BondConventionParams",
+  "title": "DatedCell",
   "type": "object"
 }

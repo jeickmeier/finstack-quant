@@ -1,88 +1,41 @@
 {
+  "outcome": "incomplete",
   "results": [
     {
       "check_id": "non_finite",
       "check_name": "Non-Finite Value",
       "category": "data_quality",
-      "passed": false,
-      "findings": [
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'ltm_ebitda' in period 2024Q1",
-          "period": "2024Q1",
-          "nodes": ["ltm_ebitda"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'ltm_ebitda' in period 2024Q2",
-          "period": "2024Q2",
-          "nodes": ["ltm_ebitda"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'ltm_ebitda' in period 2024Q3",
-          "period": "2024Q3",
-          "nodes": ["ltm_ebitda"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'leverage' in period 2024Q1",
-          "period": "2024Q1",
-          "nodes": ["leverage"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'leverage' in period 2024Q2",
-          "period": "2024Q2",
-          "nodes": ["leverage"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'leverage' in period 2024Q3",
-          "period": "2024Q3",
-          "nodes": ["leverage"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'revenue_growth_qoq' in period 2024Q1",
-          "period": "2024Q1",
-          "nodes": ["revenue_growth_qoq"]
-        }
-      ]
+      "outcome": "pass",
+      "evaluated": 201,
+      "findings": []
     },
     {
       "check_id": "leverage_covenant",
       "check_name": "Gross leverage <= 3.50x",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "incomplete",
+      "evaluated": 8,
       "findings": [
         {
           "check_id": "leverage_covenant",
           "severity": "warning",
-          "message": "Gross leverage <= 3.50x: insufficient data for 2024Q1: missing or non-finite inputs [leverage]",
+          "message": "Gross leverage <= 3.50x: incomplete for 2024Q1: the formula needed an observation that has no value (a missing or unavailable cell, or a lag or window reaching before the first period)",
           "period": "2024Q1",
-          "nodes": ["leverage"]
+          "coverage": true
         },
         {
           "check_id": "leverage_covenant",
           "severity": "warning",
-          "message": "Gross leverage <= 3.50x: insufficient data for 2024Q2: missing or non-finite inputs [leverage]",
+          "message": "Gross leverage <= 3.50x: incomplete for 2024Q2: the formula needed an observation that has no value (a missing or unavailable cell, or a lag or window reaching before the first period)",
           "period": "2024Q2",
-          "nodes": ["leverage"]
+          "coverage": true
         },
         {
           "check_id": "leverage_covenant",
           "severity": "warning",
-          "message": "Gross leverage <= 3.50x: insufficient data for 2024Q3: missing or non-finite inputs [leverage]",
+          "message": "Gross leverage <= 3.50x: incomplete for 2024Q3: the formula needed an observation that has no value (a missing or unavailable cell, or a lag or window reaching before the first period)",
           "period": "2024Q3",
-          "nodes": ["leverage"]
+          "coverage": true
         }
       ]
     },
@@ -90,85 +43,193 @@
       "check_id": "coverage_floor",
       "check_name": "Interest coverage >= 3.00x",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 8,
       "findings": []
     },
     {
       "check_id": "gross_margin_band",
       "check_name": "Gross margin between 55% and 75%",
       "category": "internal_consistency",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 8,
       "findings": []
     },
     {
       "check_id": "fcf_positive",
       "check_name": "Free cash flow positive",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 8,
       "findings": []
     },
     {
       "check_id": "debt_corkscrew_ties",
       "check_name": "Opening + draws - repayments = closing",
       "category": "accounting_identity",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 8,
       "findings": [],
       "comparisons": [
         {
           "identity": "debt_corkscrew_ties",
           "period": "2024Q1",
-          "actual": 1,
-          "expected": 0,
-          "tolerance": 1
+          "actual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "expected": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "difference": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "tolerance": {
+            "amount": "1",
+            "currency": "USD"
+          }
         },
         {
           "identity": "debt_corkscrew_ties",
           "period": "2024Q2",
-          "actual": 1,
-          "expected": 0,
-          "tolerance": 1
+          "actual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "expected": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "difference": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "tolerance": {
+            "amount": "1",
+            "currency": "USD"
+          }
         },
         {
           "identity": "debt_corkscrew_ties",
           "period": "2024Q3",
-          "actual": 1,
-          "expected": 0,
-          "tolerance": 1
+          "actual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "expected": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "difference": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "tolerance": {
+            "amount": "1",
+            "currency": "USD"
+          }
         },
         {
           "identity": "debt_corkscrew_ties",
           "period": "2024Q4",
-          "actual": 1,
-          "expected": 0,
-          "tolerance": 1
+          "actual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "expected": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "difference": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "tolerance": {
+            "amount": "1",
+            "currency": "USD"
+          }
         },
         {
           "identity": "debt_corkscrew_ties",
           "period": "2025Q1",
-          "actual": 1,
-          "expected": 0,
-          "tolerance": 1
+          "actual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "expected": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "difference": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "tolerance": {
+            "amount": "1",
+            "currency": "USD"
+          }
         },
         {
           "identity": "debt_corkscrew_ties",
           "period": "2025Q2",
-          "actual": 1,
-          "expected": 0,
-          "tolerance": 1
+          "actual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "expected": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "difference": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "tolerance": {
+            "amount": "1",
+            "currency": "USD"
+          }
         },
         {
           "identity": "debt_corkscrew_ties",
           "period": "2025Q3",
-          "actual": 1,
-          "expected": 0,
-          "tolerance": 1
+          "actual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "expected": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "difference": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "tolerance": {
+            "amount": "1",
+            "currency": "USD"
+          }
         },
         {
           "identity": "debt_corkscrew_ties",
           "period": "2025Q4",
-          "actual": 1,
-          "expected": 0,
-          "tolerance": 1
+          "actual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "expected": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "difference": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "tolerance": {
+            "amount": "1",
+            "currency": "USD"
+          }
         }
       ]
     }
@@ -176,8 +237,10 @@
   "summary": {
     "total_checks": 6,
     "passed": 5,
-    "failed": 1,
-    "errors": 7,
+    "failed": 0,
+    "incomplete": 1,
+    "unevaluated": 0,
+    "errors": 0,
     "warnings": 3,
     "infos": 0
   }

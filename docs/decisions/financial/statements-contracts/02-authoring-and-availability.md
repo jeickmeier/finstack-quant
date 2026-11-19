@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full builder composition and observation availability contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited path allows duplicate replacement, last-touched predicate attachment and inferred availability defaults.
+**Implementation status:** Reconciled (2026-11-16). Node ids and import rows follow the formula identifier rules. A repeated node id, period or availability date is rejected; an existing node changes through `replace_node`, `remove_node` or the atomic `FinancialModelSpec::apply_edits` batch of named `ModelEdit`s. `where_clause` names its target. `import_observations` needs a set timeline, maps unique period labels in any order, keeps missing cells absent and zeros known, and is atomic. `Evaluator::evaluate_with_market` takes an explicit `ObservationCutoff`; a cutoff date needs a model `source_snapshot` and a publication date on every observation in an actual period. The audited sections below describe revision `7e82fd03ad`.
 
-**Validation status:** Existing source and regression evidence mapped. Independent authoring, import and publication-replay qualification remains pending.
+**Validation status:** Duplicate rejection, named edits, sparse and unordered imports, and the April 25 / May 15 revision replay are qualified in the [model regression tests](../../../../finstack-quant/statements/tests/finance_model_regressions.rs) and [builder tests](../../../../finstack-quant/statements/src/builder/model_builder.rs).
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 
@@ -46,4 +46,4 @@ The audited last-touched behavior and implicit replacement remain implementation
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

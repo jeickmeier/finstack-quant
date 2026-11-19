@@ -44,7 +44,12 @@ def test_portfolio_cashflows_render_each_native_currency() -> None:
 
 def test_decimal_statement_ratios_and_basis_point_cds_spread() -> None:
     sheet = statement_tearsheet(
-        {"nodes": {"gross_margin": {"2025Q1": 0.25}, "revenue_growth": {"2025Q1": 0.1}}},
+        {
+            "cells": {
+                "gross_margin": {"2025Q1": {"status": "value", "value": 0.25}},
+                "revenue_growth": {"2025Q1": {"status": "value", "value": 0.1}},
+            }
+        },
         sections=["summary", "margins"],
     )
     html = sheet.to_html()

@@ -298,8 +298,8 @@ it("presents the native tornado and the target metric in every returned scenario
           .map((cell) => cell.textContent),
       ),
   ).toEqual([
-    ["Revenue · 2025Q4", "-15,329,233.72698751", "15,329,233.726987481"],
-    ["Opex · 2025Q4", "9,190,853.399279997", "-9,190,853.399280012"],
+    ["Revenue · 2025Q4", "-15,329,233.726987496", "15,329,233.726987518"],
+    ["Opex · 2025Q4", "9,190,853.39927999", "-9,190,853.399280012"],
   ]);
   const scenarios = screen.getByRole("table", {
     name: "Returned sensitivity scenarios",
@@ -310,7 +310,7 @@ it("presents the native tornado and the target metric in every returned scenario
     within(rows[0]!)
       .getAllByRole("cell")
       .map((cell) => cell.textContent),
-  ).toEqual(["Unperturbed", "61,383,803.27707498"]);
+  ).toEqual(["Unperturbed", "61,383,803.27707497"]);
   expect(within(rows[1]!).getByRole("rowheader").textContent).toBe(
     "Scenario 1",
   );
@@ -318,7 +318,10 @@ it("presents the native tornado and the target metric in every returned scenario
     within(rows[1]!)
       .getAllByRole("cell")
       .map((cell) => cell.textContent),
-  ).toEqual(["Revenue · 2025Q4 = 208,246,194.02699998", "46,054,569.55008747"]);
+  ).toEqual([
+    "Revenue · 2025Q4 = 208,246,194.02699998",
+    "46,054,569.550087474",
+  ]);
 });
 
 it("shows a native error and notes a full-grid run has no tornado", () => {

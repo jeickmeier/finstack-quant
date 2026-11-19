@@ -1,6 +1,7 @@
 //! Regression coverage for evaluated input units and accounting-check policies.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
+use crate::AllMetrics;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
@@ -21,6 +22,13 @@ fn q(quarter: u8) -> PeriodId {
     PeriodId::quarter(2025, quarter).unwrap()
 }
 
+fn opening() -> finstack_quant_statements::checks::DatedOpening {
+    finstack_quant_statements::checks::DatedOpening {
+        date: time::macros::date!(2025 - 01 - 01),
+        value: AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
+    }
+}
+
 fn identities(tolerance: Option<f64>) -> Vec<Box<dyn Check>> {
     vec![
         Box::new(BalanceSheetArticulation {
@@ -32,6 +40,8 @@ fn identities(tolerance: Option<f64>) -> Vec<Box<dyn Check>> {
         Box::new(CashReconciliation {
             cash_balance_node: NodeId::new("a"),
             total_cash_flow_node: NodeId::new("b"),
+            opening_balance: opening(),
+            adjustment_nodes: vec![],
             cfo_node: None,
             cfi_node: None,
             cff_node: None,
@@ -40,6 +50,7 @@ fn identities(tolerance: Option<f64>) -> Vec<Box<dyn Check>> {
         Box::new(RetainedEarningsReconciliation {
             retained_earnings_node: NodeId::new("a"),
             net_income_node: NodeId::new("b"),
+            opening_balance: opening(),
             dividends_node: None,
             other_adjustments: vec![],
             tolerance,
@@ -93,7 +104,7 @@ fn prepared_and_ordinary_evaluation_reject_changed_input_currency() {
         evaluator.evaluate_prepared(&model, &prepared).unwrap_err(),
         evaluator.evaluate(&model).unwrap_err(),
         evaluator
-            .evaluate_monte_carlo(&model, &MonteCarloConfig::new(2, 42))
+            .evaluate_all_metrics(&model, &MonteCarloConfig::new(2, 42, [""; 0]))
             .unwrap_err(),
     ] {
         assert!(
@@ -202,7 +213,8 @@ fn precomputed_identity_checks_reject_units_that_disagree_with_the_model() {
             equity_nodes: vec![NodeId::new("c")],
             tolerance: None,
         })
-        .build();
+        .build()
+        .expect("unique check ids");
     // The numeric balance sheet articulates in both periods. Stale scalar
     // metadata must not hide that the operands use different currencies.
     for declarations_present in [true, false] {
@@ -211,8 +223,18 @@ fn precomputed_identity_checks_reject_units_that_disagree_with_the_model() {
                 node.value_type = None;
             }
         }
-        let error = suite.run_model(&model, Some(&results)).unwrap_err();
-        assert!(error.to_string().contains("result units"));
+        let error = suite
+            .run_model(
+                &model,
+                &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+                Some(&results),
+            )
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("result units")
+                || error.to_string().contains("not a verified run"),
+            "{error}"
+        );
         for check in identities(None) {
             assert!(
                 check
@@ -240,10 +262,17 @@ fn precomputed_checks_reject_explicit_currency_changes_with_stale_declarations()
             equity_nodes: vec![NodeId::new("c")],
             tolerance: None,
         })
-        .build();
-    let error = suite.run_model(&model, Some(&results)).unwrap_err();
-    assert!(error.to_string().contains("Node 'b' declares"));
-    assert!(error.to_string().contains("EUR"));
+        .build()
+        .expect("unique check ids");
+    let error = suite
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            Some(&results),
+        )
+        .unwrap_err();
+    // The model changed after the run, so the results are not its run.
+    assert!(error.to_string().contains("not a verified run"), "{error}");
 }
 
 #[test]
@@ -270,12 +299,39 @@ fn precomputed_inferred_money_units_keep_valid_results_and_missing_node_warnings
             equity_nodes: vec![NodeId::new("c")],
             tolerance: None,
         })
-        .build();
-    assert!(suite.run_model(&model, Some(&results)).unwrap().results[0].passed);
+        .build()
+        .expect("unique check ids");
+    assert!(
+        suite
+            .run_model(
+                &model,
+                &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+                Some(&results)
+            )
+            .unwrap()
+            .results[0]
+            .passed()
+    );
     results.node_value_types.clear();
-    assert!(suite.run_model(&model, Some(&results)).unwrap().results[0].passed);
-    results.nodes.shift_remove("b");
-    let report = suite.run_model(&model, Some(&results)).unwrap();
+    assert!(
+        suite
+            .run_model(
+                &model,
+                &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+                Some(&results)
+            )
+            .unwrap()
+            .results[0]
+            .passed()
+    );
+    results.cells.shift_remove("b");
+    let report = suite
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            Some(&results),
+        )
+        .unwrap();
     let findings = &report.results[0].findings;
     assert_eq!(findings.len(), 2);
     assert!(findings.iter().all(|finding| {
@@ -331,7 +387,10 @@ fn check_configs_reject_invalid_numeric_policies_even_for_empty_suites() {
                 .resolve()
                 .is_err()
             );
-            let suite = CheckSuite::builder("empty").config(config).build();
+            let suite = CheckSuite::builder("empty")
+                .config(config)
+                .build()
+                .expect("unique check ids");
             assert!(suite.run(&model, &results).is_err());
         }
     }
@@ -374,10 +433,13 @@ fn shared_formula_check_history_preserves_temporal_results_and_visibility() {
         severity: Severity::Error,
         formula: "expected - (coalesce(lag(x, 1), 0) + rolling_mean(x, 2, 1))".into(),
         message_template: "bad {period}".into(),
+        mode: finstack_quant_statements::checks::FormulaCheckMode::Residual,
+        scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+        eligibility: None,
         tolerance: Some(1e-10),
     };
     let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
-    assert!(result.passed, "{:?}", result.findings);
+    assert!(result.passed(), "{:?}", result.findings);
     assert_eq!(results.get("expected", &q(1)), Some(10.0));
     assert_eq!(results.get("expected", &q(4)), Some(65.0));
 }

@@ -21,7 +21,8 @@ class RollupSpec:
         :attr:`NodeSpec.rollup`: ``"sum"`` (flows), ``"period_end"`` (balances
         and trailing metrics such as LTM EBITDA take the last source period) or
         ``"formula"`` (ratios re-evaluate their formula on the rolled-up
-        values). A node not listed uses its declaration, and sums without one.
+        values). A node not listed uses its declaration; a node with neither
+        fails the rollup, since nothing is summed by default.
 
     Examples
     --------
@@ -43,7 +44,7 @@ class RollupSpec:
         methods : dict[str, str] or None, default None
             Node id to ``"sum"``, ``"period_end"`` or ``"formula"``, overriding
             the node's declared method; a node not listed uses its declaration
-            and sums without one.
+            and must have one.
 
         Raises
         ------
@@ -58,7 +59,8 @@ class RollupSpec:
         List the rollup methods a model's lines declare.
 
         Only each node's ``rollup`` is read: a line that declares nothing is not
-        listed and sums, whatever its tags say. Use it to seed the method
+        listed, whatever its tags say, and needs a method before the model can
+        be rolled up. Use it to seed the method
         choices a host shows; :meth:`StatementResult.rollup` already applies
         the declarations when given a spec with no methods.
 
@@ -170,7 +172,7 @@ class RollupSpec:
     @property
     def methods(self) -> dict[str, str]:
         """
-        Rollup method label per listed node id; unlisted nodes use their declaration or sum.
+        Rollup method label per listed node id; unlisted nodes use their declaration.
 
         Returns
         -------

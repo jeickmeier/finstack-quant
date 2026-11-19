@@ -2,6 +2,37 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Why a cell has no value although its node and period are valid.
+ *
+ * An unavailable cell is not an error: the model is well formed and the run
+ * continues. Invalid arithmetic, an invalid mask and unrepresentable money
+ * are errors instead and fail the run.
+ */
+export type D_6C08F5490Eda9E343593 =
+  | "missing_mask"
+  | "hidden_by_cutoff"
+  | "missing_input"
+  | "undefined_base"
+  | "missing_forecast_base"
+  | "missing_peer_shock"
+  | "missing_fx_quote";
+/**
+ * Which value source produced a statement cell (one node in one period).
+ *
+ * The evaluator resolves every unmasked cell by the precedence
+ * `Value > Forecast > Formula`. The selected source is recorded on the cell,
+ * including when that source's result is unavailable.
+ */
+export type D_2A886A29E286928Aba1B = "value" | "forecast" | "formula";
+/**
+ * Value that can be currency-aware or unitless.
+ *
+ * Used for node values that can represent:
+ * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+ * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
+ */
+export type D_8831040Eb61De989F7Ea = D_1B5716Dde9957A614F3C | number;
+/**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
  * This type wraps a string identifier with a phantom type parameter to ensure
@@ -253,70 +284,6 @@ export type D_76Adf23Abc095Fd56514 =
         warning:
           | {
               /**
-               * Actual ratio of stateful to scheduled opening applied to the cashflows.
-               */
-              applied_ratio: number;
-              kind: "residual_scale_mismatch";
-              [k: string]: unknown;
-            }
-          | {
-              /**
-               * Original contractual payment date.
-               */
-              cashflow_date: string;
-              /**
-               * Canonical cashflow classification that was excluded.
-               */
-              cashflow_kind:
-                | "fixed"
-                | "floating"
-                | "inflation_coupon"
-                | "fee"
-                | "commitment_fee"
-                | "usage_fee"
-                | "facility_fee"
-                | "lc_fee"
-                | "fronting_fee"
-                | "notional"
-                | "pik"
-                | "amortization"
-                | "pre_payment"
-                | "revolving_draw"
-                | "revolving_repayment"
-                | "defaulted_notional"
-                | "recovery"
-                | "accrued_on_default"
-                | "protection_payment"
-                | "stub"
-                | "initial_margin_post"
-                | "initial_margin_return"
-                | "variation_margin_receive"
-                | "variation_margin_pay"
-                | "margin_interest"
-                | "collateral_substitution_in"
-                | "collateral_substitution_out"
-                | "derivative_settlement";
-              kind: "cashflow_ignored";
-              [k: string]: unknown;
-            }
-          | {
-              /**
-               * Negative claim amount in the waterfall currency.
-               */
-              amount: number;
-              /**
-               * Payment category containing the invalid negative claim.
-               */
-              category: "fees" | "interest";
-              /**
-               * Instrument whose claim was neutralized.
-               */
-              instrument_id: string;
-              kind: "negative_claim_neutralized";
-              [k: string]: unknown;
-            }
-          | {
-              /**
                * Negative amount that was floored, in the waterfall currency.
                */
               amount: number;
@@ -367,34 +334,51 @@ export type D_76Adf23Abc095Fd56514 =
       };
     }
   | {
-      non_finite_skipped: {
+      forecast_clipped: {
         /**
-         * Number of non-finite inputs dropped.
-         */
-        count: number;
-        /**
-         * Name of the aggregate function that dropped values.
-         */
-        function: string;
-        /**
-         * Identifier of the node whose aggregate dropped inputs.
+         * Identifier of the forecast node.
          */
         node_id: string;
         /**
-         * Period in which the drop occurred.
+         * Period whose published level was clipped.
          */
         period: string;
+        /**
+         * Level published after the bound, in the node's units.
+         */
+        published: number;
+        /**
+         * Level the forecast generated, in the node's units.
+         */
+        raw: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      gapped_sample: {
+        /**
+         * Name of the statistic.
+         */
+        function: string;
+        /**
+         * Identifier of the node whose statistic has gaps.
+         */
+        node_id: string;
+        /**
+         * Observations that had a value.
+         */
+        observations: number;
+        /**
+         * Period the statistic was computed for.
+         */
+        period: string;
+        /**
+         * Plan slots from the model start through the period.
+         */
+        slots: number;
         [k: string]: unknown;
       };
     };
-/**
- * Which evaluation layer produced a statement cell (one node in one period).
- *
- * The evaluator resolves every cell by the precedence
- * `Value > Forecast > Formula`, after the node's optional `where` mask. The
- * winning layer is recorded per cell in [`StatementResult::node_sources`].
- */
-export type D_2A886A29E286928Aba1B = "value" | "forecast" | "formula" | "where_masked";
 /**
  * Node value type classification.
  *
@@ -575,12 +559,69 @@ export type D_8B741636Dd21D9F7Ad3F =
       type: "scalar";
       [k: string]: unknown;
     };
-export type DD2458Ef8E558D1360642 = number | ("nan" | "inf" | "-inf");
+/**
+ * A cap on the magnitude of one adjustment. The adjustment keeps its sign.
+ * Each cap applies to its own adjustment only; it is not a shared basket.
+ */
+export type D_87E7D6Db07659C292388 =
+  | {
+      /**
+       * Value that can be currency-aware or unitless.
+       *
+       * Used for node values that can represent:
+       * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+       * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
+       */
+      amount: D_1B5716Dde9957A614F3C | number;
+      type: "absolute";
+    }
+  | {
+      /**
+       * When `base_node` is the target: size the cap against its reported
+       * value (the default) or against the reported value plus every
+       * earlier applied adjustment. Any other base node is always read at
+       * its reported value.
+       */
+      base_mode?: "reported" | "progressive";
+      /**
+       * Node the cap is sized against; it must share the target's units.
+       */
+      base_node: string;
+      /**
+       * Non-negative decimal fraction of the base (0.30 for 30%). It may
+       * exceed 1.
+       */
+      fraction: number;
+      type: "reference";
+    };
+/**
+ * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+ */
+export type D_11C7Dbc9Fa7Cb6Ce298A = string;
+/**
+ * How one node's values combine over the source periods of a target period.
+ */
+export type D_8Fc526D8A2276361B742 = "sum" | "period_end" | "formula";
+/**
+ * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
+ * `FY2025W53`.
+ */
+export type D_7Ed5D95D5Da0Aa4F3Cb9 = string;
 
 /**
  * Versioned financial statement evaluation result.
  */
 export interface StatementResultWire {
+  /**
+   * Map of node_id → (period_id → [`ResultCell`]): the typed result.
+   *
+   * Every evaluated node has a cell for every period of the plan.
+   */
+  cells: {
+    [k: string]: {
+      [k: string]: D_583D7Ac2C659B0D958A8;
+    };
+  };
   /**
    * Check report from inline validation (None if no checks configured)
    */
@@ -591,46 +632,22 @@ export interface StatementResultWire {
   cs_cashflows?: DF840Db5F4C38222F7Ca7 | null;
   meta: DD812Cec4E88E45C1B673;
   /**
-   * Map of node_id → (period_id → Money) for monetary nodes
-   */
-  monetary_nodes?: {
-    [k: string]: {
-      [k: string]: D_1B5716Dde9957A614F3C;
-    };
-  };
-  /**
-   * Map of node_id → (period_id → [`CellSource`]): which layer of the
-   * `Value > Forecast > Formula` precedence produced each cell of `nodes`.
-   *
-   * Populated for every cell by [`Evaluator`](crate::evaluator::Evaluator)
-   * (with or without market context / capital structure). The model spec
-   * alone does not determine it: an as-of visibility cutoff can hide an
-   * explicit value so that the forecast or formula fires instead. Empty
-   * only for results that were not produced by the evaluator (hand-built)
-   * or were serialized before this field existed.
-   */
-  node_sources?: {
-    [k: string]: {
-      [k: string]: D_2A886A29E286928Aba1B;
-    };
-  };
-  /**
-   * Track value types for each node
+   * Units of each node: scalar, or monetary in one currency.
    */
   node_value_types?: {
     [k: string]: D_8B741636Dd21D9F7Ad3F;
   };
   /**
-   * Map of node_id → (period_id → value). Native values are f64; JSON uses
-   * numbers for finite values and `"nan"`, `"inf"`, `"-inf"` for non-finite cells.
+   * The ordered configuration of every adjusted metric published into
+   * this result, by its output node id
+   * ([`merge_into_results`](crate::adjustments::merge_into_results)). The
+   * source run is this result's own `provenance` or `rollup_provenance`.
    */
-  nodes: {
-    [k: string]: {
-      [k: string]: DD2458Ef8E558D1360642;
-    };
+  normalizations?: {
+    [k: string]: D_6D88C3Cd9765D62Eaff0;
   };
   /**
-   * The period plan `nodes` is keyed by: the periods in timeline order,
+   * The period plan `cells` is keyed by: the periods in timeline order,
    * with their dates and actual/forecast split, and their calendar context.
    *
    * [`Evaluator`](crate::evaluator::Evaluator) records the model's plan and
@@ -640,16 +657,238 @@ export interface StatementResultWire {
    */
   periods?: D_6F601764Dacadc213E87 | null;
   /**
+   * What was evaluated: the model, its source snapshot, the observation
+   * cutoff and the run. `None` only for hand-built results.
+   */
+  provenance?: D_1B23Dc87C71E8Faf60D2 | null;
+  /**
+   * How a rolled-up result was produced: the source run, the method used
+   * for each node and the source periods of each target period. `None`
+   * for every result that [`rollup`](Self::rollup) did not produce.
+   */
+  rollup_provenance?: DE3Cfd6D553De5F758Bab | null;
+  /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
   schema_version: number;
+}
+/**
+ * One published cell: a node in a period.
+ *
+ * A `value` cell carries a finite scalar or an exact [`Money`]; every other
+ * status carries no value. An `unavailable` cell carries its reason.
+ */
+export interface D_583D7Ac2C659B0D958A8 {
+  /**
+   * Why an `unavailable` cell has no value. Absent otherwise.
+   */
+  reason?: D_6C08F5490Eda9E343593 | null;
+  /**
+   * The value source selected for the cell. Absent for a masked cell, a
+   * missing cell, a cell left unavailable before a source was selected,
+   * and cells of hand-built results.
+   */
+  source?: D_2A886A29E286928Aba1B | null;
+  /**
+   * Whether the cell has a value.
+   */
+  status: "value" | "missing" | "masked" | "unavailable";
+  /**
+   * The value of a `value` cell: a finite number for a scalar node, or
+   * exact tagged money for a monetary node. Absent otherwise.
+   */
+  value?: D_8831040Eb61De989F7Ea | null;
+}
+/**
+ * Currency-aware amount
+ */
+export interface D_1B5716Dde9957A614F3C {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
 }
 /**
  * Full report aggregating all [`CheckResult`]s from a check run.
  */
 export interface DF0893F1D89Ca5934871F {
   /**
-   * Individual results for each check.
+   * Verdict of the suite from the unfiltered check outcomes: `fail` when
+   * any check failed, else `incomplete` when any check is incomplete,
+   * else `pass` when at least one check passed, else `unevaluated` (an
+   * empty suite, or one with no applicable check).
+   */
+  outcome: "pass" | "fail" | "incomplete" | "unevaluated";
+  /**
+   * Individual results for each check, in declared order.
    */
   results: D_4F32370227B1985D85E9[];
   summary: D_033184211Bfcc772Ee94;
@@ -687,36 +926,62 @@ export interface D_4F32370227B1985D85E9 {
    */
   comparisons?: DF881E913E411C3Be88E6[];
   /**
-   * Individual findings produced by the check.
+   * Number of periods or cells the check examined.
+   */
+  evaluated: number;
+  /**
+   * Findings produced by the check. The suite's `min_severity` and
+   * `materiality_threshold` filters remove advisory findings only: an
+   * error-severity or coverage finding is always retained.
    */
   findings: D_82A7F3795866Afe7C96C[];
   /**
-   * Whether the check passed (no error-severity findings).
+   * Verdict of the check, decided from all of its findings before the
+   * suite's reporting filters: `fail` on an error-severity finding, else
+   * `incomplete` on a coverage finding, else `unevaluated` when
+   * `evaluated` is zero, else `pass`.
    */
-  passed: boolean;
+  outcome: "pass" | "fail" | "incomplete" | "unevaluated";
   [k: string]: unknown;
 }
 /**
- * The two numbers a check compared, and the tolerance it allowed.
+ * The two values a check compared, their difference and the tolerance it
+ * allowed.
  *
- * Recorded for every numeric comparison a check performs — whether it passed
- * or failed — so the verdict can be reconstructed from exported data:
- * the comparison fails exactly when `|actual - expected| > tolerance`.
+ * Recorded for every numeric comparison a check performs, whether it passed
+ * or failed, so the verdict can be reconstructed from exported data: the
+ * comparison fails exactly when `|difference| > tolerance`.
  *
- * `actual`, `expected` and `tolerance` are all in the units of the compared
- * nodes (currency units for monetary nodes, the same units as
- * [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
- * a fraction or percentage.
+ * Every value is typed in the units of the compared nodes: exact money in
+ * their currency, or a scalar. `difference` is the one exact residual the
+ * check computed (an exact sum for money), not a difference of the two
+ * recorded sides; `tolerance` is an absolute amount in the same units.
  */
 export interface DF881E913E411C3Be88E6 {
   /**
-   * Observed (left-hand) value, in the compared nodes' units.
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
    */
-  actual: number;
+  actual: D_1B5716Dde9957A614F3C | number;
   /**
-   * Value the identity requires (right-hand side), in the same units.
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
    */
-  expected: number;
+  difference: D_1B5716Dde9957A614F3C | number;
+  /**
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
+   */
+  expected: D_1B5716Dde9957A614F3C | number;
   /**
    * Stable snake_case name of the identity that was tested (for example
    * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
@@ -728,12 +993,13 @@ export interface DF881E913E411C3Be88E6 {
    */
   period?: string | null;
   /**
-   * Absolute tolerance applied to `|actual - expected|`, in the same units.
-   * This is the effective tolerance: the per-check override when one is
-   * configured, otherwise
-   * `max(default_tolerance, default_relative_tolerance * |reference|)`.
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
    */
-  tolerance: number;
+  tolerance: D_1B5716Dde9957A614F3C | number;
   [k: string]: unknown;
 }
 /**
@@ -752,6 +1018,13 @@ export interface D_82A7F3795866Afe7C96C {
    * with a tolerance compares its value against zero).
    */
   comparison?: DF881E913E411C3Be88E6 | null;
+  /**
+   * True for a coverage finding: required data was missing or unavailable,
+   * so the check could not evaluate the period or cell it names. A
+   * coverage finding makes its check incomplete and is never removed by
+   * the reporting filters.
+   */
+  coverage?: boolean;
   /**
    * Materiality context, if applicable.
    */
@@ -792,9 +1065,10 @@ export interface D_288B30976E4551573Cdd {
    */
   reference_value: number;
   /**
-   * Discrepancy as a percentage of the reference value.
+   * Discrepancy as a percentage of the reference value; `None` when the
+   * percentage is undefined (a zero reference) or does not apply.
    */
-  relative_pct: number;
+  relative_pct?: number | null;
   [k: string]: unknown;
 }
 /**
@@ -806,21 +1080,29 @@ export interface D_033184211Bfcc772Ee94 {
    */
   errors: number;
   /**
-   * Number of checks that failed (at least one error-severity finding).
+   * Number of checks whose outcome is `fail` (an error-severity finding).
    */
   failed: number;
+  /**
+   * Number of checks whose outcome is `incomplete` (a coverage finding).
+   */
+  incomplete: number;
   /**
    * Total number of info-severity findings across all checks.
    */
   infos: number;
   /**
-   * Number of checks that passed.
+   * Number of checks whose outcome is `pass`.
    */
   passed: number;
   /**
    * Total number of checks executed.
    */
   total_checks: number;
+  /**
+   * Number of checks whose outcome is `unevaluated` (nothing examined).
+   */
+  unevaluated: number;
   /**
    * Total number of warning-severity findings across all checks.
    */
@@ -864,6 +1146,16 @@ export interface D_033184211Bfcc772Ee94 {
  *         mandatory_prepayment: None,
  *         sweep_prepayment: None,
  *         voluntary_prepayment: None,
+ *         interest_arrears: None,
+ *         principal_pending: None,
+ *         principal_arrears: None,
+ *         principal_advance_reserve: None,
+ *         fee_rebates: None,
+ *         repayment_refunds: None,
+ *         funding_proceeds: None,
+ *         funding_principal: None,
+ *         scheduled_cash_interest_due: None,
+ *         scheduled_principal_due: None,
  *     });
  * cs.totals.insert(period, CashflowBreakdown {
  *     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -878,6 +1170,16 @@ export interface D_033184211Bfcc772Ee94 {
  *     mandatory_prepayment: None,
  *     sweep_prepayment: None,
  *     voluntary_prepayment: None,
+ *     interest_arrears: None,
+ *     principal_pending: None,
+ *     principal_arrears: None,
+ *     principal_advance_reserve: None,
+ *     fee_rebates: None,
+ *     repayment_refunds: None,
+ *     funding_proceeds: None,
+ *     funding_principal: None,
+ *     scheduled_cash_interest_due: None,
+ *     scheduled_principal_due: None,
  * });
  *
  * assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
@@ -893,10 +1195,10 @@ export interface DF840Db5F4C38222F7Ca7 {
    * Only populated for periods in which a waterfall ran; empty for models
    * without a waterfall and for JSON written before this field existed.
    * Reconciles the period's uses:
-   * `fees + cash interest + principal + equity_distribution == available_cash`.
+   * `fees + cash interest + principal + equity_distribution + retained_cash == available_cash`.
    */
   available_cash?: {
-    [k: string]: D_1B5716Dde9957A614F3C;
+    [k: string]: D_1B5716Dde9957A614F3C1;
   };
   /**
    * Map of instrument_id → (period_id → cashflow_type → amount)
@@ -907,20 +1209,72 @@ export interface DF840Db5F4C38222F7Ca7 {
     };
   };
   /**
-   * Post-waterfall residual cash distributed to equity per period.
+   * Why a period has no consolidated `totals`, when consolidation was
+   * requested and could not be completed (for example a missing FX quote).
+   * Per-instrument and native-currency values of the period are
+   * unaffected.
+   */
+  consolidation_unavailable?: {
+    [k: string]: string;
+  };
+  /**
+   * Distress cash by period: recoveries, accrual paid on default and
+   * protection payments, each with its instrument, native currency and
+   * actual payment date, in schedule order.
    *
-   * Only populated by waterfall evaluation when `available_cash_node` is
-   * configured: it is the cash remaining after fees, interest, and
-   * principal allocations. With the per-period allocations this satisfies
-   * `fees + cash interest + principal + equity == available cash`.
+   * These amounts are outside scheduled debt service: they are in no
+   * breakdown, total or waterfall claim, and they change no principal.
+   * Only periods with a distress row have an entry.
+   */
+  distress_cash?: {
+    [k: string]: DB74Dc9Ca475664736351[];
+  };
+  /**
+   * Residual cash distributed to equity per period: the cash left after
+   * fees, interest and principal when `Equity` is the waterfall's terminal
+   * priority, and zero when it is not.
+   *
+   * Only populated for periods in which a waterfall ran. With the
+   * per-period allocations,
+   * `fees + cash interest + principal + equity + retained == available cash`
+   * exactly.
    */
   equity_distribution?: {
-    [k: string]: D_1B5716Dde9957A614F3C;
+    [k: string]: D_1B5716Dde9957A614F3C1;
+  };
+  /**
+   * Every FX conversion applied to form the consolidated `totals`, by
+   * period: the currency pair, the rate, the date it was read on and how
+   * it was obtained. Empty when every instrument is in the reporting
+   * currency.
+   */
+  fx_conversions?: {
+    [k: string]: DC1B4Ba8405B0Bd5Bf8D6[];
+  };
+  /**
+   * What each configured prepayment requested, paid and left unpaid in
+   * each period, in the waterfall's priority order.
+   *
+   * Only populated for periods in which a waterfall with a prepayment
+   * priority ran. An unpaid amount is not carried forward: a prepayment
+   * request is not a dated contractual obligation.
+   */
+  prepayments?: {
+    [k: string]: D_048108Bf9Dc923C7B537[];
   };
   /**
    * Reporting currency used for `totals` (if populated)
    */
   reporting_currency?: D_9E50E1B9698Ebe0E1126 | null;
+  /**
+   * Residual cash the company retains per period: the cash left after the
+   * payment stack when `Equity` is not a priority, and zero when it is.
+   *
+   * Only populated for periods in which a waterfall ran.
+   */
+  retained_cash?: {
+    [k: string]: D_1B5716Dde9957A614F3C1;
+  };
   /**
    * Total cashflows across all instruments in the reporting currency (if available)
    */
@@ -954,7 +1308,7 @@ export interface DF840Db5F4C38222F7Ca7 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface D_1B5716Dde9957A614F3C {
+export interface D_1B5716Dde9957A614F3C1 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1148,11 +1502,40 @@ export interface D_1B5716Dde9957A614F3C {
  * allocation. See [`Self::net_interest_expense_cash`] for the combined view.
  */
 export interface D_677810Bf9653Cfb0A467 {
-  accrued_interest: D_1B5716Dde9957A614F3C1;
-  debt_balance: D_1B5716Dde9957A614F3C2;
-  fees: D_1B5716Dde9957A614F3C3;
-  interest_expense_cash: D_1B5716Dde9957A614F3C4;
-  interest_expense_pik: D_1B5716Dde9957A614F3C5;
+  accrued_interest: D_1B5716Dde9957A614F3C2;
+  debt_balance: D_1B5716Dde9957A614F3C3;
+  /**
+   * Fee cash the company received in the period: a rebate of a fee it
+   * paid. A receipt, reported apart from `fees` and never a waterfall
+   * claim. Positive amount in the breakdown's currency; `Some` on
+   * evaluator-produced breakdowns.
+   */
+  fee_rebates?: D_1B5716Dde9957A614F3C1 | null;
+  fees: D_1B5716Dde9957A614F3C4;
+  /**
+   * Principal established by funding that took effect in the period:
+   * draws and issuance at their explicit principal effect, whatever cash
+   * was received. `Some` on evaluator-produced breakdowns of a borrowing.
+   */
+  funding_principal?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Signed company cash of the funding rows that settled in the period:
+   * positive for proceeds received (net of any discount), negative for
+   * cash paid. It is the cash, not the principal it establishes. `Some`
+   * on evaluator-produced breakdowns of a borrowing.
+   */
+  funding_proceeds?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Cash interest already due and still unpaid at the period close:
+   * overdue arrears carried as a claim into the next period. It is separate
+   * from `accrued_interest`, which is interest earned but not yet due.
+   * Positive amount in the breakdown's currency. Always `Some` on
+   * breakdowns produced by the evaluator or the waterfall; `None` on
+   * hand-built breakdowns.
+   */
+  interest_arrears?: D_1B5716Dde9957A614F3C1 | null;
+  interest_expense_cash: D_1B5716Dde9957A614F3C5;
+  interest_expense_pik: D_1B5716Dde9957A614F3C6;
   /**
    * Net cash interest **received** during the period.
    *
@@ -1165,14 +1548,14 @@ export interface D_677810Bf9653Cfb0A467 {
    * [`Self::interest_income_cash_or_zero`] when a currency-preserving zero
    * is more convenient than an optional value.
    */
-  interest_income_cash?: D_1B5716Dde9957A614F3C | null;
+  interest_income_cash?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Part of `principal_payment` paid at the waterfall's
-   * `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).
+   * `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepayment`).
    * Zero when no waterfall ran. Same sign, currency and absence rule as
    * [`Self::scheduled_principal`].
    */
-  mandatory_prepayment?: D_1B5716Dde9957A614F3C | null;
+  mandatory_prepayment?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Outstanding debt balance at period start, before this period's draws,
    * repayments and PIK capitalization. Positive amount in the breakdown's
@@ -1181,8 +1564,47 @@ export interface D_677810Bf9653Cfb0A467 {
    * Always `Some` on breakdowns produced by the evaluator. `None` on
    * hand-built breakdowns and on JSON written before this field existed.
    */
-  opening_balance?: D_1B5716Dde9957A614F3C | null;
-  principal_payment: D_1B5716Dde9957A614F3C6;
+  opening_balance?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Face already paid for whose reduction takes effect after the period
+   * close. It is still part of `debt_balance` and is reserved from further
+   * prepayment until then. Positive amount in the breakdown's currency;
+   * `Some` on evaluator-produced breakdowns.
+   */
+  principal_advance_reserve?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Scheduled principal cash due and still unpaid at the period close,
+   * carried as a claim into the next period. It is a cash obligation
+   * separate from `debt_balance`, which follows the contract's effective
+   * dates whether or not the cash was paid. Positive amount in the
+   * breakdown's currency; `Some` on evaluator-produced breakdowns.
+   */
+  principal_arrears?: D_1B5716Dde9957A614F3C1 | null;
+  principal_payment: D_1B5716Dde9957A614F3C7;
+  /**
+   * Scheduled principal cash whose face reduction is already effective
+   * and whose payment falls due after the period close: owed, not yet
+   * due. `debt_balance` is already net of that face. Positive amount in
+   * the breakdown's currency; `Some` on evaluator-produced breakdowns.
+   */
+  principal_pending?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Principal cash the company received back in the period: a refund of a
+   * repayment. A receipt, reported apart from `principal_payment`; the
+   * balance moves only through the row's explicit principal effect.
+   * Positive amount in the breakdown's currency; `Some` on
+   * evaluator-produced breakdowns.
+   */
+  repayment_refunds?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Scheduled cash interest that fell due in the period under the
+   * borrowing's contractual schedule, recognized once on its due date
+   * whether or not it was paid. It excludes PIK, fees, arrears settled
+   * from an earlier period and hedge flows. Positive amount in the
+   * breakdown's currency. `Some` on evaluator-produced breakdowns of a
+   * borrowing; `None` for a hedge and on hand-built breakdowns.
+   */
+  scheduled_cash_interest_due?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Part of `principal_payment` paid against the instrument's own
    * contractual schedule: amortization, maturity redemption,
@@ -1197,212 +1619,29 @@ export interface D_677810Bf9653Cfb0A467 {
    * breakdowns produced by the evaluator or the waterfall; `None` on
    * hand-built breakdowns and on JSON written before this field existed.
    */
-  scheduled_principal?: D_1B5716Dde9957A614F3C | null;
+  scheduled_principal?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Scheduled principal that fell due in the period under the borrowing's
+   * contractual schedule (amortization and maturity), recognized once on
+   * its due date whether or not it was paid. It excludes prepayments,
+   * sweeps, arrears settled from an earlier period and advance payments.
+   * Same sign, currency and absence rule as
+   * [`Self::scheduled_cash_interest_due`].
+   */
+  scheduled_principal_due?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Part of `principal_payment` paid by the excess-cash-flow sweep at the
    * waterfall's `Sweep` priority. Zero when no waterfall ran. Same sign,
    * currency and absence rule as [`Self::scheduled_principal`].
    */
-  sweep_prepayment?: D_1B5716Dde9957A614F3C | null;
+  sweep_prepayment?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Part of `principal_payment` paid at the waterfall's
-   * `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).
+   * `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepayment`).
    * Zero when no waterfall ran. Same sign, currency and absence rule as
    * [`Self::scheduled_principal`].
    */
-  voluntary_prepayment?: D_1B5716Dde9957A614F3C | null;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface D_1B5716Dde9957A614F3C1 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XCG"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWG"
-    | "ZWL";
+  voluntary_prepayment?: D_1B5716Dde9957A614F3C1 | null;
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.
@@ -2365,6 +2604,1570 @@ export interface D_1B5716Dde9957A614F3C6 {
     | "ZWL";
 }
 /**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface D_1B5716Dde9957A614F3C7 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * One distress cash amount of a capital-structure instrument.
+ *
+ * Distress cash is a recovery, an accrual paid on default or a protection
+ * payment. It is reported separately from scheduled debt service.
+ */
+export interface DB74Dc9Ca475664736351 {
+  amount: D_1B5716Dde9957A614F3C8;
+  /**
+   * Capital-structure identifier of the instrument.
+   */
+  instrument_id: string;
+  /**
+   * The cashflow kind: `recovery`, `accrued_on_default` or
+   * `protection_payment`.
+   */
+  kind:
+    | "fixed"
+    | "floating"
+    | "inflation_coupon"
+    | "fee"
+    | "commitment_fee"
+    | "usage_fee"
+    | "facility_fee"
+    | "lc_fee"
+    | "fronting_fee"
+    | "notional"
+    | "pik"
+    | "amortization"
+    | "pre_payment"
+    | "revolving_draw"
+    | "revolving_repayment"
+    | "defaulted_notional"
+    | "recovery"
+    | "accrued_on_default"
+    | "protection_payment"
+    | "stub"
+    | "initial_margin_post"
+    | "initial_margin_return"
+    | "variation_margin_receive"
+    | "variation_margin_pay"
+    | "margin_interest"
+    | "collateral_substitution_in"
+    | "collateral_substitution_out"
+    | "derivative_settlement";
+  /**
+   * Actual payment date of the cash.
+   */
+  payment_date: string;
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface D_1B5716Dde9957A614F3C8 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * One FX conversion applied to consolidate capital-structure totals.
+ */
+export interface DC1B4Ba8405B0Bd5Bf8D6 {
+  /**
+   * Inclusive period-close date the rate was read on.
+   */
+  date: string;
+  /**
+   * Native currency converted from.
+   */
+  from:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+  /**
+   * Units of `to` per unit of `from` (1.20 converts EUR 1 to USD 1.20).
+   */
+  rate: number;
+  /**
+   * How the rate was obtained: `direct` for a quoted pair, `triangulated`
+   * when it was built through the FX matrix's pivot currency.
+   */
+  source: string;
+  /**
+   * Reporting currency converted to.
+   */
+  to:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * What one prepayment priority requested and paid in a period.
+ */
+export interface D_048108Bf9Dc923C7B537 {
+  carried: D_1B5716Dde9957A614F3C9;
+  /**
+   * The prepayment priority: mandatory prepayment, voluntary prepayment
+   * or sweep.
+   */
+  kind: "fees" | "interest" | "amortization" | "mandatory_prepayment" | "voluntary_prepayment" | "sweep" | "equity";
+  paid: D_1B5716Dde9957A614F3C10;
+  requested: D_1B5716Dde9957A614F3C11;
+  unpaid: D_1B5716Dde9957A614F3C12;
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface D_1B5716Dde9957A614F3C9 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface D_1B5716Dde9957A614F3C10 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface D_1B5716Dde9957A614F3C11 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface D_1B5716Dde9957A614F3C12 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
  * Metadata about the evaluation
  */
 export interface DD812Cec4E88E45C1B673 {
@@ -2392,6 +4195,74 @@ export interface DD812Cec4E88E45C1B673 {
    * Warnings encountered during evaluation (division by zero, NaN propagation, etc.)
    */
   warnings?: D_76Adf23Abc095Fd56514[];
+}
+/**
+ * An ordered bridge from a reported metric to a separately named adjusted
+ * metric (for example reported EBITDA to adjusted EBITDA).
+ */
+export interface D_6D88C3Cd9765D62Eaff0 {
+  /**
+   * Adjustments, applied in this order
+   */
+  adjustments?: D_88C9Bc8Df9Daae33F80E[];
+  /**
+   * The new node the adjusted metric is published under (e.g.,
+   * "adjusted_ebitda"). It must differ from `target_node` and from every
+   * node the result already holds.
+   */
+  output_node: string;
+  /**
+   * The reported node the bridge starts from (e.g., "ebitda"). It is never
+   * modified.
+   */
+  target_node: string;
+}
+/**
+ * Specification for a single adjustment (add-back or deduction).
+ */
+export interface D_88C9Bc8Df9Daae33F80E {
+  /**
+   * Optional cap on the adjustment amount
+   */
+  cap?: D_87E7D6Db07659C292388 | null;
+  /**
+   * Category for grouping (optional)
+   */
+  category?: string | null;
+  /**
+   * Unique identifier for this adjustment
+   */
+  id: string;
+  /**
+   * Human-readable name (e.g., "Synergies", "Management Fees")
+   */
+  name: string;
+  /**
+   * How the adjustment value is calculated
+   */
+  value:
+    | {
+        /**
+         * Map of period_id -> signed amount
+         */
+        amounts: {
+          [k: string]: D_8831040Eb61De989F7Ea;
+        };
+        type: "fixed";
+        [k: string]: unknown;
+      }
+    | {
+        /**
+         * Node ID to reference (e.g., "revenue")
+         */
+        node_id: string;
+        /**
+         * Signed decimal percentage to apply (0.05 for 5%)
+         */
+        percentage: number;
+        type: "percentage_of_node";
+        [k: string]: unknown;
+      };
 }
 /**
  * Builder/plan for a contiguous sequence of periods and their actual/forecast split.
@@ -2445,4 +4316,148 @@ export interface D_29936D53E5E53Cef8284 {
    * Inclusive start date.
    */
   start: string;
+}
+/**
+ * What a result was evaluated from.
+ *
+ * A consumer that is handed a result checks this against the model, period
+ * plan and run it expects before trusting the cells.
+ */
+export interface D_1B23Dc87C71E8Faf60D2 {
+  /**
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
+   */
+  forecast_streams?: D_5E7D1E3926C16B095Ad9[];
+  /**
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
+   */
+  model_content_hash: string;
+  /**
+   * Identifier of the evaluated model.
+   */
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff:
+    | "full_snapshot"
+    | {
+        through: D_11C7Dbc9Fa7Cb6Ce298A;
+      };
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above. Two runs of the same model content, snapshot, cutoff
+   * and valuation date share it.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: D_11C7Dbc9Fa7Cb6Ce298A | null;
+}
+/**
+ * Replay provenance of one stochastic forecast node in a single run.
+ *
+ * The generator is the shared PCG64 started at `state` on stream `stream`
+ * (`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the
+ * versioned key: the key version, the configured seed, the node and the
+ * single-run mode. Unsigned 64-bit values are decimal strings in JSON.
+ */
+export interface D_5E7D1E3926C16B095Ad9 {
+  /**
+   * The stochastic forecast node.
+   */
+  node_id: string;
+  /**
+   * The forecast method's exact configured seed.
+   */
+  seed: string;
+  /**
+   * Effective PCG64 starting state.
+   */
+  state: string;
+  /**
+   * Effective PCG64 stream selector.
+   */
+  stream: string;
+  /**
+   * Version of the mapping from the key to the stream.
+   */
+  stream_version: number;
+}
+/**
+ * How a rolled-up result was produced.
+ */
+export interface DE3Cfd6D553De5F758Bab {
+  /**
+   * Target frequency of the rollup.
+   */
+  frequency: "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
+  /**
+   * The method used for every node, in model order: the request's entry
+   * where it had one, the node's declaration otherwise.
+   */
+  methods: {
+    [k: string]: D_8Fc526D8A2276361B742;
+  };
+  /**
+   * The source periods combined into each target period, in timeline
+   * order.
+   */
+  source_periods: {
+    [k: string]: D_7Ed5D95D5Da0Aa4F3Cb9[];
+  };
+  source_run: D_1B23Dc87C71E8Faf60D21;
+}
+/**
+ * What a result was evaluated from.
+ *
+ * A consumer that is handed a result checks this against the model, period
+ * plan and run it expects before trusting the cells.
+ */
+export interface D_1B23Dc87C71E8Faf60D21 {
+  /**
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
+   */
+  forecast_streams?: D_5E7D1E3926C16B095Ad9[];
+  /**
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
+   */
+  model_content_hash: string;
+  /**
+   * Identifier of the evaluated model.
+   */
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff:
+    | "full_snapshot"
+    | {
+        through: D_11C7Dbc9Fa7Cb6Ce298A;
+      };
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above. Two runs of the same model content, snapshot, cutoff
+   * and valuation date share it.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: D_11C7Dbc9Fa7Cb6Ce298A | null;
 }

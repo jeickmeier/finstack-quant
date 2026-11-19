@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Literal
 import pandas as pd
 
 class CheckSuiteSpec:
@@ -40,7 +41,7 @@ class CheckSuiteSpec:
         builtin_checks : list[dict] | None
             Ordered built-in specifications, each the Rust ``BuiltinCheckSpec``
             serde form: a dict with the check's canonical ``type`` tag plus its
-            node fields, e.g. ``{"type": "non_finite"}`` or ``{"type":
+            node fields, e.g. ``{"type": "non_finite", "nodes": "all"}`` or ``{"type":
             "balance_sheet_articulation", "assets_nodes": ["assets"],
             "liabilities_nodes": ["liabilities"], "equity_nodes":
             ["equity"]}``. None means no built-in checks.
@@ -64,7 +65,7 @@ class CheckSuiteSpec:
         Examples
         --------
         >>> from finstack_quant.statements import CheckSuiteSpec
-        >>> CheckSuiteSpec("quality", builtin_checks=[{"type": "non_finite"}]).builtin_check_count
+        >>> CheckSuiteSpec("quality", builtin_checks=[{"type": "non_finite", "nodes": "all"}]).builtin_check_count
         1
         """
         ...
@@ -276,10 +277,10 @@ class CheckReport:
     --------
     >>> from finstack_quant.statements import CheckReport
     >>> report = CheckReport.from_json(
-    ...     '{"results":[],"summary":{"total_checks":0,"passed":0,"failed":0,"errors":0,"warnings":0,"infos":0}}'
+    ...     '{"outcome":"unevaluated","results":[],"summary":{"total_checks":0,"passed":0,"failed":0,"incomplete":0,"unevaluated":0,"errors":0,"warnings":0,"infos":0}}'
     ... )
-    >>> (report.passed, report.total_findings)
-    (True, 0)
+    >>> (report.outcome, report.passed, report.total_findings)
+    ('unevaluated', False, 0)
 
     """
 
@@ -306,9 +307,7 @@ class CheckReport:
         Examples
         --------
         >>> from finstack_quant.statements import CheckReport
-        >>> payload = (
-        ...     '{"results":[],"summary":{"total_checks":0,"passed":0,"failed":0,"errors":0,"warnings":0,"infos":0}}'
-        ... )
+        >>> payload = '{"outcome":"unevaluated","results":[],"summary":{"total_checks":0,"passed":0,"failed":0,"incomplete":0,"unevaluated":0,"errors":0,"warnings":0,"infos":0}}'
         >>> CheckReport.from_json(payload).total_checks
         0
 
@@ -333,19 +332,39 @@ class CheckReport:
         ...
 
     @property
+    def outcome(self) -> Literal["pass", "fail", "incomplete", "unevaluated"]:
+        """
+        Verdict of the suite, decided from every check before any reporting filter.
+
+        Returns
+        -------
+        str
+            ``"fail"`` when any check has an error-severity finding, else
+            ``"incomplete"`` when any check lacked required data, else
+            ``"pass"`` when at least one check passed, else ``"unevaluated"``
+            (an empty suite, or one in which no check had anything to
+            examine).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
     def passed(self) -> bool:
         """
-        Whether the whole report passed: no error-severity finding was retained
-        by any check.
+        Whether the report's outcome is ``"pass"``.
 
-        Warnings and info findings do not fail a report. A suite's materiality
-        threshold never suppresses error findings, so it cannot flip this to
-        ``True``.
+        A pass requires evaluated work and complete required coverage: an
+        empty suite and an incomplete report are not passes. Warnings and
+        info findings do not fail a report, and no reporting filter can
+        change the outcome.
 
         Returns
         -------
         bool
-            ``True`` when zero error-severity findings were retained.
+            ``True`` when :attr:`outcome` is ``"pass"``.
 
         Notes
         -----
@@ -390,8 +409,8 @@ class CheckReport:
         --------
         >>> from finstack_quant.statements import CheckReport
         >>> report = CheckReport.from_json(
-        ...     '{"results": [], "summary": {"total_checks": 0, "passed": 0,'
-        ...     ' "failed": 0, "errors": 0, "warnings": 0, "infos": 0}}'
+        ...     '{"outcome": "unevaluated", "results": [], "summary": {"total_checks": 0, "passed": 0,'
+        ...     ' "failed": 0, "incomplete": 0, "unevaluated": 0, "errors": 0, "warnings": 0, "infos": 0}}'
         ... )
         >>> report.has_errors()
         False
@@ -417,8 +436,8 @@ class CheckReport:
         --------
         >>> from finstack_quant.statements import CheckReport
         >>> report = CheckReport.from_json(
-        ...     '{"results": [], "summary": {"total_checks": 0, "passed": 0,'
-        ...     ' "failed": 0, "errors": 0, "warnings": 0, "infos": 0}}'
+        ...     '{"outcome": "unevaluated", "results": [], "summary": {"total_checks": 0, "passed": 0,'
+        ...     ' "failed": 0, "incomplete": 0, "unevaluated": 0, "errors": 0, "warnings": 0, "infos": 0}}'
         ... )
         >>> report.has_warnings()
         False
@@ -451,8 +470,8 @@ class CheckReport:
         --------
         >>> from finstack_quant.statements import CheckReport
         >>> report = CheckReport.from_json(
-        ...     '{"results": [], "summary": {"total_checks": 0, "passed": 0,'
-        ...     ' "failed": 0, "errors": 0, "warnings": 0, "infos": 0}}'
+        ...     '{"outcome": "unevaluated", "results": [], "summary": {"total_checks": 0, "passed": 0,'
+        ...     ' "failed": 0, "incomplete": 0, "unevaluated": 0, "errors": 0, "warnings": 0, "infos": 0}}'
         ... )
         >>> report.findings_by_severity("error")
         []
@@ -521,9 +540,11 @@ class CheckReport:
         (human-readable name), ``category`` (snake_case group, one of
         ``accounting_identity``, ``cross_statement_reconciliation``,
         ``internal_consistency``, ``credit_reasonableness``, ``data_quality``),
-        ``passed`` (``True`` when the check retained no error-severity
-        finding), ``finding_count`` (retained findings for this check, after
-        the suite's reporting filters).
+        ``outcome`` (``"pass"``, ``"fail"``, ``"incomplete"`` or
+        ``"unevaluated"``, decided before the reporting filters),
+        ``evaluated`` (periods or cells the check examined),
+        ``finding_count`` (retained findings for this check, after the
+        suite's reporting filters).
 
         One row per check result, so the row count equals
         :attr:`total_checks`. A report with no checks still yields the
@@ -562,7 +583,8 @@ class CheckReport:
         ``total_assets``), and ``comparison_actual``, ``comparison_expected``,
         ``comparison_tolerance`` (the two values the check compared and the
         absolute tolerance it allowed on their difference, all in the compared
-        nodes' own units).
+        nodes' own units) with ``comparison_currency`` (their ISO currency code,
+        ``None`` for a scalar comparison).
 
         The four materiality columns are ``None`` for findings that carry no
         materiality context, and the three comparison columns are ``None`` for
@@ -596,11 +618,12 @@ class CheckReport:
         ``cash_flow_components``), ``period`` (period identifier string,
         ``None`` when not period-specific), ``actual`` (observed value),
         ``expected`` (value the identity requires), ``difference``
-        (``actual - expected``), ``tolerance`` (absolute tolerance applied to
-        ``|difference|``) and ``within_tolerance`` (``True`` when
-        ``|difference| <= tolerance``). ``actual``, ``expected``,
-        ``difference`` and ``tolerance`` are in the compared nodes' own units
-        (currency amounts for monetary nodes).
+        (the exact residual the check computed), ``tolerance`` (absolute
+        tolerance applied to ``|difference|``), ``currency`` (ISO code of the
+        compared amounts, ``None`` for a scalar comparison) and
+        ``within_tolerance`` (``True`` when ``|difference| <= tolerance``,
+        judged on the exact values). ``actual``, ``expected``, ``difference``
+        and ``tolerance`` are float views in the compared nodes' own units.
 
         Checks that do not compare two numbers, and periods a check skipped
         for missing inputs, contribute no rows. A report with no comparisons
@@ -667,11 +690,11 @@ class CheckConfig:
         ----------
         default_tolerance : float | None
             Finite, non-negative absolute tolerance in the checked node's units
-            (Rust default ``0.01``).
+            (default ``0.0``: identities must hold exactly).
         default_relative_tolerance : float | None
             Finite, non-negative relative tolerance as a decimal fraction of
             the reference magnitude; zero disables relative tolerance (Rust
-            default ``1e-9``).
+            default ``0.0``: no relative term).
         materiality_threshold : float | None
             Finite, non-negative absolute magnitude below which advisory
             findings are suppressed; error findings are retained (Rust default
@@ -805,66 +828,70 @@ class CheckConfig:
         ...
 
 class FormulaCheckSpec:
-    """A user-defined check expressed as a statements DSL predicate.
+    """A user-defined check expressed as a statements DSL formula.
 
-    Each period passes, fails (a finding with the configured severity), or
-    has insufficient data: a same-period input is missing or non-finite, or
-    the formula consumes a non-finite value such as a ``lag`` before the first
-    period. Insufficient data is reported as a ``"warning"`` finding naming
-    the inputs and never fails the check. A division by zero over finite
-    inputs still fails.
+    The ``mode`` states how the formula is judged. A ``"predicate"`` formula
+    is Boolean (a comparison) and a period passes when it is true. A
+    ``"residual"`` formula is a scalar or monetary amount and a period passes
+    when its absolute value is at most ``tolerance`` (zero when omitted).
+    Truthiness is never inferred: a numeric predicate, a Boolean residual and
+    a tolerance on a predicate are rejected when the suite runs.
+
+    ``scope`` selects all periods, actual periods or forecast periods, and the
+    optional Boolean ``eligibility`` formula selects periods within the scope:
+    a period in which it is false is not covered, and one in which it has no
+    value is incomplete. Evaluation is lazy, so ``coalesce(a, b)`` uses ``b``
+    when ``a`` has no value and an untaken ``if`` branch never reads its
+    inputs. A period whose formula needed an observation without a value (a
+    missing or unavailable cell, a ``lag`` before the first period) carries a
+    coverage finding and makes the check ``"incomplete"``. An invalid
+    operation such as a division by zero is an execution error, not a finding.
 
     Examples
     --------
     >>> from finstack_quant.statements import FormulaCheckSpec
-    >>> FormulaCheckSpec(
-    ...     "c1", "Positive revenue", "revenue > 0", "revenue <= 0", "internal_consistency", "error"
-    ... ).severity
-    'error'
+    >>> spec = FormulaCheckSpec({
+    ...     "id": "c1",
+    ...     "name": "Positive revenue",
+    ...     "category": "internal_consistency",
+    ...     "severity": "error",
+    ...     "mode": "predicate",
+    ...     "scope": "all_periods",
+    ...     "formula": "revenue > 0",
+    ...     "message_template": "revenue <= 0 in {period}",
+    ... })
+    >>> spec.mode, spec.scope
+    ('predicate', 'all_periods')
 
     """
 
-    def __init__(
-        self,
-        id: str,
-        name: str,
-        formula: str,
-        message_template: str,
-        category: str,
-        severity: str,
-        tolerance: float | None = None,
-    ) -> None:
-        """Define a formula check.
+    def __init__(self, spec: Mapping[str, object]) -> None:
+        """Define a formula check from its canonical fields.
 
         Parameters
         ----------
-        id : str
-            Check identifier, unique within a suite.
-        name : str
-            Human-readable label.
-        formula : str
-            DSL predicate that must hold; a false result raises a finding.
-        message_template : str
-            Message emitted when the predicate fails.
-        category : str
-            Classification bucket: ``"accounting_identity"``,
+        spec : Mapping[str, object]
+            The Rust ``FormulaCheckSpec`` serde form; unknown keys are
+            rejected and nothing is defaulted beyond the two optional keys.
+            Required keys: ``id`` (unique within a suite), ``name``,
+            ``category`` (``"accounting_identity"``,
             ``"cross_statement_reconciliation"``, ``"internal_consistency"``,
-            ``"credit_reasonableness"`` or ``"data_quality"``. Required, as in
-            the Rust/JSON form.
-        severity : str
-            ``"info"``, ``"warning"`` or ``"error"``. Required, as in the
-            Rust/JSON form.
-        tolerance : float, optional
-            Finite, non-negative absolute residual bound in the formula's result
-            units. When supplied, a period passes if the formula result's absolute
-            value is at most this bound. None treats the formula as a predicate
-            whose nonzero result passes. Validated when the suite executes.
+            ``"credit_reasonableness"`` or ``"data_quality"``), ``severity``
+            (``"info"``, ``"warning"`` or ``"error"``), ``mode``
+            (``"predicate"`` or ``"residual"``), ``scope`` (``"all_periods"``,
+            ``"actuals_only"`` or ``"forecast_only"``), ``formula`` (statements
+            DSL) and ``message_template`` (``{period}`` is replaced at run
+            time). Optional keys: ``eligibility`` (Boolean DSL formula) and
+            ``tolerance`` (residual mode only; finite, non-negative absolute
+            bound in the residual's units, zero when omitted).
 
         Raises
         ------
         ValueError
-            If ``category`` or ``severity`` is not recognized. Formula compilation,
-            node references, and tolerance validation occur when the suite executes.
+            If ``spec`` is not a mapping, a required key is missing, a key is
+            unknown or a discriminant is not recognized. Formula compilation,
+            node references and the mode and tolerance rules are validated
+            when the suite executes.
 
         """
         ...
@@ -900,28 +927,28 @@ class FormulaCheckSpec:
     @property
     def formula(self) -> str:
         """
-        DSL predicate that must hold.
+        DSL formula judged per period.
 
         This property does not raise.
 
         Returns
         -------
         str
-            DSL predicate that must hold.
+            A Boolean formula in predicate mode, an amount in residual mode.
         """
         ...
 
     @property
     def message_template(self) -> str:
         """
-        Message emitted when the predicate fails.
+        Message emitted for a breach.
 
         This property does not raise.
 
         Returns
         -------
         str
-            Message emitted when the predicate fails.
+            Message emitted for a breach.
         """
         ...
 
@@ -960,17 +987,66 @@ class FormulaCheckSpec:
         ...
 
     @property
+    def mode(self) -> str:
+        """
+        How the formula is judged.
+
+        Returns
+        -------
+        str
+            ``"predicate"`` for a Boolean formula or ``"residual"`` for an
+            amount compared with zero.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    @property
+    def scope(self) -> str:
+        """
+        Which periods the check covers.
+
+        Returns
+        -------
+        str
+            ``"all_periods"``, ``"actuals_only"`` or ``"forecast_only"``.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    @property
+    def eligibility(self) -> str | None:
+        """
+        Boolean formula selecting the covered periods within the scope.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            The eligibility formula, or None when every in-scope period is covered.
+        """
+        ...
+
+    @property
     def tolerance(self) -> float | None:
         """
-        Absolute residual bound, or ``None`` to interpret the formula as a predicate.
+        Absolute residual bound of a residual check.
 
         This property does not raise.
 
         Returns
         -------
         float | None
-            Bound in the formula result's units; None makes any finite nonzero
-            result pass. A configured bound makes absolute results at or below it pass.
+            Bound in the residual's units; None means zero, an exact
+            comparison. Always None for a predicate.
         """
         ...
 
@@ -1170,13 +1246,16 @@ class CheckFinding:
         Returns
         -------
         dict[str, Any] | None
-            ``{"identity", "period", "actual", "expected", "tolerance"}``:
+            ``{"identity", "period", "actual", "expected", "difference",
+            "tolerance"}``:
             ``identity`` names the tested identity (e.g.
             ``"balance_sheet_articulation"``), ``period`` is the period id
             (omitted when not period-specific), ``actual`` and ``expected``
-            are the two compared values and ``tolerance`` is the absolute
-            tolerance applied to ``|actual - expected|`` — all three in the
-            compared nodes' own units (currency amounts for monetary nodes).
+            are the two compared values, ``difference`` the exact residual
+            and ``tolerance`` the absolute tolerance applied to
+            ``|difference|``. Each is typed in the compared nodes' units: a
+            number for a scalar, ``{"amount": "<decimal>", "currency": "<ISO>"}``
+            for money.
             ``None`` for findings that do not compare two numbers (skipped
             periods, missing or non-finite inputs, sign-convention warnings,
             formula checks without a tolerance) and for findings serialized

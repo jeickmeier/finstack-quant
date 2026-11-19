@@ -1,6 +1,5 @@
 //! Debt stack by seniority over an evaluated capital structure.
 
-use super::parse_model;
 use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::evaluator::StatementResult;
@@ -40,7 +39,7 @@ pub fn capital_structure_summary(
     config: JsValue,
 ) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;
-    let model = parse_model(&model)?;
+    let model = crate::api::statements::load_model(&model, "model")?;
     let config: CapitalStructureSummaryConfig = from_js_json(&config, "config")?;
     to_js_value(
         &finstack_quant_statements_analytics::analysis::capital_structure_summary(

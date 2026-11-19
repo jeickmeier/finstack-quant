@@ -585,7 +585,7 @@
     {
       "name": "statement-grid",
       "type": "registry:component",
-      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Each cell shows the evaluation layer Rust recorded in node_sources (value, forecast, formula or where mask) as a glyph with a legend and accessible text; results without node_sources, such as rollups, show no marker. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
+      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Each cell shows the source Rust recorded on the typed cell (value, forecast or formula) as a glyph with a legend and accessible text; cells without a source, such as rollups, show no marker, and a masked cell is marked as masked. Exact native values, cell statuses, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
       "worker": "none"
     },
     {
@@ -675,7 +675,7 @@
     {
       "name": "statement-monte-carlo",
       "type": "registry:component",
-      "docs": "Edit a MonteCarloConfig with the schema form over the generated monte_carlo_config contract (path count, the uint64 seed kept as an exact integer, percentiles and include path data; the form starts empty, Rust's example is not preloaded); Simulate passes the structurally valid JSON to the caller (usually the useEvaluateMonteCarlo request), and Rust validates it. The native MonteCarloResults (statements.Evaluator.evaluateMonteCarlo) are shown as returned: for the chosen metric (the first returned by default), a fan of bands between the returned percentiles paired from the outside in, with the unpaired middle percentile as a line, over the forecast periods, the percentile table (percentiles shown as percents of Rust's fractions), the breach probability Rust reports for a threshold (statements.monteCarloBreachProbability; null when the results carry no path data) and the simulation warnings in a collapsed list. Nothing is simulated, interpolated or summed. Accepts defaultConfig, onSubmit, results, loading, error, defaultBreach, onBreach, breachProbability, breachLoading, breachError, formatValue and density props.",
+      "docs": "Edit a MonteCarloConfig with the schema form over the generated monte_carlo_config contract (path count, the uint64 seed as an exact decimal string, percentiles and include path data; the form starts empty, Rust's example is not preloaded); Simulate passes the structurally valid JSON to the caller (usually the useEvaluateMonteCarlo request), and Rust validates it. The native MonteCarloResults (statements.Evaluator.evaluateMonteCarlo) are shown as returned: for the chosen metric (the first returned by default), a fan of bands between the returned percentiles paired from the outside in, with the unpaired middle percentile as a line, over the forecast periods, the percentile table (percentiles shown as percents of Rust's fractions), the breach probability Rust reports for a threshold (statements.monteCarloBreachProbability; null when the results carry no path data) and the simulation warnings in a collapsed list. Nothing is simulated, interpolated or summed. Accepts defaultConfig, onSubmit, results, loading, error, defaultBreach, onBreach, breachProbability, breachLoading, breachError, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -687,7 +687,7 @@
     {
       "name": "normalization-editor",
       "type": "registry:component",
-      "docs": "Answers what adjusted EBITDA is and how each add-back gets there. Edits a NormalizationConfig with the schema form over the generated normalization_config contract (target, percentage and cap-base nodes as id-comboboxes over the supplied node ids; fixed per-period amounts, percentages of a node and caps as Rust declares them), validated natively (useNormalizationConfigValidator; a duplicate id is Rust's error). Normalize passes the canonical config to the caller (usually the useNormalize request). The native statements.normalize results are shown as returned, above the form: for a chosen period, a bridge from the reported base through each adjustment in declaration order to the final value, each step drawn from the previous step's adjusted_value (the base for the first) to its own, coloured by Rust's is_capped, and a table of every adjustment's capped amount by period with the raw amount beside a capped one. A missing node, a non-finite base or a negative cap shows the native error. Nothing is summed, capped or classified here. Accepts defaultConfig, nodeIds, validate, onSubmit, results, loading, error, formatValue and density props; no worker or query provider required.",
+      "docs": "Answers what adjusted EBITDA is and how each add-back gets there. Edits a NormalizationConfig with the schema form over the generated normalization_config contract (target, percentage and cap-base nodes as id-comboboxes over the supplied node ids; the new output node the adjusted metric is published under; fixed per-period amounts in the target's units, percentages of a node and absolute or reference caps as Rust declares them), validated natively (useNormalizationConfigValidator; a duplicate id is Rust's error). Normalize passes the canonical config to the caller (usually the useNormalize request). The native statements.normalize results are shown as returned, above the form: for a chosen period, a bridge from the reported base through each adjustment in declaration order to the final value, each step drawn from the previous step's adjusted_value (the base for the first) to its own, coloured by Rust's is_capped, and a table of every adjustment's capped amount by period with the raw amount beside a capped one. A period Rust returns without an adjusted value (its target, percentage reference or cap base has no value) shows its reason instead of a bridge and reads Unavailable in the table. A missing node, mismatched units or a negative cap shows the native error. Nothing is summed, capped or classified here. Accepts defaultConfig, nodeIds, validate, onSubmit, results, loading, error, formatValue and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -1641,7 +1641,7 @@
       "type": "registry:lib"
     },
     {
-      "name": "contract-forecast-parameters",
+      "name": "contract-forecast-spec",
       "type": "registry:lib"
     },
     {
@@ -1868,27 +1868,27 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
-      "sha256": "a55fbd0ff2733ea3298f9107f753ec43625db27e39c909abdb741cd2dae10945"
+      "sha256": "c0adfbdb14e41168356f54a9e4d3f55c721b51b6a1d9423ef3de84e506fe5fd6"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
-      "sha256": "5d6b62d74046ac0eb1285859d824c261cd2d387b8b1918bbe14ff3bc6c2181b2"
+      "sha256": "ffbb8e7ab96877931952bef37b6332911b40c8550e95636125dabc67a7d0c8d1"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "a61e49a54b1ea81db59fd03bb6685b8df6fab705e6f82f10f07feca02b0cfa7e"
+      "sha256": "88748c1991cbb64fe93700c7c5d259fac390f35368930116b351eac59757fbdc"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
-      "sha256": "36f2c7475ea85b8f3101f649330243ff9d94c4c8d4d98b13c3178ddb6e655722"
+      "sha256": "5ce3d028f6eee3a910bbbe3c25c1e736eff7cbd328545dc14b3f920129777819"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-pl-summary.json",
-      "sha256": "ae0b624dc30e44539a907b91c25f18a8503ef58bd1e60c8d95e2ee28b2ed0b62"
+      "sha256": "139d659c03325f6c8ebc9d7d777f11644e559cefff25736e2aa2e960fa7549f6"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-credit-assessment.json",
-      "sha256": "f54fb7eec15ae6e5a843366bdc5b49f5ca95635adc0d04fbe714a297916732ed"
+      "sha256": "4bdc4b14b25c7c1ce44a9520389dcba49411da97a420872274cfe0da3f2a3c0d"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf-assumptions.json",
@@ -1896,11 +1896,11 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf.json",
-      "sha256": "0f5a7a89903e50d167d6e676bce708c5faf7ee4148d97810f3b0458b38432970"
+      "sha256": "aee5dff3d999d6147eae9a7501784115a0fcf9feb52433b21a60832f63216b0b"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf-sensitivity.json",
-      "sha256": "24722aa6248d7185ed0a71f4b5c2dbed75be461f4d159379b3b9ff918b93c770"
+      "sha256": "9fd078e6604b6765e0de97cb79f30fe73e414c64d9258e261d3cdd1caced444b"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo-config.json",
@@ -1908,7 +1908,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo.json",
-      "sha256": "fb0d8f3e8b008747a95d4edf5ca16abce68d7433b8daf870f3cbaa19382bcfed"
+      "sha256": "da1f09c578e63320cae9ee2797a72814ae655ef60d60e46d53ae481af7600108"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity-run.json",
@@ -1916,7 +1916,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
-      "sha256": "3f3a7c81c0111e0c2547e4721651dc039b27d158b262143f0b91e7c26efd2efd"
+      "sha256": "53b3de952a55c739961fa99584f6759e6f85114845774f2f93f65369ccf89cd8"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
@@ -1924,7 +1924,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek.json",
-      "sha256": "18bd52e65c0badd889b328fc748a29c626044e37f060e9c508a9e97616679d7e"
+      "sha256": "9844d258ec9f13a2ad80511094864e1e1708415dcd1ca8c47c984f32bbd56176"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-bridge.json",
@@ -1936,15 +1936,15 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-config.json",
-      "sha256": "1d6a3005e1cde3f95aafba6b5407bd3c1dc0b1b0639ce3f1878bdacc08588793"
+      "sha256": "d1d1a1e04401c4d564a31ef56657b913a37d9c25ef3116ca48748fa49bd1768c"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
-      "sha256": "188e83b166e3d2b536f916b0ad827e82cea7c0c92c0ad72892eb2eab1eda0b4a"
+      "sha256": "c071b239f88bd820a56a25e94694e616bd8883d7f1eb9b3b2465f2ea42f7c14d"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",
-      "sha256": "89b2a80d33565cad1cb7063e44ce1c7c8105a9885f36a25eb8b7f49298b29fa2"
+      "sha256": "299f148df9c85b34ffa8ca1b81cac915f8c2d6ee45ea9ffcb20193ba05e7571b"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",
@@ -1952,19 +1952,19 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenario-diff.json",
-      "sha256": "b0944c409c3d2275d23f6c9b7bccb9ba6fabf33f2b6846a93ca231177d0b3588"
+      "sha256": "1db3f40df1482cbfd4bc7c001558cfa3b0d0420a07870939291c03e22dc086e8"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
-      "sha256": "2bd6a653f144141a15df583c36ae8c249b97e44c770c5b6bf05e62859ec66012"
+      "sha256": "e419e5661d26a216145dffd8041979b2fb5fad34f034e0119a6be93cd73262cb"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q3.json",
-      "sha256": "e5d86ab722794c569135d146079aee634126c54e4ad32930bc6b670f02849842"
+      "sha256": "f1504967c897786d11d6217848e06364c6ea1c5356f9f7e34506185dcec50187"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
-      "sha256": "05eb74260e4378f9c1b2685fc184c87374b57e3951387a0348434da99b94a441"
+      "sha256": "a472eee93fee26e710f41e02d3133a23fb7802855c1afec7b0f4815b664c46ae"
     },
     {
       "path": "finstack-quant-ui/tests/statements/wacc/cases.json",
@@ -1972,11 +1972,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/normalization/cases.json",
-      "sha256": "95b78aca6e160a2ad11a82bfd0795bd3bfaf46c1b2acab3fcb144ad3dd601cac"
+      "sha256": "5e9e2a31fc19b933eefdeb0f9d1afcc077591b05eb45aadebe023d1f4e0838f4"
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
-      "sha256": "cdb1b47d8786509aecd6c00035de8a0e83f58213e1a7a62cf104ffb7ce04b5a0"
+      "sha256": "46b4523844687baea0214be6871d61f7c93772ac8ae788d74fbd86f295445bb7"
     },
     {
       "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",
@@ -1984,11 +1984,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/export/cases.json",
-      "sha256": "7a9648b76d87423d757bdae647855708476ce957398298fcf9733fc507eff507"
+      "sha256": "3d7fb52ba51d1f30059a13cd10dcd2a9f4d51c69fd02784e6d62de6d3d22836d"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",
-      "sha256": "d27e146fc8bf943c2dd44ce6581fdd068ccad37bfaca19271409de85c3e7b936"
+      "sha256": "51d3d016972955976dc76cae6f4e53cacabb3a18e3e29e91e6e641e76adc1d64"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenants.json",
@@ -2000,7 +2000,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-breach-forecast.json",
-      "sha256": "7d96b237b279a0e8978698e7454b1b373a5198011b8fd187db147ee4e36fa6e5"
+      "sha256": "51fb5b6c669d2022a85df79d8f004abc62e9711390cc75b9d0e9673a5a5ab1b6"
     }
   ]
 }

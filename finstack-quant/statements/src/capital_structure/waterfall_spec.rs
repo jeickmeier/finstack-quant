@@ -33,19 +33,20 @@ pub struct WaterfallSpec {
     #[serde(default = "default_priority_of_payments")]
     pub priority_of_payments: Vec<PaymentPriority>,
 
-    /// Formula or node reference for cash available to allocate in the waterfall.
+    /// Formula or node reference for the cash available to allocate.
     ///
-    /// This is the **pre-waterfall** cash pool: cash before fees, interest,
-    /// amortization, and prepays allocated by this waterfall. Point it at a
-    /// standalone cash / FCF node (`cash`, `cash_available`, `free_cash_flow`).
-    /// Do not deduct `cs.interest_expense`, `cs.interest_expense_cash`,
-    /// `cs.principal_payment`, or `cs.fees` here — those are allocated by the
-    /// waterfall, and subtracting them from the pool double-pays debt service.
+    /// This is the cash pool **before debt service**: cash before the fees,
+    /// interest, amortization and prepayments this waterfall allocates. Point
+    /// it at a standalone cash or free-cash-flow node (`cash`,
+    /// `cash_available`, `free_cash_flow`). It may not depend on any
+    /// same-period `cs` component, directly or through the formulas and masks
+    /// of the nodes it names: every such component is an output of this
+    /// waterfall. A prior period read with `lag(...)` is allowed.
     ///
-    /// Required. Without a cash pool the waterfall reports every scheduled fee,
-    /// coupon and amortization as paid in full regardless of whether the model
-    /// generated the cash — uses exceed sources and no shortfall can ever be
-    /// raised, so the structure cannot report insolvency.
+    /// A negative pool is a funding shortfall: it is reported and nothing is
+    /// allocated. The cash left after the payment stack is an equity
+    /// distribution when `Equity` is the terminal priority and retained cash
+    /// when `Equity` is absent.
     pub available_cash_node: String,
 
     /// Excess Cash Flow (ECF) sweep specification.
@@ -65,21 +66,19 @@ pub struct WaterfallSpec {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub payment_classes: Vec<PaymentClassSpec>,
 
-    /// Formula or node for the `MandatoryPrepayment` rung.
+    /// The at-par mandatory prepayment: its amount and eligible facilities.
     ///
-    /// Required when `MandatoryPrepayment` appears in `priority_of_payments`.
-    /// When configured, that priority must be present so payment consumes cash.
-    /// Sized independently of the ECF sweep and voluntary prepay buckets.
+    /// Supplied together with `MandatoryPrepayment` in
+    /// `priority_of_payments`: neither is valid without the other.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mandatory_prepay_node: Option<String>,
+    pub mandatory_prepayment: Option<PrepaymentSpec>,
 
-    /// Formula or node for the `VoluntaryPrepayment` rung.
+    /// The at-par voluntary prepayment: its amount and eligible facilities.
     ///
-    /// Required when `VoluntaryPrepayment` appears in `priority_of_payments`.
-    /// When configured, that priority must be present so payment consumes cash.
-    /// Sized independently of the ECF sweep and mandatory prepay buckets.
+    /// Supplied together with `VoluntaryPrepayment` in
+    /// `priority_of_payments`: neither is valid without the other.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub voluntary_prepay_node: Option<String>,
+    pub voluntary_prepayment: Option<PrepaymentSpec>,
 }
 
 /// A seniority class for intra-category waterfall allocation.
@@ -104,8 +103,8 @@ impl Default for WaterfallSpec {
             ecf_sweep: None,
             pik_toggle: None,
             payment_classes: Vec::new(),
-            mandatory_prepay_node: None,
-            voluntary_prepay_node: None,
+            mandatory_prepayment: None,
+            voluntary_prepayment: None,
         }
     }
 }
@@ -135,8 +134,9 @@ impl WaterfallSpec {
     /// - `payment_classes` ids and ranks are unique, each class lists at least
     ///   one instrument, and no instrument appears in more than one class.
     /// - `MandatoryPrepayment` / `VoluntaryPrepayment` require the matching
-    ///   `mandatory_prepay_node` / `voluntary_prepay_node`, and configured sizing
-    ///   nodes require their matching priority so every payment consumes cash.
+    ///   `mandatory_prepayment` / `voluntary_prepayment`, and each configured
+    ///   prepayment requires its matching priority so every payment consumes
+    ///   cash. Each prepayment names its eligible facilities.
     ///
     /// When `available_cash_node` is set, the fees, interest, and amortization
     /// priorities must all be listed so every cash-consuming category is capped
@@ -187,32 +187,38 @@ impl WaterfallSpec {
                  supplying the period's available cash.",
             ));
         }
-        reject_available_cash_debt_service(&self.available_cash_node)?;
+        for (setting, expression) in self.sizing_expressions() {
+            reject_pool_output_dependence(&indexmap::IndexMap::new(), setting, expression)?;
+        }
         validate_payment_classes(&self.payment_classes)?;
-        for (priority, node_name, node) in [
+        for (priority, name, prepayment) in [
             (
                 PaymentPriority::MandatoryPrepayment,
-                "mandatory_prepay_node",
-                &self.mandatory_prepay_node,
+                "mandatory_prepayment",
+                &self.mandatory_prepayment,
             ),
             (
                 PaymentPriority::VoluntaryPrepayment,
-                "voluntary_prepay_node",
-                &self.voluntary_prepay_node,
+                "voluntary_prepayment",
+                &self.voluntary_prepayment,
             ),
         ] {
             let has_priority = self.priority_of_payments.contains(&priority);
-            if has_priority && node.as_ref().is_none_or(|n| n.trim().is_empty()) {
-                return Err(Error::build(format!(
-                    "WaterfallSpec: `{priority:?}` in `priority_of_payments` requires \
-                     `{node_name}`."
-                )));
-            }
-            if node.is_some() && !has_priority {
-                return Err(Error::build(format!(
-                    "WaterfallSpec: `{node_name}` requires `{priority:?}` in \
-                     `priority_of_payments` so its payment consumes available cash."
-                )));
+            match (prepayment, has_priority) {
+                (Some(prepayment), true) => prepayment.validate(name)?,
+                (None, true) => {
+                    return Err(Error::build(format!(
+                        "WaterfallSpec: `{priority:?}` in `priority_of_payments` requires \
+                         `{name}`."
+                    )));
+                }
+                (Some(_), false) => {
+                    return Err(Error::build(format!(
+                        "WaterfallSpec: `{name}` requires `{priority:?}` in \
+                         `priority_of_payments` so its payment consumes available cash."
+                    )));
+                }
+                (None, false) => {}
             }
         }
 
@@ -253,28 +259,6 @@ impl WaterfallSpec {
     }
 }
 
-/// Tokens that mean the cash pool has already deducted waterfall debt service.
-const AVAILABLE_CASH_DEBT_SERVICE_TOKENS: &[&str] = &[
-    "cs.interest_expense",
-    "cs.interest_expense_cash",
-    "cs.principal_payment",
-    "cs.fees",
-];
-
-/// Reject an `available_cash_node` expression (or a named node's formula) that
-/// deducts capital-structure debt service from the pre-waterfall cash pool.
-///
-/// # Arguments
-///
-/// * `text` - Inline DSL formula or node `formula_text` to scan for
-///   `cs.interest_expense`, `cs.interest_expense_cash`, `cs.principal_payment`,
-///   or `cs.fees`. Those buckets are allocated by the waterfall; subtracting
-///   them here double-pays debt service.
-///
-/// # Errors
-///
-/// Returns a build error naming the pre-waterfall contract when `text`
-/// contains any of those `cs.*` debt-service identifiers.
 fn validate_payment_classes(classes: &[PaymentClassSpec]) -> Result<()> {
     if classes.is_empty() {
         return Ok(());
@@ -318,20 +302,81 @@ fn validate_payment_classes(classes: &[PaymentClassSpec]) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn reject_available_cash_debt_service(text: &str) -> Result<()> {
-    if let Some(token) = AVAILABLE_CASH_DEBT_SERVICE_TOKENS
-        .iter()
-        .copied()
-        .find(|token| text.contains(token))
-    {
-        return Err(Error::build(format!(
-            "WaterfallSpec: `available_cash_node` is the pre-waterfall cash pool \
-             (cash before fees, interest, amortization, and prepays allocated by \
-             this waterfall). The formula must not deduct `{token}` or other \
-             `cs.interest_expense` / `cs.interest_expense_cash` / \
-             `cs.principal_payment` / `cs.fees` terms; those are allocated by \
-             the waterfall and deducting them here double-pays debt service."
-        )));
+/// Reject a cash pool that depends, in the same period, on an output of the
+/// waterfall it funds.
+///
+/// The pool is cash before debt service. Every same-period capital-structure
+/// component (`cs.*`: interest, fees, principal, balances, accruals, arrears)
+/// is an output of the allocation, so the pool expression may not read one,
+/// directly or through the formulas and masks of the nodes it names. A lagged
+/// reference (`lag(cs.debt_balance.total, 1)`) reads a committed prior period
+/// and is allowed.
+///
+/// # Arguments
+///
+/// * `nodes` - The model's nodes, searched transitively through their
+///   formulas and `where` masks. Empty checks the expression alone.
+/// * `setting` - Name of the waterfall setting that holds the expression,
+///   for the error.
+/// * `expression` - The pool or sizing input: a node id or an inline formula.
+///
+/// # Errors
+///
+/// Returns a build error naming the `cs` component and the chain of nodes
+/// that reaches it, or a parse error for an invalid formula.
+pub(crate) fn reject_pool_output_dependence(
+    nodes: &indexmap::IndexMap<crate::types::NodeId, crate::types::NodeSpec>,
+    setting: &str,
+    expression: &str,
+) -> Result<()> {
+    use crate::utils::formula::extract_direct_dependencies;
+    let same_period = |text: &str| -> Result<Vec<String>> {
+        Ok(
+            extract_direct_dependencies(&crate::dsl::parse_formula(text)?)
+                .into_iter()
+                .map(|id| id.as_str().to_string())
+                .collect(),
+        )
+    };
+    let mut pending: Vec<(String, Vec<String>)> = if nodes.contains_key(expression) {
+        vec![(expression.to_string(), Vec::new())]
+    } else {
+        same_period(expression)?
+            .into_iter()
+            .map(|id| (id, Vec::new()))
+            .collect()
+    };
+    let mut visited = HashSet::new();
+    while let Some((identifier, path)) = pending.pop() {
+        if identifier.starts_with("cs.") {
+            let via = if path.is_empty() {
+                String::new()
+            } else {
+                format!(" through {}", path.join(" -> "))
+            };
+            return Err(Error::build(format!(
+                "WaterfallSpec: `{setting}` is an input measured before debt service, but it \
+                 reads `{identifier}`{via} in the same period. Every same-period `cs` \
+                 component is an output of the waterfall this input feeds; read a prior \
+                 period with `lag(...)` or name an input that does not depend on it."
+            )));
+        }
+        if !visited.insert(identifier.clone()) {
+            continue;
+        }
+        let Some(node) = nodes.get(identifier.as_str()) else {
+            continue;
+        };
+        let mut chain = path;
+        chain.push(identifier);
+        for text in [node.formula_text.as_deref(), node.where_text.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            for dependency in same_period(text)? {
+                pending.push((dependency, chain.clone()));
+            }
+        }
     }
     Ok(())
 }
@@ -357,24 +402,119 @@ pub enum PaymentPriority {
     Equity,
 }
 
+/// The facilities a prepayment may repay.
+///
+/// Eligibility is elected, never implied: either every eligible facility of
+/// the structure (its term loans and revolvers), or the named ones.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum FacilitySelection {
+    /// Every term loan and revolver of the capital structure.
+    AllEligible,
+    /// The listed instrument ids only. Each must be a term loan or revolver
+    /// of the structure.
+    Named(Vec<String>),
+}
+
+impl FacilitySelection {
+    /// Whether `instrument_id` may be repaid under this selection.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_id` - Exact debt instrument id of the capital structure.
+    #[must_use]
+    pub fn includes(&self, instrument_id: &str) -> bool {
+        match self {
+            Self::AllEligible => true,
+            Self::Named(ids) => ids.iter().any(|id| id == instrument_id),
+        }
+    }
+
+    fn validate(&self, owner: &str) -> Result<()> {
+        let Self::Named(ids) = self else {
+            return Ok(());
+        };
+        if ids.is_empty() {
+            return Err(Error::build(format!(
+                "WaterfallSpec: `{owner}.facilities` names no facility; list at least one \
+                 instrument or elect `all_eligible`."
+            )));
+        }
+        let mut seen = HashSet::new();
+        for id in ids {
+            if id.trim().is_empty() || !seen.insert(id.as_str()) {
+                return Err(Error::build(format!(
+                    "WaterfallSpec: `{owner}.facilities` lists an empty or repeated \
+                     instrument id '{id}'."
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// An at-par mandatory or voluntary prepayment.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PrepaymentSpec {
+    /// Formula or node for the amount requested in the period, in the
+    /// waterfall currency. It must be finite and non-negative: a negative
+    /// request is an error, not zero. It may not depend on a same-period
+    /// `cs` component.
+    pub amount: String,
+    /// The facilities the prepayment may repay.
+    pub facilities: FacilitySelection,
+}
+
+impl PrepaymentSpec {
+    fn validate(&self, owner: &str) -> Result<()> {
+        if self.amount.trim().is_empty() {
+            return Err(Error::build(format!(
+                "WaterfallSpec: `{owner}.amount` must name a node or formula."
+            )));
+        }
+        self.facilities.validate(owner)
+    }
+}
+
+/// One elected deduction from, or credit to, the excess-cash-flow measure.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum EcfTerm {
+    /// A model amount: a node or formula in the waterfall currency, signed
+    /// as the model states it. It may not depend on a same-period `cs`
+    /// component.
+    Input {
+        /// Node id or formula.
+        expression: String,
+    },
+    /// Cash interest actually paid by the priorities ahead of the sweep in
+    /// this period, including carried arrears. PIK and unpaid interest are
+    /// not cash and are not included.
+    PaidCashInterest,
+    /// Fees actually paid by the priorities ahead of the sweep.
+    PaidFees,
+    /// Scheduled principal actually paid by the priorities ahead of the
+    /// sweep, including carried arrears. Other prepayments are not included.
+    PaidScheduledPrincipal,
+}
+
 /// Excess Cash Flow (ECF) sweep specification.
 ///
-/// Defines how to calculate ECF and what percentage to sweep to pay down debt.
-///
-/// # ECF Calculation
-///
-/// The ECF formula deducts cash interest, fees and scheduled principal paid
-/// by payment categories ahead of the `Sweep` priority, including carried
-/// arrears. Unpaid claims, PIK and later payment priorities are not deducted:
+/// The agreement's formula is elected in full: a cash measure, each
+/// deduction and each credit. Nothing is deducted automatically.
 ///
 /// ```text
-/// ECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid
-///       - Fees Paid Ahead of Prepayment
-///       - Scheduled Principal Paid Ahead of Prepayment
-///   ```
+/// ECF     = cash_measure - Σ deductions + Σ credits
+/// request = sweep_percentage × ECF   when ECF is positive, otherwise zero
+/// ```
 ///
-/// Set `cash_interest_node` to override the cash-interest input. If omitted,
-/// the interest actually paid ahead of `Sweep` is deducted automatically.
+/// The request is paid at par from the cash the earlier priorities left, up
+/// to the eligible principal net of reserves. It is sized, paid and applied
+/// to principal in the same reporting period.
 ///
 /// # References
 ///
@@ -383,50 +523,49 @@ pub enum PaymentPriority {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct EcfSweepSpec {
-    /// Formula or node reference for EBITDA (e.g., "ebitda" or "revenue - cogs - opex")
-    pub ebitda_node: String,
+    /// Formula or node for the agreement's cash measure before deductions
+    /// (for example `ebitda`), in the waterfall currency. Signed and finite.
+    /// It may not depend on a same-period `cs` component.
+    pub cash_measure: String,
 
-    /// Formula or node reference for taxes (e.g., "taxes")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub taxes_node: Option<String>,
+    /// Amounts subtracted from the cash measure, each elected explicitly.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deductions: Vec<EcfTerm>,
 
-    /// Formula or node reference for capital expenditures (e.g., "capex")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub capex_node: Option<String>,
+    /// Amounts added to the cash measure, each elected explicitly.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub credits: Vec<EcfTerm>,
 
-    /// Formula or node reference for working capital change (e.g., "wc_change")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub working_capital_node: Option<String>,
-
-    /// Formula or node reference for cash interest paid (e.g., "cs.interest_expense_cash.total").
-    ///
-    /// If omitted, deducts cash interest actually paid by the `Interest` priority
-    /// ahead of `Sweep`, including carried coupon arrears. If `Interest` follows
-    /// `Sweep`, this automatic deduction is zero. An explicit node overrides
-    /// that amount in the model's cash currency units.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cash_interest_node: Option<String>,
-
-    /// Sweep percentage (e.g., 0.5 for 50%, 0.75 for 75%)
+    /// Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).
     pub sweep_percentage: f64,
 
-    /// Target instrument ID for sweep payments (if None, applies to all term loans)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub target_instrument_id: Option<String>,
+    /// The facilities the sweep may repay.
+    pub facilities: FacilitySelection,
+
+    /// Days from the close of the measured period to the date the sweep is
+    /// due. When set, the amount measured in a period is a dated obligation:
+    /// it is paid in the period that contains its due date, and what cash or
+    /// eligible principal cannot pay is carried as arrears and paid first at
+    /// the next sweep. `0` is due at the close of the measured period. When
+    /// omitted the sweep is paid in the period it is measured and an unpaid
+    /// amount is reported, not carried.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_lag_days: Option<u32>,
 }
 
 impl EcfSweepSpec {
     /// Validate the sweep on its own.
     ///
     /// `sweep_percentage` must be a finite decimal fraction in `[0.0, 1.0]`
-    /// (`0.5` sweeps half of excess cash flow). [`WaterfallSpec::validate`]
-    /// calls this and additionally requires a prepayment priority for a
-    /// positive sweep, which needs the enclosing priority stack.
+    /// (`0.5` sweeps half of excess cash flow), the cash measure and every
+    /// input term must name an expression, and a named facility list must be
+    /// non-empty and free of repeats. [`WaterfallSpec::validate`] calls this
+    /// and additionally requires the `Sweep` priority.
     ///
     /// # Errors
     ///
-    /// Returns a build error when `sweep_percentage` is outside `[0.0, 1.0]`
-    /// or not finite.
+    /// Returns a build error for a percentage outside `[0.0, 1.0]` or not
+    /// finite, an empty expression, or an invalid facility list.
     pub fn validate(&self) -> Result<()> {
         if !(0.0..=1.0).contains(&self.sweep_percentage) {
             return Err(Error::build(format!(
@@ -434,63 +573,195 @@ impl EcfSweepSpec {
                 self.sweep_percentage
             )));
         }
-        Ok(())
+        if self
+            .expressions()
+            .any(|expression| expression.trim().is_empty())
+        {
+            return Err(Error::build(
+                "EcfSweepSpec: the cash measure and every input term must name a node or formula.",
+            ));
+        }
+        self.facilities.validate("ecf_sweep")
+    }
+
+    /// The model expressions the sweep reads: the cash measure and every
+    /// input deduction and credit.
+    pub(crate) fn expressions(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.cash_measure.as_str()).chain(
+            self.deductions
+                .iter()
+                .chain(&self.credits)
+                .filter_map(|term| match term {
+                    EcfTerm::Input { expression } => Some(expression.as_str()),
+                    _ => None,
+                }),
+        )
     }
 }
 
-/// PIK toggle specification.
+impl WaterfallSpec {
+    /// Every prepayment the waterfall configures, with its priority, its
+    /// name in the specification and its facility selection.
+    pub(crate) fn prepayments(&self) -> Vec<(PaymentPriority, &'static str, &FacilitySelection)> {
+        let mut prepayments = Vec::new();
+        if let Some(spec) = &self.mandatory_prepayment {
+            prepayments.push((
+                PaymentPriority::MandatoryPrepayment,
+                "mandatory_prepayment",
+                &spec.facilities,
+            ));
+        }
+        if let Some(spec) = &self.voluntary_prepayment {
+            prepayments.push((
+                PaymentPriority::VoluntaryPrepayment,
+                "voluntary_prepayment",
+                &spec.facilities,
+            ));
+        }
+        if let Some(spec) = &self.ecf_sweep {
+            prepayments.push((PaymentPriority::Sweep, "ecf_sweep", &spec.facilities));
+        }
+        prepayments
+    }
+
+    /// Every model expression that sizes a waterfall amount, with the name
+    /// of the setting that holds it.
+    pub(crate) fn sizing_expressions(&self) -> Vec<(&'static str, &str)> {
+        let mut expressions = vec![("available_cash_node", self.available_cash_node.as_str())];
+        if let Some(spec) = &self.mandatory_prepayment {
+            expressions.push(("mandatory_prepayment.amount", spec.amount.as_str()));
+        }
+        if let Some(spec) = &self.voluntary_prepayment {
+            expressions.push(("voluntary_prepayment.amount", spec.amount.as_str()));
+        }
+        if let Some(spec) = &self.ecf_sweep {
+            expressions.extend(spec.expressions().map(|text| ("ecf_sweep", text)));
+        }
+        // The election is decided before the period's cash is allocated, so
+        // its metric is an input of the stage like the pool and the sizing.
+        if let Some(spec) = &self.pik_toggle {
+            expressions.push((
+                "pik_toggle.liquidity_metric",
+                spec.liquidity_metric.as_str(),
+            ));
+        }
+        expressions
+    }
+}
+
+/// PIK toggle: the modeled exercise of a borrower's PIK election.
 ///
-/// Defines conditions for switching between cash and PIK interest modes.
+/// In each forecast period the liquidity metric is compared with the
+/// threshold. A metric below the threshold requests PIK and a metric at or
+/// above it requests the loan's base coupon terms. The request takes effect
+/// at the start of each listed loan's next coupon period after the period
+/// close, never on a coupon already running, and is applied through the
+/// loan's own coupon terms: the elected share of each covered coupon is zero
+/// cash and capitalizes once, on the coupon date. Overdue cash interest and
+/// fees stay cash claims and are never capitalized by an election.
 ///
-/// # Hysteresis
+/// Actual periods are not exercised: record a historical election on the
+/// loan itself (`covenants.pik_toggles`).
 ///
-/// Set `min_periods_in_pik` to prevent oscillation when the liquidity metric
-/// hovers near the threshold. Once PIK is triggered, it stays active for at
-/// least that many periods before it can switch back.
-///
-/// Thresholds use the same scalar units as the referenced `liquidity_metric`.
+/// The threshold is in the units of `liquidity_metric`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PikToggleSpec {
-    /// Node reference or formula for liquidity metric (e.g., "cash_balance" or "ebitda / interest_expense")
+    /// Node reference or formula for the liquidity metric (for example
+    /// `"cash_balance"` or `"ebitda / interest_expense"`). It must evaluate to
+    /// a finite number in every forecast period.
     pub liquidity_metric: String,
 
-    /// Threshold value: if metric < threshold, enable PIK; otherwise use cash
+    /// Finite threshold in the metric's units: a metric below it requests
+    /// PIK, a metric at or above it requests the base coupon terms.
     pub threshold: f64,
 
-    /// Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
-    ///
-    /// Must be a non-empty list: instrument-level PIK capability is not
-    /// modeled, so an empty list is rejected by [`PikToggleSpec::validate`]
-    /// rather than meaning "every instrument".
-    /// Swaps and options cannot be PIK targets.
+    /// The loans authorized to elect PIK, one entry each. Must not be empty.
     #[cfg_attr(feature = "json-schema", schemars(length(min = 1)))]
-    pub target_instrument_ids: Vec<String>,
+    pub elections: Vec<PikElectionSpec>,
+}
 
-    /// Minimum number of periods PIK must stay active once triggered (hysteresis).
-    /// Prevents oscillation when the metric hovers near the threshold.
-    /// Default: 0 (no hysteresis, PIK can toggle every period).
+/// One loan's PIK authorization under a [`PikToggleSpec`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PikElectionSpec {
+    /// Term loan authorized to elect PIK.
+    pub instrument_id: String,
+
+    /// Share of each elected coupon that capitalizes, a decimal in `(0, 1]`
+    /// (`0.4` capitalizes 40% and pays 60% in cash; `1` is full PIK).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub pik_fraction: rust_decimal::Decimal,
+
+    /// Days of notice an election needs: it takes effect at the first coupon
+    /// period that starts at least this many days after the close of the
+    /// period that observed the metric. `0` is the next coupon period.
     #[serde(default)]
-    pub min_periods_in_pik: usize,
+    pub notice_days: u32,
+
+    /// Minimum number of consecutive coupon periods a PIK election lasts,
+    /// counting the first elected period. With `0` a request for cash before
+    /// the election starts withdraws it; with `1` an election, once made,
+    /// covers its first coupon period.
+    #[serde(default)]
+    pub min_coupon_periods: usize,
 }
 
 impl PikToggleSpec {
     /// Validate the toggle on its own.
     ///
-    /// `target_instrument_ids` must list at least one instrument explicitly.
     /// [`WaterfallSpec::validate`] calls this for a configured `pik_toggle`.
     ///
     /// # Errors
     ///
-    /// Returns a build error when `target_instrument_ids` is empty.
+    /// Returns a build error when the threshold is not finite, the metric is
+    /// empty, no election is listed, a loan is listed twice or with an empty
+    /// id, or a `pik_fraction` is outside `(0, 1]`.
     pub fn validate(&self) -> Result<()> {
-        if self.target_instrument_ids.is_empty() {
+        if !self.threshold.is_finite() {
+            return Err(Error::build(format!(
+                "PikToggleSpec: `threshold` must be finite, got {}",
+                self.threshold
+            )));
+        }
+        if self.liquidity_metric.trim().is_empty() {
             return Err(Error::build(
-                "PikToggleSpec: `target_instrument_ids` must explicitly list the \
-                 instruments that can PIK. Instrument-level PIK capability is not \
-                 modeled yet, so implicit all-instrument PIK targets are rejected.",
+                "PikToggleSpec: `liquidity_metric` must name a node or formula",
             ));
+        }
+        if self.elections.is_empty() {
+            return Err(Error::build(
+                "PikToggleSpec: `elections` must list each loan authorized to elect PIK; an \
+                 election is never implied for every instrument.",
+            ));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for election in &self.elections {
+            if election.instrument_id.trim().is_empty() {
+                return Err(Error::build(
+                    "PikToggleSpec: an election has an empty `instrument_id`",
+                ));
+            }
+            if !seen.insert(election.instrument_id.as_str()) {
+                return Err(Error::build(format!(
+                    "PikToggleSpec: `elections` lists '{}' more than once",
+                    election.instrument_id
+                )));
+            }
+            if election.pik_fraction <= rust_decimal::Decimal::ZERO
+                || election.pik_fraction > rust_decimal::Decimal::ONE
+            {
+                return Err(Error::build(format!(
+                    "PikToggleSpec: `pik_fraction` for '{}' must be in (0, 1], got {}",
+                    election.instrument_id, election.pik_fraction
+                )));
+            }
         }
         Ok(())
     }
@@ -521,13 +792,16 @@ mod tests {
 
     fn sweep_spec(percentage: f64) -> EcfSweepSpec {
         EcfSweepSpec {
-            ebitda_node: "ebitda".into(),
-            taxes_node: None,
-            capex_node: None,
-            working_capital_node: None,
-            cash_interest_node: None,
+            cash_measure: "ebitda".into(),
+            deductions: vec![
+                crate::capital_structure::EcfTerm::PaidCashInterest,
+                crate::capital_structure::EcfTerm::PaidFees,
+                crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+            ],
+            credits: Vec::new(),
             sweep_percentage: percentage,
-            target_instrument_id: None,
+            facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            payment_lag_days: None,
         }
     }
 
@@ -593,7 +867,10 @@ mod tests {
                 PaymentPriority::Equity,
                 PaymentPriority::MandatoryPrepayment,
             ],
-            mandatory_prepay_node: Some("mandatory".into()),
+            mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+                amount: "mandatory".into(),
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            }),
             ..spec_with(default_priority_of_payments())
         };
         // A prepayment after Equity means Equity is not last, which the
@@ -604,21 +881,33 @@ mod tests {
         assert!(err.to_string().contains("must be the last entry"));
     }
 
+    fn pik(elections: Vec<PikElectionSpec>) -> PikToggleSpec {
+        PikToggleSpec {
+            liquidity_metric: "liquidity".into(),
+            threshold: 100.0,
+            elections,
+        }
+    }
+
+    fn election(id: &str, fraction: rust_decimal::Decimal) -> PikElectionSpec {
+        PikElectionSpec {
+            instrument_id: id.into(),
+            pik_fraction: fraction,
+            min_coupon_periods: 0,
+            notice_days: 0,
+        }
+    }
+
     #[test]
-    fn validate_rejects_implicit_pik_targets() {
+    fn validate_rejects_a_toggle_without_elections() {
         let spec = WaterfallSpec {
-            pik_toggle: Some(PikToggleSpec {
-                liquidity_metric: "liquidity".into(),
-                threshold: 100.0,
-                target_instrument_ids: Vec::new(),
-                min_periods_in_pik: 0,
-            }),
+            pik_toggle: Some(pik(Vec::new())),
             ..spec_with(default_priority_of_payments())
         };
         let err = spec
             .validate()
-            .expect_err("implicit PIK targets must be rejected");
-        assert!(err.to_string().contains("target_instrument_ids"));
+            .expect_err("an implied election must be rejected");
+        assert!(err.to_string().contains("elections"));
     }
 
     /// The sweep and PIK rules run on the sub-specs alone, so a host can
@@ -634,16 +923,35 @@ mod tests {
         sweep_spec(0.0).validate().expect("zero sweep is valid");
         sweep_spec(1.0).validate().expect("full sweep is valid");
 
-        let mut pik = PikToggleSpec {
-            liquidity_metric: "liquidity".into(),
-            threshold: 100.0,
-            target_instrument_ids: Vec::new(),
-            min_periods_in_pik: 0,
-        };
-        let err = pik.validate().expect_err("empty PIK targets are rejected");
-        assert!(err.to_string().contains("target_instrument_ids"), "{err}");
-        pik.target_instrument_ids = vec!["TL-PIK".into()];
-        pik.validate().expect("explicit PIK targets are valid");
+        use rust_decimal::Decimal;
+        let err = pik(Vec::new())
+            .validate()
+            .expect_err("no election is rejected");
+        assert!(err.to_string().contains("elections"), "{err}");
+        pik(vec![election("TL-PIK", Decimal::new(4, 1))])
+            .validate()
+            .expect("an explicit election is valid");
+        // The fraction is in (0, 1], a loan is listed once and the threshold
+        // is finite.
+        for fraction in [Decimal::ZERO, Decimal::new(-1, 1), Decimal::new(11, 1)] {
+            let err = pik(vec![election("TL-PIK", fraction)])
+                .validate()
+                .expect_err("fraction outside (0, 1]");
+            assert!(err.to_string().contains("pik_fraction"), "{err}");
+        }
+        let err = pik(vec![
+            election("TL-PIK", Decimal::ONE),
+            election("TL-PIK", Decimal::ONE),
+        ])
+        .validate()
+        .expect_err("a loan listed twice");
+        assert!(err.to_string().contains("more than once"), "{err}");
+        for threshold in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut spec = pik(vec![election("TL-PIK", Decimal::ONE)]);
+            spec.threshold = threshold;
+            let err = spec.validate().expect_err("non-finite threshold");
+            assert!(err.to_string().contains("threshold"), "{err}");
+        }
     }
 
     #[test]
@@ -656,18 +964,60 @@ mod tests {
             .validate()
             .expect_err("deducting cs debt service from available cash must be rejected");
         assert!(
-            err.to_string().contains("pre-waterfall"),
-            "error must name the pre-waterfall contract: {err}"
+            err.to_string().contains("before debt service"),
+            "error must name the pre-debt-service contract: {err}"
         );
     }
 
     #[test]
-    fn reject_available_cash_debt_service_scans_named_node_formula() {
-        reject_available_cash_debt_service("cash_available")
-            .expect("a standalone cash node name is the pre-waterfall pool");
-        let err = reject_available_cash_debt_service("ebitda - cs.principal_payment.total")
-            .expect_err("a named node's formula that deducts cs principal must be rejected");
-        assert!(err.to_string().contains("pre-waterfall"));
+    fn the_pool_may_not_reach_a_same_period_cs_output_through_any_chain() {
+        use crate::types::{NodeId, NodeSpec, NodeType};
+        let node = |id: &str, formula: &str| {
+            (
+                NodeId::new(id),
+                NodeSpec::new(id, NodeType::Calculated).with_formula(formula),
+            )
+        };
+        let mut masked = NodeSpec::new("masked", NodeType::Calculated).with_formula("ebitda");
+        masked.where_text = Some("cs.debt_balance.total > 0 * cs.debt_balance.total".into());
+        let nodes: indexmap::IndexMap<NodeId, NodeSpec> = [
+            node("cash", "ebitda - capex"),
+            node("direct", "ebitda - cs.principal_payment.total"),
+            node("alias", "net_cash"),
+            node("net_cash", "ebitda - interest_paid"),
+            node("interest_paid", "cs.interest_expense_cash.total"),
+            node("accrual", "ebitda - cs.accrued_interest.total"),
+            node("lagged", "ebitda - lag(cs.debt_balance.total, 1)"),
+            (NodeId::new("masked"), masked),
+        ]
+        .into_iter()
+        .collect();
+
+        // A pool with no capital dependence, and one that reads a prior period.
+        for pool in ["cash", "lagged", "ebitda - capex"] {
+            reject_pool_output_dependence(&nodes, "available_cash_node", pool).expect(pool);
+        }
+        // Direct, aliased, masked and inline dependence, on any component.
+        for (pool, component) in [
+            ("direct", "cs.principal_payment.total"),
+            ("alias", "cs.interest_expense_cash.total"),
+            ("accrual", "cs.accrued_interest.total"),
+            ("masked", "cs.debt_balance.total"),
+            ("ebitda - cs.fees.total", "cs.fees.total"),
+        ] {
+            let error = reject_pool_output_dependence(&nodes, "available_cash_node", pool)
+                .expect_err(pool)
+                .to_string();
+            assert!(error.contains(component), "{pool}: {error}");
+        }
+        // The chain that reaches the output is named.
+        let error = reject_pool_output_dependence(&nodes, "available_cash_node", "alias")
+            .expect_err("alias")
+            .to_string();
+        assert!(
+            error.contains("alias -> net_cash -> interest_paid"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -692,8 +1042,8 @@ mod tests {
         ]);
         let err = spec
             .validate()
-            .expect_err("MandatoryPrepayment requires mandatory_prepay_node");
-        assert!(err.to_string().contains("mandatory_prepay_node"));
+            .expect_err("MandatoryPrepayment requires mandatory_prepayment");
+        assert!(err.to_string().contains("mandatory_prepayment"));
     }
 
     #[test]
@@ -719,26 +1069,36 @@ mod tests {
         assert!(err.to_string().contains("duplicate payment class id"));
     }
     #[test]
-    fn pik_targets_are_required_on_the_wire_and_nonempty_when_validated() {
+    fn pik_elections_are_required_on_the_wire_and_checked_when_validated() {
         for value in [
             serde_json::json!({"liquidity_metric":"cash","threshold":1.0}),
-            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":null}),
+            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"elections":null}),
+            // The retired shape is not read.
+            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":["TL"]}),
+            // A threshold the wire cannot state as a finite number.
+            serde_json::json!({"liquidity_metric":"cash","threshold":"nan","elections":[]}),
+            serde_json::json!({"liquidity_metric":"cash","threshold":null,"elections":[]}),
         ] {
             assert!(serde_json::from_value::<PikToggleSpec>(value).is_err());
         }
-        let mut value = serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":[]});
+        let mut value =
+            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"elections":[]});
         assert!(
             serde_json::from_value::<PikToggleSpec>(value.clone())
                 .expect("vector parses")
                 .validate()
                 .is_err()
         );
-        value["target_instrument_ids"] = serde_json::json!(["TL"]);
-        let spec: PikToggleSpec = serde_json::from_value(value.clone()).expect("explicit targets");
-        spec.validate().expect("valid targets");
+        value["elections"] = serde_json::json!([{"instrument_id":"TL","pik_fraction":"0.4"}]);
+        let spec: PikToggleSpec = serde_json::from_value(value.clone()).expect("explicit election");
+        spec.validate().expect("valid election");
+        assert_eq!(spec.elections[0].min_coupon_periods, 0);
         assert_eq!(
-            serde_json::to_value(spec).expect("serialize")["target_instrument_ids"],
-            value["target_instrument_ids"]
+            serde_json::to_value(&spec).expect("serialize")["elections"][0]["pik_fraction"],
+            serde_json::json!("0.4")
         );
+        // An unknown field of an election is rejected.
+        value["elections"][0]["min_periods_in_pik"] = serde_json::json!(2);
+        assert!(serde_json::from_value::<PikToggleSpec>(value).is_err());
     }
 }

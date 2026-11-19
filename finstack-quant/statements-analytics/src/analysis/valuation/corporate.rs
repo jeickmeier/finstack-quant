@@ -406,7 +406,12 @@ pub fn evaluate_dcf(
     };
     let mut evaluator = Evaluator::new();
     let results = match (market, as_of) {
-        (Some(market), Some(as_of)) => evaluator.evaluate_with_market(model, market, as_of)?,
+        (Some(market), Some(as_of)) => evaluator.evaluate_with_market(
+            model,
+            market,
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )?,
         (Some(_), None) => {
             return Err(finstack_quant_statements::Error::Eval(
                 "evaluate_dcf requires as_of when a market context is provided; \
@@ -1167,7 +1172,7 @@ fn equity_bridge_from_model(
 
     let currency = extract_currency_from_model(model)?;
     let component = |names: [&str; 2]| -> Result<f64> {
-        let node = names.into_iter().find(|name| results.get(name, &selected_period_id).is_some())
+        let node = names.into_iter().find(|name| crate::cell_float(results, name, &selected_period_id).is_some())
             .ok_or_else(|| finstack_quant_statements::Error::Eval(format!(
                 "Net debt requires '{}' or '{}' at period {}; provide the balance-sheet node or net_debt_override",
                 names[0], names[1], selected_period_id

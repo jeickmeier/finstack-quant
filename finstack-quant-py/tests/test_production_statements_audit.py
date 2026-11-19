@@ -51,6 +51,8 @@ def test_residual_tolerance_boundary_and_signed_dividends() -> None:
                 "name": "Residual",
                 "category": "accounting_identity",
                 "severity": "error",
+                "mode": "residual",
+                "scope": "all_periods",
                 "formula": "residual",
                 "message_template": "bad {period}",
                 "tolerance": 0.1,
@@ -61,6 +63,7 @@ def test_residual_tolerance_boundary_and_signed_dividends() -> None:
                 "type": "retained_earnings_reconciliation",
                 "retained_earnings_node": "re",
                 "net_income_node": "income",
+                "opening_balance": {"date": "2025-01-01", "value": 920.0},
                 "dividends_node": "div",
                 "dividends_sign_convention": "inflow_positive",
             }
@@ -100,7 +103,7 @@ def test_explicit_forecast_keeps_growth_anchor_and_seasonal_phase(forecast_json:
         "nodes": {
             "revenue": {
                 "node_id": "revenue",
-                "node_type": "value",
+                "node_type": "mixed",
                 "values": {"2025Q1": 80.0},
                 "forecast": json.loads(forecast_json),
             }

@@ -22,6 +22,17 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         crate::FIXED_INCOME
     );
 
+    fn contractual_accrual_config(
+        &self,
+    ) -> Option<finstack_quant_cashflows::accrual::AccrualConfig> {
+        Some(finstack_quant_cashflows::accrual::AccrualConfig {
+            method: self.accrual_method.clone(),
+            ex_coupon: None,
+            include_pik: false,
+            frequency: Some(self.cashflow_spec.frequency()),
+        })
+    }
+
     fn notional_draw_date(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.issue_date)
     }

@@ -5,8 +5,8 @@
     {
       "id": "debt_to_equity",
       "name": "Debt to Equity",
-      "formula": "total_debt / total_equity",
-      "description": "Total debt divided by total equity",
+      "formula": "ratio(total_debt, total_equity)",
+      "description": "Period-end gross interest-bearing debt, before cash offsets, over period-end shareholder equity, in one reporting scope and currency. Zero debt is a valid zero. A dimensionless multiple. Unavailable when an input is missing or the denominator is zero or negative. Covenant thresholds and definitions are agreement-specific and are not part of this metric.",
       "category": "leverage",
       "unit_type": "ratio",
       "rollup": "formula",
@@ -16,8 +16,8 @@
     {
       "id": "debt_to_assets",
       "name": "Debt to Assets",
-      "formula": "total_debt / total_assets",
-      "description": "Total debt divided by total assets",
+      "formula": "ratio(total_debt, total_assets)",
+      "description": "Period-end gross interest-bearing debt, before cash offsets, over period-end total assets, in one reporting scope and currency. Zero debt is a valid zero. A dimensionless multiple. Unavailable when an input is missing or the denominator is zero or negative. Covenant thresholds and definitions are agreement-specific and are not part of this metric.",
       "category": "leverage",
       "unit_type": "ratio",
       "rollup": "formula",
@@ -27,8 +27,8 @@
     {
       "id": "equity_multiplier",
       "name": "Equity Multiplier",
-      "formula": "total_assets / total_equity",
-      "description": "Total assets divided by total equity",
+      "formula": "ratio(total_assets, total_equity)",
+      "description": "Period-end total assets over period-end shareholder equity, in one reporting scope and currency. A dimensionless multiple. Unavailable when an input is missing or the denominator is zero or negative. Covenant thresholds and definitions are agreement-specific and are not part of this metric.",
       "category": "leverage",
       "unit_type": "ratio",
       "rollup": "formula",
@@ -38,8 +38,8 @@
     {
       "id": "debt_to_ebitda",
       "name": "Debt to EBITDA",
-      "formula": "total_debt / ttm(ebitda)",
-      "description": "Total debt divided by EBITDA. Common credit metric used by lenders and rating agencies. NOTE: Ensure EBITDA includes all adjustments for one-time items, stock compensation, and other addbacks per credit agreement definitions. total_debt should match the definition in loan covenants (typically includes all interest-bearing debt, may exclude certain items). Values < 3.0x are generally considered conservative for most industries.",
+      "formula": "ratio(total_debt, ttm(ebitda))",
+      "description": "Period-end gross interest-bearing debt, before cash offsets, over trailing-twelve-month EBITDA. EBITDA is the shared reported-cost `fin.ebitda`. The trailing window must be complete: an incomplete or gapped window is unavailable. Zero debt is a valid zero. A dimensionless multiple. Unavailable when an input is missing or the denominator is zero or negative. Covenant thresholds and definitions are agreement-specific and are not part of this metric.",
       "category": "leverage",
       "unit_type": "ratio",
       "rollup": "formula",
@@ -49,8 +49,8 @@
     {
       "id": "interest_coverage",
       "name": "Interest Coverage",
-      "formula": "ttm(ebitda) / ttm(interest_expense)",
-      "description": "EBITDA divided by interest expense. Measures ability to service debt from operating earnings. NOTE: This metric uses EBITDA and is sensitive to depreciation and amortization capture. Interest capitalization may affect comparability across periods or entities. Values > 1.5x are generally considered healthy for investment-grade credits.",
+      "formula": "ratio(ttm(ebitda), ttm(interest_expense))",
+      "description": "Trailing-twelve-month EBITDA over trailing-twelve-month statement interest expense. `interest_expense` is the interest recognized in the income statement, including recognized PIK, as a positive expense. EBITDA is the shared reported-cost `fin.ebitda`; a negative EBITDA gives a negative coverage. Both trailing windows must be complete. A dimensionless multiple. Unavailable when an input is missing or the denominator is zero or negative. Covenant thresholds and definitions are agreement-specific and are not part of this metric.",
       "category": "leverage",
       "unit_type": "ratio",
       "rollup": "formula",
@@ -60,12 +60,12 @@
     {
       "id": "debt_service_coverage",
       "name": "Debt Service Coverage",
-      "formula": "ttm(ebitda) / ttm(interest_expense + principal_payment)",
-      "description": "EBITDA divided by total debt service (interest + principal). Measures ability to service both interest and principal from operating cash flow. NOTE: This metric assumes standard EBITDA construction. Principal payments are not tax-deductible, so this ratio may understate true coverage. For PIK interest, ensure interest_expense includes both cash and PIK components. Values > 1.25x are typically required by lenders.",
+      "formula": "ratio(ttm(ebitda), ttm(scheduled_cash_interest_due + scheduled_principal_due))",
+      "description": "Trailing-twelve-month EBITDA over trailing-twelve-month scheduled cash debt service on borrowings. `scheduled_cash_interest_due` and `scheduled_principal_due` are the scheduled cash interest and the scheduled principal (amortization and maturity) recognized once on their contractual due dates, whether or not they were paid; they exclude arrears settlements, advance payments, prepayments and sweeps, PIK, fees, hedge flows and distress cash. With a capital structure they are `cs.scheduled_cash_interest_due.total` and `cs.scheduled_principal_due.total`. EBITDA is the shared reported-cost `fin.ebitda`; a negative EBITDA gives a negative coverage. Both trailing windows must be complete. A dimensionless multiple. Unavailable when an input is missing or the denominator is zero or negative. Covenant thresholds and definitions are agreement-specific and are not part of this metric.",
       "category": "leverage",
       "unit_type": "ratio",
       "rollup": "formula",
-      "requires": ["ebitda", "interest_expense", "principal_payment"],
+      "requires": ["ebitda", "scheduled_cash_interest_due", "scheduled_principal_due"],
       "tags": ["leverage", "credit", "coverage"]
     }
   ]

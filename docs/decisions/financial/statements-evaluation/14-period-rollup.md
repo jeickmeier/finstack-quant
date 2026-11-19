@@ -1,6 +1,8 @@
 # STATEMENTS-EVALUATION-014 — Flow, balance and formula rollup to coarser periods
 
-Decision status: **Accepted for the full period rollup contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full period rollup contract (2026-11-15)**. Implementation status: **Reconciled (2026-11-18)**. Validation status: **Qualified by the half-year example and its absent-flow variant, unresolved methods, partial periods, foreign results, compensated and exact sums, overflow, final-cell status, re-evaluated masks, target cadence and a check suite judged at the target periods**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+
+Every node resolves to an explicit method, the request's entry and then the node's declaration; a node with neither fails the rollup with every such node named, and nothing is summed by default. The bundled flow metrics declare `sum`. The source result must be a verified run of the model: the same content, source snapshot, period plan and run identity. `Sum` adds typed cells, money exactly and scalars with a compensated sum, and a source cell that is missing, masked or unavailable leaves the target unavailable; a sum that mixes units or cannot be represented is an error. `PeriodEnd` copies the final source cell with its status. `Formula` re-evaluates the mask and formula over typed rolled cells and target-period history: a false mask is a masked cell, an input without a value leaves the result unavailable, and a function that is invalid at the target cadence is an error. The rolled result records its source run, the method used for each node and the source periods of each target period (`rollup_provenance`); it is not itself a run and carries no run provenance, cell sources, capital snapshots or check report. A check suite runs against a rolled result at its target periods (`CheckSuite::run_rolled`, and `run_model` when the supplied results are a rollup): the rollup's provenance must name a verified run of the model, and every check iterates the target period plan. The sections below the accepted decision describe the audited implementation.
 
 ## Accepted decision for period rollup
 
@@ -37,4 +39,4 @@ Owning source: [rollup](../../../../finstack-quant/statements/src/evaluator/roll
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-evaluation-forecasts-and-reporting).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

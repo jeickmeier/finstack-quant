@@ -1,18 +1,27 @@
 //! Types for EBITDA Normalization & Adjustments.
 
+use crate::evaluator::UnavailableReason;
+use crate::types::AmountOrScalar;
 use finstack_quant_core::dates::PeriodId;
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 
-/// Configuration for normalizing a financial metric (e.g., EBITDA).
+/// An ordered bridge from a reported metric to a separately named adjusted
+/// metric (for example reported EBITDA to adjusted EBITDA).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct NormalizationConfig {
-    /// The target node to normalize (e.g., "EBITDA")
+    /// The reported node the bridge starts from (e.g., "ebitda"). It is never
+    /// modified.
     pub target_node: String,
 
-    /// List of adjustments to apply
+    /// The new node the adjusted metric is published under (e.g.,
+    /// "adjusted_ebitda"). It must differ from `target_node` and from every
+    /// node the result already holds.
+    pub output_node: String,
+
+    /// Adjustments, applied in this order
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub adjustments: Vec<Adjustment>,
 }
@@ -45,17 +54,24 @@ pub struct Adjustment {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AdjustmentValue {
-    /// Fixed amount per period
+    /// Signed fixed amount per period, in the target's units: a scalar for a
+    /// scalar target, money in the target's currency for a monetary one. A
+    /// period of the plan that is not listed adjusts by zero; a period
+    /// outside the plan is rejected.
     Fixed {
-        /// Map of period_id -> amount
-        #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, f64>"))]
-        amounts: IndexMap<PeriodId, f64>,
+        /// Map of period_id -> signed amount
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "IndexMap<String, AmountOrScalar>")
+        )]
+        amounts: IndexMap<PeriodId, AmountOrScalar>,
     },
-    /// Percentage of a reference node's value
+    /// Signed decimal percentage of a reference node's reported value in the
+    /// same period. The reference must share the target's units.
     PercentageOfNode {
         /// Node ID to reference (e.g., "revenue")
         node_id: String,
-        /// Percentage to apply (e.g., 0.05 for 5%)
+        /// Signed decimal percentage to apply (0.05 for 5%)
         percentage: f64,
     },
 }
@@ -79,36 +95,44 @@ pub enum CapBaseMode {
     Progressive,
 }
 
-/// Defines a cap on an adjustment.
+/// A cap on the magnitude of one adjustment. The adjustment keeps its sign.
+/// Each cap applies to its own adjustment only; it is not a shared basket.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct AdjustmentCap {
-    /// The base node to calculate the cap against (e.g., "EBITDA")
-    /// If None, the cap is a fixed absolute amount.
-    pub base_node: Option<String>,
-
-    /// The percentage of the base node to cap at (e.g., 0.20 for 20%)
-    /// Or the absolute amount if base_node is None.
-    pub value: f64,
-
-    /// For self-referential caps (`base_node == target_node`), choose whether
-    /// to size the cap against the reported or the progressively adjusted
-    /// base. Defaults to `Reported`, the standard LBO / credit-agreement
-    /// convention. Ignored when `base_node` is `None` or points to a
-    /// different node.
-    #[serde(default, skip_serializing_if = "is_default_cap_base_mode")]
-    #[cfg_attr(feature = "json-schema", schemars(extend("default" = "reported")))]
-    pub base_mode: CapBaseMode,
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum AdjustmentCap {
+    /// A fixed limit in the target's units.
+    Absolute {
+        /// Non-negative limit: a scalar for a scalar target, money in the
+        /// target's currency for a monetary one.
+        amount: AmountOrScalar,
+    },
+    /// A limit of `fraction` times the positive part of a base node's value
+    /// in the same period. A negative base gives no cap room.
+    Reference {
+        /// Node the cap is sized against; it must share the target's units.
+        base_node: String,
+        /// Non-negative decimal fraction of the base (0.30 for 30%). It may
+        /// exceed 1.
+        fraction: f64,
+        /// When `base_node` is the target: size the cap against its reported
+        /// value (the default) or against the reported value plus every
+        /// earlier applied adjustment. Any other base node is always read at
+        /// its reported value.
+        #[serde(default, skip_serializing_if = "is_default_cap_base_mode")]
+        #[cfg_attr(feature = "json-schema", schemars(extend("default" = "reported")))]
+        base_mode: CapBaseMode,
+    },
 }
 
 fn is_default_cap_base_mode(mode: &CapBaseMode) -> bool {
     *mode == CapBaseMode::default()
 }
 
-/// Result of a normalization process for a single period.
+/// One period of a normalization bridge.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct NormalizationResult {
     /// Unit and currency shared by the base, adjustments, and final value.
     pub value_type: crate::types::NodeValueType,
@@ -116,19 +140,31 @@ pub struct NormalizationResult {
     /// The period this result applies to
     pub period: PeriodId,
 
-    /// The original raw value of the target node
-    pub base_value: f64,
+    /// The reported value of the target node. Absent when the period is
+    /// unavailable because the target itself has no value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_value: Option<AmountOrScalar>,
 
-    /// Detailed breakdown of applied adjustments
+    /// The bridge rows in declaration order. Empty when the period is
+    /// unavailable.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub adjustments: Vec<AppliedAdjustment>,
 
-    /// The final adjusted value
-    pub final_value: f64,
+    /// The adjusted value. Absent when the period is unavailable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub final_value: Option<AmountOrScalar>,
+
+    /// Why the period has no adjusted value: the target, a percentage
+    /// reference or a cap base is missing, masked or unavailable. Absent
+    /// when the period has a value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unavailable: Option<UnavailableReason>,
 }
 
-/// Details of a single applied adjustment.
+/// One row of a normalization bridge.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct AppliedAdjustment {
     /// ID of the adjustment
     pub adjustment_id: String,
@@ -136,31 +172,44 @@ pub struct AppliedAdjustment {
     /// Name of the adjustment
     pub name: String,
 
-    /// The raw calculated amount before capping
-    pub raw_amount: f64,
+    /// The signed amount before capping
+    pub raw_amount: AmountOrScalar,
 
-    /// The final amount after applying any caps
-    pub capped_amount: f64,
+    /// The value the cap was sized against, for a reference cap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cap_base: Option<AmountOrScalar>,
 
-    /// Whether the amount was capped
+    /// The non-negative limit on the adjustment's magnitude, when it has a
+    /// cap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cap_limit: Option<AmountOrScalar>,
+
+    /// The signed amount applied after any cap
+    pub capped_amount: AmountOrScalar,
+
+    /// Whether the cap reduced the amount
     pub is_capped: bool,
     /// Target value through this adjustment: the period's `base_value` plus
-    /// the capped amounts of this and every earlier adjustment, in declaration
-    /// order and the target's units. The last adjustment's value equals the
-    /// period's `final_value`, so a base-to-adjusted bridge reads each step's
-    /// span from the previous step's value (or `base_value`) to this one.
-    pub adjusted_value: f64,
+    /// the applied amounts of this and every earlier adjustment, in
+    /// declaration order. The last row's value equals the period's
+    /// `final_value`.
+    pub adjusted_value: AmountOrScalar,
 }
 
 impl NormalizationConfig {
-    /// Create a new normalization configuration.
-    pub fn new(target_node: impl Into<String>) -> Self {
+    /// Create a bridge configuration with no adjustments.
+    ///
+    /// # Arguments
+    ///
+    /// * `target_node` - Reported node the bridge starts from.
+    /// * `output_node` - New node the adjusted metric is published under.
+    pub fn new(target_node: impl Into<String>, output_node: impl Into<String>) -> Self {
         Self {
             target_node: target_node.into(),
+            output_node: output_node.into(),
             adjustments: Vec::new(),
         }
     }
-
     /// Add an adjustment to the configuration.
     ///
     /// Returns an error if an adjustment with the same `id` is already present,
@@ -187,7 +236,8 @@ impl NormalizationConfig {
         Ok(self)
     }
 
-    /// Check that the configuration holds no duplicate adjustment IDs.
+    /// Check the configuration on its own: a named output node that differs
+    /// from the target, and no duplicate adjustment IDs.
     ///
     /// [`add_adjustment`](Self::add_adjustment) enforces this while building,
     /// but a config can also arrive fully-formed from JSON, where the derived
@@ -199,11 +249,18 @@ impl NormalizationConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error naming the first adjustment ID that appears more than
-    /// once.
+    /// Returns an error for an empty or target-equal output node, and one
+    /// naming the first adjustment ID that appears more than once.
     ///
     /// [`normalize`]: crate::adjustments::normalize
     pub fn validate(&self) -> crate::error::Result<()> {
+        if self.output_node.is_empty() || self.output_node == self.target_node {
+            return Err(crate::error::Error::invalid_input(format!(
+                "Normalization of '{}' needs an output node with a new id; the reported node is \
+                 never overwritten",
+                self.target_node
+            )));
+        }
         let mut seen: IndexSet<&str> = IndexSet::with_capacity(self.adjustments.len());
         for adjustment in &self.adjustments {
             if !seen.insert(adjustment.id.as_str()) {
@@ -220,10 +277,18 @@ impl NormalizationConfig {
 
 impl Adjustment {
     /// Create a fixed amount adjustment.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier, unique within the configuration.
+    /// * `name` - Label shown in the bridge.
+    /// * `amounts` - Signed amount per period in the target's units: scalars
+    ///   for a scalar target, money in its currency for a monetary one.
+    ///   Periods not listed adjust by zero.
     pub fn fixed(
         id: impl Into<String>,
         name: impl Into<String>,
-        amounts: IndexMap<PeriodId, f64>,
+        amounts: IndexMap<PeriodId, AmountOrScalar>,
     ) -> Self {
         Self {
             id: id.into(),
@@ -253,28 +318,15 @@ impl Adjustment {
         }
     }
 
-    /// Add a cap with an explicit self-referential base mode.
+    /// Cap this adjustment's magnitude.
     ///
     /// # Arguments
     ///
-    /// * `base_node` - Node whose value sets the cap base, or `None` for an
-    ///   absolute cap in the target metric's units.
-    /// * `value` - Maximum adjustment magnitude: a decimal fraction of the
-    ///   base node (0.20 means 20%), or an absolute amount when no base is set.
-    /// * `base_mode` - For a cap against the target itself, use its reported
-    ///   value or its progressive value including earlier adjustments.
+    /// * `cap` - An absolute limit in the target's units, or a fraction of a
+    ///   base node's value in the same period.
     #[must_use]
-    pub fn with_cap(
-        mut self,
-        base_node: Option<String>,
-        value: f64,
-        base_mode: CapBaseMode,
-    ) -> Self {
-        self.cap = Some(AdjustmentCap {
-            base_node,
-            value,
-            base_mode,
-        });
+    pub fn with_cap(mut self, cap: AdjustmentCap) -> Self {
+        self.cap = Some(cap);
         self
     }
 

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
+
+from finstack_quant.core.money import Money
 from finstack_quant.statements._evaluator import StatementResult
 
 class AppliedAdjustment:
@@ -46,16 +49,44 @@ class AppliedAdjustment:
         ...
     @property
     def raw_amount(self) -> float:
-        """Return the uncapped signed adjustment amount.
+        """Return the signed adjustment amount before any cap.
 
         Returns
         -------
         float
-            Amount in the normalized metric's reporting units.
+            Amount in the target's units; money as the nearest float (the
+            exact amount is in :meth:`to_json`).
 
         Notes
         -----
         This accessor does not raise; it returns stored result data.
+        """
+        ...
+    @property
+    def cap_base(self) -> float | None:
+        """Return the value a reference cap was sized against.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            The base node's value in the period (for a progressive cap on the
+            target, the reported value plus the earlier applied adjustments),
+            or ``None`` for an absolute cap or no cap.
+        """
+        ...
+    @property
+    def cap_limit(self) -> float | None:
+        """Return the non-negative limit on this adjustment's magnitude.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            The absolute cap, or the fraction times the positive part of
+            ``cap_base``; ``None`` when the adjustment has no cap.
         """
         ...
     @property
@@ -93,9 +124,8 @@ class AppliedAdjustment:
         Returns
         -------
         float
-            The period's ``base_value`` plus the capped amounts of this and every
-            earlier adjustment, in declaration order and the normalized metric's
-            reporting units. The last adjustment's value equals the period's
+            The period's ``base_value`` plus the applied amounts of this and every
+            earlier adjustment, in declaration order and the target's units. The last adjustment's value equals the period's
             ``final_value``, so each step of a base-to-adjusted bridge spans from
             the previous step's value (or ``base_value``) to this one.
 
@@ -112,7 +142,7 @@ class AppliedAdjustment:
         Parameters
         ----------
         json:
-            Serialized adjustment_id, name, raw_amount, capped_amount, is_capped, and adjusted_value fields; amounts use the normalized metric's units.
+            Serialized adjustment_id, name, raw_amount, optional cap_base and cap_limit, capped_amount, is_capped, and adjusted_value fields. An amount is a number for a scalar target and ``{"amount": ..., "currency": ...}`` for a monetary one.
 
         Returns
         -------
@@ -151,25 +181,33 @@ class AppliedAdjustment:
 
 class NormalizationConfig:
     """
-    Configuration for normalizing a target metric (for example EBITDA).
+    An ordered bridge from a reported metric to a separately named adjusted metric.
+
+    The reported ``target_node`` is never modified. The adjusted metric is
+    published under the new ``output_node`` by :func:`merge_into_results`.
 
     Examples
     --------
     >>> from finstack_quant.statements import NormalizationConfig
-    >>> config = NormalizationConfig("ebitda")
-    >>> (config.target_node, config.adjustment_count)
-    ('ebitda', 0)
+    >>> config = NormalizationConfig("ebitda", "adjusted_ebitda")
+    >>> (config.target_node, config.output_node, config.adjustment_count)
+    ('ebitda', 'adjusted_ebitda', 0)
 
     """
 
-    def __init__(self, target_node: str) -> None:
+    def __init__(self, target_node: str, output_node: str) -> None:
         """
-        Create an empty configuration for ``target_node``.
+        Create a bridge from ``target_node`` to ``output_node`` with no adjustments.
 
         Parameters
         ----------
         target_node:
-            Node id whose values will be adjusted.
+            Reported node the bridge starts from, e.g. ``"ebitda"``.
+        output_node:
+            New node id the adjusted metric is published under, e.g.
+            ``"adjusted_ebitda"``. It must differ from ``target_node`` and
+            from every node of the results; :meth:`validate` and
+            :func:`merge_into_results` check that.
 
         Notes
         -----
@@ -178,8 +216,7 @@ class NormalizationConfig:
         Examples
         --------
         >>> from finstack_quant.statements import NormalizationConfig
-        >>> config = NormalizationConfig("adjusted_ebitda")
-        >>> config.adjustment_count
+        >>> NormalizationConfig("ebitda", "adjusted_ebitda").adjustment_count
         0
         """
         ...
@@ -207,9 +244,9 @@ class NormalizationConfig:
         Examples
         --------
         >>> from finstack_quant.statements import NormalizationConfig
-        >>> config = NormalizationConfig("ebitda")
-        >>> NormalizationConfig.from_json(config.to_json()).target_node
-        'ebitda'
+        >>> config = NormalizationConfig("ebitda", "adjusted_ebitda")
+        >>> NormalizationConfig.from_json(config.to_json()).output_node
+        'adjusted_ebitda'
 
         """
         ...
@@ -233,7 +270,7 @@ class NormalizationConfig:
         --------
         >>> import json
         >>> from finstack_quant.statements import NormalizationConfig
-        >>> json.loads(NormalizationConfig("ebitda").to_json())["target_node"]
+        >>> json.loads(NormalizationConfig("ebitda", "adjusted_ebitda").to_json())["target_node"]
         'ebitda'
 
         """
@@ -247,6 +284,22 @@ class NormalizationConfig:
         -------
         str
             Node identifier of the metric being normalized (e.g. ``"ebitda"``).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def output_node(self) -> str:
+        """
+        Node id the adjusted metric is published under.
+
+        Returns
+        -------
+        str
+            New node identifier (e.g. ``"adjusted_ebitda"``).
 
         Notes
         -----
@@ -313,17 +366,25 @@ class NormalizationConfig:
         ...
 
     def validate(self) -> None:
-        """Validate adjustment identifiers, finite values, and cap configuration.
+        """Check the configuration on its own.
+
+        References, units, period keys and numbers are checked against the
+        results by :func:`normalize`.
 
         Raises
         ------
         ValueError
-            If adjustment identifiers repeat, a numeric assumption is invalid, or a cap is misconfigured.
+            If the output node is empty or equals the target node, or an
+            adjustment identifier repeats.
         """
         ...
 
 class NormalizationResult:
-    """Normalized value and adjustment detail for one reporting period.
+    """One period of a normalization bridge.
+
+    A period whose target, percentage reference or cap base is missing,
+    masked or unavailable has no adjusted value: ``final_value`` is ``None``,
+    ``unavailable`` names the reason and there are no rows.
 
     Examples
     --------
@@ -421,13 +482,14 @@ class NormalizationResult:
         """
         ...
     @property
-    def base_value(self) -> float:
-        """Return the metric value before normalization adjustments.
+    def base_value(self) -> float | None:
+        """Return the reported value of the target node.
 
         Returns
         -------
-        float
-            Base amount in the statement metric's reporting units.
+        float | None
+            Reported amount in the target's units (money as the nearest
+            float), or ``None`` when the target has no value in the period.
 
         Notes
         -----
@@ -449,106 +511,150 @@ class NormalizationResult:
         """
         ...
     @property
-    def final_value(self) -> float:
-        """Return the normalized value after all capped adjustments.
+    def final_value(self) -> float | None:
+        """Return the adjusted value after every applied adjustment.
 
         Returns
         -------
-        float
-            Final amount in the statement metric's reporting units.
+        float | None
+            Adjusted amount in the target's units (money as the nearest
+            float), or ``None`` when the period is unavailable.
 
         Notes
         -----
         This accessor does not raise; it returns stored result data.
         """
         ...
+    @property
+    def unavailable(self) -> str | None:
+        """Return why the period has no adjusted value.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            The reason label of the missing input, such as
+            ``"missing_input"`` or ``"hidden_by_cutoff"``; ``None`` when the
+            period has a value.
+        """
+        ...
     def __repr__(self) -> str: ...
 
 def normalize(results: StatementResult, config: NormalizationConfig) -> list[NormalizationResult]:
     """
-    Run normalization and return typed period results.
+    Build the ordered bridge from a reported node to its adjusted value.
+
+    The whole configuration is validated before any period is calculated.
+    Each period starts from the reported target value and applies the
+    adjustments in declaration order: a signed fixed amount (zero for a period
+    not listed) or a signed decimal percentage of a reference node's reported
+    value in the same period. Each cap limits its own adjustment's magnitude
+    and keeps its sign. Money is added and scaled exactly and scalars with a
+    compensated sum; nothing is converted between currencies. Nothing is
+    written to ``results``; use :func:`merge_into_results` to publish.
 
     Parameters
     ----------
     results:
-        Evaluated statement output.
+        Evaluated or rolled-up statement results with their period plan.
     config:
-        Target node and adjustment definitions.
+        The reported node, the new output node and the ordered adjustments.
 
     Returns
     -------
     list[NormalizationResult]
-        Chronologically ordered period results.
+        One result per period of the plan, in timeline order. A period whose
+        target, percentage reference or cap base has no value carries
+        ``unavailable`` and no rows.
 
     Raises
     ------
     ValueError
-        If the engine fails.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements import Evaluator, ModelBuilder, NormalizationConfig, normalize
-    >>> builder = ModelBuilder("demo")
-    >>> _ = builder.periods("2025Q1..Q1")
-    >>> _ = builder.value("ebitda", [("2025Q1", 25.0)])
-    >>> result = Evaluator().evaluate(builder.build())
-    >>> normalize(result, NormalizationConfig("ebitda"))[0].final_value
-    25.0
-
-    """
-    ...
-
-def merge_into_results(
-    results: StatementResult,
-    normalization_results: list[NormalizationResult],
-    output_node_id: str,
-) -> StatementResult:
-    """Write normalized values back into statement results as a node.
-
-    Wraps Rust ``adjustments::merge_into_results``: each period's
-    ``final_value`` becomes node ``output_node_id`` with the shared unit (and
-    currency for monetary values), replacing any existing node of that name
-    across all periods. The attached check report is cleared because it
-    describes the values before the merge; rerun the checks afterwards.
-
-    Parameters
-    ----------
-    results:
-        Evaluated statement results. Left unchanged; the merged copy is
-        returned (Rust updates its argument in place).
-    normalization_results:
-        Per-period results from :func:`normalize`, all with the same unit and
-        currency. An empty list returns an unchanged copy.
-    output_node_id:
-        Node to create or replace, e.g. ``"adjusted_ebitda"``.
-
-    Returns
-    -------
-    StatementResult
-        Copy of ``results`` holding the merged node.
-
-    Raises
-    ------
-    ValueError
-        If the results mix units or currencies, repeat a period, or hold a
-        non-finite value.
+        If the results carry no period plan, the output node is empty or
+        equals the target, an adjustment id repeats, the target or a
+        referenced node is absent or has no recorded units, units or
+        currencies differ, a fixed amount names a period outside the plan, a
+        number is non-finite or a cap negative, or any row's arithmetic cannot
+        be represented. No partial bridge is returned.
 
     Examples
     --------
     >>> from finstack_quant.statements import (
+    ...     Adjustment,
+    ...     Evaluator,
+    ...     ModelBuilder,
+    ...     NormalizationConfig,
+    ...     normalize,
+    ... )
+    >>> builder = ModelBuilder("demo")
+    >>> _ = builder.periods("2025Q1..Q1")
+    >>> _ = builder.value("ebitda", [("2025Q1", 100.0)])
+    >>> result = Evaluator().evaluate(builder.build())
+    >>> cap = {"type": "reference", "base_node": "ebitda", "fraction": 0.30}
+    >>> config = NormalizationConfig("ebitda", "adjusted_ebitda")
+    >>> _ = config.add_adjustment(Adjustment.fixed("a", "First", {"2025Q1": 20.0}))
+    >>> _ = config.add_adjustment(Adjustment.fixed("b", "Second", {"2025Q1": 40.0}).with_cap(cap))
+    >>> row = normalize(result, config)[0]
+    >>> (row.adjustments[1].cap_limit, row.final_value)
+    (30.0, 150.0)
+
+    """
+    ...
+
+def merge_into_results(results: StatementResult, config: NormalizationConfig) -> StatementResult:
+    """Publish the adjusted metric of ``config`` as the new node ``config.output_node``.
+
+    Wraps Rust ``adjustments::merge_into_results``. The bridge is calculated
+    from ``config`` by :func:`normalize`, so the published values always agree
+    with the configuration recorded for them in
+    :attr:`StatementResult.normalizations`. A period without an adjusted value
+    is published as an unavailable cell. The reported target, every other node
+    and the check report are left as they are: a ratio or covenant on the
+    adjusted basis must reference the output node explicitly.
+
+    Parameters
+    ----------
+    results:
+        Result of an evaluation run, or a rollup of one. Left unchanged; the
+        updated copy is returned (Rust updates its argument in place).
+    config:
+        The bridge to calculate and publish.
+
+    Returns
+    -------
+    StatementResult
+        Copy of ``results`` holding the new node, its units and the
+        configuration.
+
+    Raises
+    ------
+    ValueError
+        If ``results`` record no source run, already hold a node named
+        ``config.output_node`` (including one published earlier), or
+        :func:`normalize` rejects the configuration. Nothing is published on
+        error.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import (
+    ...     Adjustment,
     ...     Evaluator,
     ...     ModelBuilder,
     ...     NormalizationConfig,
     ...     merge_into_results,
-    ...     normalize,
     ... )
     >>> builder = ModelBuilder("m")
     >>> _ = builder.periods("2025Q1..Q2")
     >>> _ = builder.value("ebitda", [("2025Q1", 100.0), ("2025Q2", 110.0)])
     >>> results = Evaluator().evaluate(builder.build())
-    >>> merged = merge_into_results(results, normalize(results, NormalizationConfig("ebitda")), "adj")
-    >>> merged.get("adj", "2025Q2")
-    110.0
+    >>> config = NormalizationConfig("ebitda", "adjusted_ebitda")
+    >>> _ = config.add_adjustment(Adjustment.fixed("a", "Add-back", {"2025Q2": 5.0}))
+    >>> merged = merge_into_results(results, config)
+    >>> (merged.get("ebitda", "2025Q2"), merged.get("adjusted_ebitda", "2025Q2"))
+    (110.0, 115.0)
+    >>> list(merged.normalizations)
+    ['adjusted_ebitda']
     """
     ...
 
@@ -564,8 +670,8 @@ class Adjustment:
     """
 
     @staticmethod
-    def fixed(id: str, name: str, amounts: Mapping[str, float]) -> Adjustment:
-        """Build an adjustment of explicit per-period amounts.
+    def fixed(id: str, name: str, amounts: Mapping[str, float | Money]) -> Adjustment:
+        """Build an adjustment of explicit signed per-period amounts.
 
         Parameters
         ----------
@@ -573,8 +679,12 @@ class Adjustment:
             Adjustment identifier, unique within a configuration.
         name : str
             Human-readable label carried into the result.
-        amounts : Mapping[str, float]
-            Amounts keyed by period id, in the target node's units.
+        amounts : Mapping[str, float | Money]
+            Signed amounts keyed by period id, in the target node's units:
+            floats for a scalar target, :class:`Money` in its currency for a
+            monetary one (positive add-back, negative deduction). A period of
+            the results that is not listed adjusts by zero; a period outside
+            them is rejected by :func:`normalize`.
 
         Returns
         -------
@@ -584,7 +694,8 @@ class Adjustment:
         Raises
         ------
         ValueError
-            If a period id cannot be parsed.
+            If a period id cannot be parsed or an amount is neither a number
+            nor ``Money``.
 
         Examples
         --------
@@ -606,9 +717,10 @@ class Adjustment:
         name : str
             Human-readable label carried into the result.
         node_id : str
-            Node whose per-period value the percentage is applied to.
+            Node whose reported value in the same period the percentage is
+            applied to. It must share the target's units.
         percentage : float
-            Decimal fraction (``0.05`` = 5%), not percentage points.
+            Signed decimal fraction (``0.05`` = 5%), not percentage points.
 
         Returns
         -------
@@ -626,20 +738,25 @@ class Adjustment:
         """
         ...
 
-    def with_cap(self, base_node: str | None, value: float, base_mode: str) -> Adjustment:
-        """Return a capped copy using an explicit self-referential base mode.
+    def with_cap(self, cap: Mapping[str, Any]) -> Adjustment:
+        """Return a copy whose magnitude is capped; the adjustment keeps its sign.
+
+        Each cap applies to its own adjustment only; it is not a shared basket.
 
         Parameters
         ----------
-        base_node : str or None
-            Node whose value sets the cap base, or ``None`` for an absolute cap.
-        value : float
-            Maximum magnitude: a decimal fraction of the base node (0.20 means
-            20%), or an absolute amount in the target metric's units.
-        base_mode : str
-            ``"reported"`` uses the pre-adjustment target value;
-            ``"progressive"`` includes earlier adjustments. Only affects a
-            cap whose base node is the normalization target itself.
+        cap : Mapping[str, Any]
+            The Rust ``AdjustmentCap`` serde form, one of
+            ``{"type": "absolute", "amount": amount}``, a non-negative limit
+            in the target's units (a number, or
+            ``{"amount": "25", "currency": "USD"}`` for a monetary target),
+            and ``{"type": "reference", "base_node": node, "fraction": f,
+            "base_mode": mode}``, a limit of the non-negative decimal
+            ``fraction`` (which may exceed 1) times the positive part of the
+            base node's value in the same period. ``base_mode`` is optional
+            and matters only when the base node is the target itself:
+            ``"reported"`` (the default) uses its reported value and
+            ``"progressive"`` adds the earlier applied adjustments.
 
         Returns
         -------
@@ -649,7 +766,15 @@ class Adjustment:
         Raises
         ------
         ValueError
-            If ``base_mode`` is neither ``"reported"`` nor ``"progressive"``.
+            If ``cap`` is not one of the two forms or holds an unknown key.
+            Units, signs and references are checked by :func:`normalize`.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import Adjustment
+        >>> cap = {"type": "reference", "base_node": "ebitda", "fraction": 0.3}
+        >>> Adjustment.fixed("a", "A", {"2025Q1": 40.0}).with_cap(cap).cap
+        {'type': 'reference', 'base_node': 'ebitda', 'fraction': 0.3}
 
         """
         ...
@@ -717,14 +842,14 @@ class Adjustment:
     @property
     def value_type(self) -> str:
         """
-        ``"fixed"`` or ``"percentage"``.
+        ``"fixed"`` or ``"percentage_of_node"``.
 
         This property does not raise.
 
         Returns
         -------
         str
-            ``"fixed"`` or ``"percentage"``.
+            ``"fixed"`` or ``"percentage_of_node"``.
         """
         ...
 
@@ -743,47 +868,21 @@ class Adjustment:
         ...
 
     @property
-    def cap_base_node(self) -> str | None:
+    def cap(self) -> dict[str, Any] | None:
         """
-        Node the cap is measured against, or ``None`` for an absolute cap.
-
-        This property does not raise.
+        The configured cap in its serde form, or ``None`` when uncapped.
 
         Returns
         -------
-        str | None
-            Node the cap is measured against, or ``None`` for an absolute cap.
-        """
-        ...
-
-    @property
-    def cap_value(self) -> float | None:
-        """
-        Cap magnitude, or ``None`` when uncapped.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float | None
-            Cap magnitude, or ``None`` when uncapped.
-        """
-        ...
-
-    @property
-    def cap_base_mode(self) -> str | None:
-        """
-        Cap base mode, or ``None`` when uncapped.
-
-        Returns
-        -------
-        str | None
-            Cap base mode, or ``None`` when uncapped.
+        dict[str, Any] | None
+            ``{"type": "absolute", "amount": ...}`` or ``{"type":
+            "reference", "base_node": ..., "fraction": ...}`` with
+            ``"base_mode": "progressive"`` when it is not the default.
 
         Raises
         ------
-        RuntimeError
-            If the stored enum cannot be rendered as its canonical Rust wire label.
+        ValueError
+            If the stored cap cannot be serialized.
         """
         ...
 

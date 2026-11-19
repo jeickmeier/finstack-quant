@@ -1,6 +1,7 @@
 //! Monte Carlo analysis integration tests.
 #![allow(clippy::expect_used)]
 
+use crate::AllMetrics;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::MonteCarloConfig;
@@ -29,16 +30,16 @@ fn evaluate_monte_carlo_produces_deterministic_results() {
         model_builder.build().expect("valid model")
     };
 
-    let config = MonteCarloConfig::new(32, 7);
+    let config = MonteCarloConfig::new(32, 7, [""; 0]);
 
     let mut eval1 = finstack_quant_statements::evaluator::Evaluator::new();
     let mut eval2 = finstack_quant_statements::evaluator::Evaluator::new();
 
     let res1 = eval1
-        .evaluate_monte_carlo(&model, &config)
+        .evaluate_all_metrics(&model, &config)
         .expect("mc eval 1");
     let res2 = eval2
-        .evaluate_monte_carlo(&model, &config)
+        .evaluate_all_metrics(&model, &config)
         .expect("mc eval 2");
 
     assert_eq!(res1.n_paths, res2.n_paths);
@@ -57,10 +58,14 @@ fn evaluate_monte_carlo_produces_deterministic_results() {
 #[test]
 fn evaluate_monte_carlo_correlated_normals_constant_spread() {
     let mut fp_b = ForecastSpec::normal(200.0, 10.0, 42);
-    fp_b.params
-        .insert("correlation_with".into(), serde_json::json!("a"));
-    fp_b.params
-        .insert("correlation".into(), serde_json::json!(1.0));
+    fp_b = fp_b
+        .clone()
+        .with_param("correlation_with", serde_json::json!("a"))
+        .unwrap();
+    fp_b = fp_b
+        .clone()
+        .with_param("correlation", serde_json::json!(1.0))
+        .unwrap();
 
     let model = {
         let mut model_builder = ModelBuilder::new("mc-corr");
@@ -97,9 +102,9 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
         model_builder.build().expect("valid model")
     };
 
-    let config = MonteCarloConfig::new(4, 1);
+    let config = MonteCarloConfig::new(4, 1, [""; 0]);
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
-    let res = eval.evaluate_monte_carlo(&model, &config).expect("mc eval");
+    let res = eval.evaluate_all_metrics(&model, &config).expect("mc eval");
 
     let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
     let a = res
@@ -123,10 +128,14 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
 #[test]
 fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
     let mut fp_b = ForecastSpec::log_normal(4.0, 0.2, 42);
-    fp_b.params
-        .insert("correlation_with".into(), serde_json::json!("a"));
-    fp_b.params
-        .insert("correlation".into(), serde_json::json!(1.0));
+    fp_b = fp_b
+        .clone()
+        .with_param("correlation_with", serde_json::json!("a"))
+        .unwrap();
+    fp_b = fp_b
+        .clone()
+        .with_param("correlation", serde_json::json!(1.0))
+        .unwrap();
 
     let model = {
         let mut model_builder = ModelBuilder::new("mc-corr-lognormal");
@@ -163,9 +172,9 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
         model_builder.build().expect("valid model")
     };
 
-    let config = MonteCarloConfig::new(4, 1);
+    let config = MonteCarloConfig::new(4, 1, [""; 0]);
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
-    let res = eval.evaluate_monte_carlo(&model, &config).expect("mc eval");
+    let res = eval.evaluate_all_metrics(&model, &config).expect("mc eval");
 
     let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
     let a = res
@@ -189,12 +198,16 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
 #[test]
 fn evaluate_monte_carlo_correlated_forecast_rejects_unknown_peer() {
     let mut fp = ForecastSpec::normal(120_000.0, 10_000.0, 42);
-    fp.params
-        .insert("correlation_with".into(), serde_json::json!("missing_node"));
-    fp.params
-        .insert("correlation".into(), serde_json::json!(0.5));
+    fp = fp
+        .clone()
+        .with_param("correlation_with", serde_json::json!("missing_node"))
+        .unwrap();
+    fp = fp
+        .clone()
+        .with_param("correlation", serde_json::json!(0.5))
+        .unwrap();
 
-    let model = {
+    let result = {
         let mut model_builder = ModelBuilder::new("mc-corr-missing-peer");
         model_builder
             .periods("2025Q1..Q4", Some("2025Q2"))
@@ -212,16 +225,13 @@ fn evaluate_monte_carlo_correlated_forecast_rejects_unknown_peer() {
         ]);
         model_builder.forecast(fp);
         let model_builder = model_builder.build().expect("valid mixed node");
-        model_builder.build().expect("valid model")
+        model_builder.build()
     };
 
-    let config = MonteCarloConfig::new(16, 7);
-    let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
-    let err = eval
-        .evaluate_monte_carlo(&model, &config)
-        .expect_err("unknown peer should fail");
+    // The peer is checked when the model is built, before any path runs.
+    let err = result.expect_err("unknown peer should fail");
     assert!(
-        err.to_string().contains("unknown node 'missing_node'"),
-        "unexpected error: {err}"
+        err.to_string().contains("correlation peer 'missing_node'"),
+        "{err}"
     );
 }

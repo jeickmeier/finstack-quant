@@ -38,7 +38,7 @@ fn build_mc_model() -> FinancialModelSpec {
     let mut params = IndexMap::new();
     params.insert("mean".into(), serde_json::json!(0.05));
     params.insert("std_dev".into(), serde_json::json!(0.02));
-    params.insert("seed".into(), serde_json::json!(42));
+    params.insert("seed".into(), serde_json::json!("42"));
 
     {
         let mut model_builder = ModelBuilder::new("mc-model");
@@ -48,10 +48,7 @@ fn build_mc_model() -> FinancialModelSpec {
         model_builder.value("revenue", &[(actual_q, AmountOrScalar::scalar(100.0))]);
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params,
-            },
+            ForecastSpec::from_params(ForecastMethod::Normal, params).unwrap(),
         );
         model_builder.compute("cogs", "revenue * 0.6").unwrap();
         model_builder
@@ -75,10 +72,14 @@ fn bench_monte_carlo_scaling(c: &mut Criterion) {
             |b, &paths| {
                 b.iter(|| {
                     let mut evaluator = Evaluator::new();
-                    let config = MonteCarloConfig::new(paths, 42);
+                    let config = MonteCarloConfig::new(
+                        paths,
+                        42,
+                        model.nodes.keys().map(ToString::to_string),
+                    );
                     black_box(
                         evaluator
-                            .evaluate_monte_carlo(black_box(&model), &config)
+                            .evaluate_monte_carlo(black_box(&model), &config, None)
                             .unwrap(),
                     )
                 });
@@ -234,6 +235,9 @@ fn bench_formula_check_scaling(c: &mut Criterion) {
             severity: Severity::Error,
             formula: "revenue > 0".into(),
             message_template: "Revenue was not positive in {period}".into(),
+            mode: finstack_quant_statements::checks::FormulaCheckMode::Predicate,
+            scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+            eligibility: None,
             tolerance: None,
         };
         let context = CheckContext::new(&model, &results);

@@ -9519,6 +9519,20 @@ export interface StatementsNamespace {
    */
   readonly modelNodeIds: typeof wasm.modelNodeIds;
   /**
+   * Apply named edits to a financial model atomically.
+   *
+   * Twin of Python `FinancialModelSpec.apply_edits` (Rust
+   * `FinancialModelSpec::apply_edits`). Edits apply in order to a copy of the
+   * model, which must pass the runnable-model validation; the input model is
+   * never changed.
+   *
+   * @param model - `FinancialModelSpec` to edit (object or JSON).
+   * @param edits - `ModelEdit` objects, each tagged by `edit`: `add_node` and `replace_node` (`node`); `remove_node`, `remove_forecast` and `remove_where` (`node_id`); `set_observation` (`node_id`, `period`, `value`, optional `availability_date`); `remove_observation` (`node_id`, `period`); `set_formula` (`node_id`, `formula`); `set_forecast` (`node_id`, `forecast`; the node becomes mixed); `set_where` (`node_id`, `predicate`). An array or its JSON text.
+   * @returns The edited `FinancialModelSpec` plain object.
+   * @throws Error with kind `validation` if the model or an edit is malformed, an edit adds an id that is already defined or names a node or observation that does not exist, or the edited model fails validation.
+   */
+  readonly applyModelEdits: typeof wasm.applyModelEdits;
+  /**
    * Validate a `CheckSuiteSpec` JSON string.
    *
    * Deserializes the spec, validates default configuration thresholds, and
@@ -9568,9 +9582,9 @@ export interface StatementsNamespace {
    *
    * Rejects malformed or schema-incompatible `json`; duplicate or inconsistent
    * payment priorities; incomplete available-cash priorities; invalid PIK,
-   * payment-class, prepay-node, or ECF-sweep settings; or failure to serialize
+   * payment-class, prepayment, or ECF-sweep settings; or failure to serialize
    * the validated waterfall.
-   * @param json - Canonical JSON string for a `WaterfallSpec`, including `available_cash_node` and optional `priority_of_payments`, `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
+   * @param json - Canonical JSON string for a `WaterfallSpec`, including `available_cash_node` and optional `priority_of_payments`, `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepayment`, and `voluntary_prepayment` (each `{amount, facilities}`).
    * @returns Canonical waterfall JSON after schema validation.
    */
   readonly validateWaterfallSpecJson: typeof wasm.validateWaterfallSpecJson;
@@ -9584,9 +9598,10 @@ export interface StatementsNamespace {
    * # Errors
    *
    * Rejects malformed or schema-incompatible `json`, a `sweep_percentage`
-   * outside `[0.0, 1.0]`, or failure to serialize the validated ECF-sweep
-   * specification.
-   * @param json - Canonical JSON string defining the object to deserialize or normalize.
+   * outside `[0.0, 1.0]`, an empty cash measure or input expression, an empty
+   * or repeated named facility, or failure to serialize the validated
+   * ECF-sweep specification.
+   * @param json - Canonical JSON string for an `EcfSweepSpec`: `cash_measure` (a formula in the pool currency), `deductions` and `credits` (lists of `{type: "input", expression}`, `{type: "paid_cash_interest"}`, `{type: "paid_fees"}` or `{type: "paid_scheduled_principal"}`), `sweep_percentage` (decimal fraction in `[0, 1]`) and `facilities` (`"all_eligible"` or `{named: [...]}`).
    * @returns Canonical ECF-sweep JSON after schema validation.
    */
   readonly validateEcfSweepSpecJson: typeof wasm.validateEcfSweepSpecJson;
@@ -9598,50 +9613,75 @@ export interface StatementsNamespace {
    *
    * # Errors
    *
-   * Rejects malformed or schema-incompatible `json`, a missing or empty
-   * `target_instrument_ids` list, or failure to serialize the validated
-   * PIK-toggle specification.
-   * @param json - Canonical JSON string defining the object to deserialize or normalize.
+   * Rejects malformed or schema-incompatible `json`, a non-finite `threshold`,
+   * a missing or empty `elections` list, a loan listed twice, a `pik_fraction`
+   * outside `(0, 1]`, or failure to serialize the validated PIK-toggle
+   * specification.
+   * @param json - Canonical JSON string for a `PikToggleSpec`: `liquidity_metric` (a node or formula), `threshold` (finite, in the metric's units; a metric below it requests PIK) and `elections`, one `{instrument_id, pik_fraction, min_coupon_periods}` per term loan authorized to elect PIK, where `pik_fraction` is an exact decimal string in `(0, 1]` and `min_coupon_periods` counts the loan's coupon periods.
    * @returns Canonical PIK-toggle JSON after schema validation.
    */
   readonly validatePikToggleSpecJson: typeof wasm.validatePikToggleSpecJson;
   /**
-   * Export one evaluated node as a dated schedule.
+   * Export every period of one evaluated node as dated cells.
    *
    * Free-function twin of Python `StatementResult.to_dated_schedule` (Rust
-   * `evaluator::node_to_dated_schedule`): periods are taken in model timeline
-   * order, periods without a value are skipped, and each period is dated by
-   * `convention`.
-   * @param modelJson - The `FinancialModelSpec` that produced the result (its periods supply the dates).
+   * `evaluator::node_to_dated_schedule`). Periods come from the result's own
+   * period plan in timeline order. A period without a value stays in the
+   * schedule with its status and reason. The dates are period anchors, not
+   * payment dates.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
    * @param nodeId - Node identifier to export.
-   * @param convention - Optional `"end"` (default: the period's last inclusive day, `end - 1 day`, since periods are half-open `[start, end)`) or `"start"`.
-   * @returns `[isoDate, value]` pairs in timeline order, in the node's own units.
+   * @param convention - `"end"` anchors each period on its last included day (`end - 1 day`, since periods are half-open `[start, end)`); `"start"` on its first day. There is no default.
+   * @returns One `{ date, period_id, cell }` row per result period, with exact amounts and currencies.
    *
    * # Errors
    *
-   * Throws with kind `not_found` if `nodeId` has no values in the result, and
-   * kind `validation` if an input is malformed or `convention` is not
-   * `"start"` / `"end"`.
+   * Throws with kind `not_found` if `nodeId` is not in the result, and kind
+   * `validation` if an input is malformed, the result has no period plan or
+   * `convention` is not `"start"` / `"end"`.
    */
   readonly nodeToDatedSchedule: typeof wasm.nodeToDatedSchedule;
+  /**
+   * Read one monetary node as signed economic cash flows for pricing.
+   *
+   * Free-function twin of Python `StatementResult.to_pricing_flows` (Rust
+   * `evaluator::node_to_pricing_flows`). Every requested period must hold an
+   * exact amount in the expected currency. Positive means cash received: an
+   * `outflow_magnitude` node is negated once. No FX and no sign inference is
+   * applied.
+   * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+   * @param selection - The node (`node_id`), expected `currency`, `sign` (`"inflow_positive"` or `"outflow_magnitude"`), required `periods` and `date_convention` (`"start"` or `"end"`).
+   * @returns `[isoDate, money]` pairs in timeline order, one per requested period.
+   *
+   * # Errors
+   *
+   * Throws with kind `not_found` if the node is not in the result. Throws with
+   * kind `validation` if an input is malformed, the result has no period plan,
+   * a requested period is repeated or not in the result, a cell is missing,
+   * masked, unavailable or a scalar, an amount is in another currency, or an
+   * outflow magnitude is negative.
+   */
+  readonly nodeToPricingFlows: typeof wasm.nodeToPricingFlows;
   /**
    * Probability that a metric exceeds a threshold in any forecast period.
    *
    * Free-function twin of Python `MonteCarloResults.breach_probability` (Rust
-   * `MonteCarloResults::breach_probability`). Checks upside breaches only
-   * (`value > threshold`); negate values and threshold for a downside test.
-   * Per-path values come from the result's `path_data` table, so the
-   * simulation must run with `include_path_data: true`.
+   * `MonteCarloResults::breach_probability`). A path counts once when any
+   * forecast-period value is strictly greater than the threshold; for a floor,
+   * simulate a derived node that flips the sign. Per-path values come from the
+   * result's `path_data` table, so the simulation must run with
+   * `include_path_data: true`.
    * @param resultsJson - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
-   * @param metric - Node identifier to test.
-   * @param threshold - Breach level in the metric's own units.
-   * @returns Fraction of paths that breach in at least one forecast period, or `undefined` when the metric has no path data (including results run without `include_path_data`), there are no forecast periods, or the simulation is incomplete.
+   * @param metric - A requested metric's node identifier.
+   * @param threshold - Finite upper threshold in the metric's own units: a number for a scalar metric, or `{amount, currency}` money in the metric's currency for a monetary one.
+   * @returns Fraction of paths that breach in at least one forecast period, or `undefined` when no path samples are available: the run is incomplete, the metric was not requested, or the result carries no `path_data`.
    *
    * # Errors
    *
-   * Throws with kind `validation` if the results input is malformed, and kind
-   * `invalid_type` if `threshold` is not a number.
+   * Throws with kind `validation` if the results input is malformed, the
+   * threshold is not a finite number or money in the metric's units, or the
+   * path table does not hold exactly one finite sample for every path and
+   * forecast period.
    */
   readonly monteCarloBreachProbability: typeof wasm.monteCarloBreachProbability;
   /**
@@ -9665,10 +9705,10 @@ export interface StatementsNamespace {
    * Export a statement result as a long-format table.
    *
    * Free-function twin of Python `StatementResult.to_arrow_long`
-   * (Rust `StatementResult::to_table_long`): one row per `(node, period)` in
-   * the result's node and period declaration order.
+   * (Rust `StatementResult::to_table_long`): the exact table, with one row per
+   * node and period of the result's plan, including cells without a value.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-   * @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`, `source`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null; `source` is the evaluation layer that produced the cell (`value`, `forecast`, `formula` or `where_masked`), null when the result records none.
+   * @returns `TableEnvelope` with columns `node_id`, `period_id`, `status`, `value`, `amount`, `currency`, `value_type`, `reason`, `source`. `status` is `value`, `missing`, `masked` or `unavailable`; `value` is the float view of a value cell and null otherwise; `amount` is the exact decimal text of a monetary value cell and `currency` its ISO code, both null for scalar and value-less cells; `reason` says why an unavailable cell has no value; `source` is the value source selected for the cell (`value`, `forecast` or `formula`), null when none was.
    *
    * # Errors
    *
@@ -9680,10 +9720,11 @@ export interface StatementsNamespace {
    * Export a statement result as a wide-format table.
    *
    * Free-function twin of Python `StatementResult.to_arrow_wide`
-   * (Rust `StatementResult::to_table_wide`): one row per period in
-   * chronological order and one column per node in declaration order.
+   * (Rust `StatementResult::to_table_wide`): the approximate numeric view, with
+   * one row per period of the result's plan and one column per node in
+   * declaration order.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-   * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds native numeric `NaN`, not zero. Canonical table JSON retains the established `"nan"` sentinel.
+   * @returns `TableEnvelope` with a `period_id` column followed by one nullable number column per node; a cell without a value is `null`, never zero. Each node column's metadata carries its units: `value_type` (`scalar` or `monetary`) and, for money, `currency`.
    *
    * # Errors
    *
@@ -9712,15 +9753,19 @@ export interface StatementsNamespace {
    * Parse a DSL formula and return its canonical source text.
    *
    * The formula is parsed into the statements AST and rendered back through
-   * the AST's `Display`: whitespace normalised, operators spaced, and
-   * parentheses kept only where precedence requires them. Parsing the returned
+   * the AST's `Display`: whitespace normalised, operators spaced, logical
+   * negation written `!`, and parentheses kept only where precedence requires
+   * them. `!` binds like unary minus (`!a > b` is `(!a) > b`), keyword `not`
+   * binds outside a comparison, and a nested comparison needs explicit
+   * parentheses. Parsing the returned
    * text again yields the same AST, so it is a stable form for previewing,
    * diffing, or hashing formulas. Mirrors Python `parse_formula`.
    *
    * # Errors
    *
-   * Rejects trailing tokens, malformed or incomplete syntax, or a formula that
-   * exceeds the parser's nesting or term limits.
+   * Rejects trailing tokens, malformed or incomplete syntax, an identifier
+   * with an empty dot-separated segment, or a formula over 64 levels of nesting
+   * or 256 terms.
    * @param formula - Financial-model formula string to parse into its canonical expression representation.
    * @returns Canonical formula text, e.g. `"(revenue - cogs) / revenue"`.
    */
@@ -9728,8 +9773,12 @@ export interface StatementsNamespace {
   /**
    * Parse and compile a DSL formula, throwing if either step fails.
    *
-   * Compilation produces the shared expression AST for the period-aware statements
-   * evaluator. It checks supported functions, arities and capital-structure references. Returns `undefined` when the
+   * Compilation lowers the AST onto the core expression engine and rejects
+   * unsupported functions, wrong arities (`cumsum`, `cumprod`, `cummin`,
+   * `cummax`, `std`, `var` and `median` take exactly one argument), malformed
+   * capital-structure references and negative literal offsets to `lag`,
+   * `shift`, `diff`, `pct_change` or `growth_rate`, in every branch including
+   * one evaluation would skip. Returns `undefined` when the
    * formula is valid; an invalid formula throws a `FinstackError`, so
    * `if (parseAndCompile(f))` is not a validity check. Mirrors Python
    * `parse_and_compile`.
@@ -9775,6 +9824,22 @@ export interface StatementsNamespace {
    */
   readonly statementResultGetMoney: typeof wasm.statementResultGetMoney;
   /**
+   * Typed cell of one node in one period: its status, value, reason and source.
+   *
+   * Free-function twin of Python `StatementResult.get_cell` (Rust
+   * `StatementResult::get_cell`).
+   * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+   * @param nodeId - Node identifier to read.
+   * @param period - Period identifier, e.g. `"2025Q1"`.
+   * @returns The cell (`status` is `value`, `missing`, `masked` or `unavailable`), or `undefined` when the result has no such node or period.
+   *
+   * # Errors
+   *
+   * Throws with kind `validation` if the result input is malformed or `period`
+   * is not a valid period identifier.
+   */
+  readonly statementResultGetCell: typeof wasm.statementResultGetCell;
+  /**
    * Scalar (non-monetary) value of one node in one period.
    *
    * Free-function twin of Python `StatementResult.get_scalar` (Rust
@@ -9791,21 +9856,23 @@ export interface StatementsNamespace {
    */
   readonly statementResultGetScalar: typeof wasm.statementResultGetScalar;
   /**
-   * Value of one node in one period, or a fallback when it is absent.
+   * Value of one node in one period, or a fallback for a missing observation.
    *
    * Free-function twin of Python `StatementResult.get_or` (Rust
-   * `StatementResult::get_or`).
+   * `StatementResult::get_or`). The fallback applies only to a `missing` cell
+   * at a node and period the result holds.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
    * @param nodeId - Node identifier to read.
    * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @param defaultValue - Value returned when the node or period is absent, in the node's own units.
-   * @returns The node value, or `defaultValue`.
+   * @param defaultValue - Value returned for a missing observation, in the node's own units.
+   * @returns The node value, or `defaultValue` when the cell is missing.
    *
    * # Errors
    *
-   * Throws with kind `validation` if the result input is malformed or `period`
-   * is not a valid period identifier, and kind `invalid_type` if
-   * `defaultValue` is not a number.
+   * Throws with kind `validation` if the result input is malformed, `period`
+   * is not a valid period identifier or the cell is masked or unavailable,
+   * kind `not_found` if the result has no cell for the node and period, and
+   * kind `invalid_type` if `defaultValue` is not a number.
    */
   readonly statementResultGetOr: typeof wasm.statementResultGetOr;
   /**
@@ -9827,21 +9894,28 @@ export interface StatementsNamespace {
    *
    * Free-function twin of Python `StatementResult.rollup` (Rust
    * `StatementResult::rollup`). Each target period combines its source
-   * periods node by node: summed by default (flows), the last source value
-   * for `period_end` nodes (balances, LTM metrics), and the node's formula
-   * re-evaluated on the rolled-up values for `formula` nodes (ratios). Every
-   * target period must be complete.
+   * periods node by node by the node's method, from the request or else the
+   * node's declaration: `sum` adds the source cells (money exactly, scalars
+   * with a compensated sum; a source cell without a value leaves the target
+   * unavailable), `period_end` copies the last source cell with its status
+   * (balances, LTM metrics), and `formula` re-evaluates the node's mask and
+   * formula on the rolled-up values at the target cadence (ratios). Nothing is
+   * summed by default: a node with no method fails the rollup. Every target
+   * period must be complete.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
    * @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
-   * @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
-   * @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is), without `node_sources`, capital-structure cashflows or a check report.
+   * @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"`, `"period_end"` or `"formula"`), which override the methods the nodes declare (object or JSON).
+   * @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is) and `rollup_provenance` (the source run, the method used for each node and the source periods of each target period), without run `provenance`, cell sources, capital-structure cashflows or a check report.
    *
    * # Errors
    *
-   * Throws with kind `validation` if an input is malformed, the target
-   * frequency is not a whole multiple of the model's, a target period is
-   * incomplete, a method names an unknown node, a `formula` node has no
-   * formula or reads `cs.*` values, or a re-evaluated formula fails.
+   * Throws with kind `validation` if an input is malformed, the result is
+   * not a verified run of the model (no provenance, or another model content,
+   * source snapshot or period plan), the target frequency is not a whole
+   * multiple of the model's, a target period is incomplete, a method names an
+   * unknown node, a node has no method, a `formula` node has no formula or
+   * reads `cs.*` values, a sum cannot be represented, or a re-evaluated
+   * formula fails.
    */
   readonly statementResultRollup: typeof wasm.statementResultRollup;
   /**
@@ -9849,7 +9923,8 @@ export interface StatementsNamespace {
    *
    * Free-function twin of Python `RollupSpec.declared_methods` (Rust
    * `RollupSpec::declared_methods`). Only each node's `rollup` field is read: a line
-   * that declares nothing is not listed and sums, whatever its tags say.
+   * that declares nothing is not listed, whatever its tags say, and needs a
+   * method before the model can be rolled up.
    * @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
    * @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
    * @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.
@@ -9861,10 +9936,11 @@ export interface StatementsNamespace {
    */
   readonly rollupSpecDeclaredMethods: typeof wasm.rollupSpecDeclaredMethods;
   /**
-   * Period-to-value map of one node.
+   * Period-to-value map of one node: the float view of its value cells.
    *
-   * Free-function twin of Python `StatementResult.get_node` (Rust
-   * `StatementResult::get_node`).
+   * Free-function twin of Python `StatementResult.numeric_series` (Rust
+   * `StatementResult::numeric_series`). Cells without a value are omitted;
+   * read `cells` or `statementResultGetCell` for their status.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
    * @param nodeId - Node identifier to read.
    * @returns Object mapping period id to value in the node's own units, or `undefined` when the node is absent.
@@ -9873,7 +9949,7 @@ export interface StatementsNamespace {
    *
    * Throws with kind `validation` if the result input is malformed.
    */
-  readonly statementResultGetNode: typeof wasm.statementResultGetNode;
+  readonly statementResultNumericSeries: typeof wasm.statementResultNumericSeries;
   /**
    * Node identifiers held by a statement result.
    *
@@ -9965,11 +10041,14 @@ export interface StatementsNamespace {
    * * `cashflows_json` - Capital-structure cashflows object or its serialized JSON.
    * * `component` - One of `interest_expense` (cash plus PIK), `interest_expense_cash`,
    *   `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`,
-   *   `fees`, or `accrued_interest`. Flows are positive payment/receipt magnitudes;
+   *   `fees`, `accrued_interest` (cash interest earned and not yet due),
+   *   `interest_arrears` (cash interest due and unpaid), `principal_pending`,
+   *   `principal_arrears`, `principal_advance_reserve`, the receipts `fee_rebates` and `repayment_refunds`, or the funding amounts `funding_proceeds` (signed company cash) and `funding_principal`. Flows are positive payment/receipt magnitudes;
    *   debt balance is closing principal. Rate hedges have zero debt balance and
    *   debt accrued interest.
    * * `instrument_or_total` - Instrument identifier for native-currency amounts,
-   *   or `total` for reporting-currency aggregates. This lookup performs no FX.
+   *   `total` for the consolidated reporting-currency total, or `total.<CCY>`
+   *   for one native currency's total. This lookup performs no FX.
    * * `period_id` - Reporting-period label such as `2025Q1` present in the result.
    *
    * @returns Requested amount in major currency units; absent optional interest income is zero.
@@ -9977,14 +10056,37 @@ export interface StatementsNamespace {
    * # Errors
    *
    * Throws with kind `validation` for malformed inputs or period labels, and
-   * kind `computation` for unknown components, missing instrument/period data,
-   * unavailable multi-currency totals, or incompatible cash/PIK currencies.
+   * kind `computation` for an unknown component or malformed scope, a scope
+   * with no data for the period (including a consolidated total that could not
+   * be formed), or a component the breakdown does not record.
    * @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
-   * @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`, `fees`, or `accrued_interest`. Flows are positive payment/receipt magnitudes; debt balance is closing principal. Rate hedges have zero debt balance and debt accrued interest.
-   * @param instrumentOrTotal - Instrument identifier for native-currency amounts, or `total` for reporting-currency aggregates. This lookup performs no FX.
+   * @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `net_interest_expense_cash`, `principal_payment` and its parts `scheduled_principal`, `mandatory_prepayment`, `voluntary_prepayment` and `sweep_prepayment`, `scheduled_cash_interest_due` and `scheduled_principal_due` (scheduled service recognized once on its contractual due date, paid or not), `fees`, `opening_balance`, `debt_balance`, `accrued_interest`, `interest_arrears`, `principal_pending`, `principal_arrears`, `principal_advance_reserve`, the receipts `fee_rebates` and `repayment_refunds`, or the funding amounts `funding_proceeds` (signed company cash) and `funding_principal`. Flows are positive magnitudes; balances are period-close economic principal.
+   * @param instrumentOrTotal - The scope: an instrument identifier for its native-currency amount, `total` for the consolidated total in the reporting currency, or `total.<CCY>` (for example `total.EUR`) for the total of the instruments in one native currency. This lookup performs no FX.
    * @param periodId - Reporting-period label such as `2025Q1` present in the result.
    */
   readonly capitalStructureCashflowsGetComponent: typeof wasm.capitalStructureCashflowsGetComponent;
+  /**
+   * Read one capital-structure amount as exact money.
+   *
+   * Free-function twin of Python `CapitalStructureCashflows.get_money` (Rust
+   * `CapitalStructureCashflows::get_money`): the typed form of
+   * `capitalStructureCashflowsGetComponent`, with the same component and scope
+   * names.
+   *
+   * @returns `Money` wire object (`{amount, currency}`): the exact amount in the scope's currency.
+   *
+   * # Errors
+   *
+   * Throws with kind `validation` for malformed inputs or period labels, and
+   * kind `computation` for an unknown component or malformed scope, a scope
+   * with no data for the period (including a consolidated total that could not
+   * be formed), or a component the breakdown does not record.
+   * @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
+   * @param component - A component name accepted by `capitalStructureCashflowsGetComponent`, for example `interest_expense_cash` or `debt_balance`.
+   * @param scope - An instrument identifier for its native-currency amount, `total` for the consolidated total in the reporting currency, or `total.<CCY>` for the total of the instruments in one native currency. This lookup performs no FX.
+   * @param periodId - Reporting-period label such as `2025Q1` present in the result.
+   */
+  readonly capitalStructureCashflowsGetMoney: typeof wasm.capitalStructureCashflowsGetMoney;
   /**
    * Copy of a normalization configuration with one more adjustment.
    *
@@ -10016,39 +10118,50 @@ export interface StatementsNamespace {
    */
   readonly validateNormalizationConfigJson: typeof wasm.validateNormalizationConfigJson;
   /**
-   * Normalize a target metric by applying an adjustment catalog period by period.
+   * Build the ordered bridge from a reported node to its adjusted value for every period.
    *
-   * Twin of Python `normalize` (Rust `adjustments::normalize`).
-   * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
-   * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.
+   * Twin of Python `normalize` (Rust `adjustments::normalize`). The whole
+   * configuration is validated before any period is calculated. Each period
+   * starts from the reported target value and applies the adjustments in
+   * declaration order: a signed fixed amount (zero for a period not listed)
+   * or a signed decimal percentage of a reference node's reported value. Each
+   * cap limits its own adjustment's magnitude and keeps its sign. Money is
+   * exact and nothing is converted between currencies. Nothing is written to
+   * the results.
+   * @param results - Evaluated or rolled-up `StatementResult` holding the target node and any reference nodes, with its period plan (object or JSON).
+   * @param config - `NormalizationConfig`: the reported `target_node`, the new `output_node` and the ordered adjustments. A fixed amount and an absolute cap are in the target's units: a number for a scalar target, `{amount, currency}` for a monetary one (object or JSON).
+   * @returns One `NormalizationResult` per period of the plan, in timeline order: the reported `base_value`, each row (raw amount, cap base and limit, applied amount and `adjusted_value`, the target through that row) and the `final_value`. A period whose target, percentage reference or cap base has no value carries `unavailable` with the reason and no rows.
    *
    * # Errors
    *
-   * Throws with kind `validation` if an input is malformed, the target node or
-   * a referenced node is absent from the results, the configuration is
-   * invalid, or the target and a reference node have incompatible units.
+   * Throws with kind `validation` if an input is malformed, the results carry
+   * no period plan, the output node is empty or equals the target, an
+   * adjustment id repeats, the target or a referenced node is absent or has no
+   * recorded units, units or currencies differ, a fixed amount names a period
+   * outside the plan, a number is non-finite or a cap negative, or any row's
+   * arithmetic cannot be represented.
    */
   readonly normalize: typeof wasm.normalize;
   /**
-   * Write normalized values back into statement results as a node.
+   * Publish the adjusted metric of a normalization configuration as a new node.
    *
    * Twin of Python `merge_into_results` (Rust
-   * `adjustments::merge_into_results`). Each period's `final_value`
-   * becomes node `outputNodeId` with the shared unit (and currency for monetary
-   * values), replacing any existing node of that name across all periods. The
-   * attached check report is cleared because it describes the values before the
-   * merge. Rust updates its argument in place; here the merged copy is returned.
-   * @param results - Evaluated `StatementResult` to merge into (object or JSON); left unchanged.
-   * @param normalizationResults - `NormalizationResult` array from `normalize`, all with the same unit and currency (object or JSON); an empty array returns an unchanged copy.
-   * @param outputNodeId - Node to create or replace, e.g. `"adjusted_ebitda"`.
-   * @returns The merged `StatementResult`.
+   * `adjustments::merge_into_results`). The bridge is calculated from
+   * `config`, so the published values always agree with the configuration
+   * recorded for them in the result's `normalizations`. The new node is
+   * `config.output_node`; a period without an adjusted value is published as
+   * an unavailable cell. The reported target, every other node and the check
+   * report are left as they are. Rust updates its argument in place; here the
+   * updated copy is returned.
+   * @param results - `StatementResult` of an evaluation run, or a rollup of one (object or JSON); left unchanged.
+   * @param config - `NormalizationConfig` to calculate and publish (object or JSON).
+   * @returns The `StatementResult` holding the new node, its units and the configuration under `normalizations`.
    *
    * # Errors
    *
-   * Throws with kind `validation` if an input is malformed, and the kind of the
-   * Rust error if the results mix units or currencies, repeat a period or hold a
-   * non-finite value.
+   * Throws with kind `validation` if an input is malformed, the results record
+   * no source run, they already hold a node named `config.output_node`, or
+   * `normalize` rejects the configuration. Nothing is published on error.
    */
   readonly mergeIntoResults: typeof wasm.mergeIntoResults;
   /**
@@ -10327,8 +10440,8 @@ export interface StatementsAnalyticsNamespace {
    * object out).
    *
    * Returns the Rust `Explanation` as a structured object: `source` names the
-   * layer that produced the value (`value`, `forecast`, `formula` or
-   * `where_masked`), `forecast` carries the node's forecast spec for a
+   * value source selected for the cell (`value`, `forecast` or `formula`; absent
+   * for a masked or missing cell), `forecast` carries the node's forecast spec for a
    * forecast cell, and `breakdown` lists the formula's components (including
    * `cs.*` references) when the formula produced the value. A non-finite
    * `final_value` or breakdown `value` (for example a `lag` node at the first
@@ -10505,7 +10618,7 @@ export interface StatementsAnalyticsNamespace {
    * @returns Structured check report with individual results and aggregate summary.
    * @param modelJson - Financial-model specification JSON.
    * @param suiteSpecJson - Check-suite specification JSON.
-   * @param resultsJson - Evaluated statement-result JSON.
+   * @param resultsJson - Evaluated statement-result JSON, or a rollup of it (`statementResultRollup`), which is checked at its target periods.
    */
   readonly runChecks: typeof wasm.runChecks;
   /**

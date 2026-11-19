@@ -22,7 +22,8 @@ fn test_periods_parsing() {
     };
     assert!(result.is_ok());
 
-    let builder = result.unwrap();
+    let mut builder = result.unwrap();
+    builder.value_scalar("placeholder", &[]);
     let model = builder.build().unwrap();
 
     assert_eq!(model.periods.len(), 4);
@@ -41,6 +42,7 @@ fn test_periods_with_actuals_cutoff() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -69,6 +71,7 @@ fn test_periods_explicit() {
                 .expect("valid period plan"),
             )
             .unwrap();
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -98,6 +101,7 @@ fn test_model_serialization() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -244,10 +248,12 @@ fn test_calculated_node() {
         model_builder
             .compute("gross_profit", "revenue - cogs")
             .unwrap();
+        model_builder.value_scalar("revenue", &[]);
+        model_builder.value_scalar("cogs", &[]);
         model_builder.build().unwrap()
     };
 
-    assert_eq!(model.nodes.len(), 1);
+    assert_eq!(model.nodes.len(), 3);
     let node = model.get_node("gross_profit").unwrap();
 
     assert_eq!(node.node_type, NodeType::Calculated);
@@ -322,6 +328,7 @@ fn test_metadata() {
         model_builder.periods("2025Q1..Q2", None).unwrap();
         model_builder.with_meta("author", serde_json::json!("Test User"));
         model_builder.with_meta("version", serde_json::json!("1.0.0"));
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -335,6 +342,7 @@ fn test_schema_version() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -479,16 +487,17 @@ fn test_node_spec_with_forecast() {
     use finstack_quant_statements::types::{ForecastMethod, ForecastSpec, NodeSpec};
     use indexmap::indexmap;
 
-    let forecast = ForecastSpec {
-        method: ForecastMethod::GrowthPct,
-        params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-    };
+    let forecast = ForecastSpec::from_params(
+        ForecastMethod::GrowthPct,
+        indexmap! { "rate".into() => serde_json::json!(0.05) },
+    )
+    .unwrap();
 
     let node = NodeSpec::new("revenue", NodeType::Mixed).with_forecast(forecast);
 
     assert!(node.forecast.is_some());
     assert_eq!(
-        node.forecast.as_ref().unwrap().method,
+        node.forecast.as_ref().unwrap().method(),
         ForecastMethod::GrowthPct
     );
 }
@@ -540,38 +549,44 @@ fn test_forecast_spec_helpers() {
 
     // Test forward_fill helper
     let ff = ForecastSpec::forward_fill();
-    assert_eq!(ff.method, ForecastMethod::ForwardFill);
-    assert!(ff.params.is_empty());
+    assert_eq!(ff.method(), ForecastMethod::ForwardFill);
+    assert!(ff.params().is_empty());
 
     // Test growth helper
     let growth = ForecastSpec::growth(0.05);
-    assert_eq!(growth.method, ForecastMethod::GrowthPct);
-    assert_eq!(growth.params.get("rate").unwrap(), &serde_json::json!(0.05));
+    assert_eq!(growth.method(), ForecastMethod::GrowthPct);
+    assert_eq!(
+        growth.params().get("rate").unwrap(),
+        &serde_json::json!(0.05)
+    );
 
     // Test curve helper
     let curve = ForecastSpec::curve(vec![0.05, 0.06, 0.07]);
-    assert_eq!(curve.method, ForecastMethod::CurvePct);
+    assert_eq!(curve.method(), ForecastMethod::CurvePct);
     assert_eq!(
-        curve.params.get("curve").unwrap(),
+        curve.params().get("curve").unwrap(),
         &serde_json::json!([0.05, 0.06, 0.07])
     );
 
     // Test normal helper
     let normal = ForecastSpec::normal(100.0, 15.0, 42);
-    assert_eq!(normal.method, ForecastMethod::Normal);
+    assert_eq!(normal.method(), ForecastMethod::Normal);
     assert_eq!(
-        normal.params.get("mean").unwrap(),
+        normal.params().get("mean").unwrap(),
         &serde_json::json!(100.0)
     );
     assert_eq!(
-        normal.params.get("std_dev").unwrap(),
+        normal.params().get("std_dev").unwrap(),
         &serde_json::json!(15.0)
     );
-    assert_eq!(normal.params.get("seed").unwrap(), &serde_json::json!(42));
+    assert_eq!(
+        normal.params().get("seed").unwrap(),
+        &serde_json::json!("42")
+    );
 
     // Test lognormal helper
     let lognormal = ForecastSpec::log_normal(11.5, 0.15, 42);
-    assert_eq!(lognormal.method, ForecastMethod::LogNormal);
+    assert_eq!(lognormal.method(), ForecastMethod::LogNormal);
 }
 
 // AmountOrScalar Tests

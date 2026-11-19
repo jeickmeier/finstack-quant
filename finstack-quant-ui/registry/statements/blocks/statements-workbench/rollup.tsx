@@ -18,7 +18,7 @@ export function hostRollupMethods(
   return { ...(JSON.parse(specJson) as RollupSpecWire).methods };
 }
 
-/** Native annual RollupSpec JSON; a listed `sum` overrides the line's declared method. */
+/** Native annual RollupSpec JSON; a listed method overrides the line's declared one. */
 export function annualRollupSpecJson(
   methods: Record<string, RollupMethod>,
 ): string {
@@ -44,7 +44,8 @@ export function RollupMethodsEditor({
       <p className="mt-2 text-xs text-muted-foreground">
         Flows sum across the year, balances and trailing metrics take the
         year-end value, and ratios are recalculated from the annual figures.
-        WASM rolls the values up; only complete years are shown.
+        Every line needs a method: nothing is summed by default. WASM rolls the
+        values up; only complete years are shown.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {nodeIds.map((id) => {
@@ -54,7 +55,7 @@ export function RollupMethodsEditor({
               key={id}
               label={`${node?.name ?? id} roll-up method`}
               layout="select"
-              value={methods[id] ?? node?.rollup ?? "sum"}
+              value={methods[id] ?? node?.rollup ?? ""}
               onValueChange={(next) =>
                 onChange({ ...methods, [id]: next as RollupMethod })
               }

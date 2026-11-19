@@ -36,7 +36,7 @@ fn model_node_ids_returns_array() {
 }
 
 #[wasm_bindgen_test]
-fn model_node_ids_empty_model() {
+fn model_node_ids_rejects_a_model_without_nodes() {
     let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
         .unwrap()
         .into_periods();
@@ -49,9 +49,8 @@ fn model_node_ids_empty_model() {
         .expect("valid period plan"),
     );
     let json = serde_json::to_string(&model).unwrap();
-    let result = model_node_ids(JsValue::from(&json)).unwrap();
-    let ids: Vec<String> = serde_wasm_bindgen::from_value(result).unwrap();
-    assert!(ids.is_empty());
+    // A runnable model needs a node or a capital-structure instrument.
+    assert!(model_node_ids(JsValue::from(&json)).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -113,14 +112,9 @@ fn evaluate_model_produces_computed_nodes() {
         .unwrap();
     let result: finstack_quant_statements::evaluator::StatementResult =
         serde_wasm_bindgen::from_value(out).unwrap();
-    assert!(result.nodes.contains_key("revenue"));
-    assert!(result.nodes.contains_key("gross_profit"));
-    let gp_q1 = result
-        .nodes
-        .get("gross_profit")
-        .and_then(|m| m.get(&q1))
-        .copied()
-        .unwrap();
+    assert!(result.has_node("revenue"));
+    assert!(result.has_node("gross_profit"));
+    let gp_q1 = result.get("gross_profit", &q1).unwrap();
     assert!((gp_q1 - 40.0).abs() < 1e-9);
 }
 
@@ -158,18 +152,17 @@ fn validate_waterfall_spec_roundtrips_minimal_spec() {
 
 #[wasm_bindgen_test]
 fn validate_ecf_sweep_spec_accepts_minimal() {
-    let json = r#"{"ebitda_node":"ebitda","sweep_percentage":0.5}"#;
+    let json = r#"{"cash_measure":"ebitda","sweep_percentage":0.5,"facilities":"all_eligible"}"#;
     let out = validate_ecf_sweep_spec_json(JsValue::from(json)).unwrap();
-    assert!(out.contains("ebitda_node"));
+    assert!(out.contains("cash_measure"));
 }
 
 #[wasm_bindgen_test]
-fn validate_pik_toggle_spec_requires_explicit_targets() {
-    // Rust `PikToggleSpec::validate` rejects implicit all-instrument targets.
+fn validate_pik_toggle_spec_requires_explicit_elections() {
+    // Rust `PikToggleSpec::validate` rejects an implied election.
     let json = r#"{"liquidity_metric":"cash","threshold":1000000.0}"#;
     assert!(validate_pik_toggle_spec_json(JsValue::from(json)).is_err());
-    let json =
-        r#"{"liquidity_metric":"cash","threshold":1000000.0,"target_instrument_ids":["TL"]}"#;
+    let json = r#"{"liquidity_metric":"cash","threshold":1000000.0,"elections":[{"instrument_id":"TL","pik_fraction":"1"}]}"#;
     let out = validate_pik_toggle_spec_json(JsValue::from(json)).unwrap();
     assert!(out.contains("liquidity_metric"));
 }
@@ -187,7 +180,7 @@ fn validate_financial_model_json_accepts_valid_model() {
     let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
         .expect("valid periods")
         .into_periods();
-    let model = finstack_quant_statements::types::FinancialModelSpec::new(
+    let mut model = finstack_quant_statements::types::FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
             finstack_quant_core::dates::PeriodCalendar::Gregorian,
@@ -195,6 +188,12 @@ fn validate_financial_model_json_accepts_valid_model() {
         )
         .expect("valid period plan"),
     );
+    let mut placeholder = finstack_quant_statements::types::NodeSpec::new(
+        "placeholder",
+        finstack_quant_statements::types::NodeType::Value,
+    );
+    placeholder.value_type = Some(finstack_quant_statements::types::NodeValueType::Scalar);
+    model.add_node(placeholder);
     let json = serde_json::to_string(&model).expect("model should serialize to JSON");
     let out = validate_financial_model_json(JsValue::from(&json))
         .expect("validate_financial_model_json should accept valid model");
@@ -202,7 +201,7 @@ fn validate_financial_model_json_accepts_valid_model() {
         serde_json::from_str::<finstack_quant_statements::types::FinancialModelSpec>(&out)
             .expect("validated JSON should deserialize");
     assert_eq!(round_trip.id, "test");
-    assert!(round_trip.nodes.is_empty());
+    assert_eq!(round_trip.nodes.len(), 1);
 }
 
 #[wasm_bindgen_test]

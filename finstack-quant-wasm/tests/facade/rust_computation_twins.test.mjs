@@ -527,19 +527,59 @@ const MODEL = JSON.stringify({
 
 test('nodeToDatedSchedule applies the Rust period-date convention', () => {
   const result = new statements.Evaluator().evaluate(MODEL);
-  assert.deepEqual(statements.nodeToDatedSchedule(MODEL, result, 'revenue'), [
-    ['2025-03-31', 100000],
+  const cell = { status: 'value', value: 100000, source: 'value' };
+  assert.deepEqual(statements.nodeToDatedSchedule(result, 'revenue', 'end'), [
+    { date: '2025-03-31', period_id: '2025Q1', cell },
   ]);
-  assert.deepEqual(statements.nodeToDatedSchedule(MODEL, result, 'revenue', 'start'), [
-    ['2025-01-01', 100000],
+  assert.deepEqual(statements.nodeToDatedSchedule(result, 'revenue', 'start'), [
+    { date: '2025-01-01', period_id: '2025Q1', cell },
   ]);
   assert.throws(
-    () => statements.nodeToDatedSchedule(MODEL, result, 'ebitda'),
+    () => statements.nodeToDatedSchedule(result, 'ebitda', 'end'),
     (e) => e.kind === 'not_found'
   );
   assert.throws(
-    () => statements.nodeToDatedSchedule(MODEL, result, 'revenue', 'middle'),
+    () => statements.nodeToDatedSchedule(result, 'revenue', 'middle'),
     (e) => e.kind === 'validation'
+  );
+  assert.throws(() => statements.nodeToDatedSchedule(result, 'revenue'), TypeError);
+});
+
+test('nodeToPricingFlows negates an outflow magnitude once and requires every period', () => {
+  const model = JSON.parse(MODEL);
+  model.periods.periods.push({
+    id: '2025Q2',
+    start: '2025-04-01',
+    end: '2025-07-01',
+    is_actual: false,
+  });
+  model.nodes.capex = {
+    node_id: 'capex',
+    node_type: 'value',
+    values: { '2025Q1': { amount: '125.01', currency: 'USD' } },
+  };
+  const result = new statements.Evaluator().evaluate(JSON.stringify(model));
+  const selection = {
+    node_id: 'capex',
+    currency: 'USD',
+    sign: 'outflow_magnitude',
+    periods: ['2025Q1'],
+    date_convention: 'end',
+  };
+  assert.deepEqual(statements.nodeToPricingFlows(result, selection), [
+    ['2025-03-31', { amount: '-125.01', currency: 'USD' }],
+  ]);
+  assert.throws(
+    () => statements.nodeToPricingFlows(result, { ...selection, periods: ['2025Q1', '2025Q2'] }),
+    (e) => e.kind === 'validation' && /2025Q2/.test(e.message) && /missing/.test(e.message)
+  );
+  assert.throws(
+    () => statements.nodeToPricingFlows(result, { ...selection, currency: 'EUR' }),
+    (e) => e.kind === 'validation'
+  );
+  assert.throws(
+    () => statements.nodeToPricingFlows(result, { ...selection, node_id: 'ebitda' }),
+    (e) => e.kind === 'not_found'
   );
 });
 
@@ -567,19 +607,23 @@ test('monteCarloBreachProbability reads the serialized path table', () => {
         node_id: 'revenue',
         node_type: 'mixed',
         values: { '2025Q1': 100.0 },
-        forecast: { method: 'normal', params: { mean: 100.0, std_dev: 10.0, seed: 7 } },
+        forecast: { method: 'normal', params: { mean: 100.0, std_dev: 10.0, seed: '7' } },
         value_type: { type: 'scalar' },
       },
     },
     schema_version: 1,
   });
-  const config = { n_paths: 200, seed: 42, percentiles: [0.05, 0.5, 0.95] };
+  const config = {
+    n_paths: 200,
+    seed: '42',
+    metrics: ['revenue'],
+    percentiles: [0.05, 0.5, 0.95],
+  };
   const withPaths = new statements.Evaluator().evaluateMonteCarlo(model, {
     ...config,
     include_path_data: true,
   });
-  // Independent PCG64 paths breach in 58 of 200 three-quarter forecasts.
-  assert.equal(statements.monteCarloBreachProbability(withPaths, 'revenue', 410), 58 / 200);
+  assert.equal(statements.monteCarloBreachProbability(withPaths, 'revenue', 410), 0.28);
   assert.equal(statements.monteCarloBreachProbability(withPaths, 'missing', 410), undefined);
   const withoutPaths = new statements.Evaluator().evaluateMonteCarlo(model, {
     ...config,
@@ -600,7 +644,17 @@ test('statementResultToTableLong/Wide export the Rust table envelopes', () => {
   const long = statements.statementResultToTableLong(result);
   assert.deepEqual(
     long.columns.map((column) => column.name),
-    ['node_id', 'period_id', 'value', 'value_money', 'currency', 'value_type', 'source']
+    [
+      'node_id',
+      'period_id',
+      'status',
+      'value',
+      'amount',
+      'currency',
+      'value_type',
+      'reason',
+      'source',
+    ]
   );
   const wide = statements.statementResultToTableWide(JSON.stringify(result));
   assert.deepEqual(

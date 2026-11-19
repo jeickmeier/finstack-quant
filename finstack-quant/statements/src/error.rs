@@ -84,6 +84,32 @@ pub enum Error {
     Core(#[from] finstack_quant_core::Error),
 }
 
+/// A failed model load as a statements error.
+///
+/// A semantic failure is already a typed error and keeps its kind. A decode
+/// failure (limits, version, malformed or mis-shaped JSON) becomes
+/// [`Error::Serde`] carrying every diagnostic message; callers that need the
+/// diagnostic codes and JSON pointers keep the [`ContractError`] instead.
+///
+/// [`ContractError`]: finstack_quant_core::contract::ContractError
+impl From<finstack_quant_core::contract::ContractError> for Error {
+    fn from(err: finstack_quant_core::contract::ContractError) -> Self {
+        use finstack_quant_core::contract::ContractError;
+        match err {
+            ContractError::Core(core) => Self::Core(core),
+            ContractError::Report(report) => Self::Serde(
+                report
+                    .diagnostics
+                    .iter()
+                    .map(|diagnostic| diagnostic.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            ),
+            other => Self::Serde(other.to_string()),
+        }
+    }
+}
+
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Self::Serde(err.to_string())
@@ -144,6 +170,31 @@ impl Error {
     /// Create a capital structure error
     pub fn capital_structure(msg: impl Into<String>) -> Self {
         Self::CapitalStructure(msg.into())
+    }
+}
+
+impl Error {
+    /// Stable snake_case name of the failure, identical to the variant's
+    /// serde tag: the code a load diagnostic carries after `statements/`.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Error::Build(_) => "build",
+            Error::FormulaParse(_) => "formula_parse",
+            Error::Eval(_) => "eval",
+            Error::NodeNotFound(_) => "node_not_found",
+            Error::CircularDependency(_) => "circular_dependency",
+            Error::CurrencyMismatch(..) => "currency_mismatch",
+            Error::Period(_) => "period",
+            Error::MissingData(_) => "missing_data",
+            Error::InvalidInput(_) => "invalid_input",
+            Error::Forecast(_) => "forecast",
+            Error::Registry(_) => "registry",
+            Error::RegistryNotFound(_) => "registry_not_found",
+            Error::CapitalStructure(_) => "capital_structure",
+            Error::Serde(_) => "serde",
+            Error::Core(_) => "core",
+        }
     }
 }
 

@@ -4,14 +4,13 @@
 //! `StatementResult`, `CapitalStructureCashflows`, `CheckReport` and
 //! `FinancialModelSpec` is a function taking the object (or its JSON).
 
-use crate::utils::input::{from_js_json, js_f64, js_string, json_text};
+use crate::utils::input::{from_js_json, js_f64, js_string};
 use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::checks::{CheckReport, Severity};
 use finstack_quant_statements::evaluator::{RollupSpec, StatementResult};
-use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 fn period_id(period: &JsValue) -> Result<PeriodId, JsValue> {
@@ -49,21 +48,28 @@ pub fn statement_result_get(
 ///
 /// Free-function twin of Python `StatementResult.rollup` (Rust
 /// `StatementResult::rollup`). Each target period combines its source
-/// periods node by node: summed by default (flows), the last source value
-/// for `period_end` nodes (balances, LTM metrics), and the node's formula
-/// re-evaluated on the rolled-up values for `formula` nodes (ratios). Every
-/// target period must be complete.
+/// periods node by node by the node's method, from the request or else the
+/// node's declaration: `sum` adds the source cells (money exactly, scalars
+/// with a compensated sum; a source cell without a value leaves the target
+/// unavailable), `period_end` copies the last source cell with its status
+/// (balances, LTM metrics), and `formula` re-evaluates the node's mask and
+/// formula on the rolled-up values at the target cadence (ratios). Nothing is
+/// summed by default: a node with no method fails the rollup. Every target
+/// period must be complete.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
-/// @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
-/// @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is), without `node_sources`, capital-structure cashflows or a check report.
+/// @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"`, `"period_end"` or `"formula"`), which override the methods the nodes declare (object or JSON).
+/// @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is) and `rollup_provenance` (the source run, the method used for each node and the source periods of each target period), without run `provenance`, cell sources, capital-structure cashflows or a check report.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if an input is malformed, the target
-/// frequency is not a whole multiple of the model's, a target period is
-/// incomplete, a method names an unknown node, a `formula` node has no
-/// formula or reads `cs.*` values, or a re-evaluated formula fails.
+/// Throws with kind `validation` if an input is malformed, the result is
+/// not a verified run of the model (no provenance, or another model content,
+/// source snapshot or period plan), the target frequency is not a whole
+/// multiple of the model's, a target period is incomplete, a method names an
+/// unknown node, a node has no method, a `formula` node has no formula or
+/// reads `cs.*` values, a sum cannot be represented, or a re-evaluated
+/// formula fails.
 #[wasm_bindgen(js_name = statementResultRollup, unchecked_return_type = "StatementResult")]
 pub fn statement_result_rollup(
     #[wasm_bindgen(
@@ -76,7 +82,7 @@ pub fn statement_result_rollup(
     spec: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model(&model, "model")?;
     let spec: RollupSpec = from_js_json(&spec, "spec")?;
     to_js_value(&result.rollup(&model, &spec).map_err(to_js_err)?)
 }
@@ -85,7 +91,8 @@ pub fn statement_result_rollup(
 ///
 /// Free-function twin of Python `RollupSpec.declared_methods` (Rust
 /// `RollupSpec::declared_methods`). Only each node's `rollup` field is read: a line
-/// that declares nothing is not listed and sums, whatever its tags say.
+/// that declares nothing is not listed, whatever its tags say, and needs a
+/// method before the model can be rolled up.
 /// @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
 /// @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
 /// @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.
@@ -100,7 +107,7 @@ pub fn rollup_spec_declared_methods(
     #[wasm_bindgen(unchecked_param_type = "'quarterly' | 'semi_annual' | 'annual'")]
     frequency: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model(&model, "model")?;
     let frequency: PeriodKind = js_wire(&frequency, "frequency")?;
     to_js_value(&RollupSpec::declared_methods(&model, frequency))
 }
@@ -135,6 +142,39 @@ pub fn statement_result_get_money(
     }
 }
 
+/// Typed cell of one node in one period: its status, value, reason and source.
+///
+/// Free-function twin of Python `StatementResult.get_cell` (Rust
+/// `StatementResult::get_cell`).
+/// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+/// @param nodeId - Node identifier to read.
+/// @param period - Period identifier, e.g. `"2025Q1"`.
+/// @returns The cell (`status` is `value`, `missing`, `masked` or `unavailable`), or `undefined` when the result has no such node or period.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the result input is malformed or `period`
+/// is not a valid period identifier.
+#[wasm_bindgen(
+    js_name = statementResultGetCell,
+    unchecked_return_type = "generated.statements.ResultCell | undefined"
+)]
+pub fn statement_result_get_cell(
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "StatementResult | string"
+    )]
+    result_json: JsValue,
+    #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
+) -> Result<JsValue, JsValue> {
+    let result: StatementResult = from_js_json(&result_json, "resultJson")?;
+    match result.get_cell(&js_string(&node_id, "nodeId")?, &period_id(&period)?) {
+        Some(cell) => to_js_value(cell),
+        None => Ok(JsValue::UNDEFINED),
+    }
+}
+
 /// Scalar (non-monetary) value of one node in one period.
 ///
 /// Free-function twin of Python `StatementResult.get_scalar` (Rust
@@ -162,21 +202,23 @@ pub fn statement_result_get_scalar(
     Ok(result.get_scalar(&js_string(&node_id, "nodeId")?, &period_id(&period)?))
 }
 
-/// Value of one node in one period, or a fallback when it is absent.
+/// Value of one node in one period, or a fallback for a missing observation.
 ///
 /// Free-function twin of Python `StatementResult.get_or` (Rust
-/// `StatementResult::get_or`).
+/// `StatementResult::get_or`). The fallback applies only to a `missing` cell
+/// at a node and period the result holds.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param nodeId - Node identifier to read.
 /// @param period - Period identifier, e.g. `"2025Q1"`.
-/// @param defaultValue - Value returned when the node or period is absent, in the node's own units.
-/// @returns The node value, or `defaultValue`.
+/// @param defaultValue - Value returned for a missing observation, in the node's own units.
+/// @returns The node value, or `defaultValue` when the cell is missing.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if the result input is malformed or `period`
-/// is not a valid period identifier, and kind `invalid_type` if
-/// `defaultValue` is not a number.
+/// Throws with kind `validation` if the result input is malformed, `period`
+/// is not a valid period identifier or the cell is masked or unavailable,
+/// kind `not_found` if the result has no cell for the node and period, and
+/// kind `invalid_type` if `defaultValue` is not a number.
 #[wasm_bindgen(js_name = statementResultGetOr)]
 pub fn statement_result_get_or(
     #[wasm_bindgen(
@@ -190,11 +232,13 @@ pub fn statement_result_get_or(
     default_value: JsValue,
 ) -> Result<f64, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    Ok(result.get_or(
-        &js_string(&node_id, "nodeId")?,
-        &period_id(&period)?,
-        js_f64(&default_value, "defaultValue")?,
-    ))
+    result
+        .get_or(
+            &js_string(&node_id, "nodeId")?,
+            &period_id(&period)?,
+            js_f64(&default_value, "defaultValue")?,
+        )
+        .map_err(to_js_err)
 }
 
 /// Every `(period, value)` pair of one node.
@@ -225,10 +269,11 @@ pub fn statement_result_all_periods(
     to_js_value(&rows)
 }
 
-/// Period-to-value map of one node.
+/// Period-to-value map of one node: the float view of its value cells.
 ///
-/// Free-function twin of Python `StatementResult.get_node` (Rust
-/// `StatementResult::get_node`).
+/// Free-function twin of Python `StatementResult.numeric_series` (Rust
+/// `StatementResult::numeric_series`). Cells without a value are omitted;
+/// read `cells` or `statementResultGetCell` for their status.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param nodeId - Node identifier to read.
 /// @returns Object mapping period id to value in the node's own units, or `undefined` when the node is absent.
@@ -236,8 +281,8 @@ pub fn statement_result_all_periods(
 /// # Errors
 ///
 /// Throws with kind `validation` if the result input is malformed.
-#[wasm_bindgen(js_name = statementResultGetNode, unchecked_return_type = "Record<string, number> | undefined")]
-pub fn statement_result_get_node(
+#[wasm_bindgen(js_name = statementResultNumericSeries, unchecked_return_type = "Record<string, number> | undefined")]
+pub fn statement_result_numeric_series(
     #[wasm_bindgen(
         js_name = "resultJson",
         unchecked_param_type = "StatementResult | string"
@@ -246,8 +291,8 @@ pub fn statement_result_get_node(
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    match result.get_node(&js_string(&node_id, "nodeId")?) {
-        Some(values) => to_js_value(values),
+    match result.numeric_series(&js_string(&node_id, "nodeId")?) {
+        Some(values) => to_js_value(&values),
         None => Ok(JsValue::UNDEFINED),
     }
 }
@@ -270,7 +315,7 @@ pub fn statement_result_node_ids(
     result_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    let ids: Vec<&str> = result.nodes.keys().map(String::as_str).collect();
+    let ids: Vec<&str> = result.node_ids().collect();
     to_js_value(&ids)
 }
 
@@ -291,8 +336,7 @@ pub fn financial_model_has_node(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
 ) -> Result<bool, JsValue> {
-    let model =
-        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model(&model_json, "modelJson")?;
     Ok(model.has_node(&js_string(&node_id, "nodeId")?))
 }
 
@@ -313,8 +357,7 @@ pub fn financial_model_get_node(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model =
-        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model(&model_json, "modelJson")?;
     match model.get_node(&js_string(&node_id, "nodeId")?) {
         Some(node) => to_js_value(node),
         None => Ok(JsValue::UNDEFINED),
@@ -389,11 +432,14 @@ pub fn check_report_findings_by_severity(
 /// * `cashflows_json` - Capital-structure cashflows object or its serialized JSON.
 /// * `component` - One of `interest_expense` (cash plus PIK), `interest_expense_cash`,
 ///   `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`,
-///   `fees`, or `accrued_interest`. Flows are positive payment/receipt magnitudes;
+///   `fees`, `accrued_interest` (cash interest earned and not yet due),
+///   `interest_arrears` (cash interest due and unpaid), `principal_pending`,
+///   `principal_arrears`, `principal_advance_reserve`, the receipts `fee_rebates` and `repayment_refunds`, or the funding amounts `funding_proceeds` (signed company cash) and `funding_principal`. Flows are positive payment/receipt magnitudes;
 ///   debt balance is closing principal. Rate hedges have zero debt balance and
 ///   debt accrued interest.
 /// * `instrument_or_total` - Instrument identifier for native-currency amounts,
-///   or `total` for reporting-currency aggregates. This lookup performs no FX.
+///   `total` for the consolidated reporting-currency total, or `total.<CCY>`
+///   for one native currency's total. This lookup performs no FX.
 /// * `period_id` - Reporting-period label such as `2025Q1` present in the result.
 ///
 /// @returns Requested amount in major currency units; absent optional interest income is zero.
@@ -401,11 +447,12 @@ pub fn check_report_findings_by_severity(
 /// # Errors
 ///
 /// Throws with kind `validation` for malformed inputs or period labels, and
-/// kind `computation` for unknown components, missing instrument/period data,
-/// unavailable multi-currency totals, or incompatible cash/PIK currencies.
+/// kind `computation` for an unknown component or malformed scope, a scope
+/// with no data for the period (including a consolidated total that could not
+/// be formed), or a component the breakdown does not record.
 /// @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
-/// @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`, `fees`, or `accrued_interest`. Flows are positive payment/receipt magnitudes; debt balance is closing principal. Rate hedges have zero debt balance and debt accrued interest.
-/// @param instrumentOrTotal - Instrument identifier for native-currency amounts, or `total` for reporting-currency aggregates. This lookup performs no FX.
+/// @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `net_interest_expense_cash`, `principal_payment` and its parts `scheduled_principal`, `mandatory_prepayment`, `voluntary_prepayment` and `sweep_prepayment`, `scheduled_cash_interest_due` and `scheduled_principal_due` (scheduled service recognized once on its contractual due date, paid or not), `fees`, `opening_balance`, `debt_balance`, `accrued_interest`, `interest_arrears`, `principal_pending`, `principal_arrears`, `principal_advance_reserve`, the receipts `fee_rebates` and `repayment_refunds`, or the funding amounts `funding_proceeds` (signed company cash) and `funding_principal`. Flows are positive magnitudes; balances are period-close economic principal.
+/// @param instrumentOrTotal - The scope: an instrument identifier for its native-currency amount, `total` for the consolidated total in the reporting currency, or `total.<CCY>` (for example `total.EUR`) for the total of the instruments in one native currency. This lookup performs no FX.
 /// @param periodId - Reporting-period label such as `2025Q1` present in the result.
 #[wasm_bindgen(js_name = capitalStructureCashflowsGetComponent)]
 pub fn capital_structure_cashflows_get_component(
@@ -427,4 +474,45 @@ pub fn capital_structure_cashflows_get_component(
             &self::period_id(&period_id)?,
         )
         .map_err(to_js_err)
+}
+
+/// Read one capital-structure amount as exact money.
+///
+/// Free-function twin of Python `CapitalStructureCashflows.get_money` (Rust
+/// `CapitalStructureCashflows::get_money`): the typed form of
+/// `capitalStructureCashflowsGetComponent`, with the same component and scope
+/// names.
+///
+/// @returns `Money` wire object (`{amount, currency}`): the exact amount in the scope's currency.
+///
+/// # Errors
+///
+/// Throws with kind `validation` for malformed inputs or period labels, and
+/// kind `computation` for an unknown component or malformed scope, a scope
+/// with no data for the period (including a consolidated total that could not
+/// be formed), or a component the breakdown does not record.
+/// @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
+/// @param component - A component name accepted by `capitalStructureCashflowsGetComponent`, for example `interest_expense_cash` or `debt_balance`.
+/// @param scope - An instrument identifier for its native-currency amount, `total` for the consolidated total in the reporting currency, or `total.<CCY>` for the total of the instruments in one native currency. This lookup performs no FX.
+/// @param periodId - Reporting-period label such as `2025Q1` present in the result.
+#[wasm_bindgen(js_name = capitalStructureCashflowsGetMoney, unchecked_return_type = "generated.statements.Money")]
+pub fn capital_structure_cashflows_get_money(
+    #[wasm_bindgen(
+        js_name = "cashflowsJson",
+        unchecked_param_type = "generated.statements.CapitalStructureCashflows | string"
+    )]
+    cashflows_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] component: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] scope: JsValue,
+    #[wasm_bindgen(js_name = "periodId", unchecked_param_type = "string")] period_id: JsValue,
+) -> Result<JsValue, JsValue> {
+    let cashflows: CapitalStructureCashflows = from_js_json(&cashflows_json, "cashflowsJson")?;
+    let component = js_string(&component, "component")?
+        .parse()
+        .map_err(to_js_err)?;
+    let scope = js_string(&scope, "scope")?.parse().map_err(to_js_err)?;
+    let money = cashflows
+        .get_money(component, &scope, &self::period_id(&period_id)?)
+        .map_err(to_js_err)?;
+    to_js_value(&money)
 }

@@ -93,6 +93,7 @@ FORMULAS: Final[dict[str, str]] = {
 
 NORMALIZATION_DOCUMENT: Final[dict[str, Any]] = {
     "target_node": "ebitda",
+    "output_node": "adjusted_ebitda",
     "adjustments": [
         {
             "id": "restructuring",
@@ -101,7 +102,7 @@ NORMALIZATION_DOCUMENT: Final[dict[str, Any]] = {
                 "type": "fixed",
                 "amounts": {"2025Q1": 50.0, "2025Q2": 45.0, "2025Q3": 40.0},
             },
-            "cap": {"base_node": "ebitda", "value": 0.10},
+            "cap": {"type": "reference", "base_node": "ebitda", "fraction": 0.10},
         },
         {
             "id": "management_fee",
@@ -115,7 +116,7 @@ NORMALIZATION_DOCUMENT: Final[dict[str, Any]] = {
             # base_mode omitted: exercises Rust's default
             # `CapBaseMode::Reported`, capping against the *reported*
             # (pre-adjustment) EBITDA rather than the running adjusted base.
-            "cap": {"base_node": "ebitda", "value": 0.05},
+            "cap": {"type": "reference", "base_node": "ebitda", "fraction": 0.05},
         },
     ],
 }

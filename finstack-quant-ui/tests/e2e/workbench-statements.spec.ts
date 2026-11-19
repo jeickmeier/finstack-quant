@@ -87,6 +87,10 @@ test("statements-workbench normalizes EBITDA and bridges it from the native step
   await target.press("Tab");
   await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(target).toHaveValue("ebitda");
+  // The adjusted metric is published under a new node id.
+  await editor
+    .getByRole("textbox", { name: "Output node" })
+    .fill("adjusted_ebitda");
   await editor.getByRole("button", { name: "Normalize" }).click();
   const table = editor.getByRole("table", {
     name: "Adjustments by period (USD)",

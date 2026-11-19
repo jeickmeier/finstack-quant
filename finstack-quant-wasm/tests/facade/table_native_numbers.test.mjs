@@ -35,30 +35,38 @@ function result() {
 }
 const values = (table, name) => table.columns.find((column) => column.name === name).data.values;
 
-test('statement table outputs retain native nonfinite numbers and literal sentinel-like identities', () => {
+test('statement table outputs keep native numbers, nulls for valueless cells and literal identities', () => {
   const input = result();
-  input.nodes.nan = { '2025Q1': 'nan', '2025Q2': 'inf' };
-  input.nodes.other = { '2025Q1': '-inf' };
+  input.cells.nan['2025Q2'] = { status: 'missing' };
+  input.cells.other['2025Q1'] = { status: 'unavailable', reason: 'missing_mask' };
   const wide = statements.statementResultToTableWide(input);
-  assert.ok(Number.isNaN(values(wide, 'nan')[0]));
-  assert.equal(values(wide, 'nan')[1], Infinity);
-  assert.equal(values(wide, 'other')[0], -Infinity);
-  assert.ok(Number.isNaN(values(wide, 'other')[1]));
+  assert.deepEqual(values(wide, 'nan'), [100, null]);
+  assert.deepEqual(values(wide, 'other'), [null, 2]);
 
   const long = statements.statementResultToTableLong(input);
-  const nodeIds = values(long, 'node_id');
-  const periods = values(long, 'period_id');
-  const numeric = values(long, 'value');
-  const cell = (node, period) =>
-    numeric[nodeIds.findIndex((id, index) => id === node && periods[index] === period)];
-  assert.deepEqual(
-    nodeIds.filter((id) => id === 'nan'),
-    ['nan', 'nan']
+  const rows = values(long, 'node_id')
+    .map((node, index) =>
+      ['period_id', 'status', 'value', 'reason', 'currency'].reduce(
+        (row, name) => [...row, values(long, name)[index]],
+        [node]
+      )
+    )
+    .sort();
+  assert.deepEqual(rows, [
+    ['nan', '2025Q1', 'value', 100, null, null],
+    ['nan', '2025Q2', 'missing', null, null, null],
+    ['other', '2025Q1', 'unavailable', null, 'missing_mask', null],
+    ['other', '2025Q2', 'value', 2, null, null],
+  ]);
+});
+
+test('statement tables reject a value cell that is not finite', () => {
+  const input = result();
+  input.cells.nan['2025Q1'] = { status: 'value', value: 'nan' };
+  assert.throws(
+    () => statements.statementResultToTableLong(input),
+    (e) => e.kind === 'validation'
   );
-  assert.ok(Number.isNaN(cell('nan', '2025Q1')));
-  assert.equal(cell('nan', '2025Q2'), Infinity);
-  assert.equal(cell('other', '2025Q1'), -Infinity);
-  assert.deepEqual(values(long, 'currency'), [null, null, null]);
 });
 
 test('Monte Carlo nested path table retains numeric storage and literal metric identities', () => {
@@ -66,7 +74,8 @@ test('Monte Carlo nested path table retains numeric storage and literal metric i
   try {
     const output = evaluator.evaluateMonteCarlo(model(), {
       n_paths: 2,
-      seed: 7,
+      seed: '7',
+      metrics: ['nan', 'other'],
       include_path_data: true,
     });
     assert.ok(output.path_data.columns.some((column) => column.data.type === 'float64'));

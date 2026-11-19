@@ -1,7 +1,7 @@
 //! Regression coverage for priority allocation, paid-cash ECF and liabilities.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use crate::capital_structure::waterfall::execute_waterfall;
+use crate::capital_structure::waterfall::execute_waterfall_same_period;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::{
@@ -80,13 +80,19 @@ fn loans(
 
 fn sweep(percentage: f64, target: Option<&str>) -> EcfSweepSpec {
     EcfSweepSpec {
-        ebitda_node: "ebitda".into(),
-        taxes_node: None,
-        capex_node: None,
-        working_capital_node: None,
-        cash_interest_node: None,
+        cash_measure: "ebitda".into(),
+        deductions: vec![
+            crate::capital_structure::EcfTerm::PaidCashInterest,
+            crate::capital_structure::EcfTerm::PaidFees,
+            crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+        ],
+        credits: Vec::new(),
         sweep_percentage: percentage,
-        target_instrument_id: target.map(str::to_owned),
+        facilities: (target.map(str::to_owned)).map_or(
+            crate::capital_structure::FacilitySelection::AllEligible,
+            |id| crate::capital_structure::FacilitySelection::Named(vec![id]),
+        ),
+        payment_lag_days: None,
     }
 }
 
@@ -146,11 +152,14 @@ fn prepayment_rungs_follow_configured_order_and_class_rank() {
                 PaymentPriority::Equity,
             ],
             ecf_sweep: Some(sweep(1.0, Some(target))),
-            mandatory_prepay_node: Some("mandatory".into()),
+            mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+                amount: "mandatory".into(),
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            }),
             payment_classes: payment_classes(),
             ..Default::default()
         };
-        let result = execute_waterfall(
+        let result = execute_waterfall_same_period(
             &context(&[("cash", 100.0), ("ebitda", 100.0), ("mandatory", 100.0)]),
             &spec,
             &mut state,
@@ -166,8 +175,12 @@ fn prepayment_rungs_follow_configured_order_and_class_rank() {
     }
 }
 
+/// A scheduled reduction is effective whether or not its cash is paid, so
+/// the principal it removes cannot be swept. A sweep ordered ahead of
+/// amortization therefore prepays the junior loan, and the senior payment it
+/// starved is real arrears, reported apart from the debt balance.
 #[test]
-fn sweep_before_amortization_consumes_senior_capacity_without_phantom_arrears() {
+fn a_sweep_ahead_of_amortization_cannot_prepay_scheduled_principal() {
     let (mut state, mut flows) = loans(&["senior", "junior"], 100);
     flows.get_mut("senior").expect("senior").principal_payment = usd(100);
     let spec = WaterfallSpec {
@@ -182,7 +195,7 @@ fn sweep_before_amortization_consumes_senior_capacity_without_phantom_arrears() 
         payment_classes: payment_classes(),
         ..Default::default()
     };
-    let result = execute_waterfall(
+    let result = execute_waterfall_same_period(
         &context(&[("cash", 100.0), ("ebitda", 100.0)]),
         &spec,
         &mut state,
@@ -190,10 +203,18 @@ fn sweep_before_amortization_consumes_senior_capacity_without_phantom_arrears() 
     )
     .expect("sweep before amortization");
 
-    assert_eq!(result.flows["senior"].principal_payment.amount(), 100.0);
-    assert_eq!(result.flows["junior"].principal_payment.amount(), 0.0);
-    assert!(state.principal_shortfall.is_empty());
-    assert!(result.warnings.is_empty());
+    let (senior, junior) = (&result.flows["senior"], &result.flows["junior"]);
+    assert_eq!(junior.principal_payment.amount(), 100.0);
+    assert_eq!(junior.debt_balance.amount(), 0.0);
+    assert_eq!(senior.principal_payment.amount(), 0.0);
+    // The senior reduction took effect; its unpaid cash is arrears.
+    assert_eq!(senior.debt_balance.amount(), 0.0);
+    assert_eq!(senior.principal_arrears.map(|a| a.amount()), Some(100.0));
+    assert_eq!(
+        state.principal_shortfall["senior"][0].amount.amount(),
+        100.0
+    );
+    assert_eq!(result.warnings.len(), 1);
 }
 
 #[test]
@@ -207,14 +228,14 @@ fn ecf_deducts_cash_interest_fees_and_scheduled_arrears_actually_paid() {
     state.fee_shortfall.insert("loan".into(), usd(15));
     state.principal_shortfall.insert(
         "loan".into(),
-        vec![PrincipalClaim {
-            payment_date: date!(2024 - 12 - 31),
-            balance_date: date!(2024 - 12 - 31),
-            amount: usd(20),
-        }],
+        vec![PrincipalClaim::at_par(
+            date!(2024 - 12 - 31),
+            date!(2024 - 12 - 31),
+            usd(20),
+        )],
     );
     let spec = waterfall_with_sweep(0.5);
-    let result = execute_waterfall(
+    let result = execute_waterfall_same_period(
         &context(&[("cash", 300.0), ("ebitda", 300.0)]),
         &spec,
         &mut state,
@@ -249,7 +270,7 @@ fn ecf_does_not_reserve_cash_for_a_later_interest_priority() {
         ecf_sweep: Some(sweep(0.5, None)),
         ..Default::default()
     };
-    let result = execute_waterfall(
+    let result = execute_waterfall_same_period(
         &context(&[("cash", 200.0), ("ebitda", 200.0)]),
         &spec,
         &mut state,
@@ -266,7 +287,7 @@ fn full_principal_repayment_preserves_earned_unpaid_interest() {
     let (mut state, mut flows) = loans(&["loan"], 1_000);
     flows.get_mut("loan").expect("loan").accrued_interest = usd(25);
     let spec = waterfall_with_sweep(1.0);
-    let result = execute_waterfall(
+    let result = execute_waterfall_same_period(
         &context(&[("cash", 1_000.0), ("ebitda", 1_000.0)]),
         &spec,
         &mut state,
@@ -281,8 +302,11 @@ fn full_principal_repayment_preserves_earned_unpaid_interest() {
     assert_eq!(loan.accrued_interest.amount(), 25.0);
 }
 
+/// A PIK request never touches the coupon due in the period it is made in:
+/// with no cash the coupon is overdue cash interest, carried as arrears and
+/// not capitalized, and earned accrual is untouched.
 #[test]
-fn pik_preserves_earned_accrual_in_coupon_and_noncoupon_periods() {
+fn a_pik_request_leaves_the_current_coupon_and_its_arrears_in_cash() {
     for due_coupon in [0, 50] {
         let (mut state, mut flows) = loans(&["loan"], 1_000);
         let loan = flows.get_mut("loan").expect("loan");
@@ -292,18 +316,25 @@ fn pik_preserves_earned_accrual_in_coupon_and_noncoupon_periods() {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "cash".into(),
                 threshold: 100.0,
-                target_instrument_ids: vec!["loan".into()],
-                min_periods_in_pik: 0,
+                elections: vec![crate::capital_structure::PikElectionSpec {
+                    instrument_id: "loan".into(),
+                    pik_fraction: rust_decimal::Decimal::ONE,
+                    min_coupon_periods: 0,
+                    notice_days: 0,
+                }],
             }),
             ..Default::default()
         };
-        let result = execute_waterfall(&context(&[("cash", 0.0)]), &spec, &mut state, &flows)
-            .expect("PIK coupon allocation");
+        let result =
+            execute_waterfall_same_period(&context(&[("cash", 0.0)]), &spec, &mut state, &flows)
+                .expect("waterfall with a PIK request");
         let loan = &result.flows["loan"];
-        assert_eq!(loan.debt_balance, usd(1_000 + due_coupon));
-        assert_eq!(loan.interest_expense_cash.amount(), 0.0);
-        assert_eq!(loan.interest_expense_pik, usd(due_coupon));
+        assert_eq!(loan.debt_balance, usd(1_000));
+        assert_eq!(loan.interest_expense_pik.amount(), 0.0);
+        assert_eq!(loan.interest_arrears, Some(usd(due_coupon)));
         assert_eq!(loan.accrued_interest.amount(), 25.0);
+        assert_eq!(result.pik_request, Some(true));
+        assert!(result.postings.is_empty());
     }
 }
 
@@ -325,7 +356,7 @@ fn shortfall_categories_cannot_collide_with_instrument_ids() {
             .get_mut("principal::A")
             .expect("namespaced id")
             .interest_expense_cash = usd(40);
-        let result = execute_waterfall(
+        let result = execute_waterfall_same_period(
             &context(&[("cash", 0.0)]),
             &WaterfallSpec::default(),
             &mut state,
@@ -343,8 +374,10 @@ fn shortfall_categories_cannot_collide_with_instrument_ids() {
         );
         assert_eq!(state.interest_shortfall["fees::A"].amount(), 20.0);
         assert_eq!(state.interest_shortfall["principal::A"].amount(), 40.0);
-        assert_eq!(result.flows["fees::A"].accrued_interest.amount(), 20.0);
-        assert_eq!(result.flows["principal::A"].accrued_interest.amount(), 40.0);
+        let arrears = |id: &str| result.flows[id].interest_arrears.map(|a| a.amount());
+        assert_eq!(arrears("fees::A"), Some(20.0));
+        assert_eq!(arrears("principal::A"), Some(40.0));
+        assert_eq!(result.flows["fees::A"].accrued_interest.amount(), 0.0);
     }
 }
 
@@ -356,7 +389,7 @@ fn delayed_principal_settlement_does_not_reduce_economic_balance_twice() {
     state
         .set_period_principal_flows("loan", &economic_period, Vec::new())
         .expect("economic movement without cash");
-    let first = execute_waterfall(
+    let first = execute_waterfall_same_period(
         &context_for(economic_period.id, &[("cash", 0.0)]),
         &WaterfallSpec::default(),
         &mut state,
@@ -373,14 +406,14 @@ fn delayed_principal_settlement_does_not_reduce_economic_balance_twice() {
         .set_period_principal_flows(
             "loan",
             &cash_period,
-            vec![PrincipalClaim {
-                payment_date: date!(2025 - 04 - 01),
-                balance_date: date!(2025 - 03 - 31),
-                amount: usd(10),
-            }],
+            vec![PrincipalClaim::at_par(
+                date!(2025 - 04 - 01),
+                date!(2025 - 03 - 31),
+                usd(10),
+            )],
         )
         .expect("delayed cash claim");
-    let second = execute_waterfall(
+    let second = execute_waterfall_same_period(
         &context_for(cash_period.id, &[("cash", 10.0)]),
         &WaterfallSpec::default(),
         &mut state,
@@ -402,11 +435,11 @@ fn delayed_settlement_remains_payable_after_economic_principal_is_swept() {
         .set_period_principal_flows(
             "loan",
             &period,
-            vec![PrincipalClaim {
-                payment_date: date!(2025 - 04 - 01),
-                balance_date: date!(2025 - 03 - 31),
-                amount: usd(10),
-            }],
+            vec![PrincipalClaim::at_par(
+                date!(2025 - 04 - 01),
+                date!(2025 - 03 - 31),
+                usd(10),
+            )],
         )
         .expect("delayed cash claim");
     let spec = WaterfallSpec {
@@ -420,7 +453,7 @@ fn delayed_settlement_remains_payable_after_economic_principal_is_swept() {
         ecf_sweep: Some(sweep(1.0, None)),
         ..Default::default()
     };
-    let result = execute_waterfall(
+    let result = execute_waterfall_same_period(
         &context_for(period.id, &[("cash", 100.0), ("ebitda", 100.0)]),
         &spec,
         &mut state,
@@ -444,14 +477,14 @@ fn early_unpaid_principal_is_carried_without_creating_debt_before_its_economic_d
         .set_period_principal_flows(
             "loan",
             &cash_period,
-            vec![PrincipalClaim {
-                payment_date: date!(2025 - 03 - 28),
-                balance_date: date!(2025 - 04 - 02),
-                amount: usd(10),
-            }],
+            vec![PrincipalClaim::at_par(
+                date!(2025 - 03 - 28),
+                date!(2025 - 04 - 02),
+                usd(10),
+            )],
         )
         .expect("early cash claim");
-    let first = execute_waterfall(
+    let first = execute_waterfall_same_period(
         &context_for(cash_period.id, &[("cash", 0.0)]),
         &WaterfallSpec::default(),
         &mut state,
@@ -469,7 +502,7 @@ fn early_unpaid_principal_is_carried_without_creating_debt_before_its_economic_d
     state
         .set_period_principal_flows("loan", &economic_period, Vec::new())
         .expect("economic date of carried claim");
-    let second = execute_waterfall(
+    let second = execute_waterfall_same_period(
         &context_for(economic_period.id, &[("cash", 10.0)]),
         &WaterfallSpec::default(),
         &mut state,
@@ -489,7 +522,7 @@ fn contractual_pik_follows_its_economic_date_without_double_capitalization() {
     state
         .set_period_principal_flows("loan", &economic_period, Vec::new())
         .expect("PIK economic date");
-    let first = execute_waterfall(
+    let first = execute_waterfall_same_period(
         &context_for(economic_period.id, &[("cash", 0.0)]),
         &WaterfallSpec::default(),
         &mut state,
@@ -504,7 +537,7 @@ fn contractual_pik_follows_its_economic_date_without_double_capitalization() {
     state
         .set_period_principal_flows("loan", &payment_period, Vec::new())
         .expect("later PIK reporting date");
-    let second = execute_waterfall(
+    let second = execute_waterfall_same_period(
         &context_for(payment_period.id, &[("cash", 0.0)]),
         &WaterfallSpec::default(),
         &mut state,
@@ -527,14 +560,14 @@ fn advance_principal_cannot_be_repaid_again_before_its_economic_date() {
             .set_period_principal_flows(
                 "loan",
                 &first_period,
-                vec![PrincipalClaim {
-                    payment_date: date!(2025 - 03 - 28),
-                    balance_date: date!(2025 - 04 - 02),
-                    amount: usd(10),
-                }],
+                vec![PrincipalClaim::at_par(
+                    date!(2025 - 03 - 28),
+                    date!(2025 - 04 - 02),
+                    usd(10),
+                )],
             )
             .expect("advance settlement");
-        let first = execute_waterfall(
+        let first = execute_waterfall_same_period(
             &context_for(first_period.id, &[("cash", initial_cash as f64)]),
             &WaterfallSpec::default(),
             &mut state,
@@ -551,7 +584,7 @@ fn advance_principal_cannot_be_repaid_again_before_its_economic_date() {
             .set_period_principal_flows("loan", &middle_period, Vec::new())
             .expect("economic date still in the future");
         let spec = waterfall_with_sweep(1.0);
-        let middle = execute_waterfall(
+        let middle = execute_waterfall_same_period(
             &context_for(middle_period.id, &[("cash", 100.0), ("ebitda", 100.0)]),
             &spec,
             &mut state,
@@ -575,7 +608,7 @@ fn advance_principal_cannot_be_repaid_again_before_its_economic_date() {
         state
             .set_period_principal_flows("loan", &final_period, Vec::new())
             .expect("economic date of already settled principal");
-        let last = execute_waterfall(
+        let last = execute_waterfall_same_period(
             &context_for(final_period.id, &[("cash", 100.0), ("ebitda", 100.0)]),
             &spec,
             &mut state,
@@ -641,11 +674,11 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
             .set_period_principal_flows(
                 "loan",
                 &first_period,
-                vec![PrincipalClaim {
-                    payment_date: date!(2025 - 03 - 31),
-                    balance_date: date!(2025 - 04 - 03),
-                    amount: usd(50),
-                }],
+                vec![PrincipalClaim::at_par(
+                    date!(2025 - 03 - 31),
+                    date!(2025 - 04 - 03),
+                    usd(50),
+                )],
             )
             .expect("advance is economically later than the other installment");
         let mut spec = waterfall_with_sweep(1.0);
@@ -659,7 +692,7 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
             ];
         }
         let ebitda = if sweep_first { 50.0 } else { 100.0 };
-        let first = execute_waterfall(
+        let first = execute_waterfall_same_period(
             &context_for(
                 first_period.id,
                 &[("cash", initial_cash as f64), ("ebitda", ebitda)],
@@ -671,33 +704,9 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
         .expect("settle advance and prepay remaining debt");
         assert_eq!(first.flows["loan"].principal_payment, usd(initial_cash));
         assert_eq!(first.flows["loan"].debt_balance.amount(), 50.0);
-        state
-            .rebuild_residuals(date!(2025 - 03 - 31))
-            .expect("rebuild preserves already settled economic principal");
-
-        let schedule = &state.residual_schedules["loan"];
-        let path = schedule.outstanding_by_date().expect("economic path");
-        let balance_before_advance = path
-            .iter()
-            .rfind(|(date, _)| *date <= date!(2025 - 04 - 02))
-            .expect("balance before the paid advance becomes effective")
-            .1;
-        assert_eq!(balance_before_advance.amount(), 50.0);
-        assert_eq!(
-            path.last().expect("final principal movement").1.amount(),
-            0.0
-        );
-        assert_eq!(
-            schedule
-                .get_flows()
-                .iter()
-                .find(|flow| flow.get_date() == date!(2025 - 04 - 04))
-                .expect("future installment row")
-                .get_amount()
-                .amount(),
-            0.0,
-            "the unpaid installment is extinguished by the prepayment"
-        );
+        // The advance paid on 31 March becomes effective on 3 April, so 50
+        // is still outstanding in between.
+        let balance_before_advance = usd(50);
 
         state.advance_period();
         let middle_period = dated_period(date!(2025 - 04 - 02), date!(2025 - 04 - 03));
@@ -707,7 +716,7 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
         state
             .set_period_principal_flows("loan", &middle_period, Vec::new())
             .expect("no cash due before the retained advance date");
-        let middle = execute_waterfall(
+        let middle = execute_waterfall_same_period(
             &context_for(middle_period.id, &[("cash", 0.0)]),
             &WaterfallSpec::default(),
             &mut state,
@@ -726,7 +735,7 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
         state
             .set_period_principal_flows("loan", &last_period, Vec::new())
             .expect("protected installment becomes economically effective");
-        let last = execute_waterfall(
+        let last = execute_waterfall_same_period(
             &context_for(last_period.id, &[("cash", 25.0)]),
             &WaterfallSpec::default(),
             &mut state,
@@ -741,4 +750,633 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
         assert!(state.principal_shortfall.is_empty());
         assert!(state.principal_advance_payments.is_empty());
     }
+}
+
+// Dated principal claims, arrears and advance reserves (STATEMENTS-CAPITAL-004)
+
+fn amortize_then_sweep() -> WaterfallSpec {
+    WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+            PaymentPriority::Equity,
+        ],
+        ecf_sweep: Some(sweep(1.0, None)),
+        ..Default::default()
+    }
+}
+
+/// The record's example: a 20 reduction effective 31 March on a 100 loan is
+/// due on 15 April. Outstanding principal is 80 from 31 March whatever
+/// happens to the cash; the missed cash is arrears until it is paid.
+#[test]
+fn a_reduction_takes_effect_on_its_date_and_missed_cash_is_arrears() {
+    let (mut state, mut flows) = loans(&["loan"], 80);
+    let april = dated_period(date!(2025 - 04 - 01), date!(2025 - 05 - 01));
+    let loan = flows.get_mut("loan").expect("loan");
+    loan.debt_balance = usd(80);
+    loan.principal_payment = usd(20);
+    let claim = PrincipalClaim::at_par(date!(2025 - 04 - 15), date!(2025 - 03 - 31), usd(20));
+    let claim_id = claim.id.clone();
+    state
+        .set_period_principal_flows("loan", &april, vec![claim])
+        .expect("claim due in April");
+
+    // April has 5 of cash: a partial payment on the due date.
+    let paid = execute_waterfall_same_period(
+        &context_for(april.id, &[("cash", 5.0)]),
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+    )
+    .expect("partial payment");
+    let loan = &paid.flows["loan"];
+    assert_eq!(loan.principal_payment.amount(), 5.0);
+    assert_eq!(loan.debt_balance.amount(), 80.0);
+    assert_eq!(loan.principal_arrears, Some(usd(15)));
+    let carried = &state.principal_shortfall["loan"][0];
+    assert_eq!(carried.id, claim_id);
+    assert_eq!((carried.amount, carried.face), (usd(15), usd(15)));
+    assert_eq!(carried.payments.len(), 1);
+    assert_eq!(carried.payments[0].date, date!(2025 - 04 - 15));
+    assert_eq!(carried.payments[0].amount, usd(5));
+
+    // May pays the arrears late. The claim keeps its identity and dates, and
+    // settling it does not reduce the 80 again.
+    state.advance_period();
+    let may = dated_period(date!(2025 - 05 - 01), date!(2025 - 06 - 01));
+    let loan = flows.get_mut("loan").expect("loan");
+    loan.principal_payment = usd(0);
+    state
+        .set_period_principal_flows("loan", &may, Vec::new())
+        .expect("nothing new due");
+    let settled = execute_waterfall_same_period(
+        &context_for(may.id, &[("cash", 100.0)]),
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+    )
+    .expect("late payment");
+    let loan = &settled.flows["loan"];
+    assert_eq!(loan.principal_payment.amount(), 15.0);
+    assert_eq!(loan.debt_balance.amount(), 80.0);
+    assert_eq!(loan.principal_arrears, Some(usd(0)));
+    assert!(state.principal_shortfall.is_empty());
+    assert_eq!(
+        settled.equity_distribution.expect("residual").amount(),
+        85.0
+    );
+}
+
+/// Cash paid before its reduction takes effect is reserved: the face stays
+/// in outstanding principal until the effective date and cannot be prepaid
+/// a second time.
+#[test]
+fn principal_paid_ahead_is_reserved_until_its_effective_date() {
+    let (mut state, mut flows) = loans(&["loan"], 100);
+    let march = dated_period(date!(2025 - 03 - 01), date!(2025 - 04 - 01));
+    let loan = flows.get_mut("loan").expect("loan");
+    loan.debt_balance = usd(100);
+    loan.principal_payment = usd(10);
+    state
+        .set_period_principal_flows(
+            "loan",
+            &march,
+            vec![PrincipalClaim::at_par(
+                date!(2025 - 03 - 20),
+                date!(2025 - 04 - 10),
+                usd(10),
+            )],
+        )
+        .expect("early cash claim");
+    let first = execute_waterfall_same_period(
+        &context_for(march.id, &[("cash", 500.0), ("ebitda", 500.0)]),
+        &amortize_then_sweep(),
+        &mut state,
+        &flows,
+    )
+    .expect("pay ahead, then sweep");
+    let loan = &first.flows["loan"];
+    // 10 scheduled and 90 swept: the reserved 10 cannot be swept as well.
+    assert_eq!(loan.scheduled_principal, Some(usd(10)));
+    assert_eq!(loan.sweep_prepayment, Some(usd(90)));
+    assert_eq!(loan.principal_advance_reserve, Some(usd(10)));
+    assert_eq!(loan.debt_balance.amount(), 10.0);
+    assert_eq!(state.principal_advance_payments["loan"][0].face, usd(10));
+
+    // On 10 April the reduction takes effect: the schedule closes at zero
+    // and the reserve is released without any further cash.
+    state.advance_period();
+    let april = dated_period(date!(2025 - 04 - 01), date!(2025 - 05 - 01));
+    let loan = flows.get_mut("loan").expect("loan");
+    loan.debt_balance = usd(0);
+    loan.principal_payment = usd(0);
+    state
+        .set_period_principal_flows("loan", &april, Vec::new())
+        .expect("nothing due");
+    let second = execute_waterfall_same_period(
+        &context_for(april.id, &[("cash", 500.0), ("ebitda", 500.0)]),
+        &amortize_then_sweep(),
+        &mut state,
+        &flows,
+    )
+    .expect("effective date");
+    let loan = &second.flows["loan"];
+    assert_eq!(loan.principal_payment.amount(), 0.0);
+    assert_eq!(loan.debt_balance.amount(), 0.0);
+    assert_eq!(loan.principal_advance_reserve, Some(usd(0)));
+    assert!(state.principal_advance_payments.is_empty());
+}
+
+/// Scheduled principal is always dated and reconciles exactly: nothing is
+/// synthesized from an aggregate, and a claim list that misses the
+/// contractual cash by a cent is rejected.
+#[test]
+fn scheduled_principal_needs_dated_claims_that_reconcile_exactly() {
+    use crate::capital_structure::waterfall::execute_waterfall_staged;
+    let (mut state, mut flows) = loans(&["loan"], 80);
+    let april = dated_period(date!(2025 - 04 - 01), date!(2025 - 05 - 01));
+    let loan = flows.get_mut("loan").expect("loan");
+    loan.debt_balance = usd(80);
+    loan.principal_payment = usd(20);
+    let context = context_for(april.id, &[("cash", 100.0)]);
+
+    let error = execute_waterfall_staged(
+        &context,
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+        None,
+    )
+    .expect_err("no dated claims")
+    .to_string();
+    assert!(error.contains("no dated principal claims"), "{error}");
+
+    let short = Money::new(19.99, Currency::USD).expect("money");
+    state
+        .set_period_principal_flows(
+            "loan",
+            &april,
+            vec![PrincipalClaim::at_par(
+                date!(2025 - 04 - 15),
+                date!(2025 - 03 - 31),
+                short,
+            )],
+        )
+        .expect("claim");
+    let error = execute_waterfall_staged(
+        &context,
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+        None,
+    )
+    .expect_err("claims a cent short")
+    .to_string();
+    assert!(error.contains("do not reconcile"), "{error}");
+    assert!(state.closing_balances.is_empty());
+}
+
+// Exact allocation, residual treatment and conservation (STATEMENTS-CAPITAL-006)
+
+fn cents(value: i64) -> Money {
+    Money::from_decimal(rust_decimal::Decimal::new(value, 2), Currency::USD)
+}
+
+fn no_equity() -> WaterfallSpec {
+    WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+        ],
+        ..Default::default()
+    }
+}
+
+/// The record's example: five cents across three equal two-cent claims pay
+/// two, two and one by instrument id, whatever the row order, and the unpaid
+/// cent is carried.
+#[test]
+fn five_cents_across_three_claims_are_paid_in_whole_cents_by_stable_id() {
+    for order in [["a", "b", "c"], ["c", "a", "b"]] {
+        let (mut state, mut flows) = loans(&order, 100);
+        for flow in flows.values_mut() {
+            flow.interest_expense_cash = cents(2);
+        }
+        let result = execute_waterfall_same_period(
+            &context(&[("cash", 0.05)]),
+            &WaterfallSpec::default(),
+            &mut state,
+            &flows,
+        )
+        .expect("five cents");
+        let paid = |id: &str| result.flows[id].interest_expense_cash;
+        assert_eq!(
+            (paid("a"), paid("b"), paid("c")),
+            (cents(2), cents(2), cents(1))
+        );
+        assert_eq!(result.flows["c"].interest_arrears, Some(cents(1)));
+        assert_eq!(state.interest_shortfall["c"], cents(1));
+        assert_eq!(result.equity_distribution, Some(cents(0)));
+    }
+}
+
+/// Every unpaid amount is carried, however small: a claim below one cent
+/// that goes unpaid is not noise.
+#[test]
+fn a_subcent_claim_that_goes_unpaid_is_carried_exactly() {
+    let (mut state, mut flows) = loans(&["loan"], 100);
+    let tenth_of_a_cent = Money::from_decimal(rust_decimal::Decimal::new(1, 3), Currency::USD);
+    flows.get_mut("loan").expect("loan").interest_expense_cash = tenth_of_a_cent;
+    let result = execute_waterfall_same_period(
+        &context(&[("cash", 0.0)]),
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+    )
+    .expect("no cash");
+    assert_eq!(result.flows["loan"].interest_arrears, Some(tenth_of_a_cent));
+    assert_eq!(state.interest_shortfall["loan"], tenth_of_a_cent);
+    assert_eq!(result.warnings.len(), 1);
+}
+
+/// The record's example: a 15 residual is an equity distribution when
+/// Equity is the terminal priority and retained cash when it is absent.
+#[test]
+fn the_residual_goes_to_equity_only_when_equity_is_the_terminal_priority() {
+    for (spec, equity, retained) in [(WaterfallSpec::default(), 15, 0), (no_equity(), 0, 15)] {
+        let (mut state, mut flows) = loans(&["loan"], 100);
+        flows.get_mut("loan").expect("loan").interest_expense_cash = usd(5);
+        let result =
+            execute_waterfall_same_period(&context(&[("cash", 20.0)]), &spec, &mut state, &flows)
+                .expect("residual");
+        assert_eq!(result.equity_distribution, Some(usd(equity)));
+        assert_eq!(result.retained_cash, Some(usd(retained)));
+        assert_eq!(result.available_cash, Some(usd(20)));
+    }
+}
+
+/// A negative pool is a funding shortfall: nothing is allocated and every
+/// claim is carried.
+#[test]
+fn a_negative_pool_allocates_nothing_and_reports_the_shortfall() {
+    let (mut state, mut flows) = loans(&["loan"], 100);
+    let loan = flows.get_mut("loan").expect("loan");
+    loan.interest_expense_cash = usd(5);
+    loan.fees = usd(2);
+    let result = execute_waterfall_same_period(
+        &context(&[("cash", -10.0)]),
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+    )
+    .expect("negative pool");
+    assert_eq!(result.available_cash, Some(usd(0)));
+    assert_eq!(result.equity_distribution, Some(usd(0)));
+    assert_eq!(result.flows["loan"].interest_expense_cash, usd(0));
+    assert_eq!(state.interest_shortfall["loan"], usd(5));
+    assert_eq!(state.fee_shortfall["loan"], usd(2));
+    // The funding shortfall and the two unpaid claims are all reported.
+    assert_eq!(result.warnings.len(), 3);
+}
+
+/// The waterfall is evaluated without debt claims: the whole pool is
+/// residual. Only a structure with no currency at all has nothing to run.
+#[test]
+fn a_debt_free_period_still_evaluates_the_pool() {
+    use crate::capital_structure::waterfall::execute_waterfall_staged;
+    let empty = IndexMap::new();
+    let context = context(&[("cash", 40.0)]);
+    let mut state = CapitalStructureState::new();
+
+    let with_equity = execute_waterfall_staged(
+        &context,
+        &WaterfallSpec::default(),
+        &mut state,
+        &empty,
+        Some(Currency::USD),
+    )
+    .expect("debt-free");
+    assert_eq!(with_equity.available_cash, Some(usd(40)));
+    assert_eq!(with_equity.equity_distribution, Some(usd(40)));
+    assert_eq!(with_equity.retained_cash, Some(usd(0)));
+
+    let retained = execute_waterfall_staged(
+        &context,
+        &no_equity(),
+        &mut state,
+        &empty,
+        Some(Currency::USD),
+    )
+    .expect("debt-free, no equity");
+    assert_eq!(retained.retained_cash, Some(usd(40)));
+
+    let nothing = execute_waterfall_staged(
+        &context,
+        &WaterfallSpec::default(),
+        &mut state,
+        &empty,
+        None,
+    )
+    .expect("no currency");
+    assert!(nothing.available_cash.is_none() && nothing.equity_distribution.is_none());
+
+    // Zero claims on existing instruments run the same way.
+    let (mut state, flows) = loans(&["loan"], 100);
+    let result =
+        execute_waterfall_same_period(&context, &WaterfallSpec::default(), &mut state, &flows)
+            .expect("no claims");
+    assert_eq!(result.equity_distribution, Some(usd(40)));
+}
+
+/// Allocatable cash reconciles exactly to what was paid plus the residual,
+/// and each instrument's payment does not depend on the order of the rows.
+#[test]
+fn allocation_is_exact_and_independent_of_row_order() {
+    let claims = [
+        ("alpha", 94_892_500_i64),
+        ("beta", 14_753_112),
+        ("gamma", 333),
+    ];
+    let mut by_order = Vec::new();
+    for order in [[0, 1, 2], [2, 1, 0], [1, 2, 0]] {
+        let ids: Vec<&str> = order.iter().map(|index| claims[*index].0).collect();
+        let (mut state, mut flows) = loans(&ids, 1_000_000_000);
+        for (id, amount) in claims {
+            let flow = flows.get_mut(id).expect("loan");
+            flow.interest_expense_cash = cents(amount);
+            flow.fees = cents(amount / 7);
+        }
+        let result = execute_waterfall_same_period(
+            &context(&[("cash", 997_982.74)]),
+            &WaterfallSpec::default(),
+            &mut state,
+            &flows,
+        )
+        .expect("short cash");
+        let mut uses = result.equity_distribution.expect("equity");
+        for flow in result.flows.values() {
+            uses = uses
+                .checked_add(flow.fees)
+                .and_then(|sum| sum.checked_add(flow.interest_expense_cash))
+                .and_then(|sum| sum.checked_add(flow.principal_payment))
+                .expect("sum");
+        }
+        assert_eq!(Some(uses), result.available_cash);
+        by_order.push(claims.map(|(id, _)| {
+            (
+                result.flows[id].fees,
+                result.flows[id].interest_expense_cash,
+            )
+        }));
+    }
+    assert_eq!(by_order[0], by_order[1]);
+    assert_eq!(by_order[0], by_order[2]);
+}
+
+// Agreement-defined prepayments and ECF sweeps (STATEMENTS-CAPITAL-007)
+
+use crate::capital_structure::{EcfTerm, FacilitySelection, PrepaymentOutcome, PrepaymentSpec};
+
+fn input(expression: &str) -> EcfTerm {
+    EcfTerm::Input {
+        expression: expression.into(),
+    }
+}
+
+fn elected_sweep(facilities: FacilitySelection) -> WaterfallSpec {
+    WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+        ],
+        ecf_sweep: Some(EcfSweepSpec {
+            cash_measure: "measure".into(),
+            deductions: vec![input("capex"), input("taxes")],
+            credits: Vec::new(),
+            sweep_percentage: 0.5,
+            facilities,
+            payment_lag_days: None,
+        }),
+        ..Default::default()
+    }
+}
+
+/// The record's example: a cash measure of 95 with 35 of elected deductions
+/// is 60 of ECF, and a 50% sweep requests 30. With 22 in the pool and 18 of
+/// eligible principal after reserves, 18 is paid and 4 stays in the pool.
+#[test]
+fn the_sweep_pays_the_least_of_its_request_the_cash_and_eligible_principal() {
+    // 28 outstanding, of which 10 was paid ahead of its reduction and is
+    // reserved: 18 is eligible.
+    let (mut state, mut flows) = loans(&["loan"], 28);
+    let march = dated_period(date!(2025 - 03 - 01), date!(2025 - 04 - 01));
+    flows.get_mut("loan").expect("loan").debt_balance = usd(28);
+    state.principal_advance_payments.insert(
+        "loan".into(),
+        vec![PrincipalClaim::at_par(
+            date!(2025 - 02 - 20),
+            date!(2025 - 04 - 10),
+            usd(10),
+        )],
+    );
+    state
+        .set_period_principal_flows("loan", &march, Vec::new())
+        .expect("nothing due");
+    let result = execute_waterfall_same_period(
+        &context_for(
+            march.id,
+            &[
+                ("cash", 22.0),
+                ("measure", 95.0),
+                ("capex", 25.0),
+                ("taxes", 10.0),
+            ],
+        ),
+        &elected_sweep(FacilitySelection::AllEligible),
+        &mut state,
+        &flows,
+    )
+    .expect("sweep");
+
+    assert_eq!(
+        result.prepayments,
+        [PrepaymentOutcome {
+            kind: PaymentPriority::Sweep,
+            requested: usd(30),
+            paid: usd(18),
+            unpaid: usd(12),
+            carried: Money::from((0_i64, Currency::USD)),
+        }]
+    );
+    assert_eq!(result.flows["loan"].sweep_prepayment, Some(usd(18)));
+    assert_eq!(result.flows["loan"].debt_balance, usd(10));
+    // No Equity priority: the 4 left in the pool is retained.
+    assert_eq!(result.retained_cash, Some(usd(4)));
+    // The unpaid request is reported, not carried as arrears.
+    assert!(state.principal_shortfall.is_empty());
+}
+
+/// Nothing is deducted unless the agreement elects it: the paid debt
+/// service terms are the amounts the earlier priorities actually allocated.
+#[test]
+fn deductions_and_credits_are_only_the_elected_terms() {
+    let run = |deductions: Vec<EcfTerm>, credits: Vec<EcfTerm>| {
+        let (mut state, mut flows) = loans(&["loan"], 1_000);
+        let loan = flows.get_mut("loan").expect("loan");
+        loan.interest_expense_cash = usd(10);
+        loan.fees = usd(2);
+        loan.principal_payment = usd(8);
+        let mut spec = elected_sweep(FacilitySelection::AllEligible);
+        let sweep = spec.ecf_sweep.as_mut().expect("sweep");
+        sweep.deductions = deductions;
+        sweep.credits = credits;
+        sweep.sweep_percentage = 1.0;
+        let result = execute_waterfall_same_period(
+            &context(&[("cash", 500.0), ("measure", 100.0), ("refund", 5.0)]),
+            &spec,
+            &mut state,
+            &flows,
+        )
+        .expect("sweep");
+        result.prepayments[0].requested
+    };
+    // No election: the measure alone, although 20 of debt service was paid.
+    assert_eq!(run(Vec::new(), Vec::new()), usd(100));
+    assert_eq!(run(vec![EcfTerm::PaidCashInterest], Vec::new()), usd(90));
+    assert_eq!(
+        run(
+            vec![
+                EcfTerm::PaidCashInterest,
+                EcfTerm::PaidFees,
+                EcfTerm::PaidScheduledPrincipal
+            ],
+            vec![input("refund")]
+        ),
+        usd(85)
+    );
+    // A negative ECF requests nothing.
+    assert_eq!(
+        run(vec![input("measure"), input("refund")], Vec::new()),
+        usd(0)
+    );
+}
+
+/// Eligibility is elected: a named list repays only those facilities, and
+/// `all_eligible` repays every one by class and pro rata.
+#[test]
+fn a_prepayment_repays_only_its_elected_facilities() {
+    let mandatory = |facilities: FacilitySelection| WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::MandatoryPrepayment,
+            PaymentPriority::Equity,
+        ],
+        mandatory_prepayment: Some(PrepaymentSpec {
+            amount: "request".into(),
+            facilities,
+        }),
+        ..Default::default()
+    };
+    let run = |facilities: FacilitySelection, request: f64| {
+        let (mut state, flows) = loans(&["term_loan", "revolver"], 100);
+        execute_waterfall_same_period(
+            &context(&[("cash", 500.0), ("request", request)]),
+            &mandatory(facilities),
+            &mut state,
+            &flows,
+        )
+    };
+
+    let all = run(FacilitySelection::AllEligible, 60.0).expect("all eligible");
+    assert_eq!(all.flows["term_loan"].mandatory_prepayment, Some(usd(30)));
+    assert_eq!(all.flows["revolver"].mandatory_prepayment, Some(usd(30)));
+
+    let named = run(FacilitySelection::Named(vec!["revolver".into()]), 60.0).expect("named");
+    assert_eq!(named.flows["term_loan"].mandatory_prepayment, Some(usd(0)));
+    assert_eq!(named.flows["revolver"].mandatory_prepayment, Some(usd(60)));
+    // A request beyond the named facility's principal pays what is eligible.
+    let capped = run(FacilitySelection::Named(vec!["revolver".into()]), 160.0).expect("capped");
+    assert_eq!(
+        capped.prepayments[0],
+        PrepaymentOutcome {
+            kind: PaymentPriority::MandatoryPrepayment,
+            requested: usd(160),
+            paid: usd(100),
+            unpaid: usd(60),
+            carried: Money::from((0_i64, Currency::USD)),
+        }
+    );
+    assert_eq!(capped.flows["term_loan"].debt_balance, usd(100));
+
+    // A negative request and an unknown facility are errors.
+    let error = run(FacilitySelection::AllEligible, -5.0)
+        .expect_err("negative request")
+        .to_string();
+    assert!(error.contains("negative"), "{error}");
+    let error = run(FacilitySelection::Named(vec!["ghost".into()]), 5.0)
+        .expect_err("unknown facility")
+        .to_string();
+    assert!(error.contains("'ghost'"), "{error}");
+}
+
+/// Each prepayment and its priority are supplied together, a zero-percentage
+/// sweep included; an empty or repeated facility list and sizing inputs that
+/// read a same-period `cs` output are rejected.
+#[test]
+fn prepayment_elections_are_validated_before_any_period() {
+    let mut zero = elected_sweep(FacilitySelection::AllEligible);
+    zero.ecf_sweep.as_mut().expect("sweep").sweep_percentage = 0.0;
+    zero.validate()
+        .expect("a zero-percentage sweep with its priority");
+    zero.priority_of_payments
+        .retain(|p| *p != PaymentPriority::Sweep);
+    assert!(zero.validate().is_err());
+    let mut missing = elected_sweep(FacilitySelection::AllEligible);
+    missing.ecf_sweep = None;
+    assert!(missing.validate().is_err());
+
+    for facilities in [
+        FacilitySelection::Named(Vec::new()),
+        FacilitySelection::Named(vec!["a".into(), "a".into()]),
+    ] {
+        assert!(elected_sweep(facilities).validate().is_err());
+    }
+
+    let mut reads_output = elected_sweep(FacilitySelection::AllEligible);
+    reads_output.ecf_sweep.as_mut().expect("sweep").deductions =
+        vec![input("cs.interest_expense_cash.total")];
+    let error = reads_output
+        .validate()
+        .expect_err("cs deduction")
+        .to_string();
+    assert!(error.contains("cs.interest_expense_cash.total"), "{error}");
+    assert!(error.contains("ecf_sweep"), "{error}");
+
+    // The wire form is explicit.
+    let spec: EcfSweepSpec = serde_json::from_value(serde_json::json!({
+        "cash_measure": "ebitda",
+        "deductions": [{"type": "input", "expression": "capex"}, {"type": "paid_cash_interest"}],
+        "sweep_percentage": 0.5,
+        "facilities": {"named": ["TL"]}
+    }))
+    .expect("explicit sweep");
+    assert_eq!(spec.facilities, FacilitySelection::Named(vec!["TL".into()]));
+    assert!(
+        serde_json::from_value::<EcfSweepSpec>(serde_json::json!({
+            "cash_measure": "ebitda", "sweep_percentage": 0.5
+        }))
+        .is_err(),
+        "the eligible facilities must be elected"
+    );
+    let all: FacilitySelection =
+        serde_json::from_value(serde_json::json!("all_eligible")).expect("all");
+    assert_eq!(all, FacilitySelection::AllEligible);
 }

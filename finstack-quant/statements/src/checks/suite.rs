@@ -7,9 +7,12 @@ use super::builtins::{
     RetainedEarningsReconciliation, SignConventionCheck,
 };
 use super::traits::{Check, CheckContext};
-use super::types::{CheckCategory, CheckConfig, CheckReport, CheckResult, CheckSummary, Severity};
+use super::types::{
+    CheckCategory, CheckConfig, CheckOutcome, CheckReport, CheckResult, CheckSummary, PeriodScope,
+    Severity,
+};
 use crate::Result;
-use crate::evaluator::{Evaluator, StatementResult};
+use crate::evaluator::{Evaluator, ObservationCutoff, StatementResult};
 use crate::types::FinancialModelSpec;
 
 /// A named, self-contained collection of checks with its own configuration.
@@ -37,29 +40,114 @@ impl CheckSuite {
     }
 
     /// Merge another suite's checks into this one, consuming the other suite.
-    pub fn merge(mut self, other: CheckSuite) -> Self {
-        self.checks.extend(other.checks);
-        self
-    }
-
-    /// Execute all checks in the suite, applying `min_severity` and
-    /// `materiality_threshold` filters from the config.
     ///
-    /// Each check produces its full findings first; filtering then removes
-    /// findings below the configured severity or absolute materiality.
-    /// Error-severity findings are exempt from materiality filtering, so a
-    /// materiality threshold can never flip a failing check to passed. A check
-    /// passes when none of its retained findings has `Error` severity. The
-    /// returned summary counts only retained findings, so it describes the
-    /// reporting policy rather than every raw diagnostic a check generated.
+    /// The other suite's checks are appended in their declared order.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - Suite to append. Its configuration must equal this
+    ///   suite's, and its check identifiers must not repeat any of this
+    ///   suite's.
     ///
     /// # Errors
     ///
-    /// Propagates the first error returned by an individual check, such as a
-    /// missing required model node, incompatible result data, or invalid
-    /// check-specific configuration. On error no partial `CheckReport` is
-    /// returned; run smaller suites when callers need per-check isolation.
+    /// Returns an invalid-input error when the two configurations differ or
+    /// when a check identifier would appear twice.
+    pub fn merge(mut self, other: CheckSuite) -> Result<Self> {
+        if self.config != other.config {
+            return Err(crate::Error::invalid_input(format!(
+                "check suites '{}' and '{}' have different configurations and cannot be merged",
+                self.name, other.name
+            )));
+        }
+        self.checks.extend(other.checks);
+        unique_check_ids(&self.name, &self.checks)?;
+        Ok(self)
+    }
+
+    /// Run every check in declared order against verified results.
+    ///
+    /// Each check's verdict is decided from all of its findings; the report
+    /// verdict from all check verdicts. The `min_severity` and
+    /// `materiality_threshold` filters then remove advisory findings only:
+    /// an error-severity finding, a coverage finding and every recorded
+    /// comparison stay in the report, so no filter can change a verdict or
+    /// hide a failure.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - Validated model the results were evaluated from.
+    /// * `results` - Results of an evaluation run of `model`. Their recorded
+    ///   provenance must identify this model's content, its source snapshot
+    ///   and period plan, and a run of it; hand-built results are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error for results with missing or mismatched
+    /// provenance, and propagates the first configuration or execution error
+    /// of a check, such as a missing required node, incompatible units, or an
+    /// invalid check-specific setting. On error no partial report is
+    /// returned.
     pub fn run(
+        &self,
+        model: &FinancialModelSpec,
+        results: &StatementResult,
+    ) -> Result<CheckReport> {
+        results.verified_run_of(model, None)?;
+        self.execute(model, results)
+    }
+
+    /// Run every check against a rollup of a verified run, at the rollup's
+    /// target periods.
+    ///
+    /// The checks read the rolled cells and iterate the target period plan,
+    /// so a flow identity is judged on the rolled sums and a level on its
+    /// period-end cells. Verdicts and filters are those of [`Self::run`].
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - Validated model the source run evaluated.
+    /// * `rolled` - Result of [`StatementResult::rollup`]. Its provenance
+    ///   must name a run of this model: the same content, source snapshot
+    ///   and run identity under the cutoff and valuation date it records.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `rolled` carries no rollup
+    /// provenance or its source run is not a run of `model`, and propagates
+    /// the first configuration or execution error of a check.
+    pub fn run_rolled(
+        &self,
+        model: &FinancialModelSpec,
+        rolled: &StatementResult,
+    ) -> Result<CheckReport> {
+        let not_a_rollup = |what: &str| {
+            crate::error::Error::invalid_input(format!(
+                "supplied results are not a rollup of a verified run of model '{}': {what}",
+                model.id
+            ))
+        };
+        let provenance = rolled
+            .rollup_provenance
+            .as_ref()
+            .ok_or_else(|| not_a_rollup("they record no rollup provenance"))?;
+        let source = &provenance.source_run;
+        let expected = crate::evaluator::RunProvenance::for_run(
+            model,
+            source.observation_cutoff,
+            source.valuation_date,
+        )
+        .map_err(|error| not_a_rollup(&format!("the model does not validate ({error})")))?;
+        if expected != *source {
+            return Err(not_a_rollup(
+                "their source run's model content, source snapshot or run identity differs",
+            ));
+        }
+        self.execute(model, rolled)
+    }
+
+    /// Execute the checks against results the caller has admitted.
+    fn execute(
         &self,
         model: &FinancialModelSpec,
         results: &StatementResult,
@@ -73,64 +161,68 @@ impl CheckSuite {
         let min_severity = context.config.min_severity;
         let mat_threshold = context.config.materiality_threshold;
 
-        let mut filtered_results: Vec<CheckResult> = Vec::with_capacity(self.checks.len());
-
+        let mut results: Vec<CheckResult> = Vec::with_capacity(self.checks.len());
         for check in &self.checks {
+            // The verdict is decided inside `CheckResult::new` from every
+            // finding. The reporting filters below remove advisory findings
+            // only: an error-severity finding, a coverage finding and every
+            // recorded comparison stay visible, and no filter changes an
+            // outcome.
             let mut result = check.execute(&context)?;
-
             result.findings.retain(|f| {
+                if f.severity == Severity::Error || f.coverage {
+                    return true;
+                }
                 if f.severity < min_severity {
                     return false;
                 }
-                // Materiality is a reporting filter for advisory findings
-                // only. Error findings are always retained: suppressing one
-                // here would flip `passed` (recomputed below) and let a
-                // materiality setting silently convert a failing accounting
-                // identity into a passing check. Tolerances — not materiality
-                // — decide whether a diff is an Error in the first place.
-                if mat_threshold > 0.0
-                    && f.severity < Severity::Error
-                    && let Some(ref m) = f.materiality
-                    && m.absolute.abs() < mat_threshold
-                {
-                    return false;
-                }
-                true
+                !(mat_threshold > 0.0
+                    && f.materiality
+                        .as_ref()
+                        .is_some_and(|m| m.absolute.abs() < mat_threshold))
             });
+            results.push(result);
+        }
 
-            result.passed = !result
-                .findings
+        let count = |outcome: CheckOutcome| results.iter().filter(|r| r.outcome == outcome).count();
+        let (passed, failed, incomplete, unevaluated) = (
+            count(CheckOutcome::Pass),
+            count(CheckOutcome::Fail),
+            count(CheckOutcome::Incomplete),
+            count(CheckOutcome::Unevaluated),
+        );
+        // An empty suite, or one in which no check had anything to examine,
+        // is unevaluated: a pass requires evaluated work.
+        let outcome = if failed > 0 {
+            CheckOutcome::Fail
+        } else if incomplete > 0 {
+            CheckOutcome::Incomplete
+        } else if passed > 0 {
+            CheckOutcome::Pass
+        } else {
+            CheckOutcome::Unevaluated
+        };
+        let severity_count = |severity: Severity| {
+            results
                 .iter()
-                .any(|f| f.severity == Severity::Error);
-
-            filtered_results.push(result);
-        }
-
-        let total_checks = filtered_results.len();
-        let passed = filtered_results.iter().filter(|r| r.passed).count();
-        let failed = total_checks - passed;
-
-        let mut errors: usize = 0;
-        let mut warnings: usize = 0;
-        let mut infos: usize = 0;
-        for finding in filtered_results.iter().flat_map(|r| &r.findings) {
-            match finding.severity {
-                Severity::Error => errors += 1,
-                Severity::Warning => warnings += 1,
-                Severity::Info => infos += 1,
-            }
-        }
-
+                .flat_map(|r| &r.findings)
+                .filter(|f| f.severity == severity)
+                .count()
+        };
+        let summary = CheckSummary {
+            total_checks: results.len(),
+            passed,
+            failed,
+            incomplete,
+            unevaluated,
+            errors: severity_count(Severity::Error),
+            warnings: severity_count(Severity::Warning),
+            infos: severity_count(Severity::Info),
+        };
         Ok(CheckReport {
-            results: filtered_results,
-            summary: CheckSummary {
-                total_checks,
-                passed,
-                failed,
-                errors,
-                warnings,
-                infos,
-            },
+            outcome,
+            results,
+            summary,
         })
     }
 
@@ -140,9 +232,14 @@ impl CheckSuite {
     ///
     /// * `model` - Financial model whose node definitions and periods provide
     ///   check context.
-    /// * `results` - Optional precomputed statement results for `model`. When
-    ///   absent, a fresh [`Evaluator`] applies the canonical value, forecast,
-    ///   and formula precedence before checks run.
+    /// * `observation_cutoff` - The requested evaluation context: which
+    ///   observations the run may read.
+    /// * `results` - Optional results of that run, or a rollup of it
+    ///   ([`StatementResult::rollup`]), which is checked at its target
+    ///   periods as [`Self::run_rolled`] does. They are accepted only with
+    ///   verified identity: this model's content, source snapshot and period
+    ///   plan, and the requested cutoff. When absent, the model is evaluated
+    ///   under `observation_cutoff`.
     ///
     /// # Returns
     ///
@@ -150,17 +247,38 @@ impl CheckSuite {
     ///
     /// # Errors
     ///
-    /// Returns the first model-evaluation or check-execution error. Supplied
-    /// results are used directly and are never recomputed.
+    /// Returns an invalid-input error for supplied results with missing or
+    /// mismatched provenance, and the first model-evaluation or
+    /// check-execution error. Supplied results are never recomputed.
     pub fn run_model(
         &self,
         model: &FinancialModelSpec,
+        observation_cutoff: &ObservationCutoff,
         results: Option<&StatementResult>,
     ) -> Result<CheckReport> {
         match results {
-            Some(results) => self.run(model, results),
+            Some(rolled) if rolled.rollup_provenance.is_some() => {
+                let report = self.run_rolled(model, rolled)?;
+                let source_cutoff = rolled
+                    .rollup_provenance
+                    .as_ref()
+                    .map(|provenance| &provenance.source_run.observation_cutoff);
+                if source_cutoff != Some(observation_cutoff) {
+                    return Err(crate::error::Error::invalid_input(format!(
+                        "supplied results are not a rollup of a verified run of model '{}': \
+                         their observation cutoff is not the requested one",
+                        model.id
+                    )));
+                }
+                Ok(report)
+            }
+            Some(results) => {
+                results.verified_run_of(model, Some(observation_cutoff))?;
+                self.run(model, results)
+            }
             None => {
-                let evaluated = Evaluator::new().evaluate(model)?;
+                let evaluated =
+                    Evaluator::new().evaluate_under_cutoff(model, observation_cutoff)?;
                 self.run(model, &evaluated)
             }
         }
@@ -187,10 +305,13 @@ impl CheckSuite {
     /// use finstack_quant_statements::checks::builtins::NonFiniteCheck;
     /// use finstack_quant_statements::checks::CheckSuite;
     ///
+    /// # fn main() -> finstack_quant_statements::Result<()> {
     /// let suite = CheckSuite::builder("demo")
-    ///     .add_check(NonFiniteCheck { nodes: vec![] })
-    ///     .build();
+    ///     .add_check(NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() })
+    ///     .build()?;
     /// assert_eq!(suite.check_ids(), vec!["non_finite"]);
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn check_ids(&self) -> Vec<&str> {
         self.checks.iter().map(|c| c.id()).collect()
@@ -235,14 +356,34 @@ impl CheckSuiteBuilder {
     }
 
     /// Consume the builder and produce a [`CheckSuite`].
-    pub fn build(self) -> CheckSuite {
-        CheckSuite {
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when two checks share an identifier.
+    pub fn build(self) -> Result<CheckSuite> {
+        unique_check_ids(&self.name, &self.checks)?;
+        Ok(CheckSuite {
             name: self.name,
             description: self.description,
             checks: self.checks,
             config: self.config,
+        })
+    }
+}
+
+/// Reject a suite in which two checks share an identifier: results are
+/// reported per check, so an identifier names exactly one of them.
+fn unique_check_ids(suite: &str, checks: &[Box<dyn Check>]) -> Result<()> {
+    let mut seen = std::collections::HashSet::new();
+    for check in checks {
+        if !seen.insert(check.id()) {
+            return Err(crate::Error::invalid_input(format!(
+                "check suite '{suite}' has two checks with the identifier '{}'",
+                check.id()
+            )));
         }
     }
+    Ok(())
 }
 
 // Serializable suite spec
@@ -295,6 +436,7 @@ impl CheckSuiteSpec {
                 .cloned()
                 .map(|check| Box::new(check) as Box<dyn Check>),
         );
+        unique_check_ids(&self.name, &checks)?;
         Ok(CheckSuite {
             name: self.name.clone(),
             description: self.description.clone(),
@@ -357,18 +499,32 @@ impl BuiltinCheckSpec {
     }
 }
 
+/// How a formula check judges its formula.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum FormulaCheckMode {
+    /// The formula is Boolean: true passes and false is a breach.
+    Predicate,
+    /// The formula is a signed scalar or monetary residual compared with
+    /// zero: it passes when its absolute value is at most the tolerance.
+    Residual,
+}
+
 /// Serializable, runnable user-defined formula-check specification.
 ///
 /// Full suite definitions (built-in + formula) can be stored as a single JSON
 /// document and resolved directly with [`CheckSuiteSpec::resolve`].
 ///
-/// Each period ends in one of three verdicts: pass, fail (a finding with the
-/// configured `severity`), or insufficient data. A period has insufficient
-/// data when a same-period input is missing or non-finite, or when the
-/// formula consumes a non-finite value, such as a lag or rolling window that
-/// reaches before the first period. It is reported as a `warning` finding
-/// naming the inputs, records no comparison, and never fails the check. A
-/// division by zero over finite inputs is not missing data and still fails.
+/// The mode and the period scope are stated explicitly. In each in-scope
+/// period the check ends in one of three ways: pass, breach (a finding with
+/// the configured `severity`), or incomplete. The formula is evaluated on
+/// the typed cells of the verified run and consumes observations only on the
+/// paths it takes: an untaken branch may read a missing cell, and an
+/// explicit `coalesce` supplies a fallback. A period is incomplete (a
+/// coverage finding) when a needed observation, or the eligibility
+/// condition, is missing or unavailable. A division by zero, a domain error
+/// or an overflow is an execution error, for an advisory check too.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -379,19 +535,27 @@ pub struct FormulaCheckSpec {
     pub name: String,
     /// Category grouping.
     pub category: CheckCategory,
-    /// Severity assigned to findings when the formula fails.
+    /// Severity assigned to a breach.
     pub severity: Severity,
-    /// Statements DSL expression to evaluate (e.g. `"revenue > 0"`).
+    /// Whether the formula is a Boolean predicate or a residual.
+    pub mode: FormulaCheckMode,
+    /// Which periods the check covers: all, actuals only or forecasts only.
+    pub scope: PeriodScope,
+    /// Statements DSL expression to evaluate: Boolean in predicate mode
+    /// (`"revenue > 0"`), a scalar or monetary amount in residual mode
+    /// (`"assets - liabilities - equity"`).
     ///
     /// Formula checks use the same evaluator as calculated statement nodes,
     /// including time-series functions and `cs.*` capital-structure references.
     pub formula: String,
-    /// Template for the finding message (`{period}` is replaced at runtime).
+    /// Optional Boolean formula; a period in which it is false is out of
+    /// scope, and one in which it has no value is incomplete.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eligibility: Option<String>,
+    /// Template for the breach message (`{period}` is replaced at runtime).
     pub message_template: String,
-    /// Finite, nonnegative absolute residual bound in the formula's result units.
-    /// When present, the formula passes when its absolute result is at most
-    /// this bound. When absent, the formula is a predicate and any finite
-    /// nonzero result passes.
+    /// Residual mode only: finite, non-negative absolute bound in the
+    /// residual's units. Omitted means zero, an exact comparison.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tolerance: Option<f64>,
 }
@@ -424,12 +588,17 @@ mod tests {
                 .to_string()
                 .contains("unknown variant")
         );
-        // Tag-only construction succeeds for the checks whose fields all
-        // default, which is what a host's `builtin_checks=["non_finite"]`
-        // shorthand relies on.
-        for name in ["non_finite", "sign_convention"] {
-            serde_json::from_value::<BuiltinCheckSpec>(serde_json::json!({ "type": name }))
-                .expect("defaultable builtin");
-        }
+        // The sign check's groups default to empty; the validity check's
+        // node selection is explicit and has no default.
+        serde_json::from_value::<BuiltinCheckSpec>(
+            serde_json::json!({ "type": "sign_convention" }),
+        )
+        .expect("defaultable builtin");
+        serde_json::from_value::<BuiltinCheckSpec>(serde_json::json!({ "type": "non_finite" }))
+            .expect_err("the node selection is required");
+        serde_json::from_value::<BuiltinCheckSpec>(
+            serde_json::json!({ "type": "non_finite", "nodes": "all" }),
+        )
+        .expect("explicit selection of all nodes");
     }
 }

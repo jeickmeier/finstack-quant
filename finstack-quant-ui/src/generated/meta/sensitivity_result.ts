@@ -21,7 +21,14 @@ export default [
   {
     "path": "#/$defs/d_033184211bfcc772ee94/properties/failed",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/failed",
-    "description": "Number of checks that failed (at least one error-severity finding).",
+    "description": "Number of checks whose outcome is `fail` (an error-severity finding).",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_033184211bfcc772ee94/properties/incomplete",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/incomplete",
+    "description": "Number of checks whose outcome is `incomplete` (a coverage finding).",
     "format": "uint",
     "minimum": 0
   },
@@ -35,7 +42,7 @@ export default [
   {
     "path": "#/$defs/d_033184211bfcc772ee94/properties/passed",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/passed",
-    "description": "Number of checks that passed.",
+    "description": "Number of checks whose outcome is `pass`.",
     "format": "uint",
     "minimum": 0
   },
@@ -47,6 +54,13 @@ export default [
     "minimum": 0
   },
   {
+    "path": "#/$defs/d_033184211bfcc772ee94/properties/unevaluated",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/unevaluated",
+    "description": "Number of checks whose outcome is `unevaluated` (nothing examined).",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_033184211bfcc772ee94/properties/warnings",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/warnings",
     "description": "Total number of warning-severity findings across all checks.",
@@ -54,21 +68,44 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_051db3e5118e3d934ba2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory",
-    "description": "Cash claim category affected by a capital-structure warning."
+    "path": "#/$defs/d_048108bf9dc923c7b537",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome",
+    "description": "What one prepayment priority requested and paid in a period."
   },
   {
-    "path": "#/$defs/d_051db3e5118e3d934ba2/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory/oneOf/0",
-    "const": "fees",
-    "description": "Fee claims such as commitment or facility fees."
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/carried",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/carried",
+    "description": "The part of `unpaid` carried as arrears into the next period: all of\nit for a sweep with a dated payment obligation, zero otherwise (an\nunpaid amount without one is reported, not carried).",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
   {
-    "path": "#/$defs/d_051db3e5118e3d934ba2/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory/oneOf/1",
-    "const": "interest",
-    "description": "Cash-interest claims."
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/kind",
+    "description": "The prepayment priority: mandatory prepayment, voluntary prepayment\nor sweep.",
+    "ref": "#/$defs/PaymentPriority",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority"
+  },
+  {
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/paid",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/paid",
+    "description": "Cash paid at par: the request limited by the cash the earlier\npriorities left and by the eligible principal net of reserves.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/requested",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/requested",
+    "description": "Amount the priority requested: the mandatory or voluntary amount, or\nthe sweep percentage of positive excess cash flow.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/unpaid",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/unpaid",
+    "description": "`requested - paid`.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
   {
     "path": "#/$defs/d_07ccd5501efef381b26a",
@@ -112,6 +149,105 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire",
     "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
     "format": "date"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind",
+    "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Two different yearly counts exist:\n[`PeriodKind::annualization_factor`] is the conventional statistical\nfactor for explicitly selected observations (daily trading 252), and\n[`PeriodKind::slots_per_year`] is the calendar partition count, defined\nonly for the month-block kinds (record CORE-CONVENTIONS-014 #9).\n\nParses only the canonical snake_case wire values via [`std::str::FromStr`]:\n`daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.\nAliases, whitespace padding and case variants are rejected.\n\nOrdering follows [`PeriodKind::rank`] (daily through annual). It is a\ndeterministic key order, not a chronology."
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/0",
+    "const": "daily",
+    "description": "Daily periods (252 trading days per year by convention)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/1",
+    "const": "quarterly",
+    "description": "Quarterly periods (4 per year)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/2",
+    "const": "monthly",
+    "description": "Monthly periods (12 per year)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/3",
+    "const": "weekly",
+    "description": "Weekly periods (ISO 8601 week-year, typically 52 or 53 per year)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/4",
+    "const": "semi_annual",
+    "description": "Semi-annual periods (2 per year)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/5",
+    "const": "annual",
+    "description": "Annual periods (1 per year)"
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance",
+    "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/forecast_streams",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/forecast_streams",
+    "description": "The random stream of every stochastic forecast node in a single run,\nin model node order: enough to replay its draws."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/forecast_streams/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/forecast_streams/items",
+    "ref": "#/$defs/ForecastStream",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream"
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/model_content_hash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/model_content_hash",
+    "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash))."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/model_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/model_id",
+    "description": "Identifier of the evaluated model."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/observation_cutoff",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/observation_cutoff",
+    "description": "Observations the run was allowed to read.",
+    "ref": "#/$defs/ObservationCutoff",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff"
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/run_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/run_id",
+    "description": "Identity of this evaluation run: the canonical content hash of the\nfields above. Two runs of the same model content, snapshot, cutoff\nand valuation date share it."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/source_snapshot",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/source_snapshot",
+    "description": "Identity of the source snapshot the model's observations came from."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/valuation_date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/valuation_date",
+    "description": "Valuation date the capital structure was priced at, when the run used\na market."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/valuation_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/valuation_date/anyOf/0",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/valuation_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/valuation_date/anyOf/1"
   },
   {
     "path": "#/$defs/d_1b5716dde9957a614f3c",
@@ -184,7 +320,7 @@ export default [
   {
     "path": "#/$defs/d_288b30976e4551573cdd/properties/relative_pct",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/relative_pct",
-    "description": "Discrepancy as a percentage of the reference value.",
+    "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
     "format": "double"
   },
   {
@@ -219,13 +355,13 @@ export default [
   {
     "path": "#/$defs/d_2a886a29e286928aba1b",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource",
-    "description": "Which evaluation layer produced a statement cell (one node in one period).\n\nThe evaluator resolves every cell by the precedence\n`Value > Forecast > Formula`, after the node's optional `where` mask. The\nwinning layer is recorded per cell in [`StatementResult::node_sources`]."
+    "description": "Which value source produced a statement cell (one node in one period).\n\nThe evaluator resolves every unmasked cell by the precedence\n`Value > Forecast > Formula`. The selected source is recorded on the cell,\nincluding when that source's result is unavailable."
   },
   {
     "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource/oneOf/0",
     "const": "value",
-    "description": "The explicit value stored on the node for this period (and visible\nunder the active as-of policy)."
+    "description": "The explicit observation stored on the node for this period (and\nvisible under the observation cutoff)."
   },
   {
     "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/1",
@@ -240,10 +376,80 @@ export default [
     "description": "The node's formula."
   },
   {
-    "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource/oneOf/3",
-    "const": "where_masked",
-    "description": "The node's `where` clause evaluated to false (or `NaN`) for this\nperiod, so the cell was set to `0.0` without consulting the value,\nforecast or formula."
+    "path": "#/$defs/d_2d84d5c82e1a8492041a",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus",
+    "description": "Whether a cell has a value, and if not, which kind of absence it is."
+  },
+  {
+    "path": "#/$defs/d_2d84d5c82e1a8492041a/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus/oneOf/0",
+    "const": "value",
+    "description": "The cell has a value, which may be a known zero."
+  },
+  {
+    "path": "#/$defs/d_2d84d5c82e1a8492041a/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus/oneOf/1",
+    "const": "missing",
+    "description": "No observation, forecast or formula supplies the period."
+  },
+  {
+    "path": "#/$defs/d_2d84d5c82e1a8492041a/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus/oneOf/2",
+    "const": "masked",
+    "description": "The node's `where` predicate is false for the period."
+  },
+  {
+    "path": "#/$defs/d_2d84d5c82e1a8492041a/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus/oneOf/3",
+    "const": "unavailable",
+    "description": "The cell has no value for the reason the cell states."
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue",
+    "description": "Defines how an adjustment value is derived."
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/0",
+    "description": "Signed fixed amount per period, in the target's units: a scalar for a\nscalar target, money in the target's currency for a monetary one. A\nperiod of the plan that is not listed adjusts by zero; a period\noutside the plan is rejected."
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/0/properties/amounts",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/0/properties/amounts",
+    "description": "Map of period_id -> signed amount"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/0/properties/amounts/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/0/properties/amounts/additionalProperties",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/0/properties/type",
+    "const": "fixed"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/1",
+    "description": "Signed decimal percentage of a reference node's reported value in the\nsame period. The reference must share the target's units."
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/1/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/1/properties/node_id",
+    "description": "Node ID to reference (e.g., \"revenue\")"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/1/properties/percentage",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/1/properties/percentage",
+    "description": "Signed decimal percentage to apply (0.05 for 5%)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/1/properties/type",
+    "const": "percentage_of_node"
   },
   {
     "path": "#/$defs/d_41c015bc9e84634e3d38",
@@ -284,9 +490,16 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison"
   },
   {
+    "path": "#/$defs/d_4f32370227b1985d85e9/properties/evaluated",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/evaluated",
+    "description": "Number of periods or cells the check examined.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_4f32370227b1985d85e9/properties/findings",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/findings",
-    "description": "Individual findings produced by the check."
+    "description": "Findings produced by the check. The suite's `min_severity` and\n`materiality_threshold` filters remove advisory findings only: an\nerror-severity or coverage finding is always retained."
   },
   {
     "path": "#/$defs/d_4f32370227b1985d85e9/properties/findings/items",
@@ -295,9 +508,100 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckFinding"
   },
   {
-    "path": "#/$defs/d_4f32370227b1985d85e9/properties/passed",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/passed",
-    "description": "Whether the check passed (no error-severity findings)."
+    "path": "#/$defs/d_4f32370227b1985d85e9/properties/outcome",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/outcome",
+    "description": "Verdict of the check, decided from all of its findings before the\nsuite's reporting filters: `fail` on an error-severity finding, else\n`incomplete` on a coverage finding, else `unevaluated` when\n`evaluated` is zero, else `pass`.",
+    "ref": "#/$defs/CheckOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell",
+    "description": "One published cell: a node in a period.\n\nA `value` cell carries a finite scalar or an exact [`Money`]; every other\nstatus carries no value. An `unavailable` cell carries its reason."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/reason",
+    "description": "Why an `unavailable` cell has no value. Absent otherwise."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/reason/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/reason/anyOf/0",
+    "ref": "#/$defs/UnavailableReason",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/reason/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/reason/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/source",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/source",
+    "description": "The value source selected for the cell. Absent for a masked cell, a\nmissing cell, a cell left unavailable before a source was selected,\nand cells of hand-built results."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/source/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/source/anyOf/0",
+    "ref": "#/$defs/CellSource",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/source/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/source/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/status",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/status",
+    "description": "Whether the cell has a value.",
+    "ref": "#/$defs/CellStatus",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/value",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/value",
+    "description": "The value of a `value` cell: a finite number for a scalar node, or\nexact tagged money for a monetary node. Absent otherwise."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/value/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/value/anyOf/0",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/value/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/value/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream",
+    "description": "Replay provenance of one stochastic forecast node in a single run.\n\nThe generator is the shared PCG64 started at `state` on stream `stream`\n(`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the\nversioned key: the key version, the configured seed, the node and the\nsingle-run mode. Unsigned 64-bit values are decimal strings in JSON."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/node_id",
+    "description": "The stochastic forecast node."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/seed",
+    "description": "The forecast method's exact configured seed."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/state",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/state",
+    "description": "Effective PCG64 starting state."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/stream",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/stream",
+    "description": "Effective PCG64 stream selector."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/stream_version",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/stream_version",
+    "description": "Version of the mapping from the key to the stream.",
+    "format": "uint32",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467",
@@ -307,7 +611,7 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/accrued_interest",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/accrued_interest",
-    "description": "Debt coupon interest accrued but not yet paid (liability).\nHedge-leg accrual valuation is outside the debt-service contract and is zero.",
+    "description": "Contractual cash interest earned through the period close and due\nafter it (liability), from the instrument's own earning terms. Interest\nalready due and unpaid is `interest_arrears`, not part of this amount.\nHedge-leg accrual valuation is outside the debt-service contract and is zero.",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
@@ -319,11 +623,71 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
   {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/fee_rebates",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/fee_rebates",
+    "description": "Fee cash the company received in the period: a rebate of a fee it\npaid. A receipt, reported apart from `fees` and never a waterfall\nclaim. Positive amount in the breakdown's currency; `Some` on\nevaluator-produced breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/fee_rebates/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/fee_rebates/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/fee_rebates/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/fee_rebates/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/fees",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/fees",
     "description": "Fees (commitment fees, etc.)",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_principal",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_principal",
+    "description": "Principal established by funding that took effect in the period:\ndraws and issuance at their explicit principal effect, whatever cash\nwas received. `Some` on evaluator-produced breakdowns of a borrowing."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_principal/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_principal/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_principal/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_principal/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_proceeds",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_proceeds",
+    "description": "Signed company cash of the funding rows that settled in the period:\npositive for proceeds received (net of any discount), negative for\ncash paid. It is the cash, not the principal it establishes. `Some`\non evaluator-produced breakdowns of a borrowing."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_proceeds/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_proceeds/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_proceeds/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_proceeds/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_arrears",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/interest_arrears",
+    "description": "Cash interest already due and still unpaid at the period close:\noverdue arrears carried as a claim into the next period. It is separate\nfrom `accrued_interest`, which is interest earned but not yet due.\nPositive amount in the breakdown's currency. Always `Some` on\nbreakdowns produced by the evaluator or the waterfall; `None` on\nhand-built breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_arrears/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/interest_arrears/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_arrears/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/interest_arrears/anyOf/1"
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_expense_cash",
@@ -357,7 +721,7 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/mandatory_prepayment",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/mandatory_prepayment",
-    "description": "Part of `principal_payment` paid at the waterfall's\n`MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
+    "description": "Part of `principal_payment` paid at the waterfall's\n`MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepayment`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/mandatory_prepayment/anyOf/0",
@@ -385,6 +749,36 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/opening_balance/anyOf/1"
   },
   {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_advance_reserve",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_advance_reserve",
+    "description": "Face already paid for whose reduction takes effect after the period\nclose. It is still part of `debt_balance` and is reserved from further\nprepayment until then. Positive amount in the breakdown's currency;\n`Some` on evaluator-produced breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_advance_reserve/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_advance_reserve/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_advance_reserve/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_advance_reserve/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_arrears",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_arrears",
+    "description": "Scheduled principal cash due and still unpaid at the period close,\ncarried as a claim into the next period. It is a cash obligation\nseparate from `debt_balance`, which follows the contract's effective\ndates whether or not the cash was paid. Positive amount in the\nbreakdown's currency; `Some` on evaluator-produced breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_arrears/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_arrears/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_arrears/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_arrears/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_payment",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_payment",
     "description": "Principal repayments (amortization, maturity)",
@@ -392,9 +786,69 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
   {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_pending",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_pending",
+    "description": "Scheduled principal cash whose face reduction is already effective\nand whose payment falls due after the period close: owed, not yet\ndue. `debt_balance` is already net of that face. Positive amount in\nthe breakdown's currency; `Some` on evaluator-produced breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_pending/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_pending/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_pending/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_pending/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/repayment_refunds",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/repayment_refunds",
+    "description": "Principal cash the company received back in the period: a refund of a\nrepayment. A receipt, reported apart from `principal_payment`; the\nbalance moves only through the row's explicit principal effect.\nPositive amount in the breakdown's currency; `Some` on\nevaluator-produced breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/repayment_refunds/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/repayment_refunds/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/repayment_refunds/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/repayment_refunds/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_cash_interest_due",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_cash_interest_due",
+    "description": "Scheduled cash interest that fell due in the period under the\nborrowing's contractual schedule, recognized once on its due date\nwhether or not it was paid. It excludes PIK, fees, arrears settled\nfrom an earlier period and hedge flows. Positive amount in the\nbreakdown's currency. `Some` on evaluator-produced breakdowns of a\nborrowing; `None` for a hedge and on hand-built breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_cash_interest_due/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_cash_interest_due/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_cash_interest_due/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_cash_interest_due/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_principal",
     "description": "Part of `principal_payment` paid against the instrument's own\ncontractual schedule: amortization, maturity redemption,\nschedule-embedded prepayments and revolver repayments, including\nscheduled principal carried in arrears from an earlier period. Under a\nwaterfall this is the cash allocated at the `Amortization` priority.\nPositive amount in the breakdown's currency.\n\nThe four principal components\n(`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment`,\n`voluntary_prepayment`) sum to `principal_payment`. Always `Some` on\nbreakdowns produced by the evaluator or the waterfall; `None` on\nhand-built breakdowns and on JSON written before this field existed."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal_due",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_principal_due",
+    "description": "Scheduled principal that fell due in the period under the borrowing's\ncontractual schedule (amortization and maturity), recognized once on\nits due date whether or not it was paid. It excludes prepayments,\nsweeps, arrears settled from an earlier period and advance payments.\nSame sign, currency and absence rule as\n[`Self::scheduled_cash_interest_due`]."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal_due/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_principal_due/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal_due/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_principal_due/anyOf/1"
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal/anyOf/0",
@@ -424,7 +878,7 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/voluntary_prepayment",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/voluntary_prepayment",
-    "description": "Part of `principal_payment` paid at the waterfall's\n`VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
+    "description": "Part of `principal_payment` paid at the waterfall's\n`VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepayment`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/voluntary_prepayment/anyOf/0",
@@ -470,6 +924,79 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckCategory/oneOf/4",
     "const": "data_quality",
     "description": "Missing values, NaN/Inf, sign conventions"
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason",
+    "description": "Why a cell has no value although its node and period are valid.\n\nAn unavailable cell is not an error: the model is well formed and the run\ncontinues. Invalid arithmetic, an invalid mask and unrepresentable money\nare errors instead and fail the run."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/0",
+    "const": "missing_mask",
+    "description": "The node's `where` predicate had no value for the period, so whether\nthe cell is masked is unknown."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/1",
+    "const": "hidden_by_cutoff",
+    "description": "The explicit observation was published after the observation cutoff\nand the node has no forecast or formula for the period."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/2",
+    "const": "missing_input",
+    "description": "The formula or forecast that supplies the cell had no defined result,\nbecause an input it needs is missing, masked or itself unavailable."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/3",
+    "const": "undefined_base",
+    "description": "A change, growth rate or ratio has no defined value for its base: an\nexactly zero base for a percentage change, a non-positive base or a\nnegative ending value for a growth rate, and a non-positive base for\n`ratio`."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/4",
+    "const": "missing_forecast_base",
+    "description": "A forecast has no base: no start level is selected and the slot\nimmediately before the forecast suffix has no value."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/5",
+    "const": "missing_peer_shock",
+    "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/6",
+    "const": "missing_fx_quote",
+    "description": "A consolidated capital-structure value needs a period-close FX quote\nthat the market does not hold. Native-currency values are unaffected."
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig",
+    "description": "An ordered bridge from a reported metric to a separately named adjusted\nmetric (for example reported EBITDA to adjusted EBITDA)."
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0/properties/adjustments",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig/properties/adjustments",
+    "description": "Adjustments, applied in this order"
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0/properties/adjustments/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig/properties/adjustments/items",
+    "ref": "#/$defs/Adjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment"
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0/properties/output_node",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig/properties/output_node",
+    "description": "The new node the adjusted metric is published under (e.g.,\n\"adjusted_ebitda\"). It must differ from `target_node` and from every\nnode the result already holds."
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0/properties/target_node",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig/properties/target_node",
+    "description": "The reported node the bridge starts from (e.g., \"ebitda\"). It is never\nmodified."
   },
   {
     "path": "#/$defs/d_6df778c161860d725fb3",
@@ -547,7 +1074,7 @@ export default [
   {
     "path": "#/$defs/d_76adf23abc095fd56514/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/0",
-    "description": "Division by zero encountered"
+    "description": "A percentage change or growth rate was measured from a zero base, so\nits cell is unavailable. A division by zero in a formula is an error,\nnot this warning."
   },
   {
     "path": "#/$defs/d_76adf23abc095fd56514/oneOf/0/properties/division_by_zero",
@@ -613,33 +1140,71 @@ export default [
   {
     "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3",
-    "description": "One or more non-finite inputs were skipped by a skip-NaN aggregate\n(`sum`, `mean`, ...).\n\nThe aggregate's skip-NaN policy is intentional, but silently dropping a\nbroken line item can mask upstream problems (e.g. a division by zero in\none argument), so the drop is surfaced here."
+    "description": "A forecast's published level was clipped to its `min` / `max` bound.\nThe raw level still drives the forecast's later steps."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped"
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped"
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/count",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/count",
-    "description": "Number of non-finite inputs dropped.",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/node_id",
+    "description": "Identifier of the forecast node."
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/period",
+    "description": "Period whose published level was clipped."
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped/properties/published",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/published",
+    "description": "Level published after the bound, in the node's units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped/properties/raw",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/raw",
+    "description": "Level the forecast generated, in the node's units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4",
+    "description": "A full-history statistic (`std`, `var`, `median`) was computed over a\nhistory with gaps, so its sample is smaller than its slot count."
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample"
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/function",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/function",
+    "description": "Name of the statistic."
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/node_id",
+    "description": "Identifier of the node whose statistic has gaps."
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/observations",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/observations",
+    "description": "Observations that had a value.",
     "format": "uint",
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/function",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/function",
-    "description": "Name of the aggregate function that dropped values."
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/period",
+    "description": "Period the statistic was computed for."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/node_id",
-    "description": "Identifier of the node whose aggregate dropped inputs."
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/period",
-    "description": "Period in which the drop occurred."
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/slots",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/slots",
+    "description": "Plan slots from the model start through the period.",
+    "format": "uint",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_7ed5d95d5da0aa4f3cb9",
@@ -670,6 +1235,11 @@ export default [
   {
     "path": "#/$defs/d_82a7f3795866afe7c96c/properties/comparison/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckFinding/properties/comparison/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_82a7f3795866afe7c96c/properties/coverage",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckFinding/properties/coverage",
+    "description": "True for a coverage finding: required data was missing or unavailable,\nso the check could not evaluate the period or cell it names. A\ncoverage finding makes its check incomplete and is never removed by\nthe reporting filters."
   },
   {
     "path": "#/$defs/d_82a7f3795866afe7c96c/properties/materiality",
@@ -715,6 +1285,117 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSeverity"
   },
   {
+    "path": "#/$defs/d_87e7d6db07659c292388",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap",
+    "description": "A cap on the magnitude of one adjustment. The adjustment keeps its sign.\nEach cap applies to its own adjustment only; it is not a shared basket."
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/0",
+    "description": "A fixed limit in the target's units."
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/0/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/0/properties/amount",
+    "description": "Non-negative limit: a scalar for a scalar target, money in the\ntarget's currency for a monetary one.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/0/properties/type",
+    "const": "absolute"
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1",
+    "description": "A limit of `fraction` times the positive part of a base node's value\nin the same period. A negative base gives no cap room."
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1/properties/base_mode",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1/properties/base_mode",
+    "default": "reported",
+    "description": "When `base_node` is the target: size the cap against its reported\nvalue (the default) or against the reported value plus every\nearlier applied adjustment. Any other base node is always read at\nits reported value.",
+    "ref": "#/$defs/CapBaseMode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapBaseMode"
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1/properties/base_node",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1/properties/base_node",
+    "description": "Node the cap is sized against; it must share the target's units."
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1/properties/fraction",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1/properties/fraction",
+    "description": "Non-negative decimal fraction of the base (0.30 for 30%). It may\nexceed 1.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1/properties/type",
+    "const": "reference"
+  },
+  {
+    "path": "#/$defs/d_8831040eb61de989f7ea",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar",
+    "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+  },
+  {
+    "path": "#/$defs/d_8831040eb61de989f7ea/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar/anyOf/0",
+    "description": "Currency-aware amount",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_8831040eb61de989f7ea/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar/anyOf/1",
+    "description": "Unitless scalar (ratio, percentage, count, etc.)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment",
+    "description": "Specification for a single adjustment (add-back or deduction)."
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/cap",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/cap",
+    "description": "Optional cap on the adjustment amount"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/cap/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/cap/anyOf/0",
+    "ref": "#/$defs/AdjustmentCap",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/cap/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/cap/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/category",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/category",
+    "description": "Category for grouping (optional)"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/id",
+    "description": "Unique identifier for this adjustment"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/name",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/name",
+    "description": "Human-readable name (e.g., \"Synergies\", \"Management Fees\")"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/value",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/value",
+    "description": "How the adjustment value is calculated",
+    "ref": "#/$defs/AdjustmentValue",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue"
+  },
+  {
     "path": "#/$defs/d_8b741636dd21d9f7ad3f",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NodeValueType",
     "description": "Node value type classification.\n\nDetermines whether a node represents monetary values (with a specific currency)\nor scalar values (ratios, percentages, counts, etc.)."
@@ -745,6 +1426,51 @@ export default [
     "path": "#/$defs/d_8b741636dd21d9f7ad3f/oneOf/1/properties/type",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NodeValueType/oneOf/1/properties/type",
     "const": "scalar"
+  },
+  {
+    "path": "#/$defs/d_8fc526d8a2276361b742",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod",
+    "description": "How one node's values combine over the source periods of a target period."
+  },
+  {
+    "path": "#/$defs/d_8fc526d8a2276361b742/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod/oneOf/0",
+    "const": "sum",
+    "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nMoney is summed exactly and scalars with a compensated sum. A source\ncell without a value leaves the target unavailable."
+  },
+  {
+    "path": "#/$defs/d_8fc526d8a2276361b742/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod/oneOf/1",
+    "const": "period_end",
+    "description": "Copy the last source period's cell with its status: balances such as\ncash, debt and equity, and trailing metrics such as last-twelve-month\nEBITDA."
+  },
+  {
+    "path": "#/$defs/d_8fc526d8a2276361b742/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod/oneOf/2",
+    "const": "formula",
+    "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period."
+  },
+  {
+    "path": "#/$defs/d_9b3d87b6c4349df4e78d",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff",
+    "description": "Which explicit observations an evaluation may read.\n\nOn the wire: `\"full_snapshot\"`, or `{\"through\": \"2025-04-25\"}`."
+  },
+  {
+    "path": "#/$defs/d_9b3d87b6c4349df4e78d/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff/oneOf/0",
+    "const": "full_snapshot",
+    "description": "Read every observation in the model's snapshot, with no publication\ncutoff."
+  },
+  {
+    "path": "#/$defs/d_9b3d87b6c4349df4e78d/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff/oneOf/1",
+    "description": "Read an observation only when its availability date is on or before\nthis date, inclusive through the end of the day."
+  },
+  {
+    "path": "#/$defs/d_9b3d87b6c4349df4e78d/oneOf/1/properties/through",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff/oneOf/1/properties/through",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_9e50e1b9698ebe0e1126",
@@ -1724,6 +2450,84 @@ export default [
     "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
   },
   {
+    "path": "#/$defs/d_b74dc9ca475664736351",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow",
+    "description": "One distress cash amount of a capital-structure instrument.\n\nDistress cash is a recovery, an accrual paid on default or a protection\npayment. It is reported separately from scheduled debt service."
+  },
+  {
+    "path": "#/$defs/d_b74dc9ca475664736351/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow/properties/amount",
+    "description": "Signed cash in the company's perspective and the instrument's native\ncurrency: a receipt is positive and a payment is negative.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_b74dc9ca475664736351/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow/properties/instrument_id",
+    "description": "Capital-structure identifier of the instrument."
+  },
+  {
+    "path": "#/$defs/d_b74dc9ca475664736351/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow/properties/kind",
+    "description": "The cashflow kind: `recovery`, `accrued_on_default` or\n`protection_payment`.",
+    "ref": "#/$defs/CFKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CFKind"
+  },
+  {
+    "path": "#/$defs/d_b74dc9ca475664736351/properties/payment_date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow/properties/payment_date",
+    "description": "Actual payment date of the cash.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority",
+    "description": "Payment priority levels in the waterfall."
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/0",
+    "const": "fees",
+    "description": "Fees (commitment fees, facility fees, etc.)"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/1",
+    "const": "interest",
+    "description": "Cash interest payments"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/2",
+    "const": "amortization",
+    "description": "Scheduled amortization"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/3",
+    "const": "mandatory_prepayment",
+    "description": "Mandatory prepayments"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/4",
+    "const": "voluntary_prepayment",
+    "description": "Voluntary prepayments"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/5",
+    "const": "sweep",
+    "description": "Excess cash flow sweep"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/6",
+    "const": "equity",
+    "description": "Equity distributions"
+  },
+  {
     "path": "#/$defs/d_ba2543cd986556705dcc",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/SensitivityScenario",
     "description": "Result of a single sensitivity scenario."
@@ -1744,6 +2548,43 @@ export default [
     "description": "Full evaluation results",
     "ref": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord",
+    "description": "One FX conversion applied to consolidate capital-structure totals."
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/date",
+    "description": "Inclusive period-close date the rate was read on.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/from",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/from",
+    "description": "Native currency converted from.",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/rate",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/rate",
+    "description": "Units of `to` per unit of `from` (1.20 converts EUR 1 to USD 1.20).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/source",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/source",
+    "description": "How the rate was obtained: `direct` for a quoted pair, `triangulated`\nwhen it was built through the FX matrix's pivot currency."
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/to",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/to",
+    "description": "Reporting currency converted to.",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Currency"
   },
   {
     "path": "#/$defs/d_c44e4163513f1741db76",
@@ -2013,153 +2854,85 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0",
-    "description": "The residual schedule opening differs from the stateful opening balance."
+    "description": "A negative available-cash pool was floored to zero before allocation."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/applied_ratio",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/applied_ratio",
-    "description": "Actual ratio of stateful to scheduled opening applied to the cashflows.",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/amount",
+    "description": "Negative amount that was floored, in the waterfall currency.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
-    "const": "residual_scale_mismatch"
+    "const": "negative_available_cash_floored"
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/node_id",
+    "description": "Statement node supplying the available-cash amount."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
-    "description": "A contractual cashflow kind is not represented in statement debt service."
+    "description": "Available cash was insufficient to pay a cash-interest claim."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/cashflow_date",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/cashflow_date",
-    "description": "Original contractual payment date.",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
+    "description": "Unpaid amount in the waterfall currency.",
+    "format": "double"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/cashflow_kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/cashflow_kind",
-    "description": "Canonical cashflow classification that was excluded.",
-    "ref": "#/$defs/CFKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CFKind"
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
-    "const": "cashflow_ignored"
+    "const": "interest_shortfall"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
-    "description": "A negative creditor claim was neutralized instead of reducing other claims."
+    "description": "Available cash was insufficient to pay a fee claim."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/amount",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
-    "description": "Negative claim amount in the waterfall currency.",
+    "description": "Unpaid amount in the waterfall currency.",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/category",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/category",
-    "description": "Payment category containing the invalid negative claim.",
-    "ref": "#/$defs/CapitalStructureClaimCategory",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/instrument_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/instrument_id",
-    "description": "Instrument whose claim was neutralized."
+    "description": "Instrument carrying the unpaid claim forward."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
-    "const": "negative_claim_neutralized"
+    "const": "fee_shortfall"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
-    "description": "A negative available-cash pool was floored to zero before allocation."
+    "description": "Available cash was insufficient to pay scheduled principal."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/amount",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/amount",
-    "description": "Negative amount that was floored, in the waterfall currency.",
+    "description": "Unpaid amount in the waterfall currency.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
-    "const": "negative_available_cash_floored"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/node_id",
-    "description": "Statement node supplying the available-cash amount."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4",
-    "description": "Available cash was insufficient to pay a cash-interest claim."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/kind",
-    "const": "interest_shortfall"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5",
-    "description": "Available cash was insufficient to pay a fee claim."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/kind",
-    "const": "fee_shortfall"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/6",
-    "description": "Available cash was insufficient to pay scheduled principal."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/6/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/6/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/6/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/kind",
     "const": "principal_shortfall"
   },
   {
@@ -2168,17 +2941,52 @@ export default [
     "description": "Versioned financial statement evaluation result.",
     "examples": [
       {
+        "cells": {
+          "revenue": {
+            "2025Q1": {
+              "source": "value",
+              "status": "value",
+              "value": {
+                "amount": "125.01",
+                "currency": "USD"
+              }
+            },
+            "2025Q2": {
+              "status": "missing"
+            }
+          }
+        },
         "meta": {
-          "num_nodes": 0,
-          "num_periods": 0,
+          "num_nodes": 1,
+          "num_periods": 2,
           "numeric_mode": "float64",
           "parallel": false
         },
-        "nodes": {},
+        "node_value_types": {
+          "revenue": {
+            "currency": "USD",
+            "type": "monetary"
+          }
+        },
         "schema_version": 1
       }
     ],
     "title": "StatementResult"
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/cells",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/cells",
+    "description": "Map of node_id → (period_id → [`ResultCell`]): the typed result.\n\nEvery evaluated node has a cell for every period of the plan."
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/cells/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/cells/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/cells/additionalProperties/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/cells/additionalProperties/additionalProperties",
+    "ref": "#/$defs/ResultCell",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell"
   },
   {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/check_report",
@@ -2218,39 +3026,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/StatementEvalStats"
   },
   {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/monetary_nodes",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/monetary_nodes",
-    "description": "Map of node_id → (period_id → Money) for monetary nodes"
-  },
-  {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/monetary_nodes/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/monetary_nodes/additionalProperties"
-  },
-  {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/monetary_nodes/additionalProperties/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/monetary_nodes/additionalProperties/additionalProperties",
-    "ref": "#/$defs/Money",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
-  },
-  {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/node_sources",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_sources",
-    "description": "Map of node_id → (period_id → [`CellSource`]): which layer of the\n`Value > Forecast > Formula` precedence produced each cell of `nodes`.\n\nPopulated for every cell by [`Evaluator`](crate::evaluator::Evaluator)\n(with or without market context / capital structure). The model spec\nalone does not determine it: an as-of visibility cutoff can hide an\nexplicit value so that the forecast or formula fires instead. Empty\nonly for results that were not produced by the evaluator (hand-built)\nor were serialized before this field existed."
-  },
-  {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/node_sources/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_sources/additionalProperties"
-  },
-  {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/node_sources/additionalProperties/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_sources/additionalProperties/additionalProperties",
-    "ref": "#/$defs/CellSource",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource"
-  },
-  {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/node_value_types",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_value_types",
-    "description": "Track value types for each node"
+    "description": "Units of each node: scalar, or monetary in one currency."
   },
   {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/node_value_types/additionalProperties",
@@ -2259,24 +3037,20 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NodeValueType"
   },
   {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/nodes",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/nodes",
-    "description": "Map of node_id → (period_id → value). Native values are f64; JSON uses\nnumbers for finite values and `\"nan\"`, `\"inf\"`, `\"-inf\"` for non-finite cells."
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/normalizations",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/normalizations",
+    "description": "The ordered configuration of every adjusted metric published into\nthis result, by its output node id\n([`merge_into_results`](crate::adjustments::merge_into_results)). The\nsource run is this result's own `provenance` or `rollup_provenance`."
   },
   {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/nodes/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/nodes/additionalProperties"
-  },
-  {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/nodes/additionalProperties/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/nodes/additionalProperties/additionalProperties",
-    "ref": "#/$defs/ResultNumber",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultNumber"
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/normalizations/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/normalizations/additionalProperties",
+    "ref": "#/$defs/NormalizationConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig"
   },
   {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/periods",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods",
-    "description": "The period plan `nodes` is keyed by: the periods in timeline order,\nwith their dates and actual/forecast split, and their calendar context.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's plan and\n[`rollup`](Self::rollup) records its target periods in the model's\ncalendar, where a target is actual only when every source period is.\n`None` only for hand-built results, such as [`new`](Self::new)."
+    "description": "The period plan `cells` is keyed by: the periods in timeline order,\nwith their dates and actual/forecast split, and their calendar context.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's plan and\n[`rollup`](Self::rollup) records its target periods in the model's\ncalendar, where a target is actual only when every source period is.\n`None` only for hand-built results, such as [`new`](Self::new)."
   },
   {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/periods/anyOf/0",
@@ -2287,6 +3061,36 @@ export default [
   {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/periods/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/provenance",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/provenance",
+    "description": "What was evaluated: the model, its source snapshot, the observation\ncutoff and the run. `None` only for hand-built results."
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/provenance/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/provenance/anyOf/0",
+    "ref": "#/$defs/RunProvenance",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance"
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/provenance/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/provenance/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/rollup_provenance",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/rollup_provenance",
+    "description": "How a rolled-up result was produced: the source run, the method used\nfor each node and the source periods of each target period. `None`\nfor every result that [`rollup`](Self::rollup) did not produce."
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/rollup_provenance/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/rollup_provenance/anyOf/0",
+    "ref": "#/$defs/RollupProvenance",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance"
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/rollup_provenance/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/rollup_provenance/anyOf/1"
   },
   {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/schema_version",
@@ -2319,14 +3123,83 @@ export default [
     "description": "Ranked by impact magnitude"
   },
   {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance",
+    "description": "How a rolled-up result was produced."
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/frequency",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/frequency",
+    "description": "Target frequency of the rollup.",
+    "ref": "#/$defs/PeriodKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind"
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/methods",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/methods",
+    "description": "The method used for every node, in model order: the request's entry\nwhere it had one, the node's declaration otherwise."
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/methods/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/methods/additionalProperties",
+    "ref": "#/$defs/RollupMethod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod"
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/source_periods",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/source_periods",
+    "description": "The source periods combined into each target period, in timeline\norder."
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/source_periods/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/source_periods/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/source_periods/additionalProperties/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/source_periods/additionalProperties/items",
+    "ref": "#/$defs/PeriodId",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodId"
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/source_run",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/source_run",
+    "description": "The evaluation run the source result came from. Its diagnostics,\ncheck report and capital-structure cashflows stay on that run, keyed\nby the source periods.",
+    "ref": "#/$defs/RunProvenance",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance"
+  },
+  {
+    "path": "#/$defs/d_ed07f3603dd3fb46568b",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapBaseMode",
+    "description": "How a self-referential cap base (where `base_node == target_node`) is\nresolved each period."
+  },
+  {
+    "path": "#/$defs/d_ed07f3603dd3fb46568b/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapBaseMode/oneOf/0",
+    "const": "reported",
+    "description": "Cap against the **reported** (pre-adjustment) value of the base node.\nThis is the standard credit-agreement convention — e.g., \"add-backs\ncapped at 25% of reported EBITDA\" uses a fixed denominator that does\nnot widen as earlier add-backs are applied."
+  },
+  {
+    "path": "#/$defs/d_ed07f3603dd3fb46568b/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapBaseMode/oneOf/1",
+    "const": "progressive",
+    "description": "Cap against the **progressively adjusted** value\n(`base_value + running_total_of_earlier_adjustments`). Earlier\nadjustments widen the cap room for later ones. Use this only when a\ndocument explicitly caps against \"adjusted\" EBITDA at each step."
+  },
+  {
     "path": "#/$defs/d_f0893f1d89ca5934871f",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckReport",
     "description": "Full report aggregating all [`CheckResult`]s from a check run."
   },
   {
+    "path": "#/$defs/d_f0893f1d89ca5934871f/properties/outcome",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckReport/properties/outcome",
+    "description": "Verdict of the suite from the unfiltered check outcomes: `fail` when\nany check failed, else `incomplete` when any check is incomplete,\nelse `pass` when at least one check passed, else `unevaluated` (an\nempty suite, or one with no applicable check).",
+    "ref": "#/$defs/CheckOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome"
+  },
+  {
     "path": "#/$defs/d_f0893f1d89ca5934871f/properties/results",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckReport/properties/results",
-    "description": "Individual results for each check."
+    "description": "Individual results for each check, in declared order."
   },
   {
     "path": "#/$defs/d_f0893f1d89ca5934871f/properties/results/items",
@@ -2342,14 +3215,43 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary"
   },
   {
+    "path": "#/$defs/d_f1c764667142e4944f0b",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome",
+    "description": "Verdict of a check, or of a whole report, decided from every outcome\nbefore any reporting filter is applied."
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome/oneOf/0",
+    "const": "pass",
+    "description": "Work was evaluated, required coverage was complete and nothing failed."
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome/oneOf/1",
+    "const": "fail",
+    "description": "At least one error-severity finding."
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome/oneOf/2",
+    "const": "incomplete",
+    "description": "Nothing failed, but required data was missing or unavailable for at\nleast one period or cell."
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome/oneOf/3",
+    "const": "unevaluated",
+    "description": "Nothing was evaluated: an empty suite, or a check with no applicable\nperiod or cell."
+  },
+  {
     "path": "#/$defs/d_f840db5f4c38222f7ca7",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows",
-    "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\ncomponent accessor returns raw `f64` amounts in the instrument's native\ncurrency or the reporting currency for totals. Callers that need currency\nmetadata should inspect the underlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n        opening_balance: None,\n        scheduled_principal: None,\n        mandatory_prepayment: None,\n        sweep_prepayment: None,\n        voluntary_prepayment: None,\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    opening_balance: None,\n    scheduled_principal: None,\n    mandatory_prepayment: None,\n    sweep_prepayment: None,\n    voluntary_prepayment: None,\n});\n\nassert_eq!(cs.get_component(\"interest_expense\", \"total\", &period).unwrap(), 12_500.0);\n```"
+    "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\ncomponent accessor returns raw `f64` amounts in the instrument's native\ncurrency or the reporting currency for totals. Callers that need currency\nmetadata should inspect the underlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n        opening_balance: None,\n        scheduled_principal: None,\n        mandatory_prepayment: None,\n        sweep_prepayment: None,\n        voluntary_prepayment: None,\n        interest_arrears: None,\n        principal_pending: None,\n        principal_arrears: None,\n        principal_advance_reserve: None,\n        fee_rebates: None,\n        repayment_refunds: None,\n        funding_proceeds: None,\n        funding_principal: None,\n        scheduled_cash_interest_due: None,\n        scheduled_principal_due: None,\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    opening_balance: None,\n    scheduled_principal: None,\n    mandatory_prepayment: None,\n    sweep_prepayment: None,\n    voluntary_prepayment: None,\n    interest_arrears: None,\n    principal_pending: None,\n    principal_arrears: None,\n    principal_advance_reserve: None,\n    fee_rebates: None,\n    repayment_refunds: None,\n    funding_proceeds: None,\n    funding_principal: None,\n    scheduled_cash_interest_due: None,\n    scheduled_principal_due: None,\n});\n\nassert_eq!(cs.get_component(\"interest_expense\", \"total\", &period).unwrap(), 12_500.0);\n```"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/available_cash",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/available_cash",
-    "description": "Cash the waterfall had to allocate in each period: the value of\n`WaterfallSpec.available_cash_node`, floored at zero (a negative pool\nis reported as a `NegativeAvailableCashFloored` warning), in the\nwaterfall's currency.\n\nOnly populated for periods in which a waterfall ran; empty for models\nwithout a waterfall and for JSON written before this field existed.\nReconciles the period's uses:\n`fees + cash interest + principal + equity_distribution == available_cash`."
+    "description": "Cash the waterfall had to allocate in each period: the value of\n`WaterfallSpec.available_cash_node`, floored at zero (a negative pool\nis reported as a `NegativeAvailableCashFloored` warning), in the\nwaterfall's currency.\n\nOnly populated for periods in which a waterfall ran; empty for models\nwithout a waterfall and for JSON written before this field existed.\nReconciles the period's uses:\n`fees + cash interest + principal + equity_distribution + retained_cash == available_cash`."
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/available_cash/additionalProperties",
@@ -2373,15 +3275,69 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown"
   },
   {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/consolidation_unavailable",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/consolidation_unavailable",
+    "description": "Why a period has no consolidated `totals`, when consolidation was\nrequested and could not be completed (for example a missing FX quote).\nPer-instrument and native-currency values of the period are\nunaffected."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/consolidation_unavailable/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/consolidation_unavailable/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/distress_cash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/distress_cash",
+    "description": "Distress cash by period: recoveries, accrual paid on default and\nprotection payments, each with its instrument, native currency and\nactual payment date, in schedule order.\n\nThese amounts are outside scheduled debt service: they are in no\nbreakdown, total or waterfall claim, and they change no principal.\nOnly periods with a distress row have an entry."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/distress_cash/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/distress_cash/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/distress_cash/additionalProperties/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/distress_cash/additionalProperties/items",
+    "ref": "#/$defs/DistressCashflow",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow"
+  },
+  {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/equity_distribution",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/equity_distribution",
-    "description": "Post-waterfall residual cash distributed to equity per period.\n\nOnly populated by waterfall evaluation when `available_cash_node` is\nconfigured: it is the cash remaining after fees, interest, and\nprincipal allocations. With the per-period allocations this satisfies\n`fees + cash interest + principal + equity == available cash`."
+    "description": "Residual cash distributed to equity per period: the cash left after\nfees, interest and principal when `Equity` is the waterfall's terminal\npriority, and zero when it is not.\n\nOnly populated for periods in which a waterfall ran. With the\nper-period allocations,\n`fees + cash interest + principal + equity + retained == available cash`\nexactly."
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/equity_distribution/additionalProperties",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/equity_distribution/additionalProperties",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/fx_conversions",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/fx_conversions",
+    "description": "Every FX conversion applied to form the consolidated `totals`, by\nperiod: the currency pair, the rate, the date it was read on and how\nit was obtained. Empty when every instrument is in the reporting\ncurrency."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/fx_conversions/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/fx_conversions/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/fx_conversions/additionalProperties/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/fx_conversions/additionalProperties/items",
+    "ref": "#/$defs/FxConversionRecord",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/prepayments",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/prepayments",
+    "description": "What each configured prepayment requested, paid and left unpaid in\neach period, in the waterfall's priority order.\n\nOnly populated for periods in which a waterfall with a prepayment\npriority ran. An unpaid amount is not carried forward: a prepayment\nrequest is not a dated contractual obligation."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/prepayments/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/prepayments/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/prepayments/additionalProperties/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/prepayments/additionalProperties/items",
+    "ref": "#/$defs/PrepaymentOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/reporting_currency",
@@ -2397,6 +3353,17 @@ export default [
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/reporting_currency/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/reporting_currency/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/retained_cash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/retained_cash",
+    "description": "Residual cash the company retains per period: the cash left after the\npayment stack when `Equity` is not a priority, and zero when it is.\n\nOnly populated for periods in which a waterfall ran."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/retained_cash/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/retained_cash/additionalProperties",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/totals",
@@ -2427,19 +3394,28 @@ export default [
   {
     "path": "#/$defs/d_f881e913e411c3be88e6",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison",
-    "description": "The two numbers a check compared, and the tolerance it allowed.\n\nRecorded for every numeric comparison a check performs — whether it passed\nor failed — so the verdict can be reconstructed from exported data:\nthe comparison fails exactly when `|actual - expected| > tolerance`.\n\n`actual`, `expected` and `tolerance` are all in the units of the compared\nnodes (currency units for monetary nodes, the same units as\n[`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not\na fraction or percentage."
+    "description": "The two values a check compared, their difference and the tolerance it\nallowed.\n\nRecorded for every numeric comparison a check performs, whether it passed\nor failed, so the verdict can be reconstructed from exported data: the\ncomparison fails exactly when `|difference| > tolerance`.\n\nEvery value is typed in the units of the compared nodes: exact money in\ntheir currency, or a scalar. `difference` is the one exact residual the\ncheck computed (an exact sum for money), not a difference of the two\nrecorded sides; `tolerance` is an absolute amount in the same units."
   },
   {
     "path": "#/$defs/d_f881e913e411c3be88e6/properties/actual",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison/properties/actual",
     "description": "Observed (left-hand) value, in the compared nodes' units.",
-    "format": "double"
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_f881e913e411c3be88e6/properties/difference",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison/properties/difference",
+    "description": "Signed residual `actual - expected`, in the same units.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_f881e913e411c3be88e6/properties/expected",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison/properties/expected",
     "description": "Value the identity requires (right-hand side), in the same units.",
-    "format": "double"
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_f881e913e411c3be88e6/properties/identity",
@@ -2454,8 +3430,9 @@ export default [
   {
     "path": "#/$defs/d_f881e913e411c3be88e6/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison/properties/tolerance",
-    "description": "Absolute tolerance applied to `|actual - expected|`, in the same units.\nThis is the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
-    "format": "double"
+    "description": "Absolute tolerance applied to `|difference|`, in the same units. This\nis the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_feab1608ae875b3fa417",

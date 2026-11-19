@@ -6,6 +6,10 @@ import type * as statements from '../statements/index.js';
  */
 export type AccountType = "asset" | "liability" | "equity";
 /**
+ * The explicit selection of every modeled node (`"all"`).
+ */
+export type AllNodes = "all";
+/**
  * Value that can be currency-aware or unitless.
  *
  * Used for node values that can represent:
@@ -213,6 +217,10 @@ export type Currency =
  */
 export type Id = string;
 /**
+ * What a bootstrap resamples from its historical series.
+ */
+export type ForecastBootstrapMode = "growth" | "diff";
+/**
  * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
  * `FY2025W53`.
  */
@@ -275,17 +283,24 @@ export type BuiltinCheckSpec =
  */
 export type SignConventionPolicy = "magnitude_positive" | "inflow_positive";
 /**
+ * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+ */
+export type DateWire = string;
+/**
  * Scope that determines which periods a check applies to.
  */
 export type PeriodScope = "all_periods" | "actuals_only" | "forecast_only";
 /**
+ * The nodes a validity check covers: every modeled node, selected
+ * explicitly, or a named list.
+ *
+ * The JSON form is the string `"all"` or an array of node identifiers.
+ */
+export type NodeSelection = AllNodes | Id[];
+/**
  * Instrument type of a tranche in the debt stack.
  */
 export type DebtInstrumentKind = "bond" | "convertible_bond" | "term_loan" | "revolving_credit";
-/**
- * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
- */
-export type DateWire = string;
 /**
  * CECL calculation methodology.
  *
@@ -311,13 +326,13 @@ export type ReversionMethod =
       };
     };
 /**
- * Which evaluation layer produced a statement cell (one node in one period).
+ * Which value source produced a statement cell (one node in one period).
  *
- * The evaluator resolves every cell by the precedence
- * `Value > Forecast > Formula`, after the node's optional `where` mask. The
- * winning layer is recorded per cell in [`StatementResult::node_sources`].
+ * The evaluator resolves every unmasked cell by the precedence
+ * `Value > Forecast > Formula`. The selected source is recorded on the cell,
+ * including when that source's result is unavailable.
  */
-export type CellSource = "value" | "forecast" | "formula" | "where_masked";
+export type CellSource = "value" | "forecast" | "formula";
 /**
  * Category that groups related checks together.
  */
@@ -331,6 +346,15 @@ export type CheckCategory =
  * Severity level for a check finding, ordered from least to most severe.
  */
 export type CheckSeverity = "info" | "warning" | "error";
+/**
+ * Verdict of a check, or of a whole report, decided from every outcome
+ * before any reporting filter is applied.
+ */
+export type CheckOutcome = "pass" | "fail" | "incomplete" | "unevaluated";
+/**
+ * How a formula check judges its formula.
+ */
+export type FormulaCheckMode = "predicate" | "residual";
 /**
  * Opaque company identifier within a peer set.
  */
@@ -529,20 +553,79 @@ export type NonFiniteF64Wire = number | NonFiniteSentinel;
  */
 export type NonFiniteSentinel = "inf" | "-inf" | "nan";
 /**
- * Available forecast methods.
+ * A forecast method with its typed parameters.
+ *
+ * Serializes as `{ "method": ..., "params": { ... } }`. `params` may be
+ * omitted when the method needs none.
  */
-export type ForecastMethod =
-  | "forward_fill"
-  | "growth_pct"
-  | "curve_pct"
-  | "normal"
-  | "log_normal"
-  | "override"
-  | "time_series"
-  | "seasonal"
-  | "fade_to_target"
-  | "mean_reverting"
-  | "bootstrap";
+export type ForecastSpec =
+  | {
+      method: "forward_fill";
+      params?: BoundsParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "growth_pct";
+      params: GrowthPctParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "curve_pct";
+      params: CurvePctParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "normal";
+      params: DistributionParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "log_normal";
+      params: DistributionParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "override";
+      params: OverrideParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "time_series";
+      params: TimeSeriesParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "seasonal";
+      params: SeasonalParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "mean_reverting";
+      params: MeanRevertingParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "bootstrap";
+      params: BootstrapParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "fade_to_target";
+      params: FadeToTargetParams;
+      [k: string]: unknown;
+    };
+/**
+ * Trend model of a time-series forecast.
+ */
+export type ForecastTrendMethod = "linear" | "exponential" | "moving_average";
+/**
+ * Seasonal decomposition mode.
+ */
+export type SeasonalMode = "additive" | "multiplicative";
+/**
+ * Path of a fade to target.
+ */
+export type ForecastFadeShape = "linear" | "geometric" | "exponential";
 /**
  * Node computation type.
  *
@@ -775,11 +858,19 @@ export interface Attributes {
   tags?: string[];
 }
 /**
- * Verifies that Assets = Liabilities + Equity for every period.
+ * Verifies that Assets = Liabilities + Equity at every model period close.
  *
- * All configured operands must have compatible scalar/monetary units and one
- * currency. Execution rejects incompatible units or invalid numeric tolerances;
- * it performs no FX conversion.
+ * Each group names known nodes, with no identifier repeated within a group
+ * or shared between groups: the caller includes each account once, through
+ * its subtotal or its components. All operands have compatible units and
+ * one currency; the check performs no FX conversion. Signed balances and
+ * typed zeros are used as they are.
+ *
+ * Monetary balances are summed exactly and scalar balances with compensated
+ * sums. The signed difference is `assets - (liabilities + equity)`; the
+ * relative reference of the tolerance is `|assets|`. A period with a
+ * missing balance is incomplete and names the nodes without a value; the
+ * check passes only when every period is complete and within tolerance.
  */
 export interface BalanceSheetArticulation {
   /**
@@ -795,11 +886,62 @@ export interface BalanceSheetArticulation {
    */
   liabilities_nodes: Id[];
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Absolute tolerance override in the balances' units; replaces both
+   * terms of the suite's
+   * [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   [k: string]: unknown;
+}
+/**
+ * Parameters of [`ForecastSpec::Bootstrap`].
+ */
+export interface BootstrapParams {
+  /**
+   * At least 2 observations in the line's base units, oldest first.
+   */
+  historical: number[];
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * What to resample; defaults to growth rates.
+   */
+  mode: ForecastBootstrapMode;
+  /**
+   * Random seed; the same seed reproduces the same path.
+   */
+  seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+}
+/**
+ * Parameters of a method with only the cross-cutting bounds.
+ */
+export interface BoundsParams {
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Bridge chart for a single target metric and period.
@@ -861,139 +1003,210 @@ export interface BridgeStep {
   [k: string]: unknown;
 }
 /**
- * Checks that retained earnings flow correctly across periods:
- * RE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).
+ * Reconciles retained earnings in every model period:
+ * `closing = opening + net income + dividend effect + direct adjustments`.
  *
- * Every configured balance, flow, and adjustment must use the same
- * scalar/monetary units and currency. Execution rejects incompatible units or
- * invalid numeric tolerances; it performs no FX conversion.
+ * The first opening is the explicit `opening_balance` at the first period
+ * boundary; each later opening is the close of the immediately adjacent
+ * prior period. All inputs share one ownership scope, compatible units and
+ * one currency; the check performs no FX conversion.
  *
  * # Sign convention
  *
- * * `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]
- *   convention — positive values increase RE (profit), negative values
- *   decrease it (loss). No validation is emitted for NI since both signs
- *   are meaningful.
- * * `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]
- *   convention by default — the formula subtracts dividends explicitly.
- * * `other_adjustments` carry
- *   [`SignConventionPolicy::InflowPositive`] — they are signed amounts
- *   added directly.
+ * * `net_income_node` is signed: a profit increases retained earnings and
+ *   a loss decreases it.
+ * * `dividends_node` is, by default
+ *   ([`SignConventionPolicy::MagnitudePositive`]), a non-negative magnitude
+ *   that the identity subtracts; a negative magnitude is rejected. Under
+ *   [`SignConventionPolicy::InflowPositive`] it is a signed amount the
+ *   identity adds.
+ * * `other_adjustments` are signed entries recorded directly in retained
+ *   earnings, each a distinct node included once. A restatement appears
+ *   once: in an already-restated opening balance or as one such entry.
+ *
+ * Omit a dividend or adjustment series only when it does not apply; a
+ * configured series without a value makes the period coverage_finding, and a
+ * known zero is a typed zero. Monetary comparisons are exact and scalar
+ * ones compensated. The relative reference of the tolerance is
+ * `|opening retained earnings|`, with no floor. The check passes only when
+ * every period is complete and within tolerance.
  */
 export interface RetainedEarningsReconciliation {
   /**
-   * Optional node for dividends paid.
+   * Node for dividends recognized in retained earnings in each period.
    */
   dividends_node?: Id | null;
   /**
-   * Sign convention applied to the `dividends_node` input. Defaults
-   * to [`SignConventionPolicy::MagnitudePositive`].
-   * `net_income_node` and `other_adjustments` always use
-   * `InflowPositive` by construction.
+   * Sign convention of `dividends_node`. Defaults to
+   * [`SignConventionPolicy::MagnitudePositive`].
    */
   dividends_sign_convention?: SignConventionPolicy;
   /**
-   * Node for net income.
+   * Node for net income of each period, signed.
    */
   net_income_node: Id;
   /**
-   * Additional adjustment nodes (buybacks, AOCI, etc.).
+   * Opening retained earnings at the start of the model's first period.
+   */
+  opening_balance: DatedOpening;
+  /**
+   * Signed direct retained-earnings entries, each a distinct node.
    */
   other_adjustments?: Id[];
   /**
-   * Node for retained earnings balance.
+   * Node for the closing retained-earnings balance of each period.
    */
   retained_earnings_node: Id;
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Absolute tolerance override in the balance units; replaces both terms
+   * of the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   [k: string]: unknown;
 }
 /**
- * Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
- * TotalCF = CFO + CFI + CFF.
+ * An explicit opening balance at the first period boundary of a
+ * roll-forward identity.
+ */
+export interface DatedOpening {
+  /**
+   * Date of the balance: the start of the model's first period.
+   */
+  date: DateWire;
+  /**
+   * The balance on that date, in the units and currency of the
+   * reconciled balance node. A known zero is a typed zero.
+   */
+  value: AmountOrScalar;
+}
+/**
+ * Reconciles closing cash to opening cash plus classified cash flows and
+ * separately identified adjustments, and independently reconciles total
+ * classified cash flows to CFO + CFI + CFF.
  *
- * Every configured operand must have the same scalar/monetary units and
- * currency. Execution rejects incompatible units or non-finite/negative
- * tolerances; it performs no FX conversion.
+ * The roll-forward is evaluated for every model period:
+ * `closing = opening + total cash flow + adjustments`. The first opening is
+ * the explicit `opening_balance` at the first period boundary; each later
+ * opening is the close of the immediately adjacent prior period. Cash
+ * inflows are positive and outflows negative. All inputs share one cash
+ * scope, compatible units and one currency; the check performs no FX
+ * conversion.
+ *
+ * The component identity `total cash flow = CFO + CFI + CFF` runs for every
+ * period when all three component nodes are configured, and not at all when
+ * none is; configuring only some of them is an error.
+ *
+ * Monetary comparisons are exact and scalar ones compensated. The relative
+ * reference of the tolerance is `|opening cash|` for the roll-forward and
+ * `|total cash flow|` for the components, with no floor. A comparison with
+ * a missing input is incomplete; the check passes only when every enabled
+ * comparison is complete and within tolerance.
  */
 export interface CashReconciliation {
   /**
-   * Node for cash balance.
+   * Signed FX and cash-scope adjustment nodes, each included once.
+   */
+  adjustment_nodes?: Id[];
+  /**
+   * Node for the closing cash balance of each period.
    */
   cash_balance_node: Id;
   /**
-   * Optional node for cash from financing.
+   * Node for cash from financing.
    */
   cff_node?: Id | null;
   /**
-   * Optional node for cash from investing.
+   * Node for cash from investing.
    */
   cfi_node?: Id | null;
   /**
-   * Optional node for cash from operations.
+   * Node for cash from operations; configure all three components or
+   * none.
    */
   cfo_node?: Id | null;
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Opening cash at the start of the model's first period.
+   */
+  opening_balance: DatedOpening;
+  /**
+   * Absolute tolerance override in the cash units; replaces both terms of
+   * the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   /**
-   * Node for total cash flow.
+   * Node for total classified cash flow of each period, inflows positive.
    */
   total_cash_flow_node: Id;
   [k: string]: unknown;
 }
 /**
- * Flags required nodes that lack values in applicable periods.
+ * Checks that every required node has a value in every period of the
+ * selected scope.
  *
- * Missing actual observations produce `Severity::Error` and fail the check.
- * Missing forecast observations produce advisory `Severity::Warning` findings.
+ * The required nodes and the period scope (actuals, forecasts or both) are
+ * stated explicitly. An observation that is missing, or unavailable for a
+ * stated reason, makes the covered scope incomplete: it is a coverage
+ * finding, and the check's outcome is `incomplete`. A typed zero is a valid
+ * observation. A scope with no required node or no period in it examines
+ * nothing and is `unevaluated`. `evaluated` counts the required cells
+ * examined; the findings list the missing and unavailable ones.
+ *
+ * A required node the model does not know, or one listed twice, is a
+ * configuration error.
  */
 export interface MissingValueCheck {
   /**
-   * Nodes that must have values in every in-scope period.
+   * Nodes that must have a value in every in-scope period.
    */
   required_nodes: Id[];
   /**
-   * Which periods to inspect.
+   * Which periods are in scope: all, actuals only or forecasts only.
    */
   scope: PeriodScope;
   [k: string]: unknown;
 }
 /**
- * Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).
+ * Flags finite values with an unexpected sign (revenue below zero, an
+ * expense above zero).
  *
- * **Advisory-only**: every finding is `Severity::Warning`, so this check's
- * `CheckResult::passed` is always `true` and it never fails a pipeline gate.
- * Treat its findings as review prompts, not assertions.
+ * **Advisory only**: every finding is `Severity::Warning`, so the check
+ * never fails. Zero is valid in either group, and a cell without a value is
+ * not examined: mandatory sign rules belong to the operation that owns
+ * them (the retained-earnings dividend convention, for example).
+ *
+ * A node the model does not know, a node listed twice, or a node in both
+ * groups is a configuration error.
  */
 export interface SignConventionCheck {
   /**
-   * Nodes expected to carry negative values.
+   * Nodes expected to be non-positive.
    */
   negative_nodes?: Id[];
   /**
-   * Nodes expected to carry positive values.
+   * Nodes expected to be non-negative.
    */
   positive_nodes?: Id[];
   [k: string]: unknown;
 }
 /**
- * Detects NaN or infinite values in node results.
+ * Detects values that are not valid numbers: a NaN or an infinity.
  *
- * **Gating**: findings are `Severity::Error`, so any non-finite cell sets
- * `CheckResult::passed` to `false` and fails a pipeline gate. Non-finite
- * values poison every downstream calculation, so they are never advisory.
+ * **Gating**: findings are `Severity::Error`, so one invalid value fails
+ * the check, whether or not any other check requires the cell. A typed
+ * zero is valid, and a cell that is missing, masked or unavailable for a
+ * stated reason is not a value and is not examined: coverage belongs to
+ * [`MissingValueCheck`](super::MissingValueCheck).
+ *
+ * The covered nodes are selected explicitly: all modeled nodes, or a named
+ * list in which an unknown or repeated identifier is a configuration
+ * error. A cell in a period the model's plan does not have, and a node
+ * whose result units contradict the model's, are errors.
  */
 export interface NonFiniteCheck {
   /**
-   * Specific nodes to check; if empty, all nodes in results are inspected.
+   * The nodes to check: `"all"` or a list of node identifiers.
    */
-  nodes?: Id[];
+  nodes: NodeSelection;
   [k: string]: unknown;
 }
 /**
@@ -1271,26 +1484,31 @@ export interface CeclResult {
   [k: string]: unknown;
 }
 /**
- * The two numbers a check compared, and the tolerance it allowed.
+ * The two values a check compared, their difference and the tolerance it
+ * allowed.
  *
- * Recorded for every numeric comparison a check performs — whether it passed
- * or failed — so the verdict can be reconstructed from exported data:
- * the comparison fails exactly when `|actual - expected| > tolerance`.
+ * Recorded for every numeric comparison a check performs, whether it passed
+ * or failed, so the verdict can be reconstructed from exported data: the
+ * comparison fails exactly when `|difference| > tolerance`.
  *
- * `actual`, `expected` and `tolerance` are all in the units of the compared
- * nodes (currency units for monetary nodes, the same units as
- * [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
- * a fraction or percentage.
+ * Every value is typed in the units of the compared nodes: exact money in
+ * their currency, or a scalar. `difference` is the one exact residual the
+ * check computed (an exact sum for money), not a difference of the two
+ * recorded sides; `tolerance` is an absolute amount in the same units.
  */
 export interface CheckComparison {
   /**
    * Observed (left-hand) value, in the compared nodes' units.
    */
-  actual: number;
+  actual: AmountOrScalar;
+  /**
+   * Signed residual `actual - expected`, in the same units.
+   */
+  difference: AmountOrScalar;
   /**
    * Value the identity requires (right-hand side), in the same units.
    */
-  expected: number;
+  expected: AmountOrScalar;
   /**
    * Stable snake_case name of the identity that was tested (for example
    * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
@@ -1302,54 +1520,50 @@ export interface CheckComparison {
    */
   period?: string | null;
   /**
-   * Absolute tolerance applied to `|actual - expected|`, in the same units.
-   * This is the effective tolerance: the per-check override when one is
+   * Absolute tolerance applied to `|difference|`, in the same units. This
+   * is the effective tolerance: the per-check override when one is
    * configured, otherwise
    * `max(default_tolerance, default_relative_tolerance * |reference|)`.
    */
-  tolerance: number;
+  tolerance: AmountOrScalar;
   [k: string]: unknown;
 }
 /**
  * Configuration parameters that govern check execution.
  *
- * Identity checks trigger a finding when
- * `|diff| > max(default_tolerance, default_relative_tolerance * |reference|)`,
- * so an analyst can set an absolute floor (currency units) that catches
- * micro-errors on small balances plus a relative ceiling that scales with
- * larger balance sheets. A per-check tolerance override bypasses both
- * defaults and is applied verbatim.
+ * The identity tolerance is zero unless one is stated: an identity then
+ * holds only when its two sides are equal. An explicit tolerance allows
+ * `|difference| <= max(default_tolerance, default_relative_tolerance *
+ * |reference|)`, where the reference is the identity owner's (total assets
+ * for the balance sheet, for example); a difference equal to the allowance
+ * is within tolerance. A per-check absolute override replaces both terms.
  *
- * All four fields are part of the public configuration surface and are
- * intended to be tuned per-deployment via JSON / serde overrides — e.g.,
- * raising `default_relative_tolerance` to `1e-4` (1 bp) when a downstream
- * process is known to round to the nearest hundred. The defaults
- * (`default_tolerance = 0.01`, `default_relative_tolerance = 1e-9`,
- * `materiality_threshold = 0.0`, `min_severity = Info`) are conservative:
- * the absolute cent floor catches micro-errors on small balances while the
- * relative component absorbs f64 accumulation noise on large ones.
+ * `materiality_threshold` and `min_severity` are reporting filters for
+ * advisory findings. They never change a verdict, and they never remove an
+ * error-severity finding, a coverage finding or a recorded comparison.
  */
 export interface CheckConfig {
   /**
-   * Default **relative** tolerance as a fraction of the reference
-   * denominator (e.g. 1e-6 ≈ "one basis point of a basis point"). Zero
-   * disables relative tolerance.
+   * **Relative** tolerance as a fraction of the identity's reference
+   * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+   * disables the relative term.
    */
   default_relative_tolerance?: number;
   /**
-   * Default **absolute** tolerance for equality comparisons, expressed in
-   * the same currency units as the node values being compared (e.g. 0.01
-   * means one cent when nodes are in whole dollars).
+   * **Absolute** tolerance for equality comparisons, in the units of the
+   * compared values (0.01 is one cent when nodes are in whole dollars).
+   * Zero, the default, requires exact equality.
    */
   default_tolerance?: number;
   /**
-   * Findings below this absolute materiality threshold are excluded from
-   * reports. Error-severity findings are exempt: materiality filters
-   * advisory noise, it never changes a check's pass/fail verdict.
+   * Advisory findings whose absolute materiality is below this threshold
+   * are left out of the report. Error-severity and coverage findings are
+   * always reported.
    */
   materiality_threshold?: number;
   /**
-   * Minimum severity a finding must have to appear in the report.
+   * Minimum severity an advisory finding must have to appear in the
+   * report. Coverage findings are always reported.
    */
   min_severity?: CheckSeverity;
 }
@@ -1369,6 +1583,13 @@ export interface CheckFinding {
    * with a tolerance compares its value against zero).
    */
   comparison?: CheckComparison | null;
+  /**
+   * True for a coverage finding: required data was missing or unavailable,
+   * so the check could not evaluate the period or cell it names. A
+   * coverage finding makes its check incomplete and is never removed by
+   * the reporting filters.
+   */
+  coverage?: boolean;
   /**
    * Materiality context, if applicable.
    */
@@ -1409,9 +1630,10 @@ export interface Materiality {
    */
   reference_value: number;
   /**
-   * Discrepancy as a percentage of the reference value.
+   * Discrepancy as a percentage of the reference value; `None` when the
+   * percentage is undefined (a zero reference) or does not apply.
    */
-  relative_pct: number;
+  relative_pct?: number | null;
   [k: string]: unknown;
 }
 /**
@@ -1419,7 +1641,14 @@ export interface Materiality {
  */
 export interface CheckReport {
   /**
-   * Individual results for each check.
+   * Verdict of the suite from the unfiltered check outcomes: `fail` when
+   * any check failed, else `incomplete` when any check is incomplete,
+   * else `pass` when at least one check passed, else `unevaluated` (an
+   * empty suite, or one with no applicable check).
+   */
+  outcome: CheckOutcome;
+  /**
+   * Individual results for each check, in declared order.
    */
   results: CheckResult[];
   /**
@@ -1455,13 +1684,22 @@ export interface CheckResult {
    */
   comparisons?: CheckComparison[];
   /**
-   * Individual findings produced by the check.
+   * Number of periods or cells the check examined.
+   */
+  evaluated: number;
+  /**
+   * Findings produced by the check. The suite's `min_severity` and
+   * `materiality_threshold` filters remove advisory findings only: an
+   * error-severity or coverage finding is always retained.
    */
   findings: CheckFinding[];
   /**
-   * Whether the check passed (no error-severity findings).
+   * Verdict of the check, decided from all of its findings before the
+   * suite's reporting filters: `fail` on an error-severity finding, else
+   * `incomplete` on a coverage finding, else `unevaluated` when
+   * `evaluated` is zero, else `pass`.
    */
-  passed: boolean;
+  outcome: CheckOutcome;
   [k: string]: unknown;
 }
 /**
@@ -1473,21 +1711,29 @@ export interface CheckSummary {
    */
   errors: number;
   /**
-   * Number of checks that failed (at least one error-severity finding).
+   * Number of checks whose outcome is `fail` (an error-severity finding).
    */
   failed: number;
+  /**
+   * Number of checks whose outcome is `incomplete` (a coverage finding).
+   */
+  incomplete: number;
   /**
    * Total number of info-severity findings across all checks.
    */
   infos: number;
   /**
-   * Number of checks that passed.
+   * Number of checks whose outcome is `pass`.
    */
   passed: number;
   /**
    * Total number of checks executed.
    */
   total_checks: number;
+  /**
+   * Number of checks whose outcome is `unevaluated` (nothing examined).
+   */
+  unevaluated: number;
   /**
    * Total number of warning-severity findings across all checks.
    */
@@ -1528,13 +1774,15 @@ export interface CheckSuiteSpec {
  * Full suite definitions (built-in + formula) can be stored as a single JSON
  * document and resolved directly with [`CheckSuiteSpec::resolve`].
  *
- * Each period ends in one of three verdicts: pass, fail (a finding with the
- * configured `severity`), or insufficient data. A period has insufficient
- * data when a same-period input is missing or non-finite, or when the
- * formula consumes a non-finite value, such as a lag or rolling window that
- * reaches before the first period. It is reported as a `warning` finding
- * naming the inputs, records no comparison, and never fails the check. A
- * division by zero over finite inputs is not missing data and still fails.
+ * The mode and the period scope are stated explicitly. In each in-scope
+ * period the check ends in one of three ways: pass, breach (a finding with
+ * the configured `severity`), or incomplete. The formula is evaluated on
+ * the typed cells of the verified run and consumes observations only on the
+ * paths it takes: an untaken branch may read a missing cell, and an
+ * explicit `coalesce` supplies a fallback. A period is incomplete (a
+ * coverage finding) when a needed observation, or the eligibility
+ * condition, is missing or unavailable. A division by zero, a domain error
+ * or an overflow is an execution error, for an advisory check too.
  */
 export interface FormulaCheckSpec {
   /**
@@ -1542,7 +1790,14 @@ export interface FormulaCheckSpec {
    */
   category: CheckCategory;
   /**
-   * Statements DSL expression to evaluate (e.g. `"revenue > 0"`).
+   * Optional Boolean formula; a period in which it is false is out of
+   * scope, and one in which it has no value is incomplete.
+   */
+  eligibility?: string | null;
+  /**
+   * Statements DSL expression to evaluate: Boolean in predicate mode
+   * (`"revenue > 0"`), a scalar or monetary amount in residual mode
+   * (`"assets - liabilities - equity"`).
    *
    * Formula checks use the same evaluator as calculated statement nodes,
    * including time-series functions and `cs.*` capital-structure references.
@@ -1553,22 +1808,28 @@ export interface FormulaCheckSpec {
    */
   id: string;
   /**
-   * Template for the finding message (`{period}` is replaced at runtime).
+   * Template for the breach message (`{period}` is replaced at runtime).
    */
   message_template: string;
+  /**
+   * Whether the formula is a Boolean predicate or a residual.
+   */
+  mode: FormulaCheckMode;
   /**
    * Human-readable name shown in reports.
    */
   name: string;
   /**
-   * Severity assigned to findings when the formula fails.
+   * Which periods the check covers: all, actuals only or forecasts only.
+   */
+  scope: PeriodScope;
+  /**
+   * Severity assigned to a breach.
    */
   severity: CheckSeverity;
   /**
-   * Finite, nonnegative absolute residual bound in the formula's result units.
-   * When present, the formula passes when its absolute result is at most
-   * this bound. When absent, the formula is a predicate and any finite
-   * nonzero result passes.
+   * Residual mode only: finite, non-negative absolute bound in the
+   * residual's units. Omitted means zero, an exact comparison.
    */
   tolerance?: number | null;
 }
@@ -2172,6 +2433,11 @@ export interface CreditMapping {
    */
   cash_node?: Id | null;
   /**
+   * Comparison and reporting policy of the suite. Identities are compared
+   * exactly unless a tolerance is stated here.
+   */
+  config?: CheckConfig;
+  /**
    * Minimum coverage ratio that triggers a warning; defaults to `1.5`.
    */
   coverage_min_warn?: number | null;
@@ -2198,6 +2464,29 @@ export interface CreditMapping {
    * @maxItems 2
    */
   leverage_warn?: [number, number] | null;
+}
+/**
+ * Parameters of [`ForecastSpec::CurvePct`].
+ */
+export interface CurvePctParams {
+  /**
+   * Growth rate per forecast period as decimals, one per period in order.
+   */
+  curve: number[];
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.
@@ -2463,6 +2752,45 @@ export interface DimensionScore {
    */
   z_score: number;
   [k: string]: unknown;
+}
+/**
+ * Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`].
+ */
+export interface DistributionParams {
+  /**
+   * Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
+   */
+  correlation?: number | null;
+  /**
+   * Node whose shocks this one correlates with; Monte Carlo evaluation only.
+   */
+  correlation_with?: string | null;
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Mean shock per period, as the method applies it.
+   */
+  mean: number;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Random seed; the same seed reproduces the same path.
+   */
+  seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+  /**
+   * Standard deviation of the shock per period; non-negative.
+   */
+  std_dev: number;
 }
 /**
  * Verifies that dividends on the cash flow statement equal the dividends charged against equity.
@@ -2811,8 +3139,8 @@ export interface Explanation {
    * capital-structure references.
    *
    * Populated only when the formula produced the value (`source` is
-   * `formula`, or unknown). Empty when `source` is `value`, `forecast` or
-   * `where_masked`: the formula was not evaluated, and `source` /
+   * `formula`, or unknown). Empty when `source` is `value` or
+   * `forecast`: the formula was not evaluated, and `source` /
    * `forecast` describe where the value came from. When the formula is a
    * pure sum/difference of references there is one step per term, in
    * formula order, each with `operation` `"+"` or `"-"`, and the signed
@@ -2849,14 +3177,13 @@ export interface Explanation {
    */
   period_id: PeriodId;
   /**
-   * Evaluation layer that produced `final_value` under the
+   * Value source selected for the cell under the
    * `Value > Forecast > Formula` precedence: `value` (the explicit value
-   * stored on the node), `forecast`, `formula`, or `where_masked` (the
-   * node's `where` clause zeroed the cell).
+   * stored on the node), `forecast` or `formula`.
    *
-   * Read from [`StatementResult::node_sources`]; `None` when the results
-   * carry no source for the cell (hand-built results, or results or
-   * explanations serialized before sources were recorded).
+   * Read from the result cell; `None` when no source was selected (a
+   * masked or missing cell, or one left unavailable before a source was
+   * chosen) and for hand-built results.
    */
   source?: CellSource | null;
   [k: string]: unknown;
@@ -2885,21 +3212,188 @@ export interface ExplanationStep {
   [k: string]: unknown;
 }
 /**
- * Forecast method specification.
- *
- * Defines how to forecast future values for a node.
+ * Parameters of [`ForecastSpec::GrowthPct`].
  */
-export interface ForecastSpec {
+export interface GrowthPctParams {
   /**
-   * Forecast method
+   * Upper bound clamped onto generated values, in the line's base units.
    */
-  method: ForecastMethod;
+  max?: number | null;
   /**
-   * Method-specific parameters
+   * Lower bound clamped onto generated values, in the line's base units.
    */
-  params?: {
-    [k: string]: unknown;
+  min?: number | null;
+  /**
+   * Growth per period as a decimal: 0.03 = 3%.
+   */
+  rate: number;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+}
+/**
+ * Parameters of [`ForecastSpec::Override`].
+ */
+export interface OverrideParams {
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Exact levels by period id, in the line's base units; other periods carry forward.
+   */
+  overrides: {
+    [k: string]: number;
   };
+}
+/**
+ * Parameters of [`ForecastSpec::TimeSeries`].
+ */
+export interface TimeSeriesParams {
+  /**
+   * Level smoothing in (0, 1); required for the exponential method.
+   */
+  alpha?: number | null;
+  /**
+   * Trend smoothing in (0, 1); required for the exponential method.
+   */
+  beta?: number | null;
+  /**
+   * At least two observations in the line's base units, oldest first,
+   * from consecutive reporting slots of the model's frequency; the last
+   * one is the slot that ends where the forecast opens.
+   */
+  historical: number[];
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Trend model; required.
+   */
+  method: ForecastTrendMethod;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Trend damping in (0, 1]; legal only with the exponential method.
+   */
+  phi?: number | null;
+  /**
+   * Averaging window in periods; required for the moving-average method.
+   */
+  window?: number | null;
+}
+/**
+ * Parameters of [`ForecastSpec::Seasonal`].
+ */
+export interface SeasonalParams {
+  /**
+   * Trend growth per period as a decimal: 0.03 = 3%; defaults to none.
+   */
+  growth?: number | null;
+  /**
+   * Observations in the line's base units, oldest first; at least two full cycles.
+   */
+  historical: number[];
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * How the seasonal pattern combines with the trend.
+   */
+  mode: SeasonalMode;
+  /**
+   * Periods per seasonal cycle.
+   */
+  season_length: number;
+}
+/**
+ * Parameters of [`ForecastSpec::MeanReverting`].
+ */
+export interface MeanRevertingParams {
+  /**
+   * Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
+   */
+  correlation?: number | null;
+  /**
+   * Node whose shocks this one correlates with; Monte Carlo evaluation only.
+   */
+  correlation_with?: string | null;
+  /**
+   * Long-run level the process reverts to, in the line's base units.
+   */
+  long_run_mean: number;
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Fraction of the gap closed each period, a decimal in (0, 1].
+   */
+  reversion_speed: number;
+  /**
+   * Random seed; the same seed reproduces the same path.
+   */
+  seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+  /**
+   * Standard deviation of the shock per period; non-negative.
+   */
+  std_dev: number;
+}
+/**
+ * Parameters of [`ForecastSpec::FadeToTarget`].
+ */
+export interface FadeToTargetParams {
+  /**
+   * Periods to close half the gap; required for, and legal only with, the exponential shape.
+   */
+  half_life?: number | null;
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Path to the target; defaults to linear.
+   */
+  shape: ForecastFadeShape;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+  /**
+   * Terminal level, in the line's base units.
+   */
+  target: number;
 }
 /**
  * A single credit exposure for ECL computation.
@@ -3315,6 +3809,11 @@ export interface ThreeStatementMapping {
    */
   cfo_node?: Id | null;
   /**
+   * Comparison and reporting policy of the suite. Identities are compared
+   * exactly unless a tolerance is stated here.
+   */
+  config?: CheckConfig;
+  /**
    * Capital-structure interest node; when present the interest
    * reconciliation compares against it directly instead of testing an
    * implied rate.
@@ -3367,6 +3866,16 @@ export interface ThreeStatementMapping {
    * Net income node (income statement).
    */
   net_income_node: Id;
+  /**
+   * Opening cash at the start of the model's first period. The cash
+   * roll-forward runs only when it and `total_cf_node` are both given.
+   */
+  opening_cash?: DatedOpening | null;
+  /**
+   * Opening retained earnings at the start of the model's first period.
+   * The retained-earnings reconciliation runs only when it is given.
+   */
+  opening_retained_earnings?: DatedOpening | null;
   /**
    * PP&E additions node; enables the capex reconciliation together with
    * `capex_node`.
@@ -4545,6 +5054,11 @@ export interface TrendCheck {
    * Which direction is "good".
    */
   direction: TrendDirection;
+  /**
+   * Identifier of this check, unique within its suite (a suite may watch
+   * several nodes, one trend check each).
+   */
+  id: string;
   /**
    * Number of consecutive deteriorating periods before flagging.
    */

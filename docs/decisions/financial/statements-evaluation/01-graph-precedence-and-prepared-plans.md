@@ -1,6 +1,6 @@
 # STATEMENTS-EVALUATION-001 — Dependency graph, cell precedence and prepared evaluation
 
-Decision status: **Accepted for the full dependency graph, cell precedence and prepared evaluation contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full dependency graph, cell precedence and prepared evaluation contract (2026-11-15)**. Implementation status: **Reconciled (2026-11-17)**: cells carry a distinct value, missing, masked or unavailable state (`evaluator::cell`); a false mask gives a masked cell with no value and a mask with no value an unavailable cell; an observation hidden by the cutoff with no forecast or formula is unavailable, not an error; only a positive integer literal offset drops a `lag`/`shift` same-period edge; a monetary result is converted to exact `Money` at the cell boundary; and a prepared plan is reused only for payload changes in existing observation slots. Published run provenance and per-cell status are typed results, and the check suite attached to an evaluator runs at finalization under the accepted comparison and suite policy. Validation status: **Mask states, lag edges and plan reuse are qualified in the engine tests and [engine regressions](../../../../finstack-quant/statements/tests/finance_engine_regressions.rs); provenance and check-suite qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
 ## Accepted decision for dependency graphs, cell precedence and prepared evaluation
 
@@ -37,4 +37,4 @@ Owning sources: [engine](../../../../finstack-quant/statements/src/evaluator/eng
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-evaluation-forecasts-and-reporting).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

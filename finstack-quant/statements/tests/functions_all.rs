@@ -11,3 +11,6 @@ mod min_max_tests;
 
 #[path = "functions/nan_handling_tests.rs"]
 mod nan_handling_tests;
+
+#[path = "functions/history_statistics_tests.rs"]
+mod history_statistics_tests;

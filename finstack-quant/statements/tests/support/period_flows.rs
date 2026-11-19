@@ -72,6 +72,15 @@ impl Instrument for ScheduleInstrument {
     {
         Ok(Default::default())
     }
+
+    fn contractual_accrual_config(
+        &self,
+    ) -> Option<finstack_quant_cashflows::accrual::AccrualConfig> {
+        Some(finstack_quant_cashflows::accrual::AccrualConfig {
+            frequency: Some(finstack_quant_core::dates::Tenor::quarterly()),
+            ..Default::default()
+        })
+    }
 }
 use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -79,6 +88,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_statements::Result;
 use finstack_quant_statements::capital_structure::{
     CapitalStructureCashflows, CashflowBreakdown, calculate_period_flows,
+    scheduled_opening_principal,
 };
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -102,9 +112,13 @@ pub fn aggregate_period_flows(
         if !currencies.contains(&currency) {
             currencies.push(currency);
         }
-        let mut opening = Money::new(0.0, currency).expect("valid money fixture");
+        // The ledger opens where the dated schedule does.
+        let mut opening = match periods.first() {
+            Some(first) => scheduled_opening_principal(&schedule, first.start)?,
+            None => Money::new(0.0, currency).expect("valid money fixture"),
+        };
         for period in periods {
-            let (breakdown, closing, _net_new_funding, _warnings) = calculate_period_flows(
+            let (breakdown, closing, _net_new_funding) = calculate_period_flows(
                 instrument.as_ref(),
                 period,
                 opening,

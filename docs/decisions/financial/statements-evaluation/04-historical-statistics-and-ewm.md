@@ -1,6 +1,6 @@
 # STATEMENTS-EVALUATION-004 — Rolling, cumulative, ranked and exponentially weighted statistics
 
-Decision status: **Accepted for the full historical statistics and EWM contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full historical statistics and EWM contract (2026-11-15)**. Implementation status: **Reconciled (2026-11-17)**: every historical function reads the typed value of each canonical plan slot through the target from the same run (`evaluator::formula_aggregates::Series`), and an error in an evaluated observation propagates; rolling windows cover the last exact number of slots with an exact positive window and an exact minimum count from 1 through the window; sample variance and standard deviation use `n − 1` and need two observations; full-history statistics use the available observations and record a `gapped_sample` warning with the sample and slot counts; `rank` uses exact competition ties and `quantile` R-7 interpolation, both over a node or capital reference; cumulative functions need the complete prefix from the model start; sums and means are exact for money and the standard deviation keeps the currency; EWM decays once per slot, carries the estimate across a gap, applies the squared-weight correction by default with a Boolean, `0` or `1` toggle, and its corrected dispersion is unavailable below two observations. The float history collectors and their per-period cache are deleted. Validation status: **Qualified** by gapped windows at the minimum count, rank ties, an incomplete prefix and corrected EWM with fewer than two observations. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
 ## Accepted decision for historical statistics and EWM
 
@@ -11,6 +11,8 @@ Decision status: **Accepted for the full historical statistics and EWM contract 
 5. Require finite EWM `alpha` in `(0,1]` and decay weights once per canonical slot. A missing slot ages the weights and carries the previous estimate without adding an observation. Use the squared-weight correction for variance and standard deviation by default, with an explicit Boolean toggle. Corrected variance and standard deviation are unavailable with fewer than two positive-weight observations.
 
 ## Audited domain and collection
+
+The sections below describe the implementation audited on 2026-11-05, before reconciliation.
 
 Historical statistics operate on chronological values at or before the current context. Simple column collection includes present slots only; arbitrary expressions are evaluated over available historical/current periods. Current values overlay historical same-period entries. Thus an absent column slot and a present NaN are different observations. This protects lagged calculations from future data, but it does not build a uniform calendar or impute missing entries.
 
@@ -34,6 +36,6 @@ Owning sources: [aggregates](../../../../finstack-quant/statements/src/evaluator
 
 ## Follow-up tracking
 
-The formula contract requires one argument for all seven full-history and cumulative functions. The contracts scope owns the shared compiler and evaluator reconciliation. [Accepted formula contract](../statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Contracts follow-ups](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+The formula contract requires one argument for all seven full-history and cumulative functions. The contracts scope owns the shared compiler and evaluator reconciliation. [Accepted formula contract](../statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Contracts follow-ups](../FOLLOW_UPS.md).
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-evaluation-forecasts-and-reporting).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

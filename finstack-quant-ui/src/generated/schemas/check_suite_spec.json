@@ -19,8 +19,8 @@
         }
       ],
       "config": {
-        "default_relative_tolerance": 1e-9,
-        "default_tolerance": 0.01,
+        "default_relative_tolerance": 0,
+        "default_tolerance": 0,
         "materiality_threshold": 0,
         "min_severity": "info"
       },
@@ -31,7 +31,9 @@
           "formula": "net_debt / ebitda < 8",
           "id": "leverage_bound",
           "message_template": "Net leverage exceeds 8x",
+          "mode": "predicate",
           "name": "Net leverage below 8x",
+          "scope": "all_periods",
           "severity": "warning"
         }
       ],
@@ -50,8 +52,8 @@
     "config": {
       "$ref": "#/$defs/d_5de9f28b928c01e49782",
       "default": {
-        "default_relative_tolerance": 1e-9,
-        "default_tolerance": 0.01,
+        "default_relative_tolerance": 0,
+        "default_tolerance": 0,
         "materiality_threshold": 0,
         "min_severity": "info"
       },
@@ -104,12 +106,35 @@
         }
       ]
     },
+    "d_0a6e10d87c8ea378057d": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_4a5c42eb61628440a2ae",
+          "description": "Every node of the evaluated results."
+        },
+        {
+          "description": "The listed nodes, each a known node named once.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "The nodes a validity check covers: every modeled node, selected\nexplicitly, or a named list.\n\nThe JSON form is the string `\"all\"` or an array of node identifiers."
+    },
     "d_16c0d07694c2c99e93aa": {
-      "description": "Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally\nTotalCF = CFO + CFI + CFF.\n\nEvery configured operand must have the same scalar/monetary units and\ncurrency. Execution rejects incompatible units or non-finite/negative\ntolerances; it performs no FX conversion.",
+      "description": "Reconciles closing cash to opening cash plus classified cash flows and\nseparately identified adjustments, and independently reconciles total\nclassified cash flows to CFO + CFI + CFF.\n\nThe roll-forward is evaluated for every model period:\n`closing = opening + total cash flow + adjustments`. The first opening is\nthe explicit `opening_balance` at the first period boundary; each later\nopening is the close of the immediately adjacent prior period. Cash\ninflows are positive and outflows negative. All inputs share one cash\nscope, compatible units and one currency; the check performs no FX\nconversion.\n\nThe component identity `total cash flow = CFO + CFI + CFF` runs for every\nperiod when all three component nodes are configured, and not at all when\nnone is; configuring only some of them is an error.\n\nMonetary comparisons are exact and scalar ones compensated. The relative\nreference of the tolerance is `|opening cash|` for the roll-forward and\n`|total cash flow|` for the components, with no floor. A comparison with\na missing input is incomplete; the check passes only when every enabled\ncomparison is complete and within tolerance.",
       "properties": {
+        "adjustment_nodes": {
+          "description": "Signed FX and cash-scope adjustment nodes, each included once.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        },
         "cash_balance_node": {
           "$ref": "#/$defs/d_695249af9946117b99a3",
-          "description": "Node for cash balance."
+          "description": "Node for the closing cash balance of each period."
         },
         "cff_node": {
           "anyOf": [
@@ -120,7 +145,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional node for cash from financing."
+          "description": "Node for cash from financing."
         },
         "cfi_node": {
           "anyOf": [
@@ -131,7 +156,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional node for cash from investing."
+          "description": "Node for cash from investing."
         },
         "cfo_node": {
           "anyOf": [
@@ -142,10 +167,14 @@
               "type": "null"
             }
           ],
-          "description": "Optional node for cash from operations."
+          "description": "Node for cash from operations; configure all three components or\nnone."
+        },
+        "opening_balance": {
+          "$ref": "#/$defs/d_7e4df57c89fa33d75314",
+          "description": "Opening cash at the start of the model's first period."
         },
         "tolerance": {
-          "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+          "description": "Absolute tolerance override in the cash units; replaces both terms of\nthe suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.",
           "format": "double",
           "type": [
             "number",
@@ -154,25 +183,33 @@
         },
         "total_cash_flow_node": {
           "$ref": "#/$defs/d_695249af9946117b99a3",
-          "description": "Node for total cash flow."
+          "description": "Node for total classified cash flow of each period, inflows positive."
         }
       },
       "required": [
         "cash_balance_node",
-        "total_cash_flow_node"
+        "total_cash_flow_node",
+        "opening_balance"
       ],
       "type": "object"
     },
     "d_270bee76f784bc446378": {
       "additionalProperties": false,
-      "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].\n\nEach period ends in one of three verdicts: pass, fail (a finding with the\nconfigured `severity`), or insufficient data. A period has insufficient\ndata when a same-period input is missing or non-finite, or when the\nformula consumes a non-finite value, such as a lag or rolling window that\nreaches before the first period. It is reported as a `warning` finding\nnaming the inputs, records no comparison, and never fails the check. A\ndivision by zero over finite inputs is not missing data and still fails.",
+      "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].\n\nThe mode and the period scope are stated explicitly. In each in-scope\nperiod the check ends in one of three ways: pass, breach (a finding with\nthe configured `severity`), or incomplete. The formula is evaluated on\nthe typed cells of the verified run and consumes observations only on the\npaths it takes: an untaken branch may read a missing cell, and an\nexplicit `coalesce` supplies a fallback. A period is incomplete (a\ncoverage finding) when a needed observation, or the eligibility\ncondition, is missing or unavailable. A division by zero, a domain error\nor an overflow is an execution error, for an advisory check too.",
       "properties": {
         "category": {
           "$ref": "#/$defs/d_545b6f75d3fd6017c27d",
           "description": "Category grouping."
         },
+        "eligibility": {
+          "description": "Optional Boolean formula; a period in which it is false is out of\nscope, and one in which it has no value is incomplete.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "formula": {
-          "description": "Statements DSL expression to evaluate (e.g. `\"revenue > 0\"`).\n\nFormula checks use the same evaluator as calculated statement nodes,\nincluding time-series functions and `cs.*` capital-structure references.",
+          "description": "Statements DSL expression to evaluate: Boolean in predicate mode\n(`\"revenue > 0\"`), a scalar or monetary amount in residual mode\n(`\"assets - liabilities - equity\"`).\n\nFormula checks use the same evaluator as calculated statement nodes,\nincluding time-series functions and `cs.*` capital-structure references.",
           "type": "string"
         },
         "id": {
@@ -180,19 +217,27 @@
           "type": "string"
         },
         "message_template": {
-          "description": "Template for the finding message (`{period}` is replaced at runtime).",
+          "description": "Template for the breach message (`{period}` is replaced at runtime).",
           "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/d_d277b1328099ab8e8b10",
+          "description": "Whether the formula is a Boolean predicate or a residual."
         },
         "name": {
           "description": "Human-readable name shown in reports.",
           "type": "string"
         },
+        "scope": {
+          "$ref": "#/$defs/d_32be215bf9263ac78fcf",
+          "description": "Which periods the check covers: all, actuals only or forecasts only."
+        },
         "severity": {
           "$ref": "#/$defs/d_06907e07480e89ff7314",
-          "description": "Severity assigned to findings when the formula fails."
+          "description": "Severity assigned to a breach."
         },
         "tolerance": {
-          "description": "Finite, nonnegative absolute residual bound in the formula's result units.\nWhen present, the formula passes when its absolute result is at most\nthis bound. When absent, the formula is a predicate and any finite\nnonzero result passes.",
+          "description": "Residual mode only: finite, non-negative absolute bound in the\nresidual's units. Omitted means zero, an exact comparison.",
           "format": "double",
           "type": [
             "number",
@@ -205,23 +250,24 @@
         "name",
         "category",
         "severity",
+        "mode",
+        "scope",
         "formula",
         "message_template"
       ],
       "type": "object"
     },
     "d_2bc9b0f4efb33830f0a7": {
-      "description": "Detects NaN or infinite values in node results.\n\n**Gating**: findings are `Severity::Error`, so any non-finite cell sets\n`CheckResult::passed` to `false` and fails a pipeline gate. Non-finite\nvalues poison every downstream calculation, so they are never advisory.",
+      "description": "Detects values that are not valid numbers: a NaN or an infinity.\n\n**Gating**: findings are `Severity::Error`, so one invalid value fails\nthe check, whether or not any other check requires the cell. A typed\nzero is valid, and a cell that is missing, masked or unavailable for a\nstated reason is not a value and is not examined: coverage belongs to\n[`MissingValueCheck`](super::MissingValueCheck).\n\nThe covered nodes are selected explicitly: all modeled nodes, or a named\nlist in which an unknown or repeated identifier is a configuration\nerror. A cell in a period the model's plan does not have, and a node\nwhose result units contradict the model's, are errors.",
       "properties": {
         "nodes": {
-          "default": [],
-          "description": "Specific nodes to check; if empty, all nodes in results are inspected.",
-          "items": {
-            "$ref": "#/$defs/d_695249af9946117b99a3"
-          },
-          "type": "array"
+          "$ref": "#/$defs/d_0a6e10d87c8ea378057d",
+          "description": "The nodes to check: `\"all\"` or a list of node identifiers."
         }
       },
+      "required": [
+        "nodes"
+      ],
       "type": "object"
     },
     "d_32be215bf9263ac78fcf": {
@@ -243,6 +289,30 @@
           "type": "string"
         }
       ]
+    },
+    "d_3597ff04f9f2b22f4450": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "d_4a5c42eb61628440a2ae": {
+      "const": "all",
+      "description": "The explicit selection of every modeled node (`\"all\"`).",
+      "type": "string"
+    },
+    "d_4b696037173a5f0c74fb": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_598048de9d4527d8b97c",
+          "description": "Currency-aware amount"
+        },
+        {
+          "description": "Unitless scalar (ratio, percentage, count, etc.)",
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
     },
     "d_545b6f75d3fd6017c27d": {
       "description": "Category that groups related checks together.",
@@ -275,11 +345,11 @@
       ]
     },
     "d_596da27a7e87322af664": {
-      "description": "Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).\n\n**Advisory-only**: every finding is `Severity::Warning`, so this check's\n`CheckResult::passed` is always `true` and it never fails a pipeline gate.\nTreat its findings as review prompts, not assertions.",
+      "description": "Flags finite values with an unexpected sign (revenue below zero, an\nexpense above zero).\n\n**Advisory only**: every finding is `Severity::Warning`, so the check\nnever fails. Zero is valid in either group, and a cell without a value is\nnot examined: mandatory sign rules belong to the operation that owns\nthem (the retained-earnings dividend convention, for example).\n\nA node the model does not know, a node listed twice, or a node in both\ngroups is a configuration error.",
       "properties": {
         "negative_nodes": {
           "default": [],
-          "description": "Nodes expected to carry negative values.",
+          "description": "Nodes expected to be non-positive.",
           "items": {
             "$ref": "#/$defs/d_695249af9946117b99a3"
           },
@@ -287,7 +357,7 @@
         },
         "positive_nodes": {
           "default": [],
-          "description": "Nodes expected to carry positive values.",
+          "description": "Nodes expected to be non-negative.",
           "items": {
             "$ref": "#/$defs/d_695249af9946117b99a3"
           },
@@ -296,38 +366,57 @@
       },
       "type": "object"
     },
+    "d_598048de9d4527d8b97c": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/d_e92ffd809a0a9b085dba",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/d_ab1334cf58a671c8857c",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
     "d_5de9f28b928c01e49782": {
       "additionalProperties": false,
-      "description": "Configuration parameters that govern check execution.\n\nIdentity checks trigger a finding when\n`|diff| > max(default_tolerance, default_relative_tolerance * |reference|)`,\nso an analyst can set an absolute floor (currency units) that catches\nmicro-errors on small balances plus a relative ceiling that scales with\nlarger balance sheets. A per-check tolerance override bypasses both\ndefaults and is applied verbatim.\n\nAll four fields are part of the public configuration surface and are\nintended to be tuned per-deployment via JSON / serde overrides — e.g.,\nraising `default_relative_tolerance` to `1e-4` (1 bp) when a downstream\nprocess is known to round to the nearest hundred. The defaults\n(`default_tolerance = 0.01`, `default_relative_tolerance = 1e-9`,\n`materiality_threshold = 0.0`, `min_severity = Info`) are conservative:\nthe absolute cent floor catches micro-errors on small balances while the\nrelative component absorbs f64 accumulation noise on large ones.",
+      "description": "Configuration parameters that govern check execution.\n\nThe identity tolerance is zero unless one is stated: an identity then\nholds only when its two sides are equal. An explicit tolerance allows\n`|difference| <= max(default_tolerance, default_relative_tolerance *\n|reference|)`, where the reference is the identity owner's (total assets\nfor the balance sheet, for example); a difference equal to the allowance\nis within tolerance. A per-check absolute override replaces both terms.\n\n`materiality_threshold` and `min_severity` are reporting filters for\nadvisory findings. They never change a verdict, and they never remove an\nerror-severity finding, a coverage finding or a recorded comparison.",
       "properties": {
         "default_relative_tolerance": {
-          "default": 1e-9,
-          "description": "Default **relative** tolerance as a fraction of the reference\ndenominator (e.g. 1e-6 ≈ \"one basis point of a basis point\"). Zero\ndisables relative tolerance.",
+          "default": 0,
+          "description": "**Relative** tolerance as a fraction of the identity's reference\nvalue (1e-9 allows 10 on a reference of 1e10). Zero, the default,\ndisables the relative term.",
           "format": "double",
           "type": "number"
         },
         "default_tolerance": {
-          "default": 0.01,
-          "description": "Default **absolute** tolerance for equality comparisons, expressed in\nthe same currency units as the node values being compared (e.g. 0.01\nmeans one cent when nodes are in whole dollars).",
+          "default": 0,
+          "description": "**Absolute** tolerance for equality comparisons, in the units of the\ncompared values (0.01 is one cent when nodes are in whole dollars).\nZero, the default, requires exact equality.",
           "format": "double",
           "type": "number"
         },
         "materiality_threshold": {
           "default": 0,
-          "description": "Findings below this absolute materiality threshold are excluded from\nreports. Error-severity findings are exempt: materiality filters\nadvisory noise, it never changes a check's pass/fail verdict.",
+          "description": "Advisory findings whose absolute materiality is below this threshold\nare left out of the report. Error-severity and coverage findings are\nalways reported.",
           "format": "double",
           "type": "number"
         },
         "min_severity": {
           "$ref": "#/$defs/d_06907e07480e89ff7314",
           "default": "info",
-          "description": "Minimum severity a finding must have to appear in the report."
+          "description": "Minimum severity an advisory finding must have to appear in the\nreport. Coverage findings are always reported."
         }
       },
       "type": "object"
     },
     "d_671f6d76f67f4fafb7f3": {
-      "description": "Checks that retained earnings flow correctly across periods:\nRE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).\n\nEvery configured balance, flow, and adjustment must use the same\nscalar/monetary units and currency. Execution rejects incompatible units or\ninvalid numeric tolerances; it performs no FX conversion.\n\n# Sign convention\n\n* `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]\n  convention — positive values increase RE (profit), negative values\n  decrease it (loss). No validation is emitted for NI since both signs\n  are meaningful.\n* `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]\n  convention by default — the formula subtracts dividends explicitly.\n* `other_adjustments` carry\n  [`SignConventionPolicy::InflowPositive`] — they are signed amounts\n  added directly.",
+      "description": "Reconciles retained earnings in every model period:\n`closing = opening + net income + dividend effect + direct adjustments`.\n\nThe first opening is the explicit `opening_balance` at the first period\nboundary; each later opening is the close of the immediately adjacent\nprior period. All inputs share one ownership scope, compatible units and\none currency; the check performs no FX conversion.\n\n# Sign convention\n\n* `net_income_node` is signed: a profit increases retained earnings and\n  a loss decreases it.\n* `dividends_node` is, by default\n  ([`SignConventionPolicy::MagnitudePositive`]), a non-negative magnitude\n  that the identity subtracts; a negative magnitude is rejected. Under\n  [`SignConventionPolicy::InflowPositive`] it is a signed amount the\n  identity adds.\n* `other_adjustments` are signed entries recorded directly in retained\n  earnings, each a distinct node included once. A restatement appears\n  once: in an already-restated opening balance or as one such entry.\n\nOmit a dividend or adjustment series only when it does not apply; a\nconfigured series without a value makes the period coverage_finding, and a\nknown zero is a typed zero. Monetary comparisons are exact and scalar\nones compensated. The relative reference of the tolerance is\n`|opening retained earnings|`, with no floor. The check passes only when\nevery period is complete and within tolerance.",
       "properties": {
         "dividends_node": {
           "anyOf": [
@@ -338,20 +427,24 @@
               "type": "null"
             }
           ],
-          "description": "Optional node for dividends paid."
+          "description": "Node for dividends recognized in retained earnings in each period."
         },
         "dividends_sign_convention": {
           "$ref": "#/$defs/d_96026cdfba85af9b3310",
           "default": "magnitude_positive",
-          "description": "Sign convention applied to the `dividends_node` input. Defaults\nto [`SignConventionPolicy::MagnitudePositive`].\n`net_income_node` and `other_adjustments` always use\n`InflowPositive` by construction."
+          "description": "Sign convention of `dividends_node`. Defaults to\n[`SignConventionPolicy::MagnitudePositive`]."
         },
         "net_income_node": {
           "$ref": "#/$defs/d_695249af9946117b99a3",
-          "description": "Node for net income."
+          "description": "Node for net income of each period, signed."
+        },
+        "opening_balance": {
+          "$ref": "#/$defs/d_7e4df57c89fa33d75314",
+          "description": "Opening retained earnings at the start of the model's first period."
         },
         "other_adjustments": {
           "default": [],
-          "description": "Additional adjustment nodes (buybacks, AOCI, etc.).",
+          "description": "Signed direct retained-earnings entries, each a distinct node.",
           "items": {
             "$ref": "#/$defs/d_695249af9946117b99a3"
           },
@@ -359,10 +452,10 @@
         },
         "retained_earnings_node": {
           "$ref": "#/$defs/d_695249af9946117b99a3",
-          "description": "Node for retained earnings balance."
+          "description": "Node for the closing retained-earnings balance of each period."
         },
         "tolerance": {
-          "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+          "description": "Absolute tolerance override in the balance units; replaces both terms\nof the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.",
           "format": "double",
           "type": [
             "number",
@@ -372,13 +465,33 @@
       },
       "required": [
         "retained_earnings_node",
-        "net_income_node"
+        "net_income_node",
+        "opening_balance"
       ],
       "type": "object"
     },
     "d_695249af9946117b99a3": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
       "type": "string"
+    },
+    "d_7e4df57c89fa33d75314": {
+      "additionalProperties": false,
+      "description": "An explicit opening balance at the first period boundary of a\nroll-forward identity.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/d_3597ff04f9f2b22f4450",
+          "description": "Date of the balance: the start of the model's first period."
+        },
+        "value": {
+          "$ref": "#/$defs/d_4b696037173a5f0c74fb",
+          "description": "The balance on that date, in the units and currency of the\nreconciled balance node. A known zero is a typed zero."
+        }
+      },
+      "required": [
+        "date",
+        "value"
+      ],
+      "type": "object"
     },
     "d_96026cdfba85af9b3310": {
       "description": "Declared sign convention for a flow / magnitude input to a reconciliation\ncheck.\n\nEach reconciliation declares its input expectation so callers can\nvalidate data at construction time rather than at P&L\nreconciliation. Previously each reconciliation embedded its sign\nassumptions implicitly (e.g. `CapexReconciliation` expected\n`capex_cf` to be a positive magnitude while INVARIANTS.md §3\ndocumented the CFS convention as negative), which produced silent\ncross-check failures on any model that used the other convention.\n\n# Variants\n\n* [`Self::MagnitudePositive`] — the value is a non-negative magnitude;\n  direction (inflow vs outflow) is encoded in the reconciliation's\n  formula via `+` / `-` operators. Used by capex, depreciation,\n  dividends, and disposal magnitudes across the cross-statement\n  reconciliations.\n* [`Self::InflowPositive`] — the value is a signed flow where positive\n  means \"inflow\" / \"addition\" and negative means \"outflow\" /\n  \"reduction\". Used by `total_cash_flow` in `CashReconciliation` and\n  `net_income` in `RetainedEarningsReconciliation`.",
@@ -391,6 +504,816 @@
         {
           "const": "inflow_positive",
           "description": "The value is signed: positive = inflow / addition, negative =\noutflow / reduction.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ab1334cf58a671c8857c": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XCG",
+          "description": "Caribbean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWG",
+          "description": "Zimbabwe Gold (924)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
           "type": "string"
         }
       ]
@@ -485,10 +1408,10 @@
       ]
     },
     "d_b45cf940e78a8e787a32": {
-      "description": "Flags required nodes that lack values in applicable periods.\n\nMissing actual observations produce `Severity::Error` and fail the check.\nMissing forecast observations produce advisory `Severity::Warning` findings.",
+      "description": "Checks that every required node has a value in every period of the\nselected scope.\n\nThe required nodes and the period scope (actuals, forecasts or both) are\nstated explicitly. An observation that is missing, or unavailable for a\nstated reason, makes the covered scope incomplete: it is a coverage\nfinding, and the check's outcome is `incomplete`. A typed zero is a valid\nobservation. A scope with no required node or no period in it examines\nnothing and is `unevaluated`. `evaluated` counts the required cells\nexamined; the findings list the missing and unavailable ones.\n\nA required node the model does not know, or one listed twice, is a\nconfiguration error.",
       "properties": {
         "required_nodes": {
-          "description": "Nodes that must have values in every in-scope period.",
+          "description": "Nodes that must have a value in every in-scope period.",
           "items": {
             "$ref": "#/$defs/d_695249af9946117b99a3"
           },
@@ -496,7 +1419,7 @@
         },
         "scope": {
           "$ref": "#/$defs/d_32be215bf9263ac78fcf",
-          "description": "Which periods to inspect."
+          "description": "Which periods are in scope: all, actuals only or forecasts only."
         }
       },
       "required": [
@@ -506,7 +1429,7 @@
       "type": "object"
     },
     "d_c7d556ba6ae95916518c": {
-      "description": "Verifies that Assets = Liabilities + Equity for every period.\n\nAll configured operands must have compatible scalar/monetary units and one\ncurrency. Execution rejects incompatible units or invalid numeric tolerances;\nit performs no FX conversion.",
+      "description": "Verifies that Assets = Liabilities + Equity at every model period close.\n\nEach group names known nodes, with no identifier repeated within a group\nor shared between groups: the caller includes each account once, through\nits subtotal or its components. All operands have compatible units and\none currency; the check performs no FX conversion. Signed balances and\ntyped zeros are used as they are.\n\nMonetary balances are summed exactly and scalar balances with compensated\nsums. The signed difference is `assets - (liabilities + equity)`; the\nrelative reference of the tolerance is `|assets|`. A period with a\nmissing balance is incomplete and names the nodes without a value; the\ncheck passes only when every period is complete and within tolerance.",
       "properties": {
         "assets_nodes": {
           "description": "Node IDs whose values represent total assets.",
@@ -530,7 +1453,7 @@
           "type": "array"
         },
         "tolerance": {
-          "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+          "description": "Absolute tolerance override in the balances' units; replaces both\nterms of the suite's\n[`CheckConfig`](crate::checks::CheckConfig) allowance.",
           "format": "double",
           "type": [
             "number",
@@ -544,6 +1467,26 @@
         "equity_nodes"
       ],
       "type": "object"
+    },
+    "d_d277b1328099ab8e8b10": {
+      "description": "How a formula check judges its formula.",
+      "oneOf": [
+        {
+          "const": "predicate",
+          "description": "The formula is Boolean: true passes and false is a breach.",
+          "type": "string"
+        },
+        {
+          "const": "residual",
+          "description": "The formula is a signed scalar or monetary residual compared with\nzero: it passes when its absolute value is at most the tolerance.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_e92ffd809a0a9b085dba": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
     }
   }
 }

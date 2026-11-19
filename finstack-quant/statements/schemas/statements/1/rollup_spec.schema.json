@@ -40,12 +40,12 @@
       "oneOf": [
         {
           "const": "sum",
-          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing.",
+          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nMoney is summed exactly and scalars with a compensated sum. A source\ncell without a value leaves the target unavailable.",
           "type": "string"
         },
         {
           "const": "period_end",
-          "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA.",
+          "description": "Copy the last source period's cell with its status: balances such as\ncash, debt and equity, and trailing metrics such as last-twelve-month\nEBITDA.",
           "type": "string"
         },
         {
@@ -78,7 +78,7 @@
       "additionalProperties": {
         "$ref": "#/$defs/RollupMethod"
       },
-      "description": "Rollup method per node id, overriding the node's own declaration. A\nnode not listed uses its declared [`NodeSpec::rollup`], and sums when\nit declares none.\n\n[`NodeSpec::rollup`]: crate::types::NodeSpec::rollup",
+      "description": "Rollup method per node id, overriding the node's own declaration. A\nnode not listed uses its declared [`NodeSpec::rollup`]; a node with\nneither fails the rollup.\n\n[`NodeSpec::rollup`]: crate::types::NodeSpec::rollup",
       "type": "object"
     }
   },

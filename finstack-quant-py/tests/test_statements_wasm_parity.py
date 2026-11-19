@@ -64,6 +64,8 @@ def statements_cases() -> dict[str, Any]:
     result = st.Evaluator().evaluate(MODEL)
     model = st.FinancialModelSpec.from_json(MODEL)
 
+    stochastic = st.Evaluator().evaluate(json.dumps(INPUTS["stochastic_model"]))
+
     built = built_model()
     built_result = st.Evaluator().evaluate(built)
 
@@ -72,9 +74,9 @@ def statements_cases() -> dict[str, Any]:
 
     one_off = st.Adjustment.fixed("one_off", "One-off cost", {Q1: 5.0})
     synergy = st.Adjustment.percentage("synergy", "Synergies", "revenue", 0.1)
-    extended = st.NormalizationConfig("profit")
+    extended = st.NormalizationConfig("profit", "adjusted_profit")
     extended.add_adjustment(one_off)
-    extended.add_adjustment(synergy.with_cap("revenue", 0.05, "reported"))
+    extended.add_adjustment(synergy.with_cap({"type": "reference", "base_node": "revenue", "fraction": 0.05}))
 
     suite = st.CheckSuiteSpec.from_json(json.dumps(INPUTS["check_suite"]))
     evaluator = st.Evaluator()
@@ -97,16 +99,18 @@ def statements_cases() -> dict[str, Any]:
 
     return {
         "rollup.declared_methods": doc(rollup_spec),
-        "rollup.annual": rolled_up["nodes"],
-        "rollup.empty_spec": doc(rollup_results.rollup(rollup_model, empty_spec))["nodes"],
-        "rollup.spec_overrides": doc(rollup_results.rollup(rollup_model, override_spec))["nodes"]["cash"],
+        "rollup.annual": rolled_up["cells"],
+        "rollup.empty_spec": doc(rollup_results.rollup(rollup_model, empty_spec))["cells"],
+        "rollup.spec_overrides": doc(rollup_results.rollup(rollup_model, override_spec))["cells"]["cash"],
         "rollup.periods": rolled_up["periods"],
         "result.get": result.get("profit", Q2),
         "result.get_missing": result.get("nope", Q2),
-        "result.get_or": result.get_or("nope", Q2, -1.0),
+        "result.get_or": result.get_or("profit", Q2, -1.0),
+        "result.get_cell": result.get_cell("profit", Q2),
+        "result.get_cell_missing": result.get_cell("nope", Q2),
         "result.all_periods": [list(pair) for pair in result.all_periods("profit")],
-        "result.get_node": result.get_node("profit"),
-        "result.get_node_missing": result.get_node("nope"),
+        "result.get_node": result.numeric_series("profit"),
+        "result.get_node_missing": result.numeric_series("nope"),
         "result.node_ids": result.node_ids(),
         "result.get_scalar": result.get_scalar("margin", Q1),
         "result.get_money": money(built_result.get_money("cash", Q2)),
@@ -124,6 +128,11 @@ def statements_cases() -> dict[str, Any]:
             built_result.get("capex", Q2),
         ],
         "normalize": [doc(row) for row in normalized],
+        "stochastic.values": {
+            node: [stochastic.get(node, period) for period in ("2025Q2", "2025Q3", "2025Q4")]
+            for node in stochastic.node_ids()
+        },
+        "stochastic.streams": stochastic.provenance["forecast_streams"],
         "forecast_specs": [
             doc(spec)
             for spec in (
@@ -134,17 +143,17 @@ def statements_cases() -> dict[str, Any]:
                 st.ForecastSpec.log_normal(0.0, 0.2, 7),
                 st.ForecastSpec.overrides({Q2: 125.0}),
                 st.ForecastSpec.seasonal([1.0, 2.0, 3.0, 4.0], 4, "additive"),
-                st.ForecastSpec.time_series([1.0, 2.0, 3.0]),
-                st.ForecastSpec.fade_to_target(50.0),
+                st.ForecastSpec.time_series([1.0, 2.0, 3.0], "linear"),
+                st.ForecastSpec.fade_to_target(50.0, "linear"),
                 st.ForecastSpec.mean_reverting(100.0, 0.5, 5.0, 11),
-                st.ForecastSpec.bootstrap([1.0, 2.0, 3.0], 13),
+                st.ForecastSpec.bootstrap([1.0, 2.0, 3.0], "growth", 13),
             )
         ],
         "adjustments": [
             doc(one_off),
             doc(synergy),
-            doc(synergy.with_cap("revenue", 0.05, "reported")),
-            doc(synergy.with_cap(None, 3.0, "progressive")),
+            doc(synergy.with_cap({"type": "reference", "base_node": "revenue", "fraction": 0.05})),
+            doc(synergy.with_cap({"type": "absolute", "amount": 3.0})),
             doc(one_off.with_category("non_recurring")),
         ],
         "normalization_config.add_adjustment": doc(extended),
@@ -185,6 +194,7 @@ def capital_structure_cases() -> dict[str, Any]:
         st.FinancialModelSpec.from_json(model_json),
         MarketContext.from_json(json.dumps(INPUTS["capital_structure_market"])),
         INPUTS["capital_structure_as_of"],
+        "full_snapshot",
     )
     return {
         "full_year": doc(
@@ -461,7 +471,7 @@ def test_cashflow_lookup_preserves_currency_guards() -> None:
     payload["totals_by_currency"] = {"USD": {}, "EUR": {}}
     cashflows = st.CapitalStructureCashflows.from_json(json.dumps(payload))
     assert cashflows.get_component("interest_expense", "TL-A", Q1) == 35.0
-    with pytest.raises(RuntimeError, match="Multiple currencies"):
+    with pytest.raises(RuntimeError, match="No total cashflow data"):
         cashflows.get_component("fees", "total", Q1)
     payload["by_instrument"]["TL-A"][Q1]["interest_expense_pik"]["currency"] = "EUR"
     cashflows = st.CapitalStructureCashflows.from_json(json.dumps(payload))

@@ -35,11 +35,13 @@
 //! ```
 //! use finstack_quant_core::market_data::{context::MarketContext, term_structures::DiscountCurve};
 //! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::dates::PeriodId;
+//! use finstack_quant_core::dates::{PeriodId, StubKind};
 //! use finstack_quant_core::money::Money;
+//! use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 //! use finstack_quant_statements::builder::ModelBuilder;
 //! use finstack_quant_statements::evaluator::Evaluator;
-//! use finstack_quant_statements::types::AmountOrScalar;
+//! use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
+//! use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 //!
 //! use time::macros::date;
 //!
@@ -60,15 +62,17 @@
 //!         "revenue",
 //!         &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), issue_date)],
 //!     )?;
-//!     // Add debt instruments
-//!     model_builder.add_bond(
-//!         "BOND-001",
+//!     // Build the instrument through its Valuations API and attach it.
+//!     let bond = Bond::fixed(
+//!         InstrumentId::new("BOND-001"),
 //!         Money::from((10_000_000_i64, Currency::USD)),
-//!         0.05, // 5% coupon
+//!         Rate::from_decimal(0.05)?, // 5% coupon
 //!         issue_date,
 //!         maturity_date,
-//!         "USD-OIS",
+//!         StubKind::ShortFront,
+//!         CurveId::new("USD-OIS"),
 //!     )?;
+//!     model_builder.add_debt("BOND-001", FinancialStatementInstrument::Bond(bond));
 //!     // Reference in formulas
 //!     model_builder.compute("interest_expense", "cs.interest_expense.BOND-001")?;
 //!     model_builder.compute(
@@ -81,12 +85,20 @@
 //! let market_ctx = MarketContext::new().try_insert(
 //!     DiscountCurve::builder("USD-OIS")
 //!         .base_date(issue_date)
+//!         .day_count(finstack_quant_core::dates::DayCount::Act365F)
 //!         .knots([(0.0, 1.0), (5.0, 0.90)])
+//!         .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+//!         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
 //!         .build()?,
 //! ).expect("insert market curve");
 //!
 //! let mut evaluator = Evaluator::new();
-//! let results = evaluator.evaluate_with_market(&model, &market_ctx, issue_date)?;
+//! let results = evaluator.evaluate_with_market(
+//!     &model,
+//!     &market_ctx,
+//!     issue_date,
+//!     finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+//! )?;
 //! let q1_interest = results.get("interest_expense", &PeriodId::quarter(2025, 1).expect("valid period fixture"));
 //! # let _ = q1_interest;
 //! # Ok(())
@@ -99,22 +111,28 @@ pub(crate) mod integration;
 pub(crate) mod period_flows;
 mod principal;
 pub(crate) mod residual_schedule;
+mod selector;
 mod state;
 pub(crate) mod waterfall;
 mod waterfall_spec;
 
-// Curated public facade for capital-structure types and builder inputs.
-pub use builder::{BondConventionParams, SwapConventions, SwapParams};
+// Curated public facade for capital-structure types.
 pub(crate) use cashflows::add_optional_money;
-pub use cashflows::{CapitalStructureCashflows, CashflowBreakdown, TOTAL_ROW_LABEL};
+pub use cashflows::{
+    CapitalStructureCashflows, CashflowBreakdown, DistressCashflow, FxConversionRecord,
+    PrepaymentOutcome, TOTAL_ROW_LABEL,
+};
 pub use integration::build_instrument_from_spec;
-pub use period_flows::calculate_period_flows;
+pub use period_flows::{
+    SchedulePerspective, SuppliedSchedule, calculate_period_flows, scheduled_opening_principal,
+};
 pub(crate) use principal::PrincipalClaim;
+pub use selector::{CsComponent, CsScope};
 pub(crate) use state::CapitalStructureState;
-pub(crate) use waterfall_spec::reject_available_cash_debt_service;
+pub(crate) use waterfall_spec::reject_pool_output_dependence;
 pub use waterfall_spec::{
-    EcfSweepSpec, PaymentClassSpec, PaymentPriority, PikToggleSpec, WaterfallSpec,
-    default_priority_of_payments,
+    EcfSweepSpec, EcfTerm, FacilitySelection, PaymentClassSpec, PaymentPriority, PikElectionSpec,
+    PikToggleSpec, PrepaymentSpec, WaterfallSpec, default_priority_of_payments,
 };
 
 #[cfg(test)]

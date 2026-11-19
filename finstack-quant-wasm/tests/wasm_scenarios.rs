@@ -15,13 +15,13 @@ fn empty_market_json() -> String {
     serde_json::to_string(&ctx).unwrap()
 }
 
-/// A model with one period and no nodes: the smallest model that passes the
+/// A model with one period and one empty node: the smallest model that passes the
 /// Rust `FinancialModelSpec::from_json` validation `applyScenario` applies.
 fn empty_model_json() -> String {
     let periods = finstack_quant_core::dates::build_periods("2024Q1..Q1", None)
         .unwrap()
         .into_periods();
-    let model = finstack_quant_statements::types::FinancialModelSpec::new(
+    let mut model = finstack_quant_statements::types::FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
             finstack_quant_core::dates::PeriodCalendar::Gregorian,
@@ -29,6 +29,12 @@ fn empty_model_json() -> String {
         )
         .expect("valid period plan"),
     );
+    let mut placeholder = finstack_quant_statements::types::NodeSpec::new(
+        "placeholder",
+        finstack_quant_statements::types::NodeType::Value,
+    );
+    placeholder.value_type = Some(finstack_quant_statements::types::NodeValueType::Scalar);
+    model.add_node(placeholder);
     serde_json::to_string(&model).unwrap()
 }
 

@@ -19,163 +19,365 @@ fn test_load_builtins() {
     assert!(registry.all_metrics().any(|(id, _)| id.starts_with("fin.")));
 }
 
+/// STATEMENTS-CONTRACTS-007: the accepted six-row earnings table, four
+/// margins and two cost ratios.
 #[test]
-fn test_builtin_basic_metrics() {
-    let mut registry = Registry::new();
-    registry.load_builtins().unwrap();
-
-    // Test some basic metrics
-    assert!(registry.has("fin.gross_profit"));
-    assert!(registry.has("fin.operating_income"));
-    assert!(registry.has("fin.ebitda"));
-    assert!(registry.has("fin.net_income"));
-
-    let gross_profit = registry.get("fin.gross_profit").unwrap();
-    assert_eq!(gross_profit.definition.formula, "revenue - cogs");
-
-    let ebit = registry.get("fin.ebit").unwrap();
-    assert_eq!(
-        ebit.definition.formula,
-        "ebitda - depreciation - amortization"
-    );
-}
-
-#[test]
-fn test_builtin_margin_metrics() {
-    let mut registry = Registry::new();
-    registry.load_builtins().unwrap();
-
-    // Test margin metrics
-    assert!(registry.has("fin.gross_margin"));
-    assert!(registry.has("fin.operating_margin"));
-    assert!(registry.has("fin.ebitda_margin"));
-    assert!(registry.has("fin.net_margin"));
-
-    let gross_margin = registry.get("fin.gross_margin").unwrap();
-    assert_eq!(gross_margin.definition.formula, "gross_profit / revenue");
-    assert_eq!(
-        gross_margin.definition.unit_type,
-        Some(UnitType::Percentage)
-    );
-}
-
-#[test]
-fn test_builtin_return_metrics() {
-    let mut registry = Registry::new();
-    registry.load_builtins().unwrap();
-
-    // Test return metrics
-    assert!(registry.has("fin.roe"));
-    assert!(registry.has("fin.roa"));
-    assert!(registry.has("fin.roic"));
-
-    let roe = registry.get("fin.roe").unwrap();
-    assert_eq!(
-        roe.definition.formula,
-        "(revenue - cogs - opex - depreciation - amortization - interest_expense - taxes) / total_equity"
-    );
-
-    // ROIC uses NOPAT (EBIT less taxes), not pre-tax EBIT: pre-tax overstates
-    // the return by the tax rate.
-    let roic = registry.get("fin.roic").unwrap();
-    assert_eq!(
-        roic.definition.formula,
-        "(revenue - cogs - opex - depreciation - amortization - taxes) / (total_debt + total_equity)"
-    );
-}
-
-/// The built-in P&L metrics use the standard convention where `opex`
-/// EXCLUDES depreciation & amortization (D&A is supplied separately).
-///
-/// The previous formulas were only self-consistent if `opex` already
-/// included D&A — under the common convention (opex excluding D&A) they
-/// overstated EBITDA by D&A (double-counted add-back) and conflated
-/// operating income with EBITDA.
-#[test]
-fn builtin_pl_metrics_use_opex_excluding_da_convention() {
+fn builtin_earnings_and_margins_follow_the_reported_cost_table() {
     let registry = Registry::with_builtins().unwrap();
-
-    assert_eq!(
-        registry.get("fin.ebitda").unwrap().definition.formula,
-        "revenue - cogs - opex"
-    );
+    for (id, formula) in [
+        ("fin.gross_profit", "revenue - cogs"),
+        ("fin.operating_income", "gross_profit - opex"),
+        ("fin.ebit", "operating_income"),
+        ("fin.ebitda", "ebit + depreciation + amortization"),
+        ("fin.ebt", "ebit - interest_expense"),
+        ("fin.net_income", "ebt - tax_expense"),
+        ("fin.gross_margin", "ratio(gross_profit, revenue)"),
+        ("fin.operating_margin", "ratio(operating_income, revenue)"),
+        ("fin.ebitda_margin", "ratio(ebitda, revenue)"),
+        ("fin.net_margin", "ratio(net_income, revenue)"),
+        ("fin.cogs_as_pct_revenue", "ratio(cogs, revenue)"),
+        ("fin.opex_as_pct_revenue", "ratio(opex, revenue)"),
+    ] {
+        assert_eq!(
+            registry.get(id).unwrap().definition.formula,
+            formula,
+            "{id}"
+        );
+    }
     assert_eq!(
         registry
-            .get("fin.operating_income")
+            .get("fin.gross_margin")
             .unwrap()
             .definition
-            .formula,
-        "revenue - cogs - opex - depreciation - amortization"
+            .unit_type,
+        Some(UnitType::Percentage)
     );
+    // Each row references the row above it, so the closure walks the table.
     assert_eq!(
-        registry.get("fin.ebit").unwrap().definition.formula,
-        "ebitda - depreciation - amortization"
+        registry.get_dependencies("fin.net_margin").unwrap(),
+        [
+            "fin.gross_profit",
+            "fin.operating_income",
+            "fin.ebit",
+            "fin.ebt",
+            "fin.net_income"
+        ]
     );
-    assert_eq!(
-        registry.get("fin.net_income").unwrap().definition.formula,
-        "revenue - cogs - opex - depreciation - amortization - interest_expense - tax_expense"
+    // The leverage ratios read the bundled EBITDA, not a model input.
+    assert!(
+        registry
+            .get_dependencies("fin.debt_to_ebitda")
+            .unwrap()
+            .contains(&"fin.ebitda".to_string())
     );
 }
 
-/// Numeric articulation: with opex excluding D&A, EBITDA − D − A must equal
-/// operating income (= EBIT), and EBITDA must not double-count the add-back.
+/// A year of quarters with the bundled metrics and the inputs the return
+/// ratios read. Quarterly net income is 10 (EBIT 40, interest 10, tax 20)
+/// unless `revenue` moves it.
+fn returns_model(
+    revenue: [f64; 4],
+    configure: impl Fn(&mut finstack_quant_statements::builder::ModelBuilder),
+) -> finstack_quant_statements::types::FinancialModelSpec {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::builder::ModelBuilder;
+    use finstack_quant_statements::types::RollupMethod;
+
+    let series = |values: [f64; 4]| -> Vec<(PeriodId, f64)> {
+        (1..=4_u8)
+            .zip(values)
+            .map(|(quarter, value)| (PeriodId::quarter(2025, quarter).expect("quarter"), value))
+            .collect()
+    };
+    let mut builder = ModelBuilder::new("returns");
+    builder.periods("2025Q1..Q4", None).expect("periods");
+    for (node, values, rollup) in [
+        ("revenue", revenue, RollupMethod::Sum),
+        ("cogs", [40.0; 4], RollupMethod::Sum),
+        ("opex", [20.0; 4], RollupMethod::Sum),
+        ("interest_expense", [10.0; 4], RollupMethod::Sum),
+        ("tax_expense", [20.0; 4], RollupMethod::Sum),
+        ("depreciation", [0.0; 4], RollupMethod::Sum),
+        ("amortization", [0.0; 4], RollupMethod::Sum),
+        ("scheduled_cash_interest_due", [10.0; 4], RollupMethod::Sum),
+        ("scheduled_principal_due", [0.0; 4], RollupMethod::Sum),
+        ("operating_tax", [8.0, 8.0, -4.0, 8.0], RollupMethod::Sum),
+        (
+            "total_equity",
+            [100.0, 300.0, 500.0, 700.0],
+            RollupMethod::PeriodEnd,
+        ),
+        (
+            "total_assets",
+            [900.0, 1100.0, 1300.0, 1500.0],
+            RollupMethod::PeriodEnd,
+        ),
+        ("current_liabilities", [100.0; 4], RollupMethod::PeriodEnd),
+        ("total_debt", [400.0; 4], RollupMethod::PeriodEnd),
+        (
+            "operating_invested_capital",
+            [300.0, 340.0, 380.0, -400.0],
+            RollupMethod::PeriodEnd,
+        ),
+    ] {
+        builder.value_scalar(node, &series(values));
+        builder.rollup(node, rollup).expect("known node");
+    }
+    configure(&mut builder);
+    builder.with_builtin_metrics().expect("bundled metrics");
+    builder.build().expect("valid model")
+}
+
+/// The bundled returns divide same-period earnings by the average of the
+/// opening and closing balance (STATEMENTS-CONTRACTS-009).
 #[test]
-fn builtin_pl_metrics_articulate_numerically() {
+fn bundled_returns_use_average_balances_and_explicit_operating_inputs() {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::evaluator::{CellStatus, UnavailableReason};
+
+    let model = returns_model([100.0, 100.0, 100.0, 50.0], |_| {});
+    let results = Evaluator::new().evaluate(&model).expect("evaluation");
+    let q = |quarter: u8| PeriodId::quarter(2025, quarter).expect("quarter");
+    let close = |node: &str, quarter: u8, expected: f64| {
+        let actual = results.get(node, &q(quarter)).expect("value");
+        assert!(
+            (actual - expected).abs() < 1e-12,
+            "{node} Q{quarter}: {actual}"
+        );
+    };
+
+    // Q1 has no opening balance: every return is unavailable, not a
+    // period-end approximation.
+    for metric in ["fin.roe", "fin.roa", "fin.roce", "fin.roic"] {
+        let cell = results.get_cell(metric, &q(1)).expect("cell");
+        assert_eq!(cell.status, CellStatus::Unavailable, "{metric}");
+    }
+    // Q2: net income 10, EBIT 40, operating tax 8.
+    close("fin.roe", 2, 10.0 / 200.0);
+    close("fin.roa", 2, 10.0 / 1000.0);
+    close("fin.roce", 2, 40.0 / 900.0);
+    close("fin.roic", 2, 32.0 / 320.0);
+    // Q3: an operating tax credit of 4 raises the ROIC numerator to 44.
+    close("fin.roic", 3, 44.0 / 360.0);
+    // Q4: revenue of 50 is a loss of 40 after interest and tax; it stays signed.
+    close("fin.roe", 4, -40.0 / 600.0);
+    close("fin.roa", 4, -40.0 / 1400.0);
+    // Q4 average invested capital is (380 - 400) / 2 = -10: no return.
+    let roic = results.get_cell("fin.roic", &q(4)).expect("cell");
+    assert_eq!(roic.status, CellStatus::Unavailable);
+    assert_eq!(roic.reason, Some(UnavailableReason::UndefinedBase));
+    // Statement tax and operating tax are separate inputs.
+    assert_eq!(results.get("tax_expense", &q(3)), Some(20.0));
+}
+
+/// A coarser period recomputes each return from its own earnings and its
+/// own opening and closing balances.
+#[test]
+fn bundled_returns_roll_up_on_the_coarser_period_balances() {
+    use finstack_quant_core::dates::{PeriodId, PeriodKind};
+    use finstack_quant_statements::evaluator::{CellStatus, RollupSpec};
+
+    let model = returns_model([100.0; 4], |_| {});
+    let results = Evaluator::new().evaluate(&model).expect("evaluation");
+    let halves = results
+        .rollup(
+            &model,
+            &RollupSpec {
+                frequency: PeriodKind::SemiAnnual,
+                methods: indexmap::IndexMap::new(),
+            },
+        )
+        .expect("half-year rollup");
+    let h = |half: &str| -> PeriodId { half.parse().expect("half-year id") };
+
+    // H1 has no opening balance in the model.
+    assert_eq!(
+        halves
+            .get_cell("fin.roe", &h("2025H1"))
+            .expect("cell")
+            .status,
+        CellStatus::Unavailable
+    );
+    // H2: net income 20 over the average of the H1 close (300) and the H2
+    // close (700), not an average of the quarterly returns.
+    let roe = halves.get("fin.roe", &h("2025H2")).expect("value");
+    assert!((roe - 20.0 / 500.0).abs() < 1e-12, "{roe}");
+    let roce = halves.get("fin.roce", &h("2025H2")).expect("value");
+    assert!((roce - 80.0 / 1200.0).abs() < 1e-12, "{roce}");
+}
+
+/// The returns read the shared reported-cost earnings, so D&A inside `cogs`
+/// and `opex` is not subtracted again, and no return reads `taxes`.
+#[test]
+fn builtin_return_metrics_read_the_shared_earnings() {
+    let registry = Registry::with_builtins().unwrap();
+    for (id, earnings) in [
+        ("fin.roe", "fin.net_income"),
+        ("fin.roa", "fin.net_income"),
+        ("fin.roic", "fin.ebit"),
+        ("fin.roce", "fin.ebit"),
+    ] {
+        let dependencies = registry.get_dependencies(id).unwrap();
+        assert!(
+            dependencies.contains(&earnings.to_string()),
+            "{id}: {dependencies:?}"
+        );
+        let formula = &registry.get(id).unwrap().definition.formula;
+        assert!(formula.starts_with("ratio("), "{id}: {formula}");
+        assert!(!formula.contains("taxes"), "{id}: {formula}");
+    }
+}
+
+/// One quarter of the bundled income statement with the named inputs.
+fn income_statement(
+    inputs: &[(&str, Option<f64>)],
+) -> finstack_quant_statements::evaluator::StatementResult {
     use finstack_quant_core::dates::PeriodId;
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::evaluator::Evaluator;
-    use finstack_quant_statements::types::AmountOrScalar;
 
     let registry = Registry::with_builtins().unwrap();
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let v = |x: f64| AmountOrScalar::scalar(x);
+    let mut builder = ModelBuilder::new("income-statement");
+    builder.periods("2025Q1..Q1", None).unwrap();
+    for (node, value) in inputs {
+        let observations: Vec<_> = value.iter().map(|value| (q1, *value)).collect();
+        builder.value_scalar(*node, &observations);
+    }
+    for metric in [
+        "fin.ebitda_margin",
+        "fin.net_margin",
+        "fin.gross_margin",
+        "fin.operating_margin",
+        "fin.cogs_as_pct_revenue",
+        "fin.opex_as_pct_revenue",
+    ] {
+        builder.add_metric_from_registry(metric, &registry).unwrap();
+    }
+    Evaluator::new()
+        .evaluate(&builder.build().unwrap())
+        .unwrap()
+}
 
-    let model = {
-        let mut model_builder = ModelBuilder::new("articulation");
-        model_builder.periods("2025Q1..Q1", None).unwrap();
-        model_builder.value("revenue", &[(q1, v(1000.0))]);
-        model_builder.value("cogs", &[(q1, v(400.0))]);
-        model_builder.value("opex", &[(q1, v(300.0))]);
-        model_builder // excludes D&A
-            .value("depreciation", &[(q1, v(50.0))]);
-        model_builder.value("amortization", &[(q1, v(30.0))]);
-        model_builder
-            .compute(
-                "ebitda",
-                registry
-                    .get("fin.ebitda")
-                    .unwrap()
-                    .definition
-                    .formula
-                    .clone(),
-            )
-            .unwrap();
-        model_builder
-            .compute(
-                "operating_income",
-                registry
-                    .get("fin.operating_income")
-                    .unwrap()
-                    .definition
-                    .formula
-                    .clone(),
-            )
-            .unwrap();
-        model_builder
-            .compute(
-                "ebit",
-                registry.get("fin.ebit").unwrap().definition.formula.clone(),
-            )
-            .unwrap();
-        model_builder.build().unwrap()
+/// An income statement worked by hand. Reported COGS of 400 includes 20 of
+/// depreciation; reported OPEX of 300 includes 30 of depreciation and 30 of
+/// amortization. The included D&A of 80 is added back once, in EBITDA.
+#[test]
+fn reported_costs_include_da_and_ebitda_adds_it_back_once() {
+    use finstack_quant_core::dates::PeriodId;
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let result = income_statement(&[
+        ("revenue", Some(1_000.0)),
+        ("cogs", Some(400.0)),
+        ("opex", Some(300.0)),
+        ("depreciation", Some(50.0)),
+        ("amortization", Some(30.0)),
+        ("interest_expense", Some(40.0)),
+        ("tax_expense", Some(65.0)),
+    ]);
+    for (node, expected) in [
+        ("fin.gross_profit", 600.0),
+        ("fin.operating_income", 300.0),
+        ("fin.ebit", 300.0),
+        ("fin.ebitda", 380.0),
+        ("fin.ebt", 260.0),
+        ("fin.net_income", 195.0),
+        ("fin.gross_margin", 0.6),
+        ("fin.operating_margin", 0.3),
+        ("fin.ebitda_margin", 0.38),
+        ("fin.net_margin", 0.195),
+        ("fin.cogs_as_pct_revenue", 0.4),
+        ("fin.opex_as_pct_revenue", 0.3),
+    ] {
+        assert_eq!(result.get(node, &q1), Some(expected), "{node}");
+    }
+}
+
+/// An expense credit keeps its negative sign, a known zero is a zero, and a
+/// loss keeps its sign in a margin on positive revenue.
+#[test]
+fn expense_credits_and_losses_keep_their_sign() {
+    use finstack_quant_core::dates::PeriodId;
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let result = income_statement(&[
+        ("revenue", Some(1_000.0)),
+        ("cogs", Some(1_200.0)),
+        // A reversal larger than the period's charges.
+        ("opex", Some(-50.0)),
+        ("depreciation", Some(0.0)),
+        ("amortization", Some(0.0)),
+        ("interest_expense", Some(0.0)),
+        ("tax_expense", Some(-30.0)),
+    ]);
+    for (node, expected) in [
+        ("fin.gross_profit", -200.0),
+        ("fin.operating_income", -150.0),
+        ("fin.ebitda", -150.0),
+        ("fin.net_income", -120.0),
+        ("fin.gross_margin", -0.2),
+        ("fin.net_margin", -0.12),
+        ("fin.opex_as_pct_revenue", -0.05),
+    ] {
+        assert_eq!(result.get(node, &q1), Some(expected), "{node}");
+    }
+}
+
+/// A margin is unavailable, with a reason, when revenue is missing, zero or
+/// negative; a missing dependency makes the affected earnings unavailable.
+#[test]
+fn margins_are_unavailable_without_positive_revenue() {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::evaluator::{CellStatus, UnavailableReason};
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let statement = |revenue: Option<f64>, depreciation: Option<f64>| {
+        income_statement(&[
+            ("revenue", revenue),
+            ("cogs", Some(400.0)),
+            ("opex", Some(300.0)),
+            ("depreciation", depreciation),
+            ("amortization", Some(30.0)),
+            ("interest_expense", Some(40.0)),
+            ("tax_expense", Some(65.0)),
+        ])
     };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    assert_eq!(results.get("ebitda", &q1), Some(300.0));
-    assert_eq!(results.get("operating_income", &q1), Some(220.0));
-    assert_eq!(results.get("ebit", &q1), Some(220.0));
+    let reason = |result: &finstack_quant_statements::evaluator::StatementResult, node: &str| {
+        let cell = result.get_cell(node, &q1).expect("cell");
+        assert_eq!(cell.status, CellStatus::Unavailable, "{node}");
+        cell.reason
+    };
+    for (revenue, expected) in [
+        (Some(0.0), UnavailableReason::UndefinedBase),
+        (Some(-10.0), UnavailableReason::UndefinedBase),
+        (None, UnavailableReason::MissingInput),
+    ] {
+        let result = statement(revenue, Some(50.0));
+        for margin in [
+            "fin.gross_margin",
+            "fin.operating_margin",
+            "fin.ebitda_margin",
+            "fin.net_margin",
+            "fin.cogs_as_pct_revenue",
+            "fin.opex_as_pct_revenue",
+        ] {
+            assert_eq!(
+                reason(&result, margin),
+                Some(expected),
+                "{margin} at {revenue:?}"
+            );
+        }
+    }
+    // Zero revenue still gives the earnings lines themselves.
+    assert_eq!(
+        statement(Some(0.0), Some(50.0)).get("fin.operating_income", &q1),
+        Some(-700.0)
+    );
+    // A missing add-back leaves EBITDA and its margin unavailable, and
+    // nothing else.
+    let result = statement(Some(1_000.0), None);
+    for node in ["fin.ebitda", "fin.ebitda_margin"] {
+        assert_eq!(reason(&result, node), Some(UnavailableReason::MissingInput));
+    }
+    assert_eq!(result.get("fin.net_margin", &q1), Some(0.195));
 }
 
 #[test]
@@ -191,7 +393,7 @@ fn test_builtin_leverage_metrics() {
     let interest_coverage = registry.get("fin.interest_coverage").unwrap();
     assert_eq!(
         interest_coverage.definition.formula,
-        "ttm(ebitda) / ttm(interest_expense)"
+        "ratio(ttm(ebitda), ttm(interest_expense))"
     );
 }
 
@@ -202,13 +404,13 @@ fn builtin_credit_ratios_use_ttm_flows() {
     let debt_to_ebitda = registry.get("fin.debt_to_ebitda").unwrap();
     assert_eq!(
         debt_to_ebitda.definition.formula,
-        "total_debt / ttm(ebitda)"
+        "ratio(total_debt, ttm(ebitda))"
     );
 
     let debt_service_coverage = registry.get("fin.debt_service_coverage").unwrap();
     assert_eq!(
         debt_service_coverage.definition.formula,
-        "ttm(ebitda) / ttm(interest_expense + principal_payment)"
+        "ratio(ttm(ebitda), ttm(scheduled_cash_interest_due + scheduled_principal_due))"
     );
 }
 
@@ -387,15 +589,28 @@ fn test_model_builder_with_builtin_metrics() {
                 ),
             ],
         );
-        model_builder.with_builtin_metrics().unwrap();
-        model_builder.build().unwrap()
+        model_builder
     };
 
-    // Should have revenue, cogs, and all built-in metrics
-    assert!(model.has_node("revenue"));
-    assert!(model.has_node("cogs"));
-    assert!(model.has_node("fin.gross_profit"));
-    assert!(model.has_node("fin.gross_margin"));
+    // The whole catalogue needs inputs this model does not have, and a
+    // runnable model resolves every reference.
+    let mut whole_catalogue = ModelBuilder::from_spec({
+        let mut selected = ModelBuilder::from_spec(model.build().unwrap()).unwrap();
+        let registry = finstack_quant_statements::registry::Registry::with_builtins().unwrap();
+        selected
+            .add_metric_from_registry("fin.gross_margin", &registry)
+            .unwrap();
+        let selected = selected.build().unwrap();
+        assert!(selected.has_node("fin.gross_profit"));
+        assert!(selected.has_node("fin.gross_margin"));
+        selected
+    })
+    .unwrap();
+    whole_catalogue.with_builtin_metrics().unwrap();
+    let error = whole_catalogue
+        .build()
+        .expect_err("catalogue metrics with missing inputs leave unresolved references");
+    assert!(error.to_string().contains("Unknown identifier"), "{error}");
 }
 
 #[test]
@@ -683,20 +898,21 @@ fn test_complete_pl_model_with_select_registry_metrics() {
     // operating income (EBIT) = EBITDA − 60k D&A = 140k.
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     assert_eq!(results.get("fin.gross_profit", &q1).unwrap(), 400_000.0);
-    assert_eq!(results.get("fin.operating_income", &q1).unwrap(), 140_000.0);
-    assert_eq!(results.get("fin.ebitda", &q1).unwrap(), 200_000.0);
+    // Reported OPEX of 200k includes the 60k of D&A, so operating income is
+    // 400k − 200k and EBITDA adds the 60k back once.
+    assert_eq!(results.get("fin.operating_income", &q1).unwrap(), 200_000.0);
+    assert_eq!(results.get("fin.ebitda", &q1).unwrap(), 260_000.0);
     assert!((results.get("fin.gross_margin", &q1).unwrap() - 0.4).abs() < 0.0001);
-    assert!((results.get("fin.operating_margin", &q1).unwrap() - 0.14).abs() < 0.0001);
+    assert!((results.get("fin.operating_margin", &q1).unwrap() - 0.2).abs() < 0.0001);
 
-    // Test Q2 calculations: EBITDA = 1,100k − 660k − 220k = 220k,
-    // operating income = 220k − 60k = 160k.
+    // Q2: operating income = 440k − 220k = 220k, EBITDA = 220k + 60k = 280k.
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     assert_eq!(results.get("fin.gross_profit", &q2).unwrap(), 440_000.0);
-    assert_eq!(results.get("fin.operating_income", &q2).unwrap(), 160_000.0);
-    assert_eq!(results.get("fin.ebitda", &q2).unwrap(), 220_000.0);
+    assert_eq!(results.get("fin.operating_income", &q2).unwrap(), 220_000.0);
+    assert_eq!(results.get("fin.ebitda", &q2).unwrap(), 280_000.0);
     assert!((results.get("fin.gross_margin", &q2).unwrap() - 0.4).abs() < 0.0001);
     assert!(
-        (results.get("fin.operating_margin", &q2).unwrap() - 160_000.0 / 1_100_000.0).abs()
+        (results.get("fin.operating_margin", &q2).unwrap() - 220_000.0 / 1_100_000.0).abs()
             < 0.0001
     );
 }
@@ -917,11 +1133,13 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
         model_builder.value("tax_expense", &zero_periods(0.0));
         model_builder.value("depreciation", &zero_periods(0.0));
         model_builder.value("amortization", &zero_periods(0.0));
-        model_builder.value("principal_payment", &zero_periods(0.0));
-        model_builder.value("total_assets", &zero_periods(1.0));
+        model_builder.value("scheduled_cash_interest_due", &zero_periods(0.0));
+        model_builder.value("scheduled_principal_due", &zero_periods(0.0));
+        model_builder.value("total_assets", &zero_periods(2.0));
         model_builder.value("total_debt", &zero_periods(0.0));
         model_builder.value("total_equity", &zero_periods(1.0));
-        model_builder.value("taxes", &zero_periods(0.0));
+        model_builder.value("operating_tax", &zero_periods(0.0));
+        model_builder.value("operating_invested_capital", &zero_periods(1.0));
         model_builder.value("current_liabilities", &zero_periods(1.0));
         model_builder
     };
@@ -1136,7 +1354,20 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
             ],
         );
         model_builder.value(
-            "principal_payment",
+            "scheduled_cash_interest_due",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+            ],
+        );
+        model_builder.value(
+            "scheduled_principal_due",
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
@@ -1153,11 +1384,11 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(1.0),
+                    AmountOrScalar::scalar(2.0),
                 ),
                 (
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(1.0),
+                    AmountOrScalar::scalar(2.0),
                 ),
             ],
         );
@@ -1188,7 +1419,7 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
             ],
         );
         model_builder.value(
-            "taxes",
+            "operating_tax",
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
@@ -1197,6 +1428,19 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                 (
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(0.0),
+                ),
+            ],
+        );
+        model_builder.value(
+            "operating_invested_capital",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
                 ),
             ],
         );
@@ -1228,4 +1472,167 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
         "gross_margin = gross_profit/revenue = 100k/200k = 0.5, got {}",
         margin
     );
+}
+
+/// The bundled leverage and coverage ratios use period-end gross debt,
+/// complete trailing windows and positive denominators
+/// (STATEMENTS-CONTRACTS-008). Quarterly EBITDA is 40 (revenue 100, costs
+/// 60) unless `revenue` moves it.
+#[test]
+fn bundled_leverage_and_coverage_use_complete_windows_and_positive_denominators() {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::evaluator::CellStatus;
+
+    let q = |quarter: u8| PeriodId::quarter(2025, quarter).expect("quarter");
+    let series = |values: [f64; 4]| -> Vec<(PeriodId, f64)> {
+        (1..=4_u8)
+            .zip(values)
+            .map(|(n, value)| (q(n), value))
+            .collect()
+    };
+    // Replace an input the shared fixture already defines.
+    let reset = |builder: &mut finstack_quant_statements::builder::ModelBuilder,
+                 node: &str,
+                 values: &[(PeriodId, f64)]| {
+        builder.remove_node(node).expect("fixture node");
+        builder.value_scalar(node, values);
+        builder
+            .rollup(node, finstack_quant_statements::types::RollupMethod::Sum)
+            .expect("known node");
+    };
+    let evaluate =
+        |revenue: [f64; 4],
+         configure: &dyn Fn(&mut finstack_quant_statements::builder::ModelBuilder)| {
+            let model = returns_model(revenue, configure);
+            Evaluator::new().evaluate(&model).expect("evaluation")
+        };
+    let close = |actual: Option<f64>, expected: f64, what: &str| {
+        let actual = actual.unwrap_or_else(|| panic!("{what} has no value"));
+        assert!((actual - expected).abs() < 1e-12, "{what}: {actual}");
+    };
+    let unavailable = |results: &finstack_quant_statements::evaluator::StatementResult,
+                       metric: &str,
+                       quarter: u8| {
+        let cell = results.get_cell(metric, &q(quarter)).expect("cell");
+        assert_eq!(cell.status, CellStatus::Unavailable, "{metric} Q{quarter}");
+    };
+
+    // Scheduled principal of 5, 5, 5 and 25 falls due over the year.
+    let results = evaluate([100.0; 4], &|builder| {
+        reset(
+            builder,
+            "scheduled_principal_due",
+            &series([5.0, 5.0, 5.0, 25.0]),
+        );
+    });
+    // Balance ratios use each period's own close.
+    close(
+        results.get("fin.debt_to_equity", &q(2)),
+        400.0 / 300.0,
+        "D/E",
+    );
+    close(
+        results.get("fin.debt_to_assets", &q(4)),
+        400.0 / 1500.0,
+        "D/A",
+    );
+    close(
+        results.get("fin.equity_multiplier", &q(4)),
+        1500.0 / 700.0,
+        "multiplier",
+    );
+    // The trailing window is complete only in the fourth quarter:
+    // EBITDA 160, interest 40, scheduled service 40 + 40.
+    for metric in [
+        "fin.debt_to_ebitda",
+        "fin.interest_coverage",
+        "fin.debt_service_coverage",
+    ] {
+        for quarter in 1..=3 {
+            unavailable(&results, metric, quarter);
+        }
+    }
+    close(
+        results.get("fin.debt_to_ebitda", &q(4)),
+        400.0 / 160.0,
+        "D/EBITDA",
+    );
+    close(
+        results.get("fin.interest_coverage", &q(4)),
+        160.0 / 40.0,
+        "ICR",
+    );
+    close(
+        results.get("fin.debt_service_coverage", &q(4)),
+        160.0 / 80.0,
+        "DSCR",
+    );
+
+    // A gap inside the window leaves the trailing ratios unavailable.
+    let gapped = evaluate([100.0; 4], &|builder| {
+        reset(
+            builder,
+            "revenue",
+            &[(q(1), 100.0), (q(3), 100.0), (q(4), 100.0)],
+        );
+    });
+    unavailable(&gapped, "fin.debt_to_ebitda", 4);
+    unavailable(&gapped, "fin.interest_coverage", 4);
+
+    // Zero gross debt is a valid zero.
+    let debt_free = evaluate([100.0; 4], &|builder| {
+        reset(builder, "total_debt", &series([0.0; 4]));
+    });
+    close(debt_free.get("fin.debt_to_equity", &q(4)), 0.0, "zero D/E");
+    close(
+        debt_free.get("fin.debt_to_ebitda", &q(4)),
+        0.0,
+        "zero D/EBITDA",
+    );
+
+    // Negative EBITDA (-60 a quarter) gives signed coverage over positive
+    // denominators, and no leverage multiple over a negative denominator.
+    let losses = evaluate([0.0; 4], &|_| {});
+    close(
+        losses.get("fin.interest_coverage", &q(4)),
+        -240.0 / 40.0,
+        "signed ICR",
+    );
+    close(
+        losses.get("fin.debt_service_coverage", &q(4)),
+        -240.0 / 40.0,
+        "signed DSCR",
+    );
+    unavailable(&losses, "fin.debt_to_ebitda", 4);
+
+    // A zero denominator is unavailable, not a division error.
+    let no_interest = evaluate([100.0; 4], &|builder| {
+        reset(builder, "interest_expense", &series([0.0; 4]));
+    });
+    unavailable(&no_interest, "fin.interest_coverage", 4);
+
+    // The bundled descriptions make no threshold claim.
+    let registry = Registry::with_builtins().unwrap();
+    for id in [
+        "fin.debt_to_ebitda",
+        "fin.interest_coverage",
+        "fin.debt_service_coverage",
+    ] {
+        let description = registry
+            .get(id)
+            .unwrap()
+            .definition
+            .description
+            .clone()
+            .unwrap_or_default();
+        for claim in [
+            "3.0x",
+            "1.5x",
+            "1.25x",
+            "generally considered",
+            "typically required",
+        ] {
+            assert!(!description.contains(claim), "{id}: {claim}");
+        }
+    }
 }

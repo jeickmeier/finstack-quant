@@ -3,59 +3,35 @@
 use serde_json::Value;
 
 use crate::adjustments::{NormalizationConfig, NormalizationResult};
-use crate::capital_structure::{BondConventionParams, SwapConventions, SwapParams};
 use crate::checks::CheckSuiteSpec;
-use crate::evaluator::{MonteCarloConfig, MonteCarloResults, RollupSpec, StatementResult};
+use crate::evaluator::{
+    DatedCell, MonteCarloConfig, MonteCarloResults, PricingFlowSelection, RollupSpec,
+    StatementResult,
+};
 use crate::registry::MetricRegistry;
-use crate::types::{FinancialModelSpec, ForecastParameters};
+use crate::types::{FinancialModelSpec, ForecastMethod, ForecastSpec, ModelEdit};
 
 /// Stable base URI for statements-owned schemas.
 pub const STATEMENTS_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/statements/1/";
 
-/// A canonical two-period model with one value node and one formula node.
+/// A runnable two-quarter model with one value node and one formula node.
 ///
-/// Small on purpose: it shows the graph shape and the Value > Forecast >
-/// Formula precedence without carrying a worked forecast.
+/// Built with the model builder, so the published example is a model the
+/// loader admits and the evaluator runs.
 fn financial_model_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    use finstack_quant_core::dates::{Date, Period, PeriodId};
+    use finstack_quant_core::dates::PeriodId;
 
-    let quarter = |label: &str, start: (i32, time::Month, u8), end: (i32, time::Month, u8)| {
-        let id: PeriodId = label.parse().map_err(|error| {
-            finstack_quant_core::Error::Internal(format!("parse example period {label}: {error}"))
-        })?;
-        let start = Date::from_calendar_date(start.0, start.1, start.2).map_err(|error| {
-            finstack_quant_core::Error::Internal(format!("build example start date: {error}"))
-        })?;
-        let end = Date::from_calendar_date(end.0, end.1, end.2).map_err(|error| {
-            finstack_quant_core::Error::Internal(format!("build example end date: {error}"))
-        })?;
-        Ok::<Period, finstack_quant_core::Error>(Period {
-            id,
-            start,
-            end,
-            is_actual: false,
-        })
-    };
-
-    let periods = vec![
-        quarter(
-            "2024Q1",
-            (2024, time::Month::January, 1),
-            (2024, time::Month::April, 1),
-        )?,
-        quarter(
-            "2024Q2",
-            (2024, time::Month::April, 1),
-            (2024, time::Month::July, 1),
-        )?,
-    ];
-    let model = crate::types::FinancialModelSpec::new(
-        "example_model",
-        finstack_quant_core::dates::PeriodPlan::try_new(
-            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-            periods,
-        )?,
+    let mut builder = crate::builder::ModelBuilder::new("example_model");
+    builder.periods("2024Q1..Q2", None)?;
+    builder.value(
+        "revenue",
+        &[
+            (PeriodId::quarter(2024, 1)?, 100.0.into()),
+            (PeriodId::quarter(2024, 2)?, 110.0.into()),
+        ],
     );
+    builder.compute("gross_profit", "revenue * 0.4")?;
+    let model = builder.build()?;
 
     let value = serde_json::to_value(&model).map_err(|error| {
         finstack_quant_core::Error::Internal(format!("serialize financial model example: {error}"))
@@ -75,11 +51,18 @@ fn normalization_examples() -> finstack_quant_core::Result<Vec<Value>> {
         let period: finstack_quant_core::dates::PeriodId = label.parse().map_err(|error| {
             finstack_quant_core::Error::Internal(format!("parse example period {label}: {error}"))
         })?;
-        amounts.insert(period, amount);
+        amounts.insert(
+            period,
+            crate::types::AmountOrScalar::amount(
+                amount,
+                finstack_quant_core::currency::Currency::USD,
+            )?,
+        );
     }
 
     let config = NormalizationConfig {
         target_node: "ebitda".to_string(),
+        output_node: "adjusted_ebitda".to_string(),
         adjustments: vec![
             Adjustment {
                 id: "restructuring".to_string(),
@@ -111,22 +94,71 @@ fn normalization_examples() -> finstack_quant_core::Result<Vec<Value>> {
 ///
 /// Minimal on purpose - its job is to show the envelope shape and the policy
 /// stamps a caller reads back, not to carry a worked model.
+/// One node over two periods: a monetary value cell and a missing cell.
 fn statement_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    let value =
-        serde_json::to_value(crate::evaluator::StatementResult::default()).map_err(|error| {
-            finstack_quant_core::Error::Internal(format!(
-                "serialize statement result example: {error}"
-            ))
-        })?;
-    Ok(vec![value])
+    finstack_quant_core::schema::example_from_json::<crate::evaluator::StatementResult>(
+        serde_json::json!({
+            "schema_version": 1,
+            "cells": {
+                "revenue": {
+                    "2025Q1": {
+                        "status": "value",
+                        "value": { "amount": "125.01", "currency": "USD" },
+                        "source": "value"
+                    },
+                    "2025Q2": { "status": "missing" }
+                }
+            },
+            "node_value_types": { "revenue": { "type": "monetary", "currency": "USD" } },
+            "meta": { "num_nodes": 1, "num_periods": 2 }
+        }),
+    )
 }
 
-/// A suite with one built-in articulation check and one formula check.
+/// The method tag on its own.
+fn forecast_method_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<ForecastMethod>(serde_json::json!(
+        "growth_pct"
+    ))
+}
+
 /// Fade a line to a target level, the shape every parameterized method takes.
-fn forecast_parameters_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<ForecastParameters>(serde_json::json!({
+fn forecast_spec_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<ForecastSpec>(serde_json::json!({
         "method": "fade_to_target",
         "params": { "target": 0.35, "shape": "linear" }
+    }))
+}
+
+fn pricing_flow_selection_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<PricingFlowSelection>(serde_json::json!({
+        "node_id": "capex",
+        "currency": "USD",
+        "sign": "outflow_magnitude",
+        "periods": ["2025M03", "2025M05"],
+        "date_convention": "end"
+    }))
+}
+
+fn dated_cell_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<DatedCell>(serde_json::json!({
+        "date": "2025-03-31",
+        "period_id": "2025M03",
+        "cell": {
+            "status": "value",
+            "value": { "amount": "125.01", "currency": "USD" },
+            "source": "value"
+        }
+    }))
+}
+
+fn model_edit_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<ModelEdit>(serde_json::json!({
+        "edit": "set_observation",
+        "node_id": "revenue",
+        "period": "2025Q1",
+        "value": 110.0,
+        "availability_date": "2025-05-15"
     }))
 }
 
@@ -146,6 +178,8 @@ fn check_suite_examples() -> finstack_quant_core::Result<Vec<Value>> {
                 "name": "Net leverage below 8x",
                 "category": "credit_reasonableness",
                 "severity": "warning",
+                "mode": "predicate",
+                "scope": "all_periods",
                 "formula": "net_debt / ebitda < 8",
                 "message_template": "Net leverage exceeds 8x"
             }]
@@ -172,12 +206,14 @@ fn metric_registry_examples() -> finstack_quant_core::Result<Vec<Value>> {
     )
 }
 
-/// A seeded 1,000-path run reporting the 5th, 50th and 95th percentiles.
+/// A seeded 1,000-path run reporting the 5th, 50th and 95th percentiles of
+/// revenue.
 fn monte_carlo_config_examples() -> finstack_quant_core::Result<Vec<Value>> {
     finstack_quant_core::schema::example_from_json::<crate::evaluator::MonteCarloConfig>(
         serde_json::json!({
             "n_paths": 1000,
-            "seed": 42,
+            "seed": "42",
+            "metrics": ["revenue"],
             "percentiles": [0.05, 0.5, 0.95]
         }),
     )
@@ -190,6 +226,8 @@ fn monte_carlo_results_examples() -> finstack_quant_core::Result<Vec<Value>> {
             "percentile_results": {
                 "revenue": {
                     "metric": "revenue",
+                    "value_type": {"type": "scalar"},
+                    "sample_count": 1000,
                     "values": {
                         "2025Q1": [[0.05, 940_000.0], [0.5, 1_000_000.0], [0.95, 1_065_000.0]],
                         "2025Q2": [[0.05, 925_000.0], [0.5, 1_020_000.0], [0.95, 1_120_000.0]]
@@ -197,6 +235,9 @@ fn monte_carlo_results_examples() -> finstack_quant_core::Result<Vec<Value>> {
                 }
             },
             "n_paths": 1000,
+            "seed": "42",
+            "stream_version": 1,
+            "metrics": ["revenue"],
             "percentiles": [0.05, 0.5, 0.95],
             "forecast_periods": ["2025Q1", "2025Q2"]
         }),
@@ -213,64 +254,29 @@ fn rollup_spec_examples() -> finstack_quant_core::Result<Vec<Value>> {
     )
 }
 
-/// A five-year US Treasury-convention bond.
-fn bond_convention_params_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<BondConventionParams>(serde_json::json!({
-        "id": "UST-5Y",
-        "notional": {"amount": "1000000", "currency": "USD"},
-        "coupon_rate": 0.03,
-        "issue_date": "2025-01-15",
-        "maturity_date": "2030-01-15",
-        "convention": "us_treasury",
-        "discount_curve_id": "USD-OIS"
-    }))
-}
-
-/// A five-year pay-fixed swap against a three-month SOFR forward curve.
-fn swap_params_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<SwapParams>(serde_json::json!({
-        "id": "SWAP-5Y",
-        "notional": {"amount": "1000000", "currency": "USD"},
-        "fixed_rate": 0.04,
-        "start_date": "2025-01-15",
-        "maturity_date": "2030-01-15",
-        "discount_curve_id": "USD-OIS",
-        "forward_curve_id": "USD-SOFR-3M"
-    }))
-}
-
-/// Annual ACT/360 fixed coupons against quarterly ACT/360 floating coupons.
-fn swap_conventions_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<SwapConventions>(serde_json::json!({
-        "fixed_frequency": {"count": 1, "unit": "years"},
-        "fixed_day_count": "act_360",
-        "float_frequency": {"count": 3, "unit": "months"},
-        "float_day_count": "act_360",
-        "business_day_convention": "modified_following"
-    }))
-}
-
 /// One quarter of EBITDA with a single restructuring add-back.
 fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
     finstack_quant_core::schema::example_from_json::<crate::adjustments::NormalizationResult>(
         serde_json::json!({
             "value_type": {"type": "monetary", "currency": "USD"},
             "period": "2024Q1",
-            "base_value": 12_000_000.0,
+            "base_value": {"amount": "12000000", "currency": "USD"},
             "adjustments": [{
                 "adjustment_id": "restructuring",
                 "name": "Restructuring charges",
-                "raw_amount": 1_500_000.0,
-                "capped_amount": 1_500_000.0,
+                "raw_amount": {"amount": "1500000", "currency": "USD"},
+                "capped_amount": {"amount": "1500000", "currency": "USD"},
                 "is_capped": false,
-                "adjusted_value": 13_500_000.0
+                "adjusted_value": {"amount": "13500000", "currency": "USD"}
             }],
-            "final_value": 13_500_000.0
+            "final_value": {"amount": "13500000", "currency": "USD"}
         }),
     )
 }
 
-/// The crate's complete schema registry, sorted by artifact path.
+/// The crate's complete schema registry, in declaration order.
+///
+/// The shared renderer owns the order artifacts are published in.
 ///
 /// This lives in the library, not the generator binary, so the generator, the
 /// contract tests and the bindings all render from one definition. Render an
@@ -285,13 +291,21 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     )
     .with_examples(check_suite_examples),
     finstack_quant_core::schema_artifact!(
-        ForecastParameters,
+        ForecastSpec,
         "statements",
-        "forecast_parameters",
+        "forecast_spec",
         Input,
         "One forecast method with its typed parameters, in the wire shape of ForecastSpec."
     )
-    .with_examples(forecast_parameters_examples),
+    .with_examples(forecast_spec_examples),
+    finstack_quant_core::schema_artifact!(
+        ForecastMethod,
+        "statements",
+        "forecast_method",
+        Component,
+        "The method tag of a forecast specification."
+    )
+    .with_examples(forecast_method_examples),
     finstack_quant_core::schema_artifact!(
         FinancialModelSpec,
         "statements",
@@ -362,27 +376,27 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     )
     .with_examples(rollup_spec_examples),
     finstack_quant_core::schema_artifact!(
-        BondConventionParams,
+        PricingFlowSelection,
         "statements",
-        "bond_convention_params",
+        "pricing_flow_selection",
         Input,
-        "Identity, notional, decimal coupon, dates, regional convention and discount curve of a capital-structure bond."
+        "The monetary node, expected currency, sign convention, required periods and anchor date a pricing caller reads."
     )
-    .with_examples(bond_convention_params_examples),
+    .with_examples(pricing_flow_selection_examples),
     finstack_quant_core::schema_artifact!(
-        SwapParams,
+        DatedCell,
         "statements",
-        "swap_params",
-        Input,
-        "Identity, notional, decimal fixed rate, dates and curves of a capital-structure pay-fixed swap."
+        "dated_cell",
+        Output,
+        "One period of a dated statement export: the anchor date, the period and its typed cell."
     )
-    .with_examples(swap_params_examples),
+    .with_examples(dated_cell_examples),
     finstack_quant_core::schema_artifact!(
-        SwapConventions,
+        ModelEdit,
         "statements",
-        "swap_conventions",
+        "model_edit",
         Input,
-        "Fixed and floating leg frequencies and day counts plus the business-day convention of a capital-structure swap."
+        "One named change to a financial model, applied atomically with the others in its batch."
     )
-    .with_examples(swap_conventions_examples),
+    .with_examples(model_edit_examples),
 ];

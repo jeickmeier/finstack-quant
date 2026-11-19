@@ -6,9 +6,11 @@ mod support;
 mod bond;
 #[path = "bond_future/mod.rs"]
 mod bond_future;
+mod contractual_accrual;
 mod default_risk;
 #[path = "inflation_linked_bond/mod.rs"]
 mod inflation_linked_bond;
+mod principal_postings;
 #[path = "revolving_credit/mod.rs"]
 mod revolving_credit;
 #[path = "term_loan/mod.rs"]

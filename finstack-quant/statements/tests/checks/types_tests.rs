@@ -4,8 +4,8 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::checks::{
-    CheckCategory, CheckConfig, CheckFinding, CheckReport, CheckResult, CheckSummary, Materiality,
-    PeriodScope, Severity,
+    CheckCategory, CheckConfig, CheckFinding, CheckOutcome, CheckReport, CheckResult, CheckSummary,
+    Materiality, PeriodScope, Severity,
 };
 use finstack_quant_statements::types::NodeId;
 
@@ -99,7 +99,7 @@ fn period_scope_serde_roundtrip() {
 fn materiality_serde_roundtrip() {
     let m = Materiality {
         absolute: 500.0,
-        relative_pct: 2.5,
+        relative_pct: Some(2.5),
         reference_value: 20_000.0,
         reference_label: "total_assets".into(),
     };
@@ -113,7 +113,9 @@ fn materiality_serde_roundtrip() {
 #[test]
 fn check_config_defaults() {
     let cfg = CheckConfig::default();
-    assert!((cfg.default_tolerance - 0.01).abs() < f64::EPSILON);
+    // Identities hold exactly unless a tolerance is stated.
+    assert_eq!(cfg.default_tolerance, 0.0);
+    assert_eq!(cfg.default_relative_tolerance, 0.0);
     assert!((cfg.materiality_threshold - 0.0).abs() < f64::EPSILON);
     assert_eq!(cfg.min_severity, Severity::Info);
 }
@@ -121,7 +123,8 @@ fn check_config_defaults() {
 #[test]
 fn test_check_config_partial_json() {
     let config: CheckConfig = serde_json::from_str("{}").unwrap();
-    assert!((config.default_tolerance - 0.01).abs() < f64::EPSILON);
+    assert_eq!(config.default_tolerance, 0.0);
+    assert_eq!(config.default_relative_tolerance, 0.0);
     assert!((config.materiality_threshold - 0.0).abs() < f64::EPSILON);
     assert_eq!(config.min_severity, Severity::Info);
 }
@@ -137,7 +140,7 @@ fn check_finding_serde_roundtrip() {
         period: Some(PeriodId::quarter(2025, 1).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 100.0,
-            relative_pct: 0.5,
+            relative_pct: Some(0.5),
             reference_value: 20_000.0,
             reference_label: "total_assets".into(),
         }),
@@ -146,6 +149,7 @@ fn check_finding_serde_roundtrip() {
             NodeId::new("total_liabilities"),
         ],
         comparison: None,
+        coverage: false,
     };
     let json = serde_json::to_string(&finding).unwrap();
     let back: CheckFinding = serde_json::from_str(&json).unwrap();
@@ -162,6 +166,7 @@ fn check_finding_optional_fields_omitted() {
         materiality: None,
         nodes: vec![],
         comparison: None,
+        coverage: false,
     };
     let json = serde_json::to_string(&finding).unwrap();
     assert!(!json.contains("period"));
@@ -177,11 +182,12 @@ fn check_result_passed_true_when_no_findings() {
         check_id: "test".into(),
         check_name: "Test Check".into(),
         category: CheckCategory::AccountingIdentity,
-        passed: true,
+        outcome: CheckOutcome::Pass,
+        evaluated: 1,
         findings: vec![],
         comparisons: Vec::new(),
     };
-    assert!(result.passed);
+    assert!(result.passed());
 }
 
 #[test]
@@ -190,7 +196,8 @@ fn check_result_passed_false_with_error_findings() {
         check_id: "test".into(),
         check_name: "Test Check".into(),
         category: CheckCategory::AccountingIdentity,
-        passed: false,
+        outcome: CheckOutcome::Fail,
+        evaluated: 1,
         findings: vec![CheckFinding {
             check_id: "test".into(),
             severity: Severity::Error,
@@ -199,10 +206,11 @@ fn check_result_passed_false_with_error_findings() {
             materiality: None,
             nodes: vec![],
             comparison: None,
+            coverage: false,
         }],
         comparisons: Vec::new(),
     };
-    assert!(!result.passed);
+    assert!(!result.passed());
 }
 
 // CheckSummary
@@ -213,6 +221,8 @@ fn check_summary_fields() {
         total_checks: 5,
         passed: 3,
         failed: 2,
+        incomplete: 0,
+        unevaluated: 0,
         errors: 2,
         warnings: 1,
         infos: 4,
@@ -235,12 +245,13 @@ fn sample_report() -> CheckReport {
         period: Some(PeriodId::quarter(2025, 1).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 1000.0,
-            relative_pct: 5.0,
+            relative_pct: Some(5.0),
             reference_value: 20_000.0,
             reference_label: "total_assets".into(),
         }),
         nodes: vec![NodeId::new("total_assets")],
         comparison: None,
+        coverage: false,
     };
     let warning_finding = CheckFinding {
         check_id: "ratio".into(),
@@ -249,12 +260,13 @@ fn sample_report() -> CheckReport {
         period: Some(PeriodId::quarter(2025, 2).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 50.0,
-            relative_pct: 0.25,
+            relative_pct: Some(0.25),
             reference_value: 20_000.0,
             reference_label: "total_debt".into(),
         }),
         nodes: vec![NodeId::new("debt_ratio")],
         comparison: None,
+        coverage: false,
     };
     let info_finding = CheckFinding {
         check_id: "completeness".into(),
@@ -264,15 +276,18 @@ fn sample_report() -> CheckReport {
         materiality: None,
         nodes: vec![],
         comparison: None,
+        coverage: false,
     };
 
     CheckReport {
+        outcome: CheckOutcome::Fail,
         results: vec![
             CheckResult {
                 check_id: "bs".into(),
                 check_name: "Balance Sheet Identity".into(),
                 category: CheckCategory::AccountingIdentity,
-                passed: false,
+                outcome: CheckOutcome::Fail,
+                evaluated: 1,
                 findings: vec![error_finding],
                 comparisons: Vec::new(),
             },
@@ -280,7 +295,8 @@ fn sample_report() -> CheckReport {
                 check_id: "ratio".into(),
                 check_name: "Leverage Ratio".into(),
                 category: CheckCategory::CreditReasonableness,
-                passed: true,
+                outcome: CheckOutcome::Pass,
+                evaluated: 1,
                 findings: vec![warning_finding],
                 comparisons: Vec::new(),
             },
@@ -288,7 +304,8 @@ fn sample_report() -> CheckReport {
                 check_id: "completeness".into(),
                 check_name: "Node Coverage".into(),
                 category: CheckCategory::DataQuality,
-                passed: true,
+                outcome: CheckOutcome::Pass,
+                evaluated: 1,
                 findings: vec![info_finding],
                 comparisons: Vec::new(),
             },
@@ -297,6 +314,8 @@ fn sample_report() -> CheckReport {
             total_checks: 3,
             passed: 2,
             failed: 1,
+            incomplete: 0,
+            unevaluated: 0,
             errors: 1,
             warnings: 1,
             infos: 1,
@@ -322,11 +341,14 @@ fn has_errors_and_warnings() {
 #[test]
 fn has_errors_false_when_no_errors() {
     let report = CheckReport {
+        outcome: CheckOutcome::Unevaluated,
         results: vec![],
         summary: CheckSummary {
             total_checks: 0,
             passed: 0,
             failed: 0,
+            incomplete: 0,
+            unevaluated: 0,
             errors: 0,
             warnings: 0,
             infos: 0,

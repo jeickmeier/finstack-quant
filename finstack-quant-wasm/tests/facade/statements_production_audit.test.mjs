@@ -23,7 +23,7 @@ function model(values, forecast) {
     nodes: {
       revenue: {
         node_id: 'revenue',
-        node_type: 'value',
+        node_type: 'mixed',
         values,
         ...(forecast ? { forecast } : {}),
       },
@@ -46,11 +46,11 @@ for (const forecast of [
     const baseline = model({ '2025Q1': 80 }, forecast);
     const overridden = structuredClone(baseline);
     overridden.nodes.revenue.values['2025Q2'] = 999;
-    const expected = new statements.Evaluator().evaluate(JSON.stringify(baseline)).nodes.revenue;
-    const actual = new statements.Evaluator().evaluate(JSON.stringify(overridden)).nodes.revenue;
-    assert.equal(actual['2025Q2'], 999);
-    assert.equal(actual['2025Q3'], expected['2025Q3']);
-    assert.equal(actual['2025Q4'], expected['2025Q4']);
+    const expected = new statements.Evaluator().evaluate(JSON.stringify(baseline)).cells.revenue;
+    const actual = new statements.Evaluator().evaluate(JSON.stringify(overridden)).cells.revenue;
+    assert.equal(actual['2025Q2'].value, 999);
+    assert.equal(actual['2025Q3'].value, expected['2025Q3'].value);
+    assert.equal(actual['2025Q4'].value, expected['2025Q4'].value);
   });
 }
 
@@ -65,6 +65,8 @@ test('formula residual checks accept the tolerance boundary and reject larger re
         name: 'Residual',
         category: 'accounting_identity',
         severity: 'error',
+        mode: 'residual',
+        scope: 'all_periods',
         formula: 'revenue',
         message_template: 'residual {period}',
         tolerance: 0.1,
@@ -77,6 +79,7 @@ test('formula residual checks accept the tolerance boundary and reject larger re
     ['2025Q4']
   );
   suite.formula_checks[0].formula = 'revenue <= 0.1';
+  suite.formula_checks[0].mode = 'predicate';
   suite.formula_checks[0].tolerance = null;
   assert.deepEqual(
     statements_analytics
@@ -106,6 +109,8 @@ test('retained earnings accepts the elected inflow-positive dividend convention'
         type: 'retained_earnings_reconciliation',
         retained_earnings_node: 're',
         net_income_node: 'revenue',
+        // 1000 = 920 + 100 of income - 20 of signed dividends.
+        opening_balance: { date: '2025-01-01', value: 920 },
         dividends_node: 'div',
         dividends_sign_convention: 'inflow_positive',
       },

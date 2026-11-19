@@ -2,16 +2,15 @@
 //! through `ModelBuilder::from_spec`, and returns the extended model.
 
 use crate::utils::input::{
-    from_js_json, js_f64, js_f64_seq, js_opt_string_seq, js_string, js_string_seq, json_text,
+    from_js_json, js_f64, js_f64_seq, js_opt_string_seq, js_string, js_string_seq,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements_analytics::templates::{real_estate, roll_forward, vintage};
 use wasm_bindgen::prelude::*;
 
 fn builder(model: &JsValue) -> Result<ModelBuilder, JsValue> {
-    let model = FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)?;
+    let model = crate::api::statements::load_model(model, "model")?;
     ModelBuilder::from_spec(model).map_err(to_js_err)
 }
 

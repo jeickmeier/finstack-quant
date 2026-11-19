@@ -48,7 +48,7 @@ proptest! {
 
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(result.passed, "Expected pass for A={a}, L={l}, E={e}");
+        prop_assert!(result.passed(), "Expected pass for A={a}, L={l}, E={e}");
     }
 
     #[test]
@@ -80,7 +80,7 @@ proptest! {
 
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(!result.passed, "Expected fail for gap={gap}");
+        prop_assert!(!result.passed(), "Expected fail for gap={gap}");
     }
 }
 
@@ -101,16 +101,16 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results
-            .nodes
-            .entry("bad_node".to_string())
-            .or_default()
-            .insert(q1(), f64::NAN);
+        // A raw invalid number in a value cell, as a foreign producer could
+        // write it; a typed constructor would reject it.
+        let mut bad = finstack_quant_statements::evaluator::ResultCell::scalar(0.0).unwrap();
+        bad.value = Some(AmountOrScalar::scalar(f64::NAN));
+        results.set_cell("bad_node", q1(), bad);
 
-        let check = NonFiniteCheck { nodes: vec![] };
+        let check = NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(!result.passed, "NonFiniteCheck should catch NaN");
+        prop_assert!(!result.passed(), "NonFiniteCheck should catch NaN");
     }
 
     #[test]
@@ -127,16 +127,16 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results
-            .nodes
-            .entry("bad_node".to_string())
-            .or_default()
-            .insert(q1(), f64::INFINITY);
+        // A raw invalid number in a value cell, as a foreign producer could
+        // write it; a typed constructor would reject it.
+        let mut bad = finstack_quant_statements::evaluator::ResultCell::scalar(0.0).unwrap();
+        bad.value = Some(AmountOrScalar::scalar(f64::INFINITY));
+        results.set_cell("bad_node", q1(), bad);
 
-        let check = NonFiniteCheck { nodes: vec![] };
+        let check = NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(!result.passed, "NonFiniteCheck should catch Inf");
+        prop_assert!(!result.passed(), "NonFiniteCheck should catch Inf");
     }
 
     #[test]
@@ -153,16 +153,16 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results
-            .nodes
-            .entry("bad_node".to_string())
-            .or_default()
-            .insert(q1(), f64::NEG_INFINITY);
+        // A raw invalid number in a value cell, as a foreign producer could
+        // write it; a typed constructor would reject it.
+        let mut bad = finstack_quant_statements::evaluator::ResultCell::scalar(0.0).unwrap();
+        bad.value = Some(AmountOrScalar::scalar(f64::NEG_INFINITY));
+        results.set_cell("bad_node", q1(), bad);
 
-        let check = NonFiniteCheck { nodes: vec![] };
+        let check = NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(!result.passed, "NonFiniteCheck should catch -Inf");
+        prop_assert!(!result.passed(), "NonFiniteCheck should catch -Inf");
     }
 }
 
@@ -192,7 +192,7 @@ proptest! {
 
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(result.passed, "Expected pass for v1={v1}, v2={v2}");
+        prop_assert!(result.passed(), "Expected pass for v1={v1}, v2={v2}");
         prop_assert!(result.findings.is_empty(), "Expected no findings");
     }
 

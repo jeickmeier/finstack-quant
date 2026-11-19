@@ -17,11 +17,14 @@ from finstack_quant.statements._types import FinancialModelSpec, NumericMode
 
 class StatementResult:
     """
-    Per-node, per-period numeric results from evaluating a model.
+    Typed per-node, per-period results from evaluating a model.
 
-    JSON and pickle preserve non-finite values with ``"nan"``, ``"inf"``, and
-    ``"-inf"`` strings in node cells and non-finite warnings. Accessors return
-    Python floats, including NaN and infinities.
+    Every node has one cell per period: a value (a finite float, or exact
+    tagged money for a monetary node), or a cell without a value that is
+    ``missing``, ``masked`` or ``unavailable`` with a reason. A zero is a
+    value; a cell without a value is never a zero. JSON and pickle preserve
+    the cells exactly; non-finite numbers appear only in warnings, as
+    ``"nan"``, ``"inf"`` and ``"-inf"`` strings.
 
     Examples
     --------
@@ -89,8 +92,9 @@ class StatementResult:
         """
         Get the value for a node at a specific period.
 
-        Returns the f64 view of whichever source won this period under the
-        crate's **Value > Forecast > Formula** precedence rule.
+        Returns the float view of a value cell: a scalar as stored, money as
+        the nearest float. A cell without a value (missing, masked or
+        unavailable) has no float view; use :meth:`get_cell` to see why.
 
         Parameters
         ----------
@@ -105,7 +109,7 @@ class StatementResult:
             The value in the node's own units — a currency amount for
             monetary nodes (currency not carried; use :meth:`get_money` for
             that) and a unitless scalar otherwise. ``None`` when the node or
-            period is unknown.
+            period is unknown, or the cell has no value.
 
         Raises
         ------
@@ -169,7 +173,11 @@ class StatementResult:
 
     def get_or(self, node_id: str, period: str, default: float) -> float:
         """
-        Return the value for a node at a period, or a default when missing.
+        Return the value of a cell, with an explicit fallback for a missing observation.
+
+        The fallback applies only to a ``missing`` cell at a node and period
+        the result holds. It never stands in for a masked or unavailable
+        cell, or for a node or period the result does not have.
 
         Parameters
         ----------
@@ -178,27 +186,31 @@ class StatementResult:
         period:
             Period label such as ``"2025Q1"``.
         default:
-            Value returned when the node or period is unknown.
+            Value returned for a missing observation, in the node's own units.
 
         Returns
         -------
         float
-            The evaluated value in the node's own units, or ``default``.
+            The cell's value in the node's own units, or ``default`` when the
+            cell is a missing observation.
 
         Raises
         ------
         ValueError
-            If ``period`` cannot be parsed as a period id.
+            If ``period`` cannot be parsed as a period id, or the cell is
+            masked or unavailable.
+        KeyError
+            If the result has no cell for the node and period.
 
         Examples
         --------
         >>> from finstack_quant.statements import Evaluator, ModelBuilder
         >>> builder = ModelBuilder("demo")
-        >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.periods("2025Q1..Q2")
         >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> result = Evaluator().evaluate(builder.build())
-        >>> result.get_or("missing", "2025Q1", 0.0)
-        0.0
+        >>> (result.get_or("revenue", "2025Q1", 0.0), result.get_or("revenue", "2025Q2", 0.0))
+        (100.0, 0.0)
         """
         ...
 
@@ -214,8 +226,9 @@ class StatementResult:
         Returns
         -------
         list[tuple[str, float]]
-            ``(period, value)`` pairs in evaluation order, in the node's own
-            units. Empty when the node is not in the result.
+            ``(period, value)`` pairs of the node's value cells in timeline
+            order, in the node's own units. Cells without a value are left
+            out. Empty when the node is not in the result.
 
         Notes
         -----
@@ -264,12 +277,15 @@ class StatementResult:
         """
         Roll these results up to a coarser frequency, such as quarterly to annual.
 
-        Each target period combines its source periods node by node: summed by
-        default (flows), the last source value for ``"period_end"`` nodes
-        (balances, LTM metrics), and the node's formula re-evaluated on the
-        rolled-up values for ``"formula"`` nodes (ratios). ``lag`` and other
-        time-series functions then step in target periods. Every target period
-        must be complete.
+        Each target period combines its source periods node by node by the
+        node's method, from ``spec`` or else the node's declaration. ``"sum"``
+        adds the source cells (money exactly, scalars with a compensated sum)
+        and is unavailable when a source cell has no value. ``"period_end"``
+        copies the last source cell with its status (balances, LTM metrics).
+        ``"formula"`` re-evaluates the node's mask and formula on the rolled-up
+        values (ratios); ``lag`` and other time-series functions then step in
+        target periods. Nothing is summed by default: a node with no method
+        fails the rollup. Every target period must be complete.
 
         Parameters
         ----------
@@ -286,16 +302,21 @@ class StatementResult:
             Values keyed by the target periods (``"2025"``, ``"2025H1"``,
             ``"2025Q1"``; fiscal periods keep their ``FY`` prefix), with
             monetary values, value types and those periods in ``periods`` (each
-            actual only when every source period is). It carries no
-            ``node_sources``, capital-structure cashflows or check report.
+            actual only when every source period is) and
+            :attr:`rollup_provenance`. It is not an evaluation run: it carries
+            no ``provenance``, per-cell ``source``, capital-structure cashflows
+            or check report.
 
         Raises
         ------
         ValueError
-            If the JSON is malformed, the target frequency is not a whole
-            multiple of the model's, a target period is incomplete, a method
-            names an unknown node, a ``"formula"`` node has no formula or reads
-            ``cs.*`` values, or a re-evaluated formula fails.
+            If the JSON is malformed, these results are not a verified run of
+            ``model`` (no provenance, or another model content, source snapshot
+            or period plan), the target frequency is not a whole multiple of
+            the model's, a target period is incomplete, a method names an
+            unknown node, a node has no method, a ``"formula"`` node has no
+            formula or reads ``cs.*`` values, a sum cannot be represented, or a
+            re-evaluated formula fails.
 
         Examples
         --------
@@ -307,84 +328,234 @@ class StatementResult:
         >>> _ = b.compute("ebitda", "revenue * 0.25")
         >>> _ = b.compute("margin", "ebitda / revenue")
         >>> model = b.build()
-        >>> spec = RollupSpec("annual", {"cash": "period_end", "margin": "formula"})
+        >>> spec = RollupSpec(
+        ...     "annual",
+        ...     {"revenue": "sum", "cash": "period_end", "ebitda": "sum", "margin": "formula"},
+        ... )
         >>> annual = Evaluator().evaluate(model).rollup(model, spec)
         >>> (annual.get("revenue", "2025"), annual.get("cash", "2025"), annual.get("margin", "2025"))
         (400.0, 40.0, 0.25)
         """
         ...
 
-    def to_dated_schedule(
-        self,
-        model: FinancialModelSpec | str,
-        node_id: str,
-        convention: Literal["end", "start"] | None = None,
-    ) -> list[tuple[date, float]]:
+    def to_dated_schedule(self, node_id: str, convention: Literal["end", "start"]) -> list[dict[str, Any]]:
         """
-        Export one node as a dated cashflow schedule.
+        Export every period of one node as dated cells.
 
         Mirrors Rust ``evaluator::node_to_dated_schedule`` (WASM
-        ``statements.nodeToDatedSchedule``). Periods are taken in ``model``
-        timeline order; periods without a value are skipped.
+        ``statements.nodeToDatedSchedule``). Periods come from the result's
+        own period plan in timeline order. A period without a value stays in
+        the schedule with its status and reason, so a gap is visible. The
+        dates are period anchors, not payment dates.
 
         Parameters
         ----------
-        model : FinancialModelSpec | str
-            The model that produced this result (its periods supply the
-            dates); a typed model or its JSON.
         node_id : str
             Node identifier to export.
-        convention : {"end", "start"}, optional
-            ``"end"`` (the Rust default when omitted) dates each period on its
-            last inclusive day (``end - 1 day``, since periods are half-open
-            ``[start, end)``); ``"start"`` uses the period start date.
+        convention : {"end", "start"}
+            ``"end"`` anchors each period on its last included day
+            (``end - 1 day``, since periods are half-open ``[start, end)``);
+            ``"start"`` on its first day. There is no default.
 
         Returns
         -------
-        list[tuple[datetime.date, float]]
-            ``(date, value)`` pairs in timeline order, in the node's own units.
+        list[dict[str, Any]]
+            One row per result period: ``date`` (``datetime.date``),
+            ``period_id`` and ``cell``, the typed cell of :attr:`cells` with
+            its exact amount and currency.
 
         Raises
         ------
         KeyError
-            If ``node_id`` has no values in the result.
+            If ``node_id`` is not in the result.
         ValueError
-            If ``convention`` is not ``"end"`` or ``"start"``.
+            If ``convention`` is not ``"end"`` or ``"start"``, or the result
+            has no period plan.
 
         Examples
         --------
         >>> from finstack_quant.statements import Evaluator, ModelBuilder
         >>> builder = ModelBuilder("demo")
-        >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.periods("2025Q1..Q2")
         >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
-        >>> model = builder.build()
-        >>> Evaluator().evaluate(model).to_dated_schedule(model, "revenue")
-        [(datetime.date(2025, 3, 31), 100.0)]
+        >>> rows = Evaluator().evaluate(builder.build()).to_dated_schedule("revenue", "end")
+        >>> [(row["date"].isoformat(), row["cell"]["status"]) for row in rows]
+        [('2025-03-31', 'value'), ('2025-06-30', 'missing')]
+        """
+        ...
+
+    def to_pricing_flows(self, selection: dict[str, Any] | str) -> list[tuple[date, Money]]:
+        """
+        Read one monetary node as signed economic cash flows for pricing.
+
+        Mirrors Rust ``evaluator::node_to_pricing_flows`` (WASM
+        ``statements.nodeToPricingFlows``). Every requested period must hold
+        an exact amount in the expected currency. Positive means cash
+        received: an ``"outflow_magnitude"`` node is negated once. No FX and
+        no sign inference is applied.
+
+        Parameters
+        ----------
+        selection : dict[str, Any] | str
+            A ``PricingFlowSelection`` mapping or its JSON: ``node_id``, the
+            expected ``currency`` code, ``sign`` (``"inflow_positive"`` for a
+            signed cash flow or ``"outflow_magnitude"`` for a non-negative
+            outflow such as CapEx), the required ``periods`` and
+            ``date_convention`` (``"start"`` or ``"end"``).
+
+        Returns
+        -------
+        list[tuple[datetime.date, Money]]
+            ``(date, amount)`` pairs in timeline order, one per requested
+            period.
+
+        Raises
+        ------
+        KeyError
+            If the node is not in the result.
+        ValueError
+            If the selection is malformed, the result has no period plan, a
+            requested period is repeated or not in the result, a cell is
+            missing, masked, unavailable or a scalar, an amount is in another
+            currency, or an outflow magnitude is negative.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.statements import Evaluator, ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025M03..M05")
+        >>> _ = builder.value_money("capex", [("2025M03", Money(125.01, "USD"))])
+        >>> result = Evaluator().evaluate(builder.build())
+        >>> selection = {
+        ...     "node_id": "capex",
+        ...     "currency": "USD",
+        ...     "sign": "outflow_magnitude",
+        ...     "periods": ["2025M03"],
+        ...     "date_convention": "end",
+        ... }
+        >>> [(day.isoformat(), str(amount)) for day, amount in result.to_pricing_flows(selection)]
+        [('2025-03-31', 'USD -125.01')]
         """
         ...
 
     @property
-    def node_sources(self) -> dict[str, dict[str, str]]:
+    def cells(self) -> dict[str, dict[str, dict[str, Any]]]:
         """
-        Which evaluation layer produced each cell of the result.
-
-        The evaluator resolves every (node, period) cell by the precedence
-        **Value > Forecast > Formula**, after the node's optional ``where``
-        mask. The model alone does not determine the outcome: an as-of
-        visibility cutoff can hide an explicit value so that the forecast or
-        formula fires instead.
+        The typed result: one cell per node and period.
 
         This property does not raise.
 
         Returns
         -------
-        dict[str, dict[str, str]]
-            Node identifier → period identifier (``"2025Q1"``) → source label:
-            ``"value"`` (explicit value), ``"forecast"`` (forecast method),
-            ``"formula"`` (formula) or ``"where_masked"`` (the ``where`` clause
-            was false, so the cell is ``0.0``). Same keys as the evaluated
-            values. Empty for a result that was not produced by an evaluator
-            or was serialized before sources were recorded.
+        dict[str, dict[str, dict[str, Any]]]
+            Node identifier → period identifier (``"2025Q1"``) → cell. A cell
+            has ``status`` (``"value"``, ``"missing"``, ``"masked"`` or
+            ``"unavailable"``); a value cell has ``value`` (a finite float for
+            a scalar node, ``{"amount": "125.01", "currency": "USD"}`` with an
+            exact decimal string for a monetary node); an unavailable cell
+            has ``reason`` (for example ``"missing_mask"``,
+            ``"hidden_by_cutoff"`` or ``"missing_input"``); and ``source``
+            (``"value"``, ``"forecast"`` or ``"formula"``) names the value
+            source selected for the cell, when one was. A zero is a value; a
+            cell without a value is never a zero.
+        """
+        ...
+
+    def get_cell(self, node_id: str, period: str) -> dict[str, Any] | None:
+        """
+        Get one typed cell with its status, value, reason and source.
+
+        Parameters
+        ----------
+        node_id:
+            Node identifier.
+        period:
+            Period label such as ``"2025Q1"``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The cell in the shape described by :attr:`cells`, or ``None``
+            when the result has no cell for the node and period.
+
+        Raises
+        ------
+        ValueError
+            If ``period`` cannot be parsed as a period id.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import Evaluator, ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q2")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+        >>> result = Evaluator().evaluate(builder.build())
+        >>> result.get_cell("revenue", "2025Q1")
+        {'status': 'value', 'value': 100.0, 'source': 'value'}
+        >>> result.get_cell("revenue", "2025Q2")
+        {'status': 'missing'}
+        """
+        ...
+
+    @property
+    def provenance(self) -> dict[str, Any] | None:
+        """
+        What the result was evaluated from.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``model_id``, ``model_content_hash``, optional
+            ``source_snapshot``, ``observation_cutoff`` (``"full_snapshot"``
+            or ``{"through": "2025-04-25"}``), optional ``valuation_date``,
+            ``forecast_streams`` when the model has stochastic forecasts
+            (per node: ``node_id``, ``stream_version``, and the ``seed``,
+            ``state`` and ``stream`` of its PCG64 generator as decimal
+            strings, enough to replay the draws) and ``run_id`` (the
+            content hash of the other fields). ``None``
+            for a result that was not produced by an evaluator.
+        """
+        ...
+
+    @property
+    def rollup_provenance(self) -> dict[str, Any] | None:
+        """
+        How a rolled-up result was produced.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``source_run`` (the :attr:`provenance` of the result that was
+            rolled up), ``frequency`` (the target frequency label),
+            ``methods`` (node id to the ``"sum"``, ``"period_end"`` or
+            ``"formula"`` method used, in model order) and ``source_periods``
+            (target period id to its source period ids, in timeline order).
+            ``None`` for a result that :meth:`rollup` did not produce.
+        """
+        ...
+
+    @property
+    def normalizations(self) -> dict[str, Any]:
+        """
+        The configuration of every adjusted metric published into this result.
+
+        Returns
+        -------
+        dict[str, Any]
+            Output node id to the ``NormalizationConfig`` (its serde form)
+            that :func:`merge_into_results` calculated it from, in publication
+            order; empty when nothing was published. The source run is this
+            result's ``provenance`` or ``rollup_provenance``.
+
+        Raises
+        ------
+        ValueError
+            If a stored configuration cannot be serialized.
         """
         ...
 
@@ -405,7 +576,7 @@ class StatementResult:
         """
         ...
 
-    def get_node(self, node_id: str) -> dict[str, float] | None:
+    def numeric_series(self, node_id: str) -> dict[str, float] | None:
         """
         Get every evaluated period for one node as a dict.
 
@@ -417,9 +588,10 @@ class StatementResult:
         Returns
         -------
         dict[str, float] | None
-            Period identifier string → value, in evaluation order, in the
-            node's own units (currency amount for monetary nodes, unitless
-            otherwise). ``None`` when the node is not in the result.
+            Period identifier string → value for the node's value cells, in
+            timeline order, in the node's own units (currency amount for
+            monetary nodes, unitless otherwise). Cells without a value are
+            left out. ``None`` when the node is not in the result.
 
         Notes
         -----
@@ -579,21 +751,23 @@ class StatementResult:
         Parameters
         ----------
         orient : {"long", "wide"}, default "long"
-            ``"long"`` yields one row per (node, period) with columns
-            ``node_id``, ``period``, ``value``, ``value_money``, ``currency``,
-            ``value_type``, ``source``. ``"wide"`` yields node identifiers as
-            rows and period identifiers as columns.
+            ``"long"`` is the exact table: one row per node and period of the
+            result's plan, including cells without a value, with columns
+            ``node_id``, ``period``, ``status``, ``value``, ``amount``,
+            ``currency``, ``value_type``, ``reason``, ``source``. ``"wide"``
+            is the approximate numeric view: node identifiers as rows and
+            period identifiers as columns.
 
         Notes
         -----
-        In long form the monetary columns are populated for nodes carrying
-        currency information and are otherwise null. ``value_money`` is a
-        float64 mirror of the monetary amount (f64, not fixed-point Decimal,
-        precision); use ``to_json()`` or ``get_money()`` when full fixed-point
-        precision is required. ``source`` is the evaluation layer that
-        produced the cell (``value``, ``forecast``, ``formula`` or
-        ``where_masked``, see :attr:`node_sources`); it is null when the
-        result records no source for the cell.
+        In long form ``status`` is ``value``, ``missing``, ``masked`` or
+        ``unavailable``; ``value`` is the float view of a value cell and null
+        otherwise; ``amount`` is the exact decimal text of a monetary value
+        cell and ``currency`` its ISO code (both null for scalar and
+        value-less cells); ``reason`` says why an unavailable cell has no
+        value; and ``source`` is the value source selected for the cell
+        (``value``, ``forecast`` or ``formula``), null when none was. In wide
+        form a cell without a value is null (NaN), never zero.
 
         Returns
         -------
@@ -634,8 +808,11 @@ class StatementResult:
         """
         Export the wide-format table via Arrow (zero-copy for consumers).
 
-        Rows are periods (column ``period_id``), one ``float64`` column per
-        node, matching ``to_dataframe("wide")`` before its transpose.
+        Rows are the periods of the result's plan (column ``period_id``), with
+        one nullable ``float64`` column per node whose field metadata carries
+        its units (``value_type`` and, for money, ``currency``). A cell
+        without a value is null. Matches ``to_dataframe("wide")`` before its
+        transpose.
 
         Returns
         -------
@@ -682,7 +859,7 @@ class StatementResult:
         Returns
         -------
         pd.Series
-            Float64 node values indexed by period identifier, in the node's own units; use get_money for currency and fixed-point precision.
+            Float64 node values indexed by period identifier, in the node's own units; a cell without a value is NaN. Use get_money for currency and fixed-point precision.
 
         Raises
         ------
@@ -754,8 +931,8 @@ class Evaluator:
         >>> _ = builder.periods("2025Q1..Q1")
         >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> evaluator = Evaluator().with_checks(spec)
-        >>> evaluator.evaluate(builder.build()).check_report.passed
-        True
+        >>> evaluator.evaluate(builder.build()).check_report.outcome
+        'unevaluated'
         """
         ...
 
@@ -798,13 +975,13 @@ class Evaluator:
         model: FinancialModelSpec,
         market: MarketContext,
         as_of: date,
+        observation_cutoff: date | str,
     ) -> StatementResult:
         """
         Evaluate ``model`` with market data and an as-of date.
 
         Use this when capital-structure instruments need market data
-        (floating coupons, swaps, caps) and for as-of filtering of future
-        actual periods.
+        (floating coupons, swaps, caps) and for point-in-time evaluation.
 
         Parameters
         ----------
@@ -813,13 +990,17 @@ class Evaluator:
         market:
             A :class:`MarketContext` with curves, FX, and vol surfaces.
         as_of:
-            Valuation date for pricing, and the cutoff for explicit-value
-            visibility. A value whose declared availability date falls
-            after ``as_of`` is hidden in any period; an actual with no
-            declared date becomes visible at its period's end; an undated
-            value in a forecast period is an assumption and stays visible. A
-            hidden value makes the node fall back to its forecast or formula
-            (a value-only node then raises).
+            Valuation date for pricing the capital structure. It does not
+            hide observations.
+        observation_cutoff:
+            ``"full_snapshot"`` reads every observation in the model. A date
+            (or ISO ``YYYY-MM-DD`` string) reads an observation only when its
+            availability date is on or before that date, inclusive; the model
+            must then name its ``source_snapshot`` and give an availability
+            date to every observation in an actual period. An undated
+            explicit value in a forecast period is a forecast assumption and
+            stays visible. A hidden value makes the node fall back to its
+            forecast or formula (a value-only node then raises).
 
         Returns
         -------
@@ -829,7 +1010,9 @@ class Evaluator:
         Raises
         ------
         ValueError
-            If ``as_of`` or a formula is invalid.
+            If ``as_of``, ``observation_cutoff`` or a formula is invalid, or a
+            cutoff date is used on a model with no ``source_snapshot`` or
+            with an undated observation in an actual period.
         KeyError
             If a referenced node, input data or required market data is missing.
         RuntimeError
@@ -843,33 +1026,57 @@ class Evaluator:
         self,
         model: FinancialModelSpec,
         config: MonteCarloConfig,
+        market: MarketContext | None = None,
+        as_of: date | str | None = None,
+        observation_cutoff: date | str | None = None,
     ) -> MonteCarloResults:
         """
         Run a Monte Carlo simulation of ``model`` under this evaluator.
 
-        Each path evaluates the model as ``evaluate`` does on that path's
-        sampled forecasts, so a capital structure (built from an empty market
-        as of the first period's start) and its waterfall run per path and
-        ``cs.*`` references see that path's debt service and balances.
+        Each path evaluates the complete model on that path's sampled
+        forecasts with fresh state, so a capital structure and its waterfall
+        run per path and ``cs.*`` references see that path's debt service and
+        balances. The requested metrics are aggregated into R-7 sample
+        quantiles per forecast period.
 
         Parameters
         ----------
         model : FinancialModelSpec
-            Model whose stochastic forecast nodes are sampled.
+            Model whose stochastic forecast nodes are sampled. It needs at
+            least one forecast period.
         config : MonteCarloConfig
-            Path count, seed and requested percentiles.
+            Path count, seed, the metrics to report and the percentiles.
+        market : MarketContext or None, default None
+            Market the capital structure is projected on, as for
+            ``evaluate_with_market``. ``None`` evaluates as ``evaluate`` does:
+            the full snapshot on an empty market as of the first period's
+            start. Give ``market`` and ``as_of`` together.
+        as_of : date or str or None, default None
+            Valuation date of the capital structure's contractual flows;
+            required with ``market``.
+        observation_cutoff : date or str or None, default None
+            ``"full_snapshot"`` (the default with a market) or the date
+            through which explicit observations are visible.
 
         Returns
         -------
         MonteCarloResults
-            Percentile summaries, warnings and optional retained paths.
+            Percentile summaries for a complete run. When a requested sample
+            has no value on some path, no statistics are published and
+            ``incomplete`` names the first such sample.
 
         Raises
         ------
         ValueError
-            If the model or configuration is rejected.
+            If the model or configuration is rejected (a path count of zero,
+            no, unknown or repeated metrics, repeated or out-of-range
+            percentiles, a run above the sample limit, no forecast period),
+            only one of ``market`` and ``as_of`` is given, or a path fails.
+        KeyError
+            If a formula references an unknown node or required market data
+            is missing.
         RuntimeError
-            If simulation fails.
+            If a capital-structure calculation fails on a path.
 
         Examples
         --------
@@ -877,7 +1084,8 @@ class Evaluator:
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q2", "2025Q1")
         >>> _ = builder.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
-        >>> Evaluator().evaluate_monte_carlo(builder.build(), MonteCarloConfig(2, 7, [0.5])).n_paths
+        >>> config = MonteCarloConfig(2, 7, ["revenue"], [0.5])
+        >>> Evaluator().evaluate_monte_carlo(builder.build(), config).n_paths
         2
 
         """

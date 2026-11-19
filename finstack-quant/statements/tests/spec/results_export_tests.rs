@@ -17,10 +17,13 @@ fn string_column<'a>(
     }
 }
 
-fn float_column<'a>(table: &'a finstack_quant_core::table::TableEnvelope, name: &str) -> &'a [f64] {
+fn float_column(table: &finstack_quant_core::table::TableEnvelope, name: &str) -> Vec<f64> {
     match &table.column(name).unwrap().data {
-        finstack_quant_core::table::TableColumnData::Float64(values) => values,
-        other => panic!("expected float column, got {other:?}"),
+        finstack_quant_core::table::TableColumnData::NullableFloat64(values) => values
+            .iter()
+            .map(|value| value.expect("every cell of this fixture has a value"))
+            .collect(),
+        other => panic!("expected nullable float column, got {other:?}"),
     }
 }
 
@@ -56,14 +59,24 @@ fn test_export_to_table_long() {
 
     // Should have 3 nodes × 2 periods = 6 rows
     assert_eq!(table.row_count, 6);
-    assert_eq!(table.columns.len(), 7); // node_id, period_id, value, value_money, currency, value_type, source
-    assert_eq!(table.columns[0].name, "node_id");
-    assert_eq!(table.columns[1].name, "period_id");
-    assert_eq!(table.columns[2].name, "value");
-    assert_eq!(table.columns[3].name, "value_money");
-    assert_eq!(table.columns[4].name, "currency");
-    assert_eq!(table.columns[5].name, "value_type");
-    assert_eq!(table.columns[6].name, "source");
+    assert_eq!(
+        table
+            .columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "node_id",
+            "period_id",
+            "status",
+            "value",
+            "amount",
+            "currency",
+            "value_type",
+            "reason",
+            "source"
+        ]
+    );
 }
 
 #[test]
@@ -134,10 +147,11 @@ fn test_export_complete_pl_model() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.compute("cogs", "revenue * 0.6").unwrap();
         model_builder.value(
@@ -149,10 +163,7 @@ fn test_export_complete_pl_model() {
         );
         model_builder.forecast(
             "opex",
-            ForecastSpec {
-                method: ForecastMethod::ForwardFill,
-                params: indexmap! {},
-            },
+            ForecastSpec::from_params(ForecastMethod::ForwardFill, indexmap! {}).unwrap(),
         );
         model_builder
             .compute("gross_profit", "revenue - cogs")
@@ -296,7 +307,7 @@ fn test_empty_results_export() {
 
     let table_long = results.to_table_long().unwrap();
     assert_eq!(table_long.row_count, 0);
-    assert_eq!(table_long.columns.len(), 7); // Updated for new columns
+    assert_eq!(table_long.columns.len(), 9);
 
     let table_wide = results.to_table_wide().unwrap();
     assert_eq!(table_wide.row_count, 0);

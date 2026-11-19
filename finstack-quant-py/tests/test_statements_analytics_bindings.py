@@ -80,6 +80,8 @@ class TestRunChecks:
                     "name": "Revenue must be positive",
                     "category": "internal_consistency",
                     "severity": "error",
+                    "mode": "predicate",
+                    "scope": "all_periods",
                     "formula": "revenue > 0",
                     "message_template": "Revenue not positive in {period}",
                 }
@@ -100,6 +102,8 @@ class TestRunChecks:
                     "name": "Revenue must be positive",
                     "category": "internal_consistency",
                     "severity": "error",
+                    "mode": "predicate",
+                    "scope": "all_periods",
                     "formula": "revenue > 0",
                     "message_template": "Revenue not positive in {period}",
                 }
@@ -108,11 +112,17 @@ class TestRunChecks:
         builder = statements.ModelBuilder("negative")
         builder.periods("2024Q1..Q2", None)
         builder.value("revenue", [("2024Q1", -1.0), ("2024Q2", -1.0)])
-        results = statements.Evaluator().evaluate(builder.build())
+        negative = builder.build()
+        results = statements.Evaluator().evaluate(negative)
 
-        report = run_checks(_model_json(), json.dumps(spec), results)
-
+        # Supplied results are used as they are, for the model they came from.
+        report = run_checks(negative, json.dumps(spec), results)
         assert report.has_errors()
+        assert report.outcome == "fail"
+
+        # Results of another model are not a verified run of this one.
+        with pytest.raises(ValueError, match="not a verified run"):
+            run_checks(_model_json(), json.dumps(spec), results)
 
 
 class TestCorporateAnalysis:

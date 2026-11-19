@@ -32,7 +32,6 @@ const sourceGlyphs: Record<StatementCellSource, string> = {
   value: "■",
   forecast: "↗",
   formula: "ƒ",
-  where_masked: "∅",
 };
 const sourceOrder = Object.keys(sourceGlyphs) as StatementCellSource[];
 
@@ -327,7 +326,7 @@ export function StatementGrid({
                           size="sm"
                           aria-label={`${row.name} ${period.id}${sourceText}${editable ? ", edit value" : ", inspect value"}`}
                           title={`${cell?.text ?? "—"}${source ? ` · ${labelFor(source)}` : ""}${editable ? ` · click to edit exact ${unit ?? "scalar"} value` : ""}`}
-                          className={`w-full justify-end gap-2 font-mono text-xs ${emphasized ? "font-semibold" : "font-normal"} ${source === "where_masked" ? "text-muted-foreground" : ""}`}
+                          className={`w-full justify-end gap-2 font-mono text-xs ${emphasized ? "font-semibold" : "font-normal"} ${cell?.status === "masked" ? "text-muted-foreground" : ""}`}
                           onClick={() => {
                             link?.select(key);
                             if (editable) {

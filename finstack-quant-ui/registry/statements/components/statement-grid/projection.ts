@@ -8,10 +8,11 @@ import { groupDecimal } from "@/lib/finstack/format/format";
 import Big from "big.js";
 
 const resultCodec = createWireCodec(statementSchema);
-/** The native evaluation layer that produced a cell (`Value > Forecast > Formula`, after a `where` mask). */
-export type StatementCellSource = NonNullable<
-  StatementResultWire["node_sources"]
->[string][string];
+type StatementResultCell = StatementResultWire["cells"][string][string];
+/** The native value source selected for a cell (`Value > Forecast > Formula`). */
+export type StatementCellSource = NonNullable<StatementResultCell["source"]>;
+/** Whether a cell has a value, and if not, the native kind of absence. */
+export type StatementCellStatus = StatementResultCell["status"];
 export type StatementPeriod =
   FinancialModelSpecWire["periods"]["periods"][number];
 export interface StatementCell {
@@ -20,8 +21,10 @@ export interface StatementCell {
   text: string;
   /** The unmodified native number or sentinel; monetary values retain their Money wire object. */
   value: unknown;
-  /** The layer Rust recorded in `node_sources`; absent for results without it (for example a rollup). */
+  /** The source Rust recorded on the cell; absent when none was selected (a masked or missing cell, or a rollup). */
   source?: StatementCellSource;
+  /** The native cell status; absent when the result has no cell for the period. */
+  status?: StatementCellStatus;
 }
 /** Explicit presentation scaling only; the returned value and exact text remain untouched. */
 export function displayStatementCell(
@@ -99,7 +102,7 @@ export function statementRows(
 ): StatementRow[] {
   const ids = new Set([
     ...Object.keys(model.nodes),
-    ...Object.keys(result.nodes),
+    ...Object.keys(result.cells),
   ]);
   return [...ids].map((nodeId) => {
     const kind = result.node_value_types?.[nodeId];
@@ -109,17 +112,22 @@ export function statementRows(
         : (kind?.type ?? "Unspecified");
     const cells = Object.fromEntries(
       model.periods.periods.map((period) => {
-        const monetary = result.monetary_nodes?.[nodeId]?.[period.id];
-        const numeric = result.nodes[nodeId]?.[period.id];
-        const present = monetary !== undefined || numeric !== undefined;
-        const source = result.node_sources?.[nodeId]?.[period.id];
+        const native = result.cells[nodeId]?.[period.id];
+        const value = native?.value ?? undefined;
+        const monetary =
+          value !== undefined && typeof value === "object" ? value : undefined;
+        const numeric = typeof value === "number" ? value : undefined;
+        // A cell without a value (missing, masked, unavailable) is not present.
+        const present = value !== undefined;
+        const source = native?.source ?? undefined;
         return [
           period.id,
           {
             periodId: period.id,
             present,
             ...(source === undefined ? {} : { source }),
-            value: monetary ?? numeric,
+            ...(native === undefined ? {} : { status: native.status }),
+            value,
             text: monetary
               ? formatRawMoney(monetary)
               : numeric === undefined

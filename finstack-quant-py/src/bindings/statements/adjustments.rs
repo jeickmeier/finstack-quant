@@ -3,9 +3,9 @@
 use super::evaluator::PyStatementResult;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pydoc::pydoc;
-use crate::errors::{statements_to_py, value_error};
+use crate::errors::statements_to_py;
 use finstack_quant_statements::adjustments::{
-    Adjustment, AdjustmentValue, AppliedAdjustment, CapBaseMode, NormalizationConfig,
+    Adjustment, AdjustmentCap, AdjustmentValue, AppliedAdjustment, NormalizationConfig,
     NormalizationResult,
 };
 use pyo3::prelude::*;
@@ -26,40 +26,15 @@ pub struct PyAdjustment {
     pub(super) inner: Adjustment,
 }
 
-/// Parse a cap base mode discriminant (``"reported"`` / ``"progressive"``).
-fn parse_cap_base_mode(mode: &str) -> PyResult<CapBaseMode> {
-    finstack_quant_core::wire::serde_parse(mode).map_err(|e| {
-        value_error(format!(
-            "invalid cap base mode {mode:?}: {e}; expected reported or progressive"
-        ))
-    })
-}
-
 wire_methods!(PyAdjustment, Adjustment, "Adjustment");
 
 #[pymethods]
 impl PyAdjustment {
-    /// Fixed per-period adjustment.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique adjustment identifier within a configuration.
-    /// name : str
-    ///     Human-readable name (``"Synergies"``, ``"Management fees"``).
-    /// amounts : Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series
-    ///     Period id to signed amount in the target metric's units
-    ///     (positive add-back, negative deduction). Periods without an
-    ///     entry receive no adjustment.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a period id does not parse or an amount is not numeric.
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "Adjustment.fixed")]
     #[staticmethod]
     #[pyo3(text_signature = "(id, name, amounts)")]
     fn fixed(id: &str, name: &str, amounts: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let amounts = super::extract_scalar_series(amounts)?.into_iter().collect();
+        let amounts = super::extract_value_series(amounts)?.into_iter().collect();
         Ok(Self {
             inner: Adjustment::fixed(id, name, amounts),
         })
@@ -87,11 +62,12 @@ impl PyAdjustment {
     }
 
     #[doc = pydoc!("finstack_quant.statements._adjustments", "Adjustment.with_cap")]
-    #[pyo3(text_signature = "($self, base_node, value, base_mode)")]
-    fn with_cap(&self, base_node: Option<String>, value: f64, base_mode: &str) -> PyResult<Self> {
-        let mode = parse_cap_base_mode(base_mode)?;
+    #[pyo3(text_signature = "($self, cap)")]
+    fn with_cap(&self, cap: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let cap: AdjustmentCap =
+            crate::bindings::module_utils::spec_from_py(cap.py(), cap, "adjustment cap")?;
         Ok(Self {
-            inner: self.inner.clone().with_cap(base_node, value, mode),
+            inner: self.inner.clone().with_cap(cap),
         })
     }
 
@@ -136,29 +112,13 @@ impl PyAdjustment {
         self.inner.cap.is_some()
     }
 
-    /// Cap base node, or ``None`` (absolute cap or no cap).
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "Adjustment.cap")]
     #[getter]
-    fn cap_base_node(&self) -> Option<String> {
+    fn cap<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
             .cap
             .as_ref()
-            .and_then(|cap| cap.base_node.clone())
-    }
-
-    /// Cap value (decimal fraction of the base node, or absolute amount),
-    /// or ``None`` when no cap is configured.
-    #[getter]
-    fn cap_value(&self) -> Option<f64> {
-        self.inner.cap.as_ref().map(|cap| cap.value)
-    }
-
-    #[doc = pydoc!("finstack_quant.statements._adjustments", "Adjustment.cap_base_mode")]
-    #[getter]
-    fn cap_base_mode(&self) -> PyResult<Option<String>> {
-        self.inner
-            .cap
-            .as_ref()
-            .map(|cap| crate::bindings::extract::label(&cap.base_mode))
+            .map(|cap| crate::bindings::pandas_utils::serde_to_py(py, cap))
             .transpose()
     }
 
@@ -206,16 +166,28 @@ impl PyAppliedAdjustment {
         &self.inner.name
     }
 
-    /// Calculated amount before applying a cap.
+    /// Signed amount before applying a cap, as a float.
     #[getter]
     fn raw_amount(&self) -> f64 {
-        self.inner.raw_amount
+        self.inner.raw_amount.value()
     }
 
-    /// Amount included after applying any cap.
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "AppliedAdjustment.cap_base")]
+    #[getter]
+    fn cap_base(&self) -> Option<f64> {
+        self.inner.cap_base.map(|amount| amount.value())
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "AppliedAdjustment.cap_limit")]
+    #[getter]
+    fn cap_limit(&self) -> Option<f64> {
+        self.inner.cap_limit.map(|amount| amount.value())
+    }
+
+    /// Signed amount applied after any cap, as a float.
     #[getter]
     fn capped_amount(&self) -> f64 {
-        self.inner.capped_amount
+        self.inner.capped_amount.value()
     }
 
     /// Whether a cap changed the calculated amount.
@@ -227,7 +199,7 @@ impl PyAppliedAdjustment {
     #[doc = pydoc!("finstack_quant.statements._adjustments", "AppliedAdjustment.adjusted_value")]
     #[getter]
     fn adjusted_value(&self) -> f64 {
-        self.inner.adjusted_value
+        self.inner.adjusted_value.value()
     }
 
     /// Return a concise diagnostic representation.
@@ -235,8 +207,8 @@ impl PyAppliedAdjustment {
         format!(
             "AppliedAdjustment(id={:?}, raw_amount={}, capped_amount={}, is_capped={})",
             self.inner.adjustment_id,
-            self.inner.raw_amount,
-            self.inner.capped_amount,
+            self.inner.raw_amount.value(),
+            self.inner.capped_amount.value(),
             if self.inner.is_capped {
                 "True"
             } else {
@@ -292,10 +264,10 @@ impl PyNormalizationResult {
         }
     }
 
-    /// Reported value before normalization adjustments.
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "NormalizationResult.base_value")]
     #[getter]
-    fn base_value(&self) -> f64 {
-        self.inner.base_value
+    fn base_value(&self) -> Option<f64> {
+        self.inner.base_value.map(|amount| amount.value())
     }
 
     /// Applied adjustments in declaration order.
@@ -309,19 +281,25 @@ impl PyNormalizationResult {
             .collect()
     }
 
-    /// Value after all capped adjustments.
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "NormalizationResult.final_value")]
     #[getter]
-    fn final_value(&self) -> f64 {
-        self.inner.final_value
+    fn final_value(&self) -> Option<f64> {
+        self.inner.final_value.map(|amount| amount.value())
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "NormalizationResult.unavailable")]
+    #[getter]
+    fn unavailable(&self) -> Option<&'static str> {
+        self.inner.unavailable.map(|reason| reason.as_str())
     }
 
     /// Return a concise diagnostic representation.
     fn __repr__(&self) -> String {
         format!(
-            "NormalizationResult(period={:?}, base_value={}, final_value={}, adjustments={})",
+            "NormalizationResult(period={:?}, base_value={:?}, final_value={:?}, adjustments={})",
             self.inner.period.to_string(),
-            self.inner.base_value,
-            self.inner.final_value,
+            self.base_value(),
+            self.final_value(),
             self.inner.adjustments.len()
         )
     }
@@ -347,19 +325,12 @@ wire_methods!(
 
 #[pymethods]
 impl PyNormalizationConfig {
-    /// Create a normalization configuration for a target node.
-    ///
-    /// Starts with no adjustments; add them with :meth:`add_adjustment`.
-    ///
-    /// Parameters
-    /// ----------
-    /// target_node : str
-    ///     Node identifier of the metric to normalize (e.g. ``"ebitda"``).
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "NormalizationConfig.__init__")]
     #[new]
-    #[pyo3(text_signature = "(target_node)")]
-    fn new(target_node: &str) -> Self {
+    #[pyo3(text_signature = "(target_node, output_node)")]
+    fn new(target_node: &str, output_node: &str) -> Self {
         Self {
-            inner: NormalizationConfig::new(target_node),
+            inner: NormalizationConfig::new(target_node, output_node),
         }
     }
 
@@ -418,6 +389,12 @@ impl PyNormalizationConfig {
         &self.inner.target_node
     }
 
+    /// New node the adjusted metric is published under (e.g. ``"adjusted_ebitda"``).
+    #[getter]
+    fn output_node(&self) -> &str {
+        &self.inner.output_node
+    }
+
     /// Configured adjustments in application order.
     #[getter]
     fn adjustments(&self) -> Vec<PyAdjustment> {
@@ -438,34 +415,15 @@ impl PyNormalizationConfig {
     /// Return the representation with the target node and adjustment count.
     fn __repr__(&self) -> String {
         format!(
-            "NormalizationConfig(target={:?}, adjustments={})",
+            "NormalizationConfig(target={:?}, output={:?}, adjustments={})",
             self.inner.target_node,
+            self.inner.output_node,
             self.inner.adjustments.len()
         )
     }
 }
 
-/// Run normalization on statement results.
-///
-/// Parameters
-/// ----------
-/// results : StatementResult
-///     Evaluated statement results.
-/// config : NormalizationConfig
-///     Normalization configuration (target node + adjustments).
-///
-/// Returns
-/// -------
-/// list[NormalizationResult]
-///     Typed period results in chronological order.
-///
-/// Raises
-/// ------
-/// KeyError
-///     If the target node or a referenced node is not in ``results``.
-/// ValueError
-///     If the configuration holds duplicate adjustment ids or a cap is
-///     misconfigured.
+#[doc = pydoc!("finstack_quant.statements._adjustments", "normalize")]
 #[pyfunction]
 #[pyo3(text_signature = "(results, config)")]
 fn normalize(
@@ -482,67 +440,16 @@ fn normalize(
         .collect())
 }
 
-/// Write normalized values back into statement results as a node.
-///
-/// Wraps Rust ``adjustments::merge_into_results``: the normalization
-/// results' ``final_value`` per period become node ``output_node_id`` with the
-/// shared unit (and currency for monetary values), replacing any existing node
-/// of that name across all periods. The attached check report is cleared
-/// because it describes the values before the merge; rerun the checks to
-/// validate the updated results.
-///
-/// Parameters
-/// ----------
-/// results : StatementResult
-///     Evaluated statement results. Left unchanged; the merged copy is
-///     returned (Rust updates its argument in place).
-/// normalization_results : list[NormalizationResult]
-///     Per-period results from :func:`normalize`, all with the same unit and
-///     currency. An empty list returns an unchanged copy.
-/// output_node_id : str
-///     Node to create or replace, e.g. ``"adjusted_ebitda"``.
-///
-/// Returns
-/// -------
-/// StatementResult
-///     Copy of ``results`` holding the merged node.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the results mix units or currencies, repeat a period, or hold a
-///     non-finite value.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import (
-/// ...     Evaluator, ModelBuilder, NormalizationConfig, merge_into_results, normalize,
-/// ... )
-/// >>> builder = ModelBuilder("m")
-/// >>> _ = builder.periods("2025Q1..Q2")
-/// >>> _ = builder.value("ebitda", [("2025Q1", 100.0), ("2025Q2", 110.0)])
-/// >>> results = Evaluator().evaluate(builder.build())
-/// >>> merged = merge_into_results(results, normalize(results, NormalizationConfig("ebitda")), "adj")
-/// >>> merged.get("adj", "2025Q2")
-/// 110.0
+#[doc = pydoc!("finstack_quant.statements._adjustments", "merge_into_results")]
 #[pyfunction]
-#[pyo3(text_signature = "(results, normalization_results, output_node_id)")]
+#[pyo3(text_signature = "(results, config)")]
 fn merge_into_results(
     results: &PyStatementResult,
-    normalization_results: Vec<PyRef<'_, PyNormalizationResult>>,
-    output_node_id: &str,
+    config: &PyNormalizationConfig,
 ) -> PyResult<PyStatementResult> {
-    let normalization_results: Vec<_> = normalization_results
-        .iter()
-        .map(|result| result.inner.clone())
-        .collect();
     let mut inner = results.inner.clone();
-    finstack_quant_statements::adjustments::merge_into_results(
-        &mut inner,
-        &normalization_results,
-        output_node_id,
-    )
-    .map_err(statements_to_py)?;
+    finstack_quant_statements::adjustments::merge_into_results(&mut inner, &config.inner)
+        .map_err(statements_to_py)?;
     Ok(PyStatementResult { inner })
 }
 

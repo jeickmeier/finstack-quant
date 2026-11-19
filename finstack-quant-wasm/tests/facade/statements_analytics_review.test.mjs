@@ -56,7 +56,7 @@ test('exit-multiple DCF sensitivity has no terminal growth shock', () => {
   assert.ok(result.entries.some((entry) => entry.parameter_id === 'exit_multiple'));
 });
 
-test('growth terminals require a full year even for annual period identifiers', () => {
+test('an annual identifier on a half-year interval is not a canonical plan', () => {
   const model = {
     id: 'annual-stub-review',
     periods: {

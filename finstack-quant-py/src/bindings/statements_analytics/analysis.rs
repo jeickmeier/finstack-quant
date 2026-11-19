@@ -1116,9 +1116,9 @@ impl PyExplanation {
         finstack_quant_core::wire::serde_label(&self.inner.node_type).map_err(core_to_py)
     }
 
-    /// Evaluation layer that produced the value: ``"value"``, ``"forecast"``,
-    /// ``"formula"`` or ``"where_masked"``; ``None`` when the results carry no
-    /// cell source.
+    /// Value source selected for the cell: ``"value"``, ``"forecast"`` or
+    /// ``"formula"``; ``None`` for a masked or missing cell and when the
+    /// results carry no cell source.
     #[getter]
     fn source(&self) -> Option<&'static str> {
         self.inner.source.map(|source| source.as_str())

@@ -121,13 +121,13 @@ test('statements.Evaluator.evaluate returns a structured StatementResult', () =>
   const roundTripped = assertStructured(result, 'Evaluator.evaluate result');
   // Property reads resolve directly off the returned object, not only after
   // a JSON round trip.
-  assert.ok(result.nodes, 'nodes is directly readable');
-  assert.ok(Object.keys(result.nodes).includes('revenue'), 'revenue node present');
-  assert.ok(roundTripped.nodes.revenue, 'revenue survives serialization');
+  assert.ok(result.cells, 'cells is directly readable');
+  assert.ok(Object.keys(result.cells).includes('revenue'), 'revenue node present');
+  assert.ok(roundTripped.cells.revenue, 'revenue survives serialization');
 });
 
 test('statements.Evaluator.evaluateMonteCarlo returns a structured object', () => {
-  const config = JSON.stringify({ n_paths: 10, seed: 42 });
+  const config = JSON.stringify({ n_paths: 10, seed: '42', metrics: ['revenue'] });
   const results = new statements.Evaluator().evaluateMonteCarlo(MODEL_JSON, config);
   assertStructured(results, 'evaluateMonteCarlo result');
 });
@@ -157,6 +157,8 @@ test('statements_analytics.runChecks returns a structured CheckReport', () => {
         name: 'Revenue must be positive',
         category: 'internal_consistency',
         severity: 'error',
+        mode: 'predicate',
+        scope: 'all_periods',
         formula: 'revenue > 0',
         message_template: 'Revenue not positive in {period}',
         tolerance: null,
@@ -185,7 +187,7 @@ test('statements_analytics.creditAssessment returns a structured object', () => 
   assert.equal(assessment.period, '2025Q1', 'assessment period is directly readable');
 });
 
-test('statement missing values survive JSON.stringify with canonical sentinels', () => {
+test('statement unavailable cells survive JSON.stringify as typed cells', () => {
   const model = JSON.parse(MODEL_JSON);
   model.nodes.lagged = {
     node_id: 'lagged',
@@ -193,8 +195,16 @@ test('statement missing values survive JSON.stringify with canonical sentinels',
     formula_text: 'lag(revenue, 1)',
   };
   const result = new statements.Evaluator().evaluate(JSON.stringify(model));
-  assert.equal(result.nodes.lagged['2025Q1'], 'nan');
-  assert.equal(JSON.parse(JSON.stringify(result)).nodes.lagged['2025Q1'], 'nan');
+  assert.deepEqual(result.cells.lagged['2025Q1'], {
+    status: 'unavailable',
+    reason: 'missing_input',
+    source: 'formula',
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(result)).cells.lagged['2025Q1'], {
+    status: 'unavailable',
+    reason: 'missing_input',
+    source: 'formula',
+  });
 });
 
 test('statement declarations cannot relabel explicit foreign money', () => {
@@ -218,7 +228,7 @@ test('statements.parseFormula returns the canonical text Python parse_formula re
   );
 });
 
-test('statements residual scale warning accepts the applied ratio and rejects obsolete clamping', () => {
+test('statements capital warnings are typed and the rescaling warnings are rejected', () => {
   const evaluator = new statements.Evaluator();
   try {
     const result = evaluator.evaluate(MODEL_JSON);
@@ -226,20 +236,22 @@ test('statements residual scale warning accepts the applied ratio and rejects ob
       {
         capital_structure: {
           period: '2025Q1',
-          warning: { kind: 'residual_scale_mismatch', applied_ratio: 10000000 },
+          warning: { kind: 'interest_shortfall', instrument_id: 'TL', amount: 12.5 },
         },
       },
     ];
     assert.equal(statements.statementResultGet(result, 'revenue', '2025Q1'), 100000);
-    result.meta.warnings[0].capital_structure.warning = {
-      kind: 'scale_clamped',
-      raw_ratio: 10000000,
-      clamped_ratio: 1,
-    };
-    assert.throws(
-      () => statements.statementResultGet(result, 'revenue', '2025Q1'),
-      /scale_clamped/
-    );
+    // An opening-balance mismatch is an error, so no result carries these.
+    for (const obsolete of [
+      { kind: 'residual_scale_mismatch', applied_ratio: 10000000 },
+      { kind: 'scale_clamped', raw_ratio: 10000000, clamped_ratio: 1 },
+    ]) {
+      result.meta.warnings[0].capital_structure.warning = obsolete;
+      assert.throws(
+        () => statements.statementResultGet(result, 'revenue', '2025Q1'),
+        new RegExp(obsolete.kind)
+      );
+    }
   } finally {
     evaluator.free();
   }
@@ -260,7 +272,7 @@ test('statements correlated paths retain sampled shocks when peer values round f
     };
     const params = {
       std_dev: tiny ? 1e-20 : 0.1,
-      seed: 42,
+      seed: '42',
       ...(method === 'mean_reverting'
         ? { long_run_mean: tiny ? 1e16 : 100, reversion_speed: 0.1 }
         : { mean: 0 }),
@@ -268,7 +280,7 @@ test('statements correlated paths retain sampled shocks when peer values round f
     model.nodes = {
       peer: {
         node_id: 'peer',
-        node_type: 'value',
+        node_type: 'mixed',
         values: { '2025Q1': tiny ? 1e16 : 100 },
         forecast: { method, params },
       },
@@ -284,7 +296,7 @@ test('statements correlated paths retain sampled shocks when peer values round f
         values: { '2025Q1': 100 },
         forecast: {
           method: 'normal',
-          params: { mean: 0, std_dev: 1, seed, correlation_with: peer, correlation },
+          params: { mean: 0, std_dev: 1, seed: String(seed), correlation_with: peer, correlation },
         },
       };
     }
@@ -292,7 +304,13 @@ test('statements correlated paths retain sampled shocks when peer values round f
     try {
       return evaluator.evaluateMonteCarlo(
         JSON.stringify(model),
-        JSON.stringify({ n_paths: 16, seed: 7, percentiles: [0.5], include_path_data: true })
+        JSON.stringify({
+          n_paths: 16,
+          seed: '7',
+          metrics: ['peer', 'follower', 'child'],
+          percentiles: [0.5],
+          include_path_data: true,
+        })
       );
     } finally {
       evaluator.free();
@@ -306,7 +324,8 @@ test('statements correlated paths retain sampled shocks when peer values round f
     for (const rho of [-1, 0, 0.6, 1]) {
       const baseline = run(method, rho, false);
       const rounded = run(method, rho, true);
-      assert.ok(paths(rounded, 'peer').every((value) => value === 1e16));
+      // A log-normal level is restored from its logarithm, so it is flat to rounding.
+      assert.ok(paths(rounded, 'peer').every((value) => Math.abs(value / 1e16 - 1) < 1e-12));
       for (const metric of ['follower', 'child'])
         assert.deepEqual(
           paths(rounded, metric),

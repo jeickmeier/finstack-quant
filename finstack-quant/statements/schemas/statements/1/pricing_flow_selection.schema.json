@@ -810,94 +810,89 @@
         }
       ]
     },
-    "DateWire": {
-      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-      "format": "date",
-      "type": "string"
-    },
-    "DecimalWire": {
-      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
-      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
-      "type": "string"
-    },
-    "Money": {
-      "additionalProperties": false,
-      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
-      "properties": {
-        "amount": {
-          "$ref": "#/$defs/DecimalWire",
-          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+    "FlowSign": {
+      "description": "What a positive amount of a statement node means at the pricing boundary.\n\nSerialized as `\"inflow_positive\"` / `\"outflow_magnitude\"`.",
+      "oneOf": [
+        {
+          "const": "inflow_positive",
+          "description": "The node is a signed economic cash flow: positive is cash received.\nAmounts pass through unchanged.",
+          "type": "string"
         },
-        "currency": {
-          "$ref": "#/$defs/Currency",
-          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        {
+          "const": "outflow_magnitude",
+          "description": "The node is a non-negative outflow magnitude such as CapEx. Each amount\nis negated once; a negative amount is an error.",
+          "type": "string"
         }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ],
-      "type": "object"
+      ]
+    },
+    "PeriodDateConvention": {
+      "description": "Which date of a half-open period `[start, end)` anchors its exported cell.\n\nSerialized and parsed as `\"start\"` / `\"end\"`. There is no default: every\ndated export states its anchor.",
+      "oneOf": [
+        {
+          "const": "start",
+          "description": "The first day of the period.",
+          "type": "string"
+        },
+        {
+          "const": "end",
+          "description": "The last day included in the period (`end - 1 day`).",
+          "type": "string"
+        }
+      ]
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
     }
   },
-  "$id": "https://finstack_quant.dev/schemas/statements/1/swap_params.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/statements/1/pricing_flow_selection.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Identity, notional, decimal fixed rate, dates and curves of a capital-structure pay-fixed swap.",
+  "description": "The monetary node, expected currency, sign convention, required periods and anchor date a pricing caller reads.",
   "examples": [
     {
-      "discount_curve_id": "USD-OIS",
-      "fixed_rate": 0.04,
-      "forward_curve_id": "USD-SOFR-3M",
-      "id": "SWAP-5Y",
-      "maturity_date": "2030-01-15",
-      "notional": {
-        "amount": "1000000",
-        "currency": "USD"
-      },
-      "start_date": "2025-01-15"
+      "currency": "USD",
+      "date_convention": "end",
+      "node_id": "capex",
+      "periods": [
+        "2025M03",
+        "2025M05"
+      ],
+      "sign": "outflow_magnitude"
     }
   ],
   "properties": {
-    "discount_curve_id": {
-      "description": "Discount-curve lookup identifier used at evaluation.",
+    "currency": {
+      "$ref": "#/$defs/Currency",
+      "description": "Currency every amount must carry. No FX is applied."
+    },
+    "date_convention": {
+      "$ref": "#/$defs/PeriodDateConvention",
+      "description": "Anchor date of each period."
+    },
+    "node_id": {
+      "description": "Monetary node to read.",
       "type": "string"
     },
-    "fixed_rate": {
-      "description": "Finite annual fixed-leg decimal rate, such as 0.04 for 4%.",
-      "format": "double",
-      "type": "number"
+    "periods": {
+      "description": "Periods the schedule requires, in any order. Each must hold an amount.",
+      "items": {
+        "$ref": "#/$defs/PeriodId"
+      },
+      "type": "array"
     },
-    "forward_curve_id": {
-      "description": "Floating forward-curve identifier, coherent with simple term-index compounding.",
-      "type": "string"
-    },
-    "id": {
-      "description": "Capital-structure identifier; market-aware evaluation rejects duplicates.",
-      "type": "string"
-    },
-    "maturity_date": {
-      "$ref": "#/$defs/DateWire",
-      "description": "Final contractual swap maturity date (ISO `YYYY-MM-DD`)."
-    },
-    "notional": {
-      "$ref": "#/$defs/Money",
-      "description": "Swap notional in the tagged currency's major units."
-    },
-    "start_date": {
-      "$ref": "#/$defs/DateWire",
-      "description": "Effective accrual start date (ISO `YYYY-MM-DD`), strictly before maturity."
+    "sign": {
+      "$ref": "#/$defs/FlowSign",
+      "description": "Sign convention of the node's amounts."
     }
   },
   "required": [
-    "id",
-    "notional",
-    "fixed_rate",
-    "start_date",
-    "maturity_date",
-    "discount_curve_id",
-    "forward_curve_id"
+    "node_id",
+    "currency",
+    "sign",
+    "periods",
+    "date_convention"
   ],
-  "title": "SwapParams",
+  "title": "PricingFlowSelection",
   "type": "object"
 }

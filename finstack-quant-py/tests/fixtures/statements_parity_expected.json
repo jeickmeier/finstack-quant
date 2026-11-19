@@ -23,7 +23,8 @@
       {
         "cap": {
           "base_node": "revenue",
-          "value": 0.05
+          "fraction": 0.05,
+          "type": "reference"
         },
         "id": "synergy",
         "name": "Synergies",
@@ -35,9 +36,8 @@
       },
       {
         "cap": {
-          "base_mode": "progressive",
-          "base_node": null,
-          "value": 3.0
+          "amount": 3.0,
+          "type": "absolute"
         },
         "id": "synergy",
         "name": "Synergies",
@@ -127,7 +127,7 @@
         "method": "normal",
         "params": {
           "mean": 100.0,
-          "seed": 7,
+          "seed": "7",
           "std_dev": 10.0
         }
       },
@@ -135,7 +135,7 @@
         "method": "log_normal",
         "params": {
           "mean": 0.0,
-          "seed": 7,
+          "seed": "7",
           "std_dev": 0.2
         }
       },
@@ -167,12 +167,14 @@
             1.0,
             2.0,
             3.0
-          ]
+          ],
+          "method": "linear"
         }
       },
       {
         "method": "fade_to_target",
         "params": {
+          "shape": "linear",
           "target": 50.0
         }
       },
@@ -181,7 +183,7 @@
         "params": {
           "long_run_mean": 100.0,
           "reversion_speed": 0.5,
-          "seed": 11,
+          "seed": "11",
           "std_dev": 5.0
         }
       },
@@ -193,7 +195,8 @@
             2.0,
             3.0
           ],
-          "seed": 13
+          "mode": "growth",
+          "seed": "13"
         }
       }
     ],
@@ -230,7 +233,8 @@
         {
           "cap": {
             "base_node": "revenue",
-            "value": 0.05
+            "fraction": 0.05,
+            "type": "reference"
           },
           "id": "synergy",
           "name": "Synergies",
@@ -241,6 +245,7 @@
           }
         }
       ],
+      "output_node": "adjusted_profit",
       "target_node": "profit"
     },
     "normalize": [
@@ -301,28 +306,23 @@
       "count": 22,
       "definition": {
         "category": "income_statement",
-        "description": "Earnings after all expenses and taxes. CONVENTION: `opex` excludes depreciation and amortization.",
-        "formula": "revenue - cogs - opex - depreciation - amortization - interest_expense - tax_expense",
-        "id": "net_income",
-        "name": "Net Income",
+        "description": "Revenue minus cost of goods sold",
+        "formula": "revenue - cogs",
+        "id": "gross_profit",
+        "name": "Gross Profit",
         "requires": [
           "revenue",
-          "cogs",
-          "opex",
-          "depreciation",
-          "amortization",
-          "interest_expense",
-          "tax_expense"
+          "cogs"
         ],
+        "rollup": "sum",
         "tags": [
           "income_statement",
-          "profitability",
-          "bottom_line"
+          "profitability"
         ],
         "unit_type": "currency"
       },
       "dependencies": [],
-      "first": "fin.net_income",
+      "first": "fin.gross_profit",
       "has": [
         true,
         false
@@ -339,6 +339,12 @@
       ]
     ],
     "result.get": 70.0,
+    "result.get_cell": {
+      "source": "formula",
+      "status": "value",
+      "value": 70.0
+    },
+    "result.get_cell_missing": null,
     "result.get_missing": null,
     "result.get_money": {
       "amount": 110.0,
@@ -350,7 +356,7 @@
       "2025Q2": 70.0
     },
     "result.get_node_missing": null,
-    "result.get_or": -1.0,
+    "result.get_or": 70.0,
     "result.get_scalar": 0.6,
     "result.get_scalar_of_money": null,
     "result.node_ids": [
@@ -361,49 +367,89 @@
     ],
     "rollup.annual": {
       "cash": {
-        "2025": 40.0
+        "2025": {
+          "status": "value",
+          "value": 40.0
+        }
       },
       "debt_draws": {
-        "2025": 10.0
+        "2025": {
+          "status": "value",
+          "value": 10.0
+        }
       },
       "ebitda": {
-        "2025": 115.0
+        "2025": {
+          "status": "value",
+          "value": 115.0
+        }
       },
       "margin": {
-        "2025": 0.25
+        "2025": {
+          "status": "value",
+          "value": 0.25
+        }
       },
       "revenue": {
-        "2025": 460.0
+        "2025": {
+          "status": "value",
+          "value": 460.0
+        }
       },
       "score": {
-        "2025": 0.8395104895104896
+        "2025": {
+          "status": "value",
+          "value": 0.8395104895104896
+        }
       }
     },
     "rollup.declared_methods": {
       "frequency": "annual",
       "methods": {
         "cash": "period_end",
-        "margin": "formula"
+        "debt_draws": "sum",
+        "ebitda": "sum",
+        "margin": "formula",
+        "revenue": "sum",
+        "score": "sum"
       }
     },
     "rollup.empty_spec": {
       "cash": {
-        "2025": 40.0
+        "2025": {
+          "status": "value",
+          "value": 40.0
+        }
       },
       "debt_draws": {
-        "2025": 10.0
+        "2025": {
+          "status": "value",
+          "value": 10.0
+        }
       },
       "ebitda": {
-        "2025": 115.0
+        "2025": {
+          "status": "value",
+          "value": 115.0
+        }
       },
       "margin": {
-        "2025": 0.25
+        "2025": {
+          "status": "value",
+          "value": 0.25
+        }
       },
       "revenue": {
-        "2025": 460.0
+        "2025": {
+          "status": "value",
+          "value": 460.0
+        }
       },
       "score": {
-        "2025": 0.8395104895104896
+        "2025": {
+          "status": "value",
+          "value": 0.8395104895104896
+        }
       }
     },
     "rollup.periods": {
@@ -418,7 +464,74 @@
       ]
     },
     "rollup.spec_overrides": {
-      "2025": 100.0
+      "2025": {
+        "status": "value",
+        "value": 100.0
+      }
+    },
+    "stochastic.streams": [
+      {
+        "node_id": "normal",
+        "seed": "9007199254740993",
+        "state": "3117243698345702134",
+        "stream": "94280920230921889",
+        "stream_version": 1
+      },
+      {
+        "node_id": "log_normal",
+        "seed": "7",
+        "state": "2290705235353552679",
+        "stream": "2700445761921302834",
+        "stream_version": 1
+      },
+      {
+        "node_id": "mean_reverting",
+        "seed": "11",
+        "state": "14620627736251365435",
+        "stream": "10803372203327503804",
+        "stream_version": 1
+      },
+      {
+        "node_id": "bootstrap_growth",
+        "seed": "13",
+        "state": "17914113250802253740",
+        "stream": "10609489772245139974",
+        "stream_version": 1
+      },
+      {
+        "node_id": "bootstrap_diff",
+        "seed": "13",
+        "state": "13352767283008906270",
+        "stream": "11997726139553619742",
+        "stream_version": 1
+      }
+    ],
+    "stochastic.values": {
+      "bootstrap_diff": [
+        89.0,
+        94.0,
+        99.0
+      ],
+      "bootstrap_growth": [
+        110.00000000000001,
+        121.00000000000003,
+        108.90000000000003
+      ],
+      "log_normal": [
+        119.5935410222615,
+        106.54127417591481,
+        124.55478936888544
+      ],
+      "mean_reverting": [
+        91.29630196576936,
+        89.0843251399897,
+        85.33454254346073
+      ],
+      "normal": [
+        103.24053865467062,
+        109.14550668944025,
+        109.54634354244563
+      ]
     }
   },
   "statements_analytics": {
@@ -769,6 +882,7 @@
     "lbo": {
       "checked": {
         "checks": {
+          "outcome": "pass",
           "results": [
             {
               "category": "accounting_identity",
@@ -776,334 +890,155 @@
               "check_name": "Balance Sheet Articulation",
               "comparisons": [
                 {
-                  "actual": 100.0,
-                  "expected": 400.0,
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q1",
-                  "tolerance": 0.01
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 },
                 {
-                  "actual": 100.0,
-                  "expected": 400.0,
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q2",
-                  "tolerance": 0.01
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 },
                 {
-                  "actual": 100.0,
-                  "expected": 400.0,
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q3",
-                  "tolerance": 0.01
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 },
                 {
-                  "actual": 100.0,
-                  "expected": 400.0,
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q4",
-                  "tolerance": 0.01
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 },
                 {
-                  "actual": 120.0,
-                  "expected": 320.0,
+                  "actual": {
+                    "amount": "120",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "120",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2026Q1",
-                  "tolerance": 0.01
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 }
               ],
-              "findings": [
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 400.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2025Q1",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 300.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 100.0,
-                    "relative_pct": 300.0
-                  },
-                  "message": "Balance sheet does not articulate in 2025Q1: assets (100.00) != liabilities (300.00) + equity (100.00), imbalance = -300.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2025Q1",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 400.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2025Q2",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 300.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 100.0,
-                    "relative_pct": 300.0
-                  },
-                  "message": "Balance sheet does not articulate in 2025Q2: assets (100.00) != liabilities (300.00) + equity (100.00), imbalance = -300.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2025Q2",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 400.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2025Q3",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 300.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 100.0,
-                    "relative_pct": 300.0
-                  },
-                  "message": "Balance sheet does not articulate in 2025Q3: assets (100.00) != liabilities (300.00) + equity (100.00), imbalance = -300.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2025Q3",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 400.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2025Q4",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 300.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 100.0,
-                    "relative_pct": 300.0
-                  },
-                  "message": "Balance sheet does not articulate in 2025Q4: assets (100.00) != liabilities (300.00) + equity (100.00), imbalance = -300.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2025Q4",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 120.0,
-                    "expected": 320.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2026Q1",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 200.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 120.0,
-                    "relative_pct": 166.66666666666669
-                  },
-                  "message": "Balance sheet does not articulate in 2026Q1: assets (120.00) != liabilities (200.00) + equity (120.00), imbalance = -200.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2026Q1",
-                  "severity": "error"
-                }
-              ],
-              "passed": false
-            },
-            {
-              "category": "accounting_identity",
-              "check_id": "retained_earnings_reconciliation",
-              "check_name": "Retained Earnings Reconciliation",
-              "comparisons": [
-                {
-                  "actual": 100.0,
-                  "expected": 200.0,
-                  "identity": "retained_earnings_roll_forward",
-                  "period": "2025Q2",
-                  "tolerance": 0.01
-                },
-                {
-                  "actual": 100.0,
-                  "expected": 200.0,
-                  "identity": "retained_earnings_roll_forward",
-                  "period": "2025Q3",
-                  "tolerance": 0.01
-                },
-                {
-                  "actual": 100.0,
-                  "expected": 200.0,
-                  "identity": "retained_earnings_roll_forward",
-                  "period": "2025Q4",
-                  "tolerance": 0.01
-                },
-                {
-                  "actual": 120.0,
-                  "expected": 220.0,
-                  "identity": "retained_earnings_roll_forward",
-                  "period": "2026Q1",
-                  "tolerance": 0.01
-                }
-              ],
-              "findings": [
-                {
-                  "check_id": "retained_earnings_reconciliation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 200.0,
-                    "identity": "retained_earnings_roll_forward",
-                    "period": "2025Q2",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 100.0,
-                    "reference_label": "prior_retained_earnings",
-                    "reference_value": 100.0,
-                    "relative_pct": 100.0
-                  },
-                  "message": "Retained earnings do not reconcile in 2025Q2: actual RE (100.00) != expected (200.00), difference = -100.00",
-                  "nodes": [
-                    "ebitda",
-                    "ebitda"
-                  ],
-                  "period": "2025Q2",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "retained_earnings_reconciliation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 200.0,
-                    "identity": "retained_earnings_roll_forward",
-                    "period": "2025Q3",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 100.0,
-                    "reference_label": "prior_retained_earnings",
-                    "reference_value": 100.0,
-                    "relative_pct": 100.0
-                  },
-                  "message": "Retained earnings do not reconcile in 2025Q3: actual RE (100.00) != expected (200.00), difference = -100.00",
-                  "nodes": [
-                    "ebitda",
-                    "ebitda"
-                  ],
-                  "period": "2025Q3",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "retained_earnings_reconciliation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 200.0,
-                    "identity": "retained_earnings_roll_forward",
-                    "period": "2025Q4",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 100.0,
-                    "reference_label": "prior_retained_earnings",
-                    "reference_value": 100.0,
-                    "relative_pct": 100.0
-                  },
-                  "message": "Retained earnings do not reconcile in 2025Q4: actual RE (100.00) != expected (200.00), difference = -100.00",
-                  "nodes": [
-                    "ebitda",
-                    "ebitda"
-                  ],
-                  "period": "2025Q4",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "retained_earnings_reconciliation",
-                  "comparison": {
-                    "actual": 120.0,
-                    "expected": 220.0,
-                    "identity": "retained_earnings_roll_forward",
-                    "period": "2026Q1",
-                    "tolerance": 0.01
-                  },
-                  "materiality": {
-                    "absolute": 100.0,
-                    "reference_label": "prior_retained_earnings",
-                    "reference_value": 100.0,
-                    "relative_pct": 100.0
-                  },
-                  "message": "Retained earnings do not reconcile in 2026Q1: actual RE (120.00) != expected (220.00), difference = -100.00",
-                  "nodes": [
-                    "ebitda",
-                    "ebitda"
-                  ],
-                  "period": "2026Q1",
-                  "severity": "error"
-                }
-              ],
-              "passed": false
+              "evaluated": 5,
+              "findings": [],
+              "outcome": "pass"
             },
             {
               "category": "internal_consistency",
               "check_id": "growth_rate_consistency",
               "check_name": "Growth Rate Consistency",
+              "evaluated": 5,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "data_quality",
               "check_id": "non_finite",
               "check_name": "Non-Finite Value",
+              "evaluated": 15,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "data_quality",
               "check_id": "missing_value",
               "check_name": "Missing Value",
+              "evaluated": 15,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "data_quality",
-              "check_id": "non_finite",
-              "check_name": "Non-Finite Value",
+              "check_id": "credit_inputs_non_finite",
+              "check_name": "Credit Inputs Non-Finite",
+              "evaluated": 10,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "credit_reasonableness",
               "check_id": "leverage_range",
               "check_name": "Leverage Range",
+              "evaluated": 5,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "credit_reasonableness",
               "check_id": "coverage_floor",
               "check_name": "Coverage Floor",
+              "evaluated": 5,
               "findings": [
                 {
                   "check_id": "coverage_floor",
@@ -1111,7 +1046,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q1 below Warning floor 1.50x",
                   "nodes": [
@@ -1127,7 +1062,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q2 below Warning floor 1.50x",
                   "nodes": [
@@ -1143,7 +1078,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q3 below Warning floor 1.50x",
                   "nodes": [
@@ -1159,7 +1094,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q4 below Warning floor 1.50x",
                   "nodes": [
@@ -1175,7 +1110,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 120.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2026Q1 below Warning floor 1.50x",
                   "nodes": [
@@ -1186,29 +1121,33 @@
                   "severity": "warning"
                 }
               ],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "credit_reasonableness",
-              "check_id": "trend",
+              "check_id": "trend_ebitda",
               "check_name": "Trend",
+              "evaluated": 5,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "credit_reasonableness",
-              "check_id": "trend",
+              "check_id": "trend_net_debt",
               "check_name": "Trend",
+              "evaluated": 5,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             }
           ],
           "summary": {
-            "errors": 9,
-            "failed": 2,
+            "errors": 0,
+            "failed": 0,
+            "incomplete": 0,
             "infos": 0,
-            "passed": 8,
-            "total_checks": 10,
+            "passed": 9,
+            "total_checks": 9,
+            "unevaluated": 0,
             "warnings": 5
           }
         },
@@ -1542,11 +1481,11 @@
               "min": 95.0,
               "q1": 98.75,
               "q3": 100.83333333333333,
-              "std_dev": 3.435921354681385
+              "std_dev": 3.435921354681382
             },
             "percentile": 1.0,
             "subject_value": 120.0,
-            "z_score": 5.942122813390153
+            "z_score": 5.942122813390163
           },
           {
             "multiple": "ev_ebitda",
@@ -1821,11 +1760,11 @@
               "min": 95.0,
               "q1": 98.75,
               "q3": 100.83333333333333,
-              "std_dev": 3.435921354681385
+              "std_dev": 3.435921354681382
             },
             "percentile": 1.0,
             "subject_value": 120.0,
-            "z_score": 5.942122813390153
+            "z_score": 5.942122813390163
           },
           {
             "multiple": "ev_ebitda",

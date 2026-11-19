@@ -217,7 +217,20 @@ impl<'a> SensitivityAnalyzer<'a> {
                     *perturbation,
                 )?;
 
-                let results = local_evaluator.evaluate_prepared(&local_model, &prepared)?;
+                // A shock on a cell with no stored observation adds an
+                // observation slot, which is a structural change: that
+                // scenario needs its own plan.
+                let has_slot = self
+                    .model
+                    .get_node(&param.node_id)
+                    .and_then(|node| node.values.as_ref())
+                    .is_some_and(|values| values.contains_key(&param.period_id));
+                let results = if has_slot {
+                    local_evaluator.evaluate_prepared(&local_model, &prepared)?
+                } else {
+                    let local_plan = local_evaluator.prepare(&local_model)?;
+                    local_evaluator.evaluate_prepared(&local_model, &local_plan)?
+                };
 
                 let mut parameter_values = IndexMap::new();
                 parameter_values.insert(
@@ -249,6 +262,9 @@ impl<'a> SensitivityAnalyzer<'a> {
         let baseline = evaluator.evaluate_prepared(self.model, &prepared)?;
 
         let mut model_clone = self.model.clone();
+        // Every grid point sets the same cells, so one plan built once those
+        // observation slots exist serves the whole grid.
+        let mut grid_plan = None;
         let mut scenarios = Vec::with_capacity(scenario_count);
         let mut indices = vec![0usize; config.parameters.len()];
         for _ in 0..scenario_count {
@@ -268,7 +284,11 @@ impl<'a> SensitivityAnalyzer<'a> {
                 );
             }
 
-            let results = evaluator.evaluate_prepared(&model_clone, &prepared)?;
+            let plan = match &grid_plan {
+                Some(plan) => plan,
+                None => grid_plan.insert(evaluator.prepare(&model_clone)?),
+            };
+            let results = evaluator.evaluate_prepared(&model_clone, plan)?;
 
             scenarios.push(SensitivityScenario {
                 parameter_values,
@@ -386,8 +406,7 @@ fn max_target_impact(
     let mut impact = 0.0_f64;
     for metric in target_metrics {
         let periods = baseline
-            .nodes
-            .get(metric)
+            .get_node(metric)
             .filter(|periods| !periods.is_empty())
             .ok_or_else(|| Error::invalid_input(format!("Missing tornado metric '{metric}'")))?;
         for period in periods.keys() {
@@ -545,7 +564,7 @@ fn build_tornado_entry(
 }
 
 fn extract_metric_value(results: &StatementResult, node_id: &str, period: PeriodId) -> Result<f64> {
-    let value = results.get(node_id, &period).ok_or_else(|| {
+    let value = crate::cell_float(results, node_id, &period).ok_or_else(|| {
         Error::invalid_input(format!(
             "Missing tornado metric '{node_id}' in period '{period}'"
         ))
@@ -790,11 +809,18 @@ mod tests {
 
         let make_results = |value: f64| {
             let mut results = StatementResult::new();
-            results
-                .nodes
-                .entry(metric.clone())
-                .or_default()
-                .insert(period, value);
+            // A `NaN` fixture value is a cell that is present without a value.
+            results.set_cell(
+                &metric,
+                period,
+                finstack_quant_statements::evaluator::ResultCell::scalar(value).unwrap_or_else(
+                    |_| {
+                        finstack_quant_statements::evaluator::ResultCell::unavailable(
+                            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+                        )
+                    },
+                ),
+            );
             results
         };
 
@@ -908,33 +934,38 @@ mod tests {
         let metric = "gross_profit".to_string();
 
         let mut baseline = StatementResult::new();
-        baseline
-            .nodes
-            .entry(metric.clone())
-            .or_default()
-            .insert(period, 100.0);
+        baseline.set_scalar(&metric, period, 100.0).expect("finite");
 
         let mut scenario = StatementResult::new();
-        scenario
-            .nodes
-            .entry(metric)
-            .or_default()
-            .insert(period, f64::INFINITY);
+        scenario.set_cell(
+            &metric,
+            period,
+            finstack_quant_statements::evaluator::ResultCell::unavailable(
+                finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+            ),
+        );
 
         assert!(max_target_impact(&baseline, &scenario, &["gross_profit".to_string()]).is_err());
         baseline
-            .nodes
+            .cells
             .get_mut("gross_profit")
             .expect("metric")
-            .insert(period, -f64::MAX);
+            .insert(
+                period,
+                finstack_quant_statements::evaluator::ResultCell::scalar(-f64::MAX)
+                    .expect("finite"),
+            );
         scenario
-            .nodes
+            .cells
             .get_mut("gross_profit")
             .expect("metric")
-            .insert(period, f64::MAX);
+            .insert(
+                period,
+                finstack_quant_statements::evaluator::ResultCell::scalar(f64::MAX).expect("finite"),
+            );
         assert!(max_target_impact(&baseline, &scenario, &["gross_profit".to_string()]).is_err());
         scenario
-            .nodes
+            .cells
             .get_mut("gross_profit")
             .expect("metric")
             .clear();
@@ -1226,11 +1257,17 @@ mod tests {
         let make_result = |base: f64, minimum: f64, maximum: f64| {
             let make_statement = |value| {
                 let mut statement = StatementResult::new();
-                statement
-                    .nodes
-                    .entry("profit".to_string())
-                    .or_default()
-                    .insert(period, value);
+                statement.set_cell(
+                    "profit",
+                    period,
+                    finstack_quant_statements::evaluator::ResultCell::scalar(value).unwrap_or_else(
+                        |_| {
+                            finstack_quant_statements::evaluator::ResultCell::unavailable(
+                            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+                        )
+                        },
+                    ),
+                );
                 statement
             };
             let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
@@ -1260,16 +1297,19 @@ mod tests {
         assert!(generate_tornado_entries(&result, "profit", later_period).is_err());
         result.scenarios[0]
             .results
-            .nodes
+            .cells
             .get_mut("profit")
             .expect("metric")
             .clear();
         result.scenarios[0]
             .results
-            .nodes
+            .cells
             .get_mut("profit")
             .expect("metric")
-            .insert(later_period, 90.0);
+            .insert(
+                later_period,
+                finstack_quant_statements::evaluator::ResultCell::scalar(90.0).expect("finite"),
+            );
         // A scenario missing the metric at the requested period is rejected;
         // it must not compare different periods across scenarios.
         assert!(generate_tornado_entries(&result, "profit", period).is_err());

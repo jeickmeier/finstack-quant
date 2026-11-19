@@ -591,19 +591,27 @@ fn value_overrides_win_over_forecast_overrides() {
 #[test]
 fn invalid_forecast_override_parameters_are_rejected_with_the_node() {
     let model = forecast_model();
-    let mut typo = ForecastSpec::growth(0.05);
-    typo.params
-        .insert("rat".to_string(), serde_json::json!(0.1));
+    // A typed specification cannot carry an unknown parameter, so the
+    // invalid override is one that fails the method's static requirements.
+    assert!(
+        ForecastSpec::growth(0.05)
+            .with_param("rat", serde_json::json!(0.1))
+            .is_err()
+    );
+    let invalid = ForecastSpec::growth(f64::NAN);
     let set = ScenarioSet {
-        scenarios: IndexMap::from([("typo".to_string(), scenario(None, &[("revenue", typo)]))]),
+        scenarios: IndexMap::from([(
+            "invalid".to_string(),
+            scenario(None, &[("revenue", invalid)]),
+        )]),
     };
 
     let err = set
         .evaluate_all(&model)
-        .expect_err("unknown forecast parameter");
+        .expect_err("invalid forecast parameter");
     let message = err.to_string();
     assert!(message.contains("'revenue'"), "{message}");
-    assert!(message.contains("rat"), "{message}");
+    assert!(message.contains("rate"), "{message}");
 
     let missing = ScenarioSet {
         scenarios: IndexMap::from([(
@@ -614,13 +622,13 @@ fn invalid_forecast_override_parameters_are_rejected_with_the_node() {
     let err = missing.evaluate_all(&model).expect_err("unknown node");
     assert!(err.to_string().contains("'nope'"));
 
-    // The new field round-trips through the strict wire format.
-    let json = serde_json::to_string(&set).expect("serialize");
+    // The field round-trips through the strict wire format.
+    let json = serde_json::to_string(&missing).expect("serialize");
     assert!(json.contains("forecast_overrides"));
     let restored: ScenarioSet = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(
-        restored.scenarios["typo"].forecast_overrides["revenue"],
-        set.scenarios["typo"].forecast_overrides["revenue"]
+        restored.scenarios["missing"].forecast_overrides["nope"],
+        missing.scenarios["missing"].forecast_overrides["nope"]
     );
 }
 
@@ -643,16 +651,17 @@ fn scenarios_evaluate_the_capital_structure() {
                 .map(|quarter| (q(quarter), AmountOrScalar::scalar(1_000.0)))
                 .collect::<Vec<_>>(),
         );
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "BOND",
+            fixed_bond(
                 "BOND",
                 Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 issue,
                 Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
                 "USD-OIS",
-            )
-            .expect("valid bond");
+            ),
+        );
         model_builder
             .compute("interest", "cs.interest_expense.total")
             .expect("valid formula");
@@ -710,4 +719,29 @@ fn scenarios_evaluate_the_capital_structure() {
         plain.scenarios["base"].get("interest", &q(3)),
         priced.scenarios["base"].get("interest", &q(3))
     );
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

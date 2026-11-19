@@ -11,7 +11,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_statements::adjustments::CapBaseMode;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::{
-    CheckCategory, CheckFinding, CheckReport, CheckResult, CheckSummary, Materiality, Severity,
+    CheckCategory, CheckFinding, CheckOutcome, CheckReport, CheckResult, CheckSummary, Materiality,
+    Severity,
 };
 use finstack_quant_statements::evaluator::{
     CapitalStructureWarning, EvalStats, EvalWarning, StatementResult,
@@ -125,6 +126,7 @@ fn model_fixture_with_bond() -> Value {
 fn normalization_fixture() -> Value {
     json!({
         "target_node": "ebitda",
+        "output_node": "adjusted_ebitda",
         "adjustments": [
             {
                 "id": "restructuring",
@@ -138,8 +140,9 @@ fn normalization_fixture() -> Value {
                     }
                 },
                 "cap": {
+                    "type": "reference",
                     "base_node": "ebitda",
-                    "value": 0.10
+                    "fraction": 0.10
                 }
             },
             {
@@ -159,12 +162,11 @@ fn representative_statement_result() -> StatementResult {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let usd = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
     let mut result = StatementResult::default();
-    result
-        .nodes
-        .insert("revenue".to_string(), IndexMap::from([(period, 100_000.0)]));
-    result
-        .monetary_nodes
-        .insert("revenue".to_string(), IndexMap::from([(period, usd)]));
+    result.set_cell(
+        "revenue",
+        period,
+        finstack_quant_statements::evaluator::ResultCell::money(usd),
+    );
     result.node_value_types.insert(
         "revenue".to_string(),
         NodeValueType::Monetary {
@@ -185,6 +187,16 @@ fn representative_statement_result() -> StatementResult {
         mandatory_prepayment: None,
         sweep_prepayment: None,
         voluntary_prepayment: None,
+        interest_arrears: None,
+        principal_pending: None,
+        principal_arrears: None,
+        principal_advance_reserve: None,
+        scheduled_cash_interest_due: None,
+        scheduled_principal_due: None,
+        fee_rebates: None,
+        repayment_refunds: None,
+        funding_proceeds: None,
+        funding_principal: None,
     };
     let mut cashflows = CapitalStructureCashflows::new();
     cashflows.by_instrument.insert(
@@ -200,11 +212,13 @@ fn representative_statement_result() -> StatementResult {
     result.cs_cashflows = Some(cashflows);
 
     result.check_report = Some(CheckReport {
+        outcome: CheckOutcome::Fail,
         results: vec![CheckResult {
             check_id: "balance-sheet".to_string(),
             check_name: "Balance sheet balances".to_string(),
             category: CheckCategory::AccountingIdentity,
-            passed: false,
+            outcome: CheckOutcome::Fail,
+            evaluated: 1,
             findings: vec![CheckFinding {
                 check_id: "balance-sheet".to_string(),
                 severity: Severity::Warning,
@@ -212,12 +226,13 @@ fn representative_statement_result() -> StatementResult {
                 period: Some(period),
                 materiality: Some(Materiality {
                     absolute: 100.0,
-                    relative_pct: 0.01,
+                    relative_pct: Some(0.01),
                     reference_value: 1_000_000.0,
                     reference_label: "total_assets".to_string(),
                 }),
                 nodes: vec!["total_assets".into(), "total_liabilities".into()],
                 comparison: None,
+                coverage: false,
             }],
             comparisons: Vec::new(),
         }],
@@ -225,6 +240,8 @@ fn representative_statement_result() -> StatementResult {
             total_checks: 1,
             passed: 0,
             failed: 1,
+            incomplete: 0,
+            unevaluated: 0,
             errors: 0,
             warnings: 1,
             infos: 0,
@@ -318,26 +335,48 @@ fn root_types_generate_typed_schemas() {
 fn capital_structure_warning_uses_typed_canonical_values() {
     let warning = EvalWarning::CapitalStructure {
         period: PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        warning: CapitalStructureWarning::CashflowIgnored {
-            cashflow_kind: CFKind::Recovery,
-            cashflow_date: Date::from_calendar_date(2025, Month::March, 31)
-                .expect("valid fixture date"),
+        warning: CapitalStructureWarning::InterestShortfall {
+            instrument_id: "TL".into(),
+            amount: 1.5,
         },
     };
 
     let json = serde_json::to_value(warning).expect("warning should serialize");
     assert_eq!(
         json["capital_structure"]["warning"]["kind"],
-        "cashflow_ignored"
+        "interest_shortfall"
     );
-    assert_eq!(
-        json["capital_structure"]["warning"]["cashflow_kind"],
-        "recovery"
+    assert_eq!(json["capital_structure"]["warning"]["amount"], 1.5);
+    // The opening-balance rescaling warning is gone: a mismatch is an error.
+    assert!(
+        serde_json::from_value::<CapitalStructureWarning>(serde_json::json!({
+            "kind": "residual_scale_mismatch",
+            "applied_ratio": 1.5
+        }))
+        .is_err()
     );
-    assert_eq!(
-        json["capital_structure"]["warning"]["cashflow_date"],
-        "2025-03-31"
-    );
+}
+
+/// Distress cash keeps its instrument, kind, payment date and signed amount.
+#[test]
+fn distress_cashflow_uses_typed_canonical_values() {
+    let row = finstack_quant_statements::capital_structure::DistressCashflow {
+        instrument_id: "TL".into(),
+        payment_date: Date::from_calendar_date(2025, Month::March, 31).expect("valid date"),
+        kind: CFKind::Recovery,
+        amount: finstack_quant_core::money::Money::new(
+            -15.0,
+            finstack_quant_core::currency::Currency::USD,
+        )
+        .expect("valid money"),
+    };
+    let json = serde_json::to_value(&row).expect("row should serialize");
+    assert_eq!(json["kind"], "recovery");
+    assert_eq!(json["payment_date"], "2025-03-31");
+    assert_eq!(json["amount"]["amount"], "-15");
+    let back: finstack_quant_statements::capital_structure::DistressCashflow =
+        serde_json::from_value(json).expect("round trip");
+    assert_eq!(back, row);
 }
 
 #[test]
@@ -396,7 +435,7 @@ fn normalization_config_schema_exposes_base_mode_reported_default() {
     // not just in the schema comparison below.
     assert_eq!(default_mode, json!("reported"));
     assert_eq!(
-        schema["$defs"]["AdjustmentCap"]["properties"]["base_mode"]["default"],
+        schema["$defs"]["AdjustmentCap"]["oneOf"][1]["properties"]["base_mode"]["default"],
         default_mode
     );
 }

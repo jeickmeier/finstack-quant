@@ -86,6 +86,7 @@ def lbo_model() -> str:
         "nodes": {
             "ebitda": {"node_id": "ebitda", "node_type": "value", "values": series([100, 100, 100, 100, 120])},
             "net_debt": {"node_id": "net_debt", "node_type": "value", "values": series([300, 300, 300, 300, 200])},
+            "equity": {"node_id": "equity", "node_type": "value", "values": series([-200, -200, -200, -200, -80])},
         },
     })
 
@@ -105,9 +106,9 @@ LBO_CHECK_MAPPINGS = {
     "three_statement": {
         "assets_nodes": ["ebitda"],
         "liabilities_nodes": ["net_debt"],
-        "equity_nodes": ["ebitda"],
+        "equity_nodes": ["equity"],
         "cash_node": "net_debt",
-        "retained_earnings_node": "ebitda",
+        "retained_earnings_node": "equity",
         "net_income_node": "ebitda",
     },
     "credit": {"debt_node": "net_debt", "ebitda_node": "ebitda", "interest_expense_node": "ebitda"},
@@ -334,17 +335,20 @@ def test_model_ingest_is_rust_from_json() -> None:
         FinancialModelSpec.from_json(empty)
     with pytest.raises(ValueError, match="at least one period"):
         DependencyTracer(empty)
-    with pytest.raises(ValueError, match="invalid FinancialModelSpec JSON"):
+    with pytest.raises(ValueError, match="validation failed") as malformed:
         FinancialModelSpec.from_json("{")
+    assert "JSON parse error" in malformed.value.report[0]["message"]
 
 
 def test_capital_structure_sub_specs_validate() -> None:
     with pytest.raises(ValueError, match="sweep_percentage"):
-        EcfSweepSpec("ebitda", 5.0).validate()
-    EcfSweepSpec("ebitda", 0.5).validate()
-    with pytest.raises(ValueError, match="target_instrument_ids"):
-        PikToggleSpec("cash", 1.0, []).validate()
-    PikToggleSpec("cash", 1.0, ["TL"]).validate()
+        EcfSweepSpec(cash_measure="ebitda", sweep_percentage=5.0, facilities="all_eligible").validate()
+    EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities="all_eligible").validate()
+    with pytest.raises(ValueError, match="elections"):
+        PikToggleSpec(liquidity_metric="cash", threshold=1.0, elections=[]).validate()
+    PikToggleSpec(
+        liquidity_metric="cash", threshold=1.0, elections=[{"instrument_id": "TL", "pik_fraction": "1"}]
+    ).validate()
 
 
 def test_compute_multiple_treats_none_as_missing() -> None:
@@ -390,18 +394,30 @@ def test_mappings_reject_unknown_keys() -> None:
 
 
 def test_check_specs_have_no_python_only_defaults_or_grammar() -> None:
-    with pytest.raises(TypeError):
-        FormulaCheckSpec("x", "x", "revenue > 0", "m")  # type: ignore[call-arg]
-    spec = FormulaCheckSpec("x", "x", "revenue > 0", "m", "internal_consistency", "error")
-    assert json.loads(spec.to_json())["severity"] == "error"
+    fields = {
+        "id": "x",
+        "name": "x",
+        "category": "internal_consistency",
+        "severity": "error",
+        "mode": "predicate",
+        "scope": "all_periods",
+        "formula": "revenue > 0",
+        "message_template": "m",
+    }
+    for required in ("category", "severity", "mode", "scope"):
+        with pytest.raises(ValueError, match=required):
+            FormulaCheckSpec({key: value for key, value in fields.items() if key != required})
+    spec = FormulaCheckSpec(fields)
+    assert json.loads(spec.to_json()) == fields
+    assert (spec.mode, spec.scope, spec.eligibility, spec.tolerance) == ("predicate", "all_periods", None, None)
     with pytest.raises(ValueError, match="dict"):
         CheckSuiteSpec("s", builtin_checks=["non_finite"])  # type: ignore[list-item]
-    suite = CheckSuiteSpec("s", builtin_checks=[{"type": "non_finite"}], formula_checks=[spec])
+    suite = CheckSuiteSpec("s", builtin_checks=[{"type": "non_finite", "nodes": "all"}], formula_checks=[spec])
     report = run_checks(goal_seek_model(), suite)
     assert report.total_findings == 0
     with pytest.raises(ValueError, match="missing field `assets_nodes`"):
         ThreeStatementMapping(cash_node="cash", retained_earnings_node="re", net_income_node="ni")  # type: ignore[call-arg]
-    assert json.loads(CheckConfig().to_json()) == json.loads(CheckConfig(0.01, 1e-9, 0.0, "info").to_json())
+    assert json.loads(CheckConfig().to_json()) == json.loads(CheckConfig(0.0, 0.0, 0.0, "info").to_json())
 
 
 def test_dependency_tree_is_the_rust_tree_and_text_is_named() -> None:

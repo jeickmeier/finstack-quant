@@ -111,6 +111,7 @@ export interface D_5884433B163D26991C12 {
    * Cash / liquidity node.
    */
   cash_node?: DC9E3046F969A3Cea691D | null;
+  config?: D_94D87Fc0115F13E52Ce3;
   /**
    * Minimum coverage ratio that triggers a warning; defaults to `1.5`.
    */
@@ -251,6 +252,35 @@ export interface D_5884433B163D26991C12 {
   leverage_warn?: [number, number] | null;
 }
 /**
+ * Comparison and reporting policy of the suite. Identities are compared
+ * exactly unless a tolerance is stated here.
+ */
+export interface D_94D87Fc0115F13E52Ce3 {
+  /**
+   * **Relative** tolerance as a fraction of the identity's reference
+   * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+   * disables the relative term.
+   */
+  default_relative_tolerance?: number;
+  /**
+   * **Absolute** tolerance for equality comparisons, in the units of the
+   * compared values (0.01 is one cent when nodes are in whole dollars).
+   * Zero, the default, requires exact equality.
+   */
+  default_tolerance?: number;
+  /**
+   * Advisory findings whose absolute materiality is below this threshold
+   * are left out of the report. Error-severity and coverage findings are
+   * always reported.
+   */
+  materiality_threshold?: number;
+  /**
+   * Minimum severity an advisory finding must have to appear in the
+   * report. Coverage findings are always reported.
+   */
+  min_severity?: "info" | "warning" | "error";
+}
+/**
  * Three-statement node mapping (balance sheet, income statement, cash flow).
  */
 export interface D_78D0Da8611Ea67085Bf9 {
@@ -315,6 +345,7 @@ export interface D_78D0Da8611Ea67085Bf9 {
    * Cash from operations node (cash flow statement).
    */
   cfo_node?: DC9E3046F969A3Cea691D | null;
+  config?: D_94D87Fc0115F13E52Ce31;
   /**
    * Capital-structure interest node; when present the interest
    * reconciliation compares against it directly instead of testing an
@@ -406,6 +437,16 @@ export interface D_78D0Da8611Ea67085Bf9 {
    */
   net_income_node: string;
   /**
+   * Opening cash at the start of the model's first period. The cash
+   * roll-forward runs only when it and `total_cf_node` are both given.
+   */
+  opening_cash?: D_445F5Ed0781964568C7D | null;
+  /**
+   * Opening retained earnings at the start of the model's first period.
+   * The retained-earnings reconciliation runs only when it is given.
+   */
+  opening_retained_earnings?: D_445F5Ed0781964568C7D | null;
+  /**
    * PP&E additions node; enables the capex reconciliation together with
    * `capex_node`.
    */
@@ -471,6 +512,227 @@ export interface D_78D0Da8611Ea67085Bf9 {
    * Change-in-working-capital node (cash flow statement, operating).
    */
   wc_change_cf_node?: DC9E3046F969A3Cea691D | null;
+}
+/**
+ * Comparison and reporting policy of the suite. Identities are compared
+ * exactly unless a tolerance is stated here.
+ */
+export interface D_94D87Fc0115F13E52Ce31 {
+  /**
+   * **Relative** tolerance as a fraction of the identity's reference
+   * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+   * disables the relative term.
+   */
+  default_relative_tolerance?: number;
+  /**
+   * **Absolute** tolerance for equality comparisons, in the units of the
+   * compared values (0.01 is one cent when nodes are in whole dollars).
+   * Zero, the default, requires exact equality.
+   */
+  default_tolerance?: number;
+  /**
+   * Advisory findings whose absolute materiality is below this threshold
+   * are left out of the report. Error-severity and coverage findings are
+   * always reported.
+   */
+  materiality_threshold?: number;
+  /**
+   * Minimum severity an advisory finding must have to appear in the
+   * report. Coverage findings are always reported.
+   */
+  min_severity?: "info" | "warning" | "error";
+}
+/**
+ * An explicit opening balance at the first period boundary of a
+ * roll-forward identity.
+ */
+export interface D_445F5Ed0781964568C7D {
+  /**
+   * Date of the balance: the start of the model's first period.
+   */
+  date: string;
+  /**
+   * The balance on that date, in the units and currency of the
+   * reconciled balance node. A known zero is a typed zero.
+   */
+  value: DBb905Dc5F46647D85Aa0 | number;
+}
+/**
+ * Currency-aware amount
+ */
+export interface DBb905Dc5F46647D85Aa0 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
 }
 /**
  * One funded debt tranche in the day-one capital structure.

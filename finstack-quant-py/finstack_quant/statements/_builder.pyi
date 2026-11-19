@@ -65,6 +65,7 @@ class ModelBuilder:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> builder.build().id
         'demo'
 
@@ -97,10 +98,10 @@ class ModelBuilder:
         Examples
         --------
         >>> from finstack_quant.statements import ModelBuilder
-        >>> original = ModelBuilder("demo").periods("2025Q1..Q1").build()
-        >>> rebuilt = ModelBuilder.from_spec(original).value("revenue", [("2025Q1", 100.0)]).build()
+        >>> original = ModelBuilder("demo").periods("2025Q1..Q1").value("revenue", [("2025Q1", 100.0)]).build()
+        >>> rebuilt = ModelBuilder.from_spec(original).compute("double", "revenue * 2").build()
         >>> rebuilt.node_ids()
-        ['revenue']
+        ['revenue', 'double']
         """
         ...
 
@@ -339,14 +340,20 @@ class ModelBuilder:
         """
         ...
 
-    def where_clause(self, where_clause: str) -> ModelBuilder:
+    def where_clause(self, node_id: str, where_clause: str) -> ModelBuilder:
         """
-        Attach a conditional expression to the last added node.
+        Attach a scalar predicate to a named node.
+
+        The predicate is evaluated before the node's value source. Where it
+        is false for a period, the node's value, forecast and formula are not
+        consulted.
 
         Parameters
         ----------
+        node_id:
+            Identifier of an existing node the predicate masks.
         where_clause:
-            DSL expression evaluated per period to gate the node's value.
+            DSL expression evaluated per period as a scalar predicate.
 
         Returns
         -------
@@ -356,7 +363,9 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If periods have not been configured or the builder has already been consumed.
+            If the predicate does not parse and compile, ``node_id`` is not
+            defined, or the builder has already been consumed. A rejected
+            call leaves the builder unchanged.
 
         """
         ...
@@ -394,20 +403,34 @@ class ModelBuilder:
         """
         Add all built-in statement metrics to the model.
 
+        The catalogue reads many input nodes and :meth:`build` resolves every
+        formula reference, so the model must define all of them. Use
+        :meth:`add_metric_from_registry` to add a subset. The import is
+        atomic. A node that already holds a metric's unchanged template is
+        shared.
+
         Returns
         -------
         ModelBuilder
             This builder, for chaining.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If a node with a built-in metric's name is already defined
+            differently. Import the metric first and change it with
+            :meth:`replace_node`.
         """
         ...
 
     def add_metric_from_registry(self, qualified_id: str, registry: Registry) -> ModelBuilder:
         """
-        Add one metric and its dependencies from a metric registry.
+        Add one metric and its dependency closure from a metric registry.
+
+        The import is atomic, with dependencies first. A node that already
+        holds the same unchanged template is shared; a node of that name with
+        another definition is a conflict. Override a metric with
+        :meth:`replace_node` after importing it.
 
         Parameters
         ----------
@@ -424,291 +447,69 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If periods have not been configured or the builder has already been consumed.
+            If the builder has already been consumed, or a node of the
+            metric's or a dependency's name is already defined differently.
         KeyError
-            If qualified_id or one of its dependencies cannot be resolved in registry.
+            If qualified_id is not in registry.
 
-        """
-        ...
-
-    def add_bond(
-        self,
-        id: str,
-        notional: Money,
-        coupon_rate: float,
-        issue_date: date | str,
-        maturity_date: date | str,
-        discount_curve_id: str,
-    ) -> ModelBuilder:
-        """
-
-        Add a fixed-rate bond to the capital structure (US 30/360 semi-annual).
-
-        Rejected inputs leave this builder usable with its accumulated model intact.
-
-        For non-USD conventions, use :meth:`add_debt` with a pre-built
-        ``Bond`` JSON specification.
-
-        Parameters
-        ----------
-        id:
-            Bond identifier.
-        notional:
-            Face value as a :class:`Money` amount.
-        coupon_rate:
-            Annual coupon rate as a decimal (e.g. ``0.05`` for 5%).
-        issue_date:
-            Contractual issue and accrual start as datetime.date or ISO YYYY-MM-DD;
-            must precede maturity.
-        maturity_date:
-            Final contractual repayment as datetime.date or ISO YYYY-MM-DD;
-            must follow the issue date.
-        discount_curve_id:
-            Curve ID for discounting (e.g. ``"USD-OIS"``).
-
-        Returns
-        -------
-        ModelBuilder
-            This builder, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If the bond constructor rejects its rate, notional, curve configuration,
-            or dates, or the builder has already been consumed.
-
-        """
-        ...
-
-    def add_swap(self, params: dict[str, Any] | str) -> ModelBuilder:
-        """
-
-        Add a pay-fixed interest rate swap to the capital structure (US conventions).
-
-        Uses semi-annual 30/360 fixed coupons, quarterly ACT/360 floating coupons,
-        Modified Following and simple floating compounding. Rejected inputs leave
-        this builder usable with its accumulated model intact.
-
-        Parameters
-        ----------
-        params:
-            The Rust ``SwapParams`` serde form, as a dict or JSON text. Every key
-            is required and an unknown key raises ``ValueError``:
-
-            * ``id`` (str): swap identifier; market-aware evaluation rejects
-              duplicates.
-            * ``notional`` (Money | dict): notional as a :class:`Money` value or
-              its wire form ``{"amount": "1000000", "currency": "USD"}``.
-            * ``fixed_rate`` (float): fixed leg rate as a decimal (``0.04`` for 4%).
-            * ``start_date`` (datetime.date | str): contractual accrual start for
-              both legs, as a date or ISO ``YYYY-MM-DD``; must precede maturity.
-            * ``maturity_date`` (datetime.date | str): final contractual accrual
-              end, as a date or ISO ``YYYY-MM-DD``.
-            * ``discount_curve_id`` (str): curve ID for discounting.
-            * ``forward_curve_id`` (str): curve ID for floating-leg forward rates.
-
-        Returns
-        -------
-        ModelBuilder
-            This builder, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``params`` is malformed, misses a key or carries an unknown one,
-            the swap constructor rejects its rate, notional, curve configuration,
-            or dates, or the builder has already been consumed.
-
-        Examples
-        --------
-        >>> from datetime import date
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements import ModelBuilder
-        >>> builder = ModelBuilder("cs-model")
-        >>> _ = builder.add_swap({
-        ...     "id": "SWAP-1",
-        ...     "notional": Money(1_000_000.0, "USD"),
-        ...     "fixed_rate": 0.04,
-        ...     "start_date": date(2025, 1, 15),
-        ...     "maturity_date": date(2030, 1, 15),
-        ...     "discount_curve_id": "USD-OIS",
-        ...     "forward_curve_id": "USD-SOFR-3M",
-        ... })
-        """
-        ...
-
-    def add_bond_with_convention(self, params: dict[str, Any] | str) -> ModelBuilder:
-        """
-
-        Add a fixed-rate bond with a market convention preset.
-
-        Rejected inputs leave this builder usable with its accumulated model intact.
-
-        Applies regional day-count, coupon-frequency, and calendar
-        conventions automatically; :meth:`add_bond` uses US corporate
-        conventions instead.
-
-        Parameters
-        ----------
-        params:
-            The Rust ``BondConventionParams`` serde form, as a dict or JSON text.
-            Every key is required and an unknown key raises ``ValueError``:
-
-            * ``id`` (str): bond identifier; market-aware evaluation rejects
-              duplicates.
-            * ``notional`` (Money | dict): face value as a :class:`Money` value
-              or its wire form ``{"amount": "10000000", "currency": "EUR"}``.
-            * ``coupon_rate`` (float): finite annual coupon rate as a decimal
-              (``0.03`` for 3%).
-            * ``issue_date`` (datetime.date | str): contractual issue and accrual
-              start, as a date or ISO ``YYYY-MM-DD``; must precede maturity.
-            * ``maturity_date`` (datetime.date | str): final contractual
-              repayment, as a date or ISO ``YYYY-MM-DD``.
-            * ``convention`` (str): regional preset as the canonical snake_case
-              identifier: ``"us_treasury"``, ``"us_agency"``, ``"german_bund"``,
-              ``"uk_gilt"``, ``"french_oat"``, ``"jgb"``, ``"us_corporate"``, or
-              ``"eur_corporate"``.
-            * ``discount_curve_id`` (str): curve ID for discounting (e.g.
-              ``"EUR-OIS"``).
-
-        Returns
-        -------
-        ModelBuilder
-            This builder, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``params`` is malformed, misses a key or carries an unknown one,
-            the convention is unknown, the coupon is not finite, the bond
-            constructor rejects its notional, curve configuration, or dates, or
-            the builder was consumed.
-
-        Examples
-        --------
-        >>> from datetime import date
-        >>> from finstack_quant.core.currency import Currency
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements import ModelBuilder
-        >>> builder = ModelBuilder("cs-model")
-        >>> _ = builder.add_bond_with_convention({
-        ...     "id": "BUND-001",
-        ...     "notional": Money(10_000_000.0, Currency("EUR")),
-        ...     "coupon_rate": 0.03,
-        ...     "issue_date": date(2025, 1, 15),
-        ...     "maturity_date": date(2030, 1, 15),
-        ...     "convention": "german_bund",
-        ...     "discount_curve_id": "EUR-OIS",
-        ... })
-        """
-        ...
-
-    def add_swap_with_conventions(
-        self,
-        params: dict[str, Any] | str,
-        conventions: dict[str, Any] | str,
-    ) -> ModelBuilder:
-        """
-
-        Add a pay-fixed interest rate swap with custom leg conventions.
-
-        Rejected inputs leave this builder usable with its accumulated model intact.
-
-        Exposes day-count, frequency, and business-day-convention parameters
-        for non-USD swaps (e.g. EUR annual ACT/360 fixed legs);
-        :meth:`add_swap` uses US conventions instead. Floating compounding stays
-        simple.
-
-        Parameters
-        ----------
-        params:
-            The Rust ``SwapParams`` serde form (dict or JSON text) with the keys
-            ``id``, ``notional``, ``fixed_rate``, ``start_date``,
-            ``maturity_date``, ``discount_curve_id`` and ``forward_curve_id``,
-            exactly as for :meth:`add_swap`.
-        conventions:
-            The Rust ``SwapConventions`` serde form, as a dict or JSON text; an
-            unknown key raises ``ValueError``:
-
-            * ``fixed_frequency`` (dict): fixed-leg payment cadence as a tenor
-              wire object, e.g. ``{"count": 1, "unit": "years"}``; ``unit`` is
-              ``"days"``, ``"weeks"``, ``"months"`` or ``"years"``.
-            * ``fixed_day_count`` (str): fixed-leg day count label, e.g.
-              ``"act_360"``, ``"30_360"`` or ``"act_365f"``.
-            * ``float_frequency`` (dict): floating-leg payment and fixing cadence,
-              e.g. ``{"count": 3, "unit": "months"}``.
-            * ``float_day_count`` (str): floating-leg day count label.
-            * ``business_day_convention`` (str): schedule-date rolling rule,
-              e.g. ``"modified_following"`` or ``"following"``. Required:
-              there is no default convention.
-
-        Returns
-        -------
-        ModelBuilder
-            This builder, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If either object is malformed, misses a required key or carries an
-            unknown one, a tenor, day count, convention, rate, notional, curve
-            configuration, or date is rejected, or the builder has already been
-            consumed.
-
-        Examples
-        --------
-        >>> from datetime import date
-        >>> from finstack_quant.core.currency import Currency
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements import ModelBuilder
-        >>> builder = ModelBuilder("cs-model")
-        >>> _ = builder.add_swap_with_conventions(
-        ...     {
-        ...         "id": "SWAP-EUR",
-        ...         "notional": Money(5_000_000.0, Currency("EUR")),
-        ...         "fixed_rate": 0.03,
-        ...         "start_date": date(2025, 1, 15),
-        ...         "maturity_date": date(2030, 1, 15),
-        ...         "discount_curve_id": "EUR-OIS",
-        ...         "forward_curve_id": "EUR-EURIBOR-6M",
-        ...     },
-        ...     {
-        ...         "fixed_frequency": {"count": 1, "unit": "years"},
-        ...         "fixed_day_count": "act_360",
-        ...         "float_frequency": {"count": 6, "unit": "months"},
-        ...         "float_day_count": "act_360",
-        ...         "business_day_convention": "modified_following",
-        ...     },
-        ... )
         """
         ...
 
     def add_debt(self, id: str, instrument: Any | str) -> ModelBuilder:
         """
-        Add a debt instrument via its canonical v1 instrument envelope.
+        Attach a canonical debt or hedge instrument to the capital structure.
 
+        This is the one way an instrument enters a model. Build the
+        instrument through its own Valuations API (``Bond.fixed``,
+        ``Bond.with_convention``, ``InterestRateSwap.from_conventions``,
+        ``TermLoan`` ...) with fully authored terms or a deliberately selected
+        convention; the model keeps its resolved terms and schedule unchanged.
         Supported instrument types are bonds, convertible bonds, revolving
-        credit facilities, term loans, interest-rate swaps, caps/floors, and
+        credit facilities, term loans, interest-rate swaps, caps/floors and
         swaptions.
 
-                Parameters
-                ----------
-                id:
-                    Instrument identifier.
-                instrument:
-                    ``finstack_quant.instrument/1`` envelope containing the debt instrument.
+        Parameters
+        ----------
+        id:
+            Capital-structure identifier of the instrument, used by
+            ``cs.<component>.<id>`` references and waterfall classes.
+            Market-aware evaluation rejects duplicate identifiers.
+        instrument:
+            A typed instrument object, or its canonical
+            ``finstack_quant.instrument/1`` envelope as a dict or JSON text.
 
-                Returns
+        Returns
         -------
         ModelBuilder
             This builder, for chaining.
 
         Raises
-                ------
-                ValueError
-                    If the envelope is invalid or its instrument type is not supported by
-                    financial statement capital structures.
+        ------
+        ValueError
+            If the envelope is invalid or its instrument type is not supported
+            by financial statement capital structures.
 
+        Examples
+        --------
+        >>> from datetime import date
+        >>> from finstack_quant.core.currency import Currency
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> bond = Bond.with_convention(
+        ...     "UST-5Y",
+        ...     Money(1_000_000.0, Currency("USD")),
+        ...     0.03,
+        ...     date(2025, 1, 15),
+        ...     date(2030, 1, 15),
+        ...     "us_treasury",
+        ...     "USD-OIS",
+        ... )
+        >>> builder = ModelBuilder("deal")
+        >>> _ = builder.add_debt("UST-5Y", bond)
+        >>> _ = builder.periods("2025Q1..Q2", None).value_scalar("revenue", {"2025Q1": 1.0})
+        >>> [entry["id"] for entry in builder.build().capital_structure["debt_instruments"]]
+        ['UST-5Y']
         """
         ...
 
@@ -737,12 +538,15 @@ class ModelBuilder:
 
     def fx_policy(self, policy: str) -> ModelBuilder:
         """
-        Set the FX policy (``cashflow_date``/``period_end``).
+        Choose how capital-structure totals are consolidated across currencies.
 
         Parameters
         ----------
         policy:
-            FX conversion policy label.
+            ``"period_end"``, the only policy: each period's native-currency
+            totals convert at the rate of the inclusive period-close date. It
+            must be set before instruments of more than one currency are
+            consolidated into the reporting currency; there is no default.
 
         Returns
         -------
@@ -785,9 +589,15 @@ class ModelBuilder:
         """
         Materialize the ``FinancialModelSpec`` and consume the builder.
 
-        Validates node identities, explicit-value periods, forecasts, formula
-        dimensions and timeline intervals. ``period_id`` is reserved for the
-        timeline column in result exports.
+        Runs the one runnable-model validation: a canonical contiguous
+        timeline with actuals as a prefix, node identifiers that follow the
+        formula identifier rules, node kinds with only their permitted
+        sources (a ``value`` node takes observations only; a ``calculated``
+        node needs a formula), finite observations inside the timeline,
+        forecasts, formula dimensions, resolved formula references and no
+        same-period dependency cycle. A missing cell is left out of a series;
+        it is never stored as NaN. ``period_id`` is reserved for the timeline
+        column in result exports.
 
         Returns
         -------
@@ -797,7 +607,7 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed or the model (including its timeline) violates its semantic invariants.
+            If the builder was already consumed, the model has no node and no capital-structure instrument, or the model violates any rule above, including a formula that references an unknown node.
 
         """
         ...
@@ -808,7 +618,7 @@ class ModelBuilder:
         Parameters
         ----------
         plan:
-            Non-empty PeriodPlan (for example from ``build_periods`` or ``build_fiscal_periods``) whose calendar context the model retains. Its periods must be one kind with positive, nonoverlapping intervals; gaps are allowed. Build rejects a non-increasing timeline or actuals that do not form a prefix.
+            Non-empty PeriodPlan (for example from ``build_periods`` or ``build_fiscal_periods``) whose calendar context the model retains. Its periods must be one kind, each with the exact bounds of its identifier, and contiguous. Build rejects a gapped or misordered timeline and actuals that do not form a prefix.
 
         Returns
         -------
@@ -822,41 +632,40 @@ class ModelBuilder:
         """
         ...
 
-    def from_dataframe(
-        self, df: pd.DataFrame, actuals_until: str | None = None, node_id_column: str | None = None
-    ) -> ModelBuilder:
-        """Load scalar value nodes from a wide pandas DataFrame.
+    def from_dataframe(self, df: pd.DataFrame, node_id_column: str | None = None) -> ModelBuilder:
+        """Import scalar value nodes from a wide pandas DataFrame.
+
+        The model timeline must already be set; an import never infers it.
+        Columns map to periods by label in any order. The import is atomic.
 
         Parameters
         ----------
         df:
-            Node rows with period-identifier columns; every label must belong to the model timeline, including all-null columns. Numeric cells use the node's own units and NaN/None cells are skipped.
-        actuals_until:
-            Inclusive actuals cutoff used when deriving an unset timeline from the first and last period columns; ignored if periods are already set.
+            One row per new value node and one column per period label (for example ``"2025Q1"``). Labels must be unique and belong to the model timeline, including all-null columns. A numeric cell is a scalar observation in the node's own units; a ``None`` or NaN cell is a missing observation and is left out; ``0`` is kept as a known zero.
         node_id_column:
             Column containing node identifiers; None takes identifiers from the frame index.
 
         Returns
         -------
         ModelBuilder
-            This builder populated with one value node per row.
+            This builder with one value node added per row.
 
         Raises
         ------
         ValueError
-            If any period label is invalid or outside the model timeline, a node identifier is reserved, numeric cells are invalid, or the builder was consumed. Rejected input leaves the builder unchanged.
+            If the timeline is not set, a period label is invalid, repeated or outside the timeline, a node identifier is invalid, repeated or already defined, a cell is not numeric or is infinite, or the builder was consumed. Rejected input leaves the builder unchanged.
         KeyError
             If node_id_column names an absent frame column.
         """
         ...
 
     def insert_node(self, node: NodeSpec) -> ModelBuilder:
-        """Insert a complete node specification, replacing a node with the same identifier.
+        """Insert a complete node specification under a new identifier.
 
         Parameters
         ----------
         node:
-            Fully configured node; semantic validity is checked together with the model at build.
+            Fully configured node; semantic validity is checked together with the model at build. A node whose identifier is already defined is a duplicate that ``build`` rejects; use ``replace_node`` to change an existing node.
 
         Returns
         -------
@@ -867,6 +676,70 @@ class ModelBuilder:
         ------
         ValueError
             If this builder has already been consumed.
+        """
+        ...
+
+    def replace_node(self, node: NodeSpec) -> ModelBuilder:
+        """Replace an existing node with a complete new definition.
+
+        Parameters
+        ----------
+        node:
+            Complete replacement, stored under its own identifier in the original node's position.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder with the node replaced.
+
+        Raises
+        ------
+        ValueError
+            If no node with that identifier exists or the builder was consumed. The builder is unchanged.
+        """
+        ...
+
+    def remove_node(self, node_id: str) -> ModelBuilder:
+        """Remove an existing node.
+
+        Parameters
+        ----------
+        node_id:
+            Identifier of the node to remove. Formulas that still reference it fail ``build``.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder without the node.
+
+        Raises
+        ------
+        ValueError
+            If no node with that identifier exists or the builder was consumed.
+        """
+        ...
+
+    def source_snapshot(self, snapshot_id: str) -> ModelBuilder:
+        """Name the source snapshot the model's observations were taken from.
+
+        An evaluation with an observation cutoff needs this identity. Keep an
+        original filing and its later revision as two models with different
+        snapshot identities, so a dated evaluation can replay its day.
+
+        Parameters
+        ----------
+        snapshot_id:
+            Nonempty identifier of the source snapshot, for example ``"FY2025-10K-original"``.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was consumed. A blank identifier is rejected by ``build``.
         """
         ...
 

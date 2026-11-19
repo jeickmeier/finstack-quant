@@ -106,16 +106,12 @@ fn trailing_year_requires_consecutive_calendar_periods() {
     };
     for p in ["2024Q1", "2024Q2", "2024Q3", "2025Q4"] {
         results
-            .nodes
-            .entry("ebitda".into())
-            .or_default()
-            .insert(p.parse().unwrap(), 100.0);
+            .set_scalar("ebitda", p.parse().unwrap(), 100.0)
+            .expect("finite");
     }
     results
-        .nodes
-        .entry("total_debt".into())
-        .or_default()
-        .insert("2025Q4".parse().unwrap(), 800.0);
+        .set_scalar("total_debt", "2025Q4".parse().unwrap(), 800.0)
+        .expect("finite");
     assert!(
         CreditAssessment::compute(&results, "2025Q4".parse().unwrap())
             .unwrap()
@@ -124,10 +120,8 @@ fn trailing_year_requires_consecutive_calendar_periods() {
     );
     for p in ["2025Q1", "2025Q2", "2025Q3"] {
         results
-            .nodes
-            .entry("ebitda".into())
-            .or_default()
-            .insert(p.parse().unwrap(), 100.0);
+            .set_scalar("ebitda", p.parse().unwrap(), 100.0)
+            .expect("finite");
     }
     assert_eq!(
         CreditAssessment::compute(&results, "2025Q4".parse().unwrap())
@@ -150,13 +144,14 @@ fn regression_rejects_unidentified_and_unaligned_samples() {
 fn corkscrew_rejects_nan_in_strict_and_report_modes() {
     let model = monetary_model(Currency::USD);
     let mut results = Evaluator::new().evaluate(&model).unwrap();
-    results.nodes.get_mut("revenue").unwrap().insert(
+    results.cells.get_mut("revenue").unwrap().insert(
         PeriodId::annual(2026).expect("valid annual period"),
-        f64::NAN,
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
     );
-    results
-        .nodes
-        .insert("liability".into(), results.nodes["revenue"].clone());
+    let revenue = results.cells["revenue"].clone();
+    results.cells.insert("liability".to_string(), revenue);
     for strict in [true, false] {
         let accounts = [
             ("revenue", AccountType::Asset),

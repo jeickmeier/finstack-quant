@@ -19,16 +19,22 @@ export const sensitivityModes: readonly string[] = (
       .mode,
   ).oneOf ?? []
 ).flatMap((branch) => (branch.const === undefined ? [] : [branch.const]));
-/**
- * The evaluated number at a node and period, as Rust returned it. A missing
- * cell or a non-finite sentinel becomes NaN, which Rust rejects as a base
- * value; nothing is defaulted.
- */
+/** The float view of a returned cell, or undefined when the cell has no value. */
+export function evaluatedValue(
+  result: StatementResult,
+  nodeId: string,
+  periodId: string,
+): number | undefined {
+  const value = result.cells[nodeId]?.[periodId]?.value;
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "number") return value;
+  return Number(value.amount);
+}
+/** A returned cell as a number; a cell without a value is NaN, which Rust rejects. */
 export function evaluatedNumber(
   result: StatementResult,
   nodeId: string,
   periodId: string,
 ): number {
-  const value = result.nodes[nodeId]?.[periodId];
-  return typeof value === "number" ? value : Number.NaN;
+  return evaluatedValue(result, nodeId, periodId) ?? Number.NaN;
 }

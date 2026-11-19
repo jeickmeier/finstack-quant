@@ -41,7 +41,7 @@ fn declared_units_must_match_observations() {
 }
 
 #[test]
-fn sparse_periods_do_not_shorten_lags_or_fill_ttm() {
+fn sparse_period_plans_are_rejected() {
     let mut model = {
         let mut model_builder = ModelBuilder::new("sparse");
         model_builder.periods("2024Q1..2025Q1", None).unwrap();
@@ -65,22 +65,14 @@ fn sparse_periods_do_not_shorten_lags_or_fill_ttm() {
     model.periods =
         finstack_quant_core::dates::PeriodPlan::try_new(model.periods.get_calendar(), rows)
             .unwrap();
-    model
-        .nodes
-        .get_mut("x")
-        .unwrap()
-        .values
-        .as_mut()
-        .unwrap()
-        .shift_remove(&q(2024, 2));
-    let result = Evaluator::new().evaluate(&model).unwrap();
-    assert!(result.get("far", &q(2025, 1)).unwrap().is_nan());
-    assert!(result.get("ttm", &q(2025, 1)).unwrap().is_nan());
-    assert_eq!(result.get("previous_year", &q(2025, 1)), Some(100.0));
+    let error = Evaluator::new()
+        .evaluate(&model)
+        .expect_err("a plan with a missing period is not a canonical timeline");
+    assert!(error.to_string().contains("contiguous"), "{error}");
 }
 
 #[test]
-fn forecasts_rebase_at_each_visible_actual_without_looking_ahead() {
+fn a_hidden_actual_is_not_forecast_and_the_suffix_starts_from_the_last_actual() {
     let mut model = {
         let mut model_builder = ModelBuilder::new("availability");
         model_builder.periods("2025Q1..Q4", Some("2025Q3")).unwrap();
@@ -99,10 +91,24 @@ fn forecasts_rebase_at_each_visible_actual_without_looking_ahead() {
         Some(serde_json::from_value(json!({"method":"growth_pct","params":{"rate":0.1}})).unwrap());
     node.node_type = finstack_quant_statements::types::NodeType::Mixed;
     node.availability_dates = indexmap! {q(2025,1) => date!(2025-04-10), q(2025,2) => date!(2025-12-01), q(2025,3) => date!(2025-10-10)};
+    model.source_snapshot = Some("original".to_string());
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 11 - 01))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 11 - 01),
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(date!(2025 - 11 - 01)),
+        )
         .unwrap();
-    assert!((result.get("x", &q(2025, 2)).unwrap() - 110.0).abs() < 1e-10);
+    // Q2 is an actual period whose observation is not yet published at the
+    // cutoff. A forecast is eligible only in a forecast period, so Q2 is
+    // unavailable, not forecast.
+    let hidden = result.get_cell("x", &q(2025, 2)).unwrap();
+    assert_eq!(
+        hidden.reason,
+        Some(finstack_quant_statements::evaluator::UnavailableReason::HiddenByCutoff)
+    );
+    // The suffix is Q4 and its base is the visible Q3 observation.
     assert!((result.get("x", &q(2025, 4)).unwrap() - 330.0).abs() < 1e-10);
 }
 
@@ -115,7 +121,6 @@ fn ewm_normalizes_after_each_observation() {
             "x",
             &[
                 (q(2025, 1), 1.0.into()),
-                (q(2025, 2), f64::NAN.into()),
                 (q(2025, 3), 3.0.into()),
                 (q(2025, 4), 4.0.into()),
             ],
@@ -145,27 +150,32 @@ fn normalization_preserves_units_and_rejects_foreign_sources_and_caps() {
         model_builder.build().unwrap()
     };
     let mut result = Evaluator::new().evaluate(&model).unwrap();
-    let invalid: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","adjustments":[{"id":"a","name":"a","value":{"type":"percentage_of_node","node_id":"eur","percentage":0.1}}]})).unwrap();
+    let invalid: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","output_node":"adjusted","adjustments":[{"id":"a","name":"a","value":{"type":"percentage_of_node","node_id":"eur","percentage":0.1}}]})).unwrap();
     assert!(normalize(&result, &invalid).is_err());
-    let invalid_cap: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","adjustments":[{"id":"a","name":"a","value":{"type":"fixed","amounts":{"2025Q1":10}},"cap":{"base_node":"eur","value":0.1}}]})).unwrap();
+    let invalid_cap: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","output_node":"adjusted","adjustments":[{"id":"a","name":"a","value":{"type":"fixed","amounts":{"2025Q1":{"amount":"10","currency":"USD"}}},"cap":{"type":"reference","base_node":"eur","fraction":0.1}}]})).unwrap();
     assert!(normalize(&result, &invalid_cap).is_err());
-    let config = NormalizationConfig::new("usd")
-        .add_adjustment(Adjustment::fixed("a", "a", indexmap! {q(2025,1)=>10.0}))
-        .unwrap();
-    let normalized = normalize(&result, &config).unwrap();
-    for target in ["adjusted", "usd", "eur"] {
-        finstack_quant_statements::adjustments::merge_into_results(
-            &mut result,
-            &normalized,
-            target,
-        )
-        .unwrap();
-        assert_eq!(result.get(target, &q(2025, 1)), Some(110.0));
-        assert_eq!(
-            result.get_money(target, &q(2025, 1)),
-            Some(Money::from((110_i64, Currency::USD)))
-        );
+    // A fixed amount and an absolute cap carry the target's currency.
+    for amount in [json!(10), json!({"amount":"10","currency":"EUR"})] {
+        let foreign: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","output_node":"adjusted","adjustments":[{"id":"a","name":"a","value":{"type":"fixed","amounts":{"2025Q1":amount}}}]})).unwrap();
+        assert!(normalize(&result, &foreign).is_err());
     }
+    let ten = Money::from((10_i64, Currency::USD));
+    let config = NormalizationConfig::new("usd", "adjusted")
+        .add_adjustment(Adjustment::fixed(
+            "a",
+            "a",
+            indexmap! {q(2025,1)=>ten.into()},
+        ))
+        .unwrap();
+    finstack_quant_statements::adjustments::merge_into_results(&mut result, &config).unwrap();
+    assert_eq!(
+        result.get_money("adjusted", &q(2025, 1)),
+        Some(Money::from((110_i64, Currency::USD)))
+    );
+    assert_eq!(
+        result.get_money("usd", &q(2025, 1)),
+        Some(Money::from((100_i64, Currency::USD)))
+    );
 }
 
 #[test]
@@ -181,7 +191,7 @@ fn every_cash_period_checks_its_components_even_without_a_prior_balance() {
         model_builder.value("cff", &[(q(2025, 1), 0.0.into())]);
         model_builder.build().unwrap()
     };
-    let spec: CheckSuiteSpec = serde_json::from_value(json!({"name":"cash","builtin_checks":[{"type":"cash_reconciliation","cash_balance_node":"cash","total_cash_flow_node":"total","cfo_node":"cfo","cfi_node":"cfi","cff_node":"cff"}]})).unwrap();
+    let spec: CheckSuiteSpec = serde_json::from_value(json!({"name":"cash","builtin_checks":[{"type":"cash_reconciliation","cash_balance_node":"cash","total_cash_flow_node":"total","opening_balance":{"date":"2025-01-01","value":0.0},"cfo_node":"cfo","cfi_node":"cfi","cff_node":"cff"}]})).unwrap();
     let result = Evaluator::new()
         .with_checks(spec.resolve().unwrap())
         .evaluate(&model)
@@ -190,29 +200,48 @@ fn every_cash_period_checks_its_components_even_without_a_prior_balance() {
 }
 
 #[test]
-fn non_finite_result_cells_and_warnings_round_trip_and_validate_schema() {
+fn valueless_result_cells_and_warnings_round_trip_and_validate_schema() {
+    use finstack_quant_statements::evaluator::{CellStatus, ResultCell, UnavailableReason};
+
+    // A published cell is finite or has no value; a non-finite number
+    // survives only in a diagnostic warning.
     let mut result = StatementResult::new();
     for (id, value) in [
         ("nan", f64::NAN),
         ("positive", f64::INFINITY),
         ("negative", f64::NEG_INFINITY),
     ] {
-        result.nodes.insert(id.into(), indexmap! {q(2025,1)=>value});
+        ResultCell::scalar(value).expect_err("a non-finite value is not a result cell");
+        result.set_cell(
+            id,
+            q(2025, 1),
+            ResultCell::unavailable(UnavailableReason::MissingInput),
+        );
         result.meta.warnings.push(EvalWarning::NonFiniteValue {
             node_id: id.into(),
             period: q(2025, 1),
             value,
         });
     }
-    let json = serde_json::to_value(&result).unwrap();
-    assert_eq!(json["nodes"]["nan"]["2025Q1"], "nan");
-    let restored: StatementResult = serde_json::from_value(json.clone()).unwrap();
-    assert!(restored.get("nan", &q(2025, 1)).unwrap().is_nan());
-    assert_eq!(restored.get("positive", &q(2025, 1)), Some(f64::INFINITY));
-    assert_eq!(
-        restored.get("negative", &q(2025, 1)),
-        Some(f64::NEG_INFINITY)
+    result.set_cell(
+        "masked",
+        q(2025, 1),
+        ResultCell::without_value(CellStatus::Masked),
     );
+    result.set_scalar("zero", q(2025, 1), 0.0).unwrap();
+    let json = serde_json::to_value(&result).unwrap();
+    assert_eq!(
+        json["cells"]["nan"]["2025Q1"],
+        json!({"status": "unavailable", "reason": "missing_input"})
+    );
+    assert_eq!(
+        json["cells"]["zero"]["2025Q1"],
+        json!({"status": "value", "value": 0.0})
+    );
+    let restored: StatementResult = serde_json::from_value(json.clone()).unwrap();
+    assert_eq!(restored.cells, result.cells);
+    assert_eq!(restored.get("nan", &q(2025, 1)), None);
+    assert_eq!(restored.get("zero", &q(2025, 1)), Some(0.0));
     let schema: serde_json::Value = serde_json::from_str(include_str!(
         "../schemas/statements/1/statement_result.schema.json"
     ))
@@ -250,6 +279,7 @@ fn reporting_grid_does_not_reprice_contractual_amortizing_interest() {
             &amortizing_loan_model("2025Q1..Q3", Currency::USD),
             &market,
             date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
         )
         .unwrap();
     let monthly = Evaluator::new()
@@ -257,6 +287,7 @@ fn reporting_grid_does_not_reprice_contractual_amortizing_interest() {
             &amortizing_loan_model("2025M1..M9", Currency::USD),
             &market,
             date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
         )
         .unwrap();
     for quarter in 1..=3 {
@@ -284,7 +315,12 @@ fn reporting_currency_requires_fx_even_with_one_native_currency() {
     }
     assert!(
         Evaluator::new()
-            .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 15))
+            .evaluate_with_market(
+                &model,
+                &MarketContext::new(),
+                date!(2025 - 01 - 15),
+                finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot
+            )
             .is_err()
     );
 }
@@ -315,7 +351,8 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
     }
     let mut model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
     model.capital_structure.as_mut().unwrap().reporting_currency = Some(Currency::USD);
-    model.capital_structure.as_mut().unwrap().fx_policy = Some(FxConversionPolicy::PeriodEnd);
+    model.capital_structure.as_mut().unwrap().fx_policy =
+        Some(finstack_quant_statements::types::CapitalFxPolicy::PeriodEnd);
     // Changing the reporting currency also changes the declared total-node units.
     for node in model.nodes.values_mut() {
         node.value_type = Some(finstack_quant_statements::types::NodeValueType::Monetary {
@@ -326,7 +363,12 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
     let market =
         MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(SnapshotFx), None));
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &market, date!(2025 - 01 - 15))
+        .evaluate_with_market(
+            &model,
+            &market,
+            date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
     let flows = result.cs_cashflows.as_ref().unwrap();
     assert_eq!(flows.reporting_currency, Some(Currency::USD));
@@ -373,10 +415,20 @@ fn fx_pivot_does_not_choose_reporting_currency() {
     let model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
     let market = MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(UnusedFx), None));
     let actual = Evaluator::new()
-        .evaluate_with_market(&model, &market, date!(2025 - 01 - 15))
+        .evaluate_with_market(
+            &model,
+            &market,
+            date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
     let native = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 15))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
     assert_eq!(
         actual.get_money("debt", &q(2025, 1)),
@@ -406,9 +458,23 @@ fn a_dated_value_hidden_by_as_of_is_not_a_forecast_base_outside_the_actuals_rang
     node.node_type = finstack_quant_statements::types::NodeType::Mixed;
     node.availability_dates =
         indexmap! {q(2025,1) => date!(2025-04-10), q(2025,2) => date!(2025-12-01)};
+    model.source_snapshot = Some("original".to_string());
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 11 - 01))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 11 - 01),
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(date!(2025 - 11 - 01)),
+        )
         .unwrap();
-    assert!((result.get("x", &q(2025, 2)).unwrap() - 110.0).abs() < 1e-10);
-    assert!((result.get("x", &q(2025, 3)).unwrap() - 121.0).abs() < 1e-10);
+    // Every period is a forecast period, so the suffix opens at Q1 and no
+    // slot precedes it. Without a selected start level the forecast has no
+    // base; the hidden Q2 value is not one.
+    assert_eq!(result.get("x", &q(2025, 1)), Some(100.0));
+    for quarter in [2, 3] {
+        assert_eq!(
+            result.get_cell("x", &q(2025, quarter)).unwrap().reason,
+            Some(finstack_quant_statements::evaluator::UnavailableReason::MissingForecastBase)
+        );
+    }
 }
