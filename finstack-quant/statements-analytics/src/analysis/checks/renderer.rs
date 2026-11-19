@@ -62,10 +62,12 @@ pub fn render_check_report_text(report: &CheckReport) -> String {
             out.push_str(&format!("  {}\n", f.message));
 
             if let Some(ref m) = f.materiality {
-                out.push_str(&match m.relative_pct {
-                    Some(pct) => format!(
-                        "  Materiality: {:.2} ({pct:.2}% of {})\n",
-                        m.absolute, m.reference_label,
+                out.push_str(&match m.relative {
+                    Some(ratio) => format!(
+                        "  Materiality: {:.2} ({:.2}% of {})\n",
+                        m.absolute,
+                        ratio * 100.0,
+                        m.reference_label,
                     ),
                     None => format!(
                         "  Materiality: {:.2} (reference {})\n",
@@ -135,10 +137,11 @@ pub fn render_check_report_html(report: &CheckReport) -> String {
 
             if let Some(ref m) = f.materiality {
                 let label = escape_html_text(&m.reference_label);
-                out.push_str(&match m.relative_pct {
-                    Some(pct) => format!(
-                        "<br/><em>Materiality: {:.2} ({pct:.2}% of {label})</em>\n",
+                out.push_str(&match m.relative {
+                    Some(ratio) => format!(
+                        "<br/><em>Materiality: {:.2} ({:.2}% of {label})</em>\n",
                         m.absolute,
+                        ratio * 100.0,
                     ),
                     None => format!(
                         "<br/><em>Materiality: {:.2} (reference {label})</em>\n",

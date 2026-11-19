@@ -111,7 +111,7 @@ impl Check for LiquidityRunwayCheck {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: months,
-                        relative_pct: None,
+                        relative: None,
                         reference_value: burn,
                         reference_label: "cash_burn".to_string(),
                     }),

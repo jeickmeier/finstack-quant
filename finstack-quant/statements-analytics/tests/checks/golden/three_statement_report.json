@@ -15,7 +15,7 @@
           "period": "2025Q4",
           "materiality": {
             "absolute": 5.0,
-            "relative_pct": 0.43478260869565216,
+            "relative": 0.004347826086956522,
             "reference_value": 1150.0,
             "reference_label": "total_assets"
           },
@@ -199,7 +199,7 @@
           "period": "2025Q4",
           "materiality": {
             "absolute": 7.0,
-            "relative_pct": null,
+            "relative": null,
             "reference_value": 317.0,
             "reference_label": "ttm_ebitda"
           },

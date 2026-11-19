@@ -43,7 +43,7 @@ CHECK_FINDING_COLUMNS = [
     "period",
     "nodes",
     "materiality_absolute",
-    "materiality_relative_pct",
+    "materiality_relative",
     "materiality_reference_value",
     "materiality_reference_label",
     "comparison_actual",
@@ -93,7 +93,7 @@ def _populated_report() -> CheckReport:
                         "period": "2025Q1",
                         "materiality": {
                             "absolute": 250.0,
-                            "relative_pct": 2.5,
+                            "relative": 0.025,
                             "reference_value": 10000.0,
                             "reference_label": "total_assets",
                         },
@@ -209,8 +209,8 @@ def test_check_report_findings_carry_materiality_and_nodes() -> None:
     assert error_row["period"] == "2025Q1"
     assert error_row["nodes"] == "total_assets,total_liabilities"
     assert error_row["materiality_absolute"] == pytest.approx(250.0)
-    # `relative_pct` is a percentage (2.5 == 2.5%), not a decimal fraction.
-    assert error_row["materiality_relative_pct"] == pytest.approx(2.5)
+    # The relative amount is a decimal fraction (0.025 represents 2.5%).
+    assert error_row["materiality_relative"] == pytest.approx(0.025)
     assert error_row["materiality_reference_value"] == pytest.approx(10000.0)
     assert error_row["materiality_reference_label"] == "total_assets"
 

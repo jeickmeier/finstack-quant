@@ -263,7 +263,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
-      "bytes": 39062,
+      "bytes": 39074,
       "kind": "output",
       "path": "schemas/statements_analytics/1/lbo_result.schema.json",
       "summary": "Outputs of an LBO evaluation.",

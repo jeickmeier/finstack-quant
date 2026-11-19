@@ -151,10 +151,10 @@ pub enum PeriodScope {
 pub struct Materiality {
     /// Absolute amount of the discrepancy.
     pub absolute: f64,
-    /// Discrepancy as a percentage of the reference value; `None` when the
-    /// percentage is undefined (a zero reference) or does not apply.
-    pub relative_pct: Option<f64>,
-    /// The reference (denominator) value used when computing `relative_pct`.
+    /// Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);
+    /// `None` when the fraction is undefined (a zero reference) or does not apply.
+    pub relative: Option<f64>,
+    /// The reference (denominator) value used when computing `relative`.
     pub reference_value: f64,
     /// Human-readable label for the reference (e.g. "total_assets").
     pub reference_label: String,

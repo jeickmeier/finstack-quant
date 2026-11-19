@@ -101,7 +101,7 @@ impl Check for DividendReconciliation {
 
             if diff.abs() > tolerance {
                 let reference = div_eq.abs().max(1.0);
-                let relative = (diff / reference).abs() * 100.0;
+                let relative = (diff / reference).abs();
 
                 findings.push(CheckFinding {
                     check_id: self.id().to_string(),
@@ -113,7 +113,7 @@ impl Check for DividendReconciliation {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: diff.abs(),
-                        relative_pct: Some(relative),
+                        relative: Some(relative),
                         reference_value: div_eq,
                         reference_label: "equity_dividends".to_string(),
                     }),

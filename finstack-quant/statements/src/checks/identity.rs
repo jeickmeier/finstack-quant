@@ -265,8 +265,8 @@ impl Comparison<'_> {
         }
         let residual = residual.value();
         // The relative residual is undefined on a zero reference.
-        let relative_pct = Some((residual / self.reference).abs() * 100.0)
-            .filter(|pct| self.reference != 0.0 && pct.is_finite());
+        let relative = Some((residual / self.reference).abs())
+            .filter(|ratio| self.reference != 0.0 && ratio.is_finite());
         let finding = CheckFinding {
             check_id: self.check_id.to_string(),
             severity: Severity::Error,
@@ -274,7 +274,7 @@ impl Comparison<'_> {
             period: Some(self.period),
             materiality: Some(Materiality {
                 absolute: residual.abs(),
-                relative_pct,
+                relative,
                 reference_value: self.reference,
                 reference_label: self.reference_label.to_string(),
             }),

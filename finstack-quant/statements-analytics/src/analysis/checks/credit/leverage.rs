@@ -92,7 +92,7 @@ impl Check for LeverageRangeCheck {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: ebitda,
-                        relative_pct: None,
+                        relative: None,
                         reference_value: ebitda,
                         reference_label: "ttm_ebitda".to_string(),
                     }),
@@ -139,7 +139,7 @@ impl Check for LeverageRangeCheck {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: leverage,
-                        relative_pct: None,
+                        relative: None,
                         reference_value: ebitda,
                         reference_label: "ttm_ebitda".to_string(),
                     }),

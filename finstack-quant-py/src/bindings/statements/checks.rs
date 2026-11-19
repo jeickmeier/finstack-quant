@@ -31,7 +31,7 @@ const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 15] = [
     ("period", "str"),
     ("nodes", "str"),
     ("materiality_absolute", "float64"),
-    ("materiality_relative_pct", "float64"),
+    ("materiality_relative", "float64"),
     ("materiality_reference_value", "float64"),
     ("materiality_reference_label", "str"),
     ("comparison_actual", "float64"),
@@ -582,11 +582,10 @@ impl PyCheckFinding {
         self.inner.materiality.as_ref().map(|m| m.absolute)
     }
 
-    /// Discrepancy as a **percentage** (already multiplied by 100) of the
-    /// reference value, or ``None``.
+    /// Discrepancy as a decimal fraction of the reference value, or ``None``.
     #[getter]
-    fn materiality_relative_pct(&self) -> Option<f64> {
-        self.inner.materiality.as_ref().and_then(|m| m.relative_pct)
+    fn materiality_relative(&self) -> Option<f64> {
+        self.inner.materiality.as_ref().and_then(|m| m.relative)
     }
 
     /// Reference (denominator) value used for the relative measure, or
@@ -809,9 +808,8 @@ impl PyCheckReport {
     /// identifiers involved, empty string when none),
     /// ``materiality_absolute`` (size of the discrepancy in the compared
     /// nodes' own units — currency amounts for monetary nodes),
-    /// ``materiality_relative_pct`` (that discrepancy as a **percentage** of
-    /// the reference value, i.e. already multiplied by 100, unlike the
-    /// decimal-fraction rates used elsewhere in this module),
+    /// ``materiality_relative`` (that discrepancy as a decimal fraction of
+    /// the reference value, such as 0.025 for 2.5%),
     /// ``materiality_reference_value`` (the denominator used),
     /// ``materiality_reference_label`` (what that denominator is, e.g.
     /// ``total_assets``), and ``comparison_actual``, ``comparison_expected``,
@@ -848,7 +846,7 @@ impl PyCheckReport {
                             .collect::<Vec<_>>()
                             .join(","),
                         "materiality_absolute": materiality.map(|m| m.absolute),
-                        "materiality_relative_pct": materiality.and_then(|m| m.relative_pct),
+                        "materiality_relative": materiality.and_then(|m| m.relative),
                         "materiality_reference_value": materiality.map(|m| m.reference_value),
                         "materiality_reference_label": materiality
                             .map(|m| m.reference_label.clone()),

@@ -1061,14 +1061,14 @@ export interface D_288B30976E4551573Cdd {
    */
   reference_label: string;
   /**
-   * The reference (denominator) value used when computing `relative_pct`.
+   * The reference (denominator) value used when computing `relative`.
    */
   reference_value: number;
   /**
-   * Discrepancy as a percentage of the reference value; `None` when the
-   * percentage is undefined (a zero reference) or does not apply.
+   * Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);
+   * `None` when the fraction is undefined (a zero reference) or does not apply.
    */
-  relative_pct?: number | null;
+  relative?: number | null;
   [k: string]: unknown;
 }
 /**

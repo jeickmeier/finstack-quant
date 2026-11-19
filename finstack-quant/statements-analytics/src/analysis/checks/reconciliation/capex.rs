@@ -148,7 +148,7 @@ impl Check for CapexReconciliation {
 
             if diff.abs() > tolerance {
                 let reference = expected.abs().max(1.0);
-                let relative = (diff / reference).abs() * 100.0;
+                let relative = (diff / reference).abs();
 
                 let mut nodes = vec![self.capex_cf_node.clone()];
                 if let Some(ref n) = self.ppe_additions_node {
@@ -169,7 +169,7 @@ impl Check for CapexReconciliation {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: diff.abs(),
-                        relative_pct: Some(relative),
+                        relative: Some(relative),
                         reference_value: expected,
                         reference_label: "balance_sheet_additions".to_string(),
                     }),

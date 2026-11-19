@@ -2429,7 +2429,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 111286
+            "bytes": 111298
           }
         ]
       },
@@ -5258,7 +5258,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 111286
+            "bytes": 111298
           },
           {
             "domain": "valuations",

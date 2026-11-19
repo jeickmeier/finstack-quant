@@ -26,7 +26,7 @@ fn sample_report() -> CheckReport {
             period: Some(PeriodId::quarter(2025, 1).expect("valid period fixture")),
             materiality: Some(Materiality {
                 absolute: 50.0,
-                relative_pct: Some(2.5),
+                relative: Some(0.025),
                 reference_value: 2000.0,
                 reference_label: "total_assets".into(),
             }),

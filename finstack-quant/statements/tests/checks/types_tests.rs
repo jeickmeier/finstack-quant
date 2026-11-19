@@ -99,7 +99,7 @@ fn period_scope_serde_roundtrip() {
 fn materiality_serde_roundtrip() {
     let m = Materiality {
         absolute: 500.0,
-        relative_pct: Some(2.5),
+        relative: Some(0.025),
         reference_value: 20_000.0,
         reference_label: "total_assets".into(),
     };
@@ -140,7 +140,7 @@ fn check_finding_serde_roundtrip() {
         period: Some(PeriodId::quarter(2025, 1).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 100.0,
-            relative_pct: Some(0.5),
+            relative: Some(0.005),
             reference_value: 20_000.0,
             reference_label: "total_assets".into(),
         }),
@@ -245,7 +245,7 @@ fn sample_report() -> CheckReport {
         period: Some(PeriodId::quarter(2025, 1).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 1000.0,
-            relative_pct: Some(5.0),
+            relative: Some(0.05),
             reference_value: 20_000.0,
             reference_label: "total_assets".into(),
         }),
@@ -260,7 +260,7 @@ fn sample_report() -> CheckReport {
         period: Some(PeriodId::quarter(2025, 2).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 50.0,
-            relative_pct: Some(0.25),
+            relative: Some(0.0025),
             reference_value: 20_000.0,
             reference_label: "total_debt".into(),
         }),

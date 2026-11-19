@@ -575,10 +575,8 @@ class CheckReport:
         finding is not period-specific), ``nodes`` (comma-joined node
         identifiers involved, empty string when none), ``materiality_absolute``
         (size of the discrepancy in the compared nodes' own units — currency
-        amounts for monetary nodes), ``materiality_relative_pct`` (that
-        discrepancy as a **percentage** of the reference value, i.e. already
-        multiplied by 100, unlike the decimal-fraction rates used elsewhere in
-        this module), ``materiality_reference_value`` (the denominator used),
+        amounts for monetary nodes), ``materiality_relative`` (that
+        discrepancy as a decimal fraction of the reference, such as 0.025 for 2.5%), ``materiality_reference_value`` (the denominator used),
         ``materiality_reference_label`` (what that denominator is, e.g.
         ``total_assets``), and ``comparison_actual``, ``comparison_expected``,
         ``comparison_tolerance`` (the two values the check compared and the
@@ -1197,16 +1195,16 @@ class CheckFinding:
         ...
 
     @property
-    def materiality_relative_pct(self) -> float | None:
+    def materiality_relative(self) -> float | None:
         """
-        Breach magnitude as a percentage of the reference value, or ``None``.
+        Breach magnitude as a decimal fraction of the reference value, or ``None``.
 
         This property does not raise.
 
         Returns
         -------
         float | None
-            Breach magnitude as a percentage of the reference value, or ``None``.
+            Breach magnitude as a decimal fraction of the reference value, or ``None``.
         """
         ...
 

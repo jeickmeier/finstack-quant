@@ -346,13 +346,13 @@ export default [
   {
     "path": "#/$defs/d_288b30976e4551573cdd/properties/reference_value",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/reference_value",
-    "description": "The reference (denominator) value used when computing `relative_pct`.",
+    "description": "The reference (denominator) value used when computing `relative`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_288b30976e4551573cdd/properties/relative_pct",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/relative_pct",
-    "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
+    "path": "#/$defs/d_288b30976e4551573cdd/properties/relative",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/relative",
+    "description": "Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);\n`None` when the fraction is undefined (a zero reference) or does not apply.",
     "format": "double"
   },
   {

@@ -160,12 +160,12 @@
           "type": "string"
         },
         "reference_value": {
-          "description": "The reference (denominator) value used when computing `relative_pct`.",
+          "description": "The reference (denominator) value used when computing `relative`.",
           "format": "double",
           "type": "number"
         },
-        "relative_pct": {
-          "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
+        "relative": {
+          "description": "Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);\n`None` when the fraction is undefined (a zero reference) or does not apply.",
           "format": "double",
           "type": [
             "number",

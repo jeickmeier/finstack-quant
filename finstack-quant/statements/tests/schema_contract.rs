@@ -226,7 +226,7 @@ fn representative_statement_result() -> StatementResult {
                 period: Some(period),
                 materiality: Some(Materiality {
                     absolute: 100.0,
-                    relative_pct: Some(0.01),
+                    relative: Some(0.0001),
                     reference_value: 1_000_000.0,
                     reference_label: "total_assets".to_string(),
                 }),
