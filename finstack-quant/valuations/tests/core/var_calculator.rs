@@ -248,7 +248,7 @@ fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
             Currency::USD,
             finstack_quant_models::types::OptionType::Call,
         )?;
-    let base_surface = VolSurface::builder("EQUITY-VOL")
+    let base_surface = VolSurface::builder("DISPLAY-VOL")
         .secondary_axis(VolSurfaceAxis::Strike)
         .quote_type(VolQuoteType::BlackLognormal)
         .interpolation_mode(VolInterpolationMode::Vol)
@@ -257,7 +257,7 @@ fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
         .row(&[0.20, 0.23])
         .row(&[0.24, 0.25])
         .build()?;
-    let manual_surface = VolSurface::builder("EQUITY-VOL")
+    let manual_surface = VolSurface::builder("DISPLAY-VOL")
         .secondary_axis(VolSurfaceAxis::Strike)
         .quote_type(VolQuoteType::BlackLognormal)
         .interpolation_mode(VolInterpolationMode::Vol)
@@ -268,7 +268,7 @@ fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
         .build()?;
     let market = usd_ois_market(as_of)?
         .insert_price(
-            "EQUITY-SPOT",
+            "DISPLAY-SPOT",
             MarketScalar::unitless(100.0).expect("valid scalar"),
         )
         .insert_price(
@@ -291,7 +291,7 @@ fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
             vec![
                 RiskFactorShift {
                     factor: RiskFactorType::ImpliedVol {
-                        vol_surface_id: "EQUITY-VOL".into(),
+                        vol_surface_id: "DISPLAY-VOL".into(),
                         expiry_years: 0.5,
                         strike: 100.0,
                     },
@@ -299,7 +299,7 @@ fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
                 },
                 RiskFactorShift {
                     factor: RiskFactorType::ImpliedVol {
-                        vol_surface_id: "EQUITY-VOL".into(),
+                        vol_surface_id: "DISPLAY-VOL".into(),
                         expiry_years: 1.5,
                         strike: 110.0,
                     },
@@ -319,7 +319,7 @@ fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
     )?;
     assert!((actual.pnl_distribution[0] - expected_pnl).abs() < 1e-12);
     assert_eq!(
-        market.get_surface("EQUITY-VOL")?.vols(),
+        market.get_surface("DISPLAY-VOL")?.vols(),
         &[0.20, 0.23, 0.24, 0.25]
     );
     Ok(())

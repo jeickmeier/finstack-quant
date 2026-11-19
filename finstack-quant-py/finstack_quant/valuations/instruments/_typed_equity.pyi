@@ -361,10 +361,10 @@ class EquityOption:
     ) -> EquityOption:
         """
         Build a cash-settled European call or put (mirrors Rust
-        ``EquityOption::european``). The option binds to the generic market-data
-        ids ``"USD-OIS"`` (discount), ``"EQUITY-SPOT"`` (spot), ``"EQUITY-VOL"``
-        (volatility surface) and ``"EQUITY-DIVYIELD"`` (continuous dividend
-        yield); use :meth:`EquityOption.builder` to bind other ids.
+        ``EquityOption::european``). Market data IDs use
+        ``{currency}-OIS`` for discounting, ``{ticker}-SPOT`` for spot
+        and ``{ticker}-VOL`` for volatility. Continuous dividend yield
+        defaults to zero. Use :meth:`EquityOption.builder` to bind other IDs.
 
         Parameters
         ----------
@@ -400,7 +400,7 @@ class EquityOption:
         >>> from finstack_quant.valuations.instruments import EquityOption
         >>> opt = EquityOption.european("AAPL-C-200", "AAPL", 200.0, "2025-06-20", 100.0, "USD", "call")
         >>> (opt.option_type, opt.settlement, opt.spot_id)
-        ('call', 'cash', 'EQUITY-SPOT')
+        ('call', 'cash', 'AAPL-SPOT')
         """
         ...
     def implied_vol(

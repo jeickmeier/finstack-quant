@@ -570,14 +570,31 @@ class TestEquityOption:
             option.implied_vol(market, "2024-06-21", price)
 
     def test_european_defaults_match_rust(self) -> None:
-        option = EquityOption.european("AAPL-C", "AAPL", 200.0, "2025-06-20", 100.0, "USD", "call")
+        option = EquityOption.european("AAPL-C", "AAPL", 200.0, "2025-06-20", 100.0, "EUR", "call")
         assert option.option_type == "call"
         assert option.exercise_style == "european"
-        assert option.spot_id == "EQUITY-SPOT"
-        assert option.vol_surface_id == "EQUITY-VOL"
+        assert option.spot_id == "AAPL-SPOT"
+        assert option.vol_surface_id == "AAPL-VOL"
         assert option.quantity == 100.0
-        assert option.currency == "USD"
-        assert option.div_yield_id == "EQUITY-DIVYIELD"
+        assert option.currency == "EUR"
+        assert option.discount_curve_id == "EUR-OIS"
+        assert option.div_yield_id is None
+        market = MarketContext().insert(_discount("EUR-OIS", 0.03))
+        market.insert_price("AAPL-SPOT", 205.0, currency="EUR")
+        market.insert(
+            VolSurface(
+                "AAPL-VOL",
+                [0.5, 2.0],
+                [180.0, 220.0],
+                [[0.2, 0.3], [0.2, 0.3]],
+                secondary_axis="strike",
+                quote_type="black_lognormal",
+                interpolation_mode="vol",
+            )
+        )
+        price = option.price(market, BASE)
+        assert price.currency == "EUR"
+        assert price.price > 0.0
         put = EquityOption.european("AAPL-P", "AAPL", 180.0, "2025-06-20", 100.0, "USD", "put")
         assert put.option_type == "put"
         assert put.settlement == "cash"

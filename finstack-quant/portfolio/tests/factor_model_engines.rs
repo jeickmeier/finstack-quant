@@ -426,18 +426,18 @@ fn equity_vol_factor() -> FactorDefinition {
 fn vol_factor_delta_matches_equity_option_vega() -> Result<()> {
     use finstack_quant_core::math::special_functions::norm_pdf;
     use finstack_quant_models::types::OptionType;
-    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+    use finstack_quant_valuations::instruments::equity::equity_option::{
+        EquityOption, EquityOptionMarketData, EquityOptionParams,
+    };
 
     let as_of = make_date(2025, Month::January, 2)?;
     let expiry = make_date(2025, Month::July, 2)?;
-    let option = EquityOption::european(
+    let option = EquityOption::european_with_market_data(
         "EQ-VOL-FACTOR",
         "SPX",
-        100.0,
-        expiry,
-        100.0,
-        Currency::USD,
-        OptionType::Call,
+        EquityOptionParams::new(100.0, expiry, OptionType::Call, 100.0, Currency::USD),
+        EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
+            .with_div_yield_id("EQUITY-DIVYIELD"),
     )?;
     let market = equity_vol_market(as_of)?;
 

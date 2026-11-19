@@ -203,9 +203,9 @@ handle_setters!(JsEquityOptionBuilder, "EquityOptionBuilder", {
 impl JsEquityOption {
     /// Create a cash-settled European option (mirrors Rust `EquityOption::european`).
     ///
-    /// Market data ids take the Rust defaults: discount curve `USD-OIS`, spot
-    /// `EQUITY-SPOT`, volatility surface `EQUITY-VOL` and dividend yield
-    /// `EQUITY-DIVYIELD`. Use `EquityOption.builder()` for other ids.
+    /// Discount uses `{currency}-OIS`, spot uses `{ticker}-SPOT`, and
+    /// volatility uses `{ticker}-VOL`. Continuous dividend yield defaults to
+    /// zero. Use `EquityOption.builder()` to bind different market inputs.
     /// @param id - Unique instrument identifier.
     /// @param ticker - Underlying equity ticker symbol.
     /// @param strike - Strike price in `currency` units per share; must be positive.

@@ -619,15 +619,22 @@ mod variance_strip_tests {
 
         let as_of = date!(2025 - 01 - 01);
         let expiry = date!(2026 - 01 - 01);
-        let (market, _) = market_and_option();
-        let option = EquityOption::european(
+        let (market, example) = market_and_option();
+        let option = EquityOption::european_with_market_data(
             "XI0-DETERMINISTIC-LIMIT",
             "SPX",
-            100.0,
-            expiry,
-            1.0,
-            Currency::USD,
-            finstack_quant_models::types::OptionType::Call,
+            super::super::parameters::EquityOptionParams::new(
+                100.0,
+                expiry,
+                finstack_quant_models::types::OptionType::Call,
+                1.0,
+                Currency::USD,
+            ),
+            super::super::parameters::EquityOptionMarketData::new(
+                "USD-OIS",
+                "EQUITY-SPOT",
+                example.vol_surface_id,
+            ),
         )
         .expect("option");
         let discount = DiscountCurve::builder("USD-OIS")
