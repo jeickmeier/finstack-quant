@@ -20,6 +20,7 @@ pub(crate) mod typed_credit;
 pub(crate) mod typed_deposit;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_fra;
+pub(crate) mod typed_inflation_bond;
 pub(crate) mod typed_fx;
 mod typed_legs;
 pub(crate) mod typed_macros;
@@ -385,6 +386,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_rates::register(py, &m)?;
     typed_deposit::register(&m)?;
     typed_fra::register(&m)?;
+    typed_inflation_bond::register(&m)?;
     typed_credit::register(py, &m)?;
     typed_convertible::register(py, &m)?;
     convertible_spot_ladder::register(&m)?;
@@ -412,6 +414,8 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend([
         "Deposit",
         "DepositBuilder",
+        "InflationLinkedBond",
+        "InflationLinkedBondBuilder",
         "ForwardRateAgreement",
         "ForwardRateAgreementBuilder",
     ]);

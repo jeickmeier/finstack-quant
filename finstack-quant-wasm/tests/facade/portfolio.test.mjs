@@ -1419,3 +1419,22 @@ test('typed positions round-trip and append to a copied portfolio', () => {
   for (const handle of [expanded, extra, holding, built, empty, loaded, position, deposit])
     handle.free();
 });
+
+test('typed inflation-linked bond edits preserve decimal coupons and the source', () => {
+  const Type = facade.valuations.instruments.InflationLinkedBond;
+  const source = Type.example();
+  const coupon = '0.025000000000000000000000001';
+  const edited = source.toBuilder().id('TIPS-EDITED').realCoupon(coupon).lag('90D').build();
+  const restored = Type.fromJson(edited.toJson());
+  try {
+    assert.equal(restored.id, 'TIPS-EDITED');
+    assert.equal(restored.realCoupon, coupon);
+    assert.equal(restored.lag, '90D');
+    assert.equal(source.lag, '3M');
+    assert.equal(restored.toJson(), edited.toJson());
+  } finally {
+    source.free();
+    edited.free();
+    restored.free();
+  }
+});

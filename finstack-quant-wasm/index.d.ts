@@ -8866,6 +8866,8 @@ export interface ValuationsInstrumentsNamespace {
   readonly trancheMetrics: typeof wasm.trancheMetrics;
   readonly Deposit: typeof wasm.Deposit;
   readonly DepositBuilder: typeof wasm.DepositBuilder;
+  readonly InflationLinkedBond: typeof wasm.InflationLinkedBond;
+  readonly InflationLinkedBondBuilder: typeof wasm.InflationLinkedBondBuilder;
   readonly ForwardRateAgreement: typeof wasm.ForwardRateAgreement;
   readonly ForwardRateAgreementBuilder: typeof wasm.ForwardRateAgreementBuilder;
   readonly InterestRateSwap: typeof wasm.InterestRateSwap;

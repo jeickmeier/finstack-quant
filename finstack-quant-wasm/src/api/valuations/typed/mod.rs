@@ -23,6 +23,7 @@ pub mod data;
 pub mod equity;
 pub mod fixed_income;
 pub mod fx;
+pub mod inflation_bond;
 pub mod rates;
 pub mod structured;
 

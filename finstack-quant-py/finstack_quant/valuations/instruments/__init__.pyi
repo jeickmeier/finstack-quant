@@ -55,6 +55,10 @@ from finstack_quant.valuations.instruments._typed_legs import (
     PremiumLegSpec as PremiumLegSpec,
     ProtectionLegSpec as ProtectionLegSpec,
 )
+from finstack_quant.valuations.instruments._typed_inflation_bond import (
+    InflationLinkedBond as InflationLinkedBond,
+    InflationLinkedBondBuilder as InflationLinkedBondBuilder,
+)
 from finstack_quant.valuations.instruments._typed_deposit import Deposit as Deposit, DepositBuilder as DepositBuilder
 from finstack_quant.valuations.instruments._typed_rates import (
     CapFloor as CapFloor,
@@ -224,6 +228,8 @@ __all__ = [
     "ConcentrationLimit",
     "Deposit",
     "DepositBuilder",
+    "InflationLinkedBond",
+    "InflationLinkedBondBuilder",
     "EligibilityRule",
     "EnhancedMonteCarloResult",
     "FacilityProjection",

@@ -345,3 +345,20 @@ def test_irs_accrual_flags_round_trip_and_builder() -> None:
     restored = InterestRateSwap.from_json(adjusted.to_json())
     assert restored.adjust_fixed_accrual_dates is True
     assert restored.adjust_float_accrual_dates is False
+
+
+def test_inflation_linked_bond_preserves_exact_contract_during_edits() -> None:
+    from decimal import Decimal
+
+    from finstack_quant.valuations.instruments import InflationLinkedBond
+
+    source = InflationLinkedBond.example()
+    coupon = Decimal("0.025000000000000000000000001")
+    changed = source.to_builder().id("TIPS-EDITED").real_coupon(coupon).lag("90D").build()
+    assert changed.id == "TIPS-EDITED"
+    assert changed.real_coupon == coupon
+    assert changed.lag == "90D"
+    assert source.lag == "3M"
+    restored = InflationLinkedBond.from_json(changed.to_json())
+    assert restored.real_coupon == coupon
+    assert restored.to_json() == changed.to_json()

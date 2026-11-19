@@ -236,6 +236,33 @@ pub struct InflationLinkedBond {
 }
 
 impl InflationLinkedBond {
+    /// Copy the current contract, attributes and pricing inputs into an editable builder.
+    pub fn to_builder(&self) -> InflationLinkedBondBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .notional(self.notional)
+            .real_coupon(self.real_coupon)
+            .frequency(self.frequency)
+            .day_count(self.day_count)
+            .issue_date(self.issue_date)
+            .maturity(self.maturity)
+            .base_cpi(self.base_cpi)
+            .base_date(self.base_date)
+            .indexation_method(self.indexation_method)
+            .lag(self.lag)
+            .deflation_protection(self.deflation_protection)
+            .floor_vol_surface_id_opt(self.floor_vol_surface_id.clone())
+            .business_day_convention(self.business_day_convention)
+            .stub(self.stub)
+            .calendar_id_opt(self.calendar_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .inflation_index_id(self.inflation_index_id.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+            .attributes(self.attributes.clone())
+    }
+
     /// Quoted clean price per 100 of real face from
     /// `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
     ///

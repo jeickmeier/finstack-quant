@@ -1026,6 +1026,8 @@ public = [
     "FxOption",
     "FxOptionBuilder",
     "HedgeSwap",
+    "InflationLinkedBond",
+    "InflationLinkedBondBuilder",
     "InstrumentCashflowEnvelope",
     "InterestRateSwap",
     "InterestRateSwapBuilder",

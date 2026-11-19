@@ -98,4 +98,6 @@ mod indexation;
 pub(crate) mod metrics;
 mod types;
 
-pub use types::{DeflationProtection, IndexationMethod, InflationLinkedBond};
+pub use types::{
+    DeflationProtection, IndexationMethod, InflationLinkedBond, InflationLinkedBondBuilder,
+};
