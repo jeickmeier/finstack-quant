@@ -331,35 +331,6 @@ fn pretty_instrument_json(json: &Bound<'_, PyAny>) -> PyResult<String> {
         .map_err(crate::errors::core_to_py)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "bond_from_cashflows_json")]
-#[pyfunction]
-#[pyo3(
-    signature = (instrument_id, schedule_json, quote_compounding, discount_curve_id, quoted_clean_price_pct = None),
-    text_signature = "(instrument_id, schedule_json, quote_compounding, discount_curve_id, quoted_clean_price_pct=None)"
-)]
-fn bond_from_cashflows_json(
-    py: Python<'_>,
-    instrument_id: &str,
-    schedule_json: &str,
-    quote_compounding: &str,
-    discount_curve_id: &str,
-    quoted_clean_price_pct: Option<f64>,
-) -> PyResult<String> {
-    let quote_compounding: finstack_quant_core::math::Compounding = quote_compounding
-        .parse()
-        .map_err(crate::errors::core_to_py)?;
-    py.detach(|| {
-        finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
-            instrument_id,
-            schedule_json,
-            quote_compounding,
-            discount_curve_id,
-            quoted_clean_price_pct,
-        )
-        .map_err(crate::errors::core_to_py)
-    })
-}
-
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "valuations")?;
     m.setattr("__doc__", pydoc!("finstack_quant.valuations", "__module__"))?;
@@ -401,7 +372,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     m.add_function(wrap_pyfunction!(validate_typed_instrument_json, &m)?)?;
     m.add_function(wrap_pyfunction!(instrument_envelope_from_spec, &m)?)?;
     m.add_function(wrap_pyfunction!(pretty_instrument_json, &m)?)?;
-    m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
     instruments::register(py, &m)?;
     merton_mc::register(py, &m)?;
     bond_quotes::register(&m)?;
@@ -424,7 +394,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "validate_typed_instrument_json",
         "instrument_envelope_from_spec",
         "pretty_instrument_json",
-        "bond_from_cashflows_json",
     ];
     exports.extend_from_slice(merton_mc::EXPORTS);
     exports.extend_from_slice(bond_quotes::EXPORTS);

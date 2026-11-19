@@ -52,6 +52,50 @@ instrument_class!(
 
 #[wasm_bindgen(js_class = Bond)]
 impl JsBond {
+    /// Construct a typed bond from an explicit cashflow schedule.
+    /// @param id - Stable bond identifier used for pricing and metric keys.
+    /// @param schedule - Validated principal and coupon schedule, copied into the bond.
+    /// @param quoteCompounding - Spread quote compounding. Use "continuous", "simple" or an object with periodic payments per year.
+    /// @param discountCurveId - Identifier of the market discount curve for the scheduled cashflows.
+    /// @param quotedCleanPricePct - Optional clean price in percent of par (99.5 means 99.5%).
+    /// @returns A bond ready to price against the discount curve.
+    /// @throws FinstackWasmError if the schedule, quote compounding or bond terms are invalid.
+    #[wasm_bindgen(js_name = fromCashflows)]
+    pub fn from_cashflows(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        schedule: &crate::api::cashflows::schedule::JsCashFlowSchedule,
+        #[wasm_bindgen(
+            js_name = "quoteCompounding",
+            unchecked_param_type = "generated.valuations.Bond['quote_compounding']"
+        )]
+        quote_compounding: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
+        discount_curve_id: JsValue,
+        #[wasm_bindgen(
+            js_name = "quotedCleanPricePct",
+            unchecked_optional_param_type = "number | null"
+        )]
+        quoted_clean_price_pct: Option<JsValue>,
+    ) -> Result<JsBond, JsValue> {
+        let id = js_string(&id, "id")?;
+        let quote_compounding =
+            crate::utils::input::from_js_json(&quote_compounding, "quoteCompounding")?;
+        let discount_curve_id = js_string(&discount_curve_id, "discountCurveId")?;
+        let quoted_clean_price_pct = crate::utils::input::js_opt_f64(
+            quoted_clean_price_pct.as_ref(),
+            "quotedCleanPricePct",
+        )?;
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::from_cashflows(
+            id,
+            schedule.inner.clone(),
+            quote_compounding,
+            discount_curve_id,
+            quoted_clean_price_pct,
+        )
+        .map(|inner| JsBond { inner })
+        .map_err(to_js_err)
+    }
+
     /// Create a US corporate fixed-rate bond (semi-annual, 30/360, T+1).
     ///
     /// Mirrors Rust `Bond::fixed` and requires an explicit stub policy.

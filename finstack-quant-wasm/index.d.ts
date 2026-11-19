@@ -8286,22 +8286,6 @@ export interface ValuationsInstrumentsNamespace {
   readonly RevolvingCredit: typeof wasm.RevolvingCredit;
   readonly AssetBackedFacility: typeof wasm.AssetBackedFacility;
   /**
-   * Construct a canonical bond instrument envelope from a cashflow schedule.
-   * @param instrumentId - Stable instrument identifier used for pricing and metric keys.
-   * @param scheduleJson - Canonical cashflow-schedule JSON used to construct the fixed-income instrument.
-   * @param quoteCompounding - Compounding of the bond's z-spread quotes, in `Compounding` wire form (`"continuous"`, `"simple"` or `{ periodic: n }`); required, never derived from the schedule's coupon frequency.
-   * @param discountCurveId - Market-context discount-curve identifier for the instrument currency.
-   * @param quotedCleanPricePct - Optional observed clean bond price in percent of par (99.5 = 99.5%), stored as `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if `scheduleJson` is malformed or violates
-   * cash-flow invariants, bond construction fails, or the canonical bond
-   * envelope cannot be serialized.
-   * @returns Canonical bond instrument envelope JSON.
-   */
-  readonly bondFromCashflowsJson: typeof wasm.bondFromCashflowsJson;
-  /**
    * Validate a canonical v1 instrument envelope after optional metric-pricing
    * overrides are merged by the canonical pricing path.
    *

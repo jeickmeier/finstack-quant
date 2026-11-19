@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from finstack_quant.cashflows.builder import CashFlowSchedule
+
 import datetime
 from typing import Any, Literal
 import pandas as pd
@@ -45,6 +47,56 @@ class Bond:
     >>> bond.notional.amount
     1000000.0
     """
+
+    @staticmethod
+    def from_cashflows(
+        id: str,
+        schedule: CashFlowSchedule,
+        quote_compounding: str,
+        discount_curve_id: str,
+        quoted_clean_price_pct: float | None = None,
+    ) -> Bond:
+        """Construct a bond from an explicit cashflow schedule.
+
+        Parameters
+        ----------
+        id : str
+            Stable bond identifier used for pricing and metric keys.
+        schedule : CashFlowSchedule
+            Validated principal and coupon schedule, copied into the bond.
+        quote_compounding : str
+            Compounding of spread quotes. Use continuous, simple, semi_annual,
+            quarterly, monthly, or periodic(n). Supply it independently of
+            coupon frequency.
+        discount_curve_id : str
+            Market discount curve used to value the scheduled cashflows.
+        quoted_clean_price_pct : float or None
+            Observed clean price in percent of par (99.5 means 99.5%).
+            Omit to calculate prices without an observed clean-price override.
+
+        Returns
+        -------
+        Bond
+            Typed bond ready to price against the discount curve.
+
+        Raises
+        ------
+        ValueError
+            If the schedule is invalid or the quote convention or bond terms are invalid.
+
+        Examples
+        --------
+        >>> from datetime import date
+        >>> from finstack_quant.cashflows.builder import CashFlowSchedule
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> schedule = (
+        ...     CashFlowSchedule.builder().principal(Money(100, "USD"), date(2025, 1, 1), date(2026, 1, 1)).build()
+        ... )
+        >>> Bond.from_cashflows("custom", schedule, "semi_annual", "USD-OIS").id
+        'custom'
+        """
+        ...
 
     @staticmethod
     def builder() -> BondBuilder:

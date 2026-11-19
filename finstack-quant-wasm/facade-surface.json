@@ -4587,7 +4587,6 @@
       "assetPoolWeightedAvgMaturity",
       "assetPoolWeightedAvgSpreadBp",
       "assetPoolWithReserve",
-      "bondFromCashflowsJson",
       "bondQuoteSetFieldUnits",
       "bondQuoteSetTable",
       "bondWorkoutLadder",
@@ -4659,6 +4658,7 @@
       "fixed",
       "floating",
       "floatingWithConvention",
+      "fromCashflows",
       "fromJson",
       "withConvention",
       "zeroCoupon"
@@ -4839,9 +4839,6 @@
       "termOut",
       "undrawn"
     ]
-  },
-  "valuations.instruments.bondFromCashflowsJson": {
-    "kind": "function"
   },
   "valuations.instruments.validateInstrumentJson": {
     "kind": "function"

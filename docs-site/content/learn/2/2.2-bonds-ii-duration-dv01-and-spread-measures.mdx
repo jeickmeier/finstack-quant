@@ -16,7 +16,7 @@ api:
 - finstack_quant.core.market_data.DiscountCurve
 - finstack_quant.core.market_data.MarketContext
 - finstack_quant.core.money.Money
-- finstack_quant.valuations.instruments.bond_from_cashflows_json
+- finstack_quant.valuations.instruments.Bond.from_cashflows
 - finstack_quant.valuations.instruments.price_instrument
 status: published
 ---
@@ -240,7 +240,7 @@ from datetime import date
 from decimal import Decimal
 from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams, AmortizationSpec
 from finstack_quant.core.money import Money
-from finstack_quant.valuations.instruments import bond_from_cashflows_json, price_instrument
+from finstack_quant.valuations.instruments import Bond, price_instrument
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 
@@ -249,7 +249,7 @@ schedule = (CashFlowSchedule.builder().principal(Money(2_000_000.0, 'USD'), date
     .amortization(AmortizationSpec.linear_to(Money(0.0, 'USD')))
     .fixed_cf(FixedCouponSpec(Decimal('0.055'), ScheduleParams.semiannual_30360()))
     .build())
-amortizer = bond_from_cashflows_json('LESSON-AMORTIZER', schedule.to_json(), 'semi_annual', 'USD-OIS')
+amortizer = Bond.from_cashflows('LESSON-AMORTIZER', schedule, 'semi_annual', 'USD-OIS')
 amortized = price_instrument(amortizer, market, AS_OF, metrics=['duration_mod', 'ytm'])
 bullet = price_instrument(json.dumps(instruments('foundations')['USD-CORP']), market, AS_OF, metrics=['duration_mod'])
 print({'amortizer_duration': amortized.get_metric('duration_mod'), 'bullet_duration': bullet.get_metric('duration_mod')})

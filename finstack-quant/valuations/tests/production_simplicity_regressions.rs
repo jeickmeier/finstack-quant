@@ -48,22 +48,14 @@ fn tied_custom_coupon_intervals_choose_shorter_frequency() {
             ..CashFlowMeta::default()
         },
     );
-    let schedule_json = serde_json::to_string(&schedule).expect("schedule JSON");
-    let wire = finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
+    let bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::from_cashflows(
         "TIED",
-        &schedule_json,
+        schedule,
         finstack_quant_core::math::Compounding::SEMI_ANNUAL,
         "USD-OIS",
         None,
     )
-    .expect("custom bond JSON");
-    let envelope: finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope =
-        serde_json::from_str(&wire).expect("bond envelope");
-    let finstack_quant_valuations::instruments::json_loader::InstrumentJson::Bond(bond) =
-        envelope.instrument
-    else {
-        panic!("expected bond")
-    };
+    .expect("custom bond");
     assert_eq!(bond.cashflow_spec.frequency(), Tenor::quarterly());
 }
 

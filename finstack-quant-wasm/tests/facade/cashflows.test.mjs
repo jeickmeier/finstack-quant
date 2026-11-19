@@ -210,18 +210,16 @@ test('cashflows end-to-end build/validate/flows/accrual from JSON spec', () => {
   assert.ok(Number.isFinite(accrued));
   assert.ok(accrued > 0);
 
-  const instrument = JSON.parse(
-    valuations.instruments.bondFromCashflowsJson(
-      'CUSTOM-CF',
-      scheduleJson,
-      { periodic: 2 },
-      'USD-OIS',
-      99.0
-    )
+  const bond = valuations.instruments.Bond.fromCashflows(
+    'CUSTOM-CF',
+    cashflows.CashFlowSchedule.fromJson(scheduleJson),
+    { periodic: 2 },
+    'USD-OIS',
+    99.0
   );
+  const instrument = JSON.parse(bond.toJson());
   assert.equal(instrument.schema, 'finstack_quant.instrument/1');
   assert.equal(instrument.instrument.type, 'bond');
-  assert.equal(cashflows.bondFromCashflowsJson, undefined);
 });
 
 test('cashflows facade builds fixed-to-float and preserves Rust window errors', () => {

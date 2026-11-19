@@ -197,10 +197,12 @@ class TestCashflowsNamespace:
     def test_bond_conversion_belongs_to_valuations(self) -> None:
         """Bond construction should live with valuation instruments."""
         from finstack_quant import cashflows
-        from finstack_quant.valuations.instruments import bond_from_cashflows_json  # noqa: F401
+        from finstack_quant.valuations.instruments import Bond
 
-        assert not hasattr(cashflows, "bond_from_cashflows_json")
-        assert "bond_from_cashflows_json" not in cashflows.__all__
+        assert callable(Bond.from_cashflows)
+
+        assert not hasattr(cashflows, "bond_from_cashflows")
+        assert "bond_from_cashflows" not in cashflows.__all__
 
 
 class TestCorrelationNamespace:

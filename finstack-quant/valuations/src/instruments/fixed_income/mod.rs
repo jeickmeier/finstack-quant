@@ -62,6 +62,3 @@ pub use finstack_quant_valuations_fixed_income::*;
 pub use finstack_quant_valuations_structured_credit::{
     asset_backed_facility, cmo, structured_credit,
 };
-
-mod bond_json;
-pub use bond_json::bond_from_cashflows_json;

@@ -80,7 +80,7 @@
       "finstack_quant.valuations.instruments.MertonMcConfig",
       "finstack_quant.valuations.instruments.PikMode",
       "finstack_quant.valuations.instruments.PikSchedule",
-      "finstack_quant.valuations.instruments.bond_from_cashflows_json",
+      "finstack_quant.valuations.instruments.Bond.from_cashflows",
       "finstack_quant.valuations.instruments.price_instrument",
       "finstack_quant.valuations.instruments.validate_instrument_json"
     ],

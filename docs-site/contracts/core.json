@@ -412,7 +412,7 @@
       "finstack_quant.core.money.Money",
       "finstack_quant.portfolio.mwr_xirr",
       "finstack_quant.valuations.instruments.Bond",
-      "finstack_quant.valuations.instruments.bond_from_cashflows_json",
+      "finstack_quant.valuations.instruments.Bond.from_cashflows",
       "finstack_quant.valuations.instruments.instrument_cashflows_json",
       "finstack_quant.valuations.instruments.list_models_grouped",
       "finstack_quant.valuations.instruments.list_standard_metrics",
@@ -496,7 +496,7 @@
       "finstack_quant.core.market_data.DiscountCurve",
       "finstack_quant.core.market_data.MarketContext",
       "finstack_quant.core.money.Money",
-      "finstack_quant.valuations.instruments.bond_from_cashflows_json",
+      "finstack_quant.valuations.instruments.Bond.from_cashflows",
       "finstack_quant.valuations.instruments.price_instrument"
     ],
     "models": [

@@ -30,8 +30,8 @@ use super::results::valuation_result_json;
 use super::results::valuation_result_value;
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{
-    js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text,
-    opt_from_js_json, opt_json_text,
+    js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text, opt_from_js_json,
+    opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -122,54 +122,6 @@ pub fn validate_instrument_json(
     finstack_quant_valuations::pricer::validate_instrument_json(
         json,
         metric_pricing_overrides.as_deref(),
-    )
-    .map_err(to_js_err)
-}
-
-/// Construct a canonical bond instrument envelope from a cashflow schedule.
-/// @param instrumentId - Stable instrument identifier used for pricing and metric keys.
-/// @param scheduleJson - Canonical cashflow-schedule JSON used to construct the fixed-income instrument.
-/// @param quoteCompounding - Compounding of the bond's z-spread quotes, in `Compounding` wire form (`"continuous"`, `"simple"` or `{ periodic: n }`); required, never derived from the schedule's coupon frequency.
-/// @param discountCurveId - Market-context discount-curve identifier for the instrument currency.
-/// @param quotedCleanPricePct - Optional observed clean bond price in percent of par (99.5 = 99.5%), stored as `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `scheduleJson` is malformed or violates
-/// cash-flow invariants, bond construction fails, or the canonical bond
-/// envelope cannot be serialized.
-/// @returns Canonical bond instrument envelope JSON.
-#[wasm_bindgen(js_name = bondFromCashflowsJson)]
-pub fn bond_from_cashflows_json(
-    #[wasm_bindgen(js_name = "instrumentId", unchecked_param_type = "string")]
-    instrument_id: JsValue,
-    #[wasm_bindgen(js_name = "scheduleJson", unchecked_param_type = "JsonInput")]
-    schedule_json: JsValue,
-    #[wasm_bindgen(
-        js_name = "quoteCompounding",
-        unchecked_param_type = "generated.valuations.Bond['quote_compounding']"
-    )]
-    quote_compounding: JsValue,
-    #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")] discount_curve_id: JsValue,
-    #[wasm_bindgen(
-        js_name = "quotedCleanPricePct",
-        unchecked_optional_param_type = "number | null"
-    )]
-    quoted_clean_price_pct: Option<JsValue>,
-) -> Result<String, JsValue> {
-    let quoted_clean_price_pct =
-        js_opt_f64(quoted_clean_price_pct.as_ref(), "quotedCleanPricePct")?;
-    let instrument_id: &str = &js_string(&instrument_id, "instrumentId")?;
-    let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
-    let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
-    let quote_compounding: finstack_quant_core::math::Compounding =
-        crate::utils::input::from_js_json(&quote_compounding, "quoteCompounding")?;
-    finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
-        instrument_id,
-        schedule_json,
-        quote_compounding,
-        discount_curve_id,
-        quoted_clean_price_pct,
     )
     .map_err(to_js_err)
 }

@@ -81,6 +81,28 @@ fn floating_bond_params(
 
 #[pymethods]
 impl PyBond {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.from_cashflows")]
+    #[staticmethod]
+    #[pyo3(signature = (id, schedule, quote_compounding, discount_curve_id, quoted_clean_price_pct=None))]
+    fn from_cashflows(
+        id: &str,
+        schedule: &crate::bindings::cashflows::builder::schedule::PyCashFlowSchedule,
+        quote_compounding: &str,
+        discount_curve_id: &str,
+        quoted_clean_price_pct: Option<f64>,
+    ) -> PyResult<Self> {
+        let quote_compounding = quote_compounding.parse().map_err(core_to_py)?;
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::from_cashflows(
+            id,
+            schedule.inner.clone(),
+            quote_compounding,
+            discount_curve_id,
+            quoted_clean_price_pct,
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.fixed")]
     #[staticmethod]
     #[pyo3(

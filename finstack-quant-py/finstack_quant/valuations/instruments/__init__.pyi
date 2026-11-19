@@ -300,7 +300,6 @@ __all__ = [
     "TrancheStructure",
     "VarResult",
     "Waterfall",
-    "bond_from_cashflows_json",
     "bond_quote_set_field_units",
     "bond_workout_ladder",
     "calculate_pool_stats",
@@ -334,56 +333,6 @@ __all__ = [
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
-
-def bond_from_cashflows_json(
-    instrument_id: str,
-    schedule_json: str,
-    quote_compounding: str,
-    discount_curve_id: str,
-    quoted_clean_price_pct: float | None = None,
-) -> str:
-    """
-    Construct tagged bond instrument JSON from a cashflow schedule.
-
-    Parameters
-    ----------
-    instrument_id : str
-        Identifier for the bond instrument.
-    schedule_json : str
-        JSON-encoded ``CashFlowSchedule``.
-    quote_compounding : str
-        Compounding of the bond's z-spread quotes: ``"continuous"``,
-        ``"simple"``, ``"semi_annual"``, ``"quarterly"``, ``"monthly"`` or
-        ``"periodic(n)"``. Required; never derived from the schedule's
-        coupon frequency.
-    discount_curve_id : str
-        Discount curve ID required for pricing.
-    quoted_clean_price_pct : float, optional
-        Clean quoted price in percent of par (``99.5`` = 99.5%), stored as
-        ``instrument_pricing_overrides.market_quotes.quoted_clean_price_pct``.
-
-    Returns
-    -------
-    str
-        Canonical ``finstack_quant.instrument/1`` envelope containing the bond.
-
-    Raises
-    ------
-    ValueError
-        If the schedule is invalid, ``quote_compounding`` is not a known
-        label, or bond construction fails.
-
-    Examples
-    --------
-    >>> from finstack_quant.valuations.instruments import bond_from_cashflows_json
-    >>> try:
-    ...     bond_from_cashflows_json("B", "{}", "semi_annual", "USD-OIS")
-    ... except ValueError as exc:
-    ...     print("flows" in str(exc))
-    True
-
-    """
-    ...
 
 def validate_instrument_json(
     json: dict[str, Any] | str,
