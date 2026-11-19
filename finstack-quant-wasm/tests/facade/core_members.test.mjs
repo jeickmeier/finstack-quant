@@ -281,3 +281,34 @@ test('all OHLC target bars contribute to the opening-gap variance', () => {
     undefined
   );
 });
+
+test('market context copies preserve fixing keys and isolate scalar inputs', () => {
+  const market = new core.MarketContext();
+  const series = new core.ScalarTimeSeries(
+    'observations',
+    [['2025-01-02', 0.035]],
+    'step',
+    'error'
+  );
+  let copy;
+  let stored;
+  try {
+    assert.equal(market.insertFixing('USD-SOFR', series), market);
+    copy = market.copy();
+    assert.equal(copy.insertDividendYield('SPX-DIV', 0.016), copy);
+    copy.insertPrice('SPX', '100', 'USD');
+    stored = market.getSeries('FIXING:USD-SOFR');
+    assert.equal(stored.id, 'FIXING:USD-SOFR');
+    assert.equal(series.id, 'observations');
+    assert.deepEqual(market.prices(), {});
+    assert.deepEqual(copy.prices(), {
+      'SPX-DIV': { unitless: 0.016 },
+      SPX: { price: { amount: '100', currency: 'USD' } },
+    });
+  } finally {
+    stored?.free();
+    copy?.free();
+    series.free();
+    market.free();
+  }
+});

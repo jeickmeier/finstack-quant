@@ -127,6 +127,8 @@ chain(wasm.MarketContext, [
   'insertFx',
   'insertCreditIndex',
   'insertSeries',
+  'insertFixing',
+  'insertDividendYield',
   'insertInflationIndex',
 ]);
 chain(wasm.ScheduleBuilder, [

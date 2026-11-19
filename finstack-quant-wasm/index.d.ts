@@ -215,6 +215,23 @@ declare module './pkg/finstack_quant_wasm.js' {
      */
     insertCreditIndex(id: string, data: CreditIndexData): this;
     /**
+     * Store a continuous dividend yield as an annualized decimal market scalar.
+     *
+     * @param id - Identifier configured on the instrument's dividend-yield input.
+     * @param yieldRate - Finite annualized continuous decimal rate (0.02 is 2%).
+     * @throws Error with kind `validation` if the yield is not finite.
+     */
+    insertDividendYield(id: string, yieldRate: number): this;
+    /**
+     * Store historical observations under a contractual fixing identifier.
+     *
+     * @param indexId - Trimmed contractual index name without the FIXING prefix.
+     * @param series - Dated observations. Rate fixings are decimal rates. A copy
+     *   is stored under the derived key, replacing any existing series there.
+     * @throws Error with kind `validation` for an empty, untrimmed, or prefixed index name.
+     */
+    insertFixing(indexId: string, series: ScalarTimeSeries): this;
+    /**
      * Attach the FX matrix used for currency conversion (Rust `MarketContext::insert_fx_mut`).
      *
      * # Arguments

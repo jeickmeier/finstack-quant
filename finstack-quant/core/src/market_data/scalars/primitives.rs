@@ -495,6 +495,11 @@ impl ScalarTimeSeries {
         &self.id
     }
 
+    pub(crate) fn with_id(mut self, id: CurveId) -> Self {
+        self.id = id;
+        self
+    }
+
     /// Optional currency accessor.
     pub fn currency(&self) -> Option<Currency> {
         self.currency

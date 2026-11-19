@@ -327,6 +327,44 @@ impl JsMarketContext {
         self.context_mut().insert_series_mut(series.inner.clone());
     }
 
+    /// Store historical observations under a contractual fixing identifier.
+    ///
+    /// @param indexId - Trimmed contractual index name without the FIXING prefix.
+    /// @param series - Dated observations. Rate fixings are decimal rates. A copy
+    ///   is stored under the derived key, replacing any existing series there.
+    /// @throws Error with kind `validation` for an empty, untrimmed, or prefixed index name.
+    #[wasm_bindgen(js_name = insertFixing)]
+    pub fn insert_fixing(
+        &mut self,
+        #[wasm_bindgen(js_name = "indexId", unchecked_param_type = "string")] index_id: JsValue,
+        series: &JsScalarTimeSeries,
+    ) -> Result<(), JsValue> {
+        let index_id = js_string(&index_id, "indexId")?;
+        self.context_mut()
+            .insert_fixing(&index_id, series.inner.clone())
+            .map_err(to_js_err)?;
+        Ok(())
+    }
+
+    /// Store a continuous dividend yield as an annualized decimal market scalar.
+    ///
+    /// @param id - Identifier configured on the instrument's dividend-yield input.
+    /// @param yieldRate - Finite annualized continuous decimal rate (0.02 is 2%).
+    /// @throws Error with kind `validation` if the yield is not finite.
+    #[wasm_bindgen(js_name = insertDividendYield)]
+    pub fn insert_dividend_yield(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "yieldRate", unchecked_param_type = "number")] yield_rate: JsValue,
+    ) -> Result<(), JsValue> {
+        let id = js_string(&id, "id")?;
+        let yield_rate = crate::utils::input::js_f64(&yield_rate, "yieldRate")?;
+        self.context_mut()
+            .insert_dividend_yield(&id, yield_rate)
+            .map_err(to_js_err)?;
+        Ok(())
+    }
+
     /// Store an inflation index under its own id (Rust
     /// `MarketContext::insert_inflation_index_mut`).
     ///
@@ -615,6 +653,27 @@ impl JsMarketContext {
             .get_price(js_string(&id, "id")?)
             .map_err(to_js_err)?;
         to_js_value(scalar)
+    }
+
+    /// Copy the market context for independent mutation.
+    ///
+    /// @returns A separate handle with the same stored market state.
+    pub fn copy(&self) -> Self {
+        self.clone()
+    }
+
+    /// Return stored scalar inputs keyed by their market lookup identifiers.
+    ///
+    /// @returns A record of monetary prices and unitless scalars in their wire forms.
+    /// @throws Error if the scalar values cannot be converted to JavaScript.
+    #[wasm_bindgen(unchecked_return_type = "Record<string, MarketScalar>")]
+    pub fn prices(&self) -> Result<JsValue, JsValue> {
+        let values: std::collections::BTreeMap<_, _> = self
+            .inner
+            .prices()
+            .map(|(id, scalar)| (id.as_str(), scalar))
+            .collect();
+        to_js_value(&values)
     }
 
     /// Look up a scalar time series by id (Rust `MarketContext::get_series`).

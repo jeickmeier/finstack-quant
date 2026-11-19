@@ -395,6 +395,52 @@ class MarketContext:
         """
         ...
 
+    def insert_fixing(self, index_id: str, series: ScalarTimeSeries) -> MarketContext:
+        """Store historical observations under the contractual benchmark key.
+
+        Parameters
+        ----------
+        index_id : str
+            Trimmed index identifier such as ``"USD-SOFR"`` without the
+            ``FIXING:`` prefix.
+        series : ScalarTimeSeries
+            Dated fixing observations. Values for rate indices use decimal
+            rates. The stored copy takes the canonical ``FIXING:{index_id}`` key.
+
+        Returns
+        -------
+        MarketContext
+            This market context, for fluent construction.
+
+        Raises
+        ------
+        ValueError
+            If the index identifier is empty, untrimmed, or prefixed.
+        """
+        ...
+
+    def insert_dividend_yield(self, id: str, yield_rate: float) -> MarketContext:
+        """Store an annualized continuous dividend yield for pricing.
+
+        Parameters
+        ----------
+        id : str
+            Identifier selected by the instrument's dividend-yield input.
+        yield_rate : float
+            Finite continuously compounded decimal rate (0.02 is 2%).
+
+        Returns
+        -------
+        MarketContext
+            This market context, for fluent construction.
+
+        Raises
+        ------
+        ValueError
+            If the yield is not finite.
+        """
+        ...
+
     def insert_inflation_index(self, index: InflationIndex) -> MarketContext:
         """
         Insert an inflation index under its own id (fluent).
@@ -573,6 +619,35 @@ class MarketContext:
             If no curve is stored under ``id``.
         ValueError
             If the stored curve is not a vol-index curve.
+        """
+        ...
+
+    def copy(self) -> MarketContext:
+        """Copy this market context for independent mutation.
+
+        Returns
+        -------
+        MarketContext
+            Context containing the same market state and its own mutable handle.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+    def prices(self) -> dict[str, Money | float]:
+        """Return stored scalar inputs keyed by lookup identifier.
+
+        Returns
+        -------
+        dict[str, Money | float]
+            Exact Money values for currency-tagged prices and floats for
+            unitless market scalars.
+
+        Notes
+        -----
+        This method does not raise for a valid context.
         """
         ...
 
