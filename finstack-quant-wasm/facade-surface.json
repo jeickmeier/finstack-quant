@@ -3683,6 +3683,7 @@
       "computePnlProfiles",
       "constraintExposureLimit",
       "constraintExposureMinimum",
+      "csrQuoteDelta",
       "excessReturns",
       "factorBrinsonAttribution",
       "fiAttributionResultReconciliationCheck",
@@ -3777,6 +3778,9 @@
     "getters": []
   },
   "portfolio.girrQuoteDelta": {
+    "kind": "function"
+  },
+  "portfolio.csrQuoteDelta": {
     "kind": "function"
   },
   "portfolio.portfolioMargin": {

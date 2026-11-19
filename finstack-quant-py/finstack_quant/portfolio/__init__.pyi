@@ -42,6 +42,10 @@ from finstack_quant.portfolio._cashflows import (
 )
 from finstack_quant.portfolio._margin import (
     NettingSetMargin as NettingSetMargin,
+    CsrQuoteClassification as CsrQuoteClassification,
+    CsrQuoteSource as CsrQuoteSource,
+    CsrQuoteDelta as CsrQuoteDelta,
+    csr_quote_delta as csr_quote_delta,
     GirrQuoteDelta as GirrQuoteDelta,
     GirrQuoteTarget as GirrQuoteTarget,
     girr_quote_delta as girr_quote_delta,
@@ -217,6 +221,10 @@ __all__ = [
     "PortfolioCashflowPositionSummary",
     "PortfolioCashflows",
     "PortfolioError",
+    "CsrQuoteClassification",
+    "CsrQuoteSource",
+    "CsrQuoteDelta",
+    "csr_quote_delta",
     "GirrQuoteDelta",
     "GirrQuoteTarget",
     "girr_quote_delta",

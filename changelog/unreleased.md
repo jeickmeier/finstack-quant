@@ -2,6 +2,14 @@
 
 ## Itemized changes
 
+### Portfolio: exact ordinary CDS spread delta
+
+`csr_quote_delta` / `csrQuoteDelta` rebuild the original single-name CDS
+calibration for each ordinary non-securitisation CSR vertex. The source
+carries dated issuer, seniority, currency and bucket evidence with exact
+executed quote bindings. The signed reprices report native P&L per basis
+point and reporting-currency P&L per percentage point.
+
 ### Python: data-class constructors are keyword-only and read by Rust
 
 A data-class constructor that builds one Rust serde struct now takes its

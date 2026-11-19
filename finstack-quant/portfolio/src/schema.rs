@@ -6,7 +6,9 @@
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
 use crate::fi_attribution::FiPositionSnapshot;
-use crate::margin::{GirrQuoteDelta, GirrQuoteTarget};
+use crate::margin::{
+    CsrQuoteClassification, CsrQuoteDelta, CsrQuoteSource, GirrQuoteDelta, GirrQuoteTarget,
+};
 use crate::{
     PortfolioResult, allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
     attribution::ReconciliationReport, brinson::CarinoLinkedAttribution, brinson::SectorPeriod,
@@ -408,6 +410,18 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_packager(package_materialization_schema)
     .with_examples(examples::portfolio_cashflows),
 
+    finstack_quant_core::schema_artifact!(
+        CsrQuoteClassification, "portfolio", "csr_quote_classification", Input,
+        "Dated issuer identity and approved ordinary CSR risk bucket."
+    ),
+    finstack_quant_core::schema_artifact!(
+        CsrQuoteSource, "portfolio", "csr_quote_source", Input,
+        "Qualified issuer curve and binding for each of five non-securitisation CSR vertices."
+    ),
+    finstack_quant_core::schema_artifact!(
+        CsrQuoteDelta, "portfolio", "csr_quote_delta", Output,
+        "Ordinary non-securitisation CSR sensitivities and signed issuer CDS quote reprices."
+    ),
     finstack_quant_core::schema_artifact!(
         GirrQuoteTarget, "portfolio", "girr_quote_target", Input,
         "Exact ordinary GIRR quote mapping at one regulatory vertex."

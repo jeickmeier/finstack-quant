@@ -11653,6 +11653,28 @@ export interface PortfolioNamespace {
    */
   readonly girrQuoteDelta: typeof wasm.girrQuoteDelta;
   /**
+   * Derive ordinary non-securitisation CSR deltas from exact single-name CDS quote reprices.
+   * @param portfolio - Trading book with signed quantities, valuation date and reporting currency.
+   * @param market - Held market with original issuer spread risk recipes and reporting FX.
+   * @param pricing - Common pricing and conversion settings for held and shocked marks.
+   * @param sources - Dated issuer classification and all five exact quote coordinates for each live issuer CDS curve.
+   * @returns Source fingerprints, signed position changes per basis point, and CSR deltas scaled to a percentage point.
+   * @throws TypeError if sources contain a non-JSON value. FinstackError for unsupported exposures, invalid mappings, missing inputs or failed replay and pricing.
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("credit", "USD", "2025-01-02").build();
+   * const market = new core.MarketContext();
+   * const pricing = new core.FinstackConfig();
+   * console.log(portfolio.csrQuoteDelta(book, market, pricing, []).quote_risk.length);
+   * pricing.free();
+   * market.free();
+   * book.free();
+   * ```
+   */
+  readonly csrQuoteDelta: typeof wasm.csrQuoteDelta;
+  /**
    * Calculate portfolio margin requirements by netting set (Rust
    * `margin::portfolio_margin`).
    *

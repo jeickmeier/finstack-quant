@@ -120,11 +120,11 @@ fn solve_discount_curve(
     Ok(curve)
 }
 
-/// An exact resolved rate quote in one recorded calibration recipe.
+/// An exact resolved market quote in a recorded calibration recipe.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct RateQuoteCoordinate {
+pub struct CalibrationQuoteCoordinate {
     /// Identifier of the authored market quote, without tenor normalization.
     pub quote_id: String,
     /// Contractual pillar of the original execution, after holiday adjustments.
@@ -138,7 +138,7 @@ pub struct RateQuoteCoordinate {
 enum RateQuoteShock<'a> {
     Bucket(&'a QuoteBump),
     Exact {
-        target: &'a RateQuoteCoordinate,
+        target: &'a CalibrationQuoteCoordinate,
         bp: f64,
     },
 }
@@ -230,7 +230,7 @@ pub fn bump_discount_curve_from_rate_calibration(
 pub fn bump_discount_rate_quote(
     curve: &DiscountCurve,
     context: &MarketContext,
-    target: &RateQuoteCoordinate,
+    target: &CalibrationQuoteCoordinate,
     bp: f64,
 ) -> finstack_quant_core::Result<DiscountCurve> {
     let calibration = required_discount_rate_calibration(curve)?;
@@ -422,7 +422,7 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
 pub fn bump_forward_rate_quote(
     curve: &ForwardCurve,
     context: &MarketContext,
-    target: &RateQuoteCoordinate,
+    target: &CalibrationQuoteCoordinate,
     bp: f64,
 ) -> finstack_quant_core::Result<ForwardCurve> {
     let calibration = required_forward_rate_calibration(curve)?;
@@ -772,7 +772,7 @@ pub fn bump_linked_ois_rate_quote(
     market: &MarketContext,
     discount_curve_id: &CurveId,
     forward_curve_id: &CurveId,
-    target: &RateQuoteCoordinate,
+    target: &CalibrationQuoteCoordinate,
     bp: f64,
 ) -> finstack_quant_core::Result<MarketContext> {
     let discount = market.get_discount(discount_curve_id.as_str())?;
@@ -1100,7 +1100,7 @@ mod tests {
         let context = MarketContext::new();
         let config = CalibrationConfig::default();
         let center = solve_discount_curve(&quotes, &params, &context, &config).unwrap();
-        let target = RateQuoteCoordinate {
+        let target = CalibrationQuoteCoordinate {
             quote_id: "LONG".into(),
             pillar_date: long,
         };
@@ -1115,7 +1115,7 @@ mod tests {
         let actual = raised.df_on_date(long).unwrap() - center.df_on_date(long).unwrap();
         let expected = (1.0_f64 / 1.0571) - (1.0_f64 / 1.057);
         assert!((actual - expected).abs() < 1e-10);
-        let wrong_date = RateQuoteCoordinate {
+        let wrong_date = CalibrationQuoteCoordinate {
             pillar_date: short,
             ..target
         };
@@ -1141,7 +1141,7 @@ mod tests {
             .iter()
             .find(|binding| binding.quote_id == "USD-DEP-1Y")
             .expect("qualified 1Y binding");
-        let quote = RateQuoteCoordinate {
+        let quote = CalibrationQuoteCoordinate {
             quote_id: row.quote_id.clone(),
             pillar_date: row.pillar_date,
         };
@@ -1165,7 +1165,7 @@ mod tests {
                 raised.df_on_date(date).expect("projected discount factor")
             );
         }
-        let wrong = RateQuoteCoordinate {
+        let wrong = CalibrationQuoteCoordinate {
             quote_id: "USD-DEP-2Y".into(),
             ..quote
         };
@@ -1984,7 +1984,7 @@ mod tests {
             .iter()
             .find(|binding| binding.quote_id == "SOFR-6M")
             .expect("quoted 6M");
-        let target = RateQuoteCoordinate {
+        let target = CalibrationQuoteCoordinate {
             quote_id: row.quote_id.clone(),
             pillar_date: row.pillar_date,
         };

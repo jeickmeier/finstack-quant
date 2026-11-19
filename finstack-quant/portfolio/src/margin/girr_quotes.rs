@@ -1,11 +1,8 @@
-use crate::evaluation::{EvaluationProfile, PortfolioEvaluationPlan, PositionInvalidation};
-use crate::types::{EntityId, PositionId};
-use crate::valuation::{
-    PortfolioValuation, PortfolioValuationOptions, RequestedMetrics, value_portfolio_at,
-};
+use super::regulatory_quotes::{RegulatoryQuoteReprice, reprice_rows};
+use crate::valuation::{PortfolioValuationOptions, RequestedMetrics, value_portfolio_at};
 use crate::{Error, Portfolio, Result};
 use finstack_quant_calibration::recalibration::{
-    RateQuoteCoordinate, bump_discount_rate_quote, bump_forward_rate_quote,
+    CalibrationQuoteCoordinate, bump_discount_rate_quote, bump_forward_rate_quote,
     bump_linked_ois_rate_quote,
 };
 use finstack_quant_core::config::FinstackConfig;
@@ -15,7 +12,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     RateCalibrationPillar, RateCalibrationQuote, RateCalibrationRecipe,
 };
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_margin::regulatory::frtb::{
     FrtbSensitivities, params::girr::GIRR_DELTA_RISK_WEIGHTS,
@@ -63,37 +59,15 @@ pub struct GirrQuoteTarget {
     /// Curve representation, roles, and dependency replay basis.
     pub source: GirrQuoteSource,
     /// Recorded quote ID and exact contractual pillar of the target source.
-    pub quote: RateQuoteCoordinate,
-}
-
-/// One signed position-level repricing difference for the requested GIRR vertex.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct GirrQuoteReprice {
-    /// Position whose risk is represented, after applying its signed quantity.
-    pub position_id: PositionId,
-    /// Owner of the position within the trading book.
-    pub entity_id: EntityId,
-    /// Signed scaling from the instrument price to the held position.
-    pub position_scale: f64,
-    /// Held reporting FX rate in units of reporting currency per native unit.
-    /// Absent when the currencies match.
-    pub fx_rate: Option<f64>,
-    /// Whether the held FX rate was triangulated through the market pivot.
-    /// Absent when the currencies match.
-    pub fx_triangulated: Option<bool>,
-    /// Baseline value on the held valuation basis in the instrument's currency.
-    pub center_native: Money,
-    /// Value on the same basis after an upward one-basis-point quote replay.
-    pub shocked_native: Money,
-    /// Signed upward reprice difference in instrument currency per basis point.
-    pub pnl_native_per_bp: Money,
-    /// Signed upward reprice difference in portfolio currency per one percentage point.
-    pub pnl_base_per_pp: f64,
+    pub quote: CalibrationQuoteCoordinate,
 }
 
 impl GirrQuoteSource {
-    fn shock(&self, market: &MarketContext, quote: &RateQuoteCoordinate) -> Result<MarketContext> {
+    fn shock(
+        &self,
+        market: &MarketContext,
+        quote: &CalibrationQuoteCoordinate,
+    ) -> Result<MarketContext> {
         Ok(match self {
             Self::Discount { curve_id } => {
                 let curve = market.get_discount(curve_id.as_str())?;
@@ -115,74 +89,6 @@ impl GirrQuoteSource {
             }
         })
     }
-}
-
-fn repriced_girr_rows(
-    portfolio: &Portfolio,
-    market: &MarketContext,
-    pricing: &FinstackConfig,
-    target: &GirrQuoteTarget,
-    center: &PortfolioValuation,
-    affected: &[(usize, &PositionId)],
-) -> Result<Vec<GirrQuoteReprice>> {
-    let shocked_market = target.source.shock(market, &target.quote)?;
-    let mut plan = PortfolioEvaluationPlan::new(pricing);
-    let market_state = plan.register_market(&shocked_market, center.as_of);
-    let portfolio_state = plan.register_portfolio(portfolio);
-    let reprice = plan.register_selective_evaluation(
-        market_state,
-        portfolio_state,
-        EvaluationProfile::strict_metrics(&[]),
-        center,
-        PositionInvalidation::new(affected.iter().map(|(index, _)| *index).collect(), false),
-    )?;
-    let shocked = plan.execute().take_valuation(reprice)?;
-
-    affected
-        .iter()
-        .map(|&(_, id)| {
-            let old = center
-                .position_values
-                .get(id)
-                .ok_or_else(|| Error::invalid_input(format!("Missing center position '{id}'")))?;
-            let new = shocked
-                .position_values
-                .get(id)
-                .ok_or_else(|| Error::invalid_input(format!("Missing shocked position '{id}'")))?;
-            if old.fx_rate != new.fx_rate || old.fx_triangulated != new.fx_triangulated {
-                return Err(Error::invalid_input(format!(
-                    "GIRR quote replay changed the held FX basis of position '{id}'"
-                )));
-            }
-            let difference = new.value_native.checked_sub(old.value_native)?;
-            let held_fx = match old.fx_rate {
-                Some(rate) if rate.is_finite() && rate > 0.0 => rate,
-                None if old.value_native.currency() == portfolio.base_currency => 1.0,
-                _ => {
-                    return Err(Error::invalid_input(format!(
-                        "Missing valid held FX for position '{id}'"
-                    )));
-                }
-            };
-            let per_pp = difference.amount() * held_fx * 100.0;
-            if !per_pp.is_finite() {
-                return Err(Error::invalid_input(format!(
-                    "Non-finite GIRR delta for position '{id}'"
-                )));
-            }
-            Ok(GirrQuoteReprice {
-                position_id: id.clone(),
-                entity_id: old.entity_id.clone(),
-                position_scale: old.metric_scale,
-                fx_rate: old.fx_rate,
-                fx_triangulated: old.fx_triangulated,
-                center_native: old.value_native,
-                shocked_native: new.value_native,
-                pnl_native_per_bp: difference,
-                pnl_base_per_pp: per_pp,
-            })
-        })
-        .collect()
 }
 
 impl GirrQuoteSource {
@@ -261,7 +167,7 @@ pub struct GirrQuoteRisk {
     /// Exact regulatory target and source binding for every included reprice.
     pub target: GirrQuoteTarget,
     /// Position basis and signed contributions before aggregation.
-    pub positions: Vec<GirrQuoteReprice>,
+    pub positions: Vec<RegulatoryQuoteReprice>,
 }
 
 /// Exact quote yield-delta input and auditable position evidence.
@@ -362,11 +268,10 @@ pub fn girr_quote_delta(
                     target.risk_curve_id
                 )));
             }
+            let shocked_market = target.source.shock(market, &target.quote)?;
             Ok(GirrQuoteRisk {
                 target: target.clone(),
-                positions: repriced_girr_rows(
-                    portfolio, market, pricing, target, &center, &affected,
-                )?,
+                positions: reprice_rows(portfolio, &shocked_market, pricing, &center, &affected)?,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -524,6 +429,7 @@ mod tests {
     use crate::types::Entity;
     use finstack_quant_calibration::api::{engine::calibrate, schema::CalibrationEnvelope};
     use finstack_quant_core::math::Compounding;
+    use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use serde_json::json;
     use std::sync::Arc;
@@ -589,7 +495,7 @@ mod tests {
                 source: GirrQuoteSource::Discount {
                     curve_id: "GBP-SONIA".into(),
                 },
-                quote: RateQuoteCoordinate {
+                quote: CalibrationQuoteCoordinate {
                     quote_id: binding.quote_id.clone(),
                     pillar_date: binding.pillar_date,
                 },

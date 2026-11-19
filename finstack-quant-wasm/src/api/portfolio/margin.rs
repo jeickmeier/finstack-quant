@@ -114,3 +114,41 @@ pub fn girr_quote_delta(
     .map_err(to_js_err)?;
     to_js_value(&result)
 }
+
+/// Derive ordinary non-securitisation CSR deltas from exact single-name CDS quote reprices.
+/// @param portfolio - Trading book with signed quantities, valuation date and reporting currency.
+/// @param market - Held market with original issuer spread risk recipes and reporting FX.
+/// @param pricing - Common pricing and conversion settings for held and shocked marks.
+/// @param sources - Dated issuer classification and all five exact quote coordinates for each live issuer CDS curve.
+/// @returns Source fingerprints, signed position changes per basis point, and CSR deltas scaled to a percentage point.
+/// @throws TypeError if sources contain a non-JSON value. FinstackError for unsupported exposures, invalid mappings, missing inputs or failed replay and pricing.
+/// @example
+/// ```typescript
+/// import init, { core, portfolio } from "finstack-quant-wasm";
+/// await init();
+/// const book = portfolio.Portfolio.builder("credit", "USD", "2025-01-02").build();
+/// const market = new core.MarketContext();
+/// const pricing = new core.FinstackConfig();
+/// console.log(portfolio.csrQuoteDelta(book, market, pricing, []).quote_risk.length);
+/// pricing.free();
+/// market.free();
+/// book.free();
+/// ```
+#[wasm_bindgen(js_name = csrQuoteDelta, unchecked_return_type = "generated.portfolio.CsrQuoteDelta")]
+pub fn csr_quote_delta(
+    portfolio: &JsPortfolio,
+    market: &JsMarketContext,
+    pricing: &crate::api::core::config::JsFinstackConfig,
+    #[wasm_bindgen(unchecked_param_type = "generated.portfolio.CsrQuoteSource[]")] sources: JsValue,
+) -> Result<JsValue, JsValue> {
+    let sources: Vec<finstack_quant_portfolio::margin::CsrQuoteSource> =
+        from_js_json(&sources, "sources")?;
+    let result = finstack_quant_portfolio::margin::csr_quote_delta(
+        &portfolio.inner,
+        market.inner(),
+        &pricing.inner,
+        &sources,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&result)
+}

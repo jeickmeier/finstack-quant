@@ -1061,6 +1061,22 @@ export type RiskMeasure =
       };
     };
 /**
+ * Seniority level for credit exposures.
+ *
+ * Order is **not** total — `SeniorSecured` is strictly senior to `Senior`,
+ * `Subordinated`, and `Junior`, but the relative ordering of `Subordinated`
+ * vs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.
+ */
+export type Seniority = "senior_secured" | "senior" | "subordinated" | "junior";
+/**
+ * DRC sector classification.
+ */
+export type DrcSector = "sovereign" | "corporate" | "local_government";
+/**
+ * DRC seniority for LGD assignment.
+ */
+export type DrcSeniority = "covered_bond" | "senior_unsecured" | "subordinated" | "equity";
+/**
  * Classification of a curve dependency's role.
  */
 export type CurveType = "discount" | "forward" | "hazard" | "inflation" | "base_correlation";
@@ -1072,14 +1088,6 @@ export type LoadPhase = "parse" | "version" | "structure" | "semantic" | "canoni
  * Severity assigned to a persisted artifact diagnostic.
  */
 export type Severity = "error" | "warning";
-/**
- * DRC sector classification.
- */
-export type DrcSector = "sovereign" | "corporate" | "local_government";
-/**
- * DRC seniority for LGD assignment.
- */
-export type DrcSeniority = "covered_bond" | "senior_unsecured" | "subordinated" | "equity";
 /**
  * A single market dependency extracted from an instrument.
  */
@@ -2091,6 +2099,19 @@ export interface SectorEffect {
   total: number;
 }
 /**
+ * An exact resolved market quote in a recorded calibration recipe.
+ */
+export interface CalibrationQuoteCoordinate {
+  /**
+   * Contractual pillar of the original execution, after holiday adjustments.
+   */
+  pillar_date: DateWire;
+  /**
+   * Identifier of the authored market quote, without tenor normalization.
+   */
+  quote_id: string;
+}
+/**
  * A candidate instrument that could be added to the portfolio.
  *
  * This represents an instrument not currently held but available for trading.
@@ -2650,6 +2671,263 @@ export interface CrossFactorDetail {
   [k: string]: unknown;
 }
 /**
+ * Dated issuer identity and approved ordinary CSR risk bucket.
+ */
+export interface CsrQuoteClassification {
+  /**
+   * Information cut of the supplied issuer, bucket and seniority assignment.
+   */
+  as_of: DateWire;
+  /**
+   * One-based prescribed non-securitisation CSR bucket.
+   */
+  bucket: number;
+  /**
+   * Payment currency of the CDS spread and contractual claims.
+   */
+  currency: Currency;
+  /**
+   * Authoritative issuer identifier matching the executed calibration quotes.
+   */
+  issuer: string;
+  /**
+   * Seniority of the funded reference claim.
+   */
+  seniority: Seniority;
+  /**
+   * Identifier of the classification evidence admitted for this date.
+   */
+  source_id: string;
+}
+/**
+ * Ordinary non-securitisation CSR sensitivities and signed issuer CDS quote reprices.
+ */
+export interface CsrQuoteDelta {
+  /**
+   * Portfolio valuation date for the classification and pricing.
+   */
+  as_of: DateWire;
+  /**
+   * Immutable original market fingerprint, before center or quote replay.
+   */
+  market_hash: string;
+  /**
+   * Trading book to which all positions and reporting FX belong.
+   */
+  portfolio_id: string;
+  /**
+   * Fingerprint of the configuration shared by every center and shocked price.
+   */
+  pricing_hash: string;
+  /**
+   * Signed position-level changes before summing by regulated CSR factor.
+   */
+  quote_risk: CsrQuoteRisk[];
+  /**
+   * Ordinary non-securitisation credit spread aggregation inputs.
+   */
+  sensitivities: FrtbSensitivities;
+  /**
+   * Qualified issuer, currency, seniority, curve and exact quote evidence.
+   */
+  sources: CsrQuoteSource[];
+  [k: string]: unknown;
+}
+/**
+ * Position reprices at an exact issuer credit spread vertex.
+ */
+export interface CsrQuoteRisk {
+  /**
+   * Issuer spread curve that was rebuilt on the selected quote.
+   */
+  curve_id: Id;
+  /**
+   * Position changes with the held reporting FX evidence.
+   */
+  positions: RegulatoryQuoteReprice[];
+  /**
+   * Exact admitted CSR non-securitisation vertex.
+   */
+  vertex: string;
+  [k: string]: unknown;
+}
+/**
+ * One signed position-level repricing difference for an exact regulatory quote vertex.
+ */
+export interface RegulatoryQuoteReprice {
+  /**
+   * Baseline value on the held valuation basis in the instrument's currency.
+   */
+  center_native: Money;
+  /**
+   * Owner of the position within the trading book.
+   */
+  entity_id: Id;
+  /**
+   * Held reporting FX rate in units of reporting currency per native unit.
+   * Absent when the currencies match.
+   */
+  fx_rate?: number | null;
+  /**
+   * Whether the held FX rate was triangulated through the market pivot.
+   * Absent when the currencies match.
+   */
+  fx_triangulated?: boolean | null;
+  /**
+   * Signed upward reprice difference in portfolio currency per one percentage point.
+   */
+  pnl_base_per_pp: number;
+  /**
+   * Signed upward reprice difference in instrument currency per basis point.
+   */
+  pnl_native_per_bp: Money;
+  /**
+   * Position whose risk is represented, after applying its signed quantity.
+   */
+  position_id: Id;
+  /**
+   * Signed scaling from the instrument price to the held position.
+   */
+  position_scale: number;
+  /**
+   * Value on the same basis after an upward one-basis-point quote replay.
+   */
+  shocked_native: Money;
+  [k: string]: unknown;
+}
+/**
+ * FRTB sensitivity inputs organized by risk class.
+ *
+ * Compared to `SimmSensitivities`, this struct adds:
+ * - GIRR inflation and cross-currency basis risk factors
+ * - CSR securitization sub-type separation
+ * - Curvature shock direction (up/down) per risk factor
+ * - Bucket assignment metadata required for FRTB aggregation
+ */
+export interface FrtbSensitivities {
+  base_currency: Currency;
+  commodity_curvature: [string, number, number, number][];
+  commodity_delta: [string, number, string, string, number][];
+  commodity_vega: [string, number, string, number][];
+  csr_nonsec_curvature: [string, number, number, number][];
+  csr_nonsec_delta: [string, number, string, string, number][];
+  csr_nonsec_vega: [string, number, string, number][];
+  csr_sec_ctp_curvature: [string, number, number, number][];
+  csr_sec_ctp_delta: [string, number, string, string, number][];
+  csr_sec_ctp_vega: [string, number, string, number][];
+  csr_sec_nonctp_curvature: [string, number, number, number][];
+  csr_sec_nonctp_delta: [string, number, string, string, number][];
+  csr_sec_nonctp_vega: [string, number, string, number][];
+  drc_positions: DrcPosition[];
+  equity_curvature: [string, number, number, number][];
+  equity_delta: [string, number, number][];
+  equity_repo_delta: [string, number, number][];
+  equity_vega: [string, number, string, number][];
+  fx_curvature: [Currency, Currency, number, number][];
+  fx_delta: [Currency, Currency, number][];
+  fx_vega: [Currency, Currency, string, number][];
+  girr_curvature: [Currency, number, number][];
+  girr_delta: [Currency, Id, string, number][];
+  girr_inflation_delta: [Currency, number][];
+  girr_vega: [Currency, string, string, number][];
+  girr_xccy_basis_delta: [Currency, number][];
+  rrao_exotic_notionals: RraoPosition[];
+}
+/**
+ * A position subject to the Default Risk Charge.
+ *
+ * Per MAR22.9, gross JTD for a position is:
+ *
+ * ```text
+ * long:  gross = max(LGD * notional + P&L, 0)
+ * short: gross = min(LGD * notional + P&L, 0)
+ * ```
+ *
+ * where the `P&L` term captures any mark-to-market adjustment already
+ * reflected in the trading-book valuation (e.g. an underwater long bond
+ * has a small negative `P&L` that reduces the exposed JTD). `jtd_amount`
+ * represents the signed *notional* (positive = long, negative = short);
+ * `FrtbSbaEngine` multiplies by [`DrcSeniority`]
+ * LGD and then applies the `pnl_adjustment` and the sign-preserving floor.
+ */
+export interface DrcPosition {
+  /**
+   * Issuer identifier.
+   */
+  issuer: string;
+  /**
+   * Signed JTD *notional* (positive = long, negative = short). Does
+   * **not** include the LGD multiplier — `FrtbSbaEngine` applies LGD.
+   */
+  jtd_amount: number;
+  /**
+   * Residual contractual maturity in years; scaled into [0.25, 1.0] for JTD.
+   * Cash equities use the elected three-month or greater-than-one-year horizon.
+   */
+  maturity_years: number;
+  /**
+   * Mark-to-market / P&L adjustment from MAR22.9. Default 0. Add a
+   * negative value for a long position with unrealised loss so the
+   * gross JTD is correctly floored at zero when the mark-down already
+   * exceeds `LGD * notional`.
+   */
+  pnl_adjustment?: number;
+  /**
+   * Credit rating bucket (1-based per FRTB specification).
+   */
+  rating_bucket: number;
+  /**
+   * Sector for DRC bucket assignment.
+   */
+  sector: DrcSector;
+  /**
+   * Seniority for LGD determination.
+   */
+  seniority: DrcSeniority;
+}
+/**
+ * A position subject to the Residual Risk Add-On.
+ *
+ * RRAO applies to exotic instruments whose risks are not adequately
+ * captured by the delta/vega/curvature framework -- instruments with
+ * gap risk, correlation risk, or behavioral risk.
+ */
+export interface RraoPosition {
+  /**
+   * Instrument identifier.
+   */
+  instrument_id: string;
+  /**
+   * Whether the instrument bears exotic underlying risk (1.0% weight)
+   * or other residual risk (0.1% weight).
+   */
+  is_exotic: boolean;
+  /**
+   * Gross notional amount.
+   */
+  notional: number;
+  [k: string]: unknown;
+}
+/**
+ * Exact market source and quote grid for one classified issuer CDS curve.
+ */
+export interface CsrQuoteSource {
+  /**
+   * Authoritative, dated identity and CSR bucket for the source.
+   */
+  classification: CsrQuoteClassification;
+  /**
+   * Exact hazard curve in the issuer market.
+   */
+  curve_id: Id;
+  /**
+   * One executed coordinate per prescribed CSR vertex.
+   */
+  vertices: {
+    [k: string]: CalibrationQuoteCoordinate;
+  };
+}
+/**
  * A dated cashflow amount for money-weighted return calculations.
  */
 export interface DatedCashflow {
@@ -2741,58 +3019,6 @@ export interface DietzFlow {
    * flow at period end has `w = 0`.
    */
   fraction_of_period_remaining: number;
-}
-/**
- * A position subject to the Default Risk Charge.
- *
- * Per MAR22.9, gross JTD for a position is:
- *
- * ```text
- * long:  gross = max(LGD * notional + P&L, 0)
- * short: gross = min(LGD * notional + P&L, 0)
- * ```
- *
- * where the `P&L` term captures any mark-to-market adjustment already
- * reflected in the trading-book valuation (e.g. an underwater long bond
- * has a small negative `P&L` that reduces the exposed JTD). `jtd_amount`
- * represents the signed *notional* (positive = long, negative = short);
- * `FrtbSbaEngine` multiplies by [`DrcSeniority`]
- * LGD and then applies the `pnl_adjustment` and the sign-preserving floor.
- */
-export interface DrcPosition {
-  /**
-   * Issuer identifier.
-   */
-  issuer: string;
-  /**
-   * Signed JTD *notional* (positive = long, negative = short). Does
-   * **not** include the LGD multiplier — `FrtbSbaEngine` applies LGD.
-   */
-  jtd_amount: number;
-  /**
-   * Residual contractual maturity in years; scaled into [0.25, 1.0] for JTD.
-   * Cash equities use the elected three-month or greater-than-one-year horizon.
-   */
-  maturity_years: number;
-  /**
-   * Mark-to-market / P&L adjustment from MAR22.9. Default 0. Add a
-   * negative value for a long position with unrealised loss so the
-   * gross JTD is correctly floored at zero when the mark-down already
-   * exceeds `LGD * notional`.
-   */
-  pnl_adjustment?: number;
-  /**
-   * Credit rating bucket (1-based per FRTB specification).
-   */
-  rating_bucket: number;
-  /**
-   * Sector for DRC bucket assignment.
-   */
-  sector: DrcSector;
-  /**
-   * Seniority for LGD determination.
-   */
-  seniority: DrcSeniority;
 }
 /**
  * A full duration-cell base-return curve built from a reference universe.
@@ -3495,67 +3721,6 @@ export interface FiLinkedSectorEffect {
   [k: string]: unknown;
 }
 /**
- * FRTB sensitivity inputs organized by risk class.
- *
- * Compared to `SimmSensitivities`, this struct adds:
- * - GIRR inflation and cross-currency basis risk factors
- * - CSR securitization sub-type separation
- * - Curvature shock direction (up/down) per risk factor
- * - Bucket assignment metadata required for FRTB aggregation
- */
-export interface FrtbSensitivities {
-  base_currency: Currency;
-  commodity_curvature: [string, number, number, number][];
-  commodity_delta: [string, number, string, string, number][];
-  commodity_vega: [string, number, string, number][];
-  csr_nonsec_curvature: [string, number, number, number][];
-  csr_nonsec_delta: [string, number, string, string, number][];
-  csr_nonsec_vega: [string, number, string, number][];
-  csr_sec_ctp_curvature: [string, number, number, number][];
-  csr_sec_ctp_delta: [string, number, string, string, number][];
-  csr_sec_ctp_vega: [string, number, string, number][];
-  csr_sec_nonctp_curvature: [string, number, number, number][];
-  csr_sec_nonctp_delta: [string, number, string, string, number][];
-  csr_sec_nonctp_vega: [string, number, string, number][];
-  drc_positions: DrcPosition[];
-  equity_curvature: [string, number, number, number][];
-  equity_delta: [string, number, number][];
-  equity_repo_delta: [string, number, number][];
-  equity_vega: [string, number, string, number][];
-  fx_curvature: [Currency, Currency, number, number][];
-  fx_delta: [Currency, Currency, number][];
-  fx_vega: [Currency, Currency, string, number][];
-  girr_curvature: [Currency, number, number][];
-  girr_delta: [Currency, Id, string, number][];
-  girr_inflation_delta: [Currency, number][];
-  girr_vega: [Currency, string, string, number][];
-  girr_xccy_basis_delta: [Currency, number][];
-  rrao_exotic_notionals: RraoPosition[];
-}
-/**
- * A position subject to the Residual Risk Add-On.
- *
- * RRAO applies to exotic instruments whose risks are not adequately
- * captured by the delta/vega/curvature framework -- instruments with
- * gap risk, correlation risk, or behavioral risk.
- */
-export interface RraoPosition {
-  /**
-   * Instrument identifier.
-   */
-  instrument_id: string;
-  /**
-   * Whether the instrument bears exotic underlying risk (1.0% weight)
-   * or other residual risk (0.1% weight).
-   */
-  is_exotic: boolean;
-  /**
-   * Gross notional amount.
-   */
-  notional: number;
-  [k: string]: unknown;
-}
-/**
  * Detailed attribution for FX rate changes.
  *
  * Provides per-currency-pair breakdown.
@@ -3620,55 +3785,11 @@ export interface GirrQuoteRisk {
   /**
    * Position basis and signed contributions before aggregation.
    */
-  positions: GirrQuoteReprice[];
+  positions: RegulatoryQuoteReprice[];
   /**
    * Exact regulatory target and source binding for every included reprice.
    */
   target: GirrQuoteTarget;
-  [k: string]: unknown;
-}
-/**
- * One signed position-level repricing difference for the requested GIRR vertex.
- */
-export interface GirrQuoteReprice {
-  /**
-   * Baseline value on the held valuation basis in the instrument's currency.
-   */
-  center_native: Money;
-  /**
-   * Owner of the position within the trading book.
-   */
-  entity_id: Id;
-  /**
-   * Held reporting FX rate in units of reporting currency per native unit.
-   * Absent when the currencies match.
-   */
-  fx_rate?: number | null;
-  /**
-   * Whether the held FX rate was triangulated through the market pivot.
-   * Absent when the currencies match.
-   */
-  fx_triangulated?: boolean | null;
-  /**
-   * Signed upward reprice difference in portfolio currency per one percentage point.
-   */
-  pnl_base_per_pp: number;
-  /**
-   * Signed upward reprice difference in instrument currency per basis point.
-   */
-  pnl_native_per_bp: Money;
-  /**
-   * Position whose risk is represented, after applying its signed quantity.
-   */
-  position_id: Id;
-  /**
-   * Signed scaling from the instrument price to the held position.
-   */
-  position_scale: number;
-  /**
-   * Value on the same basis after an upward one-basis-point quote replay.
-   */
-  shocked_native: Money;
   [k: string]: unknown;
 }
 /**
@@ -3678,7 +3799,7 @@ export interface GirrQuoteTarget {
   /**
    * Recorded quote ID and exact contractual pillar of the target source.
    */
-  quote: RateQuoteCoordinate;
+  quote: CalibrationQuoteCoordinate;
   /**
    * Risk currency used to bucket the factor, independent of PV currency.
    */
@@ -3695,19 +3816,6 @@ export interface GirrQuoteTarget {
    * Qualified regulatory vertex, matching an admitted ordinary GIRR label.
    */
   vertex: string;
-}
-/**
- * An exact resolved rate quote in one recorded calibration recipe.
- */
-export interface RateQuoteCoordinate {
-  /**
-   * Contractual pillar of the original execution, after holiday adjustments.
-   */
-  pillar_date: DateWire;
-  /**
-   * Identifier of the authored market quote, without tenor normalization.
-   */
-  quote_id: string;
 }
 /**
  * Single-period hierarchical grid attribution result.

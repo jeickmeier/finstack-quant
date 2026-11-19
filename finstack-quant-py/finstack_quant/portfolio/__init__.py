@@ -167,6 +167,10 @@ PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
 CandidatePosition = _portfolio.CandidatePosition
 TradeUniverse = _portfolio.TradeUniverse
 NettingSetMargin = _portfolio.NettingSetMargin
+CsrQuoteClassification = _portfolio.CsrQuoteClassification
+CsrQuoteSource = _portfolio.CsrQuoteSource
+CsrQuoteDelta = _portfolio.CsrQuoteDelta
+csr_quote_delta = _portfolio.csr_quote_delta
 GirrQuoteDelta = _portfolio.GirrQuoteDelta
 GirrQuoteTarget = _portfolio.GirrQuoteTarget
 girr_quote_delta = _portfolio.girr_quote_delta
@@ -182,6 +186,9 @@ __all__ = [
     "ContractLimitExceededError",
     "ContractValidationError",
     "CreditVolReport",
+    "CsrQuoteClassification",
+    "CsrQuoteDelta",
+    "CsrQuoteSource",
     "DurationCellTable",
     "ExcessReturnResult",
     "FactorAssignmentReport",
@@ -270,6 +277,7 @@ __all__ = [
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
+    "csr_quote_delta",
     "excess_returns",
     "factor_brinson_attribution",
     "girr_quote_delta",

@@ -701,7 +701,7 @@ class _LinkedOisGirrSource(TypedDict):
     discount_curve_id: str
     forward_curve_id: str
 
-class _RateQuoteCoordinate(TypedDict):
+class _CalibrationQuoteCoordinate(TypedDict):
     quote_id: str
     pillar_date: str
 
@@ -729,7 +729,7 @@ class GirrQuoteTarget:
         risk_curve_id: str,
         vertex: str,
         source: _DiscountGirrSource | _ProjectionGirrSource | _LinkedOisGirrSource,
-        quote: _RateQuoteCoordinate,
+        quote: _CalibrationQuoteCoordinate,
     ) -> None:
         """Record the identity and execution coordinate of a quoted yield.
 
@@ -872,5 +872,215 @@ def girr_quote_delta(
     >>> from finstack_quant.portfolio import Portfolio, girr_quote_delta
     >>> book = Portfolio.builder("book", "GBP", "2025-01-02").build()
     >>> girr_quote_delta(book, MarketContext(), FinstackConfig(), []).as_of.isoformat()
+    '2025-01-02'
+    """
+
+class CsrQuoteClassification:
+    """Sourced issuer identity, seniority, currency and ordinary CSR bucket.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import CsrQuoteClassification
+    >>> label = CsrQuoteClassification(
+    ...     issuer="CORP",
+    ...     currency="USD",
+    ...     seniority="senior",
+    ...     bucket=5,
+    ...     source_id="issuer-review",
+    ...     as_of="2025-01-02",
+    ... )
+    """
+
+    def __init__(
+        self,
+        *,
+        issuer: str,
+        currency: str,
+        seniority: Literal["senior_secured", "senior", "subordinated", "junior"],
+        bucket: int,
+        source_id: str,
+        as_of: datetime.date | str,
+    ) -> None:
+        """Record the authoritative classification to check against the executed curve.
+
+        Parameters
+        ----------
+        issuer : str
+            Exact nonempty issuer ID in the calibration.
+        currency : str
+            ISO 4217 native currency of the CDS payment and reference quote.
+        seniority : str
+            Contractual seniority from the curve's admitted issuer classification.
+        bucket : int
+            Applicable one-based non-securitisation CSR bucket, in 1 through 18.
+        source_id : str
+            Nonempty identifier of the classification record.
+        as_of : date or str
+            Effective information cut as a date or ISO year-month-day string.
+
+        Raises
+        ------
+        ValueError
+            If a currency, seniority or date cannot be converted.
+        OverflowError
+            If the bucket cannot be represented as an unsigned byte.
+        """
+
+class CsrQuoteSource:
+    """One issuer hazard curve's certified mapping to the five CDS spread vertices.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import CsrQuoteClassification, CsrQuoteSource
+    >>> label = CsrQuoteClassification(
+    ...     issuer="CORP",
+    ...     currency="USD",
+    ...     seniority="senior",
+    ...     bucket=5,
+    ...     source_id="issuer-review",
+    ...     as_of="2025-01-02",
+    ... )
+    >>> mapping = CsrQuoteSource(curve_id="CORP-HAZARD", classification=label, vertices={})
+    >>> mapping.to_dict()["curve_id"]
+    'CORP-HAZARD'
+    """
+
+    def __init__(
+        self,
+        *,
+        curve_id: str,
+        classification: CsrQuoteClassification,
+        vertices: dict[str, _CalibrationQuoteCoordinate],
+    ) -> None:
+        """Author exact quote IDs and contractual dates for a classified curve.
+
+        Parameters
+        ----------
+        curve_id : str
+            Exact hazard curve identifier in the market.
+        classification : CsrQuoteClassification
+            Dated issuer, currency, seniority and bucket evidence.
+        vertices : dict
+            The keyed source mapping 0.5Y, 1Y, 3Y, 5Y and 10Y to each executed
+            quote_id and ISO pillar_date. The repricer checks completeness and
+            matches the coordinates to the executed calibration.
+
+        Raises
+        ------
+        ValueError
+            If a quote coordinate cannot be parsed.
+        """
+
+    def to_dict(self) -> dict[str, object]:
+        """Export the classification and quote grid as a canonical dictionary.
+
+        Returns
+        -------
+        dict
+            Curve identity, classification evidence and authored quote coordinates.
+
+        Raises
+        ------
+        ValueError
+            If the source cannot be serialized.
+        """
+
+class CsrQuoteDelta:
+    """Signed issuer CDS quote deltas and their position-level pricing evidence.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.config import FinstackConfig
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, csr_quote_delta
+    >>> book = Portfolio.builder("credit", "USD", "2025-01-02").build()
+    >>> report = csr_quote_delta(book, MarketContext(), FinstackConfig(), [])
+    >>> report.as_of.isoformat()
+    '2025-01-02'
+    """
+
+    @property
+    def as_of(self) -> datetime.date:
+        """Valuation date held through the center and all quote reprices.
+
+        Returns
+        -------
+        date
+            The trading book's valuation date.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def sensitivities(self) -> FrtbSensitivities:
+        """Get the ordinary CSR non-securitisation FRTB inputs.
+
+        Returns
+        -------
+        FrtbSensitivities
+            Signed spread deltas in reporting currency per percentage point.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    def to_dict(self) -> dict[str, object]:
+        """Export inputs, quote-level reprices, and source hashes.
+
+        Returns
+        -------
+        dict
+            Canonical result with held market and pricing fingerprints.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized.
+        """
+
+def csr_quote_delta(
+    portfolio: Portfolio, market: MarketContext, pricing: FinstackConfig, sources: Sequence[CsrQuoteSource]
+) -> CsrQuoteDelta:
+    """Reprice live single-name CDS at exact non-securitisation CSR spread vertices.
+
+    Parameters
+    ----------
+    portfolio : Portfolio
+        Trading book with signed position quantities, reporting currency and valuation date.
+    market : MarketContext
+        Held market and executed issuer spread risk recipes.
+    pricing : FinstackConfig
+        Common pricing and conversion basis for center and shocks.
+    sources : sequence of CsrQuoteSource
+        Complete five-vertex sources for each live ordinary CDS hazard curve.
+        Empty input is valid for an empty book.
+
+    Returns
+    -------
+    CsrQuoteDelta
+        Position changes for a positive one-basis-point bump and signed
+        regulatory delta inputs scaled to one percentage point.
+
+    Raises
+    ------
+    PortfolioError
+        If a credit exposure or mapping is unsupported or inconsistent.
+    KeyError
+        If a required market observation or held FX rate is missing.
+    ValueError
+        If an executed quote or replay is invalid.
+    RuntimeError
+        If calibration or repricing fails.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.config import FinstackConfig
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, csr_quote_delta
+    >>> book = Portfolio.builder("credit", "USD", "2025-01-02").build()
+    >>> csr_quote_delta(book, MarketContext(), FinstackConfig(), []).as_of.isoformat()
     '2025-01-02'
     """

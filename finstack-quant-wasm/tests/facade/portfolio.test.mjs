@@ -52,6 +52,7 @@ const EXPORTED_KEYS = [
   'computePnlProfiles',
   'constraintExposureLimit',
   'constraintExposureMinimum',
+  'csrQuoteDelta',
   'excessReturns',
   'factorBrinsonAttribution',
   'fiAttributionResultReconciliationCheck',
@@ -1473,5 +1474,125 @@ test('ordinary GIRR uses exact tenors and preserves the signed quote change unde
   } finally {
     for (const handle of [pricing, book, position, bond, principal, currency, curve, market])
       handle.free();
+  }
+});
+
+test('ordinary CSR uses the executed CDS quote and signed book position', () => {
+  const asOf = '2024-03-20';
+  const discountId = 'USD-OIS';
+  const creditId = 'CORP-HAZARD';
+  const vertices = ['0.5Y', '1Y', '3Y', '5Y', '10Y'];
+  const fit = (bump5y) => {
+    const quotes = vertices.map((vertex, index) => ({
+      kind: 'cds_quote',
+      type: 'cds_par_spread',
+      id: vertex,
+      entity: 'CORP',
+      convention: { currency: 'USD', doc_clause: 'isda_na' },
+      pillar: {
+        tenor: {
+          count: index === 0 ? 6 : Number.parseInt(vertex, 10),
+          unit: index === 0 ? 'months' : 'years',
+        },
+      },
+      spread_bp: [80, 85, 95, 105 + bump5y, 115][index],
+      recovery_rate: 0.4,
+    }));
+    const calibration = facade.calibration.calibrate({
+      schema: 'finstack_quant.calibration/1',
+      plan: {
+        id: 'usd-credit',
+        quote_sets: { rates: ['usd-dep'], credit: vertices },
+        steps: [
+          {
+            id: discountId,
+            quote_set: 'rates',
+            kind: 'discount',
+            curve_id: discountId,
+            currency: 'USD',
+            base_date: asOf,
+            method: 'bootstrap',
+            interpolation: 'log_linear',
+            extrapolation: 'extend',
+            conventions: { curve_day_count: 'act_365f' },
+          },
+          {
+            id: creditId,
+            quote_set: 'credit',
+            kind: 'hazard',
+            curve_id: creditId,
+            currency: 'USD',
+            base_date: asOf,
+            discount_curve_id: discountId,
+            entity: 'CORP',
+            seniority: 'senior',
+            recovery_rate: 0.4,
+            notional: 1,
+            method: 'bootstrap',
+          },
+        ],
+        settings: {},
+      },
+      market_data: [
+        {
+          kind: 'rate_quote',
+          type: 'deposit',
+          id: 'usd-dep',
+          index: 'USD-SOFR-OIS',
+          pillar: { tenor: { count: 1, unit: 'years' } },
+          rate: 0.04,
+        },
+        ...quotes,
+      ],
+    });
+    return core.MarketContext.fromJson(calibration.result.final_market);
+  };
+  const market = fit(0);
+  const shocked = fit(1);
+  const curve = market.getHazard(creditId);
+  const cds = facade.valuations.instruments.CreditDefaultSwap.example();
+  const position = new portfolio.Position('short-cds', cds.toJson(), -2);
+  const book = portfolio.Portfolio.builder('credit-book', 'USD', asOf)
+    .addPosition(position)
+    .build();
+  const pricing = new core.FinstackConfig();
+  try {
+    const source = {
+      curve_id: creditId,
+      classification: {
+        issuer: 'CORP',
+        currency: 'USD',
+        seniority: 'senior',
+        bucket: 5,
+        source_id: 'issuer-review',
+        as_of: asOf,
+      },
+      vertices: Object.fromEntries(
+        curve.hazardCalibration.spread_risk_inputs.map(({ quote, pillar_date }) => [
+          quote.id,
+          { quote_id: quote.id, pillar_date },
+        ])
+      ),
+    };
+    const result = portfolio.csrQuoteDelta(book, market, pricing, [source]);
+    assert.deepEqual(
+      result.quote_risk.map(({ vertex }) => vertex),
+      vertices
+    );
+    const row = result.quote_risk[3].positions[0];
+    assert.equal(row.position_scale, -2);
+    const expected =
+      -2 *
+      (Number(cds.price(shocked.toJson(), asOf).value.amount) -
+        Number(cds.price(market.toJson(), asOf).value.amount));
+    assert.ok(Math.abs(expected) > 1);
+    assert.ok(Math.abs(row.pnl_base_per_pp - 100 * expected) < 2);
+    [source.vertices['3Y'], source.vertices['5Y']] = [source.vertices['5Y'], source.vertices['3Y']];
+    assert.throws(
+      () => portfolio.csrQuoteDelta(book, market, pricing, [source]),
+      /exact 3Y issuer vertex/
+    );
+  } finally {
+    for (const handle of [pricing, book, position, cds, curve, shocked, market]) handle.free();
   }
 });

@@ -1,5 +1,24 @@
 {
   "$defs": {
+    "CalibrationQuoteCoordinate": {
+      "additionalProperties": false,
+      "description": "An exact resolved market quote in a recorded calibration recipe.",
+      "properties": {
+        "pillar_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual pillar of the original execution, after holiday adjustments."
+        },
+        "quote_id": {
+          "description": "Identifier of the authored market quote, without tenor normalization.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "quote_id",
+        "pillar_date"
+      ],
+      "type": "object"
+    },
     "Currency": {
       "description": "ISO 4217 currency enumeration",
       "oneOf": [
@@ -1561,73 +1580,13 @@
       ],
       "type": "object"
     },
-    "GirrQuoteReprice": {
-      "description": "One signed position-level repricing difference for the requested GIRR vertex.",
-      "properties": {
-        "center_native": {
-          "$ref": "#/$defs/Money",
-          "description": "Baseline value on the held valuation basis in the instrument's currency."
-        },
-        "entity_id": {
-          "$ref": "#/$defs/Id",
-          "description": "Owner of the position within the trading book."
-        },
-        "fx_rate": {
-          "description": "Held reporting FX rate in units of reporting currency per native unit.\nAbsent when the currencies match.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "fx_triangulated": {
-          "description": "Whether the held FX rate was triangulated through the market pivot.\nAbsent when the currencies match.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "pnl_base_per_pp": {
-          "description": "Signed upward reprice difference in portfolio currency per one percentage point.",
-          "format": "double",
-          "type": "number"
-        },
-        "pnl_native_per_bp": {
-          "$ref": "#/$defs/Money",
-          "description": "Signed upward reprice difference in instrument currency per basis point."
-        },
-        "position_id": {
-          "$ref": "#/$defs/Id",
-          "description": "Position whose risk is represented, after applying its signed quantity."
-        },
-        "position_scale": {
-          "description": "Signed scaling from the instrument price to the held position.",
-          "format": "double",
-          "type": "number"
-        },
-        "shocked_native": {
-          "$ref": "#/$defs/Money",
-          "description": "Value on the same basis after an upward one-basis-point quote replay."
-        }
-      },
-      "required": [
-        "position_id",
-        "entity_id",
-        "position_scale",
-        "center_native",
-        "shocked_native",
-        "pnl_native_per_bp",
-        "pnl_base_per_pp"
-      ],
-      "type": "object"
-    },
     "GirrQuoteRisk": {
       "description": "Signed FRTB GIRR contributions for one qualified quote and their position reprices.",
       "properties": {
         "positions": {
           "description": "Position basis and signed contributions before aggregation.",
           "items": {
-            "$ref": "#/$defs/GirrQuoteReprice"
+            "$ref": "#/$defs/RegulatoryQuoteReprice"
           },
           "type": "array"
         },
@@ -1714,7 +1673,7 @@
       "description": "Source and grouping for one qualified ordinary GIRR delta vertex.",
       "properties": {
         "quote": {
-          "$ref": "#/$defs/RateQuoteCoordinate",
+          "$ref": "#/$defs/CalibrationQuoteCoordinate",
           "description": "Recorded quote ID and exact contractual pillar of the target source."
         },
         "risk_currency": {
@@ -1766,22 +1725,63 @@
       ],
       "type": "object"
     },
-    "RateQuoteCoordinate": {
-      "additionalProperties": false,
-      "description": "An exact resolved rate quote in one recorded calibration recipe.",
+    "RegulatoryQuoteReprice": {
+      "description": "One signed position-level repricing difference for an exact regulatory quote vertex.",
       "properties": {
-        "pillar_date": {
-          "$ref": "#/$defs/DateWire",
-          "description": "Contractual pillar of the original execution, after holiday adjustments."
+        "center_native": {
+          "$ref": "#/$defs/Money",
+          "description": "Baseline value on the held valuation basis in the instrument's currency."
         },
-        "quote_id": {
-          "description": "Identifier of the authored market quote, without tenor normalization.",
-          "type": "string"
+        "entity_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Owner of the position within the trading book."
+        },
+        "fx_rate": {
+          "description": "Held reporting FX rate in units of reporting currency per native unit.\nAbsent when the currencies match.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fx_triangulated": {
+          "description": "Whether the held FX rate was triangulated through the market pivot.\nAbsent when the currencies match.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "pnl_base_per_pp": {
+          "description": "Signed upward reprice difference in portfolio currency per one percentage point.",
+          "format": "double",
+          "type": "number"
+        },
+        "pnl_native_per_bp": {
+          "$ref": "#/$defs/Money",
+          "description": "Signed upward reprice difference in instrument currency per basis point."
+        },
+        "position_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Position whose risk is represented, after applying its signed quantity."
+        },
+        "position_scale": {
+          "description": "Signed scaling from the instrument price to the held position.",
+          "format": "double",
+          "type": "number"
+        },
+        "shocked_native": {
+          "$ref": "#/$defs/Money",
+          "description": "Value on the same basis after an upward one-basis-point quote replay."
         }
       },
       "required": [
-        "quote_id",
-        "pillar_date"
+        "position_id",
+        "entity_id",
+        "position_scale",
+        "center_native",
+        "shocked_native",
+        "pnl_native_per_bp",
+        "pnl_base_per_pp"
       ],
       "type": "object"
     },

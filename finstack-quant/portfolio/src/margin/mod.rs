@@ -60,14 +60,19 @@
 //! ```
 
 mod aggregator;
+mod csr_quotes;
 mod girr_quotes;
 mod netting_set;
+mod regulatory_quotes;
 mod results;
 mod wire;
 
 pub use aggregator::portfolio_margin;
-pub use girr_quotes::{
-    GirrQuoteDelta, GirrQuoteReprice, GirrQuoteRisk, GirrQuoteSource, GirrQuoteTarget,
-    girr_quote_delta,
+pub use csr_quotes::{
+    CsrQuoteClassification, CsrQuoteDelta, CsrQuoteRisk, CsrQuoteSource, csr_quote_delta,
 };
+pub use girr_quotes::{
+    GirrQuoteDelta, GirrQuoteRisk, GirrQuoteSource, GirrQuoteTarget, girr_quote_delta,
+};
+pub use regulatory_quotes::RegulatoryQuoteReprice;
 pub use results::{NettingSetMargin, PortfolioMarginResult};

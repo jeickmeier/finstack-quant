@@ -1,5 +1,24 @@
 {
   "$defs": {
+    "CalibrationQuoteCoordinate": {
+      "additionalProperties": false,
+      "description": "An exact resolved market quote in a recorded calibration recipe.",
+      "properties": {
+        "pillar_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual pillar of the original execution, after holiday adjustments."
+        },
+        "quote_id": {
+          "description": "Identifier of the authored market quote, without tenor normalization.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "quote_id",
+        "pillar_date"
+      ],
+      "type": "object"
+    },
     "Currency": {
       "description": "ISO 4217 currency enumeration",
       "oneOf": [
@@ -885,25 +904,6 @@
     "Id": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
       "type": "string"
-    },
-    "RateQuoteCoordinate": {
-      "additionalProperties": false,
-      "description": "An exact resolved rate quote in one recorded calibration recipe.",
-      "properties": {
-        "pillar_date": {
-          "$ref": "#/$defs/DateWire",
-          "description": "Contractual pillar of the original execution, after holiday adjustments."
-        },
-        "quote_id": {
-          "description": "Identifier of the authored market quote, without tenor normalization.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "quote_id",
-        "pillar_date"
-      ],
-      "type": "object"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_target.schema.json",
@@ -912,7 +912,7 @@
   "description": "Exact ordinary GIRR quote mapping at one regulatory vertex.",
   "properties": {
     "quote": {
-      "$ref": "#/$defs/RateQuoteCoordinate",
+      "$ref": "#/$defs/CalibrationQuoteCoordinate",
       "description": "Recorded quote ID and exact contractual pillar of the target source."
     },
     "risk_currency": {
