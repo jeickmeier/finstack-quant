@@ -22,24 +22,15 @@ fn refs(names: &[String]) -> Vec<&str> {
     names.iter().map(String::as_str).collect()
 }
 
-/// Add a vintage (cohort) buildup: each period's new volume decays along a curve.
-///
-/// Twin of Python `add_vintage_buildup` (Rust `add_vintage_buildup`). Adds
-/// the node `name`, the sum over lags of `newVolume[t - lag] * decayCurve[lag]`.
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
+/// Add a vintage buildup to an active builder.
+/// @param builder - ModelBuilder receiving the generated cohort total.
 /// @param name - Identifier of the outstanding-balance node to create.
-/// @param newVolumeNode - Existing node holding each period's new volume.
-/// @param decayCurve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`).
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid, or the generated formula does not compile.
-#[wasm_bindgen(js_name = addVintageBuildup, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+/// @param newVolumeNode - Identifier of the node holding each period's new volume.
+/// @param decayCurve - Finite retention multipliers by elapsed model period, starting at inception.
+/// @throws TypeError for malformed arguments or FinstackError for a consumed builder or invalid coefficient.
+#[wasm_bindgen(js_name = addVintageBuildup)]
 pub fn add_vintage_buildup(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut crate::api::statements::JsModelBuilder,
     #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
     #[wasm_bindgen(js_name = "newVolumeNode", unchecked_param_type = "string")]
     new_volume_node: JsValue,
@@ -48,14 +39,14 @@ pub fn add_vintage_buildup(
         unchecked_param_type = "number[] | Float64Array"
     )]
     decay_curve: JsValue,
-) -> Result<JsValue, JsValue> {
-    let builder = vintage::add_vintage_buildup(
-        builder(&model)?,
+) -> Result<(), JsValue> {
+    vintage::add_vintage_buildup(
+        builder.builder_mut()?,
         &js_string(&name, "name")?,
         &js_string(&new_volume_node, "newVolumeNode")?,
         &js_f64_seq(&decay_curve, "decayCurve")?,
-    );
-    finish(builder)
+    )
+    .map_err(to_js_err)
 }
 
 /// Add a roll-forward with a zero opening balance.

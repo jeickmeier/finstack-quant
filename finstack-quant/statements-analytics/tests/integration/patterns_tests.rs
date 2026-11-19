@@ -116,38 +116,32 @@ fn test_vintage_buildup_pattern_revenue() -> Result<()> {
     // Decay curve: 100% in period 0, 80% in period 1, 50% in period 2, 0% thereafter
     let decay_curve = vec![1.0, 0.8, 0.5, 0.0];
 
-    let model = vintage::add_vintage_buildup(
-        {
-            let mut model_builder = ModelBuilder::new("Cohort Model");
-            model_builder.periods("2025Q1..2025Q4", None)?;
-            model_builder.value_scalar(
-                "new_sales",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        100.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        200.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                        300.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                        400.0,
-                    ),
-                ],
-            );
-            model_builder
-        },
-        "revenue",
+    let mut model_builder = ModelBuilder::new("Cohort Model");
+    model_builder.periods("2025Q1..2025Q4", None)?;
+    model_builder.value_scalar(
         "new_sales",
-        &decay_curve,
-    )
-    .build()?;
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                100.0,
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                200.0,
+            ),
+            (
+                PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                300.0,
+            ),
+            (
+                PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                400.0,
+            ),
+        ],
+    );
+
+    vintage::add_vintage_buildup(&mut model_builder, "revenue", "new_sales", &decay_curve)?;
+    let model = model_builder.build()?;
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model)?;

@@ -76,7 +76,9 @@ test('statements_analytics matches the cross-host golden', () => {
   const rollBuilder = statements.ModelBuilder.fromSpec(MODEL);
   sa.addRollForwardWithOpening(rollBuilder, 'debt', ['revenue'], ['cogs'], 10.0);
   const rolled = rollBuilder.build();
-  const vintage = sa.addVintageBuildup(MODEL, 'book', 'revenue', [1.0, 0.5]);
+  const vintageBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addVintageBuildup(vintageBuilder, 'book', 'revenue', [1.0, 0.5]);
+  const vintage = vintageBuilder.build();
   const noi = sa.addNoiBuildup(MODEL, 'total_rev', ['revenue'], 'total_exp', ['cogs'], 'noi');
   const ncf = sa.addNcfBuildup(noi, 'noi', ['cogs'], 'ncf');
   const rentRoll = sa.addRentRoll(MODEL, [INPUTS.lease]);
@@ -469,7 +471,7 @@ test('addRollForward opens at zero and the templates reject bad inputs', () => {
     (e) => e.kind === 'validation'
   );
   assert.throws(
-    () => sa.addVintageBuildup(MODEL, 'book', 'revenue', ['x']),
+    () => sa.addVintageBuildup(statements.ModelBuilder.fromSpec(MODEL), 'book', 'revenue', ['x']),
     (e) => e instanceof TypeError && e.kind === 'invalid_type'
   );
   const named = sa.addRentRoll(MODEL, [INPUTS.lease], {

@@ -10933,21 +10933,12 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly computeEclWeighted: typeof wasm.computeEclWeighted;
   /**
-   * Add a vintage (cohort) buildup: each period's new volume decays along a curve.
-   *
-   * Twin of Python `add_vintage_buildup` (Rust `add_vintage_buildup`). Adds
-   * the node `name`, the sum over lags of `newVolume[t - lag] * decayCurve[lag]`.
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * Add a vintage buildup to an active builder.
+   * @param builder - ModelBuilder receiving the generated cohort total.
    * @param name - Identifier of the outstanding-balance node to create.
-   * @param newVolumeNode - Existing node holding each period's new volume.
-   * @param decayCurve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`).
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
-   *
-   * # Errors
-   *
-   * Throws with kind `validation` if the model is malformed, a node identifier
-   * is invalid, or the generated formula does not compile.
+   * @param newVolumeNode - Identifier of the node holding each period's new volume.
+   * @param decayCurve - Finite retention multipliers by elapsed model period, starting at inception.
+   * @throws TypeError for malformed arguments or FinstackError for a consumed builder or invalid coefficient.
    */
   readonly addVintageBuildup: typeof wasm.addVintageBuildup;
   /**

@@ -2,26 +2,23 @@
 
 from __future__ import annotations
 
-from finstack_quant.statements import FinancialModelSpec
+from finstack_quant.statements import ModelBuilder
 
 # Vintage template
 
 def add_vintage_buildup(
-    model: FinancialModelSpec | str,
+    builder: ModelBuilder,
     name: str,
     new_volume_node: str,
     decay_curve: list[float],
-) -> FinancialModelSpec:
+) -> None:
     """
-    Apply the vintage (cohort) buildup template to a model spec.
-
-    Returns a typed ``FinancialModelSpec`` with the convolution
-    node added.
+    Add a vintage cohort buildup to an active model builder.
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
-        Model specification object or JSON to augment with the cohort schedule.
+    builder : ModelBuilder
+        Active builder receiving the generated cohort-convolution node.
     name : str
         Prefix used to name the generated vintage buildup nodes.
     new_volume_node : str
@@ -30,27 +27,22 @@ def add_vintage_buildup(
         Ordered cohort-retention factors by elapsed period, expressed as decimal
         multipliers of original volume.
 
-    Returns
-    -------
-    FinancialModelSpec
-        Typed model specification containing the generated vintage-convolution node.
-
     Raises
     ------
     ValueError
-        If model JSON, a node identifier, or decay_curve is invalid.
+        If the builder has been consumed or a decay coefficient is non-finite.
+        Building the model checks the generated node and its references.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import add_vintage_buildup
-    >>> from finstack_quant.statements import FinancialModelSpec, ModelBuilder
+    >>> from finstack_quant.statements import ModelBuilder, ModelBuilder
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
     >>> _ = builder.value("new_volume", [("2025Q1", 10.0), ("2025Q2", 12.0)])
-    >>> model = builder.build()
-    >>> updated = add_vintage_buildup(model, "customers", "new_volume", [1.0, 0.8])
-    >>> updated.node_count > model.node_count
-    True
+    >>> add_vintage_buildup(builder, "customers", "new_volume", [1.0, 0.8])
+    >>> builder.build().node_count
+    2
 
     """
     ...

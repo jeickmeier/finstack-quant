@@ -3,6 +3,7 @@
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::types::{NodeSpec, NodeType};
+use finstack_quant_statements::{Error, Result};
 
 /// Add a vintage buildup (cohort analysis) structure.
 ///
@@ -13,7 +14,7 @@ use finstack_quant_statements::types::{NodeSpec, NodeType};
 /// `Total[t] = Sum(NewVolume[t-k] * Curve[k])` for k = 0..curve_len
 ///
 /// # Arguments
-/// * `builder` - Model builder (must be Ready state to access periods)
+/// * `builder` - Active model builder receiving the generated total node.
 /// * `name` - Name of the resulting total node (e.g., "revenue")
 /// * `new_volume_node` - Node ID for the new volume per period (e.g., "new_sales")
 /// * `decay_curve` - Multipliers for the vintage curve in **model periods**
@@ -21,16 +22,20 @@ use finstack_quant_statements::types::{NodeSpec, NodeType};
 ///   index `k` is the cohort `k` model periods later. On a quarterly model,
 ///   `k = 1` is the next quarter.
 ///
-/// # Returns
+/// # Errors
 ///
-/// Builder with the generated nodes inserted. Existing nodes with the same
-/// identifiers are overwritten; final `build()` validates formulas and references.
+/// Returns a build error before adding the node if a decay coefficient is
+/// non-finite. The builder's final `build()` checks duplicate identifiers,
+/// formulas and references.
 pub fn add_vintage_buildup(
-    mut builder: ModelBuilder,
+    builder: &mut ModelBuilder,
     name: &str,
     new_volume_node: &str,
     decay_curve: &[f64],
-) -> ModelBuilder {
+) -> Result<()> {
+    if decay_curve.iter().any(|rate| !rate.is_finite()) {
+        return Err(Error::build("Vintage decay coefficients must be finite"));
+    }
     let mut terms = Vec::new();
 
     for (lag, &rate) in decay_curve.iter().enumerate() {
@@ -67,6 +72,5 @@ pub fn add_vintage_buildup(
         .with_formula(formula);
 
     builder.insert_node(node);
-
-    builder
+    Ok(())
 }
