@@ -134,6 +134,12 @@ use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
 use finstack_quant_core::types::{BarrierType, PayoutTiming};
 
+/// Hard limit on integrand evaluations for the negative-rate rebate integral.
+///
+/// The integrand is smooth on `[0, 1]`, so the `1e-12` budget is met in a few
+/// thousand samples; the limit only bounds a run that cannot converge.
+const REBATE_QUADRATURE_MAX_EVALS: usize = 1_000_000;
+
 /// Parameters for barrier option pricing.
 #[derive(Debug, Clone, Copy)]
 pub struct BarrierParams {
@@ -752,12 +758,13 @@ fn discounted_touch_value(params: &BarrierParams, is_up: bool) -> f64 {
             |u| {
                 let p =
                     barrier_touch_probability(spot, barrier, time * u, rate, div_yield, vol, is_up);
-                (-rate * time * u).exp() * (1.0 - p / hit_probability).clamp(0.0, 1.0)
+                Ok((-rate * time * u).exp() * (1.0 - p / hit_probability).clamp(0.0, 1.0))
             },
             0.0,
             1.0,
             1e-12,
             48,
+            REBATE_QUADRATURE_MAX_EVALS,
         );
         return integral
             .map(|value| hit_probability * (1.0 - rate * time * value))
@@ -1062,7 +1069,7 @@ mod tests {
                         let survival = -(-2.0 * log_barrier * (log_barrier - log_terminal)
                             / variance)
                             .exp_m1();
-                        (eta * (terminal - strike)).max(0.0) * survival * norm_pdf(z)
+                        Ok((eta * (terminal - strike)).max(0.0) * survival * norm_pdf(z))
                     },
                     lower,
                     upper,
@@ -1128,13 +1135,15 @@ mod tests {
                 let expected = simpson_rule(
                     |t| {
                         if t == 0.0 {
-                            return 0.0;
+                            return Ok(0.0);
                         }
-                        distance / (params.vol * (std::f64::consts::TAU * t * t * t).sqrt())
-                            * (-(distance - signed_drift * t).powi(2)
-                                / (2.0 * params.vol * params.vol * t)
-                                - params.rate * t)
-                                .exp()
+                        Ok(
+                            distance / (params.vol * (std::f64::consts::TAU * t * t * t).sqrt())
+                                * (-(distance - signed_drift * t).powi(2)
+                                    / (2.0 * params.vol * params.vol * t)
+                                    - params.rate * t)
+                                    .exp(),
+                        )
                     },
                     0.0,
                     params.time,

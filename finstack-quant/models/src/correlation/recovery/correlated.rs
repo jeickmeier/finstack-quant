@@ -9,6 +9,9 @@ use finstack_quant_core::math::{
     special_functions::{norm_cdf, norm_pdf},
 };
 
+/// Hard limit on integrand evaluations per recovery expectation.
+const RECOVERY_EXPECTATION_MAX_EVALS: usize = 100_000;
+
 /// Bounded logistic-normal recovery with systematic and obligor variation.
 ///
 /// ```text
@@ -103,15 +106,16 @@ impl CorrelatedRecovery {
             // density itself would lose exact constants in the Gaussian tails.
             let correction = adaptive_simpson(
                 |x| {
-                    (self.sample_unchecked(shock_mean + shock_std * x)
+                    Ok((self.sample_unchecked(shock_mean + shock_std * x)
                         + self.sample_unchecked(shock_mean - shock_std * x)
                         - 2.0 * baseline)
-                        * norm_pdf(x)
+                        * norm_pdf(x))
                 },
                 0.0,
                 10.0,
                 1e-12,
                 24,
+                RECOVERY_EXPECTATION_MAX_EVALS,
             )?;
             return Ok(baseline + correction);
         }
@@ -125,13 +129,14 @@ impl CorrelatedRecovery {
             |x| {
                 let tail = (-x).exp();
                 let logistic_density = tail / (1.0 + tail).powi(2);
-                logistic_density
-                    * (norm_cdf(a + x / deviation) + norm_cdf(a - x / deviation) - 2.0 * base)
+                Ok(logistic_density
+                    * (norm_cdf(a + x / deviation) + norm_cdf(a - x / deviation) - 2.0 * base))
             },
             0.0,
             36.0,
             1e-12,
             24,
+            RECOVERY_EXPECTATION_MAX_EVALS,
         )?;
         Ok(base + correction)
     }

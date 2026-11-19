@@ -629,11 +629,12 @@ mod tests {
             let copula = RandomFactorLoadingCopula::new(sigma).expect("valid loading vol");
             for rho in [0.0, 0.01, 0.04, 0.30, 0.90, 0.999, 1.0] {
                 let realized = adaptive_simpson(
-                    |eta| copula.latent_variable(1.0, 0.0, eta, rho).powi(2) * norm_pdf(eta),
+                    |eta| Ok(copula.latent_variable(1.0, 0.0, eta, rho).powi(2) * norm_pdf(eta)),
                     -10.0,
                     10.0,
                     1e-11,
                     24,
+                    1_000_000,
                 )
                 .expect("bounded loading moment integral");
                 assert!(

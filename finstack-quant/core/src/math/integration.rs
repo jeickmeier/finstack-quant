@@ -50,6 +50,7 @@
 
 use crate::Error;
 use crate::InputError;
+use crate::math::summation::NeumaierAccumulator;
 
 /// Gauss-Hermite quadrature points and weights for numerical integration
 /// over the standard normal distribution.
@@ -311,7 +312,6 @@ impl GaussHermiteQuadrature {
     where
         F2: Fn(f64) -> f64,
     {
-        use crate::math::summation::NeumaierAccumulator;
         let sqrt_2 = std::f64::consts::SQRT_2;
         let mut acc = NeumaierAccumulator::new();
         let mut fallback = false;
@@ -332,33 +332,88 @@ impl GaussHermiteQuadrature {
     }
 }
 
-/// Simpson's rule for numerical integration.
+/// Largest count that converts to `f64` without losing its identity.
+const MAX_EXACT_COUNT: u64 = 1 << 53;
+
+/// Samples the root comparison of an adaptive Simpson panel needs.
+const SIMPSON_ROOT_EVALS: usize = 5;
+
+/// Build the computation failure shared by the Simpson rules.
 ///
-/// Provides good accuracy for smooth functions. Requires an even number of intervals.
+/// `evaluations` is the number of callback invocations actually made and
+/// `last_x` the coordinate the failure refers to, never a configured limit.
+fn quadrature_failure(
+    rule: &str,
+    evaluations: usize,
+    residual: f64,
+    last_x: f64,
+    reason: &str,
+) -> Error {
+    InputError::SolverConvergenceFailed {
+        iterations: evaluations,
+        residual,
+        last_x,
+        reason: format!("{rule}: {reason}"),
+    }
+    .into()
+}
+
+/// Multiply a weighted average by the interval width without forming an
+/// overflowing `b - a` when the product itself is representable.
+#[inline]
+fn scale_by_width(average: f64, a: f64, b: f64) -> f64 {
+    let width = b - a;
+    if width.is_finite() {
+        average * width
+    } else {
+        average * b - average * a
+    }
+}
+
+/// Interior node at fraction `t` of the increasing interval `[lo, hi]`.
+#[inline]
+fn interior_node(lo: f64, hi: f64, t: f64) -> f64 {
+    if (lo >= 0.0) == (hi >= 0.0) {
+        lo + t * (hi - lo)
+    } else {
+        lo * (1.0 - t) + hi * t
+    }
+}
+
+/// Simpson's rule on `n` equal subintervals.
+///
+/// Evaluates `(b - a) * sum(w_i * f(x_i))` with endpoint weights `1/(3n)` and
+/// alternating interior weights `4/(3n)` and `2/(3n)`. The weights sum to one,
+/// so the weighted sum is an average of the samples and cannot overflow when
+/// the samples are representable. Exact for polynomials of degree three or
+/// less; no accuracy claim is made for other integrands.
 ///
 /// # Arguments
 ///
-/// * `f` - Function to integrate
-/// * `a` - Lower endpoint of the integration interval, in the domain units
-///   accepted by `f`.
-/// * `b` - Upper endpoint of the integration interval, in the domain units
-///   accepted by `f`; values below `a` produce a signed integral.
-/// * `n` - Number of intervals (must be even and > 0)
+/// * `f` - Fallible integrand evaluated once at each of the `n + 1` nodes, in
+///   increasing coordinate order. It must describe one deterministic function
+///   for the whole call. The first error it returns stops the rule and is
+///   returned unchanged.
+/// * `a` - Finite lower endpoint, in the domain units accepted by `f`.
+/// * `b` - Finite upper endpoint in the same units. `b < a` evaluates the same
+///   increasing-bound rule and negates the result; `b == a` returns `+0.0`
+///   without calling `f`.
+/// * `n` - Positive even number of equal subintervals, at most `2^53` so the
+///   count converts to `f64` exactly.
 ///
 /// # Returns
 ///
-/// Approximate integral value.
+/// The finite Simpson estimate of the signed integral of `f` from `a` to `b`.
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] when:
-/// - `n` is zero
-/// - `n` is not an even number
-///
-/// # Complexity
-///
-/// - **Time**: O(n) function evaluations
-/// - **Space**: O(1) auxiliary space
+/// Returns [`Error::Validation`] for a non-finite endpoint or an `n` that is
+/// zero, odd or above `2^53`. Returns the callback's own error unchanged.
+/// Returns [`InputError::SolverConvergenceFailed`] (a computation error) when
+/// a sample is NaN or infinite, when a nonzero weighted sample underflows to
+/// zero, when interior nodes cannot be told apart in binary64, or when the
+/// result is not representable; `iterations` is the number of callbacks made
+/// and `last_x` the coordinate concerned.
 ///
 /// # Example
 ///
@@ -366,35 +421,122 @@ impl GaussHermiteQuadrature {
 /// use finstack_quant_core::math::integration::simpson_rule;
 ///
 /// // Integrate x² from 0 to 1 (exact answer: 1/3)
-/// let integral = simpson_rule(|x| x * x, 0.0, 1.0, 100).expect("Valid parameters");
-/// assert!((integral - 1.0/3.0).abs() < 1e-6);
+/// let integral = simpson_rule(|x| Ok(x * x), 0.0, 1.0, 100)?;
+/// assert!((integral - 1.0 / 3.0).abs() < 1e-12);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-pub fn simpson_rule<F2>(f: F2, a: f64, b: f64, n: usize) -> Result<f64, Error>
+pub fn simpson_rule<F>(mut f: F, a: f64, b: f64, n: usize) -> Result<f64, Error>
 where
-    F2: Fn(f64) -> f64,
+    F: FnMut(f64) -> Result<f64, Error>,
 {
+    const RULE: &str = "simpson_rule";
+    if !a.is_finite() || !b.is_finite() {
+        return Err(Error::Validation(format!(
+            "{RULE}: endpoints must be finite, got [{a}, {b}]"
+        )));
+    }
     if n == 0 || !n.is_multiple_of(2) {
-        return Err(crate::Error::Validation(format!(
+        return Err(Error::Validation(format!(
             "Simpson's rule needs a positive even number of intervals, got {n}"
         )));
     }
-
-    let h = (b - a) / n as f64;
-    let mut sum = f(a) + f(b);
-
-    // Add even terms (coefficient 2)
-    for i in (2..n).step_by(2) {
-        let x = a + i as f64 * h;
-        sum += 2.0 * f(x);
+    if n as u64 > MAX_EXACT_COUNT {
+        return Err(Error::Validation(format!(
+            "{RULE}: interval count {n} does not convert to f64 exactly"
+        )));
     }
-
-    // Add odd terms (coefficient 4)
-    for i in (1..n).step_by(2) {
-        let x = a + i as f64 * h;
-        sum += 4.0 * f(x);
+    #[allow(clippy::float_cmp)]
+    if a == b {
+        return Ok(0.0);
     }
+    let (lo, hi, negate) = if a < b { (a, b, false) } else { (b, a, true) };
+    let count = n as f64;
+    let unit = 1.0 / (3.0 * count);
+    let mut average = NeumaierAccumulator::new();
+    let mut previous = lo;
+    for i in 0..=n {
+        let x = if i == 0 {
+            lo
+        } else if i == n {
+            hi
+        } else {
+            interior_node(lo, hi, i as f64 / count)
+        };
+        if i > 0 && x <= previous {
+            return Err(quadrature_failure(
+                RULE,
+                i,
+                f64::NAN,
+                x,
+                "adjacent nodes are not distinct in binary64 on a nonzero interval",
+            ));
+        }
+        previous = x;
+        let sample = f(x)?;
+        let made = i + 1;
+        if !sample.is_finite() {
+            return Err(quadrature_failure(
+                RULE,
+                made,
+                f64::NAN,
+                x,
+                "integrand was not finite",
+            ));
+        }
+        let weight = if i == 0 || i == n {
+            unit
+        } else if i % 2 == 1 {
+            4.0 * unit
+        } else {
+            2.0 * unit
+        };
+        let term = sample * weight;
+        if sample != 0.0 && term == 0.0 {
+            return Err(quadrature_failure(
+                RULE,
+                made,
+                f64::NAN,
+                x,
+                "a nonzero weighted sample underflowed to zero",
+            ));
+        }
+        average.add(term).map_err(|_| {
+            quadrature_failure(RULE, made, f64::NAN, x, "weighted sum is not representable")
+        })?;
+    }
+    let evaluations = n + 1;
+    let average = average.get_total().map_err(|_| {
+        quadrature_failure(
+            RULE,
+            evaluations,
+            f64::NAN,
+            hi,
+            "weighted sum is not representable",
+        )
+    })?;
+    let value = scale_by_width(average, lo, hi);
+    if !value.is_finite() || (average != 0.0 && value == 0.0) {
+        return Err(quadrature_failure(
+            RULE,
+            evaluations,
+            f64::NAN,
+            hi,
+            "integral is not representable in binary64",
+        ));
+    }
+    Ok(oriented(value, negate))
+}
 
-    Ok(sum * h / 3.0)
+/// Apply the requested orientation, keeping an exact zero as `+0.0`.
+#[inline]
+fn oriented(value: f64, negate: bool) -> f64 {
+    if value == 0.0 {
+        0.0
+    } else if negate {
+        -value
+    } else {
+        value
+    }
 }
 
 #[inline]
@@ -415,404 +557,472 @@ fn half_width(a: f64, b: f64) -> f64 {
     }
 }
 
-/// Adaptive quadrature using recursive Simpson's rule.
+/// Explicit work controls of one adaptive Simpson run.
+#[derive(Clone, Copy)]
+struct SimpsonLimits {
+    /// Deepest bisection level allowed, with the root panel at depth zero.
+    max_depth: usize,
+    /// Hard limit on callback invocations.
+    max_evals: usize,
+}
+
+/// Actual work done so far by one adaptive Simpson run.
+struct SimpsonWork {
+    rule: &'static str,
+    max_evals: usize,
+    evaluations: usize,
+    last_x: f64,
+    depth: usize,
+}
+
+impl SimpsonWork {
+    fn failure(&self, residual: f64, x: f64, reason: &str) -> Error {
+        quadrature_failure(
+            self.rule,
+            self.evaluations,
+            residual,
+            x,
+            &format!("{reason} (panel depth {})", self.depth),
+        )
+    }
+
+    /// Evaluate the callback once at `x`, enforcing the evaluation limit and
+    /// rejecting a non-finite component.
+    fn sample<const N: usize, F>(&mut self, f: &mut F, x: f64) -> Result<[f64; N], Error>
+    where
+        F: FnMut(f64) -> Result<[f64; N], Error>,
+    {
+        if self.evaluations >= self.max_evals {
+            return Err(self.failure(
+                f64::NAN,
+                x,
+                &format!(
+                    "evaluation limit {} reached before the required sample",
+                    self.max_evals
+                ),
+            ));
+        }
+        self.evaluations += 1;
+        self.last_x = x;
+        let values = f(x)?;
+        if let Some(component) = values.iter().position(|value| !value.is_finite()) {
+            return Err(self.failure(
+                f64::NAN,
+                x,
+                &format!(
+                    "integrand{} was not finite",
+                    component_label::<N>(component)
+                ),
+            ));
+        }
+        Ok(values)
+    }
+}
+
+/// Label a pair component in tuple order; a scalar rule has no label.
+fn component_label<const N: usize>(component: usize) -> String {
+    if N == 1 {
+        String::new()
+    } else {
+        format!(" component {}", component + 1)
+    }
+}
+
+/// One pending Simpson panel `[a, b]` with its cached samples at `a`, `b` and
+/// the midpoint (`fc`), its one-panel estimate and its local error share.
+struct SimpsonPanel<const N: usize> {
+    a: f64,
+    b: f64,
+    fa: [f64; N],
+    fb: [f64; N],
+    fc: [f64; N],
+    whole: [f64; N],
+    tol: [f64; N],
+    depth: usize,
+}
+
+/// Largest sample magnitude for which `fa + 4 fm + fb` cannot overflow.
+const SIMPSON_DIRECT_LIMIT: f64 = f64::MAX / 8.0;
+
+/// One-panel Simpson value per component, `(b - a) / 6 * (fa + 4 fm + fb)`.
 ///
-/// This method automatically refines the integration grid in areas where
-/// the function changes rapidly, providing better accuracy with fewer
-/// function evaluations for smooth functions.
+/// Ordinary samples use the classical weighted sum. Samples large enough for
+/// `4 * f` to overflow use the equivalent average `fa/6 + 2 fm/3 + fb/6`
+/// scaled by the width, so a representable result is not lost. Returns the
+/// failing component when a nonzero product underflows to zero or the value
+/// is not representable.
+fn simpson_panel<const N: usize>(
+    a: f64,
+    b: f64,
+    fa: &[f64; N],
+    fm: &[f64; N],
+    fb: &[f64; N],
+) -> Result<[f64; N], usize> {
+    let mut out = [0.0; N];
+    for i in 0..N {
+        let direct = fa[i].abs() <= SIMPSON_DIRECT_LIMIT
+            && fm[i].abs() <= SIMPSON_DIRECT_LIMIT
+            && fb[i].abs() <= SIMPSON_DIRECT_LIMIT;
+        let (factor, value) = if direct {
+            let sum = fa[i] + 4.0 * fm[i] + fb[i];
+            (sum, (half_width(a, b) / 3.0) * sum)
+        } else {
+            let average = fa[i] / 6.0 + fm[i] * (2.0 / 3.0) + fb[i] / 6.0;
+            (average, scale_by_width(average, a, b))
+        };
+        if !value.is_finite() || (factor != 0.0 && value == 0.0) {
+            return Err(i);
+        }
+        out[i] = value;
+    }
+    Ok(out)
+}
+
+/// Shared adaptive Simpson engine for `N` integrands on one mesh.
+///
+/// Iterative, left panel before right, with an internal stack bounded by
+/// `max_depth + 1`. Each component has its own budget, split as
+/// `left = tol / 2`, `right = tol - left`.
+fn adaptive_simpson_core<const N: usize, F>(
+    rule: &'static str,
+    f: &mut F,
+    a: f64,
+    b: f64,
+    tol: [f64; N],
+    limits: SimpsonLimits,
+) -> Result<[f64; N], Error>
+where
+    F: FnMut(f64) -> Result<[f64; N], Error>,
+{
+    let SimpsonLimits {
+        max_depth,
+        max_evals,
+    } = limits;
+    if !a.is_finite() || !b.is_finite() {
+        return Err(Error::Validation(format!(
+            "{rule}: endpoints must be finite, got [{a}, {b}]"
+        )));
+    }
+    if tol.iter().any(|t| !t.is_finite() || *t < 0.0) {
+        return Err(Error::Validation(format!(
+            "{rule}: every tolerance must be finite and nonnegative, got {tol:?}"
+        )));
+    }
+    if max_evals == 0 {
+        return Err(Error::Validation(format!(
+            "{rule}: max_evals must be positive"
+        )));
+    }
+    #[allow(clippy::float_cmp)]
+    if a == b {
+        return Ok([0.0; N]);
+    }
+    let (lo, hi, negate) = if a < b { (a, b, false) } else { (b, a, true) };
+    let mut work = SimpsonWork {
+        rule,
+        max_evals,
+        evaluations: 0,
+        last_x: lo,
+        depth: 0,
+    };
+    if max_evals < SIMPSON_ROOT_EVALS {
+        return Err(work.failure(
+            f64::NAN,
+            lo,
+            &format!(
+                "evaluation limit {max_evals} is below the {SIMPSON_ROOT_EVALS} samples the \
+                 root comparison needs"
+            ),
+        ));
+    }
+    const NOT_BISECTABLE: &str = "panel cannot be bisected in binary64 on a nonzero interval";
+    const NOT_REPRESENTABLE: &str = "panel estimate is not representable";
+
+    let root_mid = midpoint(lo, hi);
+    if !(lo < root_mid && root_mid < hi) {
+        return Err(work.failure(f64::NAN, root_mid, NOT_BISECTABLE));
+    }
+    let fa = work.sample(f, lo)?;
+    let fb = work.sample(f, hi)?;
+    let fc = work.sample(f, root_mid)?;
+    let whole = simpson_panel(lo, hi, &fa, &fc, &fb).map_err(|component| {
+        work.failure(
+            f64::NAN,
+            root_mid,
+            &format!("{NOT_REPRESENTABLE}{}", component_label::<N>(component)),
+        )
+    })?;
+
+    let mut stack = vec![SimpsonPanel {
+        a: lo,
+        b: hi,
+        fa,
+        fb,
+        fc,
+        whole,
+        tol,
+        depth: 0,
+    }];
+    let mut values: [NeumaierAccumulator; N] = std::array::from_fn(|_| NeumaierAccumulator::new());
+    let mut errors: [NeumaierAccumulator; N] = std::array::from_fn(|_| NeumaierAccumulator::new());
+    let mut deepest = 0;
+
+    while let Some(panel) = stack.pop() {
+        work.depth = panel.depth;
+        deepest = deepest.max(panel.depth);
+        let c = midpoint(panel.a, panel.b);
+        let d = midpoint(panel.a, c);
+        let e = midpoint(c, panel.b);
+        if !(panel.a < d && d < c && c < e && e < panel.b) {
+            return Err(work.failure(f64::NAN, c, NOT_BISECTABLE));
+        }
+        let fd = work.sample(f, d)?;
+        let fe = work.sample(f, e)?;
+        let unusable = |component: usize| {
+            work.failure(
+                f64::NAN,
+                c,
+                &format!("{NOT_REPRESENTABLE}{}", component_label::<N>(component)),
+            )
+        };
+        let left = simpson_panel(panel.a, c, &panel.fa, &fd, &panel.fc).map_err(unusable)?;
+        let right = simpson_panel(c, panel.b, &panel.fc, &fe, &panel.fb).map_err(unusable)?;
+        let mut total = [0.0; N];
+        let mut estimate = [0.0; N];
+        for i in 0..N {
+            total[i] = left[i] + right[i];
+            estimate[i] = (total[i] - panel.whole[i]).abs() / 15.0;
+            if !total[i].is_finite() || !estimate[i].is_finite() {
+                return Err(unusable(i));
+            }
+        }
+
+        let within_share = (0..N).all(|i| estimate[i] <= panel.tol[i]);
+        if within_share || panel.depth >= max_depth {
+            for i in 0..N {
+                values[i].add(total[i]).map_err(|_| unusable(i))?;
+                errors[i].add(estimate[i]).map_err(|_| unusable(i))?;
+            }
+            continue;
+        }
+
+        let left_tol: [f64; N] = std::array::from_fn(|i| panel.tol[i] / 2.0);
+        let right_tol: [f64; N] = std::array::from_fn(|i| panel.tol[i] - left_tol[i]);
+        // Right is pushed first so the left panel is refined first.
+        stack.push(SimpsonPanel {
+            a: c,
+            b: panel.b,
+            fa: panel.fc,
+            fb: panel.fb,
+            fc: fe,
+            whole: right,
+            tol: right_tol,
+            depth: panel.depth + 1,
+        });
+        stack.push(SimpsonPanel {
+            a: panel.a,
+            b: c,
+            fa: panel.fa,
+            fb: panel.fc,
+            fc: fd,
+            whole: left,
+            tol: left_tol,
+            depth: panel.depth + 1,
+        });
+    }
+
+    work.depth = deepest;
+    let mut out = [0.0; N];
+    for i in 0..N {
+        let label = component_label::<N>(i);
+        let value = values[i].get_total().map_err(|_| {
+            work.failure(
+                f64::NAN,
+                work.last_x,
+                &format!("summed integral{label} is not representable"),
+            )
+        })?;
+        let estimate = errors[i].get_total().map_err(|_| {
+            work.failure(
+                f64::NAN,
+                work.last_x,
+                &format!("summed error estimate{label} is not representable"),
+            )
+        })?;
+        if estimate > tol[i] {
+            return Err(work.failure(
+                estimate,
+                work.last_x,
+                &format!(
+                    "summed error estimate{label} {estimate:.2e} exceeds tolerance {:.2e} on \
+                     [{a:.6e}, {b:.6e}] with max_depth {max_depth}",
+                    tol[i]
+                ),
+            ));
+        }
+        out[i] = oriented(value, negate);
+    }
+    Ok(out)
+}
+
+/// Adaptive Simpson quadrature with an absolute global error budget.
+///
+/// Each panel compares its one-panel Simpson value `S1` with the sum `S2` of
+/// its two half panels, uses `e = |S2 - S1| / 15` as the error estimate and
+/// keeps the uncorrected `S2`. A panel whose estimate exceeds its share of the
+/// budget is bisected, the left half receiving `tol / 2` and the right half
+/// the remainder, until `max_depth`. Terminal values and estimates are summed
+/// with compensated totals; the call succeeds only when the summed estimate is
+/// at most `tol`. Endpoint and midpoint samples are cached and reused, so the
+/// root costs five evaluations and every bisection two more.
+///
+/// The estimate is an operational difference, not a bound on the true error.
 ///
 /// # Arguments
 ///
-/// * `f` - Function to integrate (must implement `Copy` for recursive calls)
-/// * `a` - Lower endpoint of the integration interval, in the domain units
-///   accepted by `f`.
-/// * `b` - Upper endpoint of the integration interval, in the domain units
-///   accepted by `f`; values below `a` produce a signed integral.
-/// * `tol` - Non-negative absolute error budget for the sum of all subinterval
-///   estimates, in integral units; local refinement uses proportional shares.
-/// * `max_depth` - Maximum recursion depth to prevent infinite refinement
+/// * `f` - Fallible integrand. It must describe one deterministic function for
+///   the whole call; mutable diagnostics are allowed. The first error it
+///   returns stops the run and is returned unchanged.
+/// * `a` - Finite lower endpoint, in the domain units accepted by `f`.
+/// * `b` - Finite upper endpoint in the same units. `b < a` runs the same
+///   increasing-bound refinement and negates the result; `b == a` returns
+///   `+0.0` without calling `f`.
+/// * `tol` - Finite, nonnegative absolute budget for the sum of all terminal
+///   error estimates, in integral units. Zero is allowed and requests a zero
+///   computed estimate, not exact integration.
+/// * `max_depth` - Deepest bisection level, with the root panel at depth zero.
+///   Depth zero still performs the root comparison. A depth-limited panel may
+///   exceed its local share if the summed estimate still fits `tol`.
+/// * `max_evals` - Positive hard limit on callback invocations, at least five
+///   for the root comparison. The run never exceeds it and returns no partial
+///   integral when it is reached.
 ///
 /// # Returns
 ///
-/// Approximate integral value whose summed quadrature error estimate is at most `tol`.
+/// The finite signed integral estimate whose summed error estimate is at most
+/// `tol`.
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] for non-finite endpoints, or a negative or
-/// non-finite tolerance.
-///
-/// Returns [`Error::Input`] wrapping [`InputError::SolverConvergenceFailed`] if the
-/// tolerance cannot be met within `max_depth` recursion levels. The error payload
-/// includes the error estimate, the interval midpoint, and the depth reached. Callers
-/// handling pathological integrands should increase `max_depth` or switch to a
-/// non-adaptive rule such as [`gauss_legendre_integrate_composite`].
-///
-/// # Algorithm
-///
-/// Uses recursive bisection with Simpson's rule on each subinterval. At each level:
-/// 1. Compute Simpson's rule on `[a, mid]` and `[mid, b]`
-/// 2. Compare the composite estimate against the coarser estimate using Richardson
-///    extrapolation: `error ≈ |total - whole| / 15`
-/// 3. If the local error fits its share, retain the value and error estimate.
-/// 4. Otherwise refine each half with half the local budget, until `max_depth`.
-/// 5. Sum absolute error estimates across every terminal subinterval. Accept
-///    only if that sum meets `tol`; otherwise return a convergence error.
-///    This allows an isolated kink to use unused budget from smooth regions
-///    without accepting an unconverged total integral.
-///
-/// # Complexity
-///
-/// - **Time**: O(2^max_depth) function evaluations in worst case; typically much fewer
-/// - **Space**: O(max_depth) stack frames
+/// Returns [`Error::Validation`] for a non-finite endpoint, a negative or
+/// non-finite `tol`, or `max_evals == 0`. Returns the callback's own error
+/// unchanged. Returns [`InputError::SolverConvergenceFailed`] (a computation
+/// error) when the summed estimate exceeds `tol`, when `max_evals` is reached
+/// or is below five, when a sample or panel value is NaN, infinite or lost to
+/// underflow, or when a panel cannot be bisected in binary64. Its `iterations`
+/// is the number of callbacks actually made, `last_x` the coordinate concerned
+/// and `reason` names the cause and the panel depth reached.
 ///
 /// # Example
 ///
 /// ```rust
 /// use finstack_quant_core::math::integration::adaptive_simpson;
 ///
-/// // Integrate an oscillatory function with high precision
-/// let integral = adaptive_simpson(|x| (10.0 * x).sin(), 0.0, std::f64::consts::PI, 1e-6, 100)
-///     .expect("Integration succeeds");
-/// assert!(integral.abs() < 0.01); // Should be close to 0
+/// let integral = adaptive_simpson(
+///     |x| Ok((10.0 * x).sin()),
+///     0.0,
+///     std::f64::consts::PI,
+///     1e-6,
+///     40,
+///     100_000,
+/// )?;
+/// assert!(integral.abs() < 1e-5);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-pub fn adaptive_simpson<F2>(f: F2, a: f64, b: f64, tol: f64, max_depth: usize) -> Result<f64, Error>
+pub fn adaptive_simpson<F>(
+    mut f: F,
+    a: f64,
+    b: f64,
+    tol: f64,
+    max_depth: usize,
+    max_evals: usize,
+) -> Result<f64, Error>
 where
-    F2: Fn(f64) -> f64 + Copy,
+    F: FnMut(f64) -> Result<f64, Error>,
 {
-    if !a.is_finite() || !b.is_finite() || !tol.is_finite() || tol < 0.0 {
-        return Err(crate::Error::Validation(
-            "adaptive Simpson endpoints and tolerance must be finite with tol >= 0".to_string(),
-        ));
-    }
-    #[allow(clippy::float_cmp)]
-    if a == b {
-        let fa = f(a);
-        if fa.is_finite() {
-            return Ok(0.0);
-        }
-        return Err(InputError::SolverConvergenceFailed {
-            iterations: 0,
-            residual: f64::NAN,
-            last_x: a,
-            reason: format!("adaptive_simpson integrand was non-finite at endpoint {a:.6e}"),
-        }
-        .into());
-    }
-    /// One Simpson panel `[a, b]`: the integrand at `a`, `b` and the midpoint
-    /// (`fc`) plus the panel's whole-interval Simpson estimate.
-    #[derive(Clone, Copy)]
-    struct Panel {
-        a: f64,
-        b: f64,
-        fa: f64,
-        fb: f64,
-        fc: f64,
-        whole: f64,
-    }
-
-    fn adaptive_simpson_inner<F2>(
-        f: F2,
-        panel: Panel,
-        tol: f64,
-        depth: usize,
-        max_depth: usize,
-    ) -> (f64, f64)
-    where
-        F2: Fn(f64) -> f64 + Copy,
-    {
-        let Panel {
-            a,
-            b,
-            fa,
-            fb,
-            fc,
-            whole,
-        } = panel;
-        let c = midpoint(a, b);
-        let d = midpoint(a, c);
-        let e = midpoint(c, b);
-        #[allow(clippy::float_cmp)]
-        if c == a || c == b || d == a || d == c || e == c || e == b {
-            return (f64::NAN, f64::INFINITY);
-        }
-
-        let fd = f(d);
-        let fe = f(e);
-        if !fa.is_finite()
-            || !fb.is_finite()
-            || !fc.is_finite()
-            || !fd.is_finite()
-            || !fe.is_finite()
-        {
-            return (f64::NAN, f64::NAN);
-        }
-
-        // Use proper Simpson's rule for each sub-interval
-        let h_left = half_width(a, c) / 3.0;
-        let h_right = half_width(c, b) / 3.0;
-        let left = h_left * (fa + 4.0 * fd + fc);
-        let right = h_right * (fc + 4.0 * fe + fb);
-        let total = left + right;
-
-        let error_estimate = (total - whole).abs() / 15.0;
-
-        if error_estimate <= tol || !error_estimate.is_finite() || depth >= max_depth {
-            return (total, error_estimate);
-        }
-
-        let mid_tol = tol / 2.0;
-        let left_panel = Panel {
-            a,
-            b: c,
-            fa,
-            fb: fc,
-            fc: fd,
-            whole: left,
-        };
-        let right_panel = Panel {
-            a: c,
-            b,
-            fa: fc,
-            fb,
-            fc: fe,
-            whole: right,
-        };
-        let (left_result, left_error) =
-            adaptive_simpson_inner(f, left_panel, mid_tol, depth + 1, max_depth);
-        let (right_result, right_error) =
-            adaptive_simpson_inner(f, right_panel, mid_tol, depth + 1, max_depth);
-        (left_result + right_result, left_error + right_error)
-    }
-
-    let c = midpoint(a, b);
-    let h = half_width(a, b) / 3.0;
-    let fa = f(a);
-    let fb = f(b);
-    let fc = f(c);
-
-    let whole = h * (fa + 4.0 * fc + fb);
-
-    let panel = Panel {
-        a,
-        b,
-        fa,
-        fb,
-        fc,
-        whole,
+    let mut scalar = |x: f64| f(x).map(|value| [value]);
+    let limits = SimpsonLimits {
+        max_depth,
+        max_evals,
     };
-    let (value, error_estimate) = adaptive_simpson_inner(f, panel, tol, 0, max_depth);
-    if value.is_finite() && error_estimate <= tol {
-        Ok(value)
-    } else {
-        Err(InputError::SolverConvergenceFailed {
-            iterations: max_depth,
-            residual: error_estimate,
-            last_x: c,
-            reason: format!(
-                "adaptive_simpson did not meet total tolerance {tol:.2e} at max_depth {max_depth} \
-                 (interval [{a:.6e}, {b:.6e}], summed error estimate {error_estimate:.2e})"
-            ),
-        }
-        .into())
-    }
+    adaptive_simpson_core("adaptive_simpson", &mut scalar, a, b, [tol], limits).map(|[value]| value)
 }
 
-/// Integrate two functions with shared adaptive Simpson nodes.
+/// Integrate two functions on one shared adaptive Simpson mesh.
 ///
-/// The callback evaluates both components at each node. Refinement follows
-/// whichever component needs more accuracy, while each component retains its
-/// own summed absolute error estimate. A large component cannot consume the
-/// other component's error budget.
+/// The callback returns both integrands at each node and one call counts as
+/// one evaluation. The mesh is refined when either component exceeds its own
+/// share; each component's budget is split and summed independently, so a
+/// large value or spare tolerance in one component cannot consume the other's
+/// budget. The formulas are those of [`adaptive_simpson`], applied per
+/// component. Results need not match two independent scalar runs bit for bit,
+/// because the refined meshes can differ.
 ///
 /// # Arguments
 ///
-/// * `f` - Callback returning both integrands in tuple order at one domain
-///   coordinate. It must be copyable for recursive evaluation; shared immutable
-///   data or interior-mutable diagnostic state may be captured by reference.
-/// * `a` - Lower endpoint in the domain units accepted by `f`; it must be finite.
-/// * `b` - Upper endpoint in the same domain units; it must be finite. A value
-///   below `a` produces signed integrals with reversed orientation.
-/// * `tol` - Finite, nonnegative absolute error budget applied independently to
-///   each integral, in that component's integral units. Each recursive half
-///   receives half the local budget; final acceptance uses each component's
-///   sum of terminal-panel error estimates, without relative scaling.
-/// * `max_depth` - Maximum bisection depth, with the initial panel at depth zero.
-///   A depth-limited panel may exceed its local share if that component's total
-///   estimated error still fits `tol`.
+/// * `f` - Fallible callback returning both integrands in tuple order at one
+///   domain coordinate. It must describe one deterministic function for the
+///   whole call. The first error it returns stops the run and is returned
+///   unchanged.
+/// * `a` - Finite lower endpoint, in the domain units accepted by `f`.
+/// * `b` - Finite upper endpoint in the same units. `b < a` runs the same
+///   increasing-bound refinement and negates both results; `b == a` returns
+///   `(+0.0, +0.0)` without calling `f`.
+/// * `tol` - `[tol0, tol1]`: finite, nonnegative absolute budgets, one per
+///   component in tuple order, each in its own component's integral units.
+/// * `max_depth` - Deepest bisection level, with the root panel at depth zero.
+/// * `max_evals` - Positive hard limit on callback invocations, at least five
+///   for the root comparison.
 ///
 /// # Returns
 ///
-/// The two finite integral estimates, in callback tuple order, with each summed
-/// quadrature error estimate at most `tol`. Estimates use the same uncorrected
-/// composite Simpson totals as [`adaptive_simpson`].
+/// The two finite signed integral estimates in tuple order, each with a summed
+/// error estimate at most its own budget.
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] for a non-finite endpoint or a negative or
-/// non-finite tolerance. Returns [`InputError::SolverConvergenceFailed`] if
-/// either value or error estimate is non-finite, or either summed estimate
-/// exceeds `tol` at the permitted depth. When both components fail, the error
-/// identifies the first component in tuple order and reports its own estimate.
+/// Returns [`Error::Validation`] for a non-finite endpoint, a negative or
+/// non-finite budget, or `max_evals == 0`. Returns the callback's own error
+/// unchanged. Returns [`InputError::SolverConvergenceFailed`] (a computation
+/// error) under the conditions listed for [`adaptive_simpson`]; `reason`
+/// names the failing component, the first in tuple order when both fail at
+/// one sample or gate.
 ///
 /// # Example
 ///
 /// ```rust
 /// use finstack_quant_core::math::integration::adaptive_simpson_pair;
 ///
-/// let (square, cube) =
-///     adaptive_simpson_pair(|x| (x * x, x * x * x), 0.0, 1.0, 1e-10, 20)?;
+/// let (square, cube) = adaptive_simpson_pair(
+///     |x| Ok((x * x, x * x * x)),
+///     0.0,
+///     1.0,
+///     [1e-10, 1e-10],
+///     20,
+///     10_000,
+/// )?;
 /// assert!((square - 1.0 / 3.0).abs() < 1e-10);
 /// assert!((cube - 0.25).abs() < 1e-10);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn adaptive_simpson_pair<F>(
-    f: F,
+    mut f: F,
     a: f64,
     b: f64,
-    tol: f64,
+    tol: [f64; 2],
     max_depth: usize,
+    max_evals: usize,
 ) -> Result<(f64, f64), Error>
 where
-    F: Fn(f64) -> (f64, f64) + Copy,
+    F: FnMut(f64) -> Result<(f64, f64), Error>,
 {
-    if !a.is_finite() || !b.is_finite() || !tol.is_finite() || tol < 0.0 {
-        return Err(Error::Validation(
-            "adaptive Simpson endpoints and tolerance must be finite with tol >= 0".to_string(),
-        ));
-    }
-
-    let paired = |x| {
-        let (first, second) = f(x);
-        [first, second]
+    let mut paired = |x: f64| f(x).map(|(first, second)| [first, second]);
+    let limits = SimpsonLimits {
+        max_depth,
+        max_evals,
     };
-    #[allow(clippy::float_cmp)]
-    if a == b {
-        let fa = paired(a);
-        if fa.iter().all(|v| v.is_finite()) {
-            return Ok((0.0, 0.0));
-        }
-        return Err(InputError::SolverConvergenceFailed {
-            iterations: 0,
-            residual: f64::NAN,
-            last_x: a,
-            reason: format!("adaptive_simpson_pair integrand was non-finite at endpoint {a:.6e}"),
-        }
-        .into());
-    }
-
-    #[derive(Clone, Copy)]
-    struct PairPanel {
-        a: f64,
-        b: f64,
-        fa: [f64; 2],
-        fb: [f64; 2],
-        fc: [f64; 2],
-        whole: [f64; 2],
-    }
-
-    fn recurse<F>(
-        f: F,
-        panel: PairPanel,
-        tol: f64,
-        depth: usize,
-        max_depth: usize,
-    ) -> ([f64; 2], [f64; 2])
-    where
-        F: Fn(f64) -> [f64; 2] + Copy,
-    {
-        let PairPanel {
-            a,
-            b,
-            fa,
-            fb,
-            fc,
-            whole,
-        } = panel;
-        let c = midpoint(a, b);
-        let d = midpoint(a, c);
-        let e = midpoint(c, b);
-        #[allow(clippy::float_cmp)]
-        if c == a || c == b || d == a || d == c || e == c || e == b {
-            return ([f64::NAN; 2], [f64::INFINITY; 2]);
-        }
-        let fd = f(d);
-        let fe = f(e);
-        if [fa, fb, fc, fd, fe]
-            .iter()
-            .flatten()
-            .any(|v| !v.is_finite())
-        {
-            return ([f64::NAN; 2], [f64::NAN; 2]);
-        }
-        let h_left = half_width(a, c) / 3.0;
-        let h_right = half_width(c, b) / 3.0;
-        let left: [f64; 2] = std::array::from_fn(|i| h_left * (fa[i] + 4.0 * fd[i] + fc[i]));
-        let right: [f64; 2] = std::array::from_fn(|i| h_right * (fc[i] + 4.0 * fe[i] + fb[i]));
-        let total: [f64; 2] = std::array::from_fn(|i| left[i] + right[i]);
-        let error: [f64; 2] = std::array::from_fn(|i| (total[i] - whole[i]).abs() / 15.0);
-
-        if error.iter().all(|&estimate| estimate <= tol)
-            || error.iter().any(|estimate| !estimate.is_finite())
-            || depth >= max_depth
-        {
-            return (total, error);
-        }
-
-        let left_panel = PairPanel {
-            a,
-            b: c,
-            fa,
-            fb: fc,
-            fc: fd,
-            whole: left,
-        };
-        let right_panel = PairPanel {
-            a: c,
-            b,
-            fa: fc,
-            fb,
-            fc: fe,
-            whole: right,
-        };
-        let (left_value, left_error) = recurse(f, left_panel, tol / 2.0, depth + 1, max_depth);
-        let (right_value, right_error) = recurse(f, right_panel, tol / 2.0, depth + 1, max_depth);
-        (
-            std::array::from_fn(|i| left_value[i] + right_value[i]),
-            std::array::from_fn(|i| left_error[i] + right_error[i]),
-        )
-    }
-
-    let c = midpoint(a, b);
-    let h = half_width(a, b) / 3.0;
-    let fa = paired(a);
-    let fb = paired(b);
-    let fc = paired(c);
-    let panel = PairPanel {
-        a,
-        b,
-        fa,
-        fb,
-        fc,
-        whole: std::array::from_fn(|i| h * (fa[i] + 4.0 * fc[i] + fb[i])),
-    };
-    let (value, error) = recurse(paired, panel, tol, 0, max_depth);
-    for (component, (&value, &error_estimate)) in value.iter().zip(&error).enumerate() {
-        if !value.is_finite() || !error_estimate.is_finite() || error_estimate > tol {
-            return Err(InputError::SolverConvergenceFailed {
-                iterations: max_depth,
-                residual: error_estimate,
-                last_x: c,
-                reason: format!(
-                    "adaptive_simpson_pair component {} did not meet total tolerance {tol:.2e} \
-                     at max_depth {max_depth} (interval [{a:.6e}, {b:.6e}], \
-                     summed error estimate {error_estimate:.2e})",
-                    component + 1
-                ),
-            }
-            .into());
-        }
-    }
-    Ok((value[0], value[1]))
+    adaptive_simpson_core("adaptive_simpson_pair", &mut paired, a, b, tol, limits)
+        .map(|[first, second]| (first, second))
 }
 
 // Gauss–Legendre Quadrature (finite intervals)
@@ -1302,7 +1512,7 @@ mod tests {
     fn test_simpson_rule() {
         // Test Simpson's rule on a simple polynomial x² on [0, 1]
         // Exact integral = 1/3
-        let f = |x: f64| x * x;
+        let f = |x: f64| Ok(x * x);
         let integral = simpson_rule(f, 0.0, 1.0, 100)
             .expect("Simpson rule integration should succeed in test");
         assert!((integral - 1.0 / 3.0).abs() < 1e-6);
@@ -1376,16 +1586,26 @@ mod tests {
     #[test]
     fn adaptive_quadrature_fails_closed_on_midpoint_collapse_and_handles_extreme_bounds() {
         // Non-polynomial cusp with tol = 0.0 and large max_depth hits ULP midpoint
-        // collapse before `error_estimate <= 0.0`; must return SolverConvergenceFailed.
+        // collapse before `error_estimate <= 0.0`; must fail as a geometric
+        // computation error, well inside the evaluation limit.
         let cusp = |x: f64| (x - 0.3).abs().sqrt();
-        assert!(adaptive_simpson(cusp, 0.0, 1.0, 0.0, 200).is_err());
-        assert!(adaptive_simpson_pair(|x| (cusp(x), x), 0.0, 1.0, 0.0, 200).is_err());
+        let scalar = adaptive_simpson(|x| Ok(cusp(x)), 0.0, 1.0, 0.0, 200, 1_000_000)
+            .expect_err("midpoint collapse must fail");
+        assert!(
+            scalar.to_string().contains("cannot be bisected"),
+            "{scalar}"
+        );
+        let pair =
+            adaptive_simpson_pair(|x| Ok((cusp(x), x)), 0.0, 1.0, [0.0, 0.0], 200, 1_000_000)
+                .expect_err("midpoint collapse must fail");
+        assert!(pair.to_string().contains("cannot be bisected"), "{pair}");
         assert!(gauss_legendre_integrate_adaptive(cusp, 0.0, 1.0, 4, 0.0, 200).is_err());
 
         // Same-sign large bounds where `(a + b) / 2.0` would overflow `f64::MAX`
         let a = 1.0e308_f64;
         let b = 1.0e308_f64 + 1.0e295_f64;
-        let res = adaptive_simpson(|_| 1.0, a, b, 1.0e285, 10).expect("overflow-safe midpoint");
+        let res =
+            adaptive_simpson(|_| Ok(1.0), a, b, 1.0e285, 10, 100).expect("overflow-safe midpoint");
         assert!((res - (b - a)).abs() <= 1.0e285);
     }
 }

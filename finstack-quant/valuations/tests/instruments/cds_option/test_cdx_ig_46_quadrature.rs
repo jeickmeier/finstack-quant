@@ -120,9 +120,11 @@ fn cdx_ig_46_option_payoff_matches_threshold_split_integration() {
     let reference = finstack_quant_core::math::integration::simpson_rule(
         |z| {
             let spread = m * (-0.5 * vol_time * vol_time + vol_time * z).exp();
-            (ctx.swap_value_per_n(spread) + ctx.signed_strike_adjustment_per_n())
-                * (-0.5 * z * z).exp()
-                / (2.0 * std::f64::consts::PI).sqrt()
+            Ok(
+                (ctx.swap_value_per_n(spread) + ctx.signed_strike_adjustment_per_n())
+                    * (-0.5 * z * z).exp()
+                    / (2.0 * std::f64::consts::PI).sqrt(),
+            )
         },
         boundary,
         z_limit(sigma, ctx.t_expiry),

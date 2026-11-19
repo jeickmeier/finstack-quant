@@ -1,61 +1,52 @@
 //! Adaptive conditioning-factor integration for bounded pool expectations.
 
-use super::pricer::{CdsTranchePricer, INTEGRATION_MAX_DEPTH, INTEGRATION_TOLERANCE};
+use super::pricer::{
+    CdsTranchePricer, INTEGRATION_MAX_DEPTH, INTEGRATION_MAX_EVALS, INTEGRATION_TOLERANCE,
+};
 use finstack_quant_core::math::integration::{adaptive_simpson, adaptive_simpson_pair};
 use finstack_quant_core::math::special_functions::norm_pdf;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::{CopulaSpec, FactorPairIntegrand};
-use std::cell::RefCell;
 
 /// The omitted two-sided normal mass is below 1.524e-23. Every capped pool
 /// integrand is bounded by one portfolio notional, so this is also a loss bound.
 const NORMAL_LIMIT: f64 = 10.0;
 
+/// Reject a non-finite tranche integrand with its conditioning value.
+fn finite_integrand(value: f64, x: f64) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(Error::Validation(format!(
+            "non-finite tranche integrand at conditioning value {x}"
+        )))
+    }
+}
+
 /// Partition the conditioning axis before refinement so an initially broad
 /// interval cannot skip a localized transition. Each leaf receives a share
-/// of the global budget; the core integrator fails if it cannot meet it.
+/// of the global budget and its own evaluation limit; the core integrator
+/// fails if it cannot meet either.
 fn integrate_interval(
     f: &dyn Fn(f64) -> Result<f64>,
     lower: f64,
     upper: f64,
     tolerance: f64,
 ) -> Result<f64> {
-    let failure = RefCell::new(None);
-    let checked = |x| {
-        if failure.borrow().is_some() {
-            return 0.0;
-        }
-        match f(x) {
-            Ok(value) if value.is_finite() => value,
-            Ok(_) => {
-                *failure.borrow_mut() = Some(Error::Validation(format!(
-                    "non-finite tranche integrand at conditioning value {x}"
-                )));
-                0.0
-            }
-            Err(error) => {
-                *failure.borrow_mut() = Some(error);
-                0.0
-            }
-        }
-    };
     let intervals = (upper - lower).ceil().max(1.0) as usize;
     let step = (upper - lower) / intervals as f64;
     let mut result = 0.0;
     for i in 0..intervals {
         let left = lower + i as f64 * step;
         let right = lower + (i + 1) as f64 * step;
-        let part = adaptive_simpson(
-            checked,
+        result += adaptive_simpson(
+            |x| finite_integrand(f(x)?, x),
             left,
             right,
             tolerance / intervals as f64,
             INTEGRATION_MAX_DEPTH,
-        );
-        if let Some(error) = failure.borrow_mut().take() {
-            return Err(error);
-        }
-        result += part?;
+            INTEGRATION_MAX_EVALS,
+        )?;
     }
     Ok(result)
 }
@@ -70,52 +61,36 @@ fn integrate_normal(f: &dyn Fn(f64) -> Result<f64>, tolerance: f64) -> Result<f6
 }
 
 /// Integrate two Gaussian expectations on shared nodes while preserving each
-/// component's scalar error budget and the first callback error.
+/// component's scalar error budget and the first callback error. Both
+/// components are portfolio fractions, so they share one budget value.
 fn integrate_normal_pair(
     f: &dyn Fn(f64) -> Result<(f64, f64)>,
     tolerance: f64,
 ) -> Result<(f64, f64)> {
-    let failure = RefCell::new(None);
-    let checked = |z| {
-        if failure.borrow().is_some() {
-            return (0.0, 0.0);
-        }
-        match f(z) {
-            Ok((first, second)) if first.is_finite() && second.is_finite() => {
-                let density = norm_pdf(z);
-                (first * density, second * density)
-            }
-            Ok(_) => {
-                *failure.borrow_mut() = Some(Error::Validation(format!(
-                    "non-finite tranche integrand at conditioning value {z}"
-                )));
-                (0.0, 0.0)
-            }
-            Err(error) => {
-                *failure.borrow_mut() = Some(error);
-                (0.0, 0.0)
-            }
-        }
-    };
     let lower = -NORMAL_LIMIT;
     let upper = NORMAL_LIMIT;
     let intervals = (upper - lower).ceil().max(1.0) as usize;
     let step = (upper - lower) / intervals as f64;
+    let share = tolerance / intervals as f64;
     let mut result = (0.0, 0.0);
     for i in 0..intervals {
         let left = lower + i as f64 * step;
         let right = lower + (i + 1) as f64 * step;
-        let part = adaptive_simpson_pair(
-            checked,
+        let (first, second) = adaptive_simpson_pair(
+            |z| {
+                let (first, second) = f(z)?;
+                let density = norm_pdf(z);
+                Ok((
+                    finite_integrand(first, z)? * density,
+                    finite_integrand(second, z)? * density,
+                ))
+            },
             left,
             right,
-            tolerance / intervals as f64,
+            [share, share],
             INTEGRATION_MAX_DEPTH,
-        );
-        if let Some(error) = failure.borrow_mut().take() {
-            return Err(error);
-        }
-        let (first, second) = part?;
+            INTEGRATION_MAX_EVALS,
+        )?;
         result.0 += first;
         result.1 += second;
     }

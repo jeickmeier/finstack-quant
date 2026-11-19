@@ -4221,8 +4221,8 @@
               "id": "CDX-NA-IG-46_CORR",
               "detachment_points": [3, 7.000000000000001, 10, 15, 30],
               "correlations": [
-                0.20066202917964343, 0.21114989424065894, 0.21967934115491977,
-                0.23177041604877657, 0.24896498909816928
+                0.20066202917964354, 0.21114989424065894, 0.21967934115491977,
+                0.23177041604877635, 0.2489649890981721
               ]
             },
             {
@@ -4471,11 +4471,11 @@
         "report": {
           "success": true,
           "residuals": {
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 6.938893903900001e-13,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 9.154135782729602e-11,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 3.5041414214733333e-12,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 1.3010426069749997e-13,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 1.1275702593833333e-12,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 8.095376221233334e-13,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 9.166712527930403e-11,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 3.388493189741334e-12,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 1.7347234759749997e-13,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 1.3299546649166666e-12,
             "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 6.628812082576374e-8,
             "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.8919327909872052e-8,
             "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000005797814485453134,
@@ -4489,11 +4489,11 @@
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.7284841053187847e-9
           },
           "iterations": 436,
-          "objective_value": 0.0000014546190555132,
-          "max_residual": 9.154135782729602e-14,
-          "rmse": 2.7133161880438533e-14,
+          "objective_value": 0.0000014546190555136927,
+          "max_residual": 9.166712527930402e-14,
+          "rmse": 2.715955692766853e-14,
           "max_residual_ratio": 0.000005797814485453134,
-          "rmse_ratio": 0.0000014546190555132,
+          "rmse_ratio": 0.0000014546190555136927,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -4577,18 +4577,18 @@
           "CDX-NA-IG-46-BASE-CORR-STEP": {
             "success": true,
             "residuals": {
-              "CDX-IG-46-0-3": 6.9388939039e-16,
-              "CDX-IG-46-10-15": 9.154135782729602e-14,
-              "CDX-IG-46-15-30": 3.5041414214733333e-15,
-              "CDX-IG-46-3-7": 1.3010426069749997e-16,
-              "CDX-IG-46-7-10": 1.1275702593833333e-15
+              "CDX-IG-46-0-3": 8.095376221233334e-16,
+              "CDX-IG-46-10-15": 9.166712527930402e-14,
+              "CDX-IG-46-15-30": 3.388493189741334e-15,
+              "CDX-IG-46-3-7": 1.7347234759749996e-16,
+              "CDX-IG-46-7-10": 1.3299546649166667e-15
             },
             "iterations": 36,
-            "objective_value": 4.097284228427735e-14,
-            "max_residual": 9.154135782729602e-14,
-            "rmse": 4.097284228427735e-14,
+            "objective_value": 4.102876543669402e-14,
+            "max_residual": 9.166712527930402e-14,
+            "rmse": 4.102876543669402e-14,
             "validation_passed": true,
-            "convergence_reason": "generic bootstrap calibration converged: max_residual (9.15e-14) within tolerance (1.00e-3)",
+            "convergence_reason": "generic bootstrap calibration converged: max_residual (9.17e-14) within tolerance (1.00e-3)",
             "metadata": {
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
@@ -4612,7 +4612,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "CDX-IG-46-10-15",
-            "worst_quote_residual": 9.154135782729602e-14,
+            "worst_quote_residual": 9.166712527930402e-14,
             "success_tolerance": 0.001,
             "solver_method": "sequential_bootstrap",
             "residual_units": "discounted_upfront_fraction"

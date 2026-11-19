@@ -21,6 +21,13 @@ pub(super) const INTEGRATION_TOLERANCE: f64 = 1e-10;
 /// absolute quadrature error must meet the total budget, or pricing fails.
 pub(super) const INTEGRATION_MAX_DEPTH: usize = 20;
 
+/// Hard limit on integrand evaluations per conditioning interval.
+///
+/// A full refinement to [`INTEGRATION_MAX_DEPTH`] needs `2^21 + 3` samples, so
+/// this limit never changes a result that the depth limit allows; it bounds
+/// the work explicitly, as the adaptive rule requires.
+pub(super) const INTEGRATION_MAX_EVALS: usize = 1 << 22;
+
 /// Minimum correlation value for numerical stability (avoids division by near-zero)
 pub(super) const MIN_CORRELATION: f64 = 0.01;
 

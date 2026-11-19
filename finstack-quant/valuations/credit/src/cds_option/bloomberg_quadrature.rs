@@ -74,6 +74,12 @@ use rust_decimal::Decimal;
 /// Bloomberg CDSO model's intended liquid-credit regime.
 const DISTRESSED_FORWARD_SPREAD_LIMIT: f64 = 0.10;
 
+/// Hard limit on integrand evaluations per half-standard-deviation payoff panel.
+///
+/// The payoff has one exercise kink, so a panel needs a few hundred samples;
+/// the limit only bounds a run that cannot converge.
+const PAYOFF_QUADRATURE_MAX_EVALS: usize = 1_000_000;
+
 /// Price a CDS option under the Bloomberg CDSO numerical-quadrature model.
 pub fn npv(
     option: &CdsOption,
@@ -763,11 +769,12 @@ pub fn quadrature_payoff(
     for panel in 0..panels {
         let low = -limit + panel as f64 * width;
         expected_payoff += adaptive_simpson(
-            density_weighted_payoff,
+            |z| Ok(density_weighted_payoff(z)),
             low,
             low + width,
             1e-12 / panels as f64,
             32,
+            PAYOFF_QUADRATURE_MAX_EVALS,
         )?;
     }
     let default_payment = if !ctx.is_index && !ctx.knockout && ctx.option_type == OptionType::Call {
