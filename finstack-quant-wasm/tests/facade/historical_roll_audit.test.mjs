@@ -27,7 +27,7 @@ test('time roll preserves the raw crossed fixing and supports repeated rolls', (
     id: 'ROLL-FRN',
     notional: { amount: '1000000', currency: 'USD' },
     forward_curve_id: 'USD-SOFR-3M',
-    spread_bp: 150,
+    spread_bp: '150',
     issue_date: '2025-01-03',
     maturity: '2026-01-03',
     frequency: { count: 3, unit: 'months' },

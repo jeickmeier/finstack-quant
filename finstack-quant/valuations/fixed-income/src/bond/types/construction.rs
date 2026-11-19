@@ -6,8 +6,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, StubKind};
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{Bps, CurveId, InstrumentId, Rate};
+use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use rust_decimal::Decimal;
 use time::macros::date;
 
 use super::CashflowSpec;
@@ -30,9 +31,13 @@ pub struct FloatingBondParams {
     pub notional: Money,
     /// Forward (projection) curve of the coupon index, e.g. `USD-SOFR-3M`.
     pub forward_curve_id: CurveId,
-    /// Spread over the index in integer basis points (200 = 2%).
-    #[cfg_attr(feature = "json-schema", schemars(with = "i32"))]
-    pub spread_bp: Bps,
+    /// Exact spread over the index in basis points (200 = 2%).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub spread_bp: Decimal,
     /// Issue date: start of the first coupon period.
     #[cfg_attr(
         feature = "json-schema",
@@ -338,7 +343,7 @@ impl Bond {
     /// use finstack_quant_core::dates::{Tenor, DayCount};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::types::{Bps, CurveId, InstrumentId};
+    /// use finstack_quant_core::types::{CurveId, InstrumentId};
     /// use time::macros::date;
     ///
     /// // 3M SOFR + 200bps, quarterly payments
@@ -346,7 +351,7 @@ impl Bond {
     ///     id: InstrumentId::new("FRN-001"),
     ///     notional: Money::from((1_000_000_i64, Currency::USD)),
     ///     forward_curve_id: CurveId::new("USD-SOFR-3M"),
-    ///     spread_bp: Bps::new(200),
+    ///     spread_bp: 200.into(),
     ///     issue_date: date!(2025-01-15),
     ///     maturity: date!(2030-01-15),
     ///     frequency: Tenor::quarterly(),
@@ -400,7 +405,7 @@ impl Bond {
     /// use finstack_quant_core::dates::{DayCount, Tenor};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::types::{Bps, CurveId, InstrumentId};
+    /// use finstack_quant_core::types::{CurveId, InstrumentId};
     /// use time::macros::date;
     ///
     /// let frn = Bond::floating_with_convention(
@@ -408,7 +413,7 @@ impl Bond {
     ///         id: InstrumentId::new("FRN-US"),
     ///         notional: Money::from((1_000_000_i64, Currency::USD)),
     ///         forward_curve_id: CurveId::new("USD-SOFR-3M"),
-    ///         spread_bp: Bps::new(125),
+    ///         spread_bp: 125.into(),
     ///         issue_date: date!(2025-01-15),
     ///         maturity: date!(2030-01-15),
     ///         frequency: Tenor::quarterly(),
@@ -436,13 +441,8 @@ impl Bond {
             quote_compounding,
             discount_curve_id,
         } = params;
-        let mut cashflow_spec = CashflowSpec::floating(
-            forward_curve_id,
-            f64::from(spread_bp.as_bp()),
-            frequency,
-            day_count,
-            None,
-        )?;
+        let mut cashflow_spec =
+            CashflowSpec::floating_spec(forward_curve_id, spread_bp, frequency, day_count, None);
         if let CashflowSpec::Floating(spec) = &mut cashflow_spec {
             spec.schedule.business_day_convention = convention.business_day_convention();
             spec.schedule.calendar_id = convention

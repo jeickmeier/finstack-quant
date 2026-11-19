@@ -209,7 +209,7 @@ fn bond_floating_constructor_builds_frn() {
         "id": "FRN-1",
         "notional": {"amount": "1000000", "currency": "USD"},
         "forward_curve_id": "USD-SOFR-3M",
-        "spread_bp": 200,
+        "spread_bp": "200.125",
         "issue_date": "2024-01-01",
         "maturity": "2030-01-01",
         "frequency": {"count": 3, "unit": "months"},
@@ -221,6 +221,8 @@ fn bond_floating_constructor_builds_frn() {
     assert_eq!(frn.id(), "FRN-1");
     let value: serde_json::Value = serde_json::from_str(&frn.to_json().unwrap()).unwrap();
     assert_eq!(value["instrument"]["type"], "bond");
+    let rate_spec = &value["instrument"]["spec"]["cashflow_spec"]["floating"]["rate_spec"];
+    assert_eq!(rate_spec["spread_bp"], "200.125");
 }
 
 #[wasm_bindgen_test]

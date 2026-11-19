@@ -20614,9 +20614,9 @@ export interface FloatingBondParams {
    */
   quote_compounding: Compounding;
   /**
-   * Spread over the index in integer basis points (200 = 2%).
+   * Exact spread over the index in basis points (200 = 2%).
    */
-  spread_bp: number;
+  spread_bp: DecimalWire;
 }
 /**
  * Trade-date, tenor and spot-roll inputs of an FX forward built from its trade date.

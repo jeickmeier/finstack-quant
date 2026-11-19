@@ -605,13 +605,13 @@ pub(super) fn cds_trade_params() -> Result<Vec<Value>> {
 /// A 5Y USD SOFR + 200bp quarterly floating-rate note.
 pub(super) fn floating_bond_params() -> Result<Vec<Value>> {
     use finstack_quant_core::dates::{DayCount, Tenor};
-    use finstack_quant_core::types::{Bps, CurveId, InstrumentId};
+    use finstack_quant_core::types::{CurveId, InstrumentId};
     example(
         &crate::instruments::fixed_income::bond::FloatingBondParams {
             id: InstrumentId::new("FRN-001"),
             notional: Money::from((1_000_000_i64, Currency::USD)),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
-            spread_bp: Bps::new(200),
+            spread_bp: 200.into(),
             issue_date: date(2025, time::Month::January, 15)?,
             maturity: date(2030, time::Month::January, 15)?,
             frequency: Tenor::quarterly(),

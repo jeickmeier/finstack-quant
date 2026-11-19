@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 import json
 
 import pytest
@@ -122,12 +123,13 @@ class TestBondTyped:
         round_tripped = Bond.from_json(original).to_json()
         assert json.loads(round_tripped) == json.loads(original)
 
-    def test_floating_constructor(self) -> None:
+    @pytest.mark.parametrize("spread", [Bps(200), Decimal("200.125")])
+    def test_floating_constructor(self, spread: Bps | Decimal) -> None:
         frn = Bond.floating({
             "id": "FRN-1",
             "notional": Money(1_000_000.0, Currency("USD")),
             "forward_curve_id": "USD-SOFR-3M",
-            "spread_bp": Bps(200),
+            "spread_bp": spread,
             "issue_date": datetime.date(2024, 1, 1),
             "maturity": datetime.date(2030, 1, 1),
             "frequency": Tenor.quarterly(),
@@ -138,6 +140,8 @@ class TestBondTyped:
         payload = json.loads(frn.to_json())
         assert payload["instrument"]["type"] == "bond"
         assert frn.id == "FRN-1"
+        fields = payload["instrument"]["spec"]["cashflow_spec"]["floating"]["rate_spec"]
+        assert fields["spread_bp"] == ("200" if isinstance(spread, Bps) else str(spread))
 
     def test_invalid_json_raises_value_error(self) -> None:
         with pytest.raises(ValueError, match="invalid instrument envelope JSON"):

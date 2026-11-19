@@ -251,7 +251,7 @@ class Bond:
               currency is the coupon and redemption currency.
             - ``forward_curve_id`` (str): forward curve of the coupon index
               (e.g. ``"USD-SOFR-3M"``).
-            - ``spread_bp`` (int): spread over the index in whole basis points
+            - ``spread_bp``: spread over the index in basis points. The exact wire form is a decimal string such as ``"25.125"``. Python mappings also accept Decimal, Rate, Bps, or a finite number.
               (``125`` = 1.25%); a fractional value raises ``ValueError`` (use
               :meth:`Bond.from_json` for sub-bp margins).
             - ``issue_date`` / ``maturity`` (datetime.date | str): start of the
@@ -322,7 +322,7 @@ class Bond:
               currency is the coupon and redemption currency.
             - ``forward_curve_id`` (str): forward curve of the coupon index
               (e.g. ``"USD-SOFR-3M"``).
-            - ``spread_bp`` (int): spread over the index in whole basis points
+            - ``spread_bp``: spread over the index in basis points. The exact wire form is a decimal string such as ``"25.125"``. Python mappings also accept Decimal, Rate, Bps, or a finite number.
               (``125`` = 1.25%); a fractional value raises ``ValueError`` (use
               :meth:`Bond.from_json` for sub-bp margins).
             - ``issue_date`` / ``maturity`` (datetime.date | str): start of the

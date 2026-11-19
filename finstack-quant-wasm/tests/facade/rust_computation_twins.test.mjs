@@ -198,7 +198,7 @@ test('Bond presets, zeroCoupon and return floors construct validated bonds', () 
     id: 'FRN',
     notional: { amount: '1000000', currency: 'USD' },
     forward_curve_id: 'USD-SOFR-3M',
-    spread_bp: 150,
+    spread_bp: '150',
     issue_date: '2024-01-15',
     maturity: '2029-01-15',
     frequency: { count: 3, unit: 'months' },

@@ -236,7 +236,7 @@ test('floating horizons preserve opening-day and crossed fixings for every metho
       id: 'HORIZON-FRN',
       notional: { amount: '1000000', currency: 'USD' },
       forward_curve_id: 'USD-SOFR-3M',
-      spread_bp: 150,
+      spread_bp: '150',
       issue_date: issueDate,
       maturity: '2026-01-03',
       frequency: { count: 3, unit: 'months' },

@@ -60,6 +60,25 @@ instrument_pricing_methods!(
     module = "finstack_quant.valuations.instruments._instruments"
 );
 
+fn floating_bond_params(
+    params: &Bound<'_, PyAny>,
+) -> PyResult<finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams> {
+    use crate::bindings::cashflows::builder::specs::{
+        decimal_bps_from_any, fields_with_decimal_from_py,
+    };
+
+    match params.cast::<pyo3::types::PyDict>() {
+        Ok(fields) => fields_with_decimal_from_py(
+            params.py(),
+            Some(fields),
+            "FloatingBondParams",
+            "spread_bp",
+            decimal_bps_from_any,
+        ),
+        Err(_) => spec_from_py(params.py(), params, "FloatingBondParams"),
+    }
+}
+
 #[pymethods]
 impl PyBond {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.fixed")]
@@ -135,9 +154,7 @@ impl PyBond {
     #[staticmethod]
     #[pyo3(text_signature = "(params)")]
     fn floating(params: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let params = spec_from_py::<
-            finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams,
-        >(params.py(), params, "FloatingBondParams")?;
+        let params = floating_bond_params(params)?;
         finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating(params)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
@@ -147,9 +164,7 @@ impl PyBond {
     #[staticmethod]
     #[pyo3(text_signature = "(params, convention)")]
     fn floating_with_convention(params: &Bound<'_, PyAny>, convention: &str) -> PyResult<Self> {
-        let params = spec_from_py::<
-            finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams,
-        >(params.py(), params, "FloatingBondParams")?;
+        let params = floating_bond_params(params)?;
         finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
             params,
             enum_from_str::<finstack_quant_valuations::instruments::BondConvention>(

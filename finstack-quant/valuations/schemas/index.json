@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
-      "bytes": 5246,
+      "bytes": 5277,
       "kind": "input",
       "path": "schemas/common/1/floating_bond_params.schema.json",
       "summary": "Identifier, notional, index, spread, dates, frequency, day count and curve of a floating-rate note.",

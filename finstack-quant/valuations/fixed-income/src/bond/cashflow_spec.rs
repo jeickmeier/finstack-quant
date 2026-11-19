@@ -104,7 +104,7 @@ fn default_schedule(
 }
 
 impl CashflowSpec {
-    fn floating_spec(
+    pub(super) fn floating_spec(
         forward_curve_id: CurveId,
         spread_bp: Decimal,
         frequency: Tenor,

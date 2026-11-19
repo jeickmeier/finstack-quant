@@ -169,14 +169,14 @@ use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, FloatingB
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{Bps, CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use time::macros::date;
 
 let frn = Bond::floating(FloatingBondParams {
     id: InstrumentId::new("FRN-001"),
     notional: Money::new(1_000_000.0, Currency::USD)?,
     forward_curve_id: CurveId::new("USD-SOFR-3M"),
-    spread_bp: Bps::new(200),
+    spread_bp: 200.into(),
     issue_date: date!(2025 - 01 - 01),
     maturity: date!(2030 - 01 - 01),
     frequency: Tenor::quarterly(),

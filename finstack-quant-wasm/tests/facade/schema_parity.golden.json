@@ -2992,7 +2992,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
             "type_name": "FloatingBondParams",
             "kind": "input",
-            "bytes": 5246
+            "bytes": 5277
           },
           {
             "path": "schemas/common/1/fx_forward_trade_date_params.schema.json",
@@ -5394,7 +5394,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
             "type_name": "FloatingBondParams",
             "kind": "input",
-            "bytes": 5246
+            "bytes": 5277
           },
           {
             "domain": "valuations",

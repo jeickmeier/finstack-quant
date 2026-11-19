@@ -183,8 +183,8 @@ impl JsBond {
     /// required: `id`; `notional` - Money wire object
     /// `{ amount: "1000000", currency: "USD" }` (decimal string amount), the
     /// coupon and redemption currency; `forward_curve_id` - index projection curve
-    /// (e.g. `"USD-SOFR-3M"`); `spread_bp` - spread over the index in whole
-    /// basis points (an integer; use `Bond.fromJson` for sub-bp margins);
+    /// (e.g. `"USD-SOFR-3M"`); `spread_bp` - exact basis-point spread over
+    /// the index, as a decimal string such as `"25.125"`;
     /// `issue_date` / `maturity` - ISO-8601 dates; `frequency` - coupon tenor
     /// object (e.g. `{ count: 3, unit: "months" }`); `day_count` - accrual day
     /// count label (e.g. `"act_360"`);
@@ -214,7 +214,7 @@ impl JsBond {
     /// `forward index + spread_bp`.
     /// @param params - `FloatingBondParams` (plain object or JSON text) with the
     /// same keys as `Bond.floating`: `id`, `notional` (Money wire object),
-    /// `forward_curve_id`, `spread_bp` (integer basis points), `issue_date`,
+    /// `forward_curve_id`, `spread_bp` (basis points as a decimal string), `issue_date`,
     /// `maturity`, `frequency`, `day_count` and `discount_curve_id`.
     /// @param convention - Bond convention preset: `us_treasury`, `us_agency`,
     /// `german_bund`, `uk_gilt`, `french_oat`, `jgb`, `us_corporate`, or
