@@ -187,9 +187,7 @@ pub use forward::{
     ForwardGreeks, bachelier_greeks, bachelier_price, black_shifted_price, black_shifted_vega,
     black76_greeks, black76_price,
 };
-pub use heston::{
-    HestonFourierSettings, HestonPricingParams, heston_call_price_fourier, heston_price,
-};
+pub use heston::{HestonFourierSettings, heston_call_price_fourier, heston_price};
 #[cfg(test)]
 pub(crate) use heston::{heston_call_prices_fourier, heston_put_price_fourier};
 pub use implied_vol::{black76_implied_vol, bs_implied_vol};

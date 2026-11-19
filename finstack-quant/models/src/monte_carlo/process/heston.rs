@@ -94,11 +94,11 @@
 //! # Examples
 //!
 //! ```
-//! use finstack_quant_models::closed_form::HestonPricingParams;
+//! use finstack_quant_models::monte_carlo::process::heston::HestonProcessParams;
 //! use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 //!
 //! // Typical calibrated parameters for equity index
-//! let params = HestonPricingParams::new(
+//! let params = HestonProcessParams::new(
 //!     0.05,   // r = 5% risk-free rate
 //!     0.02,   // q = 2% dividend yield
 //!     2.0,    // κ = mean reversion speed
@@ -119,8 +119,111 @@
 
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
-use crate::closed_form::HestonPricingParams;
 use crate::monte_carlo::traits::ProcessMetadata;
+use crate::volatility::heston::HestonParams;
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "RawHestonProcessParams")]
+/// Risk-neutral Heston variance dynamics and continuously compounded carry.
+///
+/// The stochastic parameters are stored once in the canonical models-layer
+/// [`HestonParams`]; this wrapper adds only the continuous carry rates required
+/// by the simulated spot process.
+///
+/// # References
+///
+/// - Heston, S. L. (1993). "A Closed-Form Solution for Options with Stochastic Volatility
+///   with Applications to Bond and Currency Options." *Review of Financial Studies*, 6(2), 327-343. `docs/REFERENCES.md#heston-1993`
+pub struct HestonProcessParams {
+    /// Continuously compounded risk-free rate as an annual decimal.
+    pub r: f64,
+    /// Continuously compounded dividend or foreign yield as an annual decimal.
+    pub q: f64,
+    /// Canonical Heston stochastic parameters.
+    #[serde(flatten)]
+    pub model: HestonParams,
+}
+
+/// Raw deserialization state of [`HestonProcessParams`].
+///
+/// Mirrors the serialized (flat) field layout exactly; conversion runs
+/// [`HestonProcessParams::new`] validation. Flat rather than a flattened
+/// [`HestonParams`] because serde's `flatten` ignores unknown fields.
+#[derive(Debug, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct RawHestonProcessParams {
+    /// Continuously compounded risk-free rate as an annual decimal.
+    r: f64,
+    /// Continuously compounded dividend or foreign yield as an annual decimal.
+    q: f64,
+    /// Initial variance.
+    v0: f64,
+    /// Mean reversion speed.
+    kappa: f64,
+    /// Long-run variance.
+    theta: f64,
+    /// Vol-of-vol.
+    vol_of_vol: f64,
+    /// Spot-variance correlation.
+    rho: f64,
+}
+
+impl TryFrom<RawHestonProcessParams> for HestonProcessParams {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawHestonProcessParams) -> finstack_quant_core::Result<Self> {
+        Self::new(
+            raw.r,
+            raw.q,
+            raw.kappa,
+            raw.theta,
+            raw.vol_of_vol,
+            raw.rho,
+            raw.v0,
+        )
+    }
+}
+
+impl HestonProcessParams {
+    /// Create new Heston model parameters
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - Continuously compounded risk-free rate in decimal annual units
+    /// * `q` - Continuous dividend yield in decimal annual units
+    /// * `kappa` - Mean-reversion speed of the stochastic volatility or short-rate factor
+    /// * `theta` - Long-run mean level of the mean-reverting stochastic factor
+    /// * `vol_of_vol` - Volatility-of-variance parameter for the Heston-style variance process
+    /// * `rho` - Instantaneous correlation between Brownian drivers, in `(-1, 1)`
+    /// * `v0` - Initial variance level for the stochastic volatility process at time zero
+    pub fn new(
+        r: f64,
+        q: f64,
+        kappa: f64,
+        theta: f64,
+        vol_of_vol: f64,
+        rho: f64,
+        v0: f64,
+    ) -> finstack_quant_core::Result<Self> {
+        if !r.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Heston parameter r (risk-free rate) must be finite, got {r}"
+            )));
+        }
+        if !q.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Heston parameter q (dividend yield) must be finite, got {q}"
+            )));
+        }
+        Ok(Self {
+            r,
+            q,
+            model: HestonParams::new(v0, kappa, theta, vol_of_vol, rho)?,
+        })
+    }
+}
 
 /// Check the Feller condition `2κθ ≥ σ_v²` from raw variance-process parameters.
 ///
@@ -165,7 +268,7 @@ pub fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> bool 
 /// [`crate::monte_carlo::pricer::heston::price_heston`].
 #[derive(Debug, Clone)]
 pub struct HestonProcess {
-    params: HestonPricingParams,
+    params: HestonProcessParams,
     drift_schedule: Option<std::sync::Arc<super::gbm::DriftSchedule>>,
 }
 
@@ -175,14 +278,14 @@ impl HestonProcess {
     /// # Feller Condition
     ///
     /// This constructor accepts already validated parameters and does not
-    /// enforce the Feller condition (2κθ ≥ σᵥ²). [`HestonPricingParams::new`]
+    /// enforce the Feller condition (2κθ ≥ σᵥ²). [`HestonProcessParams::new`]
     /// (used before process construction) logs the one warning when it is
     /// violated; the QE scheme truncates variance at zero either way.
     ///
     /// # Arguments
     ///
     /// * `params` - Validated model or algorithm parameters controlling this calculation.
-    pub fn new(params: HestonPricingParams) -> Self {
+    pub fn new(params: HestonProcessParams) -> Self {
         Self {
             params,
             drift_schedule: None,
@@ -210,7 +313,7 @@ impl HestonProcess {
     }
 
     /// Get parameters.
-    pub fn params(&self) -> &HestonPricingParams {
+    pub fn params(&self) -> &HestonProcessParams {
         &self.params
     }
 }
@@ -280,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_heston_params() {
-        let params = HestonPricingParams::new(
+        let params = HestonProcessParams::new(
             0.05, // r
             0.02, // q
             2.0,  // kappa
@@ -298,11 +401,11 @@ mod tests {
     #[test]
     fn test_feller_condition() {
         let params_feller =
-            HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.2, -0.5, 0.04).expect("valid");
+            HestonProcessParams::new(0.05, 0.02, 2.0, 0.04, 0.2, -0.5, 0.04).expect("valid");
         assert!(params_feller.model.satisfies_feller());
 
         let params_no_feller =
-            HestonPricingParams::new(0.05, 0.02, 0.5, 0.04, 0.5, -0.5, 0.04).expect("valid");
+            HestonProcessParams::new(0.05, 0.02, 0.5, 0.04, 0.5, -0.5, 0.04).expect("valid");
         assert!(!params_no_feller.model.satisfies_feller());
     }
 
@@ -315,16 +418,15 @@ mod tests {
         assert!(!heston_satisfies_feller(1.0, 0.045 - 1e-12, 0.3));
         // The params method delegates to the same predicate.
         let boundary =
-            HestonPricingParams::new(0.05, 0.02, 1.0, 0.045, 0.3, -0.5, 0.04).expect("valid");
+            HestonProcessParams::new(0.05, 0.02, 1.0, 0.045, 0.3, -0.5, 0.04).expect("valid");
         assert!(boundary.model.satisfies_feller());
     }
 
     #[test]
     fn test_heston_drift_diffusion() {
-        let heston =
-            crate::closed_form::HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.5, 0.04)
-                .map(HestonProcess::new)
-                .expect("valid");
+        let heston = HestonProcessParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.5, 0.04)
+            .map(HestonProcess::new)
+            .expect("valid");
 
         let x = vec![100.0_f64, 0.04_f64];
         let mut drift = vec![0.0_f64; 2];
@@ -350,11 +452,11 @@ mod tests {
 
     #[test]
     fn test_invalid_params_negative_kappa() {
-        assert!(HestonPricingParams::new(0.05, 0.02, -1.0, 0.04, 0.3, -0.5, 0.04).is_err());
+        assert!(HestonProcessParams::new(0.05, 0.02, -1.0, 0.04, 0.3, -0.5, 0.04).is_err());
     }
 
     #[test]
     fn test_invalid_params_rho_out_of_range() {
-        assert!(HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, 1.5, 0.04).is_err());
+        assert!(HestonProcessParams::new(0.05, 0.02, 2.0, 0.04, 0.3, 1.5, 0.04).is_err());
     }
 }

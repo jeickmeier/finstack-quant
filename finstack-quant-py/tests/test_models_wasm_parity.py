@@ -949,17 +949,26 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
         ],
         "fourier.heston": lambda: [
             models.heston_price(
-                100.0,
-                100.0,
-                1.0,
-                {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "time_to_expiry": 1.0,
+                    "option_type": "call",
+                },
+                {"v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
             ),
             models.heston_price(
-                100.0,
-                110.0,
-                1.0,
-                {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
-                False,
+                {
+                    "spot": 100.0,
+                    "strike": 110.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "time_to_expiry": 1.0,
+                    "option_type": "put",
+                },
+                {"v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
             ),
         ],
         "fourier.cos": lambda: [

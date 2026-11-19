@@ -1,6 +1,7 @@
+use super::HestonFourierSettings;
 use super::fourier_prices::validate_heston_inputs;
 use super::params::HESTON_TAIL_DIAGNOSTIC_THRESHOLD;
-use super::{HestonFourierSettings, HestonPricingParams};
+use crate::monte_carlo::process::heston::HestonProcessParams;
 use crate::volatility::heston::{HestonCfStatus, heston_pj_characteristic_function};
 use finstack_quant_core::math::integration::gauss_legendre_grid;
 use finstack_quant_core::{Error, Result};
@@ -24,7 +25,7 @@ const HESTON_TAIL_WINDOW_FRACTION: f64 = 0.1;
 pub(crate) struct HestonStripPricer {
     spot: f64,
     time: f64,
-    params: HestonPricingParams,
+    params: HestonProcessParams,
     /// Composite quadrature grid as `(phi, weight)` pairs.
     grid: Vec<(f64, f64)>,
     /// Start of the tail window `u_max * (1 - HESTON_TAIL_WINDOW_FRACTION)`,
@@ -62,7 +63,7 @@ impl HestonStripPricer {
     pub(crate) fn new(
         spot: f64,
         time: f64,
-        params: &HestonPricingParams,
+        params: &HestonProcessParams,
         settings: &HestonFourierSettings,
     ) -> Option<Self> {
         validate_heston_inputs(spot, time, params).ok()?;
@@ -280,7 +281,7 @@ pub(super) fn heston_pj_with_diagnostics(
     spot: f64,
     strike: f64,
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
     settings: &HestonFourierSettings,
 ) -> HestonPjDiagnostics {
     let Ok(grid) = gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels)
@@ -302,7 +303,7 @@ pub(super) fn heston_pj_on_grid(
     spot: f64,
     strike: f64,
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
     settings: &HestonFourierSettings,
     grid: &[(f64, f64)],
 ) -> HestonPjDiagnostics {

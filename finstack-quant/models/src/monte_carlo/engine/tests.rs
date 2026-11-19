@@ -1513,14 +1513,16 @@ mod correlation_regression {
         let disc = EulerMaruyama::new();
         let discount = (-0.03_f64).exp();
 
-        let h_neg =
-            crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04)
-                .map(HestonProcess::new)
-                .expect("valid");
-        let h_pos =
-            crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, 0.7, 0.04)
-                .map(HestonProcess::new)
-                .expect("valid");
+        let h_neg = crate::monte_carlo::process::heston::HestonProcessParams::new(
+            0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04,
+        )
+        .map(HestonProcess::new)
+        .expect("valid");
+        let h_pos = crate::monte_carlo::process::heston::HestonProcessParams::new(
+            0.03, 0.0, 2.0, 0.04, 0.3, 0.7, 0.04,
+        )
+        .map(HestonProcess::new)
+        .expect("valid");
 
         let est_neg = engine
             .price(crate::monte_carlo::engine::McPricingInputs {
@@ -1570,9 +1572,11 @@ mod correlation_regression {
         let payoff = European::new(OptionType::Call, 100.0, 1.0, 100);
         let discount = (-0.03_f64).exp();
 
-        let h0 = crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, 0.0, 0.04)
-            .map(HestonProcess::new)
-            .expect("valid");
+        let h0 = crate::monte_carlo::process::heston::HestonProcessParams::new(
+            0.03, 0.0, 2.0, 0.04, 0.3, 0.0, 0.04,
+        )
+        .map(HestonProcess::new)
+        .expect("valid");
 
         let euler = config
             .price(crate::monte_carlo::engine::McPricingInputs {

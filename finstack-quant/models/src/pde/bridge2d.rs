@@ -33,7 +33,7 @@ use super::problem2d::PdeProblem2D;
 /// # Fields
 ///
 /// All parameters follow the conventions in
-/// [`crate::closed_form::HestonPricingParams`].
+/// [`crate::monte_carlo::process::heston::HestonProcessParams`].
 pub struct HestonPde {
     /// Risk-free interest rate (continuous, decimal).
     pub r: f64,
@@ -134,11 +134,26 @@ mod tests {
         rho: f64,
         v0: f64,
     ) -> f64 {
-        use crate::closed_form::{HestonPricingParams, heston_call_price_fourier};
-        let params = HestonPricingParams::new(r, q, kappa, theta, vol_of_vol, rho, v0)
+        use crate::closed_form::heston_call_price_fourier;
+        use crate::monte_carlo::process::heston::HestonProcessParams;
+        let params = HestonProcessParams::new(r, q, kappa, theta, vol_of_vol, rho, v0)
             .expect("valid heston params");
-        heston_call_price_fourier(spot, strike, maturity, &params, None)
-            .expect("Heston Fourier call price")
+        {
+            let dynamics = &params;
+            heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot,
+                    strike,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: maturity,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
+        .expect("Heston Fourier call price")
     }
 
     #[test]

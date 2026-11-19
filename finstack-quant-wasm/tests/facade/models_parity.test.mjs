@@ -1031,21 +1031,27 @@ const CASES = {
     ),
   ],
   'fourier.heston': () => [
-    models.hestonPrice(100.0, 100.0, 1.0, {
-      r: 0.05,
-      q: 0.0,
-      v0: 0.04,
-      kappa: 2.0,
-      theta: 0.04,
-      vol_of_vol: 0.3,
-      rho: -0.7,
-    }),
     models.hestonPrice(
-      100.0,
-      110.0,
-      1.0,
-      { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 },
-      false
+      {
+        spot: 100.0,
+        strike: 100.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
+        option_type: 'call',
+      },
+      { v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 }
+    ),
+    models.hestonPrice(
+      {
+        spot: 100.0,
+        strike: 110.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
+        option_type: 'put',
+      },
+      { v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 }
     ),
   ],
   'fourier.cos': () => [

@@ -79,19 +79,19 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionHestonFourie
         )
         .model(finstack_quant_valuations_core::pricer::ModelKey::HestonFourier);
         let params = finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
-            market, r, q,
+            market,
         )
         .map_err(|e| finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
-        let price = heston_price(
+        let contract = finstack_quant_models::types::OptionContractParams {
             spot,
-            equity_option.strike,
-            t,
-            &params,
-            equity_option.option_type,
-            None,
-        )
-        .map_err(|error| {
+            strike: equity_option.strike,
+            rate: r,
+            dividend_yield: q,
+            time_to_expiry: t,
+            option_type: equity_option.option_type,
+        };
+        let price = heston_price(&contract, &params, None).map_err(|error| {
             finstack_quant_valuations_core::pricer::PricingError::from_core(error, err_ctx)
         })?;
 

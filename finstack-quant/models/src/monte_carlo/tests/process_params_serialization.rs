@@ -4,7 +4,7 @@
 //! consistently when the `serde` feature is enabled.
 #![allow(clippy::expect_used)]
 
-use crate::closed_form::HestonPricingParams;
+use crate::monte_carlo::process::heston::HestonProcessParams;
 use crate::monte_carlo::process::{
     brownian::BrownianParams, cir::CirParams, gbm::GbmParams, multi_ou::MultiOuParams,
     ou::HullWhite1FParams, schwartz_smith::SchwartzSmithParams,
@@ -39,7 +39,7 @@ fn test_gbm_params_serialization() {
 
 #[test]
 fn test_heston_params_serialization() {
-    let params = HestonPricingParams::new(
+    let params = HestonProcessParams::new(
         0.05, // r = 5% risk-free rate
         0.02, // q = 2% dividend yield
         2.0,  // κ = mean reversion speed

@@ -17,10 +17,10 @@
 //!   `vega` is per unit volatility change.
 //! - `bs_greeks` and the barrier / Asian / lookback / quanto prices take the
 //!   serde form of the Rust `OptionMarketParams` as one `market` dict;
-//!   `heston_price` takes `HestonPricingParams` as `params`.
+//!   `heston_price` takes the option contract and Heston variance dynamics separately.
 
 use crate::bindings::macros::wire_methods;
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_object_to_single_row_dataframe,
 };
@@ -30,7 +30,7 @@ use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::{
     BsGreeks, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
-    ForwardGreeks, HestonPricingParams, OptionCalculation, OptionCalculationResult, OptionGreeks,
+    ForwardGreeks, HestonFourierSettings, OptionCalculation, OptionCalculationResult, OptionGreeks,
     asian_option_price, bachelier_greeks, bachelier_price, barrier_option_price,
     black_shifted_price, black_shifted_vega, black76_greeks, black76_implied_vol, black76_price,
     bs_greeks, bs_implied_vol, bs_price, heston_price, lookback_option_price, option_calculation,
@@ -38,6 +38,7 @@ use finstack_quant_models::closed_form::{
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::{OptionContractParams, OptionMarketParams, OptionType};
+use finstack_quant_models::volatility::heston::HestonParams;
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
 
@@ -750,22 +751,98 @@ fn quanto_option_wrapper(
         .map_err(core_to_py)
 }
 
-// heston_price
+/// Extract native Heston variance dynamics from the typed or structured host value.
+pub(crate) fn heston_params(params: &Bound<'_, PyAny>) -> PyResult<HestonParams> {
+    if let Ok(params) = params.cast::<PyHestonParams>() {
+        return Ok(params.borrow().inner);
+    }
+    spec_from_py(params.py(), params, "HestonParams")
+}
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams")]
+#[pyclass(
+    name = "HestonParams",
+    module = "finstack_quant.models",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+struct PyHestonParams {
+    inner: HestonParams,
+}
+
+#[pymethods]
+impl PyHestonParams {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.__init__")]
+    #[new]
+    #[pyo3(signature = (*, v0, kappa, theta, vol_of_vol, rho))]
+    fn new(v0: f64, kappa: f64, theta: f64, vol_of_vol: f64, rho: f64) -> PyResult<Self> {
+        let inner = HestonParams::new(v0, kappa, theta, vol_of_vol, rho).map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.v0")]
+    #[getter]
+    fn v0(&self) -> f64 {
+        self.inner.v0
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.kappa")]
+    #[getter]
+    fn kappa(&self) -> f64 {
+        self.inner.kappa
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.theta")]
+    #[getter]
+    fn theta(&self) -> f64 {
+        self.inner.theta
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.vol_of_vol")]
+    #[getter]
+    fn vol_of_vol(&self) -> f64 {
+        self.inner.vol_of_vol
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.rho")]
+    #[getter]
+    fn rho(&self) -> f64 {
+        self.inner.rho
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.satisfies_feller")]
+    fn satisfies_feller(&self) -> bool {
+        self.inner.satisfies_feller()
+    }
+
+    fn __repr__(&self) -> String {
+        repr_from_serde("HestonParams", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyHestonParams,
+    HestonParams,
+    "HestonParams",
+    module = "finstack_quant.models._closed_form"
+);
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "heston_price")]
 #[pyfunction(name = "heston_price")]
-#[pyo3(signature = (spot, strike, expiry, params, is_call=true))]
+#[pyo3(signature = (contract, heston, settings=None))]
 fn heston_price_wrapper(
     py: Python<'_>,
-    spot: f64,
-    strike: f64,
-    expiry: f64,
-    params: &Bound<'_, PyAny>,
-    is_call: bool,
+    contract: &Bound<'_, PyAny>,
+    heston: &Bound<'_, PyAny>,
+    settings: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<f64> {
-    let params: HestonPricingParams = spec_from_py(py, params, "HestonPricingParams")?;
-    let option_type = OptionType::from(is_call);
-    py.detach(move || heston_price(spot, strike, expiry, &params, option_type, None))
+    let contract = option_contract(contract)?;
+    let heston = heston_params(heston)?;
+    let settings: Option<HestonFourierSettings> =
+        opt_spec_from_py(py, settings, "HestonFourierSettings")?;
+    py.detach(move || heston_price(&contract, &heston, settings.as_ref()))
         .map_err(core_to_py)
 }
 
@@ -774,6 +851,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBsGreeks>()?;
     m.add_class::<PyOptionMarketParams>()?;
     m.add_class::<PyOptionContractParams>()?;
+    m.add_class::<PyHestonParams>()?;
     m.add_class::<PyForwardGreeks>()?;
     m.add_class::<PyOptionCalculationResult>()?;
     m.add_function(wrap_pyfunction!(option_calculation_wrapper, m)?)?;

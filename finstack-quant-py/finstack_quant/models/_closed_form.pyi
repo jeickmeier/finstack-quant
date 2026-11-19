@@ -1559,64 +1559,218 @@ def black_shifted_vega(
     """
     ...
 
-def heston_price(
-    spot: float,
-    strike: float,
-    expiry: float,
-    params: dict[str, Any] | str,
-    is_call: bool = True,
-) -> float:
-    """
-    Closed-form (Fourier) Heston price of a European option.
+class HestonParams:
+    """Validated stochastic variance dynamics for Fourier and Monte Carlo pricing.
 
-    Semi-analytical Heston (1993) price via the stable characteristic-function
-    branch with adaptive quadrature; puts use put-call parity.
+    Examples
+    --------
+    >>> from finstack_quant.models import HestonParams
+    >>> heston = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.3, rho=-0.7)
+    >>> heston.satisfies_feller()
+    True
+    """
+
+    def __init__(self, *, v0: float, kappa: float, theta: float, vol_of_vol: float, rho: float) -> None:
+        """Construct Heston variance dynamics with finite inputs.
+
+        Parameters
+        ----------
+        v0 : float
+            Positive opening instantaneous variance in squared-volatility units.
+        kappa : float
+            Positive annual mean-reversion speed of variance.
+        theta : float
+            Positive long-run variance in squared-volatility units.
+        vol_of_vol : float
+            Positive annualized volatility of the variance process.
+        rho : float
+            Spot/variance Brownian shock correlation in the open interval (-1, 1).
+
+        Raises
+        ------
+        ValueError
+            If any input is non-finite or outside its domain.
+        """
+
+    @property
+    def v0(self) -> float:
+        """Opening instantaneous variance in squared-volatility units.
+
+        Returns
+        -------
+        float
+            Opening instantaneous variance in squared-volatility units.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def kappa(self) -> float:
+        """Mean-reversion speed of the variance process per year.
+
+        Returns
+        -------
+        float
+            Mean-reversion speed of the variance process per year.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def theta(self) -> float:
+        """Long-run variance in squared-volatility units.
+
+        Returns
+        -------
+        float
+            Long-run variance in squared-volatility units.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def vol_of_vol(self) -> float:
+        """Annualized volatility of the instantaneous variance process.
+
+        Returns
+        -------
+        float
+            Annualized volatility of the instantaneous variance process.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def rho(self) -> float:
+        """Instantaneous correlation of spot and variance shocks in (-1, 1).
+
+        Returns
+        -------
+        float
+            Instantaneous correlation of spot and variance shocks in (-1, 1).
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    def satisfies_feller(self) -> bool:
+        """Check whether twice the speed times long-run variance covers vol-of-vol squared.
+
+        Returns
+        -------
+        bool
+            True at equality or when twice kappa times theta is greater.
+
+        Notes
+        -----
+        This check does not raise.
+        """
+
+    def to_json(self) -> str:
+        """Serialize the variance dynamics to canonical JSON text.
+
+        Returns
+        -------
+        str
+            Document with opening variance, speed, long-run variance, vol-of-vol and correlation.
+
+        Raises
+        ------
+        ValueError
+            If the native values cannot be serialized.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> HestonParams:
+        """Restore validated variance dynamics using the canonical JSON schema.
+
+        Parameters
+        ----------
+        json : str
+            Structured JSON with all five dynamics parameters.
+
+        Returns
+        -------
+        HestonParams
+            Restored immutable parameters.
+
+        Raises
+        ------
+        ValueError
+            If the text is malformed or contains unknown, missing or invalid values.
+
+        Examples
+        --------
+        >>> from finstack_quant.models import HestonParams
+        >>> heston = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.3, rho=-0.7)
+        >>> HestonParams.from_json(heston.to_json()) == heston
+        True
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct the Heston dynamics for pickle through canonical JSON.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound from_json method and the serialized variance parameters.
+
+        Raises
+        ------
+        ValueError
+            If the parameters cannot be serialized and restored.
+        """
+
+def heston_price(
+    contract: OptionContractParams | dict[str, Any] | str,
+    heston: HestonParams | dict[str, Any] | str,
+    settings: dict[str, Any] | str | None = None,
+) -> float:
+    """Price a European option by Heston Fourier inversion.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    expiry : float
-        Time to expiry in years; ``expiry <= 0`` returns intrinsic value.
-    params : dict or str
-        Serde form of the Rust ``HestonPricingParams``, as a dict or JSON text.
-        Every key is required: ``r`` (continuously compounded risk-free rate,
-        decimal); ``q`` (continuous dividend / foreign yield, decimal);
-        ``v0`` (initial instantaneous variance, not volatility; positive);
-        ``kappa`` (variance mean-reversion speed per year, positive);
-        ``theta`` (long-run variance, positive); ``vol_of_vol`` (volatility of
-        variance, positive); ``rho`` (spot/variance correlation in
-        ``[-1, 1]``).
-    is_call : bool, default True
-        ``True`` for a call, ``False`` for a put.
+    contract : OptionContractParams or dict or str
+        Option payoff, with positive spot and strike, finite annual continuously
+        compounded rates, and nonnegative expiry in years. At expiry, the price
+        equals the intrinsic payoff.
+    heston : HestonParams or dict or str
+        Validated variance parameters or their canonical structured form.
+    settings : dict or str, optional
+        Fourier quadrature with positive upper frequency u_max, positive
+        composite panel count panels, and Gauss-Legendre order gl_order in
+        {2, 4, 8, 16}. Omission selects a grid from maturity and variance.
 
     Returns
     -------
     float
-        Present-value per-unit option price.
+        Present value per unit of the underlying in the spot quote currency.
 
     Raises
     ------
     ValueError
-        If ``params`` has an unknown or missing key or a wrongly typed value,
-        or a Heston parameter or rate is non-finite or outside its domain.
+        If any structured input is malformed or an input or discount factor is invalid.
     RuntimeError
-        If the Fourier integration fails to produce a finite price.
+        If integration or put-call parity cannot resolve a finite price.
 
     Examples
     --------
-    >>> from finstack_quant.models import heston_price
-    >>> params = {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7}
-    >>> p = heston_price(100.0, 100.0, 1.0, params)
-    >>> 5.0 < p < 15.0
+    >>> from finstack_quant.models import HestonParams, OptionContractParams, heston_price
+    >>> contract = OptionContractParams(
+    ...     spot=100, strike=100, rate=0.05, dividend_yield=0.02, time_to_expiry=1, option_type="call"
+    ... )
+    >>> heston = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.3, rho=-0.7)
+    >>> 5.0 < heston_price(contract, heston) < 15.0
     True
-
-    Sources
-    -------
-    - Heston (1993): see docs/REFERENCES.md#heston-1993
-    - Albrecher et al. (2007): see docs/REFERENCES.md#albrecher-2007-little-heston-trap
     """
     ...
 

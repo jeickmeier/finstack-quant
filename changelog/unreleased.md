@@ -246,8 +246,9 @@ the finite-difference Greek `spec` takes the same keys plus optional
 `OptionMarketParams`. Variance Gamma and Merton COS share
 `OptionContractParams` and take model dynamics separately. COS term counts
 are optional arguments. Heston and rough Heston simulations take only opening
-spot in `initial_state`; both derive opening variance from `v0`. Heston `params` are `r, q, v0, kappa, theta,
-vol_of_vol, rho`. A non-finite number inside one of these objects is rejected
+spot in `initial_state`; both derive opening variance from `v0`. Heston
+pricing uses `OptionContractParams` and separate `HestonParams` with
+`v0, kappa, theta, vol_of_vol, rho`. A non-finite number inside one of these objects is rejected
 when the object is read (Python `ValueError`, WASM `TypeError`). Prices are
 unchanged. Old → new (WASM: the camelCase twin with the same arguments):
 
@@ -256,11 +257,11 @@ unchanged. Old → new (WASM: the camelCase twin with the same arguments):
 - `asian_option_price(spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging, is_call)` → `asian_option_price(market, num_fixings, averaging)`
 - `lookback_option_price(spot, strike, rate, div_yield, vol, expiry, extremum, strike_type, is_call)` → `lookback_option_price(market, extremum, strike_type)`
 - `quanto_option_price(spot, strike, expiry, rate_domestic, rate_foreign, div_yield, vol_asset, vol_fx, correlation, is_call)` → `quanto_option_price(market, rate_foreign, vol_fx, correlation)`
-- `heston_price(spot, strike, expiry, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, is_call)` → `heston_price(spot, strike, expiry, params, is_call)`
+- `heston_price(spot, strike, expiry, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, is_call)` → `heston_price(contract, heston, settings)`
 - `bs_cos_price(spot, strike, rate, div_yield, vol, expiry, is_call, n_terms)` → `bs_cos_price(market, n_terms)`
 - `vg_cos_price(spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms)` → `vg_cos_price(contract, sigma, theta, nu, n_terms)`
 - `merton_jump_cos_price(spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms)` → `merton_jump_cos_price(contract, sigma, mu_jump, sigma_jump, lambda_, n_terms)` (WASM `lambda`)
-- `monte_carlo.price_heston(spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths, seed, num_steps, currency)` → `price_heston(spot, strike, expiry, params, is_call, settings)` (`settings`: optional `num_paths`, `seed`, `num_steps`, `currency`)
+- `monte_carlo.price_heston(spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths, seed, num_steps, currency)` → `price_heston(contract, heston, settings)` (`settings`: optional `num_paths`, `seed`, `num_steps`, `currency`)
 - `monte_carlo.finite_diff_delta` / `finite_diff_gamma(spot, strike, rate, div_yield, vol, expiry, is_call, num_paths, seed, num_steps, bump_size, currency)` → `finite_diff_delta(spec)` / `finite_diff_gamma(spec)`
 - `EuropeanPricer.price_gbm`, `PathDependentPricer.price_asian` and `price_with_lrm_greeks(spot, strike, rate, div_yield, vol, expiry, is_call, num_steps, currency)` → `(market, num_steps, currency)`
 - `LsmcPricer.price_american(spot, …, is_call, currency, num_steps, basis, basis_degree)` → `price_american(market, currency, num_steps, basis, basis_degree)`
@@ -273,7 +274,7 @@ and `price_with_capture` take `engine::McPricingInputs`;
 `engine::simulate_path_fractional` takes `engine::FractionalPath`;
 `LsmcEngine::{price, fit_exercise_policy, price_with_policy, price_unbiased}`
 take `pricer::lsmc::LsmcInputs`; `pricer::heston::price_heston` takes
-`HestonPricingParams` and `HestonMcSettings`; `EuropeanPricer::price_gbm` and
+`OptionContractParams`, `HestonParams` and optional `HestonMcSettings`; `EuropeanPricer::price_gbm` and
 `PathDependentPricer::{price_asian, price_with_lrm_greeks}` take
 `OptionMarketParams`; `EuropeanPricer::price`, `PathDependentPricer::price` and
 `price_with_lrm_greeks_from_payoff` take a `TimeGrid` (the latter reads its

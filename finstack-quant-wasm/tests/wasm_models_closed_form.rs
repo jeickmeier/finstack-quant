@@ -221,11 +221,12 @@ fn bs_cos_call_atm_is_positive() {
 
 #[wasm_bindgen_test]
 fn heston_price_call_atm_is_reasonable() {
-    let p = heston_price(JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(1.0),
+    let p = heston_price(
         JsValue::from_str(
-            r#"{"r": 0.05, "q": 0.02, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7, "v0": 0.04}"#,
+            r#"{"spot": 100.0, "strike": 100.0, "rate": 0.05, "dividend_yield": 0.02, "time_to_expiry": 1.0, "option_type": "call"}"#,
+        ),
+        JsValue::from_str(
+            r#"{"kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7, "v0": 0.04}"#,
         ),
         None,
     )

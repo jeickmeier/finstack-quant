@@ -343,6 +343,15 @@
       "type_name": "GbmParams"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/heston_fourier_settings.schema.json",
+      "bytes": 882,
+      "kind": "input",
+      "path": "schemas/models/1/heston_fourier_settings.schema.json",
+      "summary": "Numerical settings for Heston Fourier integration.",
+      "title": "HestonFourierSettings",
+      "type_name": "HestonFourierSettings"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_mc_settings.schema.json",
       "bytes": 20816,
       "kind": "input",
@@ -359,15 +368,6 @@
       "summary": "Heston stochastic volatility model parameters.",
       "title": "HestonParams",
       "type_name": "HestonParams"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/models/1/heston_pricing_params.schema.json",
-      "bytes": 1320,
-      "kind": "input",
-      "path": "schemas/models/1/heston_pricing_params.schema.json",
-      "summary": "Market inputs for closed-form Heston pricing.",
-      "title": "HestonPricingParams",
-      "type_name": "HestonPricingParams"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/hull_white1_f_params.schema.json",

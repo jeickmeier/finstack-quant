@@ -150,8 +150,22 @@ fn scaling_heston_paths(c: &mut Criterion) {
             };
             let first = engine.price(inputs).expect("Heston QE pricing");
             check_estimate(&first, n, n);
-            let reference = heston_call_price_fourier(SPOT, STRIKE, 1.0, process.params(), None)
-                .expect("converged Heston Fourier reference");
+            let reference = {
+                let dynamics = process.params();
+                heston_call_price_fourier(
+                    &finstack_quant_models::types::OptionContractParams {
+                        spot: SPOT,
+                        strike: STRIKE,
+                        rate: dynamics.r,
+                        dividend_yield: dynamics.q,
+                        time_to_expiry: 1.0,
+                        option_type: finstack_quant_models::types::OptionType::Call,
+                    },
+                    &dynamics.model,
+                    None,
+                )
+            }
+            .expect("converged Heston Fourier reference");
             // A 52-step QE discretization is approximate; this smoke envelope
             // retains sampling noise plus a fixed five-cent discretization allowance.
             check_against_reference(&first, reference, 0.05);

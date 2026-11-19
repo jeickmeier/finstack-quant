@@ -30,6 +30,8 @@ export const models = {
   bsPriceMany: wasm.bsPriceMany,
   optionMarketParams: wasm.optionMarketParams,
   optionContractParams: wasm.optionContractParams,
+  hestonParams: wasm.hestonParams,
+  hestonParamsSatisfiesFeller: wasm.hestonParamsSatisfiesFeller,
   optionMarketParamsContract: wasm.optionMarketParamsContract,
   optionContractParamsWithVolatility: wasm.optionContractParamsWithVolatility,
   vanillaExpiryPayoff: wasm.vanillaExpiryPayoff,

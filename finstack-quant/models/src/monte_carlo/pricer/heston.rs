@@ -26,15 +26,15 @@
 //!   Stochastic Volatility with Applications to Bond and Currency Options."
 //!   *Review of Financial Studies*, 6(2), 327-343. `docs/REFERENCES.md#heston-1993`
 
-use crate::closed_form::HestonPricingParams;
 use crate::monte_carlo::discretization::qe_heston::QeHeston;
 use crate::monte_carlo::engine::{McEngine, McEngineConfig, McPricingInputs};
 use crate::monte_carlo::payoff::vanilla::European;
-use crate::monte_carlo::process::heston::HestonProcess;
+use crate::monte_carlo::process::heston::{HestonProcess, HestonProcessParams};
 use crate::monte_carlo::registry;
 use crate::monte_carlo::results::MoneyEstimate;
 use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::types::OptionType;
+use crate::types::OptionContractParams;
+use crate::volatility::heston::HestonParams;
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
@@ -70,16 +70,13 @@ pub struct HestonMcSettings {
 ///
 /// # Arguments
 ///
-/// * `spot` - Current underlying price
-/// * `strike` - Exercise price in the same units as `spot`
-/// * `time` - Time to expiry in years
-/// * `params` - Continuously compounded decimal annual rate `r` and dividend
-///   yield `q`, plus the Heston model (`v0` initial variance, `kappa` mean
-///   reversion, `theta` long-run variance, `vol_of_vol` vol of variance, `rho`
-///   spot/variance correlation in `[-1, 1]`); see [`HestonPricingParams`].
-/// * `option_type` - Call or put payoff direction
-/// * `settings` - Path count, seed, step count and result currency; each
-///   `None` uses the registry binding default (see [`HestonMcSettings`]).
+/// * `contract` - Positive spot and strike in quote currency, positive
+///   expiry in years, annual continuous rate and dividend yield, and call
+///   or put payoff direction.
+/// * `heston` - Canonical opening variance and annual dynamics with the
+///   spot/variance correlation in `(-1, 1)`.
+/// * `settings` - Optional path count, seed, step count and result
+///   currency. Omission uses registry defaults.
 ///
 /// # Returns
 ///
@@ -95,31 +92,31 @@ pub struct HestonMcSettings {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_models::closed_form::HestonPricingParams;
 /// use finstack_quant_models::monte_carlo::pricer::heston::{price_heston, HestonMcSettings};
-/// use finstack_quant_models::types::OptionType;
+/// use finstack_quant_models::types::{OptionContractParams, OptionType};
+/// use finstack_quant_models::volatility::heston::HestonParams;
 ///
-/// let params = HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04)
-///     .expect("valid Heston parameters");
-/// let settings = HestonMcSettings {
-///     num_paths: Some(2_000),
-///     seed: Some(42),
-///     num_steps: Some(16),
-///     currency: None,
+/// let contract = OptionContractParams {
+///     spot: 100.0, strike: 100.0, rate: 0.03, dividend_yield: 0.0,
+///     time_to_expiry: 1.0, option_type: OptionType::Call,
 /// };
-/// let estimate = price_heston(100.0, 100.0, 1.0, &params, OptionType::Call, &settings)
-///     .expect("pricing should succeed");
+/// let heston = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.7)?;
+/// let settings = HestonMcSettings {
+///     num_paths: Some(2_000), seed: Some(42), num_steps: Some(16), currency: None,
+/// };
+/// let estimate = price_heston(&contract, &heston, Some(settings))?;
 /// assert!(estimate.mean.amount() > 0.0);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn price_heston(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    params: &HestonPricingParams,
-    option_type: OptionType,
-    settings: &HestonMcSettings,
+    contract: &OptionContractParams,
+    heston: &HestonParams,
+    settings: Option<HestonMcSettings>,
 ) -> Result<MoneyEstimate> {
-    let expiry = time;
+    contract.validate()?;
+    heston.validate()?;
+    let settings = settings.unwrap_or_default();
+    let expiry = contract.time_to_expiry;
     let defaults = &registry::embedded_defaults()?.convenience;
     let pricer_defaults = &defaults.european_pricer;
     let num_paths = settings.num_paths.unwrap_or(pricer_defaults.num_paths);
@@ -136,12 +133,16 @@ pub fn price_heston(
     let time_grid = TimeGrid::uniform(expiry, num_steps)?;
     let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid).parallel(use_parallel));
     let rng = PhiloxRng::new(seed);
-    let process = HestonProcess::new(*params);
+    let process = HestonProcess::new(HestonProcessParams {
+        r: contract.rate,
+        q: contract.dividend_yield,
+        model: *heston,
+    });
     let disc = QeHeston::new();
-    let initial_state = [spot, params.model.v0];
-    let discount_factor = flat_discount_factor(params.r, expiry)?;
+    let initial_state = [contract.spot, heston.v0];
+    let discount_factor = flat_discount_factor(contract.rate, expiry)?;
 
-    let payoff = European::new(option_type, strike, 1.0, num_steps);
+    let payoff = European::new(contract.option_type, contract.strike, 1.0, num_steps);
     engine.price(McPricingInputs {
         rng: &rng,
         process: &process,
@@ -156,9 +157,10 @@ pub fn price_heston(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::OptionType;
 
-    fn params() -> HestonPricingParams {
-        HestonPricingParams::new(0.03, 0.01, 2.0, 0.04, 0.3, -0.7, 0.04)
+    fn params() -> HestonProcessParams {
+        HestonProcessParams::new(0.03, 0.01, 2.0, 0.04, 0.3, -0.7, 0.04)
             .expect("valid Heston parameters")
     }
 
@@ -172,14 +174,21 @@ mod tests {
     }
 
     fn atm_call(seed: u64) -> MoneyEstimate {
-        price_heston(
-            100.0,
-            100.0,
-            1.0,
-            &params(),
-            OptionType::Call,
-            &settings(seed),
-        )
+        {
+            let dynamics = &params();
+            price_heston(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: OptionType::Call,
+                },
+                &dynamics.model,
+                Some(settings(seed)),
+            )
+        }
         .expect("Heston call pricing should succeed")
     }
 
@@ -206,8 +215,22 @@ mod tests {
     #[test]
     fn heston_put_call_have_distinct_values() {
         let call = atm_call(42);
-        let put = price_heston(100.0, 100.0, 1.0, &params(), OptionType::Put, &settings(42))
-            .expect("Heston put pricing should succeed");
+        let put = {
+            let dynamics = &params();
+            price_heston(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: OptionType::Put,
+                },
+                &dynamics.model,
+                Some(settings(42)),
+            )
+        }
+        .expect("Heston put pricing should succeed");
         assert!(put.mean.amount() > 0.0);
         assert_ne!(call.mean.amount(), put.mean.amount());
     }

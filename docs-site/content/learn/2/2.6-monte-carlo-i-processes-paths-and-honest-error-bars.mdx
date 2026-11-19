@@ -371,24 +371,14 @@ The Heston calculation uses $v_0=\theta=0.04$, $\kappa=2$, $\xi=0.3$ and $\rho=-
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="heston-qe-pricing" role="build" */}
 ```python exec id=heston-qe-pricing role=build
+from finstack_quant.models import HestonParams, OptionContractParams
 from finstack_quant.models.monte_carlo import price_heston
 
-hc = price_heston(
-    100.0,
-    100.0,
-    1.0,
-    {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.30, "rho": -0.70},
-    True,
-    {"num_paths": 20_000, "seed": 42},
-)
-hp = price_heston(
-    100.0,
-    100.0,
-    1.0,
-    {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.30, "rho": -0.70},
-    False,
-    {"num_paths": 20_000, "seed": 42},
-)
+heston = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.30, rho=-0.70)
+market = dict(spot=100.0, strike=100.0, rate=0.05, dividend_yield=0.0, time_to_expiry=1.0)
+settings = {"num_paths": 20_000, "seed": 42}
+hc = price_heston(OptionContractParams(**market, option_type="call"), heston, settings)
+hp = price_heston(OptionContractParams(**market, option_type="put"), heston, settings)
 print(f"Heston call: {hc.mean} (stderr={hc.stderr:.4f})")
 print(f"Heston put:  {hp.mean} (stderr={hp.stderr:.4f})")
 ```
@@ -449,28 +439,20 @@ Here $2\kappa\theta=0.08$ and $\xi^2=0.49$. The inequality fails. With the displ
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="heston-feller-boundary" role="exercise" */}
 ```python exec id=heston-feller-boundary role=exercise
+from finstack_quant.models import HestonParams, OptionContractParams
 from finstack_quant.models.monte_carlo import heston_satisfies_feller, price_heston
 
 kappa, theta, xi, initial_variance = 1.0, 0.04, 0.7, 0.04
 # A single displayed Euler update can cross zero; the CIR process itself does not.
-euler_variance = initial_variance + kappa * (theta-initial_variance) * 0.25 + xi * initial_variance**0.5 * 0.25**0.5 * -2
+euler_variance = (
+    initial_variance + kappa * (theta - initial_variance) * 0.25 + xi * initial_variance**0.5 * 0.25**0.5 * -2
+)
 outside_feller = price_heston(
-    100,
-    100,
-    1,
-    {
-        "r": 0.05,
-        "q": 0,
-        "v0": initial_variance,
-        "kappa": kappa,
-        "theta": theta,
-        "vol_of_vol": xi,
-        "rho": -0.7,
-    },
-    True,
+    OptionContractParams(spot=100, strike=100, rate=0.05, dividend_yield=0, time_to_expiry=1, option_type="call"),
+    HestonParams(v0=initial_variance, kappa=kappa, theta=theta, vol_of_vol=xi, rho=-0.7),
     {"num_paths": 8192, "seed": 17},
 )
-print(f"2*kappa*theta={2*kappa*theta:.3f}; xi^2={xi**2:.3f}; Euler update={euler_variance:.3f}")
+print(f"2*kappa*theta={2 * kappa * theta:.3f}; xi^2={xi**2:.3f}; Euler update={euler_variance:.3f}")
 print(f"Native Heston QE call={outside_feller.mean.amount:.6f}; SE={outside_feller.stderr:.6f}")
 ```
 {/* /notebook-block */}

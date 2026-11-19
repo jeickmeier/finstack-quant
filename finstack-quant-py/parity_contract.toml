@@ -493,8 +493,9 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # JSON text in WASM: `spot, strike, rate, dividend_yield, volatility,
 # time_to_expiry, option_type`). The BS COS method uses the same market shape.
 # Variance Gamma and Merton COS use OptionContractParams, with their dynamics
-# and optional term count supplied separately. `heston_price` takes its existing
-# structural `HestonPricingParams` input. `bs_greeks`
+# and optional term count supplied separately. Fourier and Monte Carlo Heston
+# use `OptionContractParams` plus validated `HestonParams` and numerical settings.
+# `bs_greeks`
 # returns the typed `BsGreeks` (`rho_r`, not `rho`); `black76_greeks` /
 # `bachelier_greeks` return the typed `ForwardGreeks`. Each host function makes
 # one call into the same-named checked Rust entry point in `closed_form`
@@ -502,16 +503,13 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # constants: `theta_days_per_year` = `DEFAULT_THETA_DAYS_PER_YEAR`, `averaging` =
 # `DEFAULT_ASIAN_AVERAGING` (an `AveragingMethod`; hosts parse its serde label),
 # `strike_type` = `DEFAULT_LOOKBACK_STRIKE_TYPE`. The
-# optional `is_call` of `barrier_option_price` / `asian_option_price` /
-# `lookback_option_price` / `quanto_option_price` / `heston_price` is gone with the
-# `market` object (its `option_type` is required); `heston_price` keeps an
-# optional `is_call` that defaults to a call in both hosts (a host signature
-# default mapped to `OptionType::Call`). Rust-only closed-form
+# option payoff direction is part of the validated `market` or `contract`.
+# Rust-only closed-form
 # items, deliberately not bound: `bs_price_unchecked` / `bs_greeks_unchecked`,
 # `barrier_rebate` / `PayoutTiming` /
 # `BarrierParams` / `barrier_touch_probability`, `quanto_price` /
 # `quanto_drift_adjustment` (use `quanto_option_price`),
-# `HestonStripPricer` / `HestonFourierSettings` /
+# `HestonStripPricer` /
 # `heston_*_prices_fourier` strips, `AsianFixingSchedule` and the
 # `*_asian_price*` leaves, `ExerciseStyle`, `OptionType` (hosts pass `is_call`
 # or the serde `option_type`), `ONE_PERCENT`, and the per-model COS
@@ -520,6 +518,7 @@ public = [
     "BsGreeks",
     "ForwardGreeks",
     "OptionCalculationResult",
+    "HestonParams",
     "OptionContractParams",
     "OptionMarketParams",
     "asian_option_price",
@@ -566,11 +565,10 @@ python_package = "finstack_quant.models.monte_carlo"
 # registry default; both hosts build their pricers through it). The pricer
 # methods (`price_gbm`, `price_asian`, `price_with_lrm_greeks`,
 # `price_american`, `price_american_unbiased`) take the serde form of the Rust
-# `OptionMarketParams` as one `market` argument, and `price_heston` takes
-# Heston and rough Heston simulation specs author `[spot]` and derive the
-# opening variance from the process `v0` in both hosts.
-# `HestonPricingParams` (`params`) and an optional `HestonMcSettings`
-# (`settings`) the same way, mirroring the closed-form `heston_price`.
+# `OptionMarketParams` as one `market` argument. `price_heston` takes
+# `OptionContractParams`, `HestonParams` and optional `HestonMcSettings`.
+# Heston and rough Heston paths author `[spot]` and derive opening variance
+# from the process `v0` in both hosts.
 public = [
     "Estimate",
     "EuropeanPricer",
@@ -2342,8 +2340,8 @@ js = "margin.schema"
 
 [parity.modules."finstack_quant.models"]
 js = "models"
-types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks", OptionCalculationResult = "OptionCalculationResult", OptionMarketParams = "OptionMarketParams", OptionContractParams = "OptionContractParams" }
-constructors = { OptionMarketParams = "models.optionMarketParams", OptionContractParams = "models.optionContractParams" }
+types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks", OptionCalculationResult = "OptionCalculationResult", OptionMarketParams = "OptionMarketParams", OptionContractParams = "OptionContractParams", HestonParams = "HestonParams" }
+constructors = { OptionMarketParams = "models.optionMarketParams", OptionContractParams = "models.optionContractParams", HestonParams = "models.hestonParams" }
 
 [parity.modules."finstack_quant.models.correlation"]
 js = "models.correlation"
@@ -3199,3 +3197,6 @@ renames = { contract = { js = "models.optionMarketParamsContract", reason = "WAS
 
 [parity.members."finstack_quant.models.OptionContractParams"]
 renames = { with_volatility = { js = "models.optionContractParamsWithVolatility", reason = "WASM contract inputs are plain objects and the method validates the combined option inputs" } }
+
+[parity.members."finstack_quant.models.HestonParams"]
+renames = { satisfies_feller = { js = "models.hestonParamsSatisfiesFeller", reason = "WASM canonical variance parameters are plain structured values" } }

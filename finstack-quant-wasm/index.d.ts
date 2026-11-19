@@ -5837,15 +5837,13 @@ export interface ModelsLiquidityNamespace {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const params = { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 };
- * const est = models.monteCarlo.priceHeston(100, 100, 1.0, params, true, {
+ * const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.05, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+ * const heston = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+ * const estimate = models.monteCarlo.priceHeston(contract, heston, {
  *   num_paths: 5000,
  *   seed: 42,
  * });
- * console.log(est.mean.amount, est.mean.currency);
- * // Path count and seed default to the Rust registry values.
- * const byDefault = models.monteCarlo.priceHeston(100, 100, 1.0, params, false);
- * console.log(byDefault.num_paths); // 100000
+ * console.log(estimate.mean.amount, estimate.mean.currency);
  * ```
  */
 export interface ModelsMonteCarloNamespace {
@@ -5853,42 +5851,19 @@ export interface ModelsMonteCarloNamespace {
   readonly PathDependentPricer: typeof wasm.PathDependentPricer;
   readonly LsmcPricer: typeof wasm.LsmcPricer;
   /**
-   * Price a European option under Heston stochastic volatility by Monte Carlo.
-   *
-   * Twin of the Rust `price_heston` and the Fourier `models.hestonPrice`: same
-   * market and model inputs, with Monte Carlo settings in place of the Fourier
-   * settings. Paths use the Andersen (2008) QE discretization.
-   *
-   * # Errors
-   *
-   * Throws a `validation` error if `params` does not match
-   * `HestonPricingParams` (non-finite `r`/`q`, non-positive or non-finite
-   * `kappa`, `theta`, `vol_of_vol` or `v0`, `rho` outside `[-1, 1]`) or
-   * `settings` does not match `HestonMcSettings` (unknown currency, a
-   * fractional or out-of-range count), if the embedded defaults cannot be
-   * loaded, the expiry, step count, path count or computed discount factor
-   * fails validation, a simulated discounted payoff is non-finite, or the
-   * result cannot be serialized.
-   * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as
-   * `{amount, currency}` money, plus `stderr`, `num_paths`,
-   * `num_simulated_paths` and the optional statistics (`null` when not captured).
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield, decimal), `v0` (initial instantaneous variance), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `vol_of_vol` (annualized volatility of variance) and `rho` (asset/variance shock correlation in `[-1, 1]`).
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param settings - Optional `HestonMcSettings` object or JSON text; every key may be omitted and an omitted key uses the Rust registry European-pricer default: `num_paths` (independent path estimators in `[2, 10000000]`, each antithetic pair counts once; default 100 000), `seed` (Philox root seed, number or BigInt), `num_steps` (positive time steps per path) and `currency` (ISO-4217 code stamped on the estimate).
-   *
+   * Price a European Heston option by quadratic-exponential Monte Carlo.
+   * @param contract - Spot and strike in quote currency, positive expiry in years, annual continuous rates, and call or put payoff.
+   * @param heston - Checked opening variance, mean reversion, long-run variance, vol-of-vol and spot/variance correlation.
+   * @param settings - Optional independent path estimator count, Philox seed, uniform step count, and ISO currency. Omitted values use the registry defaults.
+   * @returns Discounted price, standard error, confidence interval, and path counts as MoneyEstimate.
+   * @throws TypeError for non-JSON inputs and FinstackError for invalid dynamics, settings, or simulated discounted payoffs.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
    * await init();
-   * const estimate = models.monteCarlo.priceHeston(
-   *   100, 100, 1.0,
-   *   { r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 },
-   *   true,
-   *   { num_paths: 2000, seed: 42, num_steps: 16 },
-   * );
+   * const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+   * const model = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+   * const estimate = models.monteCarlo.priceHeston(contract, model, { num_paths: 2000, seed: 42 });
    * console.log(estimate.mean.amount, estimate.stderr);
    * ```
    */
@@ -6850,6 +6825,20 @@ export interface ModelsNamespace {
    */
   readonly optionContractParams: typeof wasm.optionContractParams;
   /**
+   * Construct checked Heston stochastic variance dynamics.
+   * @param heston - Positive opening variance v0, mean-reversion speed kappa per year, positive long-run variance theta, positive annualized vol_of_vol, and spot/variance correlation rho in (-1, 1).
+   * @returns Canonical validated variance parameters usable by Heston pricing.
+   * @throws TypeError for a non-JSON host argument and FinstackError for invalid dynamics.
+   */
+  readonly hestonParams: typeof wasm.hestonParams;
+  /**
+   * Check the inclusive Feller condition for canonical Heston dynamics.
+   * @param heston - Validated variance dynamics or the corresponding JSON document.
+   * @returns Whether twice kappa times theta is at least vol-of-vol squared.
+   * @throws TypeError for a non-JSON host argument and FinstackError for invalid dynamics.
+   */
+  readonly hestonParamsSatisfiesFeller: typeof wasm.hestonParamsSatisfiesFeller;
+  /**
    * Read the model-independent portion of constant-volatility option inputs.
    * @param market - Spot, strike, continuous decimal rate and carry, annualized decimal volatility, expiry in years and direction.
    * @returns The same contract inputs without its volatility assumption.
@@ -7167,29 +7156,19 @@ export interface ModelsNamespace {
    */
   readonly quantoOptionPrice: typeof wasm.quantoOptionPrice;
   /**
-   * Closed-form (Fourier) Heston price of a European option.
-   *
-   * Heston (1993): see docs/REFERENCES.md#heston-1993.
-   * Albrecher et al. (2007): see docs/REFERENCES.md#albrecher-2007-little-heston-trap.
-   * @param spot - Current spot price in the same units as the strike.
-   * @param strike - Option strike price.
-   * @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
-   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `vol_of_vol` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
-   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if `params` does not match
-   * `HestonPricingParams` or a parameter is non-finite or outside its domain,
-   * or the Fourier integration fails to produce a finite price.
-   * @returns Present-value per-unit option price.
-   *
+   * Price a European option by Heston Fourier inversion.
+   * @param contract - Positive spot and strike in quote units, finite annual continuous rates, nonnegative expiry in years, and call or put payoff. A zero expiry returns intrinsic value.
+   * @param heston - Checked opening variance, mean reversion, long-run variance, vol-of-vol and spot/variance correlation.
+   * @param settings - Optional integration settings with positive upper frequency u_max, positive panel count panels and Gauss–Legendre order gl_order in {2, 4, 8, 16}. Omission selects a grid using maturity and variance.
+   * @returns Present value per unit of the underlying in its quote currency.
+   * @throws TypeError for non-JSON inputs and FinstackError for invalid parameters or unresolved integration.
    * @example
-   * ```javascript
-   * const price = models.hestonPrice(100, 100, 1.0, {
-   *   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7,
-   * });
-   * // price ≈ 9.24
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+   * const heston = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+   * console.log(models.hestonPrice(contract, heston));
    * ```
    */
   readonly hestonPrice: typeof wasm.hestonPrice;

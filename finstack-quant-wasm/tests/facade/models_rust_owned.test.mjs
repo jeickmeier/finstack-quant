@@ -57,17 +57,33 @@ test('forward Greeks are the Rust ForwardGreeks object', () => {
   assert.ok(Math.abs(models.bachelierGreeks(0.03, 0.03, 0.0075, 1, true).delta - 0.5) < 1e-12);
 });
 
-test('hestonPrice dispatches the put through Rust', () => {
-  const params = { r: 0.05, q: 0.02, v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 };
-  const call = models.hestonPrice(100, 100, 1, params);
-  const put = models.hestonPrice(100, 100, 1, params, false);
+const heston = { v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 };
+const hestonContract = (optionType, dividendYield = 0) =>
+  models.optionContractParams({
+    spot: 100,
+    strike: 100,
+    rate: 0.05,
+    dividend_yield: dividendYield,
+    time_to_expiry: 1,
+    option_type: optionType,
+  });
+
+test('Fourier Heston delegates typed contracts and variance dynamics to Rust', () => {
+  const dynamics = models.hestonParams(heston);
+  assert.equal(models.hestonParamsSatisfiesFeller(dynamics), true);
+  const call = models.hestonPrice(hestonContract('call', 0.02), dynamics);
+  const put = models.hestonPrice(hestonContract('put', 0.02), dynamics);
   const parity = call - put - (100 * Math.exp(-0.02) - 100 * Math.exp(-0.05));
   assert.ok(Math.abs(parity) < 1e-8, `parity residual ${parity}`);
+  assert.throws(() => models.hestonPrice(hestonContract('call'), { ...dynamics, r: 0.05 }));
+  assert.throws(() =>
+    models.hestonPrice(hestonContract('call'), dynamics, { u_max: 2, panels: 1, gl_order: 3 })
+  );
 });
 
 test('priceHeston defaults numPaths and seed from the Rust registry and returns MoneyEstimate', () => {
-  const params = { r: 0.05, q: 0, v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 };
-  const est = models.monteCarlo.priceHeston(100, 100, 1, params, true, { num_steps: 1 });
+  const contract = hestonContract('call');
+  const est = models.monteCarlo.priceHeston(contract, heston, { num_steps: 1 });
   assert.equal(est.num_paths, 100000);
   assert.equal(typeof est.mean.amount, 'string');
   assert.equal(est.mean.currency, 'USD');
@@ -76,13 +92,13 @@ test('priceHeston defaults numPaths and seed from the Rust registry and returns 
     assert.equal(key in est, false, `${key} is not a MoneyEstimate field`);
   }
   // The registry seed is fixed, so the default run is reproducible.
-  const again = models.monteCarlo.priceHeston(100, 100, 1, params, true, {
+  const again = models.monteCarlo.priceHeston(contract, heston, {
     num_paths: null,
     seed: null,
     num_steps: 1,
   });
   assert.deepEqual(again, est);
-  const explicit = models.monteCarlo.priceHeston(100, 100, 1, params, false, {
+  const explicit = models.monteCarlo.priceHeston(hestonContract('put'), heston, {
     num_paths: 500,
     seed: 7n,
     num_steps: 4,

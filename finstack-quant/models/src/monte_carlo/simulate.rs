@@ -58,7 +58,6 @@
 //! - Hybrid scheme for the Volterra driver:
 //!   `docs/REFERENCES.md#bennedsen-lunde-pakkanen-2017`
 
-use crate::closed_form::HestonPricingParams;
 use crate::monte_carlo::discretization::cheyette_rough::CheyetteRoughEuler;
 use crate::monte_carlo::discretization::euler::{EulerMaruyama, LogEuler};
 use crate::monte_carlo::discretization::exact::{ExactGbm, ExactMultiGbm};
@@ -84,6 +83,7 @@ use crate::monte_carlo::process::cir::{CirParams, CirPlusPlusProcess, CirProcess
 use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess, MultiGbmProcess};
 use crate::monte_carlo::process::gbm_dividends::{Dividend, GbmWithDividends};
 use crate::monte_carlo::process::heston::HestonProcess;
+use crate::monte_carlo::process::heston::HestonProcessParams;
 use crate::monte_carlo::process::lmm::{LmmParams, LmmProcess};
 use crate::monte_carlo::process::local_vol::{LocalVolParams, LocalVolProcess};
 use crate::monte_carlo::process::multi_ou::{MultiOuParams, MultiOuProcess};
@@ -203,7 +203,7 @@ pub enum ProcessSpec {
     /// Supply only the strictly positive opening spot in `initial_state`.
     /// The process derives variance from its `v0` parameter and returns states
     /// as `[spot, variance]`.
-    Heston(HestonPricingParams),
+    Heston(HestonProcessParams),
     /// Schwartz-Smith two-factor commodity model.
     ///
     /// State: `[x, y]`, the short-term deviation and the long-term level of
@@ -660,7 +660,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             Ok(summary)
         }
         ProcessSpec::Heston(p) => {
-            let process = crate::closed_form::HestonPricingParams::new(
+            let process = crate::monte_carlo::process::heston::HestonProcessParams::new(
                 p.r,
                 p.q,
                 p.model.kappa,

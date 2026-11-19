@@ -41,7 +41,7 @@ mod strip_pricer;
 #[cfg(test)]
 pub(crate) use fourier_prices::heston_put_price_fourier;
 pub use fourier_prices::{heston_call_price_fourier, heston_price};
-pub use params::{HestonFourierSettings, HestonPricingParams};
+pub use params::HestonFourierSettings;
 pub(crate) use strip_pricer::HestonStripPricer;
 
 #[cfg(test)]

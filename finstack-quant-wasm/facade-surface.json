@@ -2516,6 +2516,8 @@
       "correlation",
       "credit",
       "factor",
+      "hestonParams",
+      "hestonParamsSatisfiesFeller",
       "hestonPrice",
       "liquidity",
       "lookbackOptionPrice",
@@ -3580,6 +3582,12 @@
     "kind": "function"
   },
   "models.optionContractParams": {
+    "kind": "function"
+  },
+  "models.hestonParams": {
+    "kind": "function"
+  },
+  "models.hestonParamsSatisfiesFeller": {
     "kind": "function"
   },
   "models.optionMarketParamsContract": {

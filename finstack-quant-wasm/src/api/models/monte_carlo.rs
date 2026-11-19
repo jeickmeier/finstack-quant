@@ -9,12 +9,11 @@
 //! spec, while the process, discretization and RNG types remain Rust-only.
 
 use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_opt_bool, js_opt_currency, js_opt_string, js_opt_u64,
-    js_opt_uint, js_u64, opt_from_js_json,
+    from_js_json, js_f64, js_opt_bool, js_opt_currency, js_opt_string, js_opt_u64, js_opt_uint,
+    js_u64, opt_from_js_json,
 };
 
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_models::closed_form::HestonPricingParams;
 use finstack_quant_models::monte_carlo::convenience;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
@@ -22,75 +21,44 @@ use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
-use finstack_quant_models::types::{OptionMarketParams, OptionType};
+use finstack_quant_models::types::{OptionContractParams, OptionMarketParams};
+use finstack_quant_models::volatility::heston::HestonParams;
 use wasm_bindgen::prelude::*;
 
-/// Price a European option under Heston stochastic volatility by Monte Carlo.
-///
-/// Twin of the Rust `price_heston` and the Fourier `models.hestonPrice`: same
-/// market and model inputs, with Monte Carlo settings in place of the Fourier
-/// settings. Paths use the Andersen (2008) QE discretization.
-///
-/// # Errors
-///
-/// Throws a `validation` error if `params` does not match
-/// `HestonPricingParams` (non-finite `r`/`q`, non-positive or non-finite
-/// `kappa`, `theta`, `vol_of_vol` or `v0`, `rho` outside `[-1, 1]`) or
-/// `settings` does not match `HestonMcSettings` (unknown currency, a
-/// fractional or out-of-range count), if the embedded defaults cannot be
-/// loaded, the expiry, step count, path count or computed discount factor
-/// fails validation, a simulated discounted payoff is non-finite, or the
-/// result cannot be serialized.
-/// @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as
-/// `{amount, currency}` money, plus `stderr`, `num_paths`,
-/// `num_simulated_paths` and the optional statistics (`null` when not captured).
-/// @param spot - Current spot price or exchange rate in the same units as the strike.
-/// @param strike - Option strike price in the same price units as the underlying.
-/// @param expiry - Time to option expiry in years on the model's annual time basis.
-/// @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield, decimal), `v0` (initial instantaneous variance), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `vol_of_vol` (annualized volatility of variance) and `rho` (asset/variance shock correlation in `[-1, 1]`).
-/// @param isCall - Whether to value a call (`true`) or put (`false`).
-/// @param settings - Optional `HestonMcSettings` object or JSON text; every key may be omitted and an omitted key uses the Rust registry European-pricer default: `num_paths` (independent path estimators in `[2, 10000000]`, each antithetic pair counts once; default 100 000), `seed` (Philox root seed, number or BigInt), `num_steps` (positive time steps per path) and `currency` (ISO-4217 code stamped on the estimate).
-///
+/// Price a European Heston option by quadratic-exponential Monte Carlo.
+/// @param contract - Spot and strike in quote currency, positive expiry in years, annual continuous rates, and call or put payoff.
+/// @param heston - Checked opening variance, mean reversion, long-run variance, vol-of-vol and spot/variance correlation.
+/// @param settings - Optional independent path estimator count, Philox seed, uniform step count, and ISO currency. Omitted values use the registry defaults.
+/// @returns Discounted price, standard error, confidence interval, and path counts as MoneyEstimate.
+/// @throws TypeError for non-JSON inputs and FinstackError for invalid dynamics, settings, or simulated discounted payoffs.
 /// @example
 /// ```typescript
 /// import init, { models } from "finstack-quant-wasm";
 /// await init();
-/// const estimate = models.monteCarlo.priceHeston(
-///   100, 100, 1.0,
-///   { r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 },
-///   true,
-///   { num_paths: 2000, seed: 42, num_steps: 16 },
-/// );
+/// const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+/// const model = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+/// const estimate = models.monteCarlo.priceHeston(contract, model, { num_paths: 2000, seed: 42 });
 /// console.log(estimate.mean.amount, estimate.stderr);
 /// ```
 #[wasm_bindgen(js_name = priceHeston, unchecked_return_type = "MoneyEstimate")]
 pub fn price_heston(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonPricingParams | string")]
-    params: JsValue,
-    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionContractParams | string")]
+    contract: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonParams | string")]
+    heston: JsValue,
     #[wasm_bindgen(
         unchecked_optional_param_type = "generated.models.HestonMcSettings | string | null"
     )]
     settings: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    use finstack_quant_models::monte_carlo::pricer::heston as canonical;
-
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let expiry = js_f64(&expiry, "expiry")?;
-    let params: HestonPricingParams = from_js_json(&params, "params")?;
-    let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
-    // The canonical entry point owns the registry defaults for path count,
-    // seed, step count, currency, and (wasm-gated) parallelism; the binding
-    // only marshals explicitly supplied values.
-    let settings: canonical::HestonMcSettings =
-        opt_from_js_json(settings.as_ref(), "settings")?.unwrap_or_default();
-    let est = canonical::price_heston(spot, strike, expiry, &params, option_type, &settings)
-        .map_err(to_js_err)?;
-    crate::utils::to_js_value(&est)
+    let contract: OptionContractParams = from_js_json(&contract, "contract")?;
+    let heston: HestonParams = from_js_json(&heston, "heston")?;
+    let settings = opt_from_js_json(settings.as_ref(), "settings")?;
+    let estimate = finstack_quant_models::monte_carlo::pricer::heston::price_heston(
+        &contract, &heston, settings,
+    )
+    .map_err(to_js_err)?;
+    crate::utils::to_js_value(&estimate)
 }
 
 /// Whether Heston parameters satisfy the Feller condition `2 * kappa * theta >= volOfVol^2`.

@@ -17,6 +17,7 @@ ForwardGreeks = _models.ForwardGreeks
 OptionCalculationResult = _models.OptionCalculationResult
 OptionMarketParams = _models.OptionMarketParams
 OptionContractParams = _models.OptionContractParams
+HestonParams = _models.HestonParams
 asian_option_price = _models.asian_option_price
 bachelier_greeks = _models.bachelier_greeks
 bachelier_price = _models.bachelier_price
@@ -43,6 +44,7 @@ vg_cos_price = _models.vg_cos_price
 __all__: list[str] = [
     "BsGreeks",
     "ForwardGreeks",
+    "HestonParams",
     "OptionCalculationResult",
     "OptionContractParams",
     "OptionMarketParams",

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from typing import Any
+
+from .._closed_form import HestonParams, OptionContractParams
 from finstack_quant.models.monte_carlo._results import MoneyEstimate, PathSummary
 
 def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
@@ -203,79 +205,47 @@ def heston_satisfies_feller(kappa: float, theta: float, vol_of_vol: float) -> bo
     ...
 
 def price_heston(
-    spot: float,
-    strike: float,
-    expiry: float,
-    params: dict[str, Any] | str,
-    is_call: bool,
+    contract: OptionContractParams | dict[str, Any] | str,
+    heston: HestonParams | dict[str, Any] | str,
     settings: dict[str, Any] | str | None = None,
 ) -> MoneyEstimate:
-    """
-    Monte Carlo European option under Heston stochastic volatility.
-
-    Simulates spot and variance with Andersen's quadratic-exponential (QE)
-    discretization, which stays stable when the Feller condition is violated.
-    Mirrors the Fourier :func:`finstack_quant.models.heston_price`: the same
-    market and model inputs, with Monte Carlo settings in place of the
-    Fourier settings.
+    """Price a European Heston option using quadratic-exponential Monte Carlo.
 
     Parameters
     ----------
-    spot : float
-        Initial spot price.
-    strike : float
-        Strike price.
-    expiry : float
-        Time to maturity in years.
-    params : dict or str
-        Serde form of the Rust ``HestonPricingParams``, as a dict or JSON text.
-        Every key is required: ``r`` (continuously compounded risk-free rate,
-        decimal); ``q`` (continuous dividend yield, decimal); ``v0`` (initial
-        variance, not volatility); ``kappa`` (mean-reversion speed of
-        variance); ``theta`` (long-run variance level); ``vol_of_vol``
-        (volatility of variance, ``sigma`` in Heston notation); ``rho``
-        (correlation between spot and variance Brownian motions in
-        ``[-1, 1]``).
-    is_call : bool
-        ``True`` for a call paying ``max(S_T - K, 0)``, ``False`` for a put
-        paying ``max(K - S_T, 0)``.
+    contract : OptionContractParams or dict or str
+        Spot and strike in quote currency, positive expiry in years, annual
+        continuous rates and a call or put payoff.
+    heston : HestonParams or dict or str
+        Validated opening variance and stochastic variance dynamics or their
+        canonical structured form.
     settings : dict or str, optional
-        Serde form of the Rust ``HestonMcSettings``, as a dict or JSON text.
-        Every key is optional and an omitted key (or ``settings=None``) takes
-        the registry binding default: ``num_paths`` (independent path
-        estimators in ``[2, 10_000_000]``, each antithetic pair counts once;
-        default ``100_000``); ``seed`` (RNG seed, default ``42``);
-        ``num_steps`` (time steps per path, default ``252``); ``currency``
-        (ISO currency code stamped on the result).
+        Optional independent estimator count num_paths, Philox seed, uniform
+        step count num_steps, and ISO result currency. Omitted keys use the
+        registry defaults.
 
     Returns
     -------
     MoneyEstimate
-        Discounted Monte Carlo price with stderr and confidence bands.
+        Discounted option price and sampling uncertainty.
 
     Raises
     ------
     ValueError
-        If ``params`` or ``settings`` has an unknown key or a wrongly typed
-        value, ``params`` misses a key, the Heston parameters, expiry, path
-        count, step count, or the discount factor fail validation, or a
-        simulated discounted payoff is non-finite. Violating the Feller
-        condition does not raise.
-
-    Sources
-    -------
-    - Heston (1993): see docs/REFERENCES.md#heston-1993
-    - Andersen QE (2008): see docs/REFERENCES.md#andersen-2008-heston-qe
+        If a structured input, model parameter, simulation setting, or computed payoff is invalid.
 
     Examples
     --------
+    >>> from finstack_quant.models import HestonParams, OptionContractParams
     >>> from finstack_quant.models.monte_carlo import price_heston
-    >>> params = {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7}
-    >>> r = price_heston(100, 100, 1.0, params, True, {"num_paths": 5000})
-    >>> r.num_paths
+    >>> contract = OptionContractParams(
+    ...     spot=100, strike=100, rate=0.05, dividend_yield=0, time_to_expiry=1, option_type="put"
+    ... )
+    >>> heston = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.3, rho=-0.7)
+    >>> estimate = price_heston(contract, heston, {"num_paths": 5000})
+    >>> estimate.num_paths
     5000
-    >>> put = price_heston(100, 100, 1.0, params, False, {"num_paths": 5000})
-    >>> put.mean.amount > 0
+    >>> estimate.mean.amount > 0
     True
     """
     ...

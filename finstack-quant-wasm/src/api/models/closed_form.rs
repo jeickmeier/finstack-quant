@@ -11,21 +11,21 @@
 //! default). `bsGreeks` and the barrier, Asian, lookback and quanto prices
 //! take the shared `OptionMarketParams` object (`market`: `spot`, `strike`,
 //! `rate`, `dividend_yield`, `volatility`, `time_to_expiry`, `option_type`);
-//! `hestonPrice` takes `HestonPricingParams` (`params`).
+//! `hestonPrice` takes an option contract and the Heston variance dynamics.
 //!
 //! Named-model sources: `docs/REFERENCES.md#black-scholes-1973`,
 //! `docs/REFERENCES.md#merton-1973`, `docs/REFERENCES.md#garman-kohlhagen-1983`,
 //! `docs/REFERENCES.md#black-1976`.
 
 use crate::utils::input::{
-    from_js_json, from_js_json_exact, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string,
-    js_string, js_uint,
+    from_js_json, from_js_json_exact, js_bool, js_f64, js_opt_f64, js_opt_string, js_string,
+    js_uint, opt_from_js_json,
 };
 use crate::utils::to_js_err;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::{
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
-    HestonPricingParams, OptionCalculation, asian_option_price as asian_option_price_core,
+    HestonFourierSettings, OptionCalculation, asian_option_price as asian_option_price_core,
     bachelier_greeks as bachelier_greeks_core, bachelier_price as bachelier_price_core,
     barrier_option_price as barrier_option_price_core,
     black_shifted_price as black_shifted_price_core, black_shifted_vega as black_shifted_vega_core,
@@ -37,7 +37,8 @@ use finstack_quant_models::closed_form::{
     vanilla_expiry_payoff as vanilla_expiry_payoff_core,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_models::types::{OptionMarketParams, OptionType};
+use finstack_quant_models::types::{OptionContractParams, OptionMarketParams, OptionType};
+use finstack_quant_models::volatility::heston::HestonParams;
 use wasm_bindgen::prelude::*;
 
 /// Price a closed-form option or invert its price, with Greeks at the
@@ -755,48 +756,60 @@ pub fn quanto_option_price(
     quanto_option_price_core(&market, rate_foreign, vol_fx, correlation).map_err(to_js_err)
 }
 
-/// Closed-form (Fourier) Heston price of a European option.
-///
-/// Heston (1993): see docs/REFERENCES.md#heston-1993.
-/// Albrecher et al. (2007): see docs/REFERENCES.md#albrecher-2007-little-heston-trap.
-/// @param spot - Current spot price in the same units as the strike.
-/// @param strike - Option strike price.
-/// @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
-/// @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `vol_of_vol` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
-/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `params` does not match
-/// `HestonPricingParams` or a parameter is non-finite or outside its domain,
-/// or the Fourier integration fails to produce a finite price.
-/// @returns Present-value per-unit option price.
-///
+/// Construct checked Heston stochastic variance dynamics.
+/// @param heston - Positive opening variance v0, mean-reversion speed kappa per year, positive long-run variance theta, positive annualized vol_of_vol, and spot/variance correlation rho in (-1, 1).
+/// @returns Canonical validated variance parameters usable by Heston pricing.
+/// @throws TypeError for a non-JSON host argument and FinstackError for invalid dynamics.
+#[wasm_bindgen(js_name = hestonParams, unchecked_return_type = "generated.models.HestonParams")]
+pub fn heston_params(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonParams")] heston: JsValue,
+) -> Result<JsValue, JsValue> {
+    let heston: HestonParams = from_js_json_exact(&heston, "heston")?;
+    crate::utils::to_js_value(&heston)
+}
+
+/// Check the inclusive Feller condition for canonical Heston dynamics.
+/// @param heston - Validated variance dynamics or the corresponding JSON document.
+/// @returns Whether twice kappa times theta is at least vol-of-vol squared.
+/// @throws TypeError for a non-JSON host argument and FinstackError for invalid dynamics.
+#[wasm_bindgen(js_name = hestonParamsSatisfiesFeller)]
+pub fn heston_params_satisfies_feller(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonParams | string")]
+    heston: JsValue,
+) -> Result<bool, JsValue> {
+    let heston: HestonParams = from_js_json(&heston, "heston")?;
+    Ok(heston.satisfies_feller())
+}
+
+/// Price a European option by Heston Fourier inversion.
+/// @param contract - Positive spot and strike in quote units, finite annual continuous rates, nonnegative expiry in years, and call or put payoff. A zero expiry returns intrinsic value.
+/// @param heston - Checked opening variance, mean reversion, long-run variance, vol-of-vol and spot/variance correlation.
+/// @param settings - Optional integration settings with positive upper frequency u_max, positive panel count panels and Gauss–Legendre order gl_order in {2, 4, 8, 16}. Omission selects a grid using maturity and variance.
+/// @returns Present value per unit of the underlying in its quote currency.
+/// @throws TypeError for non-JSON inputs and FinstackError for invalid parameters or unresolved integration.
 /// @example
-/// ```javascript
-/// const price = models.hestonPrice(100, 100, 1.0, {
-///   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7,
-/// });
-/// // price ≈ 9.24
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+/// const heston = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+/// console.log(models.hestonPrice(contract, heston));
 /// ```
 #[wasm_bindgen(js_name = hestonPrice)]
 pub fn heston_price(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonPricingParams | string")]
-    params: JsValue,
-    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
-        JsValue,
-    >,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionContractParams | string")]
+    contract: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonParams | string")]
+    heston: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.models.HestonFourierSettings | string | null"
+    )]
+    settings: Option<JsValue>,
 ) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let expiry = js_f64(&expiry, "expiry")?;
-    let params: HestonPricingParams = from_js_json(&params, "params")?;
-    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    let option_type = OptionType::from(is_call.unwrap_or(true));
-    heston_price_core(spot, strike, expiry, &params, option_type, None).map_err(to_js_err)
+    let contract: OptionContractParams = from_js_json(&contract, "contract")?;
+    let heston: HestonParams = from_js_json(&heston, "heston")?;
+    let settings: Option<HestonFourierSettings> = opt_from_js_json(settings.as_ref(), "settings")?;
+    heston_price_core(&contract, &heston, settings.as_ref()).map_err(to_js_err)
 }
 
 /// Whether a set of Black-Scholes Greeks is internally consistent: gamma and

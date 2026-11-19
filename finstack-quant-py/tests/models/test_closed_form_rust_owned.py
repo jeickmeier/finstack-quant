@@ -14,7 +14,9 @@ import pytest
 from finstack_quant.models import (
     BsGreeks,
     ForwardGreeks,
+    HestonParams,
     OptionCalculationResult,
+    OptionContractParams,
     bachelier_greeks,
     bachelier_price,
     black76_greeks,
@@ -64,21 +66,23 @@ def test_forward_greeks_is_typed_with_pandas_exits() -> None:
 
 
 def test_heston_price_dispatches_put_through_rust() -> None:
-    call = heston_price(
-        100.0,
-        100.0,
-        1.0,
-        {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
-    )
-    put = heston_price(
-        100.0,
-        100.0,
-        1.0,
-        {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
-        is_call=False,
-    )
+    market = {
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.02,
+        "time_to_expiry": 1.0,
+    }
+    dynamics = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.3, rho=-0.7)
+    assert dynamics.satisfies_feller()
+    assert HestonParams.from_json(dynamics.to_json()) == dynamics
+    call_contract = OptionContractParams(**market, option_type="call")
+    call = heston_price(call_contract, dynamics)
+    put = heston_price({**market, "option_type": "put"}, dynamics.to_json())
     parity = call - put - (100.0 * math.exp(-0.02) - 100.0 * math.exp(-0.05))
     assert abs(parity) < 1e-8
+    with pytest.raises(ValueError, match="gl_order"):
+        heston_price(call_contract, dynamics, {"u_max": 2, "panels": 1, "gl_order": 3})
 
 
 def test_sabr_smile_single_strike_and_arbitrage_verdict_come_from_rust() -> None:

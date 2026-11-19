@@ -69,7 +69,14 @@ const HESTON_EXPONENT_REAL_LIMIT: f64 = 700.0;
 /// let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).unwrap();
 /// assert!(params.satisfies_feller());
 ///
-/// let call = finstack_quant_models::closed_form::heston_call_price_fourier(100.0, 100.0, 1.0, &finstack_quant_models::closed_form::HestonPricingParams { r: 0.05, q: 0.0, model: params }, None).expect("checked Heston price");
+/// use finstack_quant_models::types::{OptionContractParams, OptionType};
+/// let contract = OptionContractParams {
+///     spot: 100.0, strike: 100.0, rate: 0.05, dividend_yield: 0.0,
+///     time_to_expiry: 1.0, option_type: OptionType::Call,
+/// };
+/// let call = finstack_quant_models::closed_form::heston_call_price_fourier(
+///     &contract, &params, None,
+/// ).expect("checked Heston price");
 /// assert!(call > 0.0 && call < 100.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -526,17 +533,25 @@ mod tests {
     #[test]
     fn call_price_positive_and_bounded() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let call = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            100.0,
-            1.0,
-            &crate::closed_form::HestonPricingParams {
+        let call = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        )
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
         assert!(call > 0.0, "Call should be positive, got {call}");
         assert!(call < 100.0, "Call should be < spot, got {call}");
@@ -551,19 +566,28 @@ mod tests {
         let q = 0.02;
         let t = 1.0;
 
-        let call = crate::closed_form::heston_call_price_fourier(
-            s,
-            k,
-            t,
-            &crate::closed_form::HestonPricingParams { r, q, model: p },
-            None,
-        )
+        let call = {
+            let dynamics =
+                &crate::monte_carlo::process::heston::HestonProcessParams { r, q, model: p };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: s,
+                    strike: k,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: t,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
         let put = crate::closed_form::heston_put_price_fourier(
             s,
             k,
             t,
-            &crate::closed_form::HestonPricingParams { r, q, model: p },
+            &crate::monte_carlo::process::heston::HestonProcessParams { r, q, model: p },
             None,
         )
         .expect("checked Heston price");
@@ -580,41 +604,65 @@ mod tests {
     #[test]
     fn moneyness_ordering() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let itm = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            90.0,
-            1.0,
-            &crate::closed_form::HestonPricingParams {
+        let itm = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        )
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 90.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
-        let atm = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            100.0,
-            1.0,
-            &crate::closed_form::HestonPricingParams {
+        let atm = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        )
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
-        let otm = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            110.0,
-            1.0,
-            &crate::closed_form::HestonPricingParams {
+        let otm = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        )
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 110.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
 
         assert!(itm > atm, "ITM > ATM: {itm:.4} vs {atm:.4}");
@@ -627,17 +675,25 @@ mod tests {
         let var = vol * vol;
         // vol_of_vol → 0: Heston degenerates to Black-Scholes
         let p = HestonParams::new(var, 2.0, var, 1e-12, 0.0).expect("valid");
-        let heston = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            100.0,
-            1.0,
-            &crate::closed_form::HestonPricingParams {
+        let heston = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        )
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
         let bs = bs_reference(100.0, 100.0, 0.05, 0.0, 1.0, vol, true);
 
@@ -681,17 +737,25 @@ mod tests {
 
         // The limiting price must match Black-Scholes at σ = √v̄ (≈ 23.5%),
         // not at √v0 = 10%.
-        let heston = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            100.0,
-            t,
-            &crate::closed_form::HestonPricingParams {
+        let heston = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        )
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: t,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
         let bs_avg = bs_reference(100.0, 100.0, 0.05, 0.0, t, v_bar.sqrt(), true);
         let bs_v0 = bs_reference(100.0, 100.0, 0.05, 0.0, t, v0.sqrt(), true);
@@ -718,19 +782,28 @@ mod tests {
         let t: f64 = 0.5;
 
         for &strike in &[220.0_f64, 260.0, 300.0] {
-            let call = crate::closed_form::heston_call_price_fourier(
-                spot,
-                strike,
-                t,
-                &crate::closed_form::HestonPricingParams { r, q, model: p },
-                None,
-            )
+            let call = {
+                let dynamics =
+                    &crate::monte_carlo::process::heston::HestonProcessParams { r, q, model: p };
+                crate::closed_form::heston_call_price_fourier(
+                    &crate::types::OptionContractParams {
+                        spot,
+                        strike,
+                        rate: dynamics.r,
+                        dividend_yield: dynamics.q,
+                        time_to_expiry: t,
+                        option_type: crate::types::OptionType::Call,
+                    },
+                    &dynamics.model,
+                    None,
+                )
+            }
             .expect("checked Heston price");
             let put = crate::closed_form::heston_put_price_fourier(
                 spot,
                 strike,
                 t,
-                &crate::closed_form::HestonPricingParams { r, q, model: p },
+                &crate::monte_carlo::process::heston::HestonProcessParams { r, q, model: p },
                 None,
             )
             .expect("checked Heston price");
@@ -773,31 +846,47 @@ mod tests {
     #[test]
     fn expired_option() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let itm_call = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            90.0,
-            0.0,
-            &crate::closed_form::HestonPricingParams {
+        let itm_call = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        )
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 90.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 0.0,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
         assert!((itm_call - 10.0).abs() < 1e-10, "Expired ITM call");
 
-        let otm_call = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            110.0,
-            0.0,
-            &crate::closed_form::HestonPricingParams {
+        let otm_call = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        )
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 110.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 0.0,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
         .expect("checked Heston price");
         assert!(otm_call.abs() < 1e-10, "Expired OTM call");
 
@@ -805,7 +894,7 @@ mod tests {
             100.0,
             110.0,
             0.0,
-            &crate::closed_form::HestonPricingParams {
+            &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
@@ -819,17 +908,25 @@ mod tests {
     #[test]
     fn invalid_inputs_return_errors() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let price = crate::closed_form::heston_call_price_fourier(
-            100.0,
-            0.0,
-            1.0,
-            &crate::closed_form::HestonPricingParams {
+        let price = {
+            let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.0,
                 model: p,
-            },
-            None,
-        );
+            };
+            crate::closed_form::heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 0.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        };
         assert!(price.is_err());
     }
 
@@ -848,23 +945,31 @@ mod tests {
     fn public_heston_paths_share_short_expiry_convergence() {
         let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.7).expect("valid");
         for (t, expected) in [(0.001, 0.254803543342), (0.0001, 0.080038149868)] {
-            let scalar = crate::closed_form::heston_call_price_fourier(
-                100.0,
-                100.0,
-                t,
-                &crate::closed_form::HestonPricingParams {
+            let scalar = {
+                let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                     r: 0.05,
                     q: 0.0,
                     model: params,
-                },
-                None,
-            )
+                };
+                crate::closed_form::heston_call_price_fourier(
+                    &crate::types::OptionContractParams {
+                        spot: 100.0,
+                        strike: 100.0,
+                        rate: dynamics.r,
+                        dividend_yield: dynamics.q,
+                        time_to_expiry: t,
+                        option_type: crate::types::OptionType::Call,
+                    },
+                    &dynamics.model,
+                    None,
+                )
+            }
             .expect("checked Heston price");
             let strip = crate::closed_form::heston_call_prices_fourier(
                 100.0,
                 &[100.0],
                 t,
-                &crate::closed_form::HestonPricingParams {
+                &crate::monte_carlo::process::heston::HestonProcessParams {
                     r: 0.05,
                     q: 0.0,
                     model: params,
@@ -886,7 +991,7 @@ mod tests {
             100.0,
             &strikes,
             1.0,
-            &crate::closed_form::HestonPricingParams {
+            &crate::monte_carlo::process::heston::HestonProcessParams {
                 r: 0.05,
                 q: 0.02,
                 model: params,
@@ -897,17 +1002,25 @@ mod tests {
 
         assert_eq!(strip_prices.len(), strikes.len());
         for (idx, &strike) in strikes.iter().enumerate() {
-            let single_price = crate::closed_form::heston_call_price_fourier(
-                100.0,
-                strike,
-                1.0,
-                &crate::closed_form::HestonPricingParams {
+            let single_price = {
+                let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                     r: 0.05,
                     q: 0.02,
                     model: params,
-                },
-                None,
-            )
+                };
+                crate::closed_form::heston_call_price_fourier(
+                    &crate::types::OptionContractParams {
+                        spot: 100.0,
+                        strike,
+                        rate: dynamics.r,
+                        dividend_yield: dynamics.q,
+                        time_to_expiry: 1.0,
+                        option_type: crate::types::OptionType::Call,
+                    },
+                    &dynamics.model,
+                    None,
+                )
+            }
             .expect("checked Heston price");
             assert!(
                 (strip_prices[idx] - single_price).abs() < 1e-5,
@@ -927,7 +1040,7 @@ mod tests {
         let q: f64 = 0.02;
         let t: f64 = 1.0;
         let strikes = [85.0, 95.0, 100.0, 105.0, 115.0];
-        let pricing = crate::closed_form::HestonPricingParams {
+        let pricing = crate::monte_carlo::process::heston::HestonProcessParams {
             r,
             q,
             model: params,
@@ -961,7 +1074,7 @@ mod tests {
             spot,
             &strikes,
             t,
-            &crate::closed_form::HestonPricingParams {
+            &crate::monte_carlo::process::heston::HestonProcessParams {
                 r,
                 q,
                 model: params,
@@ -971,17 +1084,25 @@ mod tests {
         .expect("checked Heston price");
 
         for (idx, &strike) in strikes.iter().enumerate() {
-            let single_price = crate::closed_form::heston_call_price_fourier(
-                spot,
-                strike,
-                t,
-                &crate::closed_form::HestonPricingParams {
+            let single_price = {
+                let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                     r,
                     q,
                     model: params,
-                },
-                None,
-            )
+                };
+                crate::closed_form::heston_call_price_fourier(
+                    &crate::types::OptionContractParams {
+                        spot,
+                        strike,
+                        rate: dynamics.r,
+                        dividend_yield: dynamics.q,
+                        time_to_expiry: t,
+                        option_type: crate::types::OptionType::Call,
+                    },
+                    &dynamics.model,
+                    None,
+                )
+            }
             .expect("checked Heston price");
             assert!(
                 (strip_prices[idx] - single_price).abs() < 1e-5,

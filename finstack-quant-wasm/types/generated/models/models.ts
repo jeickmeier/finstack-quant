@@ -4164,6 +4164,23 @@ export interface RatingScale {
   labels: string[];
 }
 /**
+ * Numerical settings for Heston Fourier integration.
+ */
+export interface HestonFourierSettings {
+  /**
+   * Gauss-Legendre order per panel (default: 16)
+   */
+  gl_order: number;
+  /**
+   * Number of panels for composite Gauss-Legendre (default: 100)
+   */
+  panels: number;
+  /**
+   * Upper limit for Fourier integral (default: 100)
+   */
+  u_max: number;
+}
+/**
  * Monte Carlo run settings of the Heston European pricer.
  */
 export interface HestonMcSettings {
@@ -4193,39 +4210,6 @@ export interface HestonParams {
    * Mean reversion speed.
    */
   kappa: number;
-  /**
-   * Spot-variance correlation.
-   */
-  rho: number;
-  /**
-   * Long-run variance.
-   */
-  theta: number;
-  /**
-   * Initial variance.
-   */
-  v0: number;
-  /**
-   * Vol-of-vol.
-   */
-  vol_of_vol: number;
-}
-/**
- * Market inputs for closed-form Heston pricing.
- */
-export interface HestonPricingParams {
-  /**
-   * Mean reversion speed.
-   */
-  kappa: number;
-  /**
-   * Continuously compounded dividend or foreign yield as an annual decimal.
-   */
-  q: number;
-  /**
-   * Continuously compounded risk-free rate as an annual decimal.
-   */
-  r: number;
   /**
    * Spot-variance correlation.
    */

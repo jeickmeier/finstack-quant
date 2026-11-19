@@ -104,7 +104,7 @@ fn cir_plus_plus() -> ProcessSpec {
 }
 
 fn heston() -> ProcessSpec {
-    ProcessSpec::Heston(HestonPricingParams::new(0.04, 0.01, 2.0, 0.05, 0.3, -0.7, 0.03).unwrap())
+    ProcessSpec::Heston(HestonProcessParams::new(0.04, 0.01, 2.0, 0.05, 0.3, -0.7, 0.03).unwrap())
 }
 
 fn schwartz_smith() -> ProcessSpec {
@@ -492,10 +492,11 @@ fn single_factor_correlated_and_internally_correlated_arms_match_the_engine() {
 
     let mut s = spec(heston(), &[100.0], 6);
     s.num_paths = 8;
-    let process =
-        crate::closed_form::HestonPricingParams::new(0.04, 0.01, 2.0, 0.05, 0.3, -0.7, 0.03)
-            .map(HestonProcess::new)
-            .unwrap();
+    let process = crate::monte_carlo::process::heston::HestonProcessParams::new(
+        0.04, 0.01, 2.0, 0.05, 0.3, -0.7, 0.03,
+    )
+    .map(HestonProcess::new)
+    .unwrap();
     assert_eq!(
         simulate_paths(&s).unwrap().values,
         engine_states(&process, &QeHeston::new(), &[100.0, 0.03], 8)

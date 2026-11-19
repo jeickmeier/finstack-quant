@@ -131,10 +131,15 @@ def test_new_closed_form_bindings_run() -> None:
         > 0.0
     )
     p = heston_price(
-        100.0,
-        100.0,
-        1.0,
-        {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
+        {
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.02,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        {"v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
     )
     assert 5.0 < p < 15.0
 

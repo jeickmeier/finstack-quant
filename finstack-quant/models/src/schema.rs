@@ -12,7 +12,7 @@
 use finstack_quant_core::schema::SchemaArtifact;
 
 use crate::closed_form::{
-    BsGreeks, ForwardGreeks, HestonPricingParams, OptionCalculation, OptionCalculationResult,
+    BsGreeks, ForwardGreeks, HestonFourierSettings, OptionCalculation, OptionCalculationResult,
 };
 use crate::monte_carlo::pricer::lsmc::LsmcResult;
 use crate::monte_carlo::simulate::{
@@ -326,18 +326,18 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Monte Carlo run settings of the Heston European pricer."
     ),
     finstack_quant_core::schema_artifact!(
+        HestonFourierSettings,
+        "models",
+        "heston_fourier_settings",
+        Input,
+        "Numerical settings for Heston Fourier integration."
+    ),
+    finstack_quant_core::schema_artifact!(
         HestonParams,
         "models",
         "heston_params",
         Input,
         "Heston stochastic volatility model parameters."
-    ),
-    finstack_quant_core::schema_artifact!(
-        HestonPricingParams,
-        "models",
-        "heston_pricing_params",
-        Input,
-        "Market inputs for closed-form Heston pricing."
     ),
     finstack_quant_core::schema_artifact!(
         HullWhite1FParams,

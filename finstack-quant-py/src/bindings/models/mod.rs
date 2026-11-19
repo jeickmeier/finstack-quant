@@ -37,6 +37,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "ForwardGreeks",
             "OptionCalculationResult",
             "OptionContractParams",
+            "HestonParams",
             "OptionMarketParams",
             "asian_option_price",
             "bachelier_greeks",

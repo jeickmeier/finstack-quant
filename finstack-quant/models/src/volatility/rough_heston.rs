@@ -1116,17 +1116,25 @@ mod tests {
 
         for &strike in &[80.0, 90.0, 100.0, 110.0, 120.0] {
             let rough_price = rough.price_european(spot, strike, r, q, t, true);
-            let heston_price = crate::closed_form::heston_call_price_fourier(
-                spot,
-                strike,
-                t,
-                &crate::closed_form::HestonPricingParams {
+            let heston_price = {
+                let dynamics = &crate::monte_carlo::process::heston::HestonProcessParams {
                     r,
                     q,
                     model: standard,
-                },
-                None,
-            )
+                };
+                crate::closed_form::heston_call_price_fourier(
+                    &crate::types::OptionContractParams {
+                        spot,
+                        strike,
+                        rate: dynamics.r,
+                        dividend_yield: dynamics.q,
+                        time_to_expiry: t,
+                        option_type: crate::types::OptionType::Call,
+                    },
+                    &dynamics.model,
+                    None,
+                )
+            }
             .expect("checked Heston price");
             let rel_diff = (rough_price - heston_price).abs() / heston_price;
             assert!(

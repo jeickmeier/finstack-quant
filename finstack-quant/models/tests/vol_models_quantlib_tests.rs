@@ -447,30 +447,47 @@ fn test_vol_models_quantlib_parity() {
                 *counts.entry("heston").or_default() += 1;
                 let params =
                     HestonParams::new(*v0, *kappa, *theta, *sigma, *rho).expect("valid Heston");
-                let call = finstack_quant_models::closed_form::heston_call_price_fourier(
-                    *spot,
-                    *strike,
-                    *t,
-                    &finstack_quant_models::closed_form::HestonPricingParams {
-                        r: *rate,
-                        q: *dividend_yield,
-                        model: params,
-                    },
-                    None,
-                )
+                let call = {
+                    let dynamics =
+                        &finstack_quant_models::monte_carlo::process::heston::HestonProcessParams {
+                            r: *rate,
+                            q: *dividend_yield,
+                            model: params,
+                        };
+                    finstack_quant_models::closed_form::heston_call_price_fourier(
+                        &finstack_quant_models::types::OptionContractParams {
+                            spot: *spot,
+                            strike: *strike,
+                            rate: dynamics.r,
+                            dividend_yield: dynamics.q,
+                            time_to_expiry: *t,
+                            option_type: finstack_quant_models::types::OptionType::Call,
+                        },
+                        &dynamics.model,
+                        None,
+                    )
+                }
                 .expect("checked Heston price");
-                let put = finstack_quant_models::closed_form::heston_price(
-                    *spot,
-                    *strike,
-                    *t,
-                    &finstack_quant_models::closed_form::HestonPricingParams {
-                        r: *rate,
-                        q: *dividend_yield,
-                        model: params,
-                    },
-                    finstack_quant_models::types::OptionType::Put,
-                    None,
-                )
+                let put = {
+                    let dynamics =
+                        &finstack_quant_models::monte_carlo::process::heston::HestonProcessParams {
+                            r: *rate,
+                            q: *dividend_yield,
+                            model: params,
+                        };
+                    finstack_quant_models::closed_form::heston_price(
+                        &finstack_quant_models::types::OptionContractParams {
+                            spot: *spot,
+                            strike: *strike,
+                            rate: dynamics.r,
+                            dividend_yield: dynamics.q,
+                            time_to_expiry: *t,
+                            option_type: finstack_quant_models::types::OptionType::Put,
+                        },
+                        &dynamics.model,
+                        None,
+                    )
+                }
                 .expect("checked Heston price");
                 let tol = expected.tolerance_rel;
                 check_rel(&mut failures, id, "call", call, expected.call, tol);
