@@ -50,6 +50,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "bs_greeks",
             "bs_implied_vol",
             "bs_price",
+            "bs_price_many",
+            "bs_greeks_many",
             "correlation",
             "credit",
             "factor",

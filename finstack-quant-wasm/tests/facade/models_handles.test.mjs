@@ -1001,3 +1001,26 @@ test('credit registry methods require exact IDs and an explicit recovery calibra
     kind('not_found')
   );
 });
+
+test('BS batch pricing aligns spot and strike coordinates and broadcasts a scalar', () => {
+  const market = {
+    spot: 100,
+    strike: 90,
+    rate: 0.025,
+    volatility: 0.21,
+    time_to_expiry: 1.3,
+    dividend_yield: 0.015,
+    option_type: 'put',
+  };
+  const spots = new Float64Array([71, 118, 135]);
+  const strikes = [80, 98, 121];
+  assert.deepEqual(
+    Array.from(models.bsPriceMany(market, spots, strikes)),
+    strikes.map((strike, i) => models.bsPrice({ ...market, spot: spots[i], strike }))
+  );
+  assert.deepEqual(
+    models.bsGreeksMany(market, spots, 115, 360),
+    Array.from(spots, (spot) => models.bsGreeks({ ...market, spot, strike: 115 }, 360))
+  );
+  assert.throws(() => models.bsPriceMany(market, spots, strikes.slice(0, 2)), /equal lengths/);
+});

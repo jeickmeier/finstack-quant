@@ -38,6 +38,7 @@ use finstack_quant_models::closed_form::{
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::{OptionMarketParams, OptionType};
+use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
 
 /// Extract a typed market, or parse it from a dictionary or canonical JSON.
@@ -347,6 +348,79 @@ fn option_calculation_wrapper(request: &Bound<'_, PyAny>) -> PyResult<PyOptionCa
     })
 }
 
+fn option_axis(obj: Option<&Bound<'_, PyAny>>, label: &str) -> PyResult<Option<Vec<f64>>> {
+    let Some(obj) = obj else {
+        return Ok(None);
+    };
+    if let Ok(value) = obj.extract::<f64>() {
+        return Ok(Some(vec![value]));
+    }
+    let py = obj.py();
+    let kwargs = pyo3::types::PyDict::new(py);
+    kwargs.set_item("dtype", "float64")?;
+    let array = py
+        .import("numpy")?
+        .getattr("asarray")?
+        .call((obj,), Some(&kwargs))?;
+    let array = array.extract::<PyReadonlyArray1<'_, f64>>().map_err(|_| {
+        crate::errors::value_error(format!(
+            "{label} must be a scalar or a one-dimensional array"
+        ))
+    })?;
+    Ok(Some(array.as_array().iter().copied().collect()))
+}
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "bs_price_many")]
+#[pyfunction]
+#[pyo3(signature = (market, spots=None, strikes=None))]
+fn bs_price_many<'py>(
+    market: &Bound<'py, PyAny>,
+    spots: Option<&Bound<'py, PyAny>>,
+    strikes: Option<&Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let py = market.py();
+    let market = option_market(market)?;
+    let spots = option_axis(spots, "spots")?;
+    let strikes = option_axis(strikes, "strikes")?;
+    py.detach(|| {
+        finstack_quant_models::closed_form::bs_price_many(
+            &market,
+            spots.as_deref(),
+            strikes.as_deref(),
+        )
+    })
+    .map(|prices| prices.into_pyarray(py))
+    .map_err(core_to_py)
+}
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "bs_greeks_many")]
+#[pyfunction]
+#[pyo3(
+    signature = (market, spots=None, strikes=None, theta_days_per_year=DEFAULT_THETA_DAYS_PER_YEAR),
+    text_signature = "(market, spots=None, strikes=None, theta_days_per_year=365.0)"
+)]
+fn bs_greeks_many(
+    market: &Bound<'_, PyAny>,
+    spots: Option<&Bound<'_, PyAny>>,
+    strikes: Option<&Bound<'_, PyAny>>,
+    theta_days_per_year: f64,
+) -> PyResult<Vec<PyBsGreeks>> {
+    let py = market.py();
+    let market = option_market(market)?;
+    let spots = option_axis(spots, "spots")?;
+    let strikes = option_axis(strikes, "strikes")?;
+    py.detach(|| {
+        finstack_quant_models::closed_form::bs_greeks_many(
+            &market,
+            spots.as_deref(),
+            strikes.as_deref(),
+            theta_days_per_year,
+        )
+    })
+    .map(|rows| rows.into_iter().map(PyBsGreeks::from_inner).collect())
+    .map_err(core_to_py)
+}
+
 // bs_price
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "bs_price")]
@@ -620,6 +694,8 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOptionCalculationResult>()?;
     m.add_function(wrap_pyfunction!(option_calculation_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_price_wrapper, m)?)?;
+    m.add_function(wrap_pyfunction!(bs_price_many, m)?)?;
+    m.add_function(wrap_pyfunction!(bs_greeks_many, m)?)?;
     m.add_function(wrap_pyfunction!(vanilla_expiry_payoff_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_greeks_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_implied_vol_wrapper, m)?)?;

@@ -1,6 +1,9 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/models/closed_form.rs``."""
 
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 class OptionMarketParams:
@@ -731,6 +734,99 @@ def option_calculation(request: str | dict[str, Any]) -> OptionCalculationResult
     >>> solved = option_calculation({"model": model, "solve": {"kind": "implied_vol", "price": price}})
     >>> round(solved.implied_vol, 8)
     0.2
+    """
+    ...
+
+def bs_price_many(
+    market: OptionMarketParams | Mapping[str, Any] | str,
+    spots: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
+    strikes: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
+) -> npt.NDArray[np.float64]:
+    """Price BSM options with paired spot and strike coordinates.
+
+    Parameters
+    ----------
+    market : OptionMarketParams or Mapping[str, Any] or str
+        Reference rates, carry, expiry, volatility and call or put direction.
+    spots : float or array-like or None
+        Positive spot quotes. A scalar or singleton broadcasts. None uses market.spot.
+    strikes : float or array-like or None
+        Positive strikes in the same quote units. None uses market.strike.
+
+    Returns
+    -------
+    numpy.ndarray
+        One float64 price per input pair in original order, in quote units.
+
+    Raises
+    ------
+    TypeError
+        If an input axis cannot be converted to numeric values.
+    ValueError
+        If axes are empty, multidimensional, incompatible in length or contain invalid quotes.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import bs_price_many
+    >>> market = dict(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.03,
+    ...     volatility=0.2,
+    ...     time_to_expiry=1.0,
+    ...     dividend_yield=0.0,
+    ...     option_type="call",
+    ... )
+    >>> bs_price_many(market, spots=[90.0, 100.0, 110.0]).shape
+    (3,)
+    """
+    ...
+
+def bs_greeks_many(
+    market: OptionMarketParams | Mapping[str, Any] | str,
+    spots: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
+    strikes: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
+    theta_days_per_year: float = 365.0,
+) -> list[BsGreeks]:
+    """Compute BSM Greeks for paired spot and strike coordinates.
+
+    Parameters
+    ----------
+    market : OptionMarketParams or Mapping[str, Any] or str
+        Reference rates, carry, expiry, volatility and call or put direction.
+    spots : float or array-like or None
+        Positive spot quotes. A scalar or singleton broadcasts. None uses market.spot.
+    strikes : float or array-like or None
+        Positive strikes in spot quote units. None uses market.strike.
+    theta_days_per_year : float
+        Positive divisor for converting annual theta to theta per calendar day.
+
+    Returns
+    -------
+    list[BsGreeks]
+        One result per pair in the supplied order, in the scalar bs_greeks units.
+
+    Raises
+    ------
+    TypeError
+        If an input axis cannot be converted to numeric values.
+    ValueError
+        If the axes cannot be paired or a Greek input fails validation.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import bs_greeks_many
+    >>> market = dict(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.03,
+    ...     volatility=0.2,
+    ...     time_to_expiry=1.0,
+    ...     dividend_yield=0.0,
+    ...     option_type="call",
+    ... )
+    >>> len(bs_greeks_many(market, strikes=[90.0, 100.0]))
+    2
     """
     ...
 

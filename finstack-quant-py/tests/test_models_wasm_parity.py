@@ -1084,3 +1084,34 @@ def test_golden_file_lists_exactly_these_cases() -> None:
 def test_python_matches_the_cross_host_golden(name: str) -> None:
     expected = json.loads(GOLDEN.read_text())[name]
     _assert_close(_plain(CASES[name]()), expected, name)
+
+
+def test_bs_batch_pairs_strided_axes_and_broadcasts_scalar() -> None:
+    import numpy as np
+
+    from finstack_quant.models import bs_greeks, bs_greeks_many, bs_price, bs_price_many
+
+    market = {
+        "spot": 100.0,
+        "strike": 95.0,
+        "rate": 0.025,
+        "volatility": 0.21,
+        "time_to_expiry": 1.3,
+        "dividend_yield": 0.015,
+        "option_type": "put",
+    }
+    spots = np.asarray([71.0, 99.0, 118.0, 37.0, 135.0])[::2]
+    strikes = [80.0, 98.0, 121.0]
+    expected = [bs_price({**market, "spot": s, "strike": k}) for s, k in zip(spots, strikes, strict=True)]
+    np.testing.assert_array_equal(bs_price_many(market, spots, strikes), expected)
+    np.testing.assert_array_equal(
+        bs_price_many(market, spots, 115.0),
+        [bs_price({**market, "spot": s, "strike": 115.0}) for s in spots],
+    )
+    rows = bs_greeks_many(market, spots, strikes, theta_days_per_year=360.0)
+    assert [row.to_json() for row in rows] == [
+        bs_greeks({**market, "spot": s, "strike": k}, theta_days_per_year=360.0).to_json()
+        for s, k in zip(spots, strikes, strict=True)
+    ]
+    with pytest.raises(ValueError, match="equal lengths"):
+        bs_price_many(market, spots, strikes[:2])

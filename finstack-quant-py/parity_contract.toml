@@ -527,6 +527,8 @@ public = [
     "bs_greeks",
     "bs_implied_vol",
     "bs_price",
+    "bs_price_many",
+    "bs_greeks_many",
     "heston_price",
     "lookback_option_price",
     "merton_jump_cos_price",

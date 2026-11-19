@@ -119,6 +119,84 @@ pub fn bs_price(
     bs_price_core(&from_js_json_exact(&market, "market")?).map_err(to_js_err)
 }
 
+fn option_axis(value: Option<&JsValue>, field: &str) -> Result<Option<Vec<f64>>, JsValue> {
+    let Some(value) = value.filter(|value| !value.is_null() && !value.is_undefined()) else {
+        return Ok(None);
+    };
+    if value.as_f64().is_some() {
+        return js_f64(value, field).map(|x| Some(vec![x]));
+    }
+    crate::utils::input::js_f64_seq(value, field).map(Some)
+}
+
+/// Price BSM options at paired spot and strike coordinates.
+/// @param market - Reference BSM market fields in the same units as bsPrice.
+/// @param spots - Positive spot quotes. Scalar and singleton inputs broadcast. Omit to use market.spot.
+/// @param strikes - Positive strikes in spot quote units. Omit to use market.strike.
+/// @returns Float64Array of prices in quote units and input order.
+/// @throws TypeError for invalid input types or FinstackError for invalid or incompatible axes.
+#[wasm_bindgen(js_name = bsPriceMany)]
+pub fn bs_price_many(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "number | readonly number[] | Float64Array | null"
+    )]
+    spots: Option<JsValue>,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "number | readonly number[] | Float64Array | null"
+    )]
+    strikes: Option<JsValue>,
+) -> Result<js_sys::Float64Array, JsValue> {
+    let market = from_js_json_exact(&market, "market")?;
+    let spots = option_axis(spots.as_ref(), "spots")?;
+    let strikes = option_axis(strikes.as_ref(), "strikes")?;
+    let values = finstack_quant_models::closed_form::bs_price_many(
+        &market,
+        spots.as_deref(),
+        strikes.as_deref(),
+    )
+    .map_err(to_js_err)?;
+    Ok(js_sys::Float64Array::from(values.as_slice()))
+}
+
+/// Evaluate BSM Greeks for paired spot and strike coordinates.
+/// @param market - Reference BSM market fields in the same units as bsGreeks.
+/// @param spots - Positive spot quotes. Scalar and singleton inputs broadcast. Omit to use market.spot.
+/// @param strikes - Positive strikes in spot quote units. Omit to use market.strike.
+/// @param thetaDaysPerYear - Positive divisor for annual theta. Omitted uses 365 calendar days.
+/// @returns One fixed-shape BsGreeks row per pair, in input order.
+/// @throws TypeError for invalid input types or FinstackError for invalid or incompatible axes.
+#[wasm_bindgen(js_name = bsGreeksMany, unchecked_return_type = "BsGreeks[]")]
+pub fn bs_greeks_many(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "number | readonly number[] | Float64Array | null"
+    )]
+    spots: Option<JsValue>,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "number | readonly number[] | Float64Array | null"
+    )]
+    strikes: Option<JsValue>,
+    #[wasm_bindgen(js_name = "thetaDaysPerYear", unchecked_optional_param_type = "number")]
+    theta_days_per_year: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let market = from_js_json_exact(&market, "market")?;
+    let spots = option_axis(spots.as_ref(), "spots")?;
+    let strikes = option_axis(strikes.as_ref(), "strikes")?;
+    let theta = js_opt_f64(theta_days_per_year.as_ref(), "thetaDaysPerYear")?
+        .unwrap_or(DEFAULT_THETA_DAYS_PER_YEAR);
+    let rows = finstack_quant_models::closed_form::bs_greeks_many(
+        &market,
+        spots.as_deref(),
+        strikes.as_deref(),
+        theta,
+    )
+    .map_err(to_js_err)?;
+    crate::utils::to_js_value(&rows)
+}
+
 /// Vanilla option payoff at expiry: `max(±(spot - strike), 0)`.
 ///
 /// @param spot - Underlying level at expiry, in the same price units as `strike`.

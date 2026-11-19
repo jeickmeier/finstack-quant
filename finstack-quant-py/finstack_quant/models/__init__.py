@@ -29,6 +29,8 @@ bs_cos_price = _models.bs_cos_price
 bs_greeks = _models.bs_greeks
 bs_implied_vol = _models.bs_implied_vol
 bs_price = _models.bs_price
+bs_price_many = _models.bs_price_many
+bs_greeks_many = _models.bs_greeks_many
 heston_price = _models.heston_price
 lookback_option_price = _models.lookback_option_price
 merton_jump_cos_price = _models.merton_jump_cos_price
@@ -53,8 +55,10 @@ __all__: list[str] = [
     "black_shifted_vega",
     "bs_cos_price",
     "bs_greeks",
+    "bs_greeks_many",
     "bs_implied_vol",
     "bs_price",
+    "bs_price_many",
     "correlation",
     "credit",
     "factor",

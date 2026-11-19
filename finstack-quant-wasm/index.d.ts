@@ -6793,6 +6793,15 @@ export interface ModelsNamespace {
    */
   readonly bsPrice: typeof wasm.bsPrice;
   /**
+   * Price BSM options at paired spot and strike coordinates.
+   * @param market - Reference BSM market fields in the same units as bsPrice.
+   * @param spots - Positive spot quotes. Scalar and singleton inputs broadcast. Omit to use market.spot.
+   * @param strikes - Positive strikes in spot quote units. Omit to use market.strike.
+   * @returns Float64Array of prices in quote units and input order.
+   * @throws TypeError for invalid input types or FinstackError for invalid or incompatible axes.
+   */
+  readonly bsPriceMany: typeof wasm.bsPriceMany;
+  /**
    * Validate an option's market inputs and return the canonical object.
    * @param market - Positive spot and strike in matching units; continuous annual decimal rate and carry; nonnegative annualized decimal volatility and expiry in years; and call or put payoff direction.
    * @returns Validated option market object. Individual pricers may require strictly positive volatility or expiry.
@@ -6847,6 +6856,16 @@ export interface ModelsNamespace {
    * ```
    */
   readonly bsGreeks: typeof wasm.bsGreeks;
+  /**
+   * Evaluate BSM Greeks for paired spot and strike coordinates.
+   * @param market - Reference BSM market fields in the same units as bsGreeks.
+   * @param spots - Positive spot quotes. Scalar and singleton inputs broadcast. Omit to use market.spot.
+   * @param strikes - Positive strikes in spot quote units. Omit to use market.strike.
+   * @param thetaDaysPerYear - Positive divisor for annual theta. Omitted uses 365 calendar days.
+   * @returns One fixed-shape BsGreeks row per pair, in input order.
+   * @throws TypeError for invalid input types or FinstackError for invalid or incompatible axes.
+   */
+  readonly bsGreeksMany: typeof wasm.bsGreeksMany;
   /**
    * Whether a set of Black-Scholes Greeks is internally consistent: gamma and
    * vega non-negative and every value finite.

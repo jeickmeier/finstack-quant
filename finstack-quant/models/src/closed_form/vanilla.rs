@@ -551,6 +551,72 @@ pub fn bs_greeks(market: &OptionMarketParams, theta_days_per_year: f64) -> Resul
     Ok(greeks)
 }
 
+/// Price paired spot and strike coordinates with one set of BSM market conventions.
+///
+/// # Arguments
+/// * `market` - Reference BSM inputs. Rate, carry, volatility, expiry and
+///   payoff direction apply to every row. Its spot and strike supply omitted axes.
+/// * `spots` - Positive spot prices in quote units. A single value broadcasts.
+/// * `strikes` - Positive strikes in the same units. A single value broadcasts.
+///
+/// # Errors
+/// Rejects empty supplied axes, unequal lengths without broadcasting, or any invalid price input.
+pub fn bs_price_many(
+    market: &OptionMarketParams,
+    spots: Option<&[f64]>,
+    strikes: Option<&[f64]>,
+) -> Result<Vec<f64>> {
+    option_batch(market, spots, strikes)?
+        .map(|inputs| bs_price(&inputs))
+        .collect()
+}
+
+/// Evaluate BSM Greeks on paired spot and strike coordinates.
+///
+/// # Arguments
+/// * `market` - Reference rates, carry, volatility, expiry and payoff direction.
+///   Its spot and strike supply omitted axes.
+/// * `spots` - Positive spot prices in quote units. A single value broadcasts.
+/// * `strikes` - Positive strikes in the same units. A single value broadcasts.
+/// * `theta_days_per_year` - Positive finite divisor for calendar-day theta.
+///
+/// # Errors
+/// Rejects empty supplied axes, unequal lengths without broadcasting, or any invalid Greek input.
+pub fn bs_greeks_many(
+    market: &OptionMarketParams,
+    spots: Option<&[f64]>,
+    strikes: Option<&[f64]>,
+    theta_days_per_year: f64,
+) -> Result<Vec<BsGreeks>> {
+    option_batch(market, spots, strikes)?
+        .map(|inputs| bs_greeks(&inputs, theta_days_per_year))
+        .collect()
+}
+
+fn option_batch<'a>(
+    market: &'a OptionMarketParams,
+    spots: Option<&'a [f64]>,
+    strikes: Option<&'a [f64]>,
+) -> Result<impl Iterator<Item = OptionMarketParams> + 'a> {
+    let spots = spots.unwrap_or_else(|| std::slice::from_ref(&market.spot));
+    let strikes = strikes.unwrap_or_else(|| std::slice::from_ref(&market.strike));
+    let n = spots.len().max(strikes.len());
+    if spots.is_empty()
+        || strikes.is_empty()
+        || ![1, n].contains(&spots.len())
+        || ![1, n].contains(&strikes.len())
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "BSM spot and strike axes must be nonempty and have equal lengths or length one".into(),
+        ));
+    }
+    Ok((0..n).map(move |index| OptionMarketParams {
+        spot: spots[index % spots.len()],
+        strike: strikes[index % strikes.len()],
+        ..market.clone()
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -199,6 +199,7 @@ pub use lookback::{
 };
 pub use quanto::quanto_price;
 pub use vanilla::{
-    BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT, bs_greeks, bs_greeks_unchecked, bs_price,
-    bs_price_unchecked, checked_closed_form_value, vanilla_expiry_payoff,
+    BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT, bs_greeks, bs_greeks_many,
+    bs_greeks_unchecked, bs_price, bs_price_many, bs_price_unchecked, checked_closed_form_value,
+    vanilla_expiry_payoff,
 };

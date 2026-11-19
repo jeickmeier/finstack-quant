@@ -2447,8 +2447,10 @@
       "bsCosPrice",
       "bsGreeks",
       "bsGreeksIsValid",
+      "bsGreeksMany",
       "bsImpliedVol",
       "bsPrice",
+      "bsPriceMany",
       "correlation",
       "credit",
       "factor",
@@ -3506,6 +3508,9 @@
   "models.bsPrice": {
     "kind": "function"
   },
+  "models.bsPriceMany": {
+    "kind": "function"
+  },
   "models.optionMarketParams": {
     "kind": "function"
   },
@@ -3513,6 +3518,9 @@
     "kind": "function"
   },
   "models.bsGreeks": {
+    "kind": "function"
+  },
+  "models.bsGreeksMany": {
     "kind": "function"
   },
   "models.bsGreeksIsValid": {
