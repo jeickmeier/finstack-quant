@@ -69,6 +69,7 @@ ScenarioPnl = _portfolio.ScenarioPnl
 ScenarioPnlBatchItem = _portfolio.ScenarioPnlBatchItem
 PortfolioResult = _portfolio.PortfolioResult
 PortfolioMetrics = _portfolio.PortfolioMetrics
+PortfolioCashflowPositionSummary = _portfolio.PortfolioCashflowPositionSummary
 PortfolioCashflows = _portfolio.PortfolioCashflows
 PortfolioAttribution = _portfolio.PortfolioAttribution
 
@@ -192,6 +193,7 @@ __all__ = [
     "Portfolio",
     "PortfolioAttribution",
     "PortfolioBuilder",
+    "PortfolioCashflowPositionSummary",
     "PortfolioCashflows",
     "PortfolioError",
     "PortfolioMarginResult",

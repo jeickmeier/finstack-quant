@@ -34,6 +34,7 @@ from finstack_quant.portfolio._attribution import (
     attribute_portfolio_pnl as attribute_portfolio_pnl,
 )
 from finstack_quant.portfolio._cashflows import (
+    PortfolioCashflowPositionSummary as PortfolioCashflowPositionSummary,
     PortfolioCashflows as PortfolioCashflows,
     aggregate_full_cashflows as aggregate_full_cashflows,
     net_in_currency_by_date as net_in_currency_by_date,
@@ -189,6 +190,7 @@ __all__ = [
     "Portfolio",
     "PortfolioAttribution",
     "PortfolioBuilder",
+    "PortfolioCashflowPositionSummary",
     "PortfolioCashflows",
     "PortfolioError",
     "PortfolioMarginResult",

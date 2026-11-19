@@ -104,6 +104,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "ScenarioPnlBatchItem",
         "PortfolioResult",
         "PortfolioMetrics",
+        "PortfolioCashflowPositionSummary",
         "PortfolioCashflows",
         "PortfolioAttribution",
         "BrinsonPeriodResult",

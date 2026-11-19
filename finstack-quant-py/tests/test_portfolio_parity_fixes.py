@@ -184,7 +184,8 @@ class TestScenarioInputs:
         assert result.report.operations_applied == 1
         assert result.valuation.total_value < value_portfolio(pf, market).total_value
         assert all(
-            not (pos.valuation_result or {}).get("measures") for pos in result.valuation.position_values.values()
+            pos.valuation_result is None or not pos.valuation_result.metrics
+            for pos in result.valuation.position_values.values()
         )
         assert market.to_json() == snapshot
 

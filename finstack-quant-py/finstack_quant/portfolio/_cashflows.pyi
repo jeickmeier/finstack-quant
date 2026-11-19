@@ -9,6 +9,97 @@ from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.portfolio._container import Portfolio
 
+class PortfolioCashflowPositionSummary:
+    """Describe the schedule contributed by one position to a cashflow ladder.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import PortfolioCashflows
+    >>> ladder = PortfolioCashflows.from_json(
+    ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{"p":{"position_id":"p",'
+    ...     '"instrument_id":"bond","instrument_type":"bond","representation":"no_residual","event_count":0}},'
+    ...     '"issues":[],"fx_collapse_policy":"cip_forward"}'
+    ... )
+    >>> ladder.position_summaries["p"].event_count
+    0
+    """
+
+    @property
+    def position_id(self) -> str:
+        """Position identifier in the evaluated portfolio.
+
+        Returns
+        -------
+        str
+            Position identifier in the evaluated portfolio.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def instrument_id(self) -> str:
+        """Identifier of the instrument producing the schedule.
+
+        Returns
+        -------
+        str
+            Identifier of the instrument producing the schedule.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def instrument_type(self) -> str:
+        """Canonical instrument type label.
+
+        Returns
+        -------
+        str
+            Canonical instrument type label.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def representation(self) -> str:
+        """Schedule kind: contractual, projected, placeholder or no_residual.
+
+        Returns
+        -------
+        str
+            Schedule kind: contractual, projected, placeholder or no_residual.
+
+        Raises
+        ------
+        ValueError
+            If the schedule representation cannot be encoded.
+        """
+        ...
+
+    @property
+    def event_count(self) -> int:
+        """Count of cash settlement events contributed by the position.
+
+        Returns
+        -------
+        int
+            Count of cash settlement events contributed by the position.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
 class PortfolioCashflows:
     """
     Typed wrapper around a ``PortfolioCashflows`` ladder.
@@ -56,6 +147,22 @@ class PortfolioCashflows:
         ... )
         >>> (len(cashflows.by_position), len(cashflows.issues))
         (0, 0)
+        """
+        ...
+
+    @property
+    def position_summaries(self) -> dict[str, PortfolioCashflowPositionSummary]:
+        """Return the stored schedule summary for each position with a schedule.
+
+        Returns
+        -------
+        dict[str, PortfolioCashflowPositionSummary]
+            Summaries keyed by position id, including positions with no residual
+            flows and intentionally empty placeholder schedules.
+
+        Notes
+        -----
+        This accessor does not raise for a valid ladder.
         """
         ...
 
