@@ -52,21 +52,17 @@ _WF_TAIL: list[tuple[str, str]] = [
 _EPS = 1e-6
 
 
-def _factor_rows(attribution: Any) -> list[tuple[str, float]]:
-    """Ordered (label, signed amount) for each non-zero factor; sum = total_pnl.
+def _amount(value: Any) -> float:
+    return float(getattr(value, "amount", value))
 
-    Uses the static canonical order (matching ``default_waterfall_order()``) so the
-    pure-format path imports no engine code.
-    """
-    rows: list[tuple[str, float]] = []
-    for label, attr_name in _WF_FIELD.values():
-        v = float(getattr(attribution, attr_name, 0.0) or 0.0)
-        if abs(v) > _EPS:
-            rows.append((label, v))
-    for label, attr_name in _WF_TAIL:
-        v = float(getattr(attribution, attr_name, 0.0) or 0.0)
-        if abs(v) > _EPS:
-            rows.append((label, v))
+
+def _factor_rows(attribution: Any) -> list[tuple[str, str, float]]:
+    """Read ordered, non-zero factor keys, labels, and signed amounts."""
+    rows = []
+    for label, field in (*_WF_FIELD.values(), *_WF_TAIL):
+        value = _amount(getattr(attribution, field, 0.0) or 0.0)
+        if abs(value) > _EPS:
+            rows.append((field, label, value))
     return rows
 
 
@@ -74,26 +70,32 @@ def _waterfall_section(attribution: Any, theme: Theme) -> Section | None:
     rows = _factor_rows(attribution)
     if not rows:
         return None
-    labels = [lab for lab, _ in rows]
-    deltas = [v for _, v in rows]
+    labels = [label for _, label, _ in rows]
+    deltas = [value for _, _, value in rows]
     return Section(
         "P&L Attribution",
         charts.waterfall_chart(labels, deltas, theme=theme, total_label="Total P&L", height=210),
     )
 
 
-def _factors_section(attribution: Any) -> Section | None:
+def _factors_section(attribution: Any, *, portfolio: bool) -> Section | None:
     rows = _factor_rows(attribution)
     if not rows:
         return None
-    total = float(attribution.total_pnl)
-    cur = attribution.currency
-    data: list[dict[str, Any]] = []
-    # Shares come from Rust ``PnlAttribution.pct_of_total``; ``None`` (a zero
-    # total, where the share is undefined) renders as the missing marker.
-    for label, v in sorted(rows, key=lambda r: abs(r[1]), reverse=True):
-        data.append({"Factor": label, "Amount": v, "% of Total": attribution.pct_of_total(v)})
-    data.append({"Factor": "Total P&L", "Amount": total, "% of Total": attribution.pct_of_total(total)})
+    total = _amount(attribution.total_pnl)
+    if portfolio:
+        cur = str(attribution.total_pnl.currency)
+        shares = {row["field"]: row["pct_of_total"] for row in attribution.pct_of_total_by_bucket()}
+        total_share = 100.0 if any(value is not None for value in shares.values()) else None
+    else:
+        cur = attribution.currency
+        shares = {field: attribution.pct_of_total(value) for field, _, value in rows}
+        total_share = attribution.pct_of_total(total)
+    data = [
+        {"Factor": label, "Amount": value, "% of Total": shares.get(field)}
+        for field, label, value in sorted(rows, key=lambda row: abs(row[2]), reverse=True)
+    ]
+    data.append({"Factor": "Total P&L", "Amount": total, "% of Total": total_share})
     body = tables.data_table(
         data,
         columns=["Factor", "Amount", "% of Total"],
@@ -138,16 +140,18 @@ def _detail_section(df: Any, title: str, drop_total_kind: str, currency: str) ->
     return Section(title, body)
 
 
-def _build_sections(attribution: Any, wanted: list[str], theme: Theme) -> list[Section]:
+def _build_sections(attribution: Any, wanted: list[str], theme: Theme, *, portfolio: bool = False) -> list[Section]:
     out: list[Section] = []
     if "waterfall" in wanted:
         s = _waterfall_section(attribution, theme)
         if s is not None:
             out.append(s)
     if "factors" in wanted:
-        s = _factors_section(attribution)
+        s = _factors_section(attribution, portfolio=portfolio)
         if s is not None:
             out.append(s)
+    if portfolio:
+        return out
     if "carry" in wanted:
         s = _detail_section(
             attribution.to_carry_detail_dataframe(), "Carry & Roll-Down", "carry.total", attribution.currency
@@ -175,7 +179,7 @@ def attribution_tearsheet(
     theme: Theme = INSTITUTIONAL,
     generated: Any = None,
 ) -> TearSheet:
-    """Render a single instrument's T0->T1 P&L attribution as a tear sheet.
+    """Render precomputed instrument or portfolio P&L attribution.
 
     Pass a precomputed ``PnlAttribution`` object or its canonical JSON/dict
     payload. ``sections`` selects a subset of ``ALL_SECTIONS``.
@@ -183,7 +187,8 @@ def attribution_tearsheet(
     Parameters
     ----------
     attribution : Any
-        Precomputed ``PnlAttribution`` object or equivalent canonical payload.
+        A precomputed ``PortfolioAttribution`` with base-currency totals, or
+        a ``PnlAttribution`` object or equivalent canonical instrument payload.
     title : str or None
         Optional main report heading; ``None`` uses the attributed instrument.
     subtitle : str or None
@@ -223,8 +228,37 @@ def attribution_tearsheet(
         payload = attribution if isinstance(attribution, str) else json.dumps(attribution)
         attribution = PnlAttribution.from_json(payload)
 
-    attribution.validate_currencies()
     wanted = _resolve_sections(sections, ALL_SECTIONS, valid_label="valid")
+    from finstack_quant.portfolio import PortfolioAttribution
+
+    if isinstance(attribution, PortfolioAttribution):
+        cur = str(attribution.total_pnl.currency)
+        positions = attribution.by_position
+        totals = (
+            ("Total P&L", attribution.total_pnl),
+            ("Carry", attribution.carry),
+            ("FX Translation", attribution.fx_translation_pnl),
+            ("Residual", attribution.residual),
+        )
+        kpis = [KPI(label, fmt.money(money.amount, cur, dp=0), fmt.sign_class(money.amount)) for label, money in totals]
+        kpis.append(KPI("Positions", str(len(positions)), ""))
+        meta = [f"Currency {cur}"]
+        if first := next(iter(positions.values()), None):
+            meta.append(f"{first.t0} → {first.t1}")
+        if attribution.result_invalid:
+            meta.append("⚠ Attribution calculation flagged invalid")
+        return TearSheet(
+            theme=theme,
+            title=title or "P&L Attribution",
+            eyebrow="Portfolio Attribution",
+            subtitle=subtitle or f"Portfolio · {len(positions)} positions",
+            meta_lines=meta,
+            kpis=kpis,
+            sections=_build_sections(attribution, wanted, theme, portfolio=True),
+            generated=generated,
+        )
+
+    attribution.validate_currencies()
     cur = attribution.currency
     kpis = [
         KPI("Total P&L", fmt.money(attribution.total_pnl, cur, dp=0), fmt.sign_class(attribution.total_pnl)),

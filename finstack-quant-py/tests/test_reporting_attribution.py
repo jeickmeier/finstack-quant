@@ -251,3 +251,36 @@ def test_factor_shares_come_from_rust_and_are_undefined_for_zero_total() -> None
     section = next(s for s in attribution_tearsheet(zero, sections=["factors"]).sections)
     assert "+0.0%" not in section.body
     assert "·" in section.body
+
+
+def test_attribution_tearsheet_uses_native_portfolio_bucket_shares() -> None:
+    from finstack_quant.portfolio import PortfolioAttribution
+    from finstack_quant.reporting import attribution_tearsheet
+
+    amounts = {
+        "total_pnl": "100",
+        "carry": "25",
+        "rates_curves_pnl": "75",
+        "credit_curves_pnl": "0",
+        "inflation_curves_pnl": "0",
+        "correlations_pnl": "0",
+        "fx_pnl": "0",
+        "fx_translation_pnl": "0",
+        "cross_factor_pnl": "0",
+        "vol_pnl": "0",
+        "model_params_pnl": "0",
+        "market_scalars_pnl": "0",
+        "residual": "0",
+    }
+    portfolio = PortfolioAttribution.from_json(
+        json.dumps({
+            **{field: {"amount": amount, "currency": "USD"} for field, amount in amounts.items()},
+            "by_position": {},
+            "result_invalid": False,
+        })
+    )
+    sheet = attribution_tearsheet(portfolio)
+    assert [section.title for section in sheet.sections] == ["P&L Attribution", "Factor Contributions"]
+    assert "Portfolio Attribution" in sheet.to_html()
+    assert "+75.0%" in sheet.to_html()
+    assert "+25.0%" in sheet.to_html()
