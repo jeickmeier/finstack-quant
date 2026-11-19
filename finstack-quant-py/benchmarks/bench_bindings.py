@@ -70,7 +70,7 @@ from finstack_quant.models.monte_carlo import (
 from finstack_quant.portfolio import (
     InstrumentArtifactCache,
     Portfolio,
-    PortfolioValuation,
+    ReplayConfig,
     aggregate_full_cashflows,
     aggregate_metrics,
     attribute_portfolio_pnl,
@@ -323,7 +323,7 @@ def _build_bench_market(rate: float = 0.05, as_of: date = date(2025, 1, 15)) -> 
     """
     # Flat act/360 rate ≈ df = exp(-rate * t) for a reasonable approximation.
     knots = [(t, math.exp(-rate * t)) for t in (0.0, 0.25, 0.5, 1.0, 2.0)]
-    curve = DiscountCurve("USD-OIS", as_of, knots)
+    curve = DiscountCurve("USD-OIS", as_of, knots, interp="log_linear", extrapolation="extend", day_count="act_360")
     return MarketContext().insert(curve)
 
 
@@ -349,8 +349,8 @@ def _assert_deposit_valuation(valuation, n_positions: int, *, standard_risk: boo
         assert math.isfinite(position.value_base.amount)
         result = position.valuation_result
         assert result is not None
-        assert result["value"]["currency"] == "USD"
-        measures = result["measures"]
+        assert result.currency == "USD"
+        measures = result.metrics
         assert all(math.isfinite(value) for value in measures.values())
         if standard_risk:
             assert "dv01" in measures
@@ -568,6 +568,7 @@ class TestCoreBenchmarks:
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.95), (5.0, 0.75), (10.0, 0.50)],
             interp="monotone_convex",
+            extrapolation="extend",
             day_count="act_365f",
         )
         knots = [(0.0, 1.0), (1.0, 0.95), (5.0, 0.75), (10.0, 0.50)]
@@ -607,7 +608,6 @@ class TestCoreBenchmarks:
             "interp": "log_linear",
             "extrapolation": "extend",
             "day_count": "act_360",
-            "index_tenor": "3M",
         })
         assert curve.interp_style == "log_linear"
         # Log-linear on [1, 5]: ln P falls by (0.275 - 0.05) / 4 per year.
@@ -622,7 +622,6 @@ class TestCoreBenchmarks:
                 "zero_rates": zero_rates,
                 "interp": "log_linear",
                 "day_count": curve.day_count,
-                "index_tenor": "3M",
                 "t1": 2.5,
                 "t2": 2.75,
                 "accrual_year_fraction": 0.25,
@@ -1477,20 +1476,19 @@ class TestPortfolioReleaseControls:
         """PV-only 500-deposit replay through twenty prebuilt snapshots."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
         snapshots_json = _build_replay_snapshots_json(20)
+        config = ReplayConfig(
+            "pv_only",
+            valuation_options={"strict_risk": True, "metrics": {"mode": "only", "metrics": []}},
+        )
 
         def _run():
-            return replay_portfolio(
-                portfolio,
-                snapshots_json,
-                ('{"mode":"pv_only","valuation_options":{"strict_risk":true,"metrics":{"mode":"only","metrics":[]}}}'),
-            )
+            return replay_portfolio(portfolio, snapshots_json, config)
 
         def _check(result):
             assert not result.skipped_dates
             assert len(result.steps) == 20
             for step in result.steps:
-                valuation = PortfolioValuation.from_json(json.dumps(step["valuation"]))
-                _assert_deposit_valuation(valuation, 500, standard_risk=False)
+                _assert_deposit_valuation(step.valuation, 500, standard_risk=False)
 
         _check(_run())
         _check(benchmark.pedantic(_run, rounds=5, warmup_rounds=1))
