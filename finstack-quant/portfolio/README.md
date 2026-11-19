@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .interp(InterpStyle::Linear)
         .build()?;
-    let market = MarketContext::new().insert(discount_curve);
+    let market = MarketContext::new().try_insert(discount_curve)?;
     let config = FinstackConfig::default();
 
     let deposit = Deposit::builder()

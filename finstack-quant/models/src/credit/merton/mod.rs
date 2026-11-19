@@ -45,7 +45,7 @@
 //!
 //! let model = MertonModel::new(100.0, 0.20, 80.0, 0.05).unwrap();
 //! let dd = model.distance_to_default(1.0);
-//! let pd = model.default_probability(1.0);
+//! let pd = model.default_probability(1.0).expect("valid model horizon");
 //! let spread = model.implied_spread(5.0, 0.40).unwrap();
 //! ```
 

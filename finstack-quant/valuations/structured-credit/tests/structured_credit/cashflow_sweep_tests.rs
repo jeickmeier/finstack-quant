@@ -202,8 +202,10 @@ fn create_market() -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(discount)
-        .insert(forward)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
         .insert_series(first_period_fixing)
 }
 

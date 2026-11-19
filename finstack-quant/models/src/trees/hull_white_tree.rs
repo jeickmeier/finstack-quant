@@ -73,7 +73,7 @@ pub struct HullWhiteTreeConfig {
     /// Typical values: 50 (fast), 100 (standard), 200+ (high precision)
     pub steps: usize,
 
-    /// Optional left-continuous piecewise-constant volatility schedule σ(t).
+    /// Optional right-continuous piecewise-constant volatility schedule σ(t).
     ///
     /// When set it replaces the scalar `sigma` for transition widths and
     /// node bond prices, and its knots are merged into the time grid so no
@@ -111,7 +111,7 @@ impl HullWhiteTreeConfig {
         }
     }
 
-    /// Use a left-continuous piecewise-constant volatility schedule instead
+    /// Use a right-continuous piecewise-constant volatility schedule instead
     /// of the scalar `sigma`.
     ///
     /// # Arguments
@@ -134,8 +134,14 @@ impl HullWhiteTreeConfig {
         })?;
         if let Some(schedule) = &self.volatility {
             validation::require_with(
-                schedule.times().iter().all(|t| t.is_finite() && *t >= 0.0)
-                    && schedule.values().iter().all(|v| v.is_finite() && *v > 0.0),
+                schedule
+                    .get_times()
+                    .iter()
+                    .all(|t| t.is_finite() && *t >= 0.0)
+                    && schedule
+                        .get_values()
+                        .iter()
+                        .all(|v| v.is_finite() && *v > 0.0),
                 || {
                     "volatility schedule times must be finite >= 0 and values must be finite > 0"
                         .into()
@@ -191,6 +197,8 @@ pub struct HullWhiteTree {
     alpha: Vec<f64>,
     /// Per-step, per-node branching geometry, `n` entries
     branches: Vec<Vec<NodeBranch>>,
+    /// State variance and rate/integrated-rate covariance at each grid time.
+    affine_moments: Vec<(f64, f64)>,
     /// Arrow-Debreu state prices Q(t,j) for verification
     state_prices: Vec<Vec<f64>>,
 }
@@ -265,7 +273,7 @@ impl HullWhiteTree {
         if let Some(schedule) = &config.volatility {
             refined_times.extend(
                 schedule
-                    .times()
+                    .get_times()
                     .iter()
                     .copied()
                     .filter(|time| *time > 0.0 && *time < time_to_maturity),
@@ -295,9 +303,11 @@ impl HullWhiteTree {
                 config
                     .volatility
                     .as_ref()
-                    .map_or(config.sigma, |schedule| schedule.value_at(time_grid[step]))
+                    .map_or(Ok(config.sigma), |schedule| {
+                        schedule.get_value(time_grid[step])
+                    })
             })
-            .collect();
+            .collect::<Result<_>>()?;
         // Level spacing: dx_i = σ√(3·dt_{i-1}) matches the variance of the
         // step *arriving* at level i. Level 0 has a single node at x = 0, so
         // its spacing is irrelevant; mirror dx_1 for accessor consistency.
@@ -404,6 +414,11 @@ impl HullWhiteTree {
             alpha[n] = alpha[n - 1];
         }
 
+        let affine_moments = time_grid
+            .iter()
+            .map(|&t| Self::affine_moments(&config, t))
+            .collect::<Result<Vec<_>>>()?;
+
         Ok(Self {
             config,
             time_grid,
@@ -413,8 +428,48 @@ impl HullWhiteTree {
             widths,
             alpha,
             branches,
+            affine_moments,
             state_prices,
         })
+    }
+
+    // Fallible schedule integration belongs to setup. Every node at a level
+    // then uses the same checked affine bond coefficients.
+    fn affine_moments(config: &HullWhiteTreeConfig, t: f64) -> Result<(f64, f64)> {
+        let kappa = config.kappa;
+        let state_variance = if let Some(schedule) = &config.volatility {
+            schedule.integrate(kappa, t, 0.0, t)?
+        } else {
+            let sigma = config.sigma;
+            sigma * sigma * crate::rates::hull_white::hw_b(2.0 * kappa, 0.0, t)
+        };
+        let shift = if let Some(schedule) = &config.volatility {
+            if (kappa * t).abs() < 1e-10 {
+                schedule
+                    .get_times()
+                    .iter()
+                    .zip(schedule.get_values())
+                    .enumerate()
+                    .take_while(|(_, (left, _))| **left < t)
+                    .map(|(i, (&left, &sigma))| {
+                        let right = schedule.get_times().get(i + 1).copied().unwrap_or(t).min(t);
+                        sigma * sigma * (right - left) * (t - 0.5 * (left + right))
+                    })
+                    .sum()
+            } else {
+                (schedule.integrate(0.5 * kappa, t, 0.0, t)? - state_variance) / kappa
+            }
+        } else {
+            let bt = crate::rates::hull_white::hw_b(kappa, 0.0, t);
+            0.5 * config.sigma.powi(2) * bt * bt
+        };
+        if state_variance.is_finite() && shift.is_finite() {
+            Ok((state_variance, shift))
+        } else {
+            Err(Error::Internal(
+                "unrepresentable Hull-White tree moments".into(),
+            ))
+        }
     }
 
     /// Build a time grid from `0` to `time_to_maturity` that passes exactly
@@ -750,47 +805,8 @@ impl HullWhiteTree {
             return 0.0;
         }
 
-        // Variance term. A scheduled tree uses the same exact integrated
-        // state variance as its affine caplet formulas; the scalar branch
-        // retains the established arithmetic bit-for-bit.
-        let state_variance = if let Some(schedule) = &self.config.volatility {
-            match schedule.integrate_squared_exp_weight(kappa, t, 0.0, t) {
-                Ok(variance) => variance,
-                Err(_) => return f64::NAN,
-            }
-        } else {
-            let sigma = self.config.sigma;
-            sigma * sigma * crate::rates::hull_white::hw_b(2.0 * kappa, 0.0, t)
-        };
+        let (state_variance, shift) = self.affine_moments[step];
         let var_term = 0.5 * state_variance * b * b;
-
-        // The lattice alpha is an interval discounting shift. The affine
-        // formula requires the instantaneous shift f(0,t) + c(t) instead.
-        // Its forward term cancels against A(t,T), leaving the centered OU
-        // state and c(t)=Cov[x(t), integral_0^t x(s) ds].
-        let shift = if let Some(schedule) = &self.config.volatility {
-            if kappa.abs() < 1e-10 {
-                schedule
-                    .times()
-                    .iter()
-                    .zip(schedule.values())
-                    .enumerate()
-                    .take_while(|(_, (left, _))| **left < t)
-                    .map(|(i, (&left, &sigma))| {
-                        let right = schedule.times().get(i + 1).copied().unwrap_or(t).min(t);
-                        sigma * sigma * (right - left) * (t - 0.5 * (left + right))
-                    })
-                    .sum()
-            } else {
-                match schedule.integrate_squared_exp_weight(0.5 * kappa, t, 0.0, t) {
-                    Ok(first) => (first - state_variance) / kappa,
-                    Err(_) => return f64::NAN,
-                }
-            }
-        } else {
-            let bt = crate::rates::hull_white::hw_b(kappa, 0.0, t);
-            0.5 * self.config.sigma.powi(2) * bt * bt
-        };
         (p_0_tt / p_0_t) * (-b * (x + shift) - var_term).exp()
     }
 

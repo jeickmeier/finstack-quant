@@ -23,8 +23,10 @@ fn test_missing_lag_is_not_inherited_from_sources() {
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(infl_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve")
         .insert_inflation_index(index);
 
     // Swap with no lag override (uses index 3M lag)
@@ -74,8 +76,10 @@ fn test_different_lag_durations() {
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(infl_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve")
         .insert_inflation_index(index);
 
     let mut pvs = Vec::new();
@@ -123,8 +127,10 @@ fn test_lag_in_days_vs_months() {
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(infl_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve")
         .insert_inflation_index(index);
 
     // 3 months ≈ 90 days
@@ -182,7 +188,11 @@ fn test_historical_observation_requires_fixing_or_explicit_contract_base() {
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
 
     // Context without inflation index
-    let ctx = MarketContext::new().insert(disc).insert(infl_curve);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve");
 
     let swap = InflationSwap::builder()
         .id("ZCINF-NO-IDX".into())

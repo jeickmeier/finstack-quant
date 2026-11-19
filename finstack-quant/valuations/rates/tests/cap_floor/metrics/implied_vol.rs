@@ -73,8 +73,10 @@ fn test_implied_vol_round_trips_pricing_vol() {
     let vol_surface = build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let mut caplet = CapFloor {
@@ -148,8 +150,10 @@ fn test_implied_vol_fails_without_market_price_override() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let caplet = CapFloor {
@@ -212,8 +216,9 @@ fn compounded_sofr_implied_vol_round_trip_uses_contractual_coupon_and_payment() 
     let end = date!(2025 - 04 - 02);
     let surface_vol = 0.25;
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.04, as_of, "USD_OIS"))
-        .insert(
+        .try_insert(build_flat_discount_curve(0.04, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(
             ForwardCurve::builder("USD-SOFR-OIS")
                 .base_date(as_of)
                 .day_count(DayCount::Act360)
@@ -234,6 +239,7 @@ fn compounded_sofr_implied_vol_round_trip_uses_contractual_coupon_and_payment() 
                 .build()
                 .expect("SOFR forward curve"),
         )
+        .expect("insert market curve")
         .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
     let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
         id: "SOFR-IV-ROUNDTRIP".into(),
@@ -285,8 +291,10 @@ fn normal_implied_vol_round_trips_non_positive_forward() {
     let as_of = date!(2024 - 01 - 02);
     let surface_vol = 0.01;
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .expect("insert market curve")
         .insert_surface(
             finstack_quant_valuations_test_support::volatility::relabel_quote_type(
                 &build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"),
@@ -335,8 +343,10 @@ fn shifted_lognormal_implied_vol_round_trips_shifted_domain() {
     let as_of = date!(2024 - 01 - 02);
     let surface_vol = 0.30;
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .expect("insert market curve")
         .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
     let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
         id: "SHIFTED-IV".into(),
@@ -379,8 +389,10 @@ fn shifted_lognormal_implied_vol_round_trips_shifted_domain() {
 fn same_day_caplet_does_not_synthesize_option_time() {
     let as_of = date!(2024 - 03 - 01);
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(0.12, as_of, "USD_LIBOR_3M"))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.12, as_of, "USD_LIBOR_3M"))
+        .expect("insert market curve")
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"));
     let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
         id: "SAME-DAY-IV".into(),
@@ -419,8 +431,10 @@ fn auto_implied_vol_round_trips_negative_rate_normal_quote() {
     let as_of = date!(2024 - 01 - 02);
     let surface_vol = 0.01;
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .expect("insert market curve")
         .insert_surface(
             finstack_quant_valuations_test_support::volatility::relabel_quote_type(
                 &build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"),

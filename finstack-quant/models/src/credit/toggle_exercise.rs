@@ -22,7 +22,7 @@
 //!     CreditStateVariable::HazardRate, 0.15, ThresholdDirection::Above,
 //! )?;
 //! let state = CreditState::new(0.20, None, 0.0, 0.0, 0.0, None)?;
-//! assert!(model.should_pik(&state, 0.5));
+//! assert!(model.should_pik(&state, 0.5)?);
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
@@ -240,7 +240,7 @@ const NESTED_STEPS_PER_YEAR: usize = 12;
 /// Their common positive discount factor and path count cancel in the decision;
 /// omitting both also prevents numerical underflow from turning the decision
 /// into a tie.
-fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u64) -> bool {
+fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u64) -> Result<bool> {
     let v = state.asset_value.unwrap_or_else(|| {
         if state.leverage > 0.0 {
             state.accreted_notional / state.leverage
@@ -251,12 +251,12 @@ fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u6
     let n = state.accreted_notional;
 
     if n <= 0.0 {
-        return false;
+        return Ok(false);
     }
 
     let coupon = state.coupon_due.max(0.0);
     if coupon == 0.0 {
-        return false;
+        return Ok(false);
     }
 
     let v_cash_start = (v - coupon).max(0.0);
@@ -266,10 +266,10 @@ fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u6
     let barrier_pik = n + coupon;
 
     if v_cash_start <= barrier_cash {
-        return true;
+        return Ok(true);
     }
     if v_pik_start <= barrier_pik {
-        return false;
+        return Ok(false);
     }
 
     let model = NestedEquityMcModel {
@@ -279,11 +279,11 @@ fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u6
     };
 
     let equity_cash =
-        nested_equity_mc(o.nested_paths, v_cash_start, barrier_cash, model, seed_bits);
+        nested_equity_mc(o.nested_paths, v_cash_start, barrier_cash, model, seed_bits)?;
 
-    let equity_pik = nested_equity_mc(o.nested_paths, v_pik_start, barrier_pik, model, seed_bits);
+    let equity_pik = nested_equity_mc(o.nested_paths, v_pik_start, barrier_pik, model, seed_bits)?;
 
-    equity_pik > equity_cash
+    Ok(equity_pik > equity_cash)
 }
 
 /// Derive a full-entropy `u64` seed from a uniform draw `u` in `[0, 1)`.
@@ -315,7 +315,7 @@ fn nested_equity_mc(
     barrier: f64,
     model: NestedEquityMcModel,
     base_seed: u64,
-) -> f64 {
+) -> Result<f64> {
     let NestedEquityMcModel {
         sigma,
         risk_free_rate,
@@ -323,12 +323,12 @@ fn nested_equity_mc(
     } = model;
 
     if num_paths == 0 || horizon <= 0.0 || v_start <= 0.0 {
-        return 0.0;
+        return Ok(0.0);
     }
 
     // Already in default at start.
     if v_start <= barrier {
-        return 0.0;
+        return Ok(0.0);
     }
 
     let n_steps = ((horizon * NESTED_STEPS_PER_YEAR as f64).ceil() as usize).max(1);
@@ -339,12 +339,12 @@ fn nested_equity_mc(
     let mut total_payoff = 0.0;
 
     for path_idx in 0..num_paths {
-        let mut nested_rng = Pcg64Rng::new_with_stream(base_seed, path_idx as u64);
+        let mut nested_rng = Pcg64Rng::new(base_seed, path_idx as u64);
         let mut v = v_start;
         let mut defaulted = false;
 
         for _step in 0..n_steps {
-            let z = nested_rng.normal(0.0, 1.0);
+            let z = nested_rng.normal(0.0, 1.0)?;
             v *= (drift + sigma * sqrt_dt * z).exp();
 
             if v <= barrier {
@@ -359,7 +359,7 @@ fn nested_equity_mc(
         }
     }
 
-    total_payoff
+    Ok(total_payoff)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -491,19 +491,19 @@ impl ToggleExerciseModel {
     ///   stochastic rule elects PIK when `u` is below the sigmoid PIK
     ///   probability; the optimal-exercise rule derives the nested Monte
     ///   Carlo seed from every bit of `u`.
-    pub fn should_pik(&self, state: &CreditState, u: f64) -> bool {
+    pub fn should_pik(&self, state: &CreditState, u: f64) -> Result<bool> {
         match self {
             Self::Threshold(t) => {
                 let value = extract_state_value(state, &t.state_variable);
-                match t.direction {
+                Ok(match t.direction {
                     ThresholdDirection::Above => value > t.threshold,
                     ThresholdDirection::Below => value < t.threshold,
-                }
+                })
             }
             Self::Stochastic(s) => {
                 let value = extract_state_value(state, &s.state_variable);
                 let p = crate::credit::scoring::logistic(s.intercept + s.sensitivity * value);
-                u < p
+                Ok(u < p)
             }
             Self::OptimalExercise(o) => {
                 // Derive the nested-MC seed with full entropy: see
@@ -595,8 +595,8 @@ mod tests {
             hazard_rate: 0.20,
             ..Default::default()
         };
-        assert!(!model.should_pik(&state_low, 0.5));
-        assert!(model.should_pik(&state_high, 0.5));
+        assert!(!model.should_pik(&state_low, 0.5).unwrap());
+        assert!(model.should_pik(&state_high, 0.5).unwrap());
     }
 
     #[test]
@@ -615,8 +615,8 @@ mod tests {
             distance_to_default: Some(1.5),
             ..Default::default()
         };
-        assert!(!model.should_pik(&state_safe, 0.5));
-        assert!(model.should_pik(&state_stressed, 0.5));
+        assert!(!model.should_pik(&state_safe, 0.5).unwrap());
+        assert!(model.should_pik(&state_stressed, 0.5).unwrap());
     }
 
     #[test]
@@ -626,22 +626,22 @@ mod tests {
         // Run 10k samples at lambda=0.10 and lambda=0.20
         let count_low: usize = (0..10_000)
             .filter(|i| {
-                let u = Pcg64Rng::new(42 + *i as u64).uniform();
+                let u = Pcg64Rng::new(42 + *i as u64, 0).uniform();
                 let state = CreditState {
                     hazard_rate: 0.10,
                     ..Default::default()
                 };
-                model.should_pik(&state, u)
+                model.should_pik(&state, u).unwrap()
             })
             .count();
         let count_high: usize = (0..10_000)
             .filter(|i| {
-                let u = Pcg64Rng::new(42 + *i as u64).uniform();
+                let u = Pcg64Rng::new(42 + *i as u64, 0).uniform();
                 let state = CreditState {
                     hazard_rate: 0.20,
                     ..Default::default()
                 };
-                model.should_pik(&state, u)
+                model.should_pik(&state, u).unwrap()
             })
             .count();
         assert!(
@@ -675,7 +675,7 @@ mod tests {
             asset_value: Some(200.0),
             ..Default::default()
         };
-        let _ = model.should_pik(&state, 0.5);
+        let _ = model.should_pik(&state, 0.5).unwrap();
     }
 
     #[test]
@@ -707,7 +707,7 @@ mod tests {
             asset_value: Some(v),
         };
         assert!(
-            model.should_pik(&state, 0.5),
+            model.should_pik(&state, 0.5).unwrap(),
             "Stressed firm where cash breaches barrier should prefer PIK"
         );
     }
@@ -734,7 +734,7 @@ mod tests {
             asset_value: Some(v),
         };
         assert!(
-            !model.should_pik(&state, 0.5),
+            !model.should_pik(&state, 0.5).unwrap(),
             "Equal continuation values should tie-break to cash"
         );
     }
@@ -751,8 +751,8 @@ mod tests {
             ..Default::default()
         };
 
-        let result1 = model.should_pik(&state, 0.12345);
-        let result2 = model.should_pik(&state, 0.12345);
+        let result1 = model.should_pik(&state, 0.12345).unwrap();
+        let result2 = model.should_pik(&state, 0.12345).unwrap();
 
         assert_eq!(
             result1, result2,
@@ -771,7 +771,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            !model.should_pik(&state, 0.5),
+            !model.should_pik(&state, 0.5).unwrap(),
             "Zero notional should return false (nothing to toggle)"
         );
     }
@@ -793,9 +793,11 @@ mod tests {
                     risk_free_rate: o.risk_free_rate,
                     horizon: o.horizon,
                 };
-                let cash = nested_equity_mc(o.nested_paths, asset - coupon, 100.0, model, 777);
-                let pik = nested_equity_mc(o.nested_paths, asset, 100.0 + coupon, model, 777);
-                let decision = optimal_toggle_decision(&o, &state, 777);
+                let cash =
+                    nested_equity_mc(o.nested_paths, asset - coupon, 100.0, model, 777).unwrap();
+                let pik =
+                    nested_equity_mc(o.nested_paths, asset, 100.0 + coupon, model, 777).unwrap();
+                let decision = optimal_toggle_decision(&o, &state, 777).unwrap();
                 for discount in [0.0_f64, 0.02, 0.05, 0.2] {
                     let common = (-discount * o.horizon).exp() / o.nested_paths as f64;
                     assert_eq!(decision, pik * common > cash * common);
@@ -886,7 +888,7 @@ mod tests {
             risk_free_rate: r,
             horizon,
         };
-        let result = super::nested_equity_mc(200, v, barrier, model, 42);
+        let result = super::nested_equity_mc(200, v, barrier, model, 42).unwrap();
 
         let v_terminal = v * (r * horizon).exp();
         let expected = 200.0 * (v_terminal - barrier).max(0.0);

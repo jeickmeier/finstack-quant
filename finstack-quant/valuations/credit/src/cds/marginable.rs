@@ -172,13 +172,14 @@ mod tests {
         let as_of = time::macros::date!(2027 - 02 - 15);
         let mut cds = CreditDefaultSwap::example().expect("CDS");
         let market = MarketContext::new()
-            .insert(discount_forward_curve_support::flat_discount_with_tenor(
+            .try_insert(discount_forward_curve_support::flat_discount_with_tenor(
                 cds.premium_leg.discount_curve_id.as_str(),
                 as_of,
                 0.03,
                 30.0,
             ))
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 HazardCurve::builder(cds.protection_leg.credit_curve_id.as_str())
                     .base_date(as_of)
                     .recovery_rate(cds.protection_leg.recovery_rate)
@@ -186,7 +187,8 @@ mod tests {
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .build()
                     .expect("hazard"),
-            );
+            )
+            .expect("insert market curve");
         cds.upfront = Some((
             as_of + time::Duration::days(2),
             Money::new(12_345.678_9, Currency::USD).expect("upfront"),

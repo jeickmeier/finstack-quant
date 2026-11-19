@@ -203,12 +203,22 @@ test('FxDeltaVolSurface wing pairing is the Rust constructor check', () => {
   const message = 'Validation error: rr_10d and bf_10d must both be provided or both omitted';
   assert.throws(
     () =>
-      new core.FxDeltaVolSurface('X', 'EUR/USD', [1], [0.1], [0.01], [0.005], { rr10d: [0.02] }),
+      new core.FxDeltaVolSurface('X', 'EUR/USD', [1], [0.1], [0.01], [0.005], {
+        deltaConvention: 'forward_unadjusted',
+        atmConvention: 'delta_neutral_straddle',
+        butterflyConvention: 'smile',
+        rr10d: [0.02],
+      }),
     validation(message)
   );
   assert.throws(
     () =>
-      new core.FxDeltaVolSurface('X', 'EUR/USD', [1], [0.1], [0.01], [0.005], { bf10d: [0.01] }),
+      new core.FxDeltaVolSurface('X', 'EUR/USD', [1], [0.1], [0.01], [0.005], {
+        deltaConvention: 'forward_unadjusted',
+        atmConvention: 'delta_neutral_straddle',
+        butterflyConvention: 'smile',
+        bf10d: [0.01],
+      }),
     validation(message)
   );
 });

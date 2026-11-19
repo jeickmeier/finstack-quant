@@ -145,7 +145,7 @@ impl MertonModel {
                 "implied_spread: recovery must be in [0, 1], got {recovery}"
             )));
         }
-        let pd = self.default_probability(horizon);
+        let pd = self.default_probability(horizon)?;
         let lgd = 1.0 - recovery;
         Ok(-(1.0 - pd * lgd).ln() / horizon)
     }
@@ -193,7 +193,7 @@ impl MertonModel {
                     .to_string(),
             ));
         }
-        let equity = self.terminal_equity_value(horizon);
+        let equity = self.terminal_equity_value(horizon)?;
         let debt_value = self.asset_value * (-self.payout_rate * horizon).exp() - equity;
         let risk_free_value = self.debt_barrier * (-self.risk_free_rate * horizon).exp();
         if !(debt_value.is_finite() && debt_value > 0.0) {
@@ -209,19 +209,19 @@ impl MertonModel {
     ///
     /// Reduces to Black-Scholes for `GeometricBrownian` and to the Merton
     /// (1976) option series for `JumpDiffusion`.
-    fn terminal_equity_value(&self, horizon: f64) -> f64 {
+    fn terminal_equity_value(&self, horizon: f64) -> Result<f64> {
         let log_moneyness = (self.asset_value / self.debt_barrier).ln();
         let discount = (-self.risk_free_rate * horizon).exp();
-        self.terminal_log_components(self.log_drift(self.risk_free_rate), horizon)
+        self.terminal_log_components(self.log_drift(self.risk_free_rate), horizon)?
             .into_iter()
             .map(|(weight, mean, variance)| {
                 let std_dev = variance.sqrt();
                 let d2 = (log_moneyness + mean) / std_dev;
                 let d1 = d2 + std_dev;
                 let forward = self.asset_value * (mean + 0.5 * variance).exp();
-                weight
+                Ok(weight
                     * discount
-                    * forward.mul_add(norm_cdf(d1), -(self.debt_barrier * norm_cdf(d2)))
+                    * forward.mul_add(norm_cdf(d1)?, -(self.debt_barrier * norm_cdf(d2)?)))
             })
             .sum()
     }
@@ -381,7 +381,8 @@ mod tests {
         let sqrt_t = t.sqrt();
         let d1 = ((v / b).ln() + (r + 0.5 * sigma * sigma) * t) / (sigma * sqrt_t);
         let d2 = d1 - sigma * sqrt_t;
-        let put = b * (-r * t).exp() * norm_cdf(-d2) - v * norm_cdf(-d1);
+        let put = b * (-r * t).exp() * norm_cdf(-d2).expect("valid Gaussian variate")
+            - v * norm_cdf(-d1).expect("valid Gaussian variate");
         let risk_free_value = b * (-r * t).exp();
         let expected = -((risk_free_value - put) / risk_free_value).ln() / t;
 

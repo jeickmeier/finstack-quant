@@ -128,7 +128,8 @@ fn create_market_context(
         .unwrap();
 
     MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "AAPL",

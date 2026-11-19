@@ -497,7 +497,8 @@ mod tests {
             .expect("vol surface");
 
         MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "SPX",
@@ -550,7 +551,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("nonflat curve");
-        let mut market = market(as_of, 100.0, 0.0, 0.0, 0.0).insert(curve);
+        let mut market = market(as_of, 100.0, 0.0, 0.0, 0.0)
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut inst = down_and_out_call(expiry, 100.0, 110.0);
         inst.barrier_type = BarrierType::UpAndOut;
         inst.monitoring = finstack_quant_valuations_core::instruments::Monitoring::Discrete {
@@ -794,7 +797,8 @@ mod tests {
                 .build()
                 .expect("surface");
             MarketContext::new()
-                .insert(disc)
+                .try_insert(disc)
+                .expect("insert market curve")
                 .insert_surface(surface)
                 .insert_price(
                     "SPX",
@@ -829,7 +833,8 @@ mod tests {
                 .build()
                 .expect("surface");
             MarketContext::new()
-                .insert(disc)
+                .try_insert(disc)
+                .expect("insert market curve")
                 .insert_surface(surface)
                 .insert_price(
                     "SPX",

@@ -92,9 +92,13 @@ fn index_factor_scales_pv() {
         ("N4", "HZ4"),
         ("N5", "HZ5"),
     ];
-    let mut ctx = MarketContext::new().insert(disc);
+    let mut ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     for (_, hid) in names.iter() {
-        ctx = ctx.insert(flat_hazard(hid, as_of, rec, hz));
+        ctx = ctx
+            .try_insert(flat_hazard(hid, as_of, rec, hz))
+            .expect("insert market curve");
     }
 
     let cons: Vec<CdsIndexConstituent> = names

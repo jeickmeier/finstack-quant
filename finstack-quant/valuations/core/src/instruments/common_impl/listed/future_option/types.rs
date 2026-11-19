@@ -426,8 +426,10 @@ impl FutureOptionTerms {
                 }
                 let (d1, d2) = d1_d2_black76(futures_price, self.strike, volatility, t);
                 match self.option_type {
-                    OptionType::Call => futures_price * norm_cdf(d1) - self.strike * norm_cdf(d2),
-                    OptionType::Put => self.strike * norm_cdf(-d2) - futures_price * norm_cdf(-d1),
+                    OptionType::Call => futures_price * norm_cdf(d1)? - self.strike * norm_cdf(d2)?,
+                    OptionType::Put => {
+                        self.strike * norm_cdf(-d2)? - futures_price * norm_cdf(-d1)?
+                    }
                 }
             }
             FutureOptionModel::Normal => bachelier_price_with_annuity(
@@ -828,10 +830,12 @@ mod tests {
     use time::macros::date;
 
     fn market(rate: f64) -> MarketContext {
-        MarketContext::new().insert(
-            DiscountCurve::flat("USD-OIS", date!(2026 - 01 - 01), rate, DayCount::Act365F)
-                .expect("discount curve"),
-        )
+        MarketContext::new()
+            .try_insert(
+                DiscountCurve::flat("USD-OIS", date!(2026 - 01 - 01), rate, DayCount::Act365F)
+                    .expect("discount curve"),
+            )
+            .expect("insert market curve")
     }
 
     fn option(model: FutureOptionModel, option_type: OptionType) -> FutureOptionTerms {

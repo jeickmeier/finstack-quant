@@ -363,7 +363,17 @@ class FxDeltaVolSurface:
     Examples
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-    >>> surface = FxDeltaVolSurface("EURUSD", "EUR/USD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
+    >>> surface = FxDeltaVolSurface(
+    ...     "EURUSD",
+    ...     "EUR/USD",
+    ...     [0.25, 1.0],
+    ...     [0.08, 0.09],
+    ...     [0.01, 0.015],
+    ...     [0.005, 0.007],
+    ...     delta_convention="forward_unadjusted",
+    ...     atm_convention="delta_neutral_straddle",
+    ...     butterfly_convention="smile",
+    ... )
     >>> (surface.pair, len(surface.expiries), surface.rr_10d)
     ('EUR/USD', 2, None)
 
@@ -378,11 +388,11 @@ class FxDeltaVolSurface:
         rr_25d: Sequence[float],
         bf_25d: Sequence[float],
         *,
+        delta_convention: str,
+        atm_convention: str,
+        butterfly_convention: str,
         rr_10d: Optional[Sequence[float]] = None,
         bf_10d: Optional[Sequence[float]] = None,
-        delta_convention: str = "forward_unadjusted",
-        atm_convention: str = "delta_neutral_straddle",
-        butterfly_convention: str = "smile",
         expiry_clock: Optional[VolatilityClock] = None,
     ) -> None:
         """
@@ -407,11 +417,11 @@ class FxDeltaVolSurface:
             10-delta risk reversal per expiry; requires ``bf_10d``.
         bf_10d : Sequence[float], optional
             10-delta smile butterfly per expiry; requires ``rr_10d``.
-        delta_convention : str, default="forward_unadjusted"
+        delta_convention : str
             Delta quoting convention (``"forward_unadjusted"``).
-        atm_convention : str, default="delta_neutral_straddle"
+        atm_convention : str
             ATM quoting convention (``"delta_neutral_straddle"``).
-        butterfly_convention : str, default="smile"
+        butterfly_convention : str
             Butterfly quoting convention (``"smile"``).
         expiry_clock : VolatilityClock, optional
             Calendar and day-count clock defining how option expiry dates map to
@@ -427,12 +437,22 @@ class FxDeltaVolSurface:
             non-finite.
         TypeError
             If ``pair`` is not a string or 2-element currency pair, or an
-            unexpected keyword argument is passed.
+            unexpected keyword argument is passed, or a required convention is missing.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-        >>> FxDeltaVolSurface("EURUSD", "EUR/USD", [1.0], [0.09], [0.015], [0.007]).atm_vols
+        >>> FxDeltaVolSurface(
+        ...     "EURUSD",
+        ...     "EUR/USD",
+        ...     [1.0],
+        ...     [0.09],
+        ...     [0.015],
+        ...     [0.007],
+        ...     delta_convention="forward_unadjusted",
+        ...     atm_convention="delta_neutral_straddle",
+        ...     butterfly_convention="smile",
+        ... ).atm_vols
         [0.09]
 
         """
@@ -460,7 +480,17 @@ class FxDeltaVolSurface:
         Examples
         --------
         >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-        >>> surface = FxDeltaVolSurface("EURUSD", "EUR/USD", [1.0], [0.09], [0.015], [0.007])
+        >>> surface = FxDeltaVolSurface(
+        ...     "EURUSD",
+        ...     "EUR/USD",
+        ...     [1.0],
+        ...     [0.09],
+        ...     [0.015],
+        ...     [0.007],
+        ...     delta_convention="forward_unadjusted",
+        ...     atm_convention="delta_neutral_straddle",
+        ...     butterfly_convention="smile",
+        ... )
         >>> FxDeltaVolSurface.from_json(surface.to_json()) == surface
         True
 

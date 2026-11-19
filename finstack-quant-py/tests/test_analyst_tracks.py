@@ -112,7 +112,7 @@ def test_structured_helpers_are_fresh_and_use_the_base_stage(
     assert second["CDX-0-3"]["instrument"]["spec"]["detach_pct"] == 3.0
     assert stages == ["base"]
     assert market.get_credit_index("CDX-INDEX-DATA").num_constituents == 125
-    assert market.get_base_correlation("CDX-BASE-CORR").correlation(3.0) == pytest.approx(0.25)
+    assert market.get_base_correlation("CDX-BASE-CORR").get_correlation(3.0) == pytest.approx(0.25)
     assert math.isfinite(tranche.value.amount)
 
 

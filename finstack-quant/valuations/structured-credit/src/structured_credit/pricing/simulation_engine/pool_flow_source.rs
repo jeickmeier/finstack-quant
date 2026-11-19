@@ -612,7 +612,7 @@ impl PerNameDefaultEngine {
     /// partners negate the same recovery draw, including for surviving names.
     pub(super) fn sample_recovery(&mut self, recovery_factor: f64) -> Result<f64> {
         let eps = if self.recovery_model.has_idiosyncratic_dispersion() {
-            let raw = self.rng.next_std_normal();
+            let raw = self.rng.next_std_normal()?;
             if self.antithetic { -raw } else { raw }
         } else {
             0.0
@@ -917,7 +917,7 @@ mod recovery_tests {
             );
             for _ in 0..20 {
                 let eps = if model.has_idiosyncratic_dispersion() {
-                    rng.next_std_normal()
+                    rng.next_std_normal().expect("normal draw")
                 } else {
                     0.0
                 };

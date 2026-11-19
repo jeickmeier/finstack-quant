@@ -334,12 +334,14 @@ fn caps(pricer: &CdsTranchePricer, index: &CreditIndexData, tranche: &CdsTranche
     let attach = pricer.smooth_correlation_boundary(
         index
             .base_correlation_curve()
-            .correlation(tranche.attach_pct),
+            .get_correlation(tranche.attach_pct)
+            .expect("valid detachment"),
     );
     let detach = pricer.smooth_correlation_boundary(
         index
             .base_correlation_curve()
-            .correlation(tranche.detach_pct),
+            .get_correlation(tranche.detach_pct)
+            .expect("valid detachment"),
     );
     // The frozen B4 matrices use flat base correlation, including parallel
     // risk bumps. Do not silently treat a future skew as one shared node PMF.
@@ -398,33 +400,18 @@ fn gamma(operations: usize) -> f64 {
     n_epsilon / (1.0 - n_epsilon)
 }
 
-fn scenario_market(
-    case: &FrozenCase,
-    market: &MarketContext,
-    pricer: &CdsTranchePricer,
-    bump: f64,
-) -> MarketContext {
+fn scenario_market(case: &FrozenCase, market: &MarketContext, bump: f64) -> MarketContext {
     if bump == 0.0 {
         return market.clone();
     }
     let original = market
         .get_credit_index(&case.instrument.credit_index_id)
         .expect("index");
-    let curve = Arc::new(
-        pricer
-            .bump_base_correlation(original.base_correlation_curve(), bump)
-            .expect("parallel correlation bump"),
-    );
-    let index = original
-        .to_builder()
-        .base_correlation_curve(Arc::clone(&curve))
-        .build()
-        .expect("bumped index");
-    market
-        .clone()
-        .insert(curve)
-        .insert_credit_index(&case.instrument.credit_index_id, index)
-        .expect("bumped market")
+    let curve = original
+        .base_correlation_curve()
+        .apply_bucket_bump(None, bump)
+        .expect("parallel correlation bump");
+    market.clone().try_insert(curve).expect("bumped market")
 }
 
 fn scenario_record(case: &FrozenCase, market: &MarketContext, name: &str, bump: f64) -> Value {
@@ -436,7 +423,7 @@ fn scenario_record(case: &FrozenCase, market: &MarketContext, name: &str, bump: 
             calls: Arc::clone(&calls),
         }),
     };
-    let market = scenario_market(case, market, &pricer, bump);
+    let market = scenario_market(case, market, bump);
     let tranche = &case.instrument;
     assert!(
         tranche.upfront.is_none(),
@@ -569,7 +556,7 @@ fn scenario_record(case: &FrozenCase, market: &MarketContext, name: &str, bump: 
             })
         }).collect();
         let node_records: Vec<_> = nodes.iter().map(|node| {
-            let probabilities: Vec<_> = pool.pds.iter().map(|pd| pricer.conditional_default_prob_copula(pricer.copula(), pricer.default_threshold_for_copula(*pd), &node.factors, pricer.smooth_correlation_boundary(definitions[0].correlation))).collect();
+            let probabilities: Vec<_> = pool.pds.iter().map(|pd| pricer.conditional_default_prob_copula(pricer.copula(), pricer.default_threshold_for_copula(*pd).expect("valid marginal probability"), &node.factors, pricer.smooth_correlation_boundary(definitions[0].correlation))).collect();
             let isolated = conditional_pricer(&pool, &probabilities);
             let actual_caps = cap_values(&isolated, &index, period.accrual_end, &definitions);
             let conditioning_hash = content_hash(&json!({

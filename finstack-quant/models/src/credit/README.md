@@ -337,7 +337,7 @@ use finstack_quant_models::credit::{
 // Direct construction.
 let model = MertonModel::new(100.0, 0.20, 80.0, 0.05)?;
 let dd = model.distance_to_default(1.0);
-let pd = model.default_probability(1.0);
+let pd = model.default_probability(1.0)?;
 let spread = model.implied_spread(5.0, 0.40)?;
 assert!(dd > 0.0 && (0.0..1.0).contains(&pd) && spread > 0.0);
 
@@ -349,12 +349,12 @@ assert!(model.cds_par_spread(5.0, 0.40)? > spread);
 let default_point = MertonModel::kmv_default_point(40.0, 80.0)?;
 let kmv = MertonModel::new(100.0, 0.20, default_point, 0.05)?;
 let edf = kmv.default_probability_with_drift(0.12, 1.0)?;
-assert!(edf < kmv.default_probability(1.0));
+assert!(edf < kmv.default_probability(1.0)?);
 
 // Calibrate the barrier to a 5-year cumulative PD implied by a 2% annual hazard.
 let five_year_pd = 1.0 - (-0.02_f64 * 5.0).exp();
 let calibrated = MertonModel::from_target_pd(200.0, 0.25, 0.045, 0.0, five_year_pd, 5.0)?;
-assert!((calibrated.default_probability(5.0) - five_year_pd).abs() < 1e-6);
+assert!((calibrated.default_probability(5.0)? - five_year_pd).abs() < 1e-6);
 
 // Black-Cox first passage with a growing barrier, same parameters as `model`.
 let black_cox = MertonModel::new_with_dynamics(
@@ -367,7 +367,7 @@ let black_cox = MertonModel::new_with_dynamics(
     AssetDynamics::GeometricBrownian,
 )?;
 // Continuous monitoring can only default at least as often as terminal-only.
-assert!(black_cox.default_probability(5.0) >= model.default_probability(5.0));
+assert!(black_cox.default_probability(5.0)? >= model.default_probability(5.0)?);
 
 // Structural PD -> hazard curve for the reduced-form engines.
 let base_date = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 15).unwrap();

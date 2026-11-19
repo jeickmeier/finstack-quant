@@ -55,7 +55,7 @@
         "id": "WTI-FORWARD",
         "base": "2025-01-02",
         "day_count": "act_365f",
-        "spot_price": 80.0,
+        "level_kind": "price",
         "knot_points": [
           [
             0.0,

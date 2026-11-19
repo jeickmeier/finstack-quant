@@ -83,7 +83,9 @@ fn act365l_balance_segments_preserve_the_full_coupon_denominator() {
                 finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
             )
             .expect("flat term curve");
-            let market = MarketContext::new().insert(curve);
+            let market = MarketContext::new()
+                .try_insert(curve)
+                .expect("insert market curve");
             if floating {
                 value["coupon_program"][0]["kind"] = json!("floating");
                 value["coupon_program"][0]["spec"]
@@ -317,7 +319,11 @@ fn b14_overnight_principal_events_preserve_cumulative_rate_clock() {
     .expect("constant overnight rate");
     let schedule = serde_json::from_value::<cf::CashflowScheduleBuildSpec>(v)
         .expect("spec")
-        .build(Some(&MarketContext::new().insert(curve)))
+        .build(Some(
+            &MarketContext::new()
+                .try_insert(curve)
+                .expect("insert market curve"),
+        ))
         .expect("coupon");
     // Sterling RFR working-group NCCR convention: weight each increment of
     // the original period's cumulative compounded rate by that day's balance.
@@ -1293,7 +1299,9 @@ mod slice3_regressions {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        let market = MarketContext::new().insert(fwd);
+        let market = MarketContext::new()
+            .try_insert(fwd)
+            .expect("insert market curve");
 
         let mut mismatch = base_term_spec(
             Some(Tenor::semi_annual()),
@@ -1341,7 +1349,9 @@ mod slice3_regressions {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
             .build()
             .unwrap();
-        let market = MarketContext::new().insert(fwd_err);
+        let market = MarketContext::new()
+            .try_insert(fwd_err)
+            .expect("insert market curve");
         let mut schedule_params = ScheduleParams::quarterly_act360();
         schedule_params.stub = finstack_quant_core::dates::StubKind::ShortBack;
         let on_spec = base_term_spec(
@@ -1412,7 +1422,9 @@ mod slice3_regressions {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        let market = MarketContext::new().insert(fwd);
+        let market = MarketContext::new()
+            .try_insert(fwd)
+            .expect("insert market curve");
 
         // `Simple` compounding matches `None`.
         let r_none = RateSpec::Floating(base_term_spec(
@@ -1504,9 +1516,13 @@ mod slice3_regressions {
             finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .unwrap();
-        let market_json =
-            serde_json::to_string(&MarketContext::new().insert(fwd).insert_series(fixings))
-                .unwrap();
+        let market_json = serde_json::to_string(
+            &MarketContext::new()
+                .try_insert(fwd)
+                .expect("insert market curve")
+                .insert_series(fixings),
+        )
+        .unwrap();
 
         let float_spec = |as_of_date: &str, issue_str: &str, mat_str: &str| {
             json!({

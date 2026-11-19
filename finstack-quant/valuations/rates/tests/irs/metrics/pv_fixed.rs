@@ -32,7 +32,11 @@ fn build_market(rate: f64, base_date: Date) -> MarketContext {
     let disc_curve = build_flat_discount_curve(rate, base_date);
     let fwd_curve = ForwardCurve::flat("USD_LIBOR_3M", base_date, rate, DayCount::Act360).unwrap();
 
-    MarketContext::new().insert(disc_curve).insert(fwd_curve)
+    MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
 }
 
 fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> InterestRateSwap {

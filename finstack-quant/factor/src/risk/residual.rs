@@ -119,7 +119,7 @@ fn variance_from_measure(
         RiskMeasure::Variance => total_risk.max(0.0),
         RiskMeasure::Volatility => total_risk * total_risk,
         RiskMeasure::VaR { confidence } => {
-            let z = standard_normal_inv_cdf(confidence);
+            let z = standard_normal_inv_cdf(confidence)?;
             if z > 0.0 {
                 (total_risk / -z).powi(2)
             } else {
@@ -127,7 +127,7 @@ fn variance_from_measure(
             }
         }
         RiskMeasure::ExpectedShortfall { confidence } => {
-            let (_, es_multiplier) = tail_multipliers(confidence);
+            let (_, es_multiplier) = tail_multipliers(confidence)?;
             if es_multiplier > 0.0 {
                 (total_risk / -es_multiplier).powi(2)
             } else {

@@ -46,7 +46,11 @@ fn market() -> MarketContext {
         .expect("discount curve");
     let forward = ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 30), 0.03, DayCount::Act360)
         .expect("forward curve");
-    MarketContext::new().insert(discount).insert(forward)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
 }
 
 /// Seasoned, so accrued interest separates the clean and dirty paths.

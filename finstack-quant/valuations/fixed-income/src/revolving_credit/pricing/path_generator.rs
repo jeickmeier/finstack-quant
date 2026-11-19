@@ -260,7 +260,7 @@ pub(crate) fn generate_three_factor_paths(
     // discounting over the static curve.
     let stochastic_rates = matches!(
         &process.get_params().interest_rate,
-        InterestRateSpec::Floating { params, .. } if params.sigma_at_time(0.0) > 0.0
+        InterestRateSpec::Floating { params, .. } if params.sigma_at_time(0.0)? > 0.0
     );
 
     // Convert payment dates to time points using facility's day count
@@ -343,7 +343,11 @@ pub(crate) fn generate_three_factor_paths(
 
     // Simulate one path from its flat `num_steps × num_factors` normal draws
     // (step-major), negated when `sign` is -1 for the antithetic partner.
-    let simulate_path = |z_path: &[f64], sign: f64, z_step: &mut [f64], work: &mut [f64]| {
+    let simulate_path = |z_path: &[f64],
+                         sign: f64,
+                         z_step: &mut [f64],
+                         work: &mut [f64]|
+     -> Result<ThreeFactorPathData> {
         let mut state = initial_state.to_vec();
         // Only record states at observation dates, not intermediate steps.
         let mut utilization_path = Vec::with_capacity(num_payment_dates);
@@ -374,7 +378,7 @@ pub(crate) fn generate_three_factor_paths(
             // Zero utilization vol freezes ONLY the utilization factor;
             // rate and credit-spread dynamics keep stepping.
             let u_frozen = state[0];
-            disc.step(&process, t, dt, &mut state, z_step, work);
+            disc.step(&process, t, dt, &mut state, z_step, work)?;
             if is_zero_vol {
                 state[0] = u_frozen;
             }
@@ -392,14 +396,14 @@ pub(crate) fn generate_three_factor_paths(
             }
         }
 
-        ThreeFactorPathData {
+        Ok(ThreeFactorPathData {
             utilization_path,
             short_rate_path,
             credit_spread_path,
             time_points: raw_time_points.clone(),
             payment_dates: payment_dates.to_vec(),
             stochastic_rates,
-        }
+        })
     };
 
     // Parallel Philox path generation. Each estimator draws from its own
@@ -416,14 +420,14 @@ pub(crate) fn generate_three_factor_paths(
         // filling one `num_factors` block per step.
         let mut z_path = vec![0.0; num_steps * num_factors];
         for block in z_path.chunks_mut(num_factors.max(1)) {
-            rng.fill_std_normals(block);
+            rng.fill_std_normals(block)?;
         }
         let mut z_step = vec![0.0; num_factors];
         let mut work = vec![0.0; work_size];
         [1.0, -1.0][..paths_per_iteration]
             .iter()
             .map(|&sign| simulate_path(&z_path, sign, &mut z_step, &mut work))
-            .collect::<Vec<_>>()
+            .collect::<Result<Vec<_>>>()
     };
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -432,12 +436,13 @@ pub(crate) fn generate_three_factor_paths(
         (0..num_iterations)
             .into_par_iter()
             .map(generate_iteration)
-            .collect()
+            .collect::<Result<_>>()?
     };
 
     #[cfg(target_arch = "wasm32")]
-    let chunked: Vec<Vec<ThreeFactorPathData>> =
-        (0..num_iterations).map(generate_iteration).collect();
+    let chunked: Vec<Vec<ThreeFactorPathData>> = (0..num_iterations)
+        .map(generate_iteration)
+        .collect::<Result<_>>()?;
 
     // Iteration order is preserved by `collect()`, so paths keep the
     // serial order with each antithetic pair adjacent.
@@ -697,15 +702,17 @@ mod tests {
     fn market_anchored_credit_starts_at_simulation_anchor_hazard() {
         let mut facility = RevolvingCredit::example().expect("facility");
         facility.recovery_rate = 0.4;
-        let market = MarketContext::new().insert(
-            HazardCurve::builder("RC-HZ")
-                .base_date(date!(2024 - 01 - 01))
-                .knots([(0.5, 0.01), (5.0, 0.05)])
-                .recovery_rate(0.40)
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .build()
-                .expect("hazard curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                HazardCurve::builder("RC-HZ")
+                    .base_date(date!(2024 - 01 - 01))
+                    .knots([(0.5, 0.01), (5.0, 0.05)])
+                    .recovery_rate(0.40)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .build()
+                    .expect("hazard curve"),
+            )
+            .expect("insert market curve");
         let config = McConfig {
             credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
                 credit_curve_id: "RC-HZ".into(),
@@ -751,7 +758,9 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
-        let market = MarketContext::new().insert(hazard.clone());
+        let market = MarketContext::new()
+            .try_insert(hazard.clone())
+            .expect("insert market curve");
         let (kappa, implied_vol) = (0.5_f64, 0.2_f64);
         let config = McConfig {
             credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
@@ -819,20 +828,22 @@ mod tests {
     fn stochastic_hull_white_ignores_legacy_constant_seed_and_fits_curve() {
         let facility = RevolvingCredit::example().expect("facility");
         let as_of = date!(2024 - 01 - 01);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(date!(2024 - 01 - 01))
-                .day_count(DayCount::Act365F)
-                .knots([
-                    (0.0, 1.0),
-                    (1.0, (-0.03_f64).exp()),
-                    (5.0, (-0.15_f64).exp()),
-                ])
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("discount curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(date!(2024 - 01 - 01))
+                    .day_count(DayCount::Act365F)
+                    .knots([
+                        (0.0, 1.0),
+                        (1.0, (-0.03_f64).exp()),
+                        (5.0, (-0.15_f64).exp()),
+                    ])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("discount curve"),
+            )
+            .expect("insert market curve");
         let config = McConfig {
             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
             interest_rate_process: Some(InterestRateProcessSpec::HullWhite1F {

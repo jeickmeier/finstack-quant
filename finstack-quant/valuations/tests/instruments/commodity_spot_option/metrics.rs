@@ -33,8 +33,10 @@ fn test_commodity_spot_option_core_greeks_registered() -> finstack_quant_core::R
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
 
     let market = MarketContext::new()
-        .insert(discount_curve)
-        .insert(forward_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(forward_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "CL-SPOT",
@@ -151,8 +153,10 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
 
     let market = MarketContext::new()
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "CL-SPOT",
@@ -220,7 +224,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
         id: forward_curve_id.clone(),
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
-            mode: BumpMode::Additive,
+            mode: BumpMode::Multiplicative,
             units: BumpUnits::Percent,
             value: bump_pct * 100.0,
         },
@@ -229,7 +233,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
         id: forward_curve_id,
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
-            mode: BumpMode::Additive,
+            mode: BumpMode::Multiplicative,
             units: BumpUnits::Percent,
             value: -bump_pct * 100.0,
         },
@@ -319,8 +323,10 @@ fn atm_commodity_spot_option(
     let forward_curve = flat_price_curve("CL-FWD", as_of, 100.0, 2.0);
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
     let market = MarketContext::new()
-        .insert(discount_curve)
-        .insert(forward_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(forward_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "CL-SPOT",
@@ -456,7 +462,8 @@ fn commodity_spot_option_zero_vol_delta_matches_resolved_forward_payoff()
                 option.quoted_forward = explicit_quote.then_some(f);
                 let market = base_market
                     .clone()
-                    .insert(flat_price_curve("CL-FWD", as_of, f, 2.0));
+                    .try_insert(flat_price_curve("CL-FWD", as_of, f, 2.0))
+                    .expect("insert market curve");
                 let delta = option
                     .option_greeks(
                         &market,
@@ -486,18 +493,14 @@ fn commodity_spot_option_zero_vol_delta_matches_resolved_forward_payoff()
                         (market.clone(), market.clone())
                     } else {
                         (
-                            base_market.clone().insert(flat_price_curve(
-                                "CL-FWD",
-                                as_of,
-                                f + 0.001,
-                                2.0,
-                            )),
-                            base_market.clone().insert(flat_price_curve(
-                                "CL-FWD",
-                                as_of,
-                                f - 0.001,
-                                2.0,
-                            )),
+                            base_market
+                                .clone()
+                                .try_insert(flat_price_curve("CL-FWD", as_of, f + 0.001, 2.0))
+                                .expect("insert market curve"),
+                            base_market
+                                .clone()
+                                .try_insert(flat_price_curve("CL-FWD", as_of, f - 0.001, 2.0))
+                                .expect("insert market curve"),
                         )
                     };
                     let fd = (up.value(&up_market, as_of)?.amount()
@@ -597,7 +600,9 @@ fn composite_resolved_claims_preserve_value_and_risk_through_snapshot_replay() {
     let mut physical = cash.clone();
     physical.id = "PHYSICAL-CLAIM".into();
     physical.settlement = SettlementType::Physical;
-    let market = market.insert(flat_price_curve("CL-FWD", as_of, 90.0, 2.0));
+    let market = market
+        .try_insert(flat_price_curve("CL-FWD", as_of, 90.0, 2.0))
+        .expect("insert market curve");
     let df = market
         .get_discount("USD-OIS")
         .unwrap()
@@ -638,7 +643,8 @@ fn composite_resolved_claims_preserve_value_and_risk_through_snapshot_replay() {
         // underlyings. Reprice this shared forward coordinate explicitly.
         let bumped = market
             .clone()
-            .insert(flat_price_curve("CL-FWD", as_of, 91.0, 2.0));
+            .try_insert(flat_price_curve("CL-FWD", as_of, 91.0, 2.0))
+            .expect("insert market curve");
         let bumped_value = instrument.value(&bumped, as_of).unwrap().amount();
         assert!(
             (bumped_value - value - expected_delta).abs() < 1e-10 * expected_delta.abs().max(1.0)

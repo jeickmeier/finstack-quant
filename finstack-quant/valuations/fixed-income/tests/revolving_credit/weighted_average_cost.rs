@@ -50,8 +50,10 @@ fn market_with(forward: ForwardCurve) -> MarketContext {
         .map(|days| (AS_OF - time::Duration::days(days), 0.02))
         .collect();
     MarketContext::new()
-        .insert(flat_discount_curve(0.03, AS_OF, "USD-OIS"))
-        .insert(forward)
+        .try_insert(flat_discount_curve(0.03, AS_OF, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:USD-SOFR-3M",

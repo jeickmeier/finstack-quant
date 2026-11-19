@@ -96,8 +96,10 @@ fn test_quantlib_parity_atm_cap() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = cap.value(&market, as_of).unwrap().amount();
@@ -180,8 +182,10 @@ fn test_quantlib_parity_cap_floor_parity() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let cap_pv = cap.value(&market, as_of).unwrap().amount();
@@ -244,13 +248,17 @@ fn test_quantlib_parity_vol_sensitivity() {
     let vol_high = build_flat_vol_surface(0.40, as_of, "USD_CAP_VOL");
 
     let market_low = MarketContext::new()
-        .insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M"))
+        .try_insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M"))
+        .expect("insert market curve")
         .insert_surface(vol_low);
 
     let market_high = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_high);
 
     let pv_low = cap.value(&market_low, as_of).unwrap().amount();
@@ -314,8 +322,10 @@ fn test_quantlib_parity_caplet_pricing() {
     let vol_surface = build_flat_vol_surface(0.20, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = caplet.value(&market, as_of).unwrap().amount();
@@ -425,8 +435,10 @@ fn test_quantlib_parity_moneyness() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let itm_pv = itm_cap.value(&market, as_of).unwrap().amount();
@@ -516,8 +528,10 @@ fn test_quantlib_parity_delta_sign() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let cap_result = cap
@@ -623,8 +637,10 @@ fn test_quantlib_parity_gamma_positive() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let cap_result = cap
@@ -727,8 +743,10 @@ fn test_quantlib_parity_time_to_maturity() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let short_pv = short_cap.value(&market, as_of).unwrap().amount();
@@ -783,8 +801,10 @@ fn test_quantlib_parity_zero_vol_itm() {
     let vol_surface = build_flat_vol_surface(0.0001, as_of, "USD_CAP_VOL"); // Near-zero vol
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = cap.value(&market, as_of).unwrap().amount();
@@ -867,8 +887,10 @@ fn test_quantlib_parity_frequency_impact() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let quarterly_pv = quarterly_cap.value(&market, as_of).unwrap().amount();

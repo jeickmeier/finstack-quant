@@ -249,7 +249,7 @@ impl DownturnLgd {
                 lgd_sensitivity,
                 stress_quantile,
             } => {
-                let z = standard_normal_inv_cdf(stress_quantile);
+                let z = standard_normal_inv_cdf(stress_quantile)?;
                 let systematic = lgd_sensitivity
                     * asset_correlation.sqrt()
                     * z

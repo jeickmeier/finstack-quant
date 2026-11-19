@@ -776,6 +776,7 @@
           "additionalProperties": {
             "type": "string"
           },
+          "default": null,
           "description": "Optional map of issuer ID → hazard curve ID",
           "type": [
             "object",
@@ -787,6 +788,7 @@
             "format": "double",
             "type": "number"
           },
+          "default": null,
           "description": "Optional map of issuer ID → recovery rate",
           "type": [
             "object",
@@ -798,6 +800,7 @@
             "format": "double",
             "type": "number"
           },
+          "default": null,
           "description": "Optional map of issuer ID → weight",
           "type": [
             "object",
@@ -2125,6 +2128,13 @@
               "$ref": "#/$defs/DateWire",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar for the source clock.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "day_count": {
               "$ref": "#/$defs/DayCount",
               "description": "Day count convention"
@@ -2160,21 +2170,9 @@
               },
               "type": "array"
             },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
+            "level_kind": {
+              "$ref": "#/$defs/PriceCurveKind",
+              "description": "Native level family."
             },
             "type": {
               "const": "price",
@@ -2186,6 +2184,7 @@
             "id",
             "base",
             "day_count",
+            "level_kind",
             "knot_points",
             "interp_style",
             "extrapolation"
@@ -5151,6 +5150,21 @@
         }
       ]
     },
+    "PriceCurveKind": {
+      "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup.",
+      "oneOf": [
+        {
+          "const": "price",
+          "description": "Signed, finite forward prices, for example in USD per barrel.",
+          "type": "string"
+        },
+        {
+          "const": "vol_index",
+          "description": "Nonnegative volatility-index levels in index points.",
+          "type": "string"
+        }
+      ]
+    },
     "PriceTrigger": {
       "additionalProperties": false,
       "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.\n\nUsed for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and\nthe holder's contingent conversion\n(`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).\n\n# Industry Practice\n\nThe standard trigger is 130% of the conversion price on 20 of 30\nconsecutive trading days; some issues use 120% or 150%.\n\n# Modeling scope\n\nThe tree evaluates the trigger on the instantaneous node spot. The soft\ncall applies a Broadie-Glasserman-Kou-style barrier shift scaled by\n`required_days_above / observation_days`; contingent conversion compares\nthe node spot with the nominal level and does not model the observation\nwindow.",
@@ -5788,21 +5802,27 @@
       "properties": {
         "alpha": {
           "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0.0,
           "format": "double",
           "type": "number"
         },
         "beta": {
           "description": "CEV exponent in the closed interval `[0, 1]`.",
           "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
           "type": "number"
         },
         "nu": {
           "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
           "format": "double",
+          "minimum": 0.0,
           "type": "number"
         },
         "rho": {
           "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": -1.0,
           "format": "double",
           "type": "number"
         },
@@ -6041,6 +6061,16 @@
             "type": "number"
           },
           "type": "array"
+        },
+        "expiry_clock": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VolatilityClock"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "forwards": {
           "description": "Row-major: forwards[expiry_idx * n_tenors + tenor_idx]",

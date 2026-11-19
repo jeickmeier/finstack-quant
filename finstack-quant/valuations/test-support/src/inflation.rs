@@ -144,8 +144,10 @@ pub fn standard_market(as_of: Date, inflation_rate: f64, discount_rate: f64) -> 
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     MarketContext::new()
-        .insert(disc)
-        .insert(infl_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve")
         .insert_inflation_index(index)
 }
 
@@ -160,8 +162,10 @@ pub fn realistic_market(as_of: Date) -> MarketContext {
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     MarketContext::new()
-        .insert(disc)
-        .insert(infl_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve")
         .insert_inflation_index(index)
 }
 

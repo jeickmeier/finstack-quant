@@ -24,7 +24,9 @@ fn flat_eur_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("EUR discount curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// Annual Bund-style bullet with no settlement lag so `as_of` is the quote date.

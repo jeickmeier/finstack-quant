@@ -150,13 +150,13 @@ fn to_u01(x: u32) -> f64 {
 fn sobol_direction_numbers_match_joe_kuo_table() {
     let reference = reference_direction_numbers();
     assert_eq!(reference.len(), MAX_SOBOL_DIMENSION);
-    let mut sobol = SobolRng::try_new(MAX_SOBOL_DIMENSION, 0).expect("valid dimension");
+    let mut sobol = SobolRng::new(MAX_SOBOL_DIMENSION, None).expect("valid dimension");
 
     for k in 0..32usize {
         sobol.reset();
-        sobol.skip(1u64 << k);
+        sobol.skip(1u64 << k).expect("valid Sobol request");
         let mut point = vec![0.0; MAX_SOBOL_DIMENSION];
-        sobol.fill_u01(&mut point);
+        sobol.fill_u01(&mut point).expect("valid Sobol request");
         for (dim_idx, v) in reference.iter().enumerate() {
             let expected = to_u01(v[k]);
             assert_eq!(
@@ -181,12 +181,12 @@ fn sobol_direction_numbers_match_joe_kuo_table() {
 #[test]
 fn sobol_first_16_points_match_reference() {
     let reference = reference_direction_numbers();
-    let mut sobol = SobolRng::try_new(MAX_SOBOL_DIMENSION, 0).expect("valid dimension");
+    let mut sobol = SobolRng::new(MAX_SOBOL_DIMENSION, None).expect("valid dimension");
 
     let check_dims: [usize; 6] = [1, 2, 5, 21, 30, 40]; // table d
     let mut point = vec![0.0; MAX_SOBOL_DIMENSION];
     for n in 0..16u64 {
-        sobol.fill_u01(&mut point);
+        sobol.fill_u01(&mut point).expect("valid Sobol request");
         for &d in &check_dims {
             let dim_idx = d - 1; // library index
             let x = reference_point_int(&reference[dim_idx], n);

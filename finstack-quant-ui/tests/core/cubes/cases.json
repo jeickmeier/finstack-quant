@@ -549,7 +549,18 @@
           0.0579957607034755, 0.06369644107217762, 0.07733886065762598,
           0.0702358752534414, 0.07893180395314672, 0.10264113138434476
         ],
-        "interpolation_mode": "vol"
+        "interpolation_mode": "vol",
+        "expiry_clock": {
+          "reference_date": "2026-05-08",
+          "day_count": "act_365f",
+          "context": {
+            "calendar_id": null,
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": null,
+            "end_is_termination_date": null
+          }
+        }
       }
     ],
     "hierarchy": null

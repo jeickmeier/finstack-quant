@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any, Optional, Sequence, Union
+from typing import Any, NotRequired, Optional, Sequence, TypedDict, Union
 import pandas as pd
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.market_data import DateLike, TimeOrDate
+
+class _PriceCurveOptions(TypedDict):
+    id: str
+    base_date: DateLike
+    knots: Sequence[tuple[float, float]]
+    kind: str
+    day_count: Union[DayCount, str]
+    calendar_id: NotRequired[Optional[str]]
+    interp: str
+    extrapolation: str
 
 class PriceCurve:
     """
@@ -20,69 +30,68 @@ class PriceCurve:
     Examples
     --------
     >>> from finstack_quant.core.market_data import PriceCurve
-    >>> curve = PriceCurve("WTI", "2025-01-01", [(0.0, 70.0), (1.0, 72.0)])
+    >>> curve = PriceCurve({
+    ...     "id": "WTI",
+    ...     "base_date": "2025-01-01",
+    ...     "knots": [(0.0, 70.0), (1.0, 72.0)],
+    ...     "kind": "price",
+    ...     "interp": "linear",
+    ...     "extrapolation": "flat",
+    ...     "day_count": "act_365f",
+    ... })
     >>> curve.price(0.5)
     71.0
-    >>> vix = PriceCurve("VIX", "2025-01-01", [(0.0, 18.0), (1.0, 21.0)], kind="vol_index")
-    >>> (vix.kind, vix.spot_price)
+    >>> vix = PriceCurve({
+    ...     "id": "VIX",
+    ...     "base_date": "2025-01-01",
+    ...     "knots": [(0.0, 18.0), (1.0, 21.0)],
+    ...     "kind": "vol_index",
+    ...     "interp": "linear",
+    ...     "extrapolation": "flat",
+    ...     "day_count": "act_365f",
+    ... })
+    >>> (vix.kind, vix.price(0.0))
     ('vol_index', 18.0)
 
     """
 
-    def __init__(
-        self,
-        id: str,
-        base_date: DateLike,
-        knots: Sequence[tuple[float, float]],
-        *,
-        kind: Optional[str] = None,
-        spot_price: Optional[float] = None,
-        extrapolation: Optional[str] = None,
-        interp: Optional[str] = None,
-        day_count: Optional[Union[DayCount, str]] = None,
-    ) -> None:
+    def __init__(self, options: _PriceCurveOptions) -> None:
         """
-        Construct a price curve from ``(time_years, forward_price)`` knots.
+        Construct a price curve from native level pillars and explicit source conventions.
 
         Parameters
         ----------
-        id : str
-            Unique curve identifier (e.g. ``"WTI-FORWARD"`` or ``"VIX"``).
-        base_date : datetime.date or str
-            Valuation date anchoring ``t = 0``.
-        knots : Sequence[tuple[float, float]]
-            ``(time_years, forward_price)`` pairs in absolute price units. At
-            least two knots; the first must be at ``t = 0`` unless
-            ``spot_price`` is given.
-        kind : str, optional
-            ``"price"`` (default; signed prices allowed) or ``"vol_index"``
-            (non-negative volatility-index levels in vol points, e.g. ``18.0``).
-            A ``"vol_index"`` curve is stored and retrieved through
-            :meth:`MarketContext.get_vol_index_curve`.
-        spot_price : float, optional
-            Spot level at ``t = 0``; inferred from a ``t = 0`` knot when omitted.
-            An explicit spot is inserted at zero if that knot is absent and
-            must match any supplied zero-time knot.
-        extrapolation : str, optional
-            Extrapolation policy; default ``"flat"``.
-        interp : str, optional
-            Interpolation style; default ``"linear"``.
-        day_count : DayCount | str, optional
-            Day-count label; default ``"act_365f"``.
+        options : dict
+            Required fields are ``id``, ISO or Python ``base_date``, ``knots`` (at least two
+            strictly increasing nonnegative times in years paired with finite native levels),
+            ``kind`` ("price" for signed prices or "vol_index" for nonnegative index points),
+            ``day_count`` (DayCount or label), ``interp`` ("linear", "cubic_hermite" or
+            positive-only "log_linear"), and ``extrapolation`` ("flat", "extend" or "error").
+            Supply a registered ``calendar_id`` for Bus/252. A zero-time source pillar is optional.
 
         Raises
         ------
         ValueError
-            If fewer than two knots are given, a knot is non-finite or
-            duplicated, spot cannot be inferred or conflicts with a zero-time
-            knot, a vol-index level is
-            negative, or a label is unknown.
+            If the source clock, interpolation, tail policy or source pillars are invalid.
+        KeyError
+            If the supplied calendar identifier is unknown.
+        TypeError
+            If a required field is absent or an option is unrecognized or mistyped.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import PriceCurve
-        >>> PriceCurve("WTI", "2025-01-01", [(0.5, 70.0), (1.0, 72.0)], spot_price=69.5).spot_price
-        69.5
+        >>> curve = PriceCurve({
+        ...     "id": "WTI",
+        ...     "base_date": "2025-01-01",
+        ...     "knots": [(0.5, 70.0), (1.0, 72.0)],
+        ...     "kind": "price",
+        ...     "interp": "linear",
+        ...     "extrapolation": "error",
+        ...     "day_count": "act_365f",
+        ... })
+        >>> curve.price(0.75)
+        71.0
 
         """
         ...
@@ -110,7 +119,15 @@ class PriceCurve:
         Examples
         --------
         >>> from finstack_quant.core.market_data import PriceCurve
-        >>> curve = PriceCurve("WTI", "2025-01-01", [(0.0, 70.0), (1.0, 72.0)])
+        >>> curve = PriceCurve({
+        ...     "id": "WTI",
+        ...     "base_date": "2025-01-01",
+        ...     "knots": [(0.0, 70.0), (1.0, 72.0)],
+        ...     "kind": "price",
+        ...     "interp": "linear",
+        ...     "extrapolation": "flat",
+        ...     "day_count": "act_365f",
+        ... })
         >>> PriceCurve.from_json(curve.to_json()) == curve
         True
 
@@ -151,8 +168,8 @@ class PriceCurve:
         Raises
         ------
         ValueError
-            If the time or price is non-finite, extrapolation is forbidden, a date
-            precedes the earliest pillar, or the evaluated volatility-index level is negative.
+            If the time or price is non-finite, extrapolation is forbidden, a time or date
+            precedes the source base, or the evaluated volatility-index level is negative.
         """
         ...
 
@@ -221,18 +238,18 @@ class PriceCurve:
         ...
 
     @property
-    def spot_price(self) -> float:
+    def calendar_id(self) -> Optional[str]:
         """
-        Level of the underlying on the base date.
+        Registered calendar used to convert dates on the source clock.
 
         Returns
         -------
-        float
-            Spot price in the curve's currency, or the index level in volatility points when :attr:`kind` is ``"vol_index"``.
+        str or None
+            Canonical calendar identifier, or ``None`` for a calendar-independent clock.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor does not raise.
         """
         ...
 
@@ -317,6 +334,8 @@ class PriceCurve:
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct the curve through its validated canonical JSON when unpickling."""
+        ...
     def __repr__(self) -> str: ...
     def _repr_html_(self) -> Optional[str]: ...

@@ -294,9 +294,12 @@ fn benchmark_market() -> MarketContext {
         .build()
         .unwrap();
     MarketContext::new()
-        .insert(discount)
-        .insert(quarterly)
-        .insert(monthly)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(quarterly)
+        .expect("insert market curve")
+        .try_insert(monthly)
+        .expect("insert market curve")
 }
 
 struct CouponReference {
@@ -571,16 +574,18 @@ fn compact_swap() -> InterestRateSwap {
 }
 
 fn compact_market() -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(date!(2025 - 01 - 02))
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-            .interp(InterpStyle::Linear)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(date!(2025 - 01 - 02))
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                .interp(InterpStyle::Linear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve")
 }
 
 fn compact_pairs() -> [(Date, Date, f64); 6] {

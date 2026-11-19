@@ -66,7 +66,9 @@ fn test_plain_bond_quoted_price_bucketed_dv01_nonzero() {
     bond.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.5);
 
-    let market = MarketContext::new().insert(build_multi_tenor_curve(as_of));
+    let market = MarketContext::new()
+        .try_insert(build_multi_tenor_curve(as_of))
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -127,7 +129,9 @@ fn test_plain_bond_no_quote_bucketed_dv01_nonzero() {
     let as_of = date!(2024 - 03 - 15);
     let bond = build_plain_bond(as_of); // no pricing_overrides set
 
-    let market = MarketContext::new().insert(build_multi_tenor_curve(as_of));
+    let market = MarketContext::new()
+        .try_insert(build_multi_tenor_curve(as_of))
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(

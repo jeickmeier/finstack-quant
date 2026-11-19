@@ -32,26 +32,28 @@ pub(super) fn capped_annual_to_monthly(annual: f64) -> f64 {
 /// * `base_cpr` - Annual CPR before the shock, in decimal form.
 /// * `shock_volatility` - Standard deviation of the log-CPR shock (`|loading * vol|`),
 ///   in `[0, 1]` under the pool models' parameter bounds; the sign is immaterial.
-fn expected_shocked_smm(base_cpr: f64, shock_volatility: f64) -> f64 {
+fn expected_shocked_smm(base_cpr: f64, shock_volatility: f64) -> finstack_quant_core::Result<f64> {
     use finstack_quant_core::math::{
         integration::gauss_legendre_integrate_composite, special_functions::norm_cdf,
     };
 
+    if !base_cpr.is_finite() || !shock_volatility.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(
+            "non-finite prepayment assumption".into(),
+        ));
+    }
+
     if base_cpr <= 0.0 {
-        return 0.0;
+        return Ok(0.0);
     }
     let sigma = shock_volatility.abs();
     if sigma == 0.0 {
-        return capped_annual_to_monthly(base_cpr);
+        return Ok(capped_annual_to_monthly(base_cpr));
     }
-    if !base_cpr.is_finite() || !sigma.is_finite() {
-        return f64::NAN;
-    }
-
     let lower_smm = capped_annual_to_monthly(base_cpr * (-10.0 * sigma).exp());
     let upper_smm = capped_annual_to_monthly(base_cpr * (10.0 * sigma).exp());
     if upper_smm == 0.0 || lower_smm >= upper_smm {
-        return upper_smm;
+        return Ok(upper_smm);
     }
     let log_base = base_cpr.ln();
     let lower_log = if lower_smm > 0.0 {
@@ -65,17 +67,15 @@ fn expected_shocked_smm(base_cpr: f64, shock_volatility: f64) -> f64 {
         |log_smm| {
             let smm = log_smm.exp();
             let cpr = -(12.0 * (-smm).ln_1p()).exp_m1();
-            let survival = norm_cdf((log_base - cpr.ln()) / sigma);
+            let survival = norm_cdf((log_base - cpr.ln()) / sigma)?;
             Ok(survival * smm)
         },
         lower_log,
         upper_smm.ln(),
         16,
         4,
-    );
-    // Finite bounds and fixed supported quadrature settings make failure an
-    // internal numerical error; preserve it as NaN, never as a baseline rate.
-    lower_smm + integral.unwrap_or(f64::NAN)
+    )?;
+    Ok(lower_smm + integral)
 }
 
 #[cfg(test)]
@@ -86,11 +86,12 @@ mod tests {
     fn shocked_smm_expectation_preserves_deterministic_limits() {
         for base_cpr in [0.0, 0.001, 0.20, 1.0] {
             assert!(
-                (expected_shocked_smm(base_cpr, 0.0) - capped_annual_to_monthly(base_cpr)).abs()
+                (expected_shocked_smm(base_cpr, 0.0).unwrap() - capped_annual_to_monthly(base_cpr))
+                    .abs()
                     < 1e-14
             );
         }
-        assert_eq!(expected_shocked_smm(0.0, 1.0), 0.0);
+        assert_eq!(expected_shocked_smm(0.0, 1.0).unwrap(), 0.0);
     }
 
     #[test]
@@ -101,8 +102,8 @@ mod tests {
             (0.80, 0.4, 0.36629112977692),
             (0.999, 0.001, 0.52684458761249),
         ] {
-            assert!((expected_shocked_smm(base_cpr, sigma) - mean).abs() < 1e-8);
-            assert!((expected_shocked_smm(base_cpr, -sigma) - mean).abs() < 1e-8);
+            assert!((expected_shocked_smm(base_cpr, sigma).unwrap() - mean).abs() < 1e-8);
+            assert!((expected_shocked_smm(base_cpr, -sigma).unwrap() - mean).abs() < 1e-8);
         }
     }
 }

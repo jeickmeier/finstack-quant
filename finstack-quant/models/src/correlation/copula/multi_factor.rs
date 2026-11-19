@@ -26,7 +26,7 @@
 //!
 
 use super::{Copula, select_quadrature};
-use finstack_quant_core::math::{integration::GaussHermiteQuadrature, special_functions::norm_cdf};
+use finstack_quant_core::math::integration::GaussHermiteQuadrature;
 
 /// CDF argument clipping to prevent overflow.
 const CDF_CLIP: f64 = 10.0;
@@ -101,25 +101,13 @@ impl MultiFactorCopula {
         scratch: &mut [f64],
         depth: usize,
     ) -> finstack_quant_core::Result<f64> {
-        const SQRT_2: f64 = std::f64::consts::SQRT_2;
         if depth == scratch.len() {
             return f(scratch);
         }
-        // Collect nodes so we can mutate `scratch` inside the loop
-        // without the quadrature driver's closure keeping a borrow.
-        let nodes: Vec<(f64, f64)> = self
-            .quadrature
-            .get_points()
-            .iter()
-            .zip(self.quadrature.get_weights().iter())
-            .map(|(&z, &w)| (SQRT_2 * z, w))
-            .collect();
-        let mut acc = 0.0_f64;
-        for (x, w) in nodes {
-            scratch[depth] = x;
-            acc += w * self.integrate_recursive(f, scratch, depth + 1)?;
-        }
-        Ok(acc / std::f64::consts::PI.sqrt())
+        self.quadrature.integrate(|z| {
+            scratch[depth] = z;
+            self.integrate_recursive(f, scratch, depth + 1)
+        })
     }
 
     fn decompose_correlation(&self, total_correlation: f64) -> (f64, f64) {
@@ -149,7 +137,7 @@ impl Copula for MultiFactorCopula {
                 actual = factor_realization.len(),
                 "MultiFactorCopula: factor length mismatch; returning unconditional PD"
             );
-            return norm_cdf(default_threshold);
+            return crate::gaussian::norm_cdf_or_nan(default_threshold);
         }
         if !default_threshold.is_finite()
             || factor_realization.iter().any(|z| !z.is_finite())
@@ -171,7 +159,7 @@ impl Copula for MultiFactorCopula {
 
         let systematic = global_loading * z_global + sector_loading * z_sector;
         let conditional_threshold = (default_threshold - systematic) / gamma;
-        norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
+        crate::gaussian::norm_cdf_or_nan(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
     }
 
     fn conditional_default_prob_given_systematic_and_mixing(
@@ -203,7 +191,7 @@ impl Copula for MultiFactorCopula {
             return f64::from(global_loading * systematic <= default_threshold);
         }
         let conditional_threshold = (default_threshold - global_loading * systematic) / residual_sd;
-        norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
+        crate::gaussian::norm_cdf_or_nan(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
     }
 
     fn integrate_fn(
@@ -267,12 +255,14 @@ mod tests {
     fn test_integration_recovers_unconditional() {
         let copula = MultiFactorCopula::new();
         let pd = 0.05;
-        let threshold = standard_normal_inv_cdf(pd);
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
         let correlation = 0.30;
 
-        let integrated_prob = super::super::expect_integral(&copula, &|factors| {
-            copula.conditional_default_prob(threshold, factors, correlation)
-        });
+        let integrated_prob = copula
+            .integrate_fn(&|factors| {
+                Ok(copula.conditional_default_prob(threshold, factors, correlation))
+            })
+            .unwrap();
 
         assert!(
             (integrated_prob - pd).abs() < 0.01,
@@ -286,7 +276,7 @@ mod tests {
     fn test_factor_length_mismatch_contract() {
         let copula = MultiFactorCopula::new();
         let pd = 0.05;
-        let threshold = standard_normal_inv_cdf(pd);
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
         let correlation = 0.30;
 
         let assert_contract = |factors: &[f64]| {

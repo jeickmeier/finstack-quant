@@ -2058,6 +2058,21 @@
       "description": "Delta convention governing how [`FxDeltaVolSurface`] maps wing deltas onto strikes.",
       "type": "string"
     },
+    "d_5e84cbda52c98fb4f0a1": {
+      "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup.",
+      "oneOf": [
+        {
+          "const": "price",
+          "description": "Signed, finite forward prices, for example in USD per barrel.",
+          "type": "string"
+        },
+        {
+          "const": "vol_index",
+          "description": "Nonnegative volatility-index levels in index points.",
+          "type": "string"
+        }
+      ]
+    },
     "d_5f0b38036294b8235c6a": {
       "additionalProperties": false,
       "description": "Step-level conventions for rates calibration (discount and forward curves).\n\nThis is a Bloomberg/FinCad-style design: curve construction uses a small set of\n*step-level* conventions (e.g., curve time-axis day count).",
@@ -3469,6 +3484,7 @@
               "additionalProperties": {
                 "type": "string"
               },
+              "default": null,
               "description": "Optional map of issuer ID → hazard curve ID",
               "type": [
                 "object",
@@ -3480,6 +3496,7 @@
                 "format": "double",
                 "type": "number"
               },
+              "default": null,
               "description": "Optional map of issuer ID → recovery rate",
               "type": [
                 "object",
@@ -3491,6 +3508,7 @@
                 "format": "double",
                 "type": "number"
               },
+              "default": null,
               "description": "Optional map of issuer ID → weight",
               "type": [
                 "object",
@@ -3645,6 +3663,16 @@
               },
               "type": "array"
             },
+            "expiry_clock": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_04fbc100264b0ba64e0f"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "forwards": {
               "description": "Row-major: forwards[expiry_idx * n_tenors + tenor_idx]",
               "items": {
@@ -3728,21 +3756,27 @@
       "properties": {
         "alpha": {
           "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0,
           "format": "double",
           "type": "number"
         },
         "beta": {
           "description": "CEV exponent in the closed interval `[0, 1]`.",
           "format": "double",
+          "maximum": 1,
+          "minimum": 0,
           "type": "number"
         },
         "nu": {
           "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
           "format": "double",
+          "minimum": 0,
           "type": "number"
         },
         "rho": {
           "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": -1,
           "format": "double",
           "type": "number"
         },
@@ -3792,7 +3826,7 @@
             "shifted_lognormal": {
               "properties": {
                 "shift": {
-                  "description": "Finite positive additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.",
+                  "description": "Finite signed additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.\nThe effective forward and strikes must be positive.",
                   "format": "double",
                   "type": "number"
                 }
@@ -7137,6 +7171,13 @@
               "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar for the source clock.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "day_count": {
               "$ref": "#/$defs/d_c0401254ec268b317b65",
               "description": "Day count convention"
@@ -7176,21 +7217,9 @@
               },
               "type": "array"
             },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
+            "level_kind": {
+              "$ref": "#/$defs/d_5e84cbda52c98fb4f0a1",
+              "description": "Native level family."
             }
           },
           "required": [
@@ -7198,6 +7227,7 @@
             "id",
             "base",
             "day_count",
+            "level_kind",
             "knot_points",
             "interp_style",
             "extrapolation"
@@ -7211,6 +7241,13 @@
             "base": {
               "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
               "description": "Base date"
+            },
+            "calendar_id": {
+              "description": "Registered holiday calendar for the source clock.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "day_count": {
               "$ref": "#/$defs/d_c0401254ec268b317b65",
@@ -7251,21 +7288,9 @@
               },
               "type": "array"
             },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
+            "level_kind": {
+              "$ref": "#/$defs/d_5e84cbda52c98fb4f0a1",
+              "description": "Native level family."
             }
           },
           "required": [
@@ -7273,6 +7298,7 @@
             "id",
             "base",
             "day_count",
+            "level_kind",
             "knot_points",
             "interp_style",
             "extrapolation"

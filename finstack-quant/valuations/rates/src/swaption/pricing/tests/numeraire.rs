@@ -157,8 +157,9 @@ fn lmm_reference_european(
         for step in 0..grid.num_steps() {
             let t = grid.time(step);
             let dt = grid.dt(step);
-            rng.fill_std_normals(&mut z);
-            disc.step(&process, t, dt, &mut x, &z, &mut work);
+            rng.fill_std_normals(&mut z).expect("normal draws");
+            disc.step(&process, t, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
             if step + 1 == ex_step {
                 break;
             }
@@ -420,8 +421,9 @@ fn simulate_hw1f_paths(
             let r_start = rates[step];
             let t = grid.time(step);
             let dt = grid.dt(step);
-            path_rng.fill_std_normals(&mut z);
-            disc.step(hw, t, dt, &mut state, &z, &mut work);
+            path_rng.fill_std_normals(&mut z).expect("normal draws");
+            disc.step(hw, t, dt, &mut state, &z, &mut work)
+                .expect("valid simulation step");
             let r_end = state[0];
             rates.push(r_end);
             // Trapezoidal integral of the short rate over [t_step, t_{step+1}].

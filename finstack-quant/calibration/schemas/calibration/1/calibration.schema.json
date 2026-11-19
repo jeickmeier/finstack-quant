@@ -3357,6 +3357,7 @@
               "additionalProperties": {
                 "type": "string"
               },
+              "default": null,
               "description": "Optional map of issuer ID → hazard curve ID",
               "type": [
                 "object",
@@ -3368,6 +3369,7 @@
                 "format": "double",
                 "type": "number"
               },
+              "default": null,
               "description": "Optional map of issuer ID → recovery rate",
               "type": [
                 "object",
@@ -3379,6 +3381,7 @@
                 "format": "double",
                 "type": "number"
               },
+              "default": null,
               "description": "Optional map of issuer ID → weight",
               "type": [
                 "object",
@@ -3532,6 +3535,16 @@
                 "type": "number"
               },
               "type": "array"
+            },
+            "expiry_clock": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VolatilityClock"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "forwards": {
               "description": "Row-major: forwards[expiry_idx * n_tenors + tenor_idx]",
@@ -3834,6 +3847,21 @@
             "date"
           ],
           "type": "object"
+        }
+      ]
+    },
+    "PriceCurveKind": {
+      "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup.",
+      "oneOf": [
+        {
+          "const": "price",
+          "description": "Signed, finite forward prices, for example in USD per barrel.",
+          "type": "string"
+        },
+        {
+          "const": "vol_index",
+          "description": "Nonnegative volatility-index levels in index points.",
+          "type": "string"
         }
       ]
     },
@@ -4344,6 +4372,13 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar for the source clock.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "day_count": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
               "description": "Day count convention"
@@ -4383,21 +4418,9 @@
               },
               "type": "array"
             },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
+            "level_kind": {
+              "$ref": "#/$defs/PriceCurveKind",
+              "description": "Native level family."
             }
           },
           "required": [
@@ -4405,6 +4428,7 @@
             "id",
             "base",
             "day_count",
+            "level_kind",
             "knot_points",
             "interp_style",
             "extrapolation"
@@ -4418,6 +4442,13 @@
             "base": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
               "description": "Base date"
+            },
+            "calendar_id": {
+              "description": "Registered holiday calendar for the source clock.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "day_count": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
@@ -4458,21 +4489,9 @@
               },
               "type": "array"
             },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
+            "level_kind": {
+              "$ref": "#/$defs/PriceCurveKind",
+              "description": "Native level family."
             }
           },
           "required": [
@@ -4480,6 +4499,7 @@
             "id",
             "base",
             "day_count",
+            "level_kind",
             "knot_points",
             "interp_style",
             "extrapolation"
@@ -5179,21 +5199,27 @@
       "properties": {
         "alpha": {
           "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0.0,
           "format": "double",
           "type": "number"
         },
         "beta": {
           "description": "CEV exponent in the closed interval `[0, 1]`.",
           "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
           "type": "number"
         },
         "nu": {
           "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
           "format": "double",
+          "minimum": 0.0,
           "type": "number"
         },
         "rho": {
           "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": -1.0,
           "format": "double",
           "type": "number"
         },
@@ -5329,7 +5355,7 @@
             "shifted_lognormal": {
               "properties": {
                 "shift": {
-                  "description": "Finite positive additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.",
+                  "description": "Finite signed additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.\nThe effective forward and strikes must be positive.",
                   "format": "double",
                   "type": "number"
                 }

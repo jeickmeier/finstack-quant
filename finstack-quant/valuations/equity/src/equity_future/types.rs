@@ -504,7 +504,8 @@ mod tests {
         let as_of = date!(2026 - 01 - 01);
         let settlement = date!(2027 - 01 - 01);
         let market = MarketContext::new()
-            .insert(flat_discount("USD-OIS", as_of, 0.05))
+            .try_insert(flat_discount("USD-OIS", as_of, 0.05))
+            .expect("insert market curve")
             .insert_price(
                 "SPX-SPOT",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
@@ -552,8 +553,10 @@ mod tests {
         let as_of = date!(2026 - 01 - 01);
         let settlement = date!(2027 - 01 - 01);
         let market = MarketContext::new()
-            .insert(flat_discount("EUR-OIS", as_of, 0.03))
-            .insert(flat_discount("USD-OIS", as_of, 0.05))
+            .try_insert(flat_discount("EUR-OIS", as_of, 0.03))
+            .expect("insert market curve")
+            .try_insert(flat_discount("USD-OIS", as_of, 0.05))
+            .expect("insert market curve")
             .insert_price(
                 "SX5E-SPOT",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
@@ -659,7 +662,8 @@ mod tests {
         let as_of = date!(2026 - 01 - 01);
         let settlement = date!(2027 - 01 - 01);
         let market = MarketContext::new()
-            .insert(flat_discount("USD-OIS", as_of, 0.05))
+            .try_insert(flat_discount("USD-OIS", as_of, 0.05))
+            .expect("insert market curve")
             .insert_price(
                 "SPX-SPOT",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
@@ -703,7 +707,8 @@ mod tests {
         let as_of = date!(2026 - 01 - 01);
         let future = EquityFuture::example().expect("example future");
         let market = MarketContext::new()
-            .insert(flat_discount("EUR-OIS", as_of, 0.03))
+            .try_insert(flat_discount("EUR-OIS", as_of, 0.03))
+            .expect("insert market curve")
             .insert_price(
                 "SX5E-SPOT",
                 MarketScalar::unitless(100.0).expect("valid scalar"),

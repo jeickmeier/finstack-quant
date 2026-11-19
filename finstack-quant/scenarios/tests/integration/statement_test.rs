@@ -281,7 +281,9 @@ fn invalid_rate_conversion_reports_failure_without_mutating_forecasts() {
         ),
         (untenored, Compounding::Continuous, "index_tenor"),
     ] {
-        let mut market = MarketContext::new().insert(forward);
+        let mut market = MarketContext::new()
+            .try_insert(forward)
+            .expect("insert market curve");
         let initial_values = IndexMap::from([
             (periods[0].id, AmountOrScalar::Scalar(0.02)),
             (periods[1].id, AmountOrScalar::Scalar(0.03)),
@@ -362,7 +364,9 @@ fn rate_binding_rejects_monetary_nodes_without_mutating_values() {
     for validated in [false, true] {
         let forward =
             ForwardCurve::flat("FWD", as_of, 0.04, DayCount::Act365F).expect("forward curve");
-        let mut market = MarketContext::new().insert(forward);
+        let mut market = MarketContext::new()
+            .try_insert(forward)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "expenses",
             finstack_quant_core::dates::PeriodPlan::try_new(

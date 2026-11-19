@@ -295,7 +295,9 @@ fn market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// Three-class CLO: nine performing 10M bullet loans at 8% plus one 10M loan
@@ -458,7 +460,9 @@ fn bond_deal(rules: Option<CoverageRules>) -> StructuredCredit {
 #[test]
 fn nr_haircut_leaves_instrument_collateral_at_par() {
     let closing = date!(2024 - 01 - 15);
-    let market = MarketContext::new().insert(flat_discount_curve(0.03, closing, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.03, closing, "USD-OIS"))
+        .expect("insert market curve");
     let first_principal = |deal: &StructuredCredit| -> Date {
         let run = deal.run_simulation(&market, closing).expect("run");
         run.tranches["A"]

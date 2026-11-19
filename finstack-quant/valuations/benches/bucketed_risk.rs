@@ -240,7 +240,11 @@ fn create_ir_market() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 fn create_credit_market() -> MarketContext {
@@ -269,7 +273,9 @@ fn create_credit_market() -> MarketContext {
         .unwrap();
 
     // Replayable par-spread quotes are required for quote-space CS01.
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let pillars =
         [91, 182, 365, 730, 1095, 1825, 2555, 3650, 5475, 7300, 10950].map(|days| (days, 200.0));
     let hazard = credit_support::calibrated_hazard_curve_with_pillars(
@@ -282,7 +288,9 @@ fn create_credit_market() -> MarketContext {
     )
     .expect("calibrated CDS benchmark hazard with replay metadata");
 
-    source_market.insert(hazard)
+    source_market
+        .try_insert(hazard)
+        .expect("insert market curve")
 }
 
 fn validate_metrics(result: &ValuationResult, metrics: &[MetricId], curves: &[&str]) {

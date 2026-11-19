@@ -48,7 +48,9 @@ fn test_dm_fixed_bond_is_rejected_in_strict_mode() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let err = bond
         .price_with_metrics(
@@ -165,7 +167,11 @@ fn test_dm_solver_convergence_across_spread_regimes() {
         .unwrap();
     let fwd =
         ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 30), 0.03, DayCount::Act360).unwrap();
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     // Base FRNs for different maturities.
     let frn_ig = prepare_dm_roundtrip_frn(
@@ -308,7 +314,11 @@ fn flat_frn_market(
     // coupon's lagged reset date is still projectable (no fixings needed).
     let fwd = ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 28), rate, DayCount::Act360)
         .expect("flat forward curve should build");
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 fn flat_market_frn(
@@ -451,7 +461,11 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
         .expect("disc curve");
     let fwd = ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 30), 0.03, DayCount::Act360)
         .expect("fwd curve");
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     // Set a clean price close to par so the DM is small and easy to solve.
     let target_dm = 0.015_f64; // 150 bp
@@ -540,8 +554,10 @@ fn test_dm_amortizing_frn_is_supported() {
     )
     .expect("forward curve should build");
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(disc)
-        .insert(fwd);
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(

@@ -123,7 +123,19 @@ def test_fx_delta_vol_wing_pairing_is_the_rust_constructor_check(
     rr_10d: list[float] | None, bf_10d: list[float] | None
 ) -> None:
     with _raises_exactly("Validation error: rr_10d and bf_10d must both be provided or both omitted"):
-        FxDeltaVolSurface("X", "EUR/USD", [1.0], [0.1], [0.01], [0.005], rr_10d=rr_10d, bf_10d=bf_10d)
+        FxDeltaVolSurface(
+            "X",
+            "EUR/USD",
+            [1.0],
+            [0.1],
+            [0.01],
+            [0.005],
+            delta_convention="forward_unadjusted",
+            atm_convention="delta_neutral_straddle",
+            butterfly_convention="smile",
+            rr_10d=rr_10d,
+            bf_10d=bf_10d,
+        )
 
 
 def test_vol_cube_node_dicts_use_the_rust_serde_shape() -> None:

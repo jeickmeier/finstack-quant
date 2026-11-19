@@ -69,7 +69,9 @@ fn cdx_ig_46_curves(as_of: Date) -> MarketContext {
         .build()
         .expect("discount curve");
 
-    let source = MarketContext::new().insert(disc);
+    let source = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     // CBBT Mid CDX.NA.IG.46 par CDS tenors, mapped to standard IMM
     // maturities. Quote-space Spread DV01 (`bump_hazard_spreads`) needs
     // the lossless calibration recipe that this bootstrap stamps onto
@@ -99,7 +101,7 @@ fn cdx_ig_46_curves(as_of: Date) -> MarketContext {
     )
     .expect("CDX.NA.IG.46 hazard calibration should succeed");
 
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 fn build_spot_cds(_as_of: Date) -> CreditDefaultSwap {
@@ -164,7 +166,10 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
         );
     }
 
-    let market_bumped = market.clone().insert(hazard_bumped);
+    let market_bumped = market
+        .clone()
+        .try_insert(hazard_bumped)
+        .expect("insert market curve");
     let pv_bumped = cds.value(&market_bumped, as_of).unwrap().amount();
     let spread_dv01 = pv_bumped - pv_base;
     let rpv01 = spread_dv01 / cds.notional.amount() * 10000.0;
@@ -181,7 +186,13 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
         )
         .unwrap();
         let pv_b = cds
-            .value(&market.clone().insert(bumped), as_of)
+            .value(
+                &market
+                    .clone()
+                    .try_insert(bumped)
+                    .expect("insert market curve"),
+                as_of,
+            )
             .unwrap()
             .amount();
         let dpv = pv_b - pv_base;
@@ -260,9 +271,15 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
             None,
         )
         .unwrap();
-        cds.value(&market.clone().insert(bumped_zero), as_of)
-            .unwrap()
-            .amount()
+        cds.value(
+            &market
+                .clone()
+                .try_insert(bumped_zero)
+                .expect("insert market curve"),
+            as_of,
+        )
+        .unwrap()
+        .amount()
             - pv_base
     };
     let true_spread_dv01 = spread_dv01 - rebootstrap_offset;

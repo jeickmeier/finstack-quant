@@ -103,18 +103,16 @@ dσ = ν σ dW₂
 | β (`beta`) | CEV backbone exponent | `[0, 1]`; 0 = normal, 1 = lognormal |
 | ν (`nu`) | Vol-of-vol / wing curvature | ≥ 0, typically 0.1-0.5 |
 | ρ (`rho`) | Skew | `(-1, 1)`; equities ≈ −0.2, rates ≈ 0 |
-| `shift` | `Option<f64>` displacement for negative rates | > 0 when present |
+| `shift` | `Option<f64>` displacement for negative rates | Finite signed amount in forward units |
 
-### Vol quoting convention — read this first
+### Volatility quoting convention
 
-`SabrParameters::implied_vol` returns a **normal (Bachelier)** volatility in
-absolute rate units when β is within `BETA_SNAP_TOL = 1e-4` of 0, and a
-**lognormal (Black)** volatility otherwise. Storing one in a surface that
-expects the other is a silent unit error. `SabrParameters::quote_convention()`
-returns the `VolatilityConvention::{Normal, Lognormal, ShiftedLognormal}` tag
-of the vols `implied_vol(forward, strike, t)` produces. The same rule
-binds calibration: pass normal quotes when calibrating with β ≈ 0 and
-lognormal quotes otherwise.
+Pass a `VolQuoteType` when evaluating SABR, constructing a smile or calibrating
+to market quotes. `Normal` expresses annualized Bachelier volatility in the
+forward's units, and the Black variants express annualized relative volatility
+as a decimal. `BlackLognormal` requires absent displacement.
+`ShiftedBlackLognormal` requires a stored displacement. The CEV exponent β
+sets the backbone for each quote type.
 
 ### `SabrParameters` (construction, [`sabr/parameters.rs`](sabr/parameters.rs))
 
@@ -163,7 +161,7 @@ Levenberg-Marquardt on normalized vega-weighted squared relative quote errors ov
 | `with_tolerance` / `with_max_iterations` | Fluent overrides |
 | `with_shift(SabrShift)` | `None`, `Fixed(s)` for an explicit displacement, or `Auto` to pick a standardized shift when the forward or a strike is negative |
 | `with_atm_pinning(bool)` | Solves α analytically for an exact ATM match, then fits ν and ρ only |
-| `calibrate(F, &strikes, &vols, T, β)` | LM under the configured shift/pinning settings, returning `SabrCalibrationOutcome` with parameters and solver statistics |
+| `calibrate(F, &strikes, &vols, T, β, quote_type)` | LM under the configured shift/pinning settings, returning `SabrCalibrationOutcome` with parameters and solver statistics |
 
 The solve uses log(alpha), ensuring positive alpha without a quote-scale-dependent
 upper or lower bound. Nu is bounded to [0.001, 2.0] and rho to [-0.99, 0.99].
@@ -174,7 +172,7 @@ outside this budget fails, including stalled and iteration-limited solves.
 
 ### `SabrSmile`
 
-`SabrSmile::new(params, forward, time_to_expiry)`.
+`SabrSmile::new(params, forward, time_to_expiry, quote_type)`.
 
 | Method | Notes |
 |--------|-------|
@@ -222,13 +220,14 @@ forward-based call prices; carry is already in the smile's forward.
 ```rust
 use finstack_quant_models::types::OptionType;
 use finstack_quant_core::math::norm_cdf;
+use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_models::closed_form::{bachelier_price_with_annuity, d1_d2, d1_d2_black76};
 use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters, SabrSmile};
 use finstack_quant_models::volatility::VolatilityConvention;
 
 // Black-Scholes delta: note the (spot, strike, r, sigma, t, q) order.
 let (d1, _d2) = d1_d2(100.0, 105.0, 0.05, 0.20, 0.5, 0.02);
-let call_delta = (-0.02_f64 * 0.5).exp() * norm_cdf(d1);
+let call_delta = (-0.02_f64 * 0.5).exp() * norm_cdf(d1).expect("finite standardized moneyness");
 
 // Black-76 for a forward-quoted swaption leg.
 let (d1_76, d2_76) = d1_d2_black76(0.05, 0.045, 0.20, 2.0);
@@ -239,16 +238,17 @@ assert!(receiver >= 0.0);
 
 // SABR: build a rates smile at beta = 0.5 and read one vol off it.
 let params = SabrParameters::rates_standard(0.02, 0.30, -0.10)?;
-assert_eq!(params.quote_convention(), VolatilityConvention::Lognormal); // beta = 0.5
-let vol = params.implied_vol(0.03, 0.035, 1.0)?;
+let quote_type = VolQuoteType::BlackLognormal;
+assert_eq!(params.quote_convention(quote_type)?, VolatilityConvention::Lognormal);
+let vol = params.implied_vol(0.03, 0.035, 1.0, quote_type)?;
 
 // Calibrate to a market smile, then check the fit for butterfly arbitrage.
 let strikes = [0.01, 0.02, 0.03, 0.04, 0.05];
-let market_vols = [0.22, 0.20, 0.19, 0.195, 0.21];
+let market_vols = SabrSmile::new(params, 0.03, 1.0, quote_type).generate_smile(&strikes)?;
 let fitted = SabrCalibrator::high_precision()
-    .calibrate(0.03, &strikes, &market_vols, 1.0, 0.5)?;
+    .calibrate(0.03, &strikes, &market_vols, 1.0, 0.5, quote_type)?;
 
-let smile = SabrSmile::new(fitted.parameters, 0.03, 1.0);
+let smile = SabrSmile::new(fitted.parameters, 0.03, 1.0, quote_type);
 let vols = smile.generate_smile(&strikes)?;
 let report = smile.validate_no_arbitrage(&strikes, 0.03)?;
 if !report.is_arbitrage_free() {
@@ -259,9 +259,8 @@ if !report.is_arbitrage_free() {
 
 ## Conventions
 
-- Volatilities, rates, and correlations are decimals (`0.20` = 20%), never
-  basis points. The one exception is `bachelier_price_with_annuity`'s `sigma`, which is an
-  absolute rate volatility.
+- Black volatilities and rates are decimals (`0.20` = 20%). Normal volatilities
+  are annualized in absolute forward units, including `bachelier_price_with_annuity`'s `sigma`.
 - Time is a year fraction; the day-count basis is the caller's choice.
 - Everything here is `f64` analytics, not `Money` — see
   [INVARIANTS.md](../../../../../INVARIANTS.md) §1.
@@ -279,7 +278,7 @@ The SABR classes keep their Rust names on both hosts:
 
 **Python** — `finstack_quant.models.volatility`: `SabrParameters`,
 `SabrSmile`, `SabrCalibrator`. `SabrCalibrator` exposes `calibrate`, taking
-`(forward, strikes, market_vols, t, beta)` with `beta` required, plus
+`(forward, strikes, market_vols, t, beta, quote_type)` with an explicit market quote convention, plus
 `high_precision()`, `with_tolerance()`, `with_shift(None | float | "auto")`
 and `with_atm_pinning(bool)`.
 

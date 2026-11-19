@@ -347,8 +347,10 @@ fn test_cip_parity_forward_at_premium() {
     let fx_matrix = FxMatrix::new(Arc::new(UnitSpotProvider), None);
 
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve")
         .insert_fx(fx_matrix);
 
     // Create 1M swap (spot = 1.0, no explicit rates - use model forward)

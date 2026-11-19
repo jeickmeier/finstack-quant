@@ -211,10 +211,8 @@ fn partial_realized_variance_with_dates(
         });
     }
     let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
-    if prices.len() < 2 {
-        return Ok(0.0);
-    }
-    realized_variance(&prices, Some(annualization_factor))
+    // Before the first return interval, the contractual accrued contribution is zero.
+    Ok(realized_variance(&prices, Some(annualization_factor))?.unwrap_or(0.0))
 }
 
 /// Expected contractual annualized variance, shared by PV and its metric.
@@ -249,7 +247,7 @@ fn expected_variance_with_dates(
     }
     let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
     // Calling the canonical estimator also validates historical prices.
-    let realized = realized_variance(&prices, Some(1.0))?;
+    let realized = realized_variance(&prices, Some(1.0))?.unwrap_or(0.0);
     let known_sum = realized * prices.len().saturating_sub(1) as f64;
     let (future_sum, _) = remaining_squared_returns(inst, context, as_of, obs_dates, &prices)?;
     Ok(annualization_factor(inst) * (known_sum + future_sum) / total_returns as f64)
@@ -453,8 +451,10 @@ mod tests {
             .expect("valid rate");
         let fx = FxMatrix::new(Arc::new(provider), None);
         MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_fx(fx)
     }
 
@@ -462,16 +462,20 @@ mod tests {
         use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
         let mut market = build_market(as_of);
         for id in ["USD-OIS", "EUR-OIS"] {
-            market = market.insert(
-                DiscountCurve::builder(id)
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (5.0, 1.0)])
-                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                    .build()
-                    .expect("curve"),
-            );
+            market = market
+                .try_insert(
+                    DiscountCurve::builder(id)
+                        .base_date(as_of)
+                        .knots([(0.0, 1.0), (5.0, 1.0)])
+                        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                        .extrapolation(
+                            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                        )
+                        .build()
+                        .expect("curve"),
+                )
+                .expect("insert market curve");
         }
         let provider = SimpleFxProvider::new();
         provider
@@ -1177,8 +1181,10 @@ mod tests {
             .build()
             .expect("surface");
         let market = MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(Arc::new(provider), None))
             .insert_surface(surface);
 
@@ -1356,8 +1362,10 @@ mod tests {
             .build()
             .expect("surface");
         let market = MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(Arc::new(provider), None))
             .insert_surface(surface);
 

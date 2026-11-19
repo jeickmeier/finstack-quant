@@ -1051,15 +1051,17 @@ mod tests {
     #[test]
     fn schedule_pv_raw_excludes_as_of_cash() -> finstack_quant_core::Result<()> {
         let as_of = date!(2024 - 01 - 01);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("DISC")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (1.0, 0.95)])
-                .interp(InterpStyle::Linear)
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()?,
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("DISC")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.95)])
+                    .interp(InterpStyle::Linear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()?,
+            )
+            .expect("insert market curve");
 
         let pv = schedule_pv_raw(
             &SingleFlowProvider,
@@ -1097,15 +1099,17 @@ mod tests {
     #[test]
     fn schedule_pv_excludes_as_of_cash() -> finstack_quant_core::Result<()> {
         let as_of = date!(2024 - 01 - 01);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("DISC")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (1.0, 0.95)])
-                .interp(InterpStyle::Linear)
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()?,
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("DISC")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.95)])
+                    .interp(InterpStyle::Linear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()?,
+            )
+            .expect("insert market curve");
 
         let pv = schedule_pv(
             &SingleFlowProvider,
@@ -1383,16 +1387,19 @@ mod realized_inflation_index_tests {
             .unwrap()
             .with_expected_releases(releases)
             .unwrap();
-        MarketContext::new().insert_inflation_index(index).insert(
-            InflationCurve::builder("CPI")
-                .base_date(date!(2024 - 01 - 01))
-                .day_count(DayCount::Act365F)
-                .interp(InterpStyle::Linear)
-                .extrapolation(ExtrapolationPolicy::Flat)
-                .knots([(0.0, 306.0), (5.0, 306.0)])
-                .build()
-                .unwrap(),
-        )
+        MarketContext::new()
+            .insert_inflation_index(index)
+            .try_insert(
+                InflationCurve::builder("CPI")
+                    .base_date(date!(2024 - 01 - 01))
+                    .day_count(DayCount::Act365F)
+                    .interp(InterpStyle::Linear)
+                    .extrapolation(ExtrapolationPolicy::Flat)
+                    .knots([(0.0, 306.0), (5.0, 306.0)])
+                    .build()
+                    .unwrap(),
+            )
+            .expect("insert market curve")
     }
 
     #[test]

@@ -48,6 +48,8 @@
 //!   - Lewis, A. L. (2000). *Option Valuation under Stochastic Volatility*.
 //!     Finance Press. (Fourier methods and quadrature)
 
+use crate::math::interp::exact_f64_eq;
+
 use crate::Error;
 use crate::InputError;
 use crate::math::summation::NeumaierAccumulator;
@@ -254,7 +256,7 @@ impl GaussHermiteQuadrature {
     /// use finstack_quant_core::math::integration::GaussHermiteQuadrature;
     ///
     /// let quad = GaussHermiteQuadrature::new(7)?;
-    /// let integral = quad.integrate(|x| x * x);
+    /// let integral = quad.integrate(|x| Ok(x * x))?;
     /// assert!((integral - 1.0).abs() < 0.1); // E[X²] = 1 for standard normal
     ///
     /// // High-precision quadrature for demanding applications
@@ -443,13 +445,21 @@ fn scale_by_width(average: f64, a: f64, b: f64) -> f64 {
     }
 }
 
-/// Interior node at fraction `t` of the increasing interval `[lo, hi]`.
+/// Point at `fraction` of the way from `lo` to `hi`, exact at both ends and
+/// formed without an overflowing span when the endpoints allow it.
 #[inline]
-fn interior_node(lo: f64, hi: f64, t: f64) -> f64 {
-    if (lo >= 0.0) == (hi >= 0.0) {
-        lo + t * (hi - lo)
+fn interval_point(lo: f64, hi: f64, fraction: f64) -> f64 {
+    if fraction == 0.0 {
+        return lo;
+    }
+    if exact_f64_eq(fraction, 1.0) {
+        return hi;
+    }
+    let span = hi - lo;
+    if span.is_finite() {
+        fraction.mul_add(span, lo)
     } else {
-        lo * (1.0 - t) + hi * t
+        fraction.mul_add(hi, (1.0 - fraction) * lo)
     }
 }
 
@@ -533,7 +543,7 @@ where
         } else if i == n {
             hi
         } else {
-            interior_node(lo, hi, i as f64 / count)
+            interval_point(lo, hi, i as f64 / count)
         };
         if i > 0 && x <= previous {
             return Err(quadrature_failure(
@@ -623,8 +633,9 @@ fn midpoint(a: f64, b: f64) -> f64 {
 
 #[inline]
 fn half_width(a: f64, b: f64) -> f64 {
-    if (a >= 0.0) == (b >= 0.0) {
-        0.5 * (b - a)
+    let span = b - a;
+    if span.is_finite() {
+        0.5 * span
     } else {
         0.5 * b - 0.5 * a
     }
@@ -1268,17 +1279,31 @@ pub fn gauss_legendre_grid(
         ));
     }
     let (nodes, weights) = gl_nodes_weights(order)?;
-    let width = (b - a) / panels as f64;
-    let half = 0.5 * width;
-    let mut grid = Vec::with_capacity(nodes.len() * panels);
+    let count = order
+        .checked_mul(panels)
+        .filter(|_| panels as u128 <= 1u128 << 53)
+        .ok_or_else(|| Error::Validation("Legendre grid count exceeds capacity".into()))?;
+    let mut grid = Vec::new();
+    grid.try_reserve_exact(count)
+        .map_err(|e| Error::Validation(format!("Legendre grid allocation: {e}")))?;
+    let mut left = a;
     for panel in 0..panels {
-        let midpoint = a + (panel as f64 + 0.5) * width;
-        grid.extend(
-            nodes
-                .iter()
-                .zip(weights)
-                .map(|(&node, &weight)| (midpoint + half * node, half * weight)),
-        );
+        let right = interval_point(a, b, (panel + 1) as f64 / panels as f64);
+        let half = half_width(left, right);
+        let mid = midpoint(left, right);
+        let mut previous = left;
+        for (&node, &w) in nodes.iter().zip(weights) {
+            let point = half.mul_add(node, mid);
+            let weight = half * w;
+            if !(point > previous && point < right && weight > 0.0 && weight.is_finite()) {
+                return Err(Error::Internal(
+                    "unrepresentable Legendre node or weight".into(),
+                ));
+            }
+            grid.push((point, weight));
+            previous = point;
+        }
+        left = right;
     }
     Ok(grid)
 }

@@ -516,6 +516,7 @@ export default [
   {
     "path": "#/$defs/d_4ad1b3e6968748946cee/properties/issuer_credit_curve_ids",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CreditIndexState/properties/issuer_credit_curve_ids",
+    "default": null,
     "description": "Optional map of issuer ID → hazard curve ID"
   },
   {
@@ -525,6 +526,7 @@ export default [
   {
     "path": "#/$defs/d_4ad1b3e6968748946cee/properties/issuer_recovery_rates",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CreditIndexState/properties/issuer_recovery_rates",
+    "default": null,
     "description": "Optional map of issuer ID → recovery rate"
   },
   {
@@ -535,6 +537,7 @@ export default [
   {
     "path": "#/$defs/d_4ad1b3e6968748946cee/properties/issuer_weights",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CreditIndexState/properties/issuer_weights",
+    "default": null,
     "description": "Optional map of issuer ID → weight"
   },
   {
@@ -1198,6 +1201,20 @@ export default [
     "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/expiries/items",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolCube/properties/expiries/items",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/expiry_clock",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolCube/properties/expiry_clock"
+  },
+  {
+    "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/expiry_clock/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolCube/properties/expiry_clock/anyOf/0",
+    "ref": "#/$defs/VolatilityClock",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock"
+  },
+  {
+    "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/expiry_clock/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolCube/properties/expiry_clock/anyOf/1"
   },
   {
     "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/forwards",
@@ -2104,6 +2121,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/calendar_id",
+    "description": "Registered holiday calendar for the source clock."
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/day_count",
     "description": "Day count convention",
@@ -2149,16 +2171,11 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/spot_level",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/spot_level",
-    "description": "Spot index level (volatility index curves)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/spot_price",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/spot_price",
-    "description": "Spot price (signed price curves)",
-    "format": "double"
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/level_kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/level_kind",
+    "description": "Native level family.",
+    "ref": "#/$defs/PriceCurveKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PriceCurveKind"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/type",
@@ -2245,24 +2262,30 @@ export default [
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/alpha",
     "description": "Initial volatility level, strictly positive.",
+    "exclusiveMinimum": 0,
     "format": "double"
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/beta",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/beta",
     "description": "CEV exponent in the closed interval `[0, 1]`.",
-    "format": "double"
+    "format": "double",
+    "maximum": 1,
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/nu",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/nu",
     "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/rho",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/rho",
     "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+    "exclusiveMaximum": 1,
+    "exclusiveMinimum": -1,
     "format": "double"
   },
   {
@@ -3478,6 +3501,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketScalar/oneOf/1/properties/price",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_d42cbc543d2261f1cd11",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PriceCurveKind",
+    "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup."
+  },
+  {
+    "path": "#/$defs/d_d42cbc543d2261f1cd11/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PriceCurveKind/oneOf/0",
+    "const": "price",
+    "description": "Signed, finite forward prices, for example in USD per barrel."
+  },
+  {
+    "path": "#/$defs/d_d42cbc543d2261f1cd11/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PriceCurveKind/oneOf/1",
+    "const": "vol_index",
+    "description": "Nonnegative volatility-index levels in index points."
   },
   {
     "path": "#/$defs/d_d7c93a9d6d6ba5ccd0ac",

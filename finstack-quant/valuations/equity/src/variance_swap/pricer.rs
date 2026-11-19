@@ -357,10 +357,8 @@ fn realized_variance_with_factor(
         });
     }
     let prices = inst.get_historical_prices(context, as_of)?;
-    if prices.len() < 2 {
-        return Ok(0.0);
-    }
-    realized_variance(&prices, Some(annualization_factor))
+    // Before the first return interval, the contractual accrued contribution is zero.
+    Ok(realized_variance(&prices, Some(annualization_factor))?.unwrap_or(0.0))
 }
 
 /// Minimum year-fraction below which the forward-start subtraction is skipped
@@ -479,7 +477,8 @@ mod tests {
             surface = surface.row(&[0.20; 7]);
         }
         MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_surface(surface.build().expect("surface"))
             .insert_price("SPX", MarketScalar::unitless(100.0).expect("valid scalar"))
             .insert_price(
@@ -724,7 +723,8 @@ mod tests {
             .build()
             .expect("curve");
         let market = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price("SPX", MarketScalar::unitless(100.0).expect("valid scalar"))
             .insert_price(
@@ -812,7 +812,8 @@ mod tests {
             .build()
             .expect("curve");
         let market = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price("SPX", MarketScalar::unitless(100.0).expect("valid scalar"))
             .insert_price(
@@ -875,7 +876,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         let err = swap
             .remaining_forward_variance(&market, as_of)

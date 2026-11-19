@@ -171,9 +171,12 @@ fn create_market(as_of: Date) -> MarketContext {
     let fx = FxMatrix::new(fx_provider, None);
 
     MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(jpy_disc)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(jpy_disc)
+        .expect("insert market curve")
         .insert_surface(eurusd_vol)
         .insert_surface(nky_vol)
         .insert_surface(jpyusd_vol)

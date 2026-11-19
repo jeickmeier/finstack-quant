@@ -8,6 +8,10 @@ const ALLOWED: &[(&str, usize)] = &[
     // `ValuationResult::metric_seed` is pricer state handed to the metric
     // evaluation of the same request; the registry drops it before returning.
     ("core/src/results/valuation_result.rs", 1),
+    // `Swaption::theta_cube_source_date` qualifies the frozen opening cube
+    // for one synthetic theta reprice. A deserialized trade must obtain its
+    // source clock through ordinary dated admission.
+    ("rates/src/swaption/types/swaption.rs", 1),
     // `Tranche::payment_priority` and `TrancheStructure::currency` are
     // derived when the structure is assembled, never read from the wire.
     (

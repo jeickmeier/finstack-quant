@@ -105,7 +105,13 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc).insert(f3m).insert(f1m)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve")
 }
 
 fn make_leg(forward_curve: &str, start: Date, end: Date, spread_bp: Decimal) -> FloatLegSpec {
@@ -499,7 +505,13 @@ fn annuity_with_payment_lag_differs_from_no_lag() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let as_of = d(2025, 1, 2);
 

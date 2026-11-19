@@ -27,7 +27,9 @@ fn bond_quote_set()
         .expect("curve");
     compute_quotes(
         &bond,
-        &MarketContext::new().insert(curve),
+        &MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve"),
         as_of,
         BondQuoteInput::CleanPricePct(98.5),
         PricingOptions::default(),

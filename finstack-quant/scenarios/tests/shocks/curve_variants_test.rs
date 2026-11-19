@@ -122,7 +122,9 @@ fn test_forecast_curve_parallel_shock() {
 
     let curve = sample_forward_curve(base_date);
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -191,7 +193,11 @@ fn test_par_cds_parallel_shock() {
         &[("1Y", 120.0), ("5Y", 150.0)],
     );
 
-    let mut market = MarketContext::new().insert(discount).insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -261,7 +267,11 @@ fn test_inflation_curve_parallel_shock() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve).insert(ois);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
+        .try_insert(ois)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -310,7 +320,9 @@ fn test_forecast_curve_node_shock() {
 
     let curve = sample_forward_curve(base_date);
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -372,7 +384,11 @@ fn test_par_cds_node_shock() {
     );
     let orig_5y = curve.hazard_rate(5.0).unwrap();
 
-    let mut market = MarketContext::new().insert(discount).insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -442,7 +458,11 @@ fn test_inflation_curve_node_shock() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve).insert(ois);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
+        .try_insert(ois)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -494,7 +514,9 @@ fn test_discount_curve_id_preservation() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -578,11 +600,16 @@ fn test_all_curve_types_in_one_scenario() {
         .unwrap();
 
     let mut market = MarketContext::new()
-        .insert(disc)
-        .insert(ois) // Added for inflation bump dependency
-        .insert(fwd)
-        .insert(hazard)
-        .insert(inflation);
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(ois)
+        .expect("insert market curve") // Added for inflation bump dependency
+        .try_insert(fwd)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(inflation)
+        .expect("insert market curve");
 
     let mut model = FinancialModelSpec::new(
         "test",

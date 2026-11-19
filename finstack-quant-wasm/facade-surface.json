@@ -1455,21 +1455,21 @@
     "methods": ["free", "price", "toJson"],
     "getters": [
       "baseDate",
+      "calendarId",
       "dayCount",
       "extrapolation",
       "id",
       "interpStyle",
       "kind",
       "knots",
-      "prices",
-      "spotPrice"
+      "prices"
     ]
   },
   "core.BaseCorrelationCurve": {
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson"],
-    "methods": ["correlation", "free", "toJson"],
+    "methods": ["free", "getCorrelation", "toJson"],
     "getters": ["correlations", "detachmentPoints", "extrapolation", "id", "interpStyle"]
   },
   "core.CreditIndexData": {

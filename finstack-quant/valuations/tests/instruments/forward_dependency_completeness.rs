@@ -29,16 +29,20 @@ fn build_market_from_deps(
     let mut market = MarketContext::new();
 
     for curve_id in deps.curves.discount_curves.iter() {
-        market = market.insert(flat_discount_with_tenor(
-            curve_id.as_str(),
-            as_of,
-            0.02,
-            5.0,
-        ));
+        market = market
+            .try_insert(flat_discount_with_tenor(
+                curve_id.as_str(),
+                as_of,
+                0.02,
+                5.0,
+            ))
+            .expect("insert market curve");
     }
     // Use PriceCurve for commodity forward prices (not ForwardCurve which is for rates)
     for curve_id in deps.curves.forward_curves.iter() {
-        market = market.insert(flat_price_curve(curve_id.as_str(), as_of, 80.0, 5.0));
+        market = market
+            .try_insert(flat_price_curve(curve_id.as_str(), as_of, 80.0, 5.0))
+            .expect("insert market curve");
     }
     for dependency in &deps.volatility_dependencies {
         market = market.insert_surface(flat_vol_surface(
@@ -88,12 +92,14 @@ fn test_spot_option_requires_calibrated_forward_curve() {
 
     let mut market = MarketContext::new();
     for curve_id in deps.curves.discount_curves.iter() {
-        market = market.insert(flat_discount_with_tenor(
-            curve_id.as_str(),
-            as_of,
-            0.02,
-            5.0,
-        ));
+        market = market
+            .try_insert(flat_discount_with_tenor(
+                curve_id.as_str(),
+                as_of,
+                0.02,
+                5.0,
+            ))
+            .expect("insert market curve");
     }
     for dependency in &deps.volatility_dependencies {
         market = market.insert_surface(flat_vol_surface(
@@ -128,12 +134,14 @@ fn test_missing_both_forward_and_spot_fails() {
 
     let mut market = MarketContext::new();
     for curve_id in deps.curves.discount_curves.iter() {
-        market = market.insert(flat_discount_with_tenor(
-            curve_id.as_str(),
-            as_of,
-            0.02,
-            5.0,
-        ));
+        market = market
+            .try_insert(flat_discount_with_tenor(
+                curve_id.as_str(),
+                as_of,
+                0.02,
+                5.0,
+            ))
+            .expect("insert market curve");
     }
     for dependency in &deps.volatility_dependencies {
         market = market.insert_surface(flat_vol_surface(

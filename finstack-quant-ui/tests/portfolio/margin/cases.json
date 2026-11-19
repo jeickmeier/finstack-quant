@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-      "sha256": "b8a4fcf4ed2ac76b00c8450c13c27d76b36b09747384de1d3e2b1cfa4c6dfbd4"
+      "sha256": "8e5be364d8ad95ad981df79bd9994e4643a195df2c753e0fe2823480be01b3cb"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -15,7 +15,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "e136cc5320c3bfad8ad06fd111b6866ccfee6cd52e4c223521e10b065f36d4ff"
+      "sha256": "9199e3197ac1576ea82e0195430f69085c95344d8189c5a8ec1acced641ade1d"
     }
   ],
   "asOf": "2023-12-28",

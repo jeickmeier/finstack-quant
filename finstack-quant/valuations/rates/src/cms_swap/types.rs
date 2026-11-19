@@ -1005,8 +1005,10 @@ mod tests {
         let as_of = date(2025, 1, 1);
         let swap = CmsSwap::example().expect("example");
         let market = finstack_quant_core::market_data::context::MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 2.0))
-            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.04, 2.0))
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 2.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.04, 2.0))
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface(
                 "USD-CMS10Y-VOL",
                 &[0.25, 1.0],
@@ -1074,8 +1076,10 @@ mod tests {
         let vol_surface = builder.build().expect("vol surface");
 
         finstack_quant_core::market_data::context::MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 15.0))
-            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.03, 15.0))
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 15.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.03, 15.0))
+            .expect("insert market curve")
             .insert_surface(vol_surface)
     }
 
@@ -1132,7 +1136,9 @@ mod tests {
             finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         )
         .expect("dense forward");
-        let market = recon_market(as_of).insert(forward);
+        let market = recon_market(as_of)
+            .try_insert(forward)
+            .expect("insert market curve");
         let result = swap
             .price_with_metrics(
                 &market,

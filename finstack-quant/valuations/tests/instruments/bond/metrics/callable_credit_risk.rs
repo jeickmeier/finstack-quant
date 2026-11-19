@@ -58,7 +58,9 @@ fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
-    let source = MarketContext::new().insert(disc);
+    let source = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
@@ -67,7 +69,7 @@ fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
         "USD-OIS",
     )
     .expect("hazard calibration should succeed");
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 #[test]

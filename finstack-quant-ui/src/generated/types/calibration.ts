@@ -569,6 +569,7 @@ export type D_826Db27Dbb673D9F5F86 =
        * Option expiries in years, strictly increasing. Indexes the first axis.
        */
       expiries: number[];
+      expiry_clock?: D_04Fbc100264B0Ba64E0F | null;
       /**
        * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
        */
@@ -2305,8 +2306,9 @@ export type D_08Aea844Abd10Cb00E40 =
         | {
             shifted_lognormal: {
               /**
-               * Finite positive additive shift in decimal rate units, applied to
+               * Finite signed additive shift in decimal rate units, applied to
                * both forwards and strikes and retained in calibrated artifacts.
+               * The effective forward and strikes must be positive.
                */
               shift: number;
               [k: string]: unknown;
@@ -4558,6 +4560,10 @@ export type DE988Ea453181Acf6E6F1 =
     }
   | {
       base: Date40;
+      /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
       day_count: DayCount9;
       /**
        * Extrapolation policy
@@ -4577,16 +4583,16 @@ export type DE988Ea453181Acf6E6F1 =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: "price" | "vol_index";
     }
   | {
       base: Date41;
+      /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
       day_count: DayCount10;
       /**
        * Extrapolation policy
@@ -4606,13 +4612,9 @@ export type DE988Ea453181Acf6E6F1 =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: "price" | "vol_index";
     }
   | {
       /**

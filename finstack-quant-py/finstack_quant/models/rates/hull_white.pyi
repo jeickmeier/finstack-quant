@@ -156,10 +156,10 @@ class HullWhiteParams:
         float
             Volatility in absolute rate units per square-root year.
 
-        Notes
-        -----
-        This method does not raise; a time outside the knot schedule clamps
-        to the first or last knot value.
+        Raises
+        ------
+        ValueError
+            If the model time is negative or non-finite.
 
         Examples
         --------
@@ -185,7 +185,9 @@ class HullWhiteParams:
         Raises
         ------
         ValueError
-            If the integration interval is invalid.
+            If the model time is negative or non-finite.
+        RuntimeError
+            If the integrated state variance is outside the representable range.
 
         Examples
         --------
@@ -209,12 +211,14 @@ class HullWhiteParams:
         -------
         float
             Covariance in rate units squared; ``0.0`` when the earlier time is
-            non-positive.
+            zero.
 
         Raises
         ------
         ValueError
-            If the earlier-time variance cannot be evaluated.
+            If either model time is negative or non-finite.
+        RuntimeError
+            If the earlier-time state variance is outside the representable range.
 
         Examples
         --------
@@ -246,6 +250,8 @@ class HullWhiteParams:
         ValueError
             If the time ordering ``t <= expiry <= maturity`` is violated or a
             time is negative/non-finite.
+        RuntimeError
+            If the variance integral is outside the representable range.
 
         Examples
         --------

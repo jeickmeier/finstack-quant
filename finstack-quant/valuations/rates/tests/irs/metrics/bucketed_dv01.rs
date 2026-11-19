@@ -97,7 +97,9 @@ fn test_bucketed_vs_parallel_dv01_sanity() {
     swap.float_leg.forward_curve_id = "USD_OIS".into();
 
     let disc_curve = build_flat_discount_curve(0.05, as_of);
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = swap
         .price_with_metrics(
@@ -145,7 +147,11 @@ fn test_bucketed_dv01_per_curve() {
     let swap = create_swap(as_of, end);
     let disc_curve = build_flat_discount_curve(0.05, as_of);
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let result = swap
         .price_with_metrics(

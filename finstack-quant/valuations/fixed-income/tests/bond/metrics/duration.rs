@@ -37,7 +37,9 @@ fn test_duration_zero_coupon() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -90,7 +92,9 @@ fn test_yield_duration_convexity_act_act_isma() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let res = bond
         .price_with_metrics(
@@ -137,7 +141,9 @@ fn test_modified_duration_matches_macaulay_over_yield() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let res = bond
         .price_with_metrics(
@@ -182,7 +188,9 @@ fn test_convexity_matches_numerical_second_derivative() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let res = bond
         .price_with_metrics(
@@ -269,7 +277,9 @@ fn callable_risk_market(
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    finstack_quant_core::market_data::context::MarketContext::new().insert(curve)
+    finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 fn floor_only_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {

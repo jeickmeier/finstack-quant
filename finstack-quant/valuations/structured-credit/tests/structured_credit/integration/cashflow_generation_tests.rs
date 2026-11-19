@@ -178,8 +178,10 @@ fn create_test_market() -> MarketContext {
         .expect("Failed to create forward curve");
 
     MarketContext::new()
-        .insert(discount_curve)
-        .insert(forward_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(forward_curve)
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:SOFR-3M",

@@ -100,7 +100,7 @@ fn test_cs01_call_positive() {
         "USD-OIS",
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
     let option = CdsOptionBuilder::new().call().build(as_of);
 
     let result = option

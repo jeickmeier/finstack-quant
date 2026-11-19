@@ -44,7 +44,7 @@ fn build_mock_market() -> finstack_quant_core::market_data::context::MarketConte
         .expect("Curve build failed");
 
     let mut market = MarketContext::new();
-    market = market.insert(flat_curve);
+    market = market.try_insert(flat_curve).expect("insert market curve");
     market
 }
 
@@ -105,8 +105,10 @@ fn build_multi_currency_market() -> finstack_quant_core::market_data::context::M
         .expect("EUR curve should build");
 
     MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve")
         .insert_fx(FxMatrix::new(Arc::new(StaticFx { rate: 1.2 }), None))
 }
 

@@ -42,7 +42,8 @@ fn test_fx_equity_curve_combo() {
 
     let mut market = MarketContext::new()
         .insert_fx(fx_matrix)
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_price(
             "SPY",
             MarketScalar::price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
@@ -135,7 +136,9 @@ fn test_statements_rate_bindings_curve() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let period_plan = build_periods("2025Q1..Q2", None).unwrap();
     let periods = period_plan.into_periods();
@@ -301,7 +304,9 @@ fn test_conflicting_operations_last_wins() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

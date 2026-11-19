@@ -11,7 +11,10 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VolCubeSlice } from "@/components/finstack/models/components/vol-cube-slice/vol-cube-slice";
-import { VolCubeExplorer } from "@/components/finstack/models/components/vol-cube-explorer/vol-cube-explorer";
+import {
+  VolCubeExplorer,
+  type VolCubeExplorerProps,
+} from "@/components/finstack/models/components/vol-cube-explorer/vol-cube-explorer";
 import { startWorker } from "../shared/worker/harness.mjs";
 import { unwrap, type CubeSliceRequest } from "@/workers/finstack-contract";
 import fixtures from "../core/cubes/cases.json";
@@ -65,6 +68,7 @@ it("slices the cube natively at the seeded strikes, fixed axis and node", async 
       <VolCubeSlice
         cube={cube}
         initialStrikes={strikes}
+        interpolationMode="total_variance"
         initialConvention="normal"
         colorDomains={colorDomains}
       />
@@ -79,6 +83,7 @@ it("slices the cube natively at the seeded strikes, fixed axis and node", async 
     at: cube.tenors[0],
     strikes,
     convention: "normal",
+    interpolationMode: "total_variance",
   });
   // No rate was supplied, so no smile is requested.
   expect(calls("cubeSmile")).toHaveLength(0);
@@ -127,6 +132,7 @@ it("evaluates the node smile only with an explicit rate and shows the native rep
       <VolCubeSlice
         cube={cube}
         initialStrikes={strikes}
+        interpolationMode="total_variance"
         initialConvention="normal"
         initialRate={0.04}
         repairIterations={10}
@@ -141,6 +147,7 @@ it("evaluates the node smile only with an explicit rate and shows the native rep
     cube,
     expiryIndex: 0,
     tenorIndex: 0,
+    quoteType: "normal",
     strikes,
     rate: 0.04,
     repairIterations: 10,
@@ -173,6 +180,12 @@ it("evaluates the node smile only with an explicit rate and shows the native rep
   await waitFor(() =>
     expect(calls("cubeSmile").at(-1)).toMatchObject({ tenorIndex: 2 }),
   );
+  fireEvent.click(screen.getByRole("radio", { name: "Black/lognormal" }));
+  await waitFor(() =>
+    expect(calls("cubeSmile").at(-1)).toMatchObject({
+      quoteType: "black_lognormal",
+    }),
+  );
   const rate = screen.getByLabelText(/Rate for the arbitrage check/);
   fireEvent.focus(rate);
   fireEvent.change(rate, { target: { value: "" } });
@@ -183,7 +196,7 @@ it("evaluates the node smile only with an explicit rate and shows the native rep
 });
 it("mounts the slice in the explorer only when strikes are supplied", async () => {
   const cache = new QueryClient();
-  const view = (slice?: { initialStrikes: number[] }) => (
+  const view = (slice?: VolCubeExplorerProps["slice"]) => (
     <QueryClientProvider client={cache}>
       <VolCubeExplorer
         cube={cube}
@@ -199,7 +212,7 @@ it("mounts the slice in the explorer only when strikes are supplied", async () =
     null,
   );
   bare.unmount();
-  render(view({ initialStrikes: strikes }));
+  render(view({ initialStrikes: strikes, interpolationMode: "vol" }));
   await screen.findByRole("region", {
     name: `${cube.id} tenor slice evaluated surface`,
   });

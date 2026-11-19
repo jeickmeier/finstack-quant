@@ -23,6 +23,19 @@ struct CalendarDef {
     #[serde(default)]
     sources: Vec<SourceDef>,
     rules: Vec<RuleDef>,
+    /// Dated exceptions to the Saturday/Sunday closure rule.
+    #[serde(default)]
+    open_dates: Vec<OpenDateDef>,
+}
+
+/// A documented exceptional trading date, emitted as a checked date constant.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OpenDateDef {
+    year: i32,
+    month: u8,
+    day: u8,
+    notice: String,
 }
 
 /// Optional inclusive `(from_year, to_year)` calendar coverage bounds.
@@ -610,6 +623,19 @@ fn validate_calendar_def(cal: &CalendarDef, path: &Path) -> io::Result<()> {
             &format!("{context}.supported_years"),
         )?;
     }
+    for date in &cal.open_dates {
+        if date.notice.trim().is_empty()
+            || cal.supported_years.is_some_and(|years| {
+                years.from_year.is_some_and(|year| date.year < year)
+                    || years.to_year.is_some_and(|year| date.year > year)
+            })
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("{context}: exceptional opening requires a notice and supported year"),
+            ));
+        }
+    }
     for (idx, rule) in cal.rules.iter().enumerate() {
         validate_rule(rule, &format!("{context}.rules[{idx}]"))?;
     }
@@ -724,15 +750,27 @@ pub(crate) fn generate() -> io::Result<()> {
             Some(sy) => format!("Some(({:?}, {:?}))", sy.from_year, sy.to_year),
             None => "None".to_string(),
         };
+        let open_dates_code = cal
+            .open_dates
+            .iter()
+            .map(|date| {
+                format!(
+                    "time::macros::date!({}-{:02}-{:02})",
+                    date.year, date.month, date.day
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
         output.push_str(&format!(
-            "{} static {}: Calendar = Calendar::new(\n    \"{}\",\n    \"{}\",\n    {},\n    {}_RULES,\n    {},\n);\n\n",
+            "{} static {}: Calendar = Calendar::new(\n    \"{}\",\n    \"{}\",\n    {},\n    {}_RULES,\n    {},\n    &[{}],\n);\n\n",
             visibility,
             const_name,
             id,
             cal.name,
             cal.ignore_weekends,
             const_name,
-            supported_years_code
+            supported_years_code,
+            open_dates_code
         ));
     }
 

@@ -864,9 +864,8 @@ def capstone_scenario_value(shock):
         elif curve["type"]=="hazard":
             curve["knot_points"]=[[t,intensity*math.exp(hazard)] for t,intensity in curve["knot_points"]]
             curve.pop("hazard_calibration",None);curve["par_points"]=[]
-        elif curve["type"]=="price" and "spot_price" in curve:
+        elif curve["type"]=="price" and curve["level_kind"]=="price":
             log_move=energy+(basis if curve["id"]=="WTI-FORWARD" else 0.)
-            curve["spot_price"]*=math.exp(log_move)
             curve["knot_points"]=[[t,price*math.exp(log_move)] for t,price in curve["knot_points"]]
     for surface in snapshot["surfaces"]:
         surface["vols_row_major"]=[value+volatility for value in surface["vols_row_major"]]
@@ -949,7 +948,7 @@ stress.insert_price("SPX",4160.,"USD")
 strikes=[5200*math.exp(-3+i*.05) for i in range(121)]
 stress.insert(VolSurface("SPX_VOL",[.25,.5,1.,2.],strikes,[[.30]*len(strikes)]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
 for ticker,levels,sigma in [("WTI",[75.,74.,72.,70.],.35),("BRENT",[78.,77.,75.,73.],.33)]:
-    stress.insert(PriceCurve(f"{ticker}-FORWARD",AS_OF,list(zip([0.,.5,1.,2.],[.9*x for x in levels]))))
+    stress.insert(PriceCurve({"id": f"{ticker}-FORWARD", "base_date": AS_OF, "knots": list(zip([0.,.5,1.,2.],[.9*x for x in levels])), "kind": "price", "day_count": "act_365f", "interp": "linear", "extrapolation": "flat"}))
     stress.insert(VolSurface(f"{ticker}-VOL",[.25,.5,1.,2.],[20.,75.,150.],[[sigma]*3]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
 stressed=value_portfolio(book,stress,metrics=[])
 stress_wire=json.loads(stressed.to_json())

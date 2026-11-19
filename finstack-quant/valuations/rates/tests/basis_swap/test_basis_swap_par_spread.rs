@@ -83,14 +83,20 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc).insert(f3m).insert(f1m)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve")
 }
 
 #[test]
 fn par_spread_preserves_end_of_month_on_sloped_curves() {
     let as_of = d(2025, 1, 1);
     let ctx = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 0.97), (3.0, 0.88)])
@@ -100,7 +106,8 @@ fn par_spread_preserves_end_of_month_on_sloped_curves() {
                 .build()
                 .unwrap(),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             ForwardCurve::builder("USD-SOFR-3M")
                 .base_date(as_of)
                 .day_count(DayCount::Act360)
@@ -136,7 +143,8 @@ fn par_spread_preserves_end_of_month_on_sloped_curves() {
                 .build()
                 .unwrap(),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             ForwardCurve::builder("USD-SOFR-1M")
                 .base_date(as_of)
                 .day_count(DayCount::Act360)
@@ -171,7 +179,8 @@ fn par_spread_preserves_end_of_month_on_sloped_curves() {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .unwrap(),
-        );
+        )
+        .expect("insert market curve");
     let mut swap = BasisSwap::example().unwrap();
     for leg in [&mut swap.primary_leg, &mut swap.reference_leg] {
         leg.start = d(2025, 4, 30);
@@ -572,7 +581,13 @@ fn par_spread_inverted_curves() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "INVERTED-TEST",

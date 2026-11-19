@@ -36,7 +36,7 @@ function assertPlainObject(value, label) {
 
 test('SabrSmile.validateNoArbitrage returns a plain object', () => {
   const params = new wasm.SabrParameters(0.2, 1.0, 0.3, -0.2);
-  const smile = new wasm.SabrSmile(params, 100.0, 1.0);
+  const smile = new wasm.SabrSmile(params, 100.0, 1.0, 'black_lognormal');
   const diag = smile.validateNoArbitrage([80, 90, 100, 110, 120], 0.0);
   assertPlainObject(diag, 'validateNoArbitrage result');
   assert.equal(typeof diag.arbitrage_free, 'boolean');
@@ -134,12 +134,12 @@ test('SabrCalibrator surface: withTolerance, withShift, calibrate, params', () =
   const t = 1.0;
   const beta = 0.5;
   const base = new wasm.SabrParameters(0.05, beta, 0.4, -0.1);
-  const smile = new wasm.SabrSmile(base, forward, t);
+  const smile = new wasm.SabrSmile(base, forward, t, 'black_lognormal');
   const vols = smile.generateSmile(strikes);
 
   // Calibration uses normalized residuals and verifies the final quote fit.
   const calibrator = new wasm.SabrCalibrator().withTolerance(1e-6);
-  const fit = calibrator.calibrate(forward, strikes, vols, t, beta);
+  const fit = calibrator.calibrate(forward, strikes, vols, t, beta, 'black_lognormal');
   assert.equal(Object.getPrototypeOf(fit), Object.prototype);
   assert.ok(fit.total_iterations >= fit.winning_iterations);
   assert.ok(fit.residual_evaluations > 0);
@@ -149,14 +149,8 @@ test('SabrCalibrator surface: withTolerance, withShift, calibrate, params', () =
   assert.equal(fitted.beta, beta);
   assert.ok(fitted.alpha > 0);
 
-  const auto = wasm.SabrParameters.fromJson(
-    JSON.stringify(
-      calibrator.withShift('auto').calibrate(forward, strikes, vols, t, beta).parameters
-    )
-  );
-  assert.equal(auto.beta, beta);
-  assert.equal(auto.shift, undefined, 'positive-rate smile needs no shift');
-  assert.ok(fitted.impliedVol(forward, forward, t) > 0);
+  assert.equal(fitted.shift, undefined, 'unshifted Black quotes preserve no displacement');
+  assert.ok(fitted.impliedVol(forward, forward, t, 'black_lognormal') > 0);
 });
 
 test('withShift("auto") fits a negative-rate smile with a shift', () => {
@@ -167,18 +161,23 @@ test('withShift("auto") fits a negative-rate smile with a shift', () => {
   // The documented ladder rounds -min(strike) + 10bp = 1.6% up to 2%.
   // Synthetic quotes must use that same displacement convention.
   const shifted = new wasm.SabrParameters(0.05, beta, 0.4, -0.1, 0.02);
-  const smile = new wasm.SabrSmile(shifted, forward, t);
+  const smile = new wasm.SabrSmile(shifted, forward, t, 'shifted_black_lognormal');
   const vols = smile.generateSmile(strikes);
 
   const fitted = new wasm.SabrCalibrator()
     .withShift('auto')
-    .calibrate(forward, strikes, vols, t, beta);
+    .calibrate(forward, strikes, vols, t, beta, 'shifted_black_lognormal');
   const parameters = wasm.SabrParameters.fromJson(JSON.stringify(fitted.parameters));
   assert.equal(typeof parameters.shift, 'number', 'negative-rate fit must carry a shift');
   assert.ok(parameters.shift > 0);
   assert.ok(parameters.isShifted());
   assert.equal(parameters.shift, 0.02);
-  const repriced = new wasm.SabrSmile(parameters, forward, t).generateSmile(strikes);
+  const repriced = new wasm.SabrSmile(
+    parameters,
+    forward,
+    t,
+    'shifted_black_lognormal'
+  ).generateSmile(strikes);
   for (let i = 0; i < vols.length; ++i) {
     assert.ok(
       Math.abs(repriced[i] - vols[i]) < 1e-6,

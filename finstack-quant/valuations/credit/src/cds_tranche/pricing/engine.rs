@@ -23,10 +23,13 @@ impl CdsTranchePricer {
         self.copula.as_ref()
     }
 
-    pub(super) fn default_threshold_for_copula(&self, default_prob: f64) -> f64 {
-        let eps = PROBABILITY_CLIP;
-        let p = default_prob.max(eps).min(1.0 - eps);
-        self.copula_spec.default_threshold(p).unwrap_or(f64::NAN)
+    pub(super) fn default_threshold_for_copula(&self, default_prob: f64) -> Result<f64> {
+        finstack_quant_core::validation::validate_f64_unit_interval(
+            default_prob,
+            "default_probability",
+        )?;
+        let p = default_prob.clamp(PROBABILITY_CLIP, 1.0 - PROBABILITY_CLIP);
+        self.copula_spec.default_threshold(p)
     }
 
     pub(super) fn conditional_default_prob_copula(

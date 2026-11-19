@@ -180,7 +180,9 @@ pub(super) fn fixture(case: Case, as_of: Date) -> Fixture {
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .unwrap();
-    let mut market = MarketContext::new().insert(forward);
+    let mut market = MarketContext::new()
+        .try_insert(forward)
+        .expect("insert market curve");
     if !history.is_empty() {
         let series = ScalarTimeSeries::new(
             format!("FIXING:{}", case.leg.index()),

@@ -411,7 +411,7 @@ fn fill_gbm_row(
     num_steps: usize,
     path_rng: &mut PhiloxRng,
     row: &mut [f64],
-) {
+) -> finstack_quant_core::Result<()> {
     let mut state = [initial_spot];
     let mut z = [0.0];
     let mut work: [f64; 0] = [];
@@ -419,10 +419,11 @@ fn fill_gbm_row(
     for step in 0..num_steps {
         let t = time_grid.time(step);
         let dt = time_grid.dt(step);
-        path_rng.fill_std_normals(&mut z);
-        disc.step(process, t, dt, &mut state, &z, &mut work);
+        path_rng.fill_std_normals(&mut z)?;
+        disc.step(process, t, dt, &mut state, &z, &mut work)?;
         row[step + 1] = state[0];
     }
+    Ok(())
 }
 
 fn fill_gbm_antithetic_pair(
@@ -433,7 +434,7 @@ fn fill_gbm_antithetic_pair(
     num_steps: usize,
     path_rng: &mut PhiloxRng,
     (primary, anti): (&mut [f64], &mut [f64]),
-) {
+) -> finstack_quant_core::Result<()> {
     let mut state_p = [initial_spot];
     let mut state_a = [initial_spot];
     let mut z = [0.0];
@@ -444,13 +445,14 @@ fn fill_gbm_antithetic_pair(
     for step in 0..num_steps {
         let t = time_grid.time(step);
         let dt = time_grid.dt(step);
-        path_rng.fill_std_normals(&mut z);
+        path_rng.fill_std_normals(&mut z)?;
         z_anti[0] = -z[0];
-        disc.step(process, t, dt, &mut state_p, &z, &mut work);
-        disc.step(process, t, dt, &mut state_a, &z_anti, &mut work);
+        disc.step(process, t, dt, &mut state_p, &z, &mut work)?;
+        disc.step(process, t, dt, &mut state_a, &z_anti, &mut work)?;
         primary[step + 1] = state_p[0];
         anti[step + 1] = state_a[0];
     }
+    Ok(())
 }
 
 /// American LSMC pricer together with its default exercise grid and
@@ -875,7 +877,7 @@ impl LsmcEngine {
                     num_steps,
                     &mut path_rng,
                     rows.split_at_mut(stride),
-                );
+                )
             } else {
                 fill_gbm_row(
                     &disc,
@@ -885,18 +887,22 @@ impl LsmcEngine {
                     num_steps,
                     &mut path_rng,
                     rows,
-                );
+                )
             }
         };
 
         #[cfg(not(target_arch = "wasm32"))]
         if self.config.use_parallel {
             use rayon::prelude::*;
-            data.par_chunks_mut(chunk).enumerate().for_each(fill_chunk);
+            data.par_chunks_mut(chunk)
+                .enumerate()
+                .try_for_each(fill_chunk)?;
             return Ok(PathMatrix { data, stride });
         }
 
-        data.chunks_mut(chunk).enumerate().for_each(fill_chunk);
+        data.chunks_mut(chunk)
+            .enumerate()
+            .try_for_each(fill_chunk)?;
         Ok(PathMatrix { data, stride })
     }
 
@@ -2033,21 +2039,16 @@ mod tests {
         );
     }
 
-    /// Seeded GBM American convenience prices (mean and standard error) are
-    /// pinned for the in-sample and two-pass put and call. Platform libm
-    /// yields one pattern on macOS and another on the Linux libm used by
-    /// GitHub Actions.
+    /// A separate Philox and path implementation with an SVD least-squares fit
+    /// on centered monomials supplies the seeded reference prices and errors.
+    /// Their polynomial spans match the trained Laguerre and polynomial bases.
     #[test]
-    fn gbm_american_prices_are_bit_stable() {
-        const EXPECTED: &[u64] = &[
-            0x402829f6094ad2fa,
-            0x3fcf734a4ce21bbf,
-            0x40233f08bbaf83fb,
-            0x3fe096537727ca99,
-            0x402649ceac988d38,
-            0x3fcd1bc42e7f3b98,
-            0x4020f4f4ccf634a0,
-            0x3fdc7de115fa4ffe,
+    fn gbm_american_prices_match_independent_lsmc() {
+        let expected = [
+            (11.898687341034666, 0.21784542389407813),
+            (8.419769043337007, 0.42760430950110856),
+            (11.049993079057634, 0.21553979940717297),
+            (8.481169729641454, 0.4095871389934612),
         ];
         let pricer = LsmcPricer::new(
             Some(400),
@@ -2125,26 +2126,19 @@ mod tests {
                 99,
             ),
         ];
-        let mut actual = Vec::new();
-        for estimate in estimates {
+        for (estimate, (price, stderr)) in estimates.into_iter().zip(expected) {
             let estimate = estimate.expect("price");
-            actual.push(estimate.mean.amount().to_bits());
-            actual.push(estimate.stderr.to_bits());
+            assert!(
+                (estimate.mean.amount() - price).abs() <= 1e-12,
+                "American price {} vs {price}",
+                estimate.mean.amount()
+            );
+            assert!(
+                (estimate.stderr - stderr).abs() <= 1e-13,
+                "American stderr {} vs {stderr}",
+                estimate.stderr
+            );
         }
-        const LINUX: &[u64] = &[
-            0x402829f6094ad2fa,
-            0x3fcf734a4ce21bbd,
-            0x40233f08bbaf83fc,
-            0x3fe096537727ca99,
-            0x402649ceac988d34,
-            0x3fcd1bc42e7f3b9a,
-            0x4020f4f4ccf63497,
-            0x3fdc7de115fa4ffb,
-        ];
-        assert!(
-            actual.as_slice() == EXPECTED || actual.as_slice() == LINUX,
-            "GBM American prices moved off the macOS and Linux libm pins:\n{actual:#x?}"
-        );
     }
     #[test]
     fn lsmc_call_config_layers_call_overrides_over_construction() {

@@ -104,9 +104,12 @@ mod tests {
             .unwrap();
 
         MarketContext::new()
-            .insert(disc_curve)
-            .insert(fwd_curve)
-            .insert(hazard_curve)
+            .try_insert(disc_curve)
+            .expect("insert market curve")
+            .try_insert(fwd_curve)
+            .expect("insert market curve")
+            .try_insert(hazard_curve)
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:USD-SOFR-3M",

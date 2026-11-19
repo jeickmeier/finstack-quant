@@ -79,7 +79,7 @@ def test_heston_price_dispatches_put_through_rust() -> None:
 
 
 def test_sabr_smile_single_strike_and_arbitrage_verdict_come_from_rust() -> None:
-    smile = SabrSmile(SabrParameters(0.2, 0.5, 0.3, -0.2), 100.0, 1.0)
+    smile = SabrSmile(SabrParameters(0.2, 0.5, 0.3, -0.2), 100.0, 1.0, "black_lognormal")
     strikes = [80.0, 90.0, 100.0, 110.0, 120.0]
     assert [smile.implied_vol(k) for k in strikes] == smile.generate_smile(strikes)
     report = smile.validate_no_arbitrage(strikes, 0.0)

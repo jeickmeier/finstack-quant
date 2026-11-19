@@ -58,7 +58,7 @@ class BetaRecovery:
         Raises
         ------
         ValueError
-            If the moments cannot parameterise a Beta distribution.
+            If the moments do not imply two finite, strictly positive shape parameters.
         """
         ...
 
@@ -206,8 +206,8 @@ class BetaRecovery:
 
         Raises
         ------
-        ValueError
-            If sampling fails.
+        RuntimeError
+            If sampling exhausts the proposal budget or cannot resolve a draw.
         """
         ...
     @staticmethod

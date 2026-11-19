@@ -78,12 +78,12 @@
 //!     model_builder.build()?
 //! };
 //!
-//! let market_ctx = MarketContext::new().insert(
+//! let market_ctx = MarketContext::new().try_insert(
 //!     DiscountCurve::builder("USD-OIS")
 //!         .base_date(issue_date)
 //!         .knots([(0.0, 1.0), (5.0, 0.90)])
 //!         .build()?,
-//! );
+//! ).expect("insert market curve");
 //!
 //! let mut evaluator = Evaluator::new();
 //! let results = evaluator.evaluate_with_market(&model, &market_ctx, issue_date)?;

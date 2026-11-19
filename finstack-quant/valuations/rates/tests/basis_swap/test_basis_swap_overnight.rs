@@ -40,7 +40,13 @@ fn market() -> MarketContext {
         finstack_quant_core::dates::DayCount::Act365F,
     )
     .unwrap();
-    MarketContext::new().insert(disc).insert(ois).insert(term)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(ois)
+        .expect("insert market curve")
+        .try_insert(term)
+        .expect("insert market curve")
 }
 
 fn term_leg(curve: &str, compounding: FloatingLegCompounding) -> FloatLegSpec {

@@ -1314,211 +1314,8 @@ pub fn validate_correlation_matrix(
     Ok(())
 }
 
-/// Result of Ledoit-Wolf covariance shrinkage.
-///
-/// See [`ledoit_wolf_shrinkage`].
-#[derive(Debug, Clone, PartialEq)]
-pub struct LedoitWolfResult {
-    /// Row-major `n × n` shrunk covariance matrix `Σ* = δ*·μ·I + (1 − δ*)·S`.
-    pub covariance: Vec<f64>,
-    /// Optimal shrinkage intensity `δ* ∈ [0, 1]`.
-    pub shrinkage: f64,
-}
-
-/// Ledoit-Wolf (2004) shrinkage of a sample covariance matrix toward a scaled
-/// identity target, with the analytic optimal shrinkage intensity.
-///
-/// Given `t` observations of `n` variables (row-major `observations`, one
-/// observation per row), columns are demeaned, the sample covariance
-/// `S = XᵀX/T` is formed, and the estimator
-///
-/// ```text
-/// Σ* = δ*·μ·I + (1 − δ*)·S
-///
-/// μ   = tr(S)/n                       (⟨S, I⟩ under ⟨A,B⟩ = tr(ABᵀ)/n)
-/// d²  = ‖S − μI‖²                     (‖A‖² = tr(AAᵀ)/n)
-/// b̄²  = (1/T²)·Σ_t ‖x_t x_tᵀ − S‖²
-/// b²  = min(b̄², d²)
-/// δ*  = b²/d²                          (δ* = 0 when d² = 0, i.e. S = μI)
-/// ```
-///
-/// is returned. `Σ*` is a convex combination of the PSD `S` and the PSD `μI`,
-/// hence always positive semi-definite and well-conditioned for `δ* > 0`.
-/// Centered observations are normalized by a common magnitude before forming
-/// second and fourth moments, then the covariance is restored to input units.
-/// This preserves shrinkage under uniform rescaling without overflowing or
-/// underflowing the fourth moments.
-/// The computation is a deterministic serial fold: identical inputs produce
-/// bit-identical outputs. Complexity: O(t·n²) time, O(t·n + n²) space.
-///
-/// # Arguments
-///
-/// * `observations` - Row-major `t × n` observation matrix (row = one date)
-/// * `t` - Number of observations (rows); must be ≥ 2
-/// * `n` - Number of variables (columns); must be ≥ 1
-///
-/// # Errors
-///
-/// Returns [`crate::Error::Validation`] when `t < 2`, `n == 0`, any entry is
-/// non-finite, `observations.len() != t * n`, the `n * n` covariance size
-/// overflows `usize`, or the centered observations or resulting covariance
-/// exceed the finite `f64` range.
-///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_core::math::linalg::ledoit_wolf_shrinkage;
-///
-/// // 4 observations of 2 zero-mean variables (row-major).
-/// let x = [1.0, 1.0, -1.0, -1.0, 2.0, -2.0, -2.0, 2.0];
-/// let result = ledoit_wolf_shrinkage(&x, 4, 2).unwrap();
-/// assert!((result.shrinkage - 17.0 / 18.0).abs() < 1e-14);
-/// assert!((result.covariance[1] - (-1.0 / 12.0)).abs() < 1e-13);
-/// ```
-///
-/// # References
-///
-/// - Ledoit, O., & Wolf, M. (2004). "A well-conditioned estimator for
-///   large-dimensional covariance matrices." *Journal of Multivariate
-///   Analysis*, 88(2), 365–411. Lemmas 3.2–3.4. `docs/REFERENCES.md#ledoitwolf2004`
-pub fn ledoit_wolf_shrinkage(
-    observations: &[f64],
-    t: usize,
-    n: usize,
-) -> crate::Result<LedoitWolfResult> {
-    if n == 0 {
-        return Err(crate::Error::Validation(
-            "ledoit_wolf_shrinkage: n must be >= 1".to_owned(),
-        ));
-    }
-    if t < 2 {
-        return Err(crate::Error::Validation(format!(
-            "ledoit_wolf_shrinkage: need at least 2 observations, got {t}"
-        )));
-    }
-    if t.checked_mul(n) != Some(observations.len()) {
-        return Err(crate::Error::Validation(format!(
-            "ledoit_wolf_shrinkage: {} observations do not form a {t}x{n} panel",
-            observations.len()
-        )));
-    }
-    if square_len(n).is_none() {
-        return Err(crate::Error::Validation(format!(
-            "ledoit_wolf_shrinkage: a {n}x{n} covariance matrix does not fit in memory"
-        )));
-    }
-    if let Some(bad) = observations.iter().find(|v| !v.is_finite()) {
-        return Err(crate::Error::Validation(format!(
-            "ledoit_wolf_shrinkage: non-finite observation {bad}"
-        )));
-    }
-
-    let tf = t as f64;
-    let nf = n as f64;
-
-    // Compute each mean in that column's units to avoid overflowing a sum of
-    // finite observations. Center before choosing the common moment scale so
-    // a large constant column cannot erase variation in the other columns.
-    let mut x = vec![0.0_f64; t * n];
-    let mut scale = 0.0_f64;
-    for col in 0..n {
-        let column_scale = (0..t)
-            .map(|row| observations[row * n + col].abs())
-            .fold(0.0_f64, f64::max);
-        let mean = if column_scale > 0.0 {
-            crate::math::summation::neumaier_sum(
-                (0..t).map(|row| observations[row * n + col] / column_scale),
-            )? / tf
-                * column_scale
-        } else {
-            0.0
-        };
-        for row in 0..t {
-            let centered = observations[row * n + col] - mean;
-            if !centered.is_finite() {
-                return Err(crate::Error::Validation(
-                    "ledoit_wolf_shrinkage: centered observations exceed finite f64 range"
-                        .to_owned(),
-                ));
-            }
-            x[row * n + col] = centered;
-            scale = scale.max(centered.abs());
-        }
-    }
-    if scale > 0.0 {
-        for value in &mut x {
-            *value /= scale;
-        }
-    }
-
-    // S = XᵀX / T (row-major, symmetric by construction).
-    let mut s = vec![0.0_f64; n * n];
-    for i in 0..n {
-        for j in i..n {
-            let mut acc = 0.0_f64;
-            for row in 0..t {
-                acc += x[row * n + i] * x[row * n + j];
-            }
-            let value = acc / tf;
-            s[i * n + j] = value;
-            s[j * n + i] = value;
-        }
-    }
-
-    // μ = tr(S)/n.
-    let mu = (0..n).map(|i| s[i * n + i]).sum::<f64>() / nf;
-
-    // d² = ‖S − μI‖² with ‖A‖² = Σ a_ij² / n.
-    let mut d2 = 0.0_f64;
-    for i in 0..n {
-        for j in 0..n {
-            let target = if i == j { mu } else { 0.0 };
-            let dev = s[i * n + j] - target;
-            d2 += dev * dev;
-        }
-    }
-    d2 /= nf;
-
-    // b̄² = (1/T²) Σ_t ‖x_t x_tᵀ − S‖².
-    let mut b_bar2 = 0.0_f64;
-    for row in 0..t {
-        let xr = &x[row * n..(row + 1) * n];
-        let mut norm = 0.0_f64;
-        for i in 0..n {
-            for j in 0..n {
-                let dev = xr[i] * xr[j] - s[i * n + j];
-                norm += dev * dev;
-            }
-        }
-        b_bar2 += norm / nf;
-    }
-    b_bar2 /= tf * tf;
-
-    let b2 = b_bar2.min(d2);
-    let shrinkage = if d2 > 0.0 { b2 / d2 } else { 0.0 };
-
-    let mut covariance = vec![0.0_f64; n * n];
-    for i in 0..n {
-        for j in 0..n {
-            let target = if i == j { mu } else { 0.0 };
-            let normalized = shrinkage * target + (1.0 - shrinkage) * s[i * n + j];
-            // Restore units in two products: scale² can overflow even when
-            // the final covariance entry is representable.
-            let value = (normalized * scale) * scale;
-            if !value.is_finite() {
-                return Err(crate::Error::Validation(
-                    "ledoit_wolf_shrinkage: covariance exceeds finite f64 range".to_owned(),
-                ));
-            }
-            covariance[i * n + j] = value;
-        }
-    }
-
-    Ok(LedoitWolfResult {
-        covariance,
-        shrinkage,
-    })
-}
+mod shrinkage;
+pub use shrinkage::{LedoitWolfResult, ledoit_wolf_shrinkage};
 
 #[cfg(test)]
 mod tests {
@@ -2539,7 +2336,7 @@ mod ledoit_wolf_tests {
     #[test]
     fn ledoit_wolf_rejects_unrepresentable_covariance() {
         let result = ledoit_wolf_shrinkage(&[1e308, -1e308], 2, 1);
-        assert!(matches!(result, Err(crate::Error::Validation(_))));
+        assert!(matches!(result, Err(crate::Error::Internal(_))));
     }
 
     #[test]
@@ -2579,6 +2376,32 @@ mod ledoit_wolf_tests {
         for (got, want) in result.covariance.iter().zip(expected.iter()) {
             assert!((got - want).abs() < 1e-14);
         }
+    }
+
+    #[test]
+    fn ledoit_wolf_retains_local_offsets_and_mixed_units() {
+        let adjacent = ledoit_wolf_shrinkage(&[1e16, 1e16 + 2.0], 2, 1).unwrap();
+        assert_eq!(adjacent.covariance, [1.0]);
+        let (huge, tiny) = (2.0_f64.powi(500), 2.0_f64.powi(-500));
+        let mixed = ledoit_wolf_shrinkage(&[huge, tiny, -huge, -tiny], 2, 2).unwrap();
+        assert_eq!(mixed.shrinkage, 0.0);
+        assert_eq!(mixed.covariance, [huge * huge, 1.0, 1.0, tiny * tiny]);
+    }
+
+    #[test]
+    fn ledoit_wolf_retains_small_positive_target_distance() {
+        let e = 2.0_f64.powi(-600);
+        let got = ledoit_wolf_shrinkage(&[1.0, 0.0, -1.0, 0.0, e, 1.0, -e, -1.0], 4, 2).unwrap();
+        assert_eq!(got.shrinkage, 1.0);
+        assert_eq!(got.covariance, [0.5, 0.0, 0.0, 0.5]);
+    }
+
+    #[test]
+    fn rounded_unit_intensity_preserves_the_small_sample_contribution() {
+        let b = 8_700_286_382_685_973.0 / 2.0_f64.powi(52);
+        let near_cap = ledoit_wolf_shrinkage(&[1.0, 1.0, -1.0, -1.0, b, -b, -b, b], 4, 2).unwrap();
+        assert_eq!(near_cap.shrinkage, 1.0);
+        assert!((near_cap.covariance[1] / -6.23737371524e-17 - 1.0).abs() < 1e-10);
     }
 
     #[test]

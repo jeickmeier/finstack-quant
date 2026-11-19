@@ -90,8 +90,10 @@ fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
 }
 

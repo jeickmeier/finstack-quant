@@ -353,7 +353,8 @@ impl JsDiscountCurve {
     ///
     /// * `t` - Strictly positive time from the curve base date in years (`number`)
     ///   or an ISO-8601 target date strictly after `baseDate` (`"YYYY-MM-DD"`,
-    ///   converted with the curve day count).
+    ///   measured as the difference between the target and base coordinates
+    ///   on the original source clock).
     /// * `compounding` - `"continuous"`, `"simple"`, `"periodic(1)"`,
     ///   `"semi_annual"`, `"quarterly"` or `"monthly"`.
     ///
@@ -361,7 +362,7 @@ impl JsDiscountCurve {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for `t <= 0`, a date on or before `baseDate`, a malformed
     /// date, an unknown compounding, or a year fraction that cannot be computed.
-    /// @param t - Strictly positive time from the curve base date in years (`number`) or an ISO-8601 target date strictly after `baseDate`.
+    /// @param t - Strictly positive time from the curve base date in years (`number`) or an ISO-8601 target date strictly after `baseDate`. Dated horizons subtract the base coordinate from the target coordinate on the original source clock.
     /// @param compounding - `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`.
     #[wasm_bindgen(js_name = zeroRate)]
     pub fn zero_rate(

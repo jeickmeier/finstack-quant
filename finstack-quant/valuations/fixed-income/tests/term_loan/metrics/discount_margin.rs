@@ -88,7 +88,11 @@ fn build_market() -> MarketContext {
         finstack_quant_core::dates::DayCount::Act365F,
     )
     .expect("forward curve");
-    MarketContext::new().insert(disc_curve).insert(fwd_curve)
+    MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
 }
 
 /// DM should work on non-callable floating-rate loans without a quoted price.
@@ -219,7 +223,11 @@ fn flat_consistent_market(as_of: finstack_quant_core::dates::Date, rate: f64) ->
         .expect("flat discount curve should build");
     let fwd = ForwardCurve::flat("USD-SOFR", as_of, rate, DayCount::Act360)
         .expect("flat forward curve should build");
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 /// Non-callable floating loan with a quoted clean price on the flat

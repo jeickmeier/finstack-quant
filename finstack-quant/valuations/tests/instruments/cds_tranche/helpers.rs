@@ -92,9 +92,12 @@ pub fn standard_credit_index() -> CreditIndexData {
 /// Create a complete market context with standard curves
 pub fn standard_market_context() -> MarketContext {
     MarketContext::new()
-        .insert(standard_discount_curve())
-        .insert(standard_hazard_curve())
-        .insert(standard_correlation_curve())
+        .try_insert(standard_discount_curve())
+        .expect("insert market curve")
+        .try_insert(standard_hazard_curve())
+        .expect("insert market curve")
+        .try_insert(standard_correlation_curve())
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", standard_credit_index())
         .expect("standard credit index dependencies should exist")
 }
@@ -104,8 +107,10 @@ pub fn replayable_market_context() -> MarketContext {
     let discount = standard_discount_curve();
     let correlation = standard_correlation_curve();
     let source = MarketContext::new()
-        .insert(discount)
-        .insert(correlation.clone());
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(correlation.clone())
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         base_date(),
@@ -122,7 +127,8 @@ pub fn replayable_market_context() -> MarketContext {
         .build()
         .expect("replayable credit index");
     source
-        .insert(hazard)
+        .try_insert(hazard)
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", index)
         .expect("replayable credit index dependencies should exist")
 }
@@ -155,9 +161,12 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
 
     let base_corr_curve = standard_correlation_curve();
     let mut market = MarketContext::new()
-        .insert(discount_curve)
-        .insert(Arc::clone(&index_curve))
-        .insert(base_corr_curve.clone());
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(Arc::clone(&index_curve))
+        .expect("insert market curve")
+        .try_insert(base_corr_curve.clone())
+        .expect("insert market curve");
 
     let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     for i in 0..n {
@@ -175,7 +184,7 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
-        market = market.insert(hz.clone());
+        market = market.try_insert(hz.clone()).expect("insert market curve");
         issuer_curves.insert(id, Arc::new(hz));
     }
 

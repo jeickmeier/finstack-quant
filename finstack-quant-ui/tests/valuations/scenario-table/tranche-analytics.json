@@ -389,7 +389,7 @@
             "id": "WTI-FORWARD",
             "base": "2023-12-28",
             "day_count": "act_365f",
-            "spot_price": 80,
+            "level_kind": "price",
             "knot_points": [
               [0, 80],
               [40, 80]
@@ -402,7 +402,7 @@
             "id": "CL-FORWARD",
             "base": "2023-12-28",
             "day_count": "act_365f",
-            "spot_price": 80,
+            "level_kind": "price",
             "knot_points": [
               [0, 80],
               [40, 80]
@@ -415,7 +415,7 @@
             "id": "NG-SPOT-AVG",
             "base": "2023-12-28",
             "day_count": "act_365f",
-            "spot_price": 4,
+            "level_kind": "price",
             "knot_points": [
               [0, 4],
               [40, 4]
@@ -428,7 +428,7 @@
             "id": "NG-FORWARD",
             "base": "2023-12-28",
             "day_count": "act_365f",
-            "spot_price": 4,
+            "level_kind": "price",
             "knot_points": [
               [0, 4],
               [40, 4]
@@ -441,7 +441,7 @@
             "id": "RBOB-FORWARD",
             "base": "2023-12-28",
             "day_count": "act_365f",
-            "spot_price": 90,
+            "level_kind": "price",
             "knot_points": [
               [0, 90],
               [40, 90]
@@ -454,7 +454,7 @@
             "id": "IRON-ORE-FORWARD",
             "base": "2023-12-28",
             "day_count": "act_365f",
-            "spot_price": 110,
+            "level_kind": "price",
             "knot_points": [
               [0, 110],
               [40, 110]
@@ -467,7 +467,7 @@
             "id": "VIX",
             "base": "2023-12-28",
             "day_count": "act_365f",
-            "spot_level": 20,
+            "level_kind": "vol_index",
             "knot_points": [
               [0, 20],
               [40, 22]
@@ -1620,11 +1620,11 @@
         },
         "oas": {
           "value": {
-            "oas": 0.02426094655919271,
-            "model_price": 99.99999983481523,
+            "oas": 0.024465635402411926,
+            "model_price": 99.99999985386413,
             "market_price": 100,
             "num_paths": 256,
-            "price_std_error": 0.052136123233856704
+            "price_std_error": 0.04073076753435143
           }
         },
         "schedule": {

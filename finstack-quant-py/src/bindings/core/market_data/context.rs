@@ -139,21 +139,16 @@ impl PyMarketContext {
             return Ok(slf);
         }
         if let Ok(vs) = curve.extract::<PyRef<'_, PyVolSurface>>() {
-            slf.inner
-                .try_insert_surface_mut(Arc::clone(&vs.inner))
-                .map_err(core_to_py)?;
+            slf.inner.insert_surface_mut(Arc::clone(&vs.inner));
             return Ok(slf);
         }
         if let Ok(fxd) = curve.extract::<PyRef<'_, PyFxDeltaVolSurface>>() {
             slf.inner
-                .try_insert_fx_delta_vol_surface_mut(Arc::clone(&fxd.inner))
-                .map_err(core_to_py)?;
+                .insert_fx_delta_vol_surface_mut(Arc::clone(&fxd.inner));
             return Ok(slf);
         }
         if let Ok(vc) = curve.extract::<PyRef<'_, PyVolCube>>() {
-            slf.inner
-                .try_insert_vol_cube_mut(Arc::clone(&vc.inner))
-                .map_err(core_to_py)?;
+            slf.inner.insert_vol_cube_mut(Arc::clone(&vc.inner));
             return Ok(slf);
         }
         Err(PyTypeError::new_err(

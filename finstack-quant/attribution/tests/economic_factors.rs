@@ -82,7 +82,8 @@ fn published_cpi_move_must_be_inflation_pnl() {
     let as_of = date!(2025 - 07 - 14);
     let market = |cpi| {
         MarketContext::new()
-            .insert(discount(as_of))
+            .try_insert(discount(as_of))
+            .expect("insert market curve")
             .insert_inflation_index(cpi_index(cpi))
     };
     let mut bond = InflationLinkedBond::example().expect("example");
@@ -124,7 +125,9 @@ fn carry_horizon_scaling_must_not_scale_ex_coupon_price_drop() {
     .unwrap();
     bond.metric_pricing_overrides.theta_period = Some(Tenor::new(2, TenorUnit::Days).unwrap());
     let instrument: Arc<dyn Instrument> = Arc::new(bond.clone());
-    let market = MarketContext::new().insert(discount(t0));
+    let market = MarketContext::new()
+        .try_insert(discount(t0))
+        .expect("insert market curve");
     let metrics = [
         MetricId::CarryTotal,
         MetricId::CouponIncome,
@@ -168,7 +171,8 @@ fn scalar_convertible_vol_must_be_volatility_pnl() {
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
     let market = |spot, vol| {
         MarketContext::new()
-            .insert(discount(as_of))
+            .try_insert(discount(as_of))
+            .expect("insert market curve")
             .insert_price("TECH", MarketScalar::unitless(spot).unwrap())
             .insert_price("TECH-VOL", MarketScalar::unitless(vol).unwrap())
             .insert_price("TECH-DIVYIELD", MarketScalar::unitless(0.0).unwrap())

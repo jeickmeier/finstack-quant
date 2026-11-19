@@ -57,7 +57,9 @@ fn market_context_json() -> String {
         .knots([(0.5, 0.99), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(disc);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     serde_json::to_string(&ctx).unwrap()
 }
 

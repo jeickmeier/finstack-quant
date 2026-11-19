@@ -152,7 +152,8 @@ pub fn build_standard_market(
     let vol_surface = build_flat_vol_surface(vol, as_of, VOL_ID);
 
     MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
@@ -170,7 +171,8 @@ pub fn build_smile_market(as_of: Date, spot: f64, rate: f64, div_yield: f64) -> 
     let vol_surface = build_smile_vol_surface(as_of, VOL_ID);
 
     MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,

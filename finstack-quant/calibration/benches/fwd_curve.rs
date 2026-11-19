@@ -29,7 +29,9 @@ fn bench_forward_curve(c: &mut Criterion) {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(disc);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let quotes = [
         RateQuote::Fra {
             id: QuoteId::new("FRA-3x6"),

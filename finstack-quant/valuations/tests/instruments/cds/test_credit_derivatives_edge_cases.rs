@@ -88,8 +88,10 @@ fn test_recovery01_at_lower_boundary() {
     cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert(create_hazard_curve(base, recovery));
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert(create_hazard_curve(base, recovery))
+        .expect("insert market curve");
 
     let result = cds_test
         .price_with_metrics(
@@ -140,8 +142,10 @@ fn test_recovery01_at_upper_boundary() {
     cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert(create_hazard_curve(base, recovery));
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert(create_hazard_curve(base, recovery))
+        .expect("insert market curve");
 
     let result = cds_test
         .price_with_metrics(
@@ -185,8 +189,10 @@ fn test_recovery01_symmetry() {
     cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert(create_hazard_curve(base, recovery));
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert(create_hazard_curve(base, recovery))
+        .expect("insert market curve");
 
     let result = cds_test
         .price_with_metrics(
@@ -231,8 +237,10 @@ fn test_expected_loss_distressed_credit() {
     cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert(create_distressed_hazard_curve(base, recovery));
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert(create_distressed_hazard_curve(base, recovery))
+        .expect("insert market curve");
 
     let result = cds_test
         .price_with_metrics(
@@ -294,7 +302,11 @@ fn test_par_spread_npv_consistency() {
 
     let disc = create_discount_curve(base);
     let hazard = create_hazard_curve(base, recovery);
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     // Derive par spread from protection PV and risky annuity (consistent with NPV logic)
     let result = cds_test
@@ -354,8 +366,10 @@ fn test_jtd_recovery_sensitivity() {
         cds_test.protection_leg.recovery_rate = recovery;
 
         let market = MarketContext::new()
-            .insert(create_discount_curve(base))
-            .insert(create_hazard_curve(base, recovery));
+            .try_insert(create_discount_curve(base))
+            .expect("insert market curve")
+            .try_insert(create_hazard_curve(base, recovery))
+            .expect("insert market curve");
 
         let result = cds_test
             .price_with_metrics(
@@ -424,8 +438,10 @@ fn test_recovery01_ignores_unreplayable_par_spread_sidecar() {
     cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert(hazard);
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     // Metric path — correctly keeps unreplayable hazard knots frozen.
     let result = cds_test
@@ -448,13 +464,17 @@ fn test_recovery01_ignores_unreplayable_par_spread_sidecar() {
     let mut cds_up = cds_test.clone();
     cds_up.protection_leg.recovery_rate = recovery + bump;
     let market_up = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert(make_hazard(recovery + bump));
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert(make_hazard(recovery + bump))
+        .expect("insert market curve");
     let mut cds_down = cds_test;
     cds_down.protection_leg.recovery_rate = recovery - bump;
     let market_down = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert(make_hazard(recovery - bump));
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert(make_hazard(recovery - bump))
+        .expect("insert market curve");
     let pv_up_frozen = cds_up.value(&market_up, base).unwrap().amount();
     let pv_down_frozen = cds_down.value(&market_down, base).unwrap().amount();
     let frozen_recovery01 = (pv_up_frozen - pv_down_frozen) / 2.0;

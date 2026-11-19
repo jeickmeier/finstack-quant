@@ -293,8 +293,10 @@ mod tests {
             .build()
             .expect("fx vol");
         let market = MarketContext::new()
-            .insert(usd)
-            .insert(jpy)
+            .try_insert(usd)
+            .expect("insert market curve")
+            .try_insert(jpy)
+            .expect("insert market curve")
             .insert_surface(eq_vol)
             .insert_surface(fx_vol)
             .insert_price(
@@ -412,8 +414,10 @@ mod tests {
             .build()
             .expect("fx vol");
         let market = MarketContext::new()
-            .insert(usd)
-            .insert(jpy)
+            .try_insert(usd)
+            .expect("insert market curve")
+            .try_insert(jpy)
+            .expect("insert market curve")
             .insert_surface(eq_vol)
             .insert_surface(fx_vol)
             .insert_price(
@@ -525,8 +529,10 @@ mod tests {
         // Explicit FX spot via the optional `fx_spot_id` scalar — no FX
         // matrix needed. This is the standard production path.
         let market = MarketContext::new()
-            .insert(usd)
-            .insert(eur)
+            .try_insert(usd)
+            .expect("insert market curve")
+            .try_insert(eur)
+            .expect("insert market curve")
             .insert_surface(eq_vol)
             .insert_surface(fx_vol)
             .insert_price(

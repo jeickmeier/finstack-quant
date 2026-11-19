@@ -74,8 +74,8 @@ impl PyHullWhiteParams {
 
     #[doc = pydoc!("finstack_quant.models.rates.hull_white", "HullWhiteParams.get_sigma")]
     #[pyo3(text_signature = "(self, t)")]
-    fn get_sigma(&self, t: f64) -> f64 {
-        self.inner.get_sigma(t)
+    fn get_sigma(&self, t: f64) -> PyResult<f64> {
+        self.inner.get_sigma(t).map_err(core_to_py)
     }
 
     #[doc = pydoc!("finstack_quant.models.rates.hull_white", "HullWhiteParams.state_variance")]

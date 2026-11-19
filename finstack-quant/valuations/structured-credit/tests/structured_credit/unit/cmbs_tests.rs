@@ -51,7 +51,9 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// A 10M interest-only commercial mortgage at 8%, 30/360: a
@@ -638,7 +640,9 @@ fn dscr_uses_the_live_floating_coupon_and_the_amortization_schedule() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve");
-    let market = MarketContext::new().insert(sofr);
+    let market = MarketContext::new()
+        .try_insert(sofr)
+        .expect("insert market curve");
     let mut context = MetricContext::new(
         Arc::new(cmbs(vec![floating])),
         Arc::new(market.clone()),

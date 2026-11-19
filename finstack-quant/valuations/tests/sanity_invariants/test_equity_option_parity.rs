@@ -75,7 +75,8 @@ fn create_market(as_of: Date) -> MarketContext {
         .expect("vol surface should build");
 
     MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price("SPOT", MarketScalar::unitless(SPOT).expect("valid scalar"))
         .insert_price(

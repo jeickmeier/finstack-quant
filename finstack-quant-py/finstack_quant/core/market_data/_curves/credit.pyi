@@ -18,7 +18,7 @@ class BaseCorrelationCurve:
     --------
     >>> from finstack_quant.core.market_data import BaseCorrelationCurve
     >>> curve = BaseCorrelationCurve("CDX-IG", [(3.0, 0.25), (7.0, 0.40), (10.0, 0.55)])
-    >>> curve.correlation(3.0)
+    >>> curve.get_correlation(3.0)
     0.25
     >>> curve.detachment_points
     [3.0, 7.0, 10.0]
@@ -98,7 +98,7 @@ class BaseCorrelationCurve:
         """
         ...
 
-    def correlation(self, detachment_pct: float) -> float:
+    def get_correlation(self, detachment_pct: float) -> float:
         """
         Interpolated base correlation (decimal) at a detachment point.
 
@@ -110,10 +110,13 @@ class BaseCorrelationCurve:
         Returns
         -------
         float
-            Base correlation as a decimal in ``[0, 1]``.
-        Notes
-        -----
-        This method does not raise.
+            Base correlation as a decimal in ``[0, 1]``. Within the financial domain,
+            queries outside the quoted grid return the nearest boundary correlation.
+
+        Raises
+        ------
+        ValueError
+            If the detachment is non-finite or outside ``[0, 100]``.
 
         """
         ...
@@ -270,14 +273,14 @@ class CreditIndexData:
             Base correlations by detachment point.
         issuer_curves : dict[str, HazardCurve], optional
             Hazard curve per issuer identifier (ticker, CUSIP, ...). When
-            given it must cover exactly ``num_constituents`` distinct issuers.
+            given it must cover exactly ``num_constituents`` distinct, nonblank issuer identifiers.
         issuer_recovery_rates : dict[str, float], optional
             Recovery per issuer as a decimal in ``[0, 1]``; requires
             ``issuer_curves`` and only its identifiers. Issuers left out use
             ``recovery_rate``.
         issuer_weights : dict[str, float], optional
-            Non-negative notional weight per issuer (decimal fractions summing
-            to ``1.0`` within ``1e-9``); requires ``issuer_curves`` and must
+            Notional weight per issuer (decimal fractions in ``[0, 1]`` summing
+            to ``1.0`` within ``2**-52``); requires ``issuer_curves`` and must
             cover exactly its identifiers. Without it each issuer weighs
             ``1 / num_constituents``.
 
@@ -287,7 +290,7 @@ class CreditIndexData:
             If ``num_constituents`` is zero, a recovery is outside ``[0, 1]``,
             the issuer curves do not cover ``num_constituents`` issuers, the
             issuer recoveries or weights name an unknown issuer (or are given
-            without ``issuer_curves``), or the weights are negative, do not
+            without ``issuer_curves``), or the weights lie outside ``[0, 1]``, do not
             cover every issuer or do not sum to ``1.0``.
         TypeError
             If ``issuer_curves`` values are not :class:`HazardCurve` objects.

@@ -173,7 +173,11 @@ fn test_dv01_sign_convention() {
 fn test_zero_curve_zero_pv() {
     let disc = build_flat_discount_curve(0.0, BASE_DATE, "USD_OIS");
     let fwd = build_flat_forward_curve(0.0, BASE_DATE, "USD_LIBOR_3M");
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let fra = TestFraBuilder::new().fixed_rate(0.0).build();
     let pv = fra.value(&market, BASE_DATE).unwrap();

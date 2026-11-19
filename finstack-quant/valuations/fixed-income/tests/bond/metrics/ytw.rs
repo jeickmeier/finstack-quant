@@ -36,7 +36,9 @@ fn test_ytw_equals_ytm_for_non_callable_bond_from_price() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     // Request both YTM and YTW so they are computed off the same quoted price
     let result = bond
@@ -84,7 +86,9 @@ fn test_ytw_tracks_quoted_price_not_model_pv() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     // Compute model PV for reference (should differ from at least one of the quoted prices)
     let pv = bond.value(&market, as_of).unwrap().amount();
@@ -173,7 +177,9 @@ fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -282,7 +288,11 @@ fn test_ytw_floating_bond_matches_ytm_from_price() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let mut bond = Bond::floating(
         finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
@@ -367,7 +377,9 @@ fn test_ytw_amortizing_bond_matches_ytm_from_price() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let step_date = date!(2026 - 01 - 01);
     let amort_spec = AmortizationSpec::StepRemaining {
@@ -457,7 +469,9 @@ fn test_ytw_characterization_example_callable() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(

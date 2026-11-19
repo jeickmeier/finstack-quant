@@ -87,6 +87,18 @@ test('monetary quantile preserves USD through the published facade', () => {
   assert.equal(result.node_value_types.lower.currency, 'USD');
 });
 
+test('formula round preserves large integers and extreme decimal places', () => {
+  const value = 7 * 2 ** 50 + 1;
+  const input = model({
+    balance: values('balance', [value, value, value]),
+    tenths: formula('tenths', 'round(balance, 1)'),
+    coarse: formula('coarse', 'round(balance, -324)'),
+  });
+  const result = evaluateModel(JSON.stringify(input));
+  assert.equal(result.nodes.tenths['2025Q3'], value);
+  assert.equal(result.nodes.coarse['2025Q3'], 0);
+});
+
 test('coalesce skips infinite values and ranks honor direction', () => {
   const input = model({
     observation: values('observation', [20, 30, 10]),

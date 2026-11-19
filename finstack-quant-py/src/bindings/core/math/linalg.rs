@@ -93,7 +93,7 @@ fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize
         }
         if untyped.ndim() != 2 {
             return Err(crate::errors::value_error(
-                "expected a square nested list or 2-D array",
+                "expected a rectangular nested list or 2-D array",
             ));
         }
         if let Ok(array) = matrix.extract::<PyReadonlyArray2<'_, f64>>() {
@@ -126,7 +126,7 @@ fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize
             && (row_obj.is_instance_of::<PyFloat>() || row_obj.is_instance_of::<PyInt>())
         {
             return Err(crate::errors::value_error(
-                "expected a square nested list or 2-D array",
+                "expected a rectangular nested list or 2-D array",
             ));
         }
         let row_iter = row_obj.try_iter().map_err(|_| {
@@ -158,7 +158,7 @@ fn square_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize)> {
     let (flat, rows, cols) = extract_matrix(matrix)?;
     if rows != cols {
         return Err(crate::errors::value_error(format!(
-            "Matrix must be square, got {rows}x{cols}; expected a square nested list or 2-D array"
+            "Matrix must be square, got {rows}x{cols}"
         )));
     }
     Ok((flat, rows))
@@ -282,7 +282,7 @@ fn symmetric_eigen(
 }
 
 /// Ledoit-Wolf (2004) shrinkage of a sample covariance matrix toward a scaled
-/// identity target with the analytic optimal shrinkage intensity.
+/// identity target with the estimated shrinkage intensity.
 ///
 /// ``observations`` is a ``t × n`` matrix (``t`` observations of ``n``
 /// variables, one observation per row) as ``list[list[float]]`` or a
@@ -307,8 +307,8 @@ fn symmetric_eigen(
 /// # Errors
 ///
 /// Raises ``ValueError`` for an invalid matrix shape, ``t < 2``, ``n == 0``,
-/// non-finite entries, or centered observations or covariance entries that
-/// exceed the finite ``float64`` range.
+/// or non-finite entries. Raises ``RuntimeError`` when the estimated covariance or intensity
+/// cannot be resolved in the representable range.
 #[pyfunction]
 #[pyo3(text_signature = "(observations)")]
 fn ledoit_wolf_shrinkage(

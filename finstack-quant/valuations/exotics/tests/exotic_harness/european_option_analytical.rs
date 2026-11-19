@@ -65,7 +65,8 @@ fn short_rate_european_call_matches_analytical() {
     let var_r = sigma * sigma * (1.0 - (-2.0 * kappa * t).exp()) / (2.0 * kappa);
     let sig_r = var_r.sqrt();
     let d = (mu - strike) / sig_r;
-    let expected = notional * ((mu - strike) * norm_cdf(d) + sig_r * normal_pdf(d));
+    let expected = notional
+        * ((mu - strike) * norm_cdf(d).expect("valid normal variate") + sig_r * normal_pdf(d));
 
     // Constant θ = 0 ⇒ pure Ornstein-Uhlenbeck, matching the analytical μ above.
     let pricer = Hw1fMcPricer {

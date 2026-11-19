@@ -51,7 +51,9 @@ fn discount_curve(base_date: Date) -> DiscountCurve {
 }
 
 fn fixed_market() -> MarketContext {
-    MarketContext::new().insert(discount_curve(as_of()))
+    MarketContext::new()
+        .try_insert(discount_curve(as_of()))
+        .expect("insert market curve")
 }
 
 fn pool(balance: f64) -> AssetPool {
@@ -409,16 +411,18 @@ fn stochastic_default_volatility_changes_loss_dispersion() {
 
 #[test]
 fn non_pik_deferred_interest_cannot_consume_principal() {
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of())
-            .knots([(0.0, 1.0), (5.0, 1.0)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of())
+                .knots([(0.0, 1.0), (5.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
     let mut sc = structured_credit(false);
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);

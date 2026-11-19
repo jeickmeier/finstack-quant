@@ -1,12 +1,11 @@
 //! SABR model, smile, parameter, and calibration support.
 //!
-use super::expansion::BETA_SNAP_TOL;
 use super::parameters::SabrParameters;
 use crate::closed_form::{bachelier_vega, black_vega};
 use finstack_quant_core::math::solver_multi::{
     LevenbergMarquardtSolver, LmSolution, LmTerminationReason,
 };
-use finstack_quant_core::{Error, Result};
+use finstack_quant_core::{Error, Result, market_data::surfaces::VolQuoteType};
 
 /// Vega weight used by the SABR calibration objectives.
 ///
@@ -17,11 +16,9 @@ use finstack_quant_core::{Error, Result};
 /// expense of the ATM. Vega weighting gives every dollar of premium roughly
 /// equal weight, which is what the market actually quotes against.
 ///
-/// The vega convention must match the vol convention of the quotes being
-/// fitted, which follows the model's own β classification
-/// ([`SabrParameters::implied_vol`] returns normal vols for β≈0):
+/// The vega convention must match the explicitly selected volatility quotes.
 ///
-/// - `beta ≈ 0` (within `BETA_SNAP_TOL`): the quotes are *normal*
+/// - Normal quotes use
 ///   (Bachelier) vols, so weight with Bachelier vega `√T·φ((F−K)/(σ_N√T))`.
 ///   Feeding a ~1% normal vol to Black vega would collapse all wing weights
 ///   to the floor and leave the smile uncalibrated.
@@ -36,14 +33,20 @@ use finstack_quant_core::{Error, Result};
 ///
 /// * `forward` - Forward price or rate in the same units as `strike`.
 /// * `strike` - Option strike in price units or decimal-rate units.
-/// * `market_vol` - Market volatility in the convention implied by `beta`.
+/// * `market_vol` - Market volatility in the selected quote units.
 /// * `time_to_expiry` - Time to expiry in years.
-/// * `beta` - SABR elasticity parameter in the closed interval `[0, 1]`.
+/// * `quote_type` - Normal or Black vega basis matching the input volatilities.
 #[cfg(test)]
 #[inline]
-fn vega_weight(forward: f64, strike: f64, market_vol: f64, time_to_expiry: f64, beta: f64) -> f64 {
+fn vega_weight(
+    forward: f64,
+    strike: f64,
+    market_vol: f64,
+    time_to_expiry: f64,
+    quote_type: VolQuoteType,
+) -> f64 {
     const MIN_VEGA: f64 = 1e-10;
-    let vega = if beta.abs() < BETA_SNAP_TOL {
+    let vega = if quote_type == VolQuoteType::Normal {
         bachelier_vega(forward, strike, market_vol, time_to_expiry)
     } else {
         black_vega(forward, strike, market_vol, time_to_expiry)
@@ -57,6 +60,7 @@ fn normalized_quote_weights(
     market_vols: &[f64],
     time_to_expiry: f64,
     beta: f64,
+    quote_type: VolQuoteType,
 ) -> Result<Vec<f64>> {
     if strikes.len() != market_vols.len()
         || strikes.is_empty()
@@ -70,7 +74,12 @@ fn normalized_quote_weights(
     let mut weights = Vec::with_capacity(strikes.len());
     for (&strike, &vol) in strikes.iter().zip(market_vols) {
         params.validate_inputs(forward, strike, time_to_expiry)?;
-        let weight = if beta < BETA_SNAP_TOL {
+        if quote_type == VolQuoteType::BlackLognormal && (forward <= 0.0 || strike <= 0.0) {
+            return Err(Error::Validation(
+                "Black SABR calibration requires positive effective rates".into(),
+            ));
+        }
+        let weight = if quote_type == VolQuoteType::Normal {
             bachelier_vega(forward, strike, vol, time_to_expiry)
         } else {
             black_vega(forward, strike, vol, time_to_expiry)
@@ -105,20 +114,17 @@ fn normalized_quote_weights(
 // Check each candidate before selecting the best weighted fit. A small weighted
 // norm alone can conceal a bad quote at a low-vega strike.
 fn candidate_fits_quotes(
-    physical: [f64; 3],
-    beta: f64,
+    parameters: &SabrParameters,
     forward: f64,
     strikes: &[f64],
     market_vols: &[f64],
     time_to_expiry: f64,
     tolerance: f64,
+    quote_type: VolQuoteType,
 ) -> bool {
-    let Ok(parameters) = SabrParameters::new(physical[0], beta, physical[1], physical[2]) else {
-        return false;
-    };
     strikes.iter().zip(market_vols).all(|(&strike, &quote)| {
         parameters
-            .implied_vol(forward, strike, time_to_expiry)
+            .implied_vol(forward, strike, time_to_expiry, quote_type)
             .is_ok_and(|vol| vol.is_finite() && (vol - quote).abs() <= tolerance * quote)
     })
 }
@@ -130,6 +136,7 @@ fn validate_quote_fit(
     market_vols: &[f64],
     time_to_expiry: f64,
     tolerance: f64,
+    quote_type: VolQuoteType,
 ) -> Result<SabrCalibrationOutcome> {
     outcome.quote_errors = strikes
         .iter()
@@ -137,7 +144,7 @@ fn validate_quote_fit(
         .map(|(&strike, &market_vol)| {
             outcome
                 .parameters
-                .implied_vol(forward, strike, time_to_expiry)
+                .implied_vol(forward, strike, time_to_expiry, quote_type)
                 .map(|v| v - market_vol)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -157,19 +164,12 @@ fn validate_quote_fit(
     Ok(outcome)
 }
 
-/// Initial alpha guess for the LM calibration.
-///
-/// From Hagan's ATM expansion `σ_ATM ≈ α / F^(1−β)`, so `α₀ = σ_ATM·F^(1−β)`
-/// for lognormal-convention quotes. For `β ≈ 0` (within [`BETA_SNAP_TOL`])
-/// the quotes and the model output are *normal* vols where `σ_N,ATM ≈ α`
-/// directly — scaling by `F` would start the solver orders of magnitude off
-/// for rate-like forwards.
-#[inline]
-fn initial_alpha_guess(atm_vol: f64, forward: f64, beta: f64) -> f64 {
-    if beta.abs() < BETA_SNAP_TOL {
-        atm_vol
-    } else {
-        atm_vol * forward.powf(1.0 - beta)
+/// Leading ATM term of the selected SABR expansion.
+fn initial_alpha_guess(atm_vol: f64, forward: f64, beta: f64, quote_type: VolQuoteType) -> f64 {
+    match quote_type {
+        VolQuoteType::Normal if beta == 0.0 => atm_vol,
+        VolQuoteType::Normal => atm_vol / forward.powf(beta),
+        _ => atm_vol * forward.powf(1.0 - beta),
     }
 }
 
@@ -709,9 +709,8 @@ impl SabrCalibrator {
     /// Calibrate SABR and return the parameters with solver diagnostics.
     ///
     /// Applies the configured shift and ATM-pinning policy and runs a
-    /// deterministic multi-start fit. Normal quotes are absolute decimal-rate
-    /// volatilities for beta near zero; otherwise quotes are annual Black
-    /// volatilities in relative decimals.
+    /// deterministic multi-start fit. The selected quote type sets the units
+    /// and the pricing formula for the objective and residual checks.
     ///
     /// # Errors
     ///
@@ -727,6 +726,8 @@ impl SabrCalibrator {
     /// * `market_vols` - Implied volatilities aligned with `strikes`.
     /// * `time_to_expiry` - Time to expiry in years.
     /// * `beta` - Fixed SABR elasticity parameter in `[0, 1]`.
+    /// * `quote_type` - Input annualized Normal or Black quote type. Shifted Black requires an explicit
+    ///   displacement policy.
     pub fn calibrate(
         &self,
         forward: f64,
@@ -734,6 +735,7 @@ impl SabrCalibrator {
         market_vols: &[f64],
         time_to_expiry: f64,
         beta: f64,
+        quote_type: VolQuoteType,
     ) -> Result<SabrCalibrationOutcome> {
         if strikes.len() != market_vols.len() || strikes.len() < 3 {
             return Err(Error::Validation(format!(
@@ -742,10 +744,32 @@ impl SabrCalibrator {
                 market_vols.len()
             )));
         }
-        let shift = self.resolve_shift(forward, strikes)?;
-        if shift == 0.0 {
-            return self.fit(forward, strikes, market_vols, time_to_expiry, beta);
+        let fit_quote = if quote_type == VolQuoteType::Normal {
+            VolQuoteType::Normal
+        } else {
+            VolQuoteType::BlackLognormal
+        };
+        match (quote_type, self.shift) {
+            (VolQuoteType::BlackLognormal, SabrShift::None)
+            | (VolQuoteType::Normal, SabrShift::None) => {
+                return self.fit(
+                    forward,
+                    strikes,
+                    market_vols,
+                    time_to_expiry,
+                    beta,
+                    fit_quote,
+                );
+            }
+            (VolQuoteType::BlackLognormal, _)
+            | (VolQuoteType::ShiftedBlackLognormal, SabrShift::None) => {
+                return Err(Error::Validation(
+                    "SABR calibration quote type disagrees with the displacement policy".into(),
+                ));
+            }
+            _ => {}
         }
+        let shift = self.resolve_shift(forward, strikes)?;
         let shifted_forward = forward + shift;
         let shifted_strikes: Vec<f64> = strikes.iter().map(|&strike| strike + shift).collect();
         if shifted_forward <= 0.0 || shifted_strikes.iter().any(|&strike| strike <= 0.0) {
@@ -759,6 +783,7 @@ impl SabrCalibrator {
             market_vols,
             time_to_expiry,
             beta,
+            fit_quote,
         )?;
         outcome.parameters = SabrParameters::new_with_shift(
             outcome.parameters.alpha,
@@ -802,11 +827,26 @@ impl SabrCalibrator {
         market_vols: &[f64],
         time_to_expiry: f64,
         beta: f64,
+        quote_type: VolQuoteType,
     ) -> Result<SabrCalibrationOutcome> {
         if self.atm_pinning {
-            self.fit_atm_pinned(forward, strikes, market_vols, time_to_expiry, beta)
+            self.fit_atm_pinned(
+                forward,
+                strikes,
+                market_vols,
+                time_to_expiry,
+                beta,
+                quote_type,
+            )
         } else {
-            self.fit_free(forward, strikes, market_vols, time_to_expiry, beta)
+            self.fit_free(
+                forward,
+                strikes,
+                market_vols,
+                time_to_expiry,
+                beta,
+                quote_type,
+            )
         }
     }
 
@@ -818,9 +858,16 @@ impl SabrCalibrator {
         market_vols: &[f64],
         time_to_expiry: f64,
         beta: f64,
+        quote_type: VolQuoteType,
     ) -> Result<SabrCalibrationOutcome> {
-        let weights =
-            normalized_quote_weights(forward, strikes, market_vols, time_to_expiry, beta)?;
+        let weights = normalized_quote_weights(
+            forward,
+            strikes,
+            market_vols,
+            time_to_expiry,
+            beta,
+            quote_type,
+        )?;
         self.validate_settings()?;
         let residual_tolerance = self.tolerance;
         let solver = LevenbergMarquardtSolver::new(
@@ -829,7 +876,7 @@ impl SabrCalibrator {
             self.max_iterations,
         )?;
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
-        let alpha_start = initial_alpha_guess(atm_vol, forward, beta);
+        let alpha_start = initial_alpha_guess(atm_vol, forward, beta, quote_type);
         let starts = deterministic_sabr_starts(alpha_start);
         let template = SabrParameters::new(1.0, beta, 0.4, 0.0)?;
         let prepared: Vec<_> = strikes
@@ -840,6 +887,7 @@ impl SabrCalibrator {
                     forward,
                     strike,
                     time_to_expiry,
+                    quote_type,
                 )
             })
             .collect::<Result<_>>()?;
@@ -876,12 +924,16 @@ impl SabrCalibrator {
                     |coordinates: &[f64], output: &mut [f64]| -> finstack_quant_core::Result<()> {
                         compute_sabr_jacobian(&prepared, &weights, beta, coordinates, output)
                     };
-                let solution = solver.solve_least_squares_with_jacobian(
-                    residuals,
-                    jacobian,
-                    &initial,
-                    prepared.len(),
-                );
+                let solution = if quote_type == VolQuoteType::Normal && beta > 0.0 {
+                    solver.solve_least_squares(residuals, &initial, prepared.len())
+                } else {
+                    solver.solve_least_squares_with_jacobian(
+                        residuals,
+                        jacobian,
+                        &initial,
+                        prepared.len(),
+                    )
+                };
                 (solution, calls.get())
             },
             |solution| {
@@ -890,14 +942,19 @@ impl SabrCalibrator {
                     unconstrained_to_bounded(solution.params[1], 0.001, 2.0),
                     unconstrained_to_bounded(solution.params[2], -0.99, 0.99),
                 ];
+                let Ok(parameters) =
+                    SabrParameters::new(physical[0], beta, physical[1], physical[2])
+                else {
+                    return None;
+                };
                 candidate_fits_quotes(
-                    physical,
-                    beta,
+                    &parameters,
                     forward,
                     strikes,
                     market_vols,
                     time_to_expiry,
                     self.tolerance,
+                    quote_type,
                 )
                 .then_some(physical)
             },
@@ -910,6 +967,7 @@ impl SabrCalibrator {
             market_vols,
             time_to_expiry,
             self.tolerance,
+            quote_type,
         )
     }
 
@@ -999,12 +1057,19 @@ impl SabrCalibrator {
         market_vols: &[f64],
         time_to_expiry: f64,
         beta: f64,
+        quote_type: VolQuoteType,
     ) -> Result<SabrCalibrationOutcome> {
-        let weights =
-            normalized_quote_weights(forward, strikes, market_vols, time_to_expiry, beta)?;
+        let weights = normalized_quote_weights(
+            forward,
+            strikes,
+            market_vols,
+            time_to_expiry,
+            beta,
+            quote_type,
+        )?;
         self.validate_settings()?;
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
-        let alpha_start = initial_alpha_guess(atm_vol, forward, beta);
+        let alpha_start = initial_alpha_guess(atm_vol, forward, beta, quote_type);
         let starts = deterministic_sabr_starts(alpha_start);
         let template = SabrParameters::new(1.0, beta, 0.4, 0.0)?;
         let prepared: Vec<_> = strikes
@@ -1015,6 +1080,7 @@ impl SabrCalibrator {
                     forward,
                     strike,
                     time_to_expiry,
+                    quote_type,
                 )
             })
             .collect::<Result<_>>()?;
@@ -1045,10 +1111,9 @@ impl SabrCalibrator {
                         forward,
                         atm_vol,
                         time_to_expiry,
-                        beta,
-                        nu,
-                        rho,
+                        [beta, nu, rho],
                         self.tolerance.min(1e-10),
+                        quote_type,
                     )?;
                     let parameters = SabrParameters::new(alpha, beta, nu, rho)?;
                     for (index, (strike, &market_vol)) in
@@ -1069,22 +1134,26 @@ impl SabrCalibrator {
                     forward,
                     atm_vol,
                     time_to_expiry,
-                    beta,
-                    nu,
-                    rho,
+                    [beta, nu, rho],
                     self.tolerance.min(1e-10),
+                    quote_type,
                 )
                 .ok()
                 .map(|alpha| [alpha, nu, rho])
                 .filter(|&physical| {
+                    let Ok(parameters) =
+                        SabrParameters::new(physical[0], beta, physical[1], physical[2])
+                    else {
+                        return false;
+                    };
                     candidate_fits_quotes(
-                        physical,
-                        beta,
+                        &parameters,
                         forward,
                         strikes,
                         market_vols,
                         time_to_expiry,
                         self.tolerance,
+                        quote_type,
                     )
                 })
             },
@@ -1097,6 +1166,7 @@ impl SabrCalibrator {
             market_vols,
             time_to_expiry,
             self.tolerance,
+            quote_type,
         )
     }
 }
@@ -1109,25 +1179,19 @@ pub(super) fn solve_alpha_for_atm(
     forward: f64,
     target_atm_vol: f64,
     time_to_expiry: f64,
-    beta: f64,
-    nu: f64,
-    rho: f64,
+    [beta, nu, rho]: [f64; 3],
     tolerance: f64,
+    quote_type: VolQuoteType,
 ) -> Result<f64> {
-    // For normal SABR, ATM volatility is approximately α.
-    let f_pow = if beta < BETA_SNAP_TOL {
-        1.0
-    } else {
-        forward.powf(1.0 - beta)
-    };
-    let mut alpha = target_atm_vol * f_pow;
+    let alpha_start = initial_alpha_guess(target_atm_vol, forward, beta, quote_type);
+    let mut alpha = alpha_start;
 
     const MAX_ITER: usize = 50;
 
     let mut last_error = f64::INFINITY;
     for _ in 0..MAX_ITER {
         let params = SabrParameters::new(alpha, beta, nu, rho)?;
-        let model_vol = params.implied_vol(forward, forward, time_to_expiry)?;
+        let model_vol = params.implied_vol(forward, forward, time_to_expiry, quote_type)?;
 
         let error = model_vol - target_atm_vol;
         last_error = error;
@@ -1138,7 +1202,7 @@ pub(super) fn solve_alpha_for_atm(
         // Numerical derivative for Newton step
         let bump = alpha * 1e-6;
         let params_bumped = SabrParameters::new(alpha + bump, beta, nu, rho)?;
-        let vol_bumped = params_bumped.implied_vol(forward, forward, time_to_expiry)?;
+        let vol_bumped = params_bumped.implied_vol(forward, forward, time_to_expiry, quote_type)?;
 
         let d_vol_d_alpha = (vol_bumped - model_vol) / bump;
         if d_vol_d_alpha.abs() < 1e-14 {
@@ -1150,7 +1214,7 @@ pub(super) fn solve_alpha_for_atm(
         alpha += step.clamp(-alpha * 0.5, alpha * 0.5);
 
         if alpha <= 0.0 {
-            alpha = target_atm_vol * f_pow * 0.5;
+            alpha = alpha_start * 0.5;
         }
     }
 
@@ -1192,13 +1256,13 @@ mod acceptance_tests {
             .iter()
             .map(|&k| {
                 true_params
-                    .implied_vol(forward, k, expiry)
+                    .implied_vol(forward, k, expiry, VolQuoteType::BlackLognormal)
                     .expect("synthetic vol should compute")
             })
             .collect();
 
         let true_atm = true_params
-            .implied_vol(forward, forward, expiry)
+            .implied_vol(forward, forward, expiry, VolQuoteType::BlackLognormal)
             .expect("true ATM vol should compute");
 
         // The nearest-strike quote (K=98) — what the OLD `find_atm_vol` would pin
@@ -1215,7 +1279,14 @@ mod acceptance_tests {
         assert!(
             SabrCalibrator::new()
                 .with_atm_pinning(true)
-                .calibrate(forward, &strikes, &market_vols, expiry, 0.5)
+                .calibrate(
+                    forward,
+                    &strikes,
+                    &market_vols,
+                    expiry,
+                    0.5,
+                    VolQuoteType::BlackLognormal
+                )
                 .is_err()
         );
         let calibrated_atm = SabrCalibrator::new()
@@ -1334,8 +1405,18 @@ mod acceptance_tests {
             let strikes: Vec<_> = [0.005, 0.009999999, 0.01, 0.010000001, 0.02]
                 .into_iter()
                 .map(|k| {
-                    super::super::expansion::PreparedSabrStrike::new(&template, 0.01, k, 2.0)
-                        .expect("strike")
+                    super::super::expansion::PreparedSabrStrike::new(
+                        &template,
+                        0.01,
+                        k,
+                        2.0,
+                        if beta == 0.0 {
+                            VolQuoteType::Normal
+                        } else {
+                            VolQuoteType::BlackLognormal
+                        },
+                    )
+                    .expect("strike")
                 })
                 .collect();
             let weights = [0.25, 0.5, 1.0, 0.5, 0.25];
@@ -1426,7 +1507,18 @@ mod acceptance_tests {
                         .iter()
                         .map(|&strike| {
                             source
-                                .implied_vol(forward, strike, 2.0)
+                                .implied_vol(
+                                    forward,
+                                    strike,
+                                    2.0,
+                                    if beta == 0.0 {
+                                        VolQuoteType::Normal
+                                    } else if shifted {
+                                        VolQuoteType::ShiftedBlackLognormal
+                                    } else {
+                                        VolQuoteType::BlackLognormal
+                                    },
+                                )
                                 .expect("source volatility")
                         })
                         .collect();
@@ -1439,10 +1531,36 @@ mod acceptance_tests {
                                 SabrShift::None
                             });
                     let fit = calibrator
-                        .calibrate(forward, &strikes, &vols, 2.0, beta)
+                        .calibrate(
+                            forward,
+                            &strikes,
+                            &vols,
+                            2.0,
+                            beta,
+                            if beta == 0.0 {
+                                VolQuoteType::Normal
+                            } else if shifted {
+                                VolQuoteType::ShiftedBlackLognormal
+                            } else {
+                                VolQuoteType::BlackLognormal
+                            },
+                        )
                         .expect("fit");
                     let repeat = calibrator
-                        .calibrate(forward, &strikes, &vols, 2.0, beta)
+                        .calibrate(
+                            forward,
+                            &strikes,
+                            &vols,
+                            2.0,
+                            beta,
+                            if beta == 0.0 {
+                                VolQuoteType::Normal
+                            } else if shifted {
+                                VolQuoteType::ShiftedBlackLognormal
+                            } else {
+                                VolQuoteType::BlackLognormal
+                            },
+                        )
                         .expect("repeat");
                     assert_eq!(
                         serde_json::to_string(&fit).expect("serialize"),
@@ -1463,10 +1581,32 @@ mod acceptance_tests {
                         let strike = forward + (i as f64 - 20.0) * 0.0003;
                         let actual = fit
                             .parameters
-                            .implied_vol(forward, strike, 2.0)
+                            .implied_vol(
+                                forward,
+                                strike,
+                                2.0,
+                                if beta == 0.0 {
+                                    VolQuoteType::Normal
+                                } else if shifted {
+                                    VolQuoteType::ShiftedBlackLognormal
+                                } else {
+                                    VolQuoteType::BlackLognormal
+                                },
+                            )
                             .expect("fit off grid");
                         let expected = source
-                            .implied_vol(forward, strike, 2.0)
+                            .implied_vol(
+                                forward,
+                                strike,
+                                2.0,
+                                if beta == 0.0 {
+                                    VolQuoteType::Normal
+                                } else if shifted {
+                                    VolQuoteType::ShiftedBlackLognormal
+                                } else {
+                                    VolQuoteType::BlackLognormal
+                                },
+                            )
                             .expect("source off grid");
                         assert!(
                             (actual - expected).abs() < 1e-8 * expected.abs().max(0.01),
@@ -1566,7 +1706,12 @@ mod acceptance_tests {
             .iter()
             .map(|&strike| {
                 source_parameters
-                    .implied_vol(forward, strike, time_to_expiry)
+                    .implied_vol(
+                        forward,
+                        strike,
+                        time_to_expiry,
+                        VolQuoteType::BlackLognormal,
+                    )
                     .expect("source volatility")
             })
             .collect();
@@ -1576,14 +1721,28 @@ mod acceptance_tests {
 
         let calibrate_free = || {
             calibrator
-                .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
+                .calibrate(
+                    forward,
+                    &strikes,
+                    &market_vols,
+                    time_to_expiry,
+                    beta,
+                    VolQuoteType::BlackLognormal,
+                )
                 .expect("free-alpha calibration")
         };
         let calibrate_pinned = || {
             calibrator
                 .clone()
                 .with_atm_pinning(true)
-                .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
+                .calibrate(
+                    forward,
+                    &strikes,
+                    &market_vols,
+                    time_to_expiry,
+                    beta,
+                    VolQuoteType::BlackLognormal,
+                )
                 .expect("ATM-pinned calibration")
         };
         let free_first = calibrate_free();
@@ -1616,11 +1775,22 @@ mod acceptance_tests {
                     if pin_atm && is_atm {
                         0.0
                     } else {
-                        let weight =
-                            vega_weight(forward, strike, market_vol, time_to_expiry, beta).sqrt();
+                        let weight = vega_weight(
+                            forward,
+                            strike,
+                            market_vol,
+                            time_to_expiry,
+                            VolQuoteType::BlackLognormal,
+                        )
+                        .sqrt();
                         let model_vol = outcome
                             .parameters
-                            .implied_vol(forward, strike, time_to_expiry)
+                            .implied_vol(
+                                forward,
+                                strike,
+                                time_to_expiry,
+                                VolQuoteType::BlackLognormal,
+                            )
                             .expect("fitted volatility");
                         weight * (model_vol - market_vol)
                     }
@@ -1642,7 +1812,8 @@ mod acceptance_tests {
         let atm_vol = calibrator
             .find_atm_vol(forward, &strikes, &market_vols)
             .expect("ATM volatility");
-        let expected_alpha_start = initial_alpha_guess(atm_vol, forward, beta);
+        let expected_alpha_start =
+            initial_alpha_guess(atm_vol, forward, beta, VolQuoteType::BlackLognormal);
         for outcome in [&free_first, &pinned_first] {
             assert!((outcome.winning_start[0] - expected_alpha_start).abs() <= 1.0e-15);
             assert!(
@@ -1658,7 +1829,12 @@ mod acceptance_tests {
 
         let pinned_atm = pinned_first
             .parameters
-            .implied_vol(forward, forward, time_to_expiry)
+            .implied_vol(
+                forward,
+                forward,
+                time_to_expiry,
+                VolQuoteType::BlackLognormal,
+            )
             .expect("pinned ATM volatility");
         assert!((pinned_atm - atm_vol).abs() <= calibrator.tolerance);
     }
@@ -1675,6 +1851,7 @@ mod acceptance_tests {
                 &[0.02, 0.015, 0.01, 0.015, 0.02],
                 5.0,
                 0.0,
+                VolQuoteType::BlackLognormal,
             )
             .expect_err("one iteration cannot accept this bounded SABR smile");
         let message = error.to_string();
@@ -1697,6 +1874,7 @@ mod acceptance_tests {
                 &[0.02, 0.015, 0.01, 0.015, 0.02],
                 5.0,
                 0.0,
+                VolQuoteType::BlackLognormal,
             )
             .expect_err("one iteration cannot accept this bounded ATM-pinned smile");
         let message = error.to_string();

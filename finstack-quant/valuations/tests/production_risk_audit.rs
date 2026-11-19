@@ -26,16 +26,18 @@ fn market() -> MarketContext {
         .expect("FX quote");
     let mut market = MarketContext::new().insert_fx(FxMatrix::new(provider, None));
     for id in ["USD-OIS", "EUR-OIS"] {
-        market = market.insert(
-            DiscountCurve::builder(id)
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (10.0, 1.0)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        );
+        market = market
+            .try_insert(
+                DiscountCurve::builder(id)
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (10.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve");
     }
     market.insert_surface(
         VolSurface::builder("EURUSD-VOL")
@@ -104,7 +106,7 @@ fn fx01_follows_active_spot_and_forward_overrides() {
     assert_eq!(result.measures["fx01"], 0.0);
 
     let bare = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, 1.0)])
@@ -114,7 +116,8 @@ fn fx01_follows_active_spot_and_forward_overrides() {
                 .build()
                 .expect("curve"),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             DiscountCurve::builder("EUR-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, 1.0)])
@@ -123,7 +126,8 @@ fn fx01_follows_active_spot_and_forward_overrides() {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
-        );
+        )
+        .expect("insert market curve");
     for instrument in [&forward as &dyn Instrument, &spot, &fixed] {
         let result = instrument
             .price_with_metrics(&bare, as_of, &[MetricId::Fx01], PricingOptions::default())

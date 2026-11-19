@@ -157,8 +157,10 @@ mod inflation_swap_inflation01_tests {
             .build()
             .expect("inflation curve");
         MarketContext::new()
-            .insert(discount)
-            .insert(inflation)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(inflation)
+            .expect("insert market curve")
             .insert_inflation_index(
                 finstack_quant_valuations_test_support::inflation::simple_index(
                     "US-CPI",

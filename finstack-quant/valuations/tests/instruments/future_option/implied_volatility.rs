@@ -31,16 +31,18 @@ fn as_of() -> Date {
 }
 
 fn market(curve_id: &str) -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder(curve_id)
-            .base_date(as_of())
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (2.0, (-2.0 * RATE).exp())])
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount curve"),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder(curve_id)
+                .base_date(as_of())
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (2.0, (-2.0 * RATE).exp())])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount curve"),
+        )
+        .expect("insert market curve")
 }
 
 /// European, premium-paid, cash-settled call terms shared by every wrapper.
@@ -73,12 +75,14 @@ fn closed_form(terms: &FutureOptionTerms, market: &MarketContext, sigma: f64) ->
         FutureOptionModel::Black76 => {
             let std_dev = sigma * t.sqrt();
             let d1 = ((f / k).ln() + 0.5 * std_dev * std_dev) / std_dev;
-            f * norm_cdf(d1) - k * norm_cdf(d1 - std_dev)
+            f * norm_cdf(d1).expect("valid normal variate")
+                - k * norm_cdf(d1 - std_dev).expect("valid normal variate")
         }
         FutureOptionModel::Normal => {
             let std_dev = sigma * t.sqrt();
             let d = (f - k) / std_dev;
-            (f - k) * norm_cdf(d) + std_dev * norm_pdf(d)
+            (f - k) * norm_cdf(d).expect("valid normal variate")
+                + std_dev * norm_pdf(d).expect("valid normal variate")
         }
     };
     df * call * terms.contracts * terms.multiplier

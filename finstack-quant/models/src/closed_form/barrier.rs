@@ -129,6 +129,7 @@
 //! - Monte Carlo barrier pricing for discrete monitoring and exotic payoffs
 
 use super::vanilla::require_finite_positive;
+use crate::gaussian::{log_norm_cdf_or_nan, norm_cdf_or_nan};
 use crate::types::OptionType;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
@@ -367,22 +368,22 @@ fn barrier_helper(
     let option_sign = eta;
     let barrier_sign = -phi;
 
-    let a = option_sign * spot * forward_discount * norm_cdf(option_sign * x)
-        - option_sign * strike * discount * norm_cdf(option_sign * (x - vol * time.sqrt()));
+    let a = option_sign * spot * forward_discount * norm_cdf(option_sign * x)?
+        - option_sign * strike * discount * norm_cdf(option_sign * (x - vol * time.sqrt()))?;
 
-    let b = option_sign * spot * forward_discount * norm_cdf(option_sign * x1)
-        - option_sign * strike * discount * norm_cdf(option_sign * (x1 - vol * time.sqrt()));
+    let b = option_sign * spot * forward_discount * norm_cdf(option_sign * x1)?
+        - option_sign * strike * discount * norm_cdf(option_sign * (x1 - vol * time.sqrt()))?;
 
     // Evaluate powers and Gaussian tails together in log space. The powers
     // alone can overflow while the complete reflected claims remain finite.
     let log_asset_reflection = spot.ln() - div_yield * time + 2.0 * (mu + 1.0) * log_barrier_spot;
     let log_cash_reflection = strike.ln() - rate * time + 2.0 * mu * log_barrier_spot;
     let c = option_sign
-        * ((log_asset_reflection + log_norm_cdf(barrier_sign * y)).exp()
-            - (log_cash_reflection + log_norm_cdf(barrier_sign * (y - sigma_sqrt_t))).exp());
+        * ((log_asset_reflection + log_norm_cdf(barrier_sign * y)?).exp()
+            - (log_cash_reflection + log_norm_cdf(barrier_sign * (y - sigma_sqrt_t))?).exp());
     let d = option_sign
-        * ((log_asset_reflection + log_norm_cdf(barrier_sign * y1)).exp()
-            - (log_cash_reflection + log_norm_cdf(barrier_sign * (y1 - sigma_sqrt_t))).exp());
+        * ((log_asset_reflection + log_norm_cdf(barrier_sign * y1)?).exp()
+            - (log_cash_reflection + log_norm_cdf(barrier_sign * (y1 - sigma_sqrt_t))?).exp());
 
     let is_call = eta > 0.0;
 
@@ -420,6 +421,9 @@ fn barrier_helper(
 ///
 /// Returns P(min S < H) for down barrier, or P(max S > H) for up barrier.
 ///
+/// Returns NaN when the input is non-finite, the levels are non-positive,
+/// or the Gaussian reflection cannot be evaluated.
+///
 /// # Arguments
 ///
 /// * `spot` - Current underlying spot price in the barrier's quote units.
@@ -440,6 +444,14 @@ pub fn barrier_touch_probability(
     vol: f64,
     is_up: bool,
 ) -> f64 {
+    if ![spot, barrier, time, rate, div_yield, vol]
+        .iter()
+        .all(|v| v.is_finite())
+        || spot <= 0.0
+        || barrier <= 0.0
+    {
+        return f64::NAN;
+    }
     if (is_up && spot >= barrier) || (!is_up && spot <= barrier) {
         return 1.0;
     }
@@ -485,7 +497,7 @@ pub fn barrier_touch_probability(
             (log_h_s + nu * time) / sigma_sqrt_t,
         )
     };
-    (norm_cdf(d1) + (log_power + log_norm_cdf(d2)).exp()).clamp(0.0, 1.0)
+    (norm_cdf_or_nan(d1) + (log_power + log_norm_cdf_or_nan(d2)).exp()).clamp(0.0, 1.0)
 }
 
 /// Calculate value of a rebate paid at maturity.
@@ -787,8 +799,8 @@ fn discounted_touch_value(params: &BarrierParams, is_up: bool) -> f64 {
     } else {
         (nu - root) / sigma2
     };
-    let value = (power_plus * log_hs + log_norm_cdf(eta * z)).exp()
-        + (power_minus * log_hs + log_norm_cdf(eta * z_prime)).exp();
+    let value = (power_plus * log_hs + log_norm_cdf_or_nan(eta * z)).exp()
+        + (power_minus * log_hs + log_norm_cdf_or_nan(eta * z_prime)).exp();
     if value.is_finite() {
         value.clamp(0.0, 1.0_f64.max((-rate * time).exp()))
     } else {
@@ -1069,7 +1081,7 @@ mod tests {
                         let survival = -(-2.0 * log_barrier * (log_barrier - log_terminal)
                             / variance)
                             .exp_m1();
-                        Ok((eta * (terminal - strike)).max(0.0) * survival * norm_pdf(z))
+                        Ok((eta * (terminal - strike)).max(0.0) * survival * norm_pdf(z)?)
                     },
                     lower,
                     upper,
@@ -1194,8 +1206,9 @@ mod tests {
         let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time)
             / (vol * time.sqrt());
         let d2 = d1 - vol * time.sqrt();
-        let vanilla = spot * (-div_yield * time).exp() * norm_cdf(d1)
-            - strike * (-rate * time).exp() * norm_cdf(d2);
+        let vanilla =
+            spot * (-div_yield * time).exp() * norm_cdf(d1).expect("valid Gaussian variate")
+                - strike * (-rate * time).exp() * norm_cdf(d2).expect("valid Gaussian variate");
 
         let sum = up_in + up_out;
 
@@ -1224,8 +1237,9 @@ mod tests {
         let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time)
             / (vol * time.sqrt());
         let d2 = d1 - vol * time.sqrt();
-        let vanilla = strike * (-rate * time).exp() * norm_cdf(-d2)
-            - spot * (-div_yield * time).exp() * norm_cdf(-d1);
+        let vanilla =
+            strike * (-rate * time).exp() * norm_cdf(-d2).expect("valid Gaussian variate")
+                - spot * (-div_yield * time).exp() * norm_cdf(-d1).expect("valid Gaussian variate");
 
         let sum = down_in + down_out;
 
@@ -1438,16 +1452,16 @@ mod tests {
         let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time)
             / (vol * time.sqrt());
         let d2 = d1 - vol * time.sqrt();
-        spot * (-div_yield * time).exp() * norm_cdf(d1)
-            - strike * (-rate * time).exp() * norm_cdf(d2)
+        spot * (-div_yield * time).exp() * norm_cdf(d1).expect("valid Gaussian variate")
+            - strike * (-rate * time).exp() * norm_cdf(d2).expect("valid Gaussian variate")
     }
 
     fn vanilla_put(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vol: f64) -> f64 {
         let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time)
             / (vol * time.sqrt());
         let d2 = d1 - vol * time.sqrt();
-        strike * (-rate * time).exp() * norm_cdf(-d2)
-            - spot * (-div_yield * time).exp() * norm_cdf(-d1)
+        strike * (-rate * time).exp() * norm_cdf(-d2).expect("valid Gaussian variate")
+            - spot * (-div_yield * time).exp() * norm_cdf(-d1).expect("valid Gaussian variate")
     }
 
     /// Verify In + Out = Vanilla for ALL 8 barrier option types.

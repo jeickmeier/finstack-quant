@@ -67,7 +67,9 @@ fn envelope_for_step(
 fn hazard_preflight_rejects_entity_mismatch() {
     let base_date = base_date();
     let discount = usd_discount_curve(base_date);
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
 
     let quote = MarketQuote::Cds(CdsQuote::CdsParSpread {
         id: QuoteId::new("CDS-ACME-5Y"),
@@ -110,7 +112,9 @@ fn hazard_preflight_rejects_entity_mismatch() {
 fn inflation_preflight_rejects_invalid_observation_lag() {
     let base_date = base_date();
     let discount = usd_discount_curve(base_date);
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
 
     let quote = MarketQuote::Inflation(InflationQuote::InflationSwap {
         id: QuoteId::new("USA-CPI-U-ZCIS-20300102"),
@@ -158,7 +162,9 @@ fn inflation_preflight_rejects_invalid_observation_lag() {
 fn inflation_preflight_rejects_day_based_observation_lag() {
     let base_date = base_date();
     let discount = usd_discount_curve(base_date);
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
 
     let quote = MarketQuote::Inflation(InflationQuote::InflationSwap {
         id: QuoteId::new("USA-CPI-U-ZCIS-20300102"),
@@ -235,7 +241,9 @@ fn vol_surface_deserialization_rejects_unknown_model() {
 fn swaption_vol_preflight_rejects_invalid_shift() {
     let base_date = base_date();
     let discount = usd_discount_curve(base_date);
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
 
     let step = CalibrationStep {
         id: "swaption".to_string(),
@@ -246,7 +254,7 @@ fn swaption_vol_preflight_rejects_invalid_shift() {
             discount_curve_id: "USD-OIS".into(),
             forward_id: None,
             currency: Currency::USD,
-            vol_convention: SwaptionVolConvention::ShiftedLognormal { shift: 0.0 },
+            vol_convention: SwaptionVolConvention::ShiftedLognormal { shift: f64::NAN },
             sabr_beta: 0.5,
             target_expiries: Vec::new(),
             target_tenors: Vec::new(),
@@ -292,8 +300,10 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
         .expect("credit index data");
 
     let source_market = MarketContext::new()
-        .insert(hazard.as_ref().clone())
-        .insert(base_corr.as_ref().clone())
+        .try_insert(hazard.as_ref().clone())
+        .expect("insert market curve")
+        .try_insert(base_corr.as_ref().clone())
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG", index_data)
         .expect("credit index dependencies");
 
@@ -345,7 +355,9 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
 fn base_correlation_preflight_requires_credit_index_data() {
     let base_date = base_date();
     let discount = usd_discount_curve(base_date);
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
 
     let tranche_quote = MarketQuote::CdsTranche(CdsTrancheQuote {
         id: QuoteId::new("CDX-IG-0-3"),
@@ -424,8 +436,10 @@ fn base_correlation_preflight_rejects_non_monotone_tranche_points() {
         .expect("credit index data");
 
     let source_market = MarketContext::new()
-        .insert(hazard_clone)
-        .insert(base_corr_clone)
+        .try_insert(hazard_clone)
+        .expect("insert market curve")
+        .try_insert(base_corr_clone)
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG", index_data)
         .expect("credit index dependencies");
 
@@ -481,7 +495,8 @@ fn inflation_preflight_requires_release_facts_for_unobserved_anchors() {
         .expect("empty explicitly selected snapshot");
 
     let source_market = MarketContext::new()
-        .insert(discount)
+        .try_insert(discount)
+        .expect("insert market curve")
         .insert_inflation_index(index);
 
     let quote = MarketQuote::Inflation(InflationQuote::InflationSwap {
@@ -527,7 +542,9 @@ fn inflation_preflight_requires_release_facts_for_unobserved_anchors() {
 fn forward_preflight_requires_quotes() {
     let base_date = base_date();
     let discount = usd_discount_curve(base_date);
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
 
     let step = CalibrationStep {
         id: "fwd".to_string(),
@@ -558,7 +575,9 @@ fn forward_preflight_requires_quotes() {
 fn vol_surface_requires_quotes_even_when_params_valid() {
     let base_date = base_date();
     let discount = usd_discount_curve(base_date);
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
 
     let step = CalibrationStep {
         id: "vol".to_string(),

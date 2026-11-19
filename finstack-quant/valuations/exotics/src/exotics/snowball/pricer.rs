@@ -684,7 +684,11 @@ mod tests {
             .build()
             .expect("forward curve");
         let _ = (forward_rate, &forward);
-        MarketContext::new().insert(discount).insert(forward)
+        MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve")
     }
 
     /// Test market whose projection curve is consistent with the discount curve.
@@ -712,7 +716,11 @@ mod tests {
             .expect("discount curve");
         let forward =
             ForwardCurve::from_discount_curve("USD-SOFR-6M", &discount, Some(Tenor::semi_annual()));
-        MarketContext::new().insert(discount).insert(forward)
+        MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve")
     }
 
     fn deterministic_mc_pricer(paths: usize) -> SnowballHw1fMcPricer {

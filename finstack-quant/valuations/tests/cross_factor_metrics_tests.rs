@@ -55,8 +55,10 @@ fn build_test_bond(as_of: Date) -> Bond {
 
 fn build_market(as_of: Date, rate: f64, hazard_rate: f64) -> MarketContext {
     MarketContext::new()
-        .insert(build_discount_curve("USD-OIS", as_of, rate))
-        .insert(build_hazard_curve("USD-CREDIT", as_of, hazard_rate))
+        .try_insert(build_discount_curve("USD-OIS", as_of, rate))
+        .expect("insert market curve")
+        .try_insert(build_hazard_curve("USD-CREDIT", as_of, hazard_rate))
+        .expect("insert market curve")
 }
 
 #[test]

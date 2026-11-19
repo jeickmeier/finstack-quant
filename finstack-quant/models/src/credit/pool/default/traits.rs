@@ -37,6 +37,14 @@ pub trait StochasticDefault: Send + Sync + std::fmt::Debug {
     /// Asset correlation parameter.
     fn correlation(&self) -> f64;
 
-    /// Expected (unconditional) MDR at given seasoning.
-    fn expected_mdr(&self, seasoning: u32) -> f64;
+    /// Expected unconditional monthly default probability.
+    ///
+    /// # Arguments
+    ///
+    /// * `seasoning` - Loan age in months used to select the base default rate.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an invalid base rate or Gaussian variate.
+    fn expected_mdr(&self, seasoning: u32) -> finstack_quant_core::Result<f64>;
 }

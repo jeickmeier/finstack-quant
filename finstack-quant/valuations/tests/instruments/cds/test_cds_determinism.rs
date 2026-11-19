@@ -48,7 +48,9 @@ fn create_test_market(base_date: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    let source = MarketContext::new().insert(disc);
+    let source = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let hazard = test_utils::calibrated_hazard_curve(
         &source,
         base_date,
@@ -57,7 +59,7 @@ fn create_test_market(base_date: Date) -> MarketContext {
         "USD-OIS",
     )
     .unwrap();
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 fn metric_value(

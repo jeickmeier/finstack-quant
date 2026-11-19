@@ -4,7 +4,7 @@ use super::pricer::{
     CdsTranchePricer, INTEGRATION_MAX_DEPTH, INTEGRATION_MAX_EVALS, INTEGRATION_TOLERANCE,
 };
 use finstack_quant_core::math::integration::{adaptive_simpson, adaptive_simpson_pair};
-use finstack_quant_core::math::special_functions::norm_pdf;
+use finstack_quant_core::math::special_functions::{norm_pdf, norm_pdf_unchecked};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::{CopulaSpec, FactorPairIntegrand};
 
@@ -53,7 +53,7 @@ fn integrate_interval(
 
 fn integrate_normal(f: &dyn Fn(f64) -> Result<f64>, tolerance: f64) -> Result<f64> {
     integrate_interval(
-        &|z| Ok(f(z)? * norm_pdf(z)),
+        &|z| Ok(f(z)? * norm_pdf(z)?),
         -NORMAL_LIMIT,
         NORMAL_LIMIT,
         tolerance,
@@ -79,7 +79,7 @@ fn integrate_normal_pair(
         let (first, second) = adaptive_simpson_pair(
             |z| {
                 let (first, second) = f(z)?;
-                let density = norm_pdf(z);
+                let density = norm_pdf_unchecked(z);
                 Ok((
                     finite_integrand(first, z)? * density,
                     finite_integrand(second, z)? * density,
@@ -163,7 +163,7 @@ mod tests {
         let pricer = CdsTranchePricer::new();
         let boundary = 0.123_456_7;
         let amplitude = 1e-4;
-        let expected = amplitude * (1.0 - norm_cdf(boundary));
+        let expected = amplitude * (1.0 - norm_cdf(boundary).expect("valid normal variate"));
         for swapped in [false, true] {
             let (first, second) = pricer
                 .integrate_factors_pair(&|factors| {

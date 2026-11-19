@@ -657,8 +657,10 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         let market = MarketContext::new()
-            .insert(usd)
-            .insert(eur)
+            .try_insert(usd)
+            .expect("insert market curve")
+            .try_insert(eur)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_fx(FxMatrix::new(provider, None));
 

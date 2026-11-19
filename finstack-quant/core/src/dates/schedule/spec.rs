@@ -104,8 +104,7 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
 }
 
 impl ScheduleSpec {
-    /// Check the specification's own consistency (not its dates' grid
-    /// alignment, which generation checks).
+    /// Check the regular grid anchors, frequency, date range and payment conventions.
     ///
     /// # Errors
     ///
@@ -116,7 +115,7 @@ impl ScheduleSpec {
         if self.start >= self.end {
             return Err(crate::InputError::InvalidDateRange.into());
         }
-        self.grid.check_frequency(self.frequency)?;
+        BuilderInternal::from(self).check_grid_anchor()?;
         for lag in [self.payment_lag_days]
             .into_iter()
             .chain(self.fixing_lag_business_days)
@@ -183,9 +182,9 @@ impl NominalReference {
     ///
     /// # Errors
     ///
-    /// Returns an error when the roll is outside the supported date range or
-    /// the tenor arithmetic overflows; the reference is then unavailable even
-    /// if the schedule itself ends before it.
+    /// Returns an error if the anchor or frequency is incompatible with the
+    /// grid, the roll is outside the supported date range, or tenor arithmetic
+    /// overflows.
     pub fn roll_date(&self, n: i32) -> crate::Result<Date> {
         let generator = BuilderInternal {
             start: self.anchor,
@@ -194,6 +193,7 @@ impl NominalReference {
             stub: StubKind::None,
             roll: self.grid,
         };
+        generator.check_grid_anchor()?;
         generator.nth_rolled(self.anchor, n)?.ok_or_else(|| {
             crate::Error::Validation(format!(
                 "nominal roll {n} from {} at {} is outside the supported date range",

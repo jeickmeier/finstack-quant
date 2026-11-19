@@ -602,16 +602,18 @@ mod zspread_quote_tests {
         let payment_date = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
         let deal = StructuredCredit::example().expect("example");
         let discount_curve_id = deal.discount_curve_id.clone();
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder(discount_curve_id.as_str())
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (1.0, 0.95)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("valid curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder(discount_curve_id.as_str())
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.95)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("valid curve"),
+            )
+            .expect("insert market curve");
         let mut context = MetricContext::new(
             Arc::new(deal),
             Arc::new(market),

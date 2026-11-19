@@ -226,7 +226,8 @@ fn test_realized_variance_matches_series_calculation() {
         .map(|(_, p)| *p)
         .collect();
     let manual = realized_variance(&used_prices, Some(annualization_factor))
-        .expect("CloseToClose should succeed");
+        .expect("valid close prices")
+        .expect("observed return");
 
     assert!((rv - manual).abs() < EPSILON);
 }

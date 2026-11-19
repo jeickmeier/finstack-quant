@@ -50,7 +50,7 @@ fn benchmark_eval(c: &mut Criterion) {
                 let compiled =
                     CompiledExpr::new(build_expr(n_cols)).expect("elementwise expression compiles");
 
-                let checked = compiled.eval(&ctx, &cols).expect("preflight eval");
+                let checked = compiled.eval(&ctx, &cols, n_rows).expect("preflight eval");
                 assert_eq!(checked.len(), n_rows);
                 for (row, &actual) in checked.iter().enumerate() {
                     // Scalar reference written independently of the AST/evaluator.
@@ -70,7 +70,7 @@ fn benchmark_eval(c: &mut Criterion) {
 
                 b.iter(|| {
                     let res = compiled
-                        .eval(black_box(&ctx), black_box(&cols))
+                        .eval(black_box(&ctx), black_box(&cols), n_rows)
                         .expect("eval");
                     black_box(res)
                 });

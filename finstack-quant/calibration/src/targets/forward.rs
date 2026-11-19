@@ -899,7 +899,9 @@ mod tests {
         let (_market, report) = ForwardCurveTarget::solve(
             &params,
             &quotes,
-            &MarketContext::new().insert(discount),
+            &MarketContext::new()
+                .try_insert(discount)
+                .expect("insert market curve"),
             &CalibrationConfig::default(),
         )
         .expect("forward calibration");
@@ -978,7 +980,9 @@ mod tests {
             let (curve, report) = ForwardCurveTarget::solve(
                 &params,
                 &[quote],
-                &MarketContext::new().insert(discount),
+                &MarketContext::new()
+                    .try_insert(discount)
+                    .expect("insert market curve"),
                 &CalibrationConfig::default(),
             )
             .expect("forward calibration");
@@ -1068,7 +1072,9 @@ mod tests {
                 let (curve, report) = ForwardCurveTarget::solve(
                     &params,
                     std::slice::from_ref(&quote),
-                    &MarketContext::new().insert(discount.clone()),
+                    &MarketContext::new()
+                        .try_insert(discount.clone())
+                        .expect("insert market curve"),
                     &CalibrationConfig::default(),
                 )
                 .expect("future calibration");
@@ -1102,7 +1108,9 @@ mod tests {
                 } else {
                     future
                         .model_settlement_rate(
-                            &MarketContext::new().insert(curve.clone()),
+                            &MarketContext::new()
+                                .try_insert(curve.clone())
+                                .expect("insert market curve"),
                             base_date,
                         )
                         .expect("arithmetic-average settlement rate")

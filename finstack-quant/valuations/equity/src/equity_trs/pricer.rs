@@ -375,7 +375,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut trs = EquityTotalReturnSwap::example().expect("TRS");
         trs.financing_leg.discount_curve_id = CurveId::new("DISC");
         trs.discrete_dividends = vec![(date(2025, 2, 15), 5.0)];
@@ -413,7 +415,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let context = MarketContext::new().insert(disc);
+        let context = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let mut trs = EquityTotalReturnSwap::example().expect("example TRS");
         trs.financing_leg.discount_curve_id = CurveId::new("DISC");
@@ -469,7 +473,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let context = MarketContext::new().insert(disc.clone());
+        let context = MarketContext::new()
+            .try_insert(disc.clone())
+            .expect("insert market curve");
 
         let dividend = 5.0;
         let mut with_div = EquityTotalReturnSwap::example().expect("example TRS");
@@ -549,10 +555,13 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        MarketContext::new().insert(disc).insert_price(
-            "SPX-SPOT",
-            MarketScalar::unitless(spot).expect("valid scalar"),
-        )
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(spot).expect("valid scalar"),
+            )
     }
 
     fn mid_period_trs() -> EquityTotalReturnSwap {

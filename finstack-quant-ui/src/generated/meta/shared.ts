@@ -6839,7 +6839,7 @@ export default [
   {
     "path": "#/$defs/CommodityForward/properties/spot_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommodityForward/properties/spot_id",
-    "description": "Optional spot price ID (for delta calculations)."
+    "description": "Optional observed spot identifier. At maturity the scalar is the delivery\nobservation. After maturity use the exact delivery observation in the\ncorresponding `FIXING:{spot_id}` series. Before maturity an explicitly\nidentified spot can supply the cost-of-carry input if the forward curve is absent."
   },
   {
     "path": "#/$defs/CommodityForward/properties/spot_id/anyOf/0",
@@ -14434,7 +14434,7 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve",
-    "description": "A finite, left-continuous piecewise-constant curve."
+    "description": "A finite, right-continuous piecewise-constant curve."
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times",
@@ -14443,7 +14443,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/times/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values",
@@ -14452,7 +14453,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_d30540ea90ce7eca3dee",
@@ -18174,7 +18176,7 @@ export default [
     "path": "#/$defs/Function/oneOf/39",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/39",
     "const": "pow",
-    "description": "Exponentiation (`pow(base, exp)`), computed as `base^exp` with IEEE 754\nsemantics: `pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf, and overflow\nsaturates to ±inf."
+    "description": "Exponentiation (`pow(base, exponent)`). Core rejects domain and overflow errors."
   },
   {
     "path": "#/$defs/Function/oneOf/4",
@@ -18186,7 +18188,7 @@ export default [
     "path": "#/$defs/Function/oneOf/40",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/40",
     "const": "round",
-    "description": "Round to a number of decimal digits (`round(expr[, digits])`).\n\nTies round half away from zero (Excel convention): `round(2.5)` is 3,\n`round(-2.5)` is -3. `digits` defaults to 0 and may be negative to\nround to tens/hundreds (`round(1234, -2)` is 1200). Non-finite inputs\npass through unchanged."
+    "description": "Quantize the represented value to a decimal place, with ties away from zero.\nDigits default to zero. Core requires a direct, integral i32 literal."
   },
   {
     "path": "#/$defs/Function/oneOf/41",
@@ -18204,37 +18206,37 @@ export default [
     "path": "#/$defs/Function/oneOf/43",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/43",
     "const": "ln",
-    "description": "Natural logarithm (`ln(expr)`), IEEE semantics: `ln(0)` is -inf and\n`ln(x)` for `x < 0` is NaN."
+    "description": "Natural logarithm of a positive operand (`ln(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/44",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/44",
     "const": "exp",
-    "description": "Natural exponential (`exp(expr)`); overflow saturates to +inf."
+    "description": "Natural exponential (`exp(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/45",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/45",
     "const": "log10",
-    "description": "Base-10 logarithm (`log10(expr)`), IEEE semantics: `log10(0)` is -inf\nand `log10(x)` for `x < 0` is NaN."
+    "description": "Base-10 logarithm of a positive operand (`log10(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/46",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/46",
     "const": "sqrt",
-    "description": "Square root (`sqrt(expr)`), IEEE semantics: `sqrt(x)` for `x < 0` is\nNaN."
+    "description": "Square root of a nonnegative operand (`sqrt(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/47",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/47",
     "const": "clamp",
-    "description": "Clamp a value to an inclusive range (`clamp(expr, lo, hi)`),\nequivalent to `min(max(expr, lo), hi)`. Returns NaN when any argument\nis NaN or when `lo > hi`; it never panics on an inverted range."
+    "description": "Restrict a value to ordered, inclusive finite bounds (`clamp(expr, lo, hi)`).\nMissing operands propagate and infinite operands fail."
   },
   {
     "path": "#/$defs/Function/oneOf/48",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/48",
     "const": "is_missing",
-    "description": "Missing-value predicate (`is_missing(expr)`), returning 1 when the\nvalue is non-finite (NaN or ±inf) and 0 otherwise — the same\n\"finite\" convention used by `coalesce`."
+    "description": "Missing-value predicate (`is_missing(expr)`); core admits NaN as its missing sentinel."
   },
   {
     "path": "#/$defs/Function/oneOf/5",
@@ -23791,13 +23793,6 @@ export default [
     "description": "Rate quoted as settlement currency per base currency (e.g., 0.138 USD per CNY).\nSettlement = Notional_base × (F_fixing - F_contract)"
   },
   {
-    "path": "#/$defs/NonNegativeF64Wire",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NonNegativeF64Wire",
-    "description": "Finite JSON number greater than or equal to zero.",
-    "format": "double",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/Notional",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Notional",
     "description": "Notional amount with an optional amortisation rule.\n\nCombines initial principal with amortization behavior for complete\nnotional lifecycle management."
@@ -27946,50 +27941,43 @@ export default [
   {
     "path": "#/$defs/SabrParameters",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters",
-    "description": "SABR model parameters"
+    "description": "Parameters of a SABR backbone, with an optional signed rate displacement."
   },
   {
     "path": "#/$defs/SabrParameters/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/alpha",
-    "description": "Initial volatility (alpha)",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PositiveF64Wire"
+    "description": "Initial volatility level, strictly positive.",
+    "exclusiveMinimum": 0,
+    "format": "double"
   },
   {
     "path": "#/$defs/SabrParameters/properties/beta",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/beta",
-    "description": "CEV exponent (beta) - typically 0 to 1",
-    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClosedUnitIntervalF64Wire"
+    "description": "CEV exponent in the closed interval `[0, 1]`.",
+    "format": "double",
+    "maximum": 1,
+    "minimum": 0
   },
   {
     "path": "#/$defs/SabrParameters/properties/nu",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/nu",
-    "description": "Volatility of volatility (nu/volvol)",
-    "ref": "#/$defs/NonNegativeF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NonNegativeF64Wire"
+    "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/SabrParameters/properties/rho",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/rho",
-    "description": "Correlation between asset and volatility (rho)",
-    "ref": "#/$defs/CorrelationWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CorrelationWire"
+    "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+    "exclusiveMaximum": 1,
+    "exclusiveMinimum": -1,
+    "format": "double"
   },
   {
     "path": "#/$defs/SabrParameters/properties/shift",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/shift",
-    "description": "Shift parameter for handling negative rates (optional)"
-  },
-  {
-    "path": "#/$defs/SabrParameters/properties/shift/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/shift/anyOf/0",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/SabrParameters/properties/shift/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/shift/anyOf/1"
+    "description": "Optional finite displacement applied to forward and strike.",
+    "format": "double"
   },
   {
     "path": "#/$defs/ScheduledFee",
@@ -29746,7 +29734,7 @@ export default [
   {
     "path": "#/$defs/Swaption/properties/vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Swaption/properties/vol_surface_id",
-    "description": "Volatility surface ID for option pricing",
+    "description": "Volatility source ID for option pricing. A dated SABR cube needs an\nACT/365F expiry clock anchored at the valuation date.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -33268,12 +33256,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/NdfQuoteConvention",
     "ref": "#/$defs/NdfQuoteConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfQuoteConvention"
-  },
-  {
-    "path": "#/properties/NonNegativeF64Wire",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/NonNegativeF64Wire",
-    "ref": "#/$defs/NonNegativeF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NonNegativeF64Wire"
   },
   {
     "path": "#/properties/Notional",

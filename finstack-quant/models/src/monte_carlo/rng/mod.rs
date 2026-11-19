@@ -1,7 +1,7 @@
 //! Random number generation for Monte Carlo simulation.
 //!
 //! Provides counter-based RNGs (Philox) for deterministic parallel simulation
-//! and quasi-Monte Carlo sequences (Sobol with Owen scrambling).
+//! and quasi-Monte Carlo sequences (Sobol with prefix hash scrambling).
 //!
 //! # RNG Selection: Philox vs MT19937
 //!
@@ -63,5 +63,4 @@
 
 pub mod fbm;
 pub mod philox;
-mod sobol;
 pub mod volterra;

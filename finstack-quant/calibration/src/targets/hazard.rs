@@ -427,7 +427,7 @@ impl HazardCurveTarget {
         let mut report = report;
         report.update_solver_config(config.solver.clone());
 
-        let calibrated_context = context.clone().insert(curve.clone());
+        let calibrated_context = context.clone().try_insert(curve.clone())?;
         let mut par_points = Vec::with_capacity(prepared_quotes.len());
         let mut calibration_inputs = Vec::with_capacity(prepared_quotes.len());
         let mut spread_risk_inputs = Vec::with_capacity(prepared_quotes.len());

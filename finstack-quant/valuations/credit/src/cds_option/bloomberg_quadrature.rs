@@ -63,7 +63,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_core::math::special_functions::norm_pdf;
+use finstack_quant_core::math::special_functions::{norm_pdf, norm_pdf_unchecked};
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::OptionType;
@@ -604,6 +604,16 @@ impl ForwardCdsContext {
 /// at `s_par` and expand multiplicatively (doubling outward) until a sign
 /// change is found. Empirically 4–10 quadrature evaluations are needed
 /// versus the prior 200-step linear scan (~48k evals per NPV).
+///
+/// # Arguments
+///
+/// * `ctx` - Forward CDS valuation inputs including the decimal par spread,
+///   volatility, time to expiry in years, and the observed forward value.
+///
+/// # Errors
+///
+/// Returns an error for unsupported distressed spreads, an invalid quadrature
+/// grid or value, or a failed bracket or solve.
 pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
     if ctx.forward_par_spread > DISTRESSED_FORWARD_SPREAD_LIMIT {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -617,7 +627,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
     let s0 = (-0.5 * ctx.sigma * ctx.sigma * t_expiry).exp();
     let sigma_sqrt_t = ctx.sigma * t_expiry.sqrt();
 
-    let expected_v_te = |m: f64| -> f64 {
+    let expected_v_te = |m: f64| -> Result<f64> {
         normal_integral(
             bloomberg_cdso::Z_STEP,
             z_limit(ctx.sigma, ctx.t_expiry),
@@ -628,7 +638,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
         )
     };
 
-    let f = |log_m: f64| -> f64 { expected_v_te(log_m.exp()) - target };
+    let f = |log_m: f64| -> Result<f64> { Ok(expected_v_te(log_m.exp())? - target) };
 
     // Hard bounds (same as before): `m ∈ [1e-8, 100]` covers spreads from
     // sub-bp to fully distressed; we never let the bracket escape these.
@@ -641,7 +651,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
     // to be safe for degenerate inputs).
     let m_seed = ctx.forward_par_spread.clamp(1e-8, 100.0);
     let log_seed = m_seed.ln().clamp(LOG_M_LO, LOG_M_HI);
-    let f_seed = f(log_seed);
+    let f_seed = f(log_seed)?;
     if f_seed == 0.0 {
         return Ok(log_seed.exp());
     }
@@ -668,7 +678,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
         let x_lo_new = (log_seed - widen).max(LOG_M_LO);
         let x_hi_new = (log_seed + widen).min(LOG_M_HI);
         if x_lo_new < lo_x {
-            let f_new = f(x_lo_new);
+            let f_new = f(x_lo_new)?;
             if f_new.is_finite() && f_new * lo_f <= 0.0 {
                 bracket = Some((x_lo_new, lo_x));
                 break;
@@ -677,7 +687,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
             lo_f = f_new;
         }
         if x_hi_new > hi_x {
-            let f_new = f(x_hi_new);
+            let f_new = f(x_hi_new)?;
             if f_new.is_finite() && f_new * hi_f <= 0.0 {
                 bracket = Some((hi_x, x_hi_new));
                 break;
@@ -697,7 +707,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
         )));
     };
     let solver = BrentSolver::new(1e-12, 100)?;
-    let log_m = solver.solve_in_bracket(|x| Ok(f(x)), bracket_lo, bracket_hi)?;
+    let log_m = solver.solve_in_bracket(f, bracket_lo, bracket_hi)?;
     Ok(log_m.exp())
 }
 
@@ -758,7 +768,7 @@ pub fn quadrature_payoff(
     let limit = z_limit(ctx.sigma, t_expiry);
     let density_weighted_payoff = |z: f64| {
         let s = m * s0 * (sigma_sqrt_t * z).exp();
-        (sign * ctx.swap_value_per_n(s) + h_k + d_loss).max(0.0) * norm_pdf(z)
+        (sign * ctx.swap_value_per_n(s) + h_k + d_loss).max(0.0) * norm_pdf_unchecked(z)
     };
     // Refine the exercise kink instead of sampling it on the calibration
     // grid. Seed half-standard-deviation panels so a small tail exercise
@@ -794,25 +804,57 @@ pub fn quadrature_payoff(
 /// driver grid for normal market vols. The legacy `4·σ√t` guard is retained
 /// only for extreme stress inputs so the integration range never narrows
 /// relative to the prior high-vol protection.
+///
+/// # Arguments
+///
+/// * `sigma` - Annualized lognormal spread volatility as a decimal.
+/// * `t_expiry` - Remaining volatility horizon in years, floored at zero.
 #[doc(hidden)]
 pub fn z_limit(sigma: f64, t_expiry: f64) -> f64 {
     bloomberg_cdso::MIN_Z_LIMIT.max(4.0 * sigma * t_expiry.max(0.0).sqrt())
 }
 
 /// Integrate a function against the standard-normal density on `[-limit, limit]`.
+///
+/// # Arguments
+///
+/// * `step` - Positive target spacing in standard deviations. The nearest whole
+///   number of trapezoids spans the requested integration interval.
+/// * `limit` - Positive finite integration half-width in standard deviations.
+/// * `value_at` - Finite conditional value evaluated at each normal variate.
+///
+/// # Errors
+///
+/// Returns an error for an unrepresentable grid, non-finite node value, or sum overflow.
 #[doc(hidden)]
-pub fn normal_integral<F>(step: f64, limit: f64, mut value_at: F) -> f64
+pub fn normal_integral<F>(step: f64, limit: f64, mut value_at: F) -> Result<f64>
 where
     F: FnMut(f64) -> f64,
 {
-    let n_steps = ((2.0 * limit) / step).round() as usize;
-    let mut acc = 0.0;
-    for i in 0..=n_steps {
-        let z = -limit + (i as f64) * step;
-        let weight = if i == 0 || i == n_steps { 0.5 } else { 1.0 };
-        acc += weight * value_at(z) * norm_pdf(z);
+    if !step.is_finite() || step <= 0.0 || !limit.is_finite() || limit <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "normal quadrature requires positive finite node spacing and limit".into(),
+        ));
     }
-    acc * step
+    let count = ((2.0 * limit) / step).round();
+    if !(1.0..usize::MAX as f64).contains(&count) {
+        return Err(finstack_quant_core::Error::Validation(
+            "normal quadrature requires a representable positive panel count".into(),
+        ));
+    }
+    let n_steps = count as usize;
+    let width = 2.0 * limit / count;
+    let mut sum = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    for i in 0..=n_steps {
+        let z = if i == n_steps {
+            limit
+        } else {
+            -limit + (i as f64) * width
+        };
+        let weight = if i == 0 || i == n_steps { 0.5 } else { 1.0 };
+        sum.add(weight * width * norm_pdf(z)? * value_at(z))?;
+    }
+    sum.get_total()
 }
 
 #[cfg(test)]
@@ -860,8 +902,10 @@ mod tests {
 
     fn market(as_of: Date) -> MarketContext {
         MarketContext::new()
-            .insert(flat_discount("USD-OIS", as_of, 0.03))
-            .insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02))
+            .try_insert(flat_discount("USD-OIS", as_of, 0.03))
+            .expect("insert market curve")
+            .try_insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02))
+            .expect("insert market curve")
     }
 
     fn option(as_of: Date, option_type: OptionType, strike_bp: f64, vol: f64) -> CdsOption {
@@ -931,7 +975,7 @@ mod tests {
             * (0.319_381_530
                 + t * (-0.356_563_782
                     + t * (1.781_477_937 + t * (-1.821_255_978 + t * 1.330_274_429))));
-        let tail = norm_pdf(x) * poly;
+        let tail = norm_pdf(x).expect("valid normal variate") * poly;
         if x >= 0.0 { 1.0 - tail } else { tail }
     }
 
@@ -951,13 +995,23 @@ mod tests {
     }
 
     #[test]
+    fn normal_quadrature_rejects_invalid_grids_and_node_values() {
+        for (step, limit) in [(0.0, 6.0), (0.05, f64::INFINITY), (f64::from_bits(1), 6.0)] {
+            assert!(normal_integral(step, limit, |_| 1.0).is_err());
+        }
+        assert!(normal_integral(0.05, 6.0, |_| f64::NAN).is_err());
+    }
+
+    #[test]
     fn normal_quadrature_converges_when_step_is_halved() {
         let coarse = normal_integral(0.05, bloomberg_cdso::MIN_Z_LIMIT, |z| {
             (0.30 * z).exp().max(0.0)
-        });
+        })
+        .expect("valid quadrature grid");
         let fine = normal_integral(0.025, bloomberg_cdso::MIN_Z_LIMIT, |z| {
             (0.30 * z).exp().max(0.0)
-        });
+        })
+        .expect("valid quadrature grid");
         assert!(
             (coarse - fine).abs() < 1e-8,
             "normal quadrature should be stable under step halving: coarse={coarse}, fine={fine}",
@@ -1001,7 +1055,9 @@ mod tests {
         let bumped_hazard = hazard
             .with_parallel_hazard_rate_bump_bp(1.0)
             .expect("bumped hazard");
-        let bumped_market = market.insert(bumped_hazard);
+        let bumped_market = market
+            .try_insert(bumped_hazard)
+            .expect("insert market curve");
         let bumped_ctx = context_for(&option, &bumped_market, as_of, 0.30);
 
         assert!(
@@ -1079,8 +1135,10 @@ mod tests {
     fn calibration_rejects_distressed_forward_spreads() {
         let as_of = date!(2025 - 01 - 01);
         let distressed_market = MarketContext::new()
-            .insert(flat_discount("USD-OIS", as_of, 0.03))
-            .insert(flat_hazard("HZ-SN", as_of, 0.4, 0.25));
+            .try_insert(flat_discount("USD-OIS", as_of, 0.03))
+            .expect("insert market curve")
+            .try_insert(flat_hazard("HZ-SN", as_of, 0.4, 0.25))
+            .expect("insert market curve");
         let option = option(as_of, OptionType::Call, 100.0, 0.30);
         let ctx = context_for(&option, &distressed_market, as_of, 0.30);
 
@@ -1592,8 +1650,10 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let mkt = market(as_of);
         let wider_spread_market = MarketContext::new()
-            .insert(flat_discount("USD-OIS", as_of, 0.03))
-            .insert(flat_hazard("HZ-SN", as_of, 0.4, 0.03));
+            .try_insert(flat_discount("USD-OIS", as_of, 0.03))
+            .expect("insert market curve")
+            .try_insert(flat_hazard("HZ-SN", as_of, 0.4, 0.03))
+            .expect("insert market curve");
         let vol = 0.40;
 
         let payer_low =
@@ -1738,8 +1798,10 @@ mod tests {
         fn index_parity_contains_front_end_protection_once() {
             let as_of = date!(2025 - 01 - 01);
             let curves = MarketContext::new()
-                .insert(flat_discount("USD-OIS", as_of, 0.0))
-                .insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02));
+                .try_insert(flat_discount("USD-OIS", as_of, 0.0))
+                .expect("insert market curve")
+                .try_insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02))
+                .expect("insert market curve");
             let mut payer = option_with_coupon(as_of, OptionType::Call, 100.0, 100.0, 0.3);
             payer.underlying_is_index = true;
             payer.knockout = false;
@@ -1782,8 +1844,10 @@ mod tests {
         fn knockout_forward_excludes_pre_expiry_defaults() {
             let as_of = date!(2025 - 01 - 01);
             let curves = MarketContext::new()
-                .insert(flat_discount("USD-OIS", as_of, 0.0))
-                .insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02));
+                .try_insert(flat_discount("USD-OIS", as_of, 0.0))
+                .expect("insert market curve")
+                .try_insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02))
+                .expect("insert market curve");
             let mut option = option_with_coupon(as_of, OptionType::Call, 100.0, 100.0, 0.3);
             option.knockout = true;
             let ctx = context_for(&option, &curves, as_of, 0.3);

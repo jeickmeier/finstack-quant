@@ -183,7 +183,7 @@ use time::macros::date;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let as_of = date!(2025 - 01 - 01);
-    let mut market = MarketContext::new().insert(
+    let mut market = MarketContext::new().try_insert(
         DiscountCurve::builder("USD_SOFR")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
@@ -191,7 +191,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .extrapolation(ExtrapolationPolicy::Extend)
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()?,
-    );
+    )?;
 
     let scenario = ScenarioSpec {
         id: "stress_test".into(),

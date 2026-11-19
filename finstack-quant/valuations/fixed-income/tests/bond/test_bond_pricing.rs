@@ -48,7 +48,9 @@ fn create_test_market(base_date: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 #[test]

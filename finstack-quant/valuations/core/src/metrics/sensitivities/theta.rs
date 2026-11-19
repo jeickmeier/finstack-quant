@@ -50,6 +50,11 @@
 //!   observations, cliquet resets) record the `as_of` spot, and a trade struck
 //!   at `as_of` records that spot as its strike-set level.
 //!
+//! A European swaption backed by a dated SABR cube holds the admitted opening
+//! quote at its contractual expiry and tenor, preserving the cube's original
+//! clock and displacement. Its rolled pricing formula uses the remaining
+//! option time and the conditioned rates.
+//!
 //! The `as_of` valuation and the period cash use the instrument unchanged,
 //! and ordinary pricing still requires recorded state for past observations.
 //! Coupon fixings the roll crosses are projected from the pre-roll cashflow

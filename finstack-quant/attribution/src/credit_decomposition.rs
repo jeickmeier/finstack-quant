@@ -530,8 +530,10 @@ mod tests {
         let instrument: Arc<dyn Instrument> = Arc::new(bond);
         let model = make_model();
         let market_t0 = MarketContext::new()
-            .insert(flat_discount(t0, r))
-            .insert(flat_hazard(curve_id.as_str(), t0, hazard_rate, recovery));
+            .try_insert(flat_discount(t0, r))
+            .expect("insert market curve")
+            .try_insert(flat_hazard(curve_id.as_str(), t0, hazard_rate, recovery))
+            .expect("insert market curve");
 
         let mut attribution = PnlAttribution::new(
             Money::from((0_i64, Currency::USD)),

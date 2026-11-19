@@ -61,7 +61,8 @@ mod cv_notional_tests {
             .build()
             .expect("vol surface");
         MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "SPX",

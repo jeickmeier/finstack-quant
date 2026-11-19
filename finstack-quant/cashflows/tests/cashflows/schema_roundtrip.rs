@@ -657,7 +657,10 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
         finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixing series builds");
-    let market = MarketContext::new().insert(fwd).insert_series(series);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve")
+        .insert_series(series);
     let market_json = serde_json::to_string(&market).expect("market context serializes");
     assert!(
         market_json.contains("FIXING:USD-SOFR-3M"),

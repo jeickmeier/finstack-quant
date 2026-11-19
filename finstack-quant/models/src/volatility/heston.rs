@@ -471,7 +471,8 @@ fn bs_reference(spot: f64, strike: f64, r: f64, q: f64, t: f64, vol: f64, is_cal
     let d1 = ((spot / strike).ln() + (r - q + 0.5 * vol * vol) * t) / (vol * sqrt_t);
     let d2 = d1 - vol * sqrt_t;
 
-    let call = spot * (-q * t).exp() * norm_cdf(d1) - strike * (-r * t).exp() * norm_cdf(d2);
+    let call = spot * (-q * t).exp() * norm_cdf(d1).expect("valid Gaussian variate")
+        - strike * (-r * t).exp() * norm_cdf(d2).expect("valid Gaussian variate");
 
     if is_call {
         call.max(0.0)

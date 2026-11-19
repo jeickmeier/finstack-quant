@@ -90,7 +90,7 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 | `math::interp` | `Interpolator`, `InterpStyle`, `ExtrapolationPolicy`, `ValidationPolicy` and the strategies (`LinearStrategy`, `LogLinearStrategy`, `CubicHermiteStrategy`, `MonotoneConvexStrategy`, `PiecewiseQuadraticForwardStrategy`). |
 | `math::solver` / `math::solver_multi` | `BrentSolver` and `LevenbergMarquardtSolver` for root finding and least-squares calibration. |
 | `math::integration` | Gauss-Legendre (fixed, composite, adaptive), Gauss-Hermite. |
-| `math::random` | `Pcg64Rng`, `RandomNumberGenerator`, `SobolRng` (up to `MAX_SOBOL_DIMENSION` = 40), `BrownianBridge`, Poisson inversion, `box_muller_transform`. |
+| `math::random` | `Pcg64Rng`, `RandomNumberGenerator`, `SobolRng` (up to `MAX_SOBOL_DIMENSION` = 40), `BrownianBridge`, Poisson inversion, `box_muller`. |
 | `math::distributions` / `math::probability` | Binomial and chi-squared helpers, `CorrelatedBernoulli`, `correlation_bounds`. |
 | `math::Compounding` | `Compounding` conversions between simple, periodic, and continuous rates. |
 | `math::{time_grid, piecewise, fractional}` | `TimeGrid` with `map_date_to_step`/`map_exercise_dates_to_steps`; validated left-continuous piecewise-constant curves; `HurstExponent` and fractional-Brownian-motion increment covariances (scalar and matrix). |
@@ -122,7 +122,10 @@ evaluator over `&[f64]` columns. `Expr`/`ExprNode` build the AST and
 elementwise subset (`abs`, `pow`, `round`, `clamp`, operators, conditionals)
 and rejects the windowed, cumulative, reducing and period-aware functions,
 which only the `statements` per-period evaluator runs. `SimpleContext` maps
-column names to positions and `eval` returns one value per row. The
+column names to positions. `eval(ctx, cols, num_rows)` requires all columns to
+match the declared row count. NaN inputs represent missing data. Invalid
+finite computations report their row and DAG node, including computations in
+unselected branches. The
 in-workspace caller of `CompiledExpr::eval` is the valuations
 composite instrument.
 
@@ -168,7 +171,7 @@ fn main() -> finstack_quant_core::Result<()> {
         .build()?;
 
     // MarketContext is immutable; `insert` returns a new context.
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new().try_insert(curve)?;
     let usd_ois = market.get_discount("USD-OIS")?; // Arc<DiscountCurve>
 
     let flows = [

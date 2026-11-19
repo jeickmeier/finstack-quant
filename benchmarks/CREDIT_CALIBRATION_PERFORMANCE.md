@@ -342,7 +342,9 @@ persistent pricing-cache memory.
 
 ## BC5: prepared binomial log coefficients
 
-The core PMF now shares one recurrence implementation between one-off and
+These historical timings describe the log-coefficient implementation at BC5.
+The current PMF uses mode-centered outward probability ratios and requires no
+coefficient cache. At BC5 the core shared one recurrence between one-off and
 prepared callers. Preparation stores the unchanged `ln(N-k) - ln(k+1)`
 expressions; conditional probabilities, normalization and accumulation order
 are unchanged. A preparation-local Arc shares one lazy coefficient vector

@@ -248,6 +248,10 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       base: string;
       /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
+      /**
        * Day count convention
        */
       day_count:
@@ -282,13 +286,9 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: "price" | "vol_index";
       type: "price";
     }
   | {
@@ -2673,6 +2673,7 @@ export interface D_8292Ddf9415F5B0B91Bb {
    * Option expiries in years, strictly increasing. Indexes the first axis.
    */
   expiries: number[];
+  expiry_clock?: DD7C93A9D6D6Ba5Ccd0Ac | null;
   /**
    * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
    */

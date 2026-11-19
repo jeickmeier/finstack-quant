@@ -50,7 +50,7 @@ fn swap_position(id: &str, csa: CsaSpec) -> Position {
 fn bilateral_irs_portfolio_margin_reports_finite_im_and_positive_zero_vm() {
     let as_of = date!(2023 - 12 - 28);
     let market = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, (-0.04_f64 * 10.0).exp())])
@@ -60,10 +60,12 @@ fn bilateral_irs_portfolio_margin_reports_finite_im_and_positive_zero_vm() {
                 .build()
                 .expect("USD-OIS curve builds"),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             ForwardCurve::flat("USD-SOFR-3M", as_of, 0.04, DayCount::Act360)
                 .expect("USD-SOFR-3M curve builds"),
-        );
+        )
+        .expect("insert market curve");
 
     let usd = CsaSpec::usd_regulatory().expect("USD regulatory CSA");
     let csa_b = CsaSpec::regulatory_for_currency(Currency::USD, "CSA-B", "USD-OIS")

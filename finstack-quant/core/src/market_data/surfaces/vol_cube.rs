@@ -60,6 +60,7 @@ pub struct VolCube {
     /// Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
     forwards: Vec<f64>,
     interpolation_mode: VolInterpolationMode,
+    expiry_clock: Option<VolatilityClock>,
 }
 
 /// Raw serializable state of a VolCube.
@@ -80,6 +81,8 @@ struct VolCubeWire {
     pub forwards: Vec<f64>,
     /// How volatilities are interpolated between the cube's grid points.
     pub interpolation_mode: VolInterpolationMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    expiry_clock: Option<VolatilityClock>,
 }
 
 impl From<VolCube> for VolCubeWire {
@@ -91,6 +94,7 @@ impl From<VolCube> for VolCubeWire {
             params: cube.params,
             forwards: cube.forwards,
             interpolation_mode: cube.interpolation_mode,
+            expiry_clock: cube.expiry_clock,
         }
     }
 }
@@ -99,18 +103,21 @@ impl TryFrom<VolCubeWire> for VolCube {
     type Error = crate::Error;
 
     fn try_from(raw: VolCubeWire) -> crate::Result<Self> {
-        Ok(VolCube::from_grid(
+        let mut cube = VolCube::from_grid(
             &raw.id,
             &raw.expiries,
             &raw.tenors,
             &raw.params,
             &raw.forwards,
         )?
-        .with_interpolation_mode(raw.interpolation_mode))
+        .with_interpolation_mode(raw.interpolation_mode);
+        cube.expiry_clock = raw.expiry_clock;
+        Ok(cube)
     }
 }
 
 use super::validate_axis;
+use crate::dates::VolatilityClock;
 
 // VolCube impl — construction and accessors
 
@@ -126,7 +133,7 @@ impl VolCube {
     ///
     /// # Arguments
     ///
-    /// * `id` - Market-data identifier stored on the cube and used for context lookup.
+    /// * `id` - Nonblank market-data identifier stored on the cube and used for context lookup.
     /// * `expiries` - Strictly increasing option expiries in year-fraction units.
     /// * `tenors` - Strictly ordered tenor coordinates in year-fraction units.
     /// * `params` - SABR nodes in expiry-major, tenor-minor row order, one per grid point.
@@ -138,6 +145,11 @@ impl VolCube {
         params: &[SabrParameterData],
         forwards: &[f64],
     ) -> crate::Result<Self> {
+        if id.as_ref().trim().is_empty() {
+            return Err(crate::Error::Validation(
+                "vol cube id cannot be blank".to_owned(),
+            ));
+        }
         validate_axis(expiries)?;
         validate_axis(tenors)?;
         if expiries.iter().any(|&value| value <= 0.0) || tenors.iter().any(|&value| value <= 0.0) {
@@ -162,7 +174,23 @@ impl VolCube {
             params: params.to_vec(),
             forwards: forwards.to_vec(),
             interpolation_mode: VolInterpolationMode::Vol,
+            expiry_clock: None,
         })
+    }
+
+    /// Source clock used to measure option expiry, when available.
+    pub const fn expiry_clock(&self) -> Option<&VolatilityClock> {
+        self.expiry_clock.as_ref()
+    }
+
+    /// Attach the source clock without transforming existing expiry coordinates.
+    ///
+    /// # Arguments
+    ///
+    /// * `clock` - Origin and day count originally used for the stored option expiry.
+    pub fn with_expiry_clock(mut self, clock: VolatilityClock) -> Self {
+        self.expiry_clock = Some(clock);
+        self
     }
 
     /// Unique identifier.

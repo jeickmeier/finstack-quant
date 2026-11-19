@@ -1,28 +1,10 @@
 //! Special mathematical functions for financial computation.
 //!
-//! This module provides numerically stable implementations of special functions
-//! commonly used in financial mathematics, including the error function, normal
-//! distribution functions, and their inverses.
-//!
-//! **Implementation Note**: As of version 0.3.0, these functions are thin wrappers
-//! around the battle-tested [`statrs`](https://crates.io/crates/statrs) crate,
-//! which provides highly accurate, SIMD-optimized implementations.
-//!
-//! # Functions
-//!
-//! - [`erf`]: Error function (wrapper around `statrs`)
-//! - [`norm_cdf`]: Standard normal cumulative distribution function (Φ)
-//! - [`norm_pdf`]: Standard normal probability density function (φ)
-//! - [`standard_normal_inv_cdf`]: Inverse standard normal CDF (Φ⁻¹)
-//!
-//! # Numerical Accuracy
-//!
-//! The `statrs` implementations prioritize:
-//! - **Tail accuracy**: Critical for risk metrics (VaR, CVaR) and copula models
-//! - **Boundary stability**: Proper handling of extreme values (±∞)
-//! - **Determinism**: Identical results across platforms and compilers
-//! - **Performance**: SIMD optimizations where available
-//! - **Battle-tested**: Widely used in the Rust ecosystem
+//! Checked evaluations of the error function, positive-real log-Gamma,
+//! normal probabilities and densities, and Student-t distributions.
+//! Gaussian evaluations use the existing statrs kernels where applicable.
+//! Student-t tails and inverse probabilities use bounded incomplete-beta
+//! calculations.
 //!
 //! # Use Cases
 //!
@@ -30,7 +12,6 @@
 //! - **Implied volatility**: Inverse CDF needed for smile calibration
 //! - **Risk metrics**: VaR calculation uses Φ⁻¹(confidence level)
 //! - **Copula models**: Credit correlation and CDO tranching
-//! - **Monte Carlo**: Box-Muller transform uses Φ⁻¹
 //!
 //! # Examples
 //!
@@ -40,15 +21,15 @@
 //! use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf, standard_normal_inv_cdf};
 //!
 //! // Standard normal CDF at zero should be 0.5
-//! assert!((norm_cdf(0.0) - 0.5).abs() < 1e-6);
+//! assert!((norm_cdf(0.0).expect("valid variate") - 0.5).abs() < 1e-6);
 //!
 //! // PDF at zero is 1/√(2π)
 //! let expected = 1.0 / (2.0 * std::f64::consts::PI).sqrt();
-//! assert!((norm_pdf(0.0) - expected).abs() < 1e-6);
+//! assert!((norm_pdf(0.0).expect("valid variate") - expected).abs() < 1e-6);
 //!
 //! // Round-trip test for inverse CDF
-//! let x = standard_normal_inv_cdf(0.84);
-//! let p_back = norm_cdf(x);
+//! let x = standard_normal_inv_cdf(0.84).expect("valid probability");
+//! let p_back = norm_cdf(x).expect("valid variate");
 //! assert!((p_back - 0.84).abs() < 1e-3);
 //! ```
 //!
@@ -62,7 +43,7 @@
 //!     let d1 = ((s / k).ln() + (r + 0.5 * vol * vol) * t) / (vol * t.sqrt());
 //!     let d2 = d1 - vol * t.sqrt();
 //!
-//!     s * norm_cdf(d1) - k * (-r * t).exp() * norm_cdf(d2)
+//!     s * norm_cdf(d1).expect("valid variate") - k * (-r * t).exp() * norm_cdf(d2).expect("valid variate")
 //! }
 //!
 //! let call_price = black_scholes_call(100.0, 100.0, 0.05, 0.2, 1.0);
@@ -71,7 +52,7 @@
 //!
 //! # References
 //!
-//! - **statrs crate**: The underlying implementation for all special functions.
+//! - **statrs crate**: The underlying implementation for erf and Gaussian CDF and inverse CDF.
 //!   See <https://github.com/statrs-dev/statrs> for implementation details and accuracy benchmarks.
 //!
 //! - **Error Function**:
@@ -94,6 +75,9 @@
 use std::sync::LazyLock;
 
 use statrs::distribution::Normal;
+
+#[path = "special_functions_student_t.rs"]
+mod student_t;
 
 /// Static standard normal distribution N(0, 1) for performance.
 ///
@@ -122,7 +106,11 @@ static STANDARD_NORMAL: LazyLock<Normal> = LazyLock::new(Normal::standard);
 ///
 /// # Returns
 ///
-/// The error function erf(x) ∈ (-1, 1)
+/// The error function erf(x) in `[-1, 1]`. Infinite inputs return
+/// the corresponding signed unit value.
+///
+/// # Errors
+/// Returns a validation error if `x` is NaN.
 ///
 /// # Examples
 ///
@@ -130,22 +118,27 @@ static STANDARD_NORMAL: LazyLock<Normal> = LazyLock::new(Normal::standard);
 /// use finstack_quant_core::math::special_functions::erf;
 ///
 /// // erf(0) ≈ 0
-/// assert!(erf(0.0).abs() < 1e-6);
+/// assert!(erf(0.0).expect("valid variate").abs() < 1e-6);
 ///
-/// // erf is odd: erf(-x) = -erf(x)
+/// // The error function is odd.
 /// let x = 1.5;
-/// assert!((erf(-x) + erf(x)).abs() < 1e-6);
+/// assert!((erf(-x).expect("valid variate") + erf(x).expect("valid variate")).abs() < 1e-6);
 ///
 /// // erf(∞) → 1
-/// assert!((erf(5.0) - 1.0).abs() < 1e-5);
+/// assert!((erf(5.0).expect("valid variate") - 1.0).abs() < 1e-5);
 /// ```
 ///
 /// # Implementation
 ///
 /// This is a thin wrapper around `statrs::function::erf::erf`.
 #[inline]
-pub fn erf(x: f64) -> f64 {
-    statrs::function::erf::erf(x)
+pub fn erf(x: f64) -> crate::Result<f64> {
+    if x.is_nan() {
+        return Err(crate::Error::Validation(
+            "erf requires a non-NaN variate".into(),
+        ));
+    }
+    Ok(statrs::function::erf::erf(x))
 }
 
 /// Natural logarithm of the Gamma function.
@@ -158,10 +151,32 @@ pub fn erf(x: f64) -> f64 {
 ///
 /// # Returns
 ///
-/// ln(Γ(x)). Defined for x > 0. Returns positive infinity at x = 0; negative inputs are outside the supported domain and can return NaN.
+/// Real ln(Γ(x)) for finite positive `x`, with exact zero at one and two.
+///
+/// # Errors
+/// Returns a validation error if `x` is non-finite or nonpositive. Returns a
+/// computation error if the logarithm exceeds the finite output range.
 #[inline]
-pub fn ln_gamma(x: f64) -> f64 {
-    statrs::function::gamma::ln_gamma(x)
+pub fn ln_gamma(x: f64) -> crate::Result<f64> {
+    if !x.is_finite() || x <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "log Gamma requires a finite positive argument, got {x}"
+        )));
+    }
+    if x.to_bits() == 1.0_f64.to_bits() || x.to_bits() == 2.0_f64.to_bits() {
+        return Ok(0.0);
+    }
+    let value = if x < 0.5 {
+        statrs::function::gamma::ln_gamma(1.0 + x) - x.ln()
+    } else {
+        statrs::function::gamma::ln_gamma(x)
+    };
+    if !value.is_finite() {
+        return Err(crate::Error::Internal(
+            "log Gamma exceeds the finite output range".into(),
+        ));
+    }
+    Ok(value)
 }
 
 /// Cumulative standard normal distribution function Φ(x).
@@ -199,22 +214,36 @@ pub fn ln_gamma(x: f64) -> f64 {
 /// use finstack_quant_core::math::special_functions::norm_cdf;
 ///
 /// // Φ(0) = 0.5 (median of standard normal)
-/// assert!((norm_cdf(0.0) - 0.5).abs() < 1e-6);
+/// assert!((norm_cdf(0.0).expect("valid variate") - 0.5).abs() < 1e-6);
 ///
 /// // Φ(-x) = 1 - Φ(x) (symmetry)
 /// let x = 1.96; // 97.5th percentile
-/// assert!((norm_cdf(-x) + norm_cdf(x) - 1.0).abs() < 1e-6);
+/// assert!((norm_cdf(-x).expect("valid variate") + norm_cdf(x).expect("valid variate") - 1.0).abs() < 1e-6);
 ///
 /// // 95% confidence interval: [-1.96, 1.96]
-/// assert!((norm_cdf(1.96) - 0.975).abs() < 1e-3);
-/// assert!((norm_cdf(-1.96) - 0.025).abs() < 1e-3);
+/// assert!((norm_cdf(1.96).expect("valid variate") - 0.975).abs() < 1e-3);
+/// assert!((norm_cdf(-1.96).expect("valid variate") - 0.025).abs() < 1e-3);
 /// ```
 ///
 /// # Implementation
 ///
 /// Uses a static standard normal distribution instance for performance in hot paths.
+///
+/// # Errors
+/// Returns a validation error if `x` is NaN.
 #[inline]
-pub fn norm_cdf(x: f64) -> f64 {
+pub fn norm_cdf(x: f64) -> crate::Result<f64> {
+    validate_normal_variate(x)?;
+    Ok(norm_cdf_unchecked(x))
+}
+
+/// Standard-normal cumulative probability for a validated variate.
+///
+/// # Arguments
+/// * `x` - A non-NaN standard-deviation variate from a validated model path.
+#[doc(hidden)]
+#[inline]
+pub fn norm_cdf_unchecked(x: f64) -> f64 {
     use statrs::distribution::ContinuousCDF;
     STANDARD_NORMAL.cdf(x)
 }
@@ -228,21 +257,23 @@ pub fn norm_cdf(x: f64) -> f64 {
 /// # Arguments
 ///
 /// * `x` - Standardized, dimensionless normal variate. Any finite real value
-///   or infinity is accepted; NaN propagates.
+///   or infinity is accepted.
 ///
 /// # Returns
 ///
 /// Log probability in `[-infinity, 0]`. Negative infinity maps to negative
-/// infinity and positive infinity maps to zero. Extremely negative finite
-/// arguments can return negative infinity when the log probability itself
-/// exceeds the representable floating-point range.
+/// infinity and positive infinity maps to zero.
+///
+/// # Errors
+/// Returns a validation error for NaN. Returns a computation error for
+/// finite `x` whose log probability exceeds the representable range.
 ///
 /// # Examples
 ///
 /// ```
 /// use finstack_quant_core::math::special_functions::log_norm_cdf;
-/// assert!((log_norm_cdf(0.0) + 2.0_f64.ln()).abs() < 1e-14);
-/// assert!(log_norm_cdf(-40.0).is_finite());
+/// assert!((log_norm_cdf(0.0).expect("valid variate") + 2.0_f64.ln()).abs() < 1e-14);
+/// assert!(log_norm_cdf(-40.0).expect("valid variate").is_finite());
 /// ```
 ///
 /// # Numerical method
@@ -251,16 +282,29 @@ pub fn norm_cdf(x: f64) -> f64 {
 /// Mills-ratio expansion beyond ten standard deviations. For positive real
 /// arguments the omitted remainder is bounded by the first omitted term;
 /// see <https://dlmf.nist.gov/7.12.E1>.
-#[must_use]
-pub fn log_norm_cdf(x: f64) -> f64 {
-    if x.is_nan() {
-        return f64::NAN;
+pub fn log_norm_cdf(x: f64) -> crate::Result<f64> {
+    validate_normal_variate(x)?;
+    let value = log_norm_cdf_unchecked(x);
+    if x.is_finite() && !value.is_finite() {
+        return Err(crate::Error::Internal(
+            "normal log probability exceeds the finite output range".into(),
+        ));
     }
+    Ok(value)
+}
+
+/// Logarithmic Gaussian probability for an established non-NaN variate.
+///
+/// # Arguments
+/// * `x` - A validated standard-deviation threshold. The caller owns handling
+///   the negative tail if its logarithm overflows finite binary64.
+#[doc(hidden)]
+pub fn log_norm_cdf_unchecked(x: f64) -> f64 {
     if x >= 0.0 {
-        return (-norm_cdf(-x)).ln_1p();
+        return (-norm_cdf_unchecked(-x)).ln_1p();
     }
     if x > -10.0 {
-        return norm_cdf(x).ln();
+        return norm_cdf_unchecked(x).ln();
     }
 
     // Phi(-a) = phi(a)/a * (1 - 1/a² + 3/a⁴ - 15/a⁶ + ...).
@@ -303,7 +347,7 @@ const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
 ///
 /// # Returns
 ///
-/// Probability density φ(x) ∈ (0, 1/√(2π)]
+/// Probability density φ(x) ∈ [0, 1/√(2π)]
 /// Maximum value occurs at x = 0: φ(0) = 1/√(2π) ≈ 0.3989
 ///
 /// # Examples
@@ -312,15 +356,15 @@ const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
 /// use finstack_quant_core::math::special_functions::norm_pdf;
 ///
 /// // Maximum at x = 0
-/// let max_density = norm_pdf(0.0);
+/// let max_density = norm_pdf(0.0).expect("valid variate");
 /// assert!((max_density - 0.3989).abs() < 1e-4);
 ///
 /// // Symmetric: φ(-x) = φ(x)
 /// let x = 1.5;
-/// assert!((norm_pdf(-x) - norm_pdf(x)).abs() < 1e-6);
+/// assert!((norm_pdf(-x).expect("valid variate") - norm_pdf(x).expect("valid variate")).abs() < 1e-6);
 ///
 /// // Approximately zero in tails (φ(5.0) ≈ 1.49e-6)
-/// assert!(norm_pdf(5.0) < 2e-6);
+/// assert!(norm_pdf(5.0).expect("valid variate") < 2e-6);
 /// ```
 ///
 /// # Use Cases
@@ -334,9 +378,30 @@ const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
 ///
 /// Direct computation using the formula φ(x) = (1/√(2π)) × e^(-x²/2) with a
 /// precomputed constant, avoiding trait dispatch overhead from statrs.
+///
+/// # Errors
+/// Returns a validation error if `x` is NaN.
 #[inline]
-pub fn norm_pdf(x: f64) -> f64 {
+pub fn norm_pdf(x: f64) -> crate::Result<f64> {
+    validate_normal_variate(x)?;
+    Ok(norm_pdf_unchecked(x))
+}
+
+#[inline]
+/// Standard-normal density for a validated quadrature node.
+///
+/// # Arguments
+/// * `x` - Non-NaN standard-deviation variate from a validated integration grid.
+#[doc(hidden)]
+pub fn norm_pdf_unchecked(x: f64) -> f64 {
     INV_SQRT_2PI * (-0.5 * x * x).exp()
+}
+
+fn validate_normal_variate(x: f64) -> crate::Result<()> {
+    if x.is_nan() {
+        return Err(crate::Error::Validation("x must not be NaN".into()));
+    }
+    Ok(())
 }
 
 fn validate_finite_positive(name: &str, value: f64) -> crate::Result<()> {
@@ -355,9 +420,7 @@ fn standardize_normal(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
             "mean must be finite, got {mean}"
         )));
     }
-    if x.is_nan() {
-        return Err(crate::Error::Validation("x must not be NaN".to_string()));
-    }
+    validate_normal_variate(x)?;
     if !x.is_finite() {
         return Ok(x);
     }
@@ -392,7 +455,7 @@ fn standardize_normal(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
 /// is non-finite, or `x` is `NaN`.
 pub fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
     let z = standardize_normal(x, mean, std_dev)?;
-    Ok(norm_cdf(z))
+    Ok(norm_cdf_unchecked(z))
 }
 
 /// General normal probability density function.
@@ -403,7 +466,7 @@ pub fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 ///
 /// `std_dev` is the standard deviation in the same units as `x` and `mean`,
 /// not the variance. Infinite `x` values return `0.0`; `NaN` `x`, non-finite
-/// `mean`, or density overflow returns a validation error.
+/// `mean`, or invalid scale returns a validation error.
 ///
 /// # Arguments
 ///
@@ -414,15 +477,17 @@ pub fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 ///
 /// # Errors
 ///
-/// Returns an error if `std_dev` is non-finite or not strictly positive, `mean`
-/// is non-finite, `x` is `NaN`, or the resulting density overflows `f64`.
+/// Returns a validation error if `std_dev` is non-finite or not strictly
+/// positive, `mean` is non-finite, or `x` is NaN. Density overflow returns a
+/// computation error.
 pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
     let z = standardize_normal(x, mean, std_dev)?;
     if !z.is_finite() {
         return Ok(0.0);
     }
-    let direct = norm_pdf(z) / std_dev;
-    if direct.is_finite() && direct > 0.0 {
+    let standard_density = norm_pdf_unchecked(z);
+    let direct = standard_density / std_dev;
+    if standard_density.is_normal() && direct.is_normal() {
         return Ok(direct);
     }
     let log_density = -0.5 * (2.0 * std::f64::consts::PI).ln() - std_dev.ln() - 0.5 * z * z;
@@ -430,7 +495,7 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
     if density.is_finite() {
         Ok(density)
     } else {
-        Err(crate::Error::Validation(
+        Err(crate::Error::Internal(
             "normal density overflowed finite f64 range".to_string(),
         ))
     }
@@ -453,10 +518,10 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// # Domain-edge convention
 ///
 /// Exact boundary probabilities map to signed infinity, while strictly
-/// out-of-domain inputs return `NaN` instead of panicking or silently saturating:
+/// out-of-domain inputs return a validation error:
 /// - `p == 0.0` → `f64::NEG_INFINITY`
 /// - `p == 1.0` → `f64::INFINITY`
-/// - `p < 0.0`, `p > 1.0`, or `p.is_nan()` → `f64::NAN`
+/// - `p < 0.0`, `p > 1.0`, or `p.is_nan()` → validation error
 ///
 /// # Examples
 ///
@@ -464,18 +529,18 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// use finstack_quant_core::math::special_functions::{standard_normal_inv_cdf, norm_cdf};
 ///
 /// // Inverse of median should be zero
-/// assert!((standard_normal_inv_cdf(0.5) - 0.0).abs() < 1e-6);
+/// assert!((standard_normal_inv_cdf(0.5).expect("valid probability") - 0.0).abs() < 1e-6);
 ///
 /// // Round-trip test
-/// let x = standard_normal_inv_cdf(0.84);
-/// let p_back = norm_cdf(x);
+/// let x = standard_normal_inv_cdf(0.84).expect("valid probability");
+/// let p_back = norm_cdf(x).expect("valid variate");
 /// assert!((p_back - 0.84).abs() < 1e-6);
 ///
-/// // Exact domain edges map to ±∞; out-of-domain inputs return NaN
-/// assert_eq!(standard_normal_inv_cdf(0.0), f64::NEG_INFINITY);
-/// assert_eq!(standard_normal_inv_cdf(1.0), f64::INFINITY);
-/// assert!(standard_normal_inv_cdf(-0.1).is_nan());
-/// assert!(standard_normal_inv_cdf(f64::NAN).is_nan());
+/// // Exact domain edges map to ±∞; out-of-domain inputs return errors
+/// assert_eq!(standard_normal_inv_cdf(0.0).expect("valid probability"), f64::NEG_INFINITY);
+/// assert_eq!(standard_normal_inv_cdf(1.0).expect("valid probability"), f64::INFINITY);
+/// assert!(standard_normal_inv_cdf(-0.1).is_err());
+/// assert!(standard_normal_inv_cdf(f64::NAN).is_err());
 /// ```
 ///
 /// # Implementation
@@ -483,24 +548,32 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// Uses a static standard normal distribution instance for performance in hot
 /// paths. statrs 0.18 evaluates the quantile via a Boost-Math-derived
 /// `erfc_inv` rational approximation (not Wichura's AS 241). Delivered
-/// accuracy: round-trips `norm_cdf(standard_normal_inv_cdf(p))` agree to
+/// accuracy: CDF–quantile round trips agree to
 /// ~5e-12 absolute in the central region, and the quantile itself is accurate
 /// to ~1e-6 relative in the far tails (p down to ~1e-300).
 #[inline]
-pub fn standard_normal_inv_cdf(p: f64) -> f64 {
+pub fn standard_normal_inv_cdf(p: f64) -> crate::Result<f64> {
     use statrs::distribution::ContinuousCDF;
-    if p.is_nan() || !(0.0..=1.0).contains(&p) {
-        return f64::NAN;
+    if !(0.0..=1.0).contains(&p) {
+        return Err(crate::Error::Validation(format!(
+            "normal quantile requires probability in [0, 1], got {p}"
+        )));
     }
     #[allow(clippy::float_cmp)]
     if p == 0.0 {
-        return f64::NEG_INFINITY;
+        return Ok(f64::NEG_INFINITY);
     }
     #[allow(clippy::float_cmp)]
     if p == 1.0 {
-        return f64::INFINITY;
+        return Ok(f64::INFINITY);
     }
-    STANDARD_NORMAL.inverse_cdf(p)
+    let quantile = STANDARD_NORMAL.inverse_cdf(p);
+    if !quantile.is_finite() || (quantile == 0.0 && p.to_bits() != 0.5_f64.to_bits()) {
+        return Err(crate::Error::Internal(
+            "normal quantile cannot be resolved in the finite output range".into(),
+        ));
+    }
+    Ok(quantile)
 }
 
 /// Student-t cumulative distribution function.
@@ -544,25 +617,13 @@ pub fn standard_normal_inv_cdf(p: f64) -> f64 {
 ///
 /// # Implementation
 ///
-/// This is a thin wrapper around `statrs::distribution::StudentsT::cdf`.
-#[inline]
-/// A NaN `x` returns NaN (as [`norm_cdf`] does); statrs itself panics on it.
+/// Uses a bounded regularized incomplete beta fraction.
 ///
 /// # Errors
-/// Returns a validation error when `df` is non-finite or not strictly positive.
+/// Returns a validation error for NaN `x` or non-finite or nonpositive `df`.
+/// Returns a computation error if the tail cannot be evaluated.
 pub fn student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
-    if !df.is_finite() || df <= 0.0 {
-        return Err(crate::Error::Validation(format!(
-            "student_t_cdf requires finite df > 0, got {df}"
-        )));
-    }
-    if x.is_nan() {
-        return Ok(f64::NAN);
-    }
-    use statrs::distribution::{ContinuousCDF, StudentsT};
-    StudentsT::new(0.0, 1.0, df)
-        .map(|dist| dist.cdf(x))
-        .map_err(|err| crate::Error::Validation(format!("invalid Student-t parameters: {err}")))
+    student_t::cdf(x, df)
 }
 
 /// Inverse Student-t cumulative distribution function.
@@ -601,41 +662,14 @@ pub fn student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
 ///
 /// # Implementation
 ///
-/// This is a thin wrapper around `statrs::distribution::StudentsT::inverse_cdf`.
+/// Uses bounded inverse regularized incomplete beta refinement.
 ///
 /// # Errors
-/// Returns a validation error when `df` is non-finite or not strictly positive,
-/// when `p` is non-finite or outside `[0, 1]`, or when an interior quantile
-/// overflows finite `f64`.
+/// Returns a validation error for non-finite or nonpositive `df` or for `p`
+/// outside `[0, 1]`. Returns a computation error if the interior quantile
+/// cannot be resolved or represented.
 pub fn student_t_inv_cdf(p: f64, df: f64) -> crate::Result<f64> {
-    if !df.is_finite() || df <= 0.0 {
-        return Err(crate::Error::Validation(format!(
-            "student_t_inv_cdf requires finite df > 0, got {df}"
-        )));
-    }
-    if !p.is_finite() || !(0.0..=1.0).contains(&p) {
-        return Err(crate::Error::Validation(format!(
-            "student_t_inv_cdf requires finite probability p in [0, 1], got {p}"
-        )));
-    }
-    #[allow(clippy::float_cmp)]
-    if p == 0.0 {
-        return Ok(f64::NEG_INFINITY);
-    }
-    #[allow(clippy::float_cmp)]
-    if p == 1.0 {
-        return Ok(f64::INFINITY);
-    }
-    use statrs::distribution::{ContinuousCDF, StudentsT};
-    let quantile = StudentsT::new(0.0, 1.0, df)
-        .map(|dist| dist.inverse_cdf(p))
-        .map_err(|err| crate::Error::Validation(format!("invalid Student-t parameters: {err}")))?;
-    if !quantile.is_finite() {
-        return Err(crate::Error::Validation(format!(
-            "student_t_inv_cdf produced non-finite quantile for p={p}, df={df}"
-        )));
-    }
-    Ok(quantile)
+    student_t::inverse(p, df)
 }
 
 #[cfg(test)]
@@ -648,37 +682,54 @@ mod tests {
             (-40.0, -804.608_442_013_753_8),
             (-100.0, -5_005.524_208_694_205),
         ] {
-            assert!((super::log_norm_cdf(x) - expected).abs() < 2e-12);
+            assert!((super::log_norm_cdf(x).expect("valid variate") - expected).abs() < 2e-12);
         }
         for x in [-9.999, -5.0, -1.0, 0.0, 1.0, 5.0] {
-            assert!((super::log_norm_cdf(x).exp() - super::norm_cdf(x)).abs() < 2e-15);
+            assert!(
+                (super::log_norm_cdf(x).expect("valid variate").exp()
+                    - super::norm_cdf(x).expect("valid variate"))
+                .abs()
+                    < 2e-15
+            );
         }
-        assert_eq!(super::log_norm_cdf(f64::NEG_INFINITY), f64::NEG_INFINITY);
-        assert_eq!(super::log_norm_cdf(f64::INFINITY), 0.0);
-        assert!(super::log_norm_cdf(f64::NAN).is_nan());
+        assert_eq!(
+            super::log_norm_cdf(f64::NEG_INFINITY).expect("valid variate"),
+            f64::NEG_INFINITY
+        );
+        assert_eq!(
+            super::log_norm_cdf(f64::INFINITY).expect("valid variate"),
+            0.0
+        );
+        assert!(super::log_norm_cdf(f64::NAN).is_err());
         // The probability itself is unrepresentable, but its reflected
         // product is an ordinary finite number.
-        let reflected = (800.0 + super::log_norm_cdf(-40.0)).exp();
+        let reflected = (800.0 + super::log_norm_cdf(-40.0).expect("valid variate")).exp();
         assert!((reflected - 0.009_967_335_188_301_31).abs() < 2e-15);
     }
 
     use super::*;
 
     #[test]
-    fn student_t_cdf_propagates_nan() {
-        // statrs panics on a NaN argument; the wrapper returns NaN like norm_cdf.
-        assert!(student_t_cdf(f64::NAN, 5.0).expect("valid df").is_nan());
+    fn student_t_cdf_rejects_nan() {
+        // NaN is outside the Student-t variate domain.
+        assert!(student_t_cdf(f64::NAN, 5.0).is_err());
         assert!(student_t_cdf(f64::NAN, 0.0).is_err());
     }
 
     #[test]
     fn test_standard_normal_inv_cdf_domain_boundaries_and_out_of_domain() {
-        assert!(standard_normal_inv_cdf(f64::NAN).is_nan());
-        assert!(standard_normal_inv_cdf(-0.1).is_nan());
-        assert!(standard_normal_inv_cdf(-1e-15).is_nan());
-        assert_eq!(standard_normal_inv_cdf(0.0), f64::NEG_INFINITY);
-        assert_eq!(standard_normal_inv_cdf(1.0), f64::INFINITY);
-        assert!(standard_normal_inv_cdf(1.000_000_000_000_000_2).is_nan());
+        assert!(standard_normal_inv_cdf(f64::NAN).is_err());
+        assert!(standard_normal_inv_cdf(-0.1).is_err());
+        assert!(standard_normal_inv_cdf(-1e-15).is_err());
+        assert_eq!(
+            standard_normal_inv_cdf(0.0).expect("valid probability"),
+            f64::NEG_INFINITY
+        );
+        assert_eq!(
+            standard_normal_inv_cdf(1.0).expect("valid probability"),
+            f64::INFINITY
+        );
+        assert!(standard_normal_inv_cdf(1.000_000_000_000_000_2).is_err());
     }
 
     #[test]
@@ -734,53 +785,63 @@ mod tests {
     fn test_erf() {
         // Test known values with reasonable tolerance for approximation
         assert!(
-            (erf(0.0) - 0.0).abs() < 1e-6,
+            (erf(0.0).expect("valid variate") - 0.0).abs() < 1e-6,
             "erf(0) should be 0, got {}",
-            erf(0.0)
+            erf(0.0).expect("valid variate")
         );
         assert!(
-            (erf(1.0) - 0.8427007929).abs() < 1e-4,
+            (erf(1.0).expect("valid variate") - 0.8427007929).abs() < 1e-4,
             "erf(1) should be ~0.8427, got {}",
-            erf(1.0)
+            erf(1.0).expect("valid variate")
         );
         assert!(
-            (erf(-1.0) - (-0.8427007929)).abs() < 1e-4,
+            (erf(-1.0).expect("valid variate") - (-0.8427007929)).abs() < 1e-4,
             "erf(-1) should be ~-0.8427, got {}",
-            erf(-1.0)
+            erf(-1.0).expect("valid variate")
         );
     }
 
     #[test]
     fn test_norm_cdf() {
         // Test known values
-        assert!((norm_cdf(0.0) - 0.5).abs() < 1e-6);
-        assert!((norm_cdf(1.0) - 0.8413447460685429).abs() < 1e-6);
-        assert!((norm_cdf(-1.0) - 0.15865525393145705).abs() < 1e-6);
+        assert!((norm_cdf(0.0).expect("valid variate") - 0.5).abs() < 1e-6);
+        assert!((norm_cdf(1.0).expect("valid variate") - 0.8413447460685429).abs() < 1e-6);
+        assert!((norm_cdf(-1.0).expect("valid variate") - 0.15865525393145705).abs() < 1e-6);
 
         // Test extreme values
-        assert!(norm_cdf(-10.0) < 1e-10);
-        assert!(norm_cdf(10.0) > 1.0 - 1e-10);
+        assert!(norm_cdf(-10.0).expect("valid variate") < 1e-10);
+        assert!(norm_cdf(10.0).expect("valid variate") > 1.0 - 1e-10);
     }
 
     #[test]
     fn test_norm_pdf() {
         use std::f64::consts::PI;
         // Test known values
-        assert!((norm_pdf(0.0) - (1.0 / (2.0 * PI).sqrt())).abs() < 1e-12);
+        assert!((norm_pdf(0.0).expect("valid variate") - (1.0 / (2.0 * PI).sqrt())).abs() < 1e-12);
 
         // Test symmetry
-        assert!((norm_pdf(1.0) - norm_pdf(-1.0)).abs() < 1e-12);
+        assert!(
+            (norm_pdf(1.0).expect("valid variate") - norm_pdf(-1.0).expect("valid variate")).abs()
+                < 1e-12
+        );
 
         // Test non-negativity
-        assert!(norm_pdf(5.0) >= 0.0);
+        assert!(norm_pdf(5.0).expect("valid variate") >= 0.0);
     }
 
     #[test]
     fn test_standard_normal_inv_cdf() {
         // Known values at the precision the Boost-derived erfc_inv delivers.
-        assert!((standard_normal_inv_cdf(0.5) - 0.0).abs() < 1e-12);
-        assert!((standard_normal_inv_cdf(0.8413447460685429) - 1.0).abs() < 1e-9);
-        assert!((standard_normal_inv_cdf(0.15865525393145705) - (-1.0)).abs() < 1e-9);
+        assert!((standard_normal_inv_cdf(0.5).expect("valid probability") - 0.0).abs() < 1e-12);
+        assert!(
+            (standard_normal_inv_cdf(0.8413447460685429).expect("valid probability") - 1.0).abs()
+                < 1e-9
+        );
+        assert!(
+            (standard_normal_inv_cdf(0.15865525393145705).expect("valid probability") - (-1.0))
+                .abs()
+                < 1e-9
+        );
 
         // Tail quantiles: reference values from scipy.special.ndtri
         // (double-precision evaluation of Φ⁻¹). The implementation delivers
@@ -793,7 +854,7 @@ mod tests {
             (1e-6, -4.753424308822899),
         ];
         for &(p, x_ref) in &tail_cases {
-            let x = standard_normal_inv_cdf(p);
+            let x = standard_normal_inv_cdf(p).expect("valid probability");
             let rel_err = ((x - x_ref) / x_ref).abs();
             assert!(
                 rel_err < 1e-7,
@@ -810,8 +871,8 @@ mod tests {
         let test_values = [0.1, 0.25, 0.5, 0.75, 0.9];
 
         for &p in &test_values {
-            let x = standard_normal_inv_cdf(p);
-            let p_back = norm_cdf(x);
+            let x = standard_normal_inv_cdf(p).expect("valid probability");
+            let p_back = norm_cdf(x).expect("valid variate");
             assert!(
                 (p - p_back).abs() < 1e-11,
                 "Failed roundtrip for p={}, got x={}, p_back={}",
@@ -828,8 +889,8 @@ mod tests {
         let extreme_values = [1e-12, 1e-10, 1e-8, 1e-6];
 
         for &p in &extreme_values {
-            let x_low = standard_normal_inv_cdf(p);
-            let x_high = standard_normal_inv_cdf(1.0 - p);
+            let x_low = standard_normal_inv_cdf(p).expect("valid probability");
+            let x_high = standard_normal_inv_cdf(1.0 - p).expect("valid probability");
 
             // Inverse CDF should be finite and reasonable
             assert!(
@@ -848,7 +909,10 @@ mod tests {
             // p = 1e-12), not by the algorithm. Assert proportionally to the
             // quantile's tail sensitivity rather than a flat 0.01.
             let symmetry_error = (x_low + x_high).abs();
-            let one_minus_p_resolution = f64::EPSILON / norm_pdf(x_low).max(f64::MIN_POSITIVE);
+            let one_minus_p_resolution = f64::EPSILON
+                / norm_pdf(x_low)
+                    .expect("valid variate")
+                    .max(f64::MIN_POSITIVE);
             let symmetry_tol = (1e-6 * x_low.abs()).max(4.0 * one_minus_p_resolution);
             assert!(
                 symmetry_error < symmetry_tol,
@@ -861,8 +925,8 @@ mod tests {
             );
 
             // CDF should be stable in extreme tails
-            let p_back_low = norm_cdf(x_low);
-            let p_back_high = norm_cdf(x_high);
+            let p_back_low = norm_cdf(x_low).expect("valid variate");
+            let p_back_high = norm_cdf(x_high).expect("valid variate");
 
             assert!(
                 p_back_low.is_finite(),
@@ -937,11 +1001,11 @@ mod tests {
             );
 
             // Test conditional probability calculation stability
-            let default_threshold = standard_normal_inv_cdf(0.05); // 5% default prob
+            let default_threshold = standard_normal_inv_cdf(0.05).expect("valid probability"); // 5% default prob
             for market_factor in [-3.0, -1.0, 0.0, 1.0, 3.0] {
                 let conditional_threshold =
                     (default_threshold - sqrt_rho * market_factor) / sqrt_one_minus_rho;
-                let cond_prob = norm_cdf(conditional_threshold);
+                let cond_prob = norm_cdf(conditional_threshold).expect("valid variate");
 
                 assert!(
                     cond_prob.is_finite(),
@@ -995,7 +1059,7 @@ mod tests {
         // With high df, Student-t approaches Normal
         let x = -1.5;
         let t_cdf = student_t_cdf(x, 200.0).expect("valid checked inputs");
-        let normal_cdf = norm_cdf(x);
+        let normal_cdf = norm_cdf(x).expect("valid variate");
 
         assert!(
             (t_cdf - normal_cdf).abs() < 0.01,
@@ -1060,8 +1124,8 @@ mod tests {
         let std_dev = 0.4;
         let z = (x - mean) / std_dev;
 
-        let expected_cdf = norm_cdf(z);
-        let expected_pdf = norm_pdf(z) / std_dev;
+        let expected_cdf = norm_cdf(z).expect("valid variate");
+        let expected_pdf = norm_pdf(z).expect("valid variate") / std_dev;
         let actual_cdf = match norm_cdf_with_params(x, mean, std_dev) {
             Ok(value) => value,
             Err(err) => panic!("norm_cdf_with_params should succeed for positive std_dev: {err}"),
@@ -1087,7 +1151,9 @@ mod tests {
         assert_eq!(norm_pdf_with_params(f64::INFINITY, 0.0, 1.0).unwrap(), 0.0);
         // Overflow-safe standardization when `x - mean` would overflow f64
         assert!(
-            (norm_cdf_with_params(f64::MAX, -f64::MAX, f64::MAX).unwrap() - norm_cdf(2.0)).abs()
+            (norm_cdf_with_params(f64::MAX, -f64::MAX, f64::MAX).unwrap()
+                - norm_cdf(2.0).expect("valid variate"))
+            .abs()
                 < 1e-12
         );
     }

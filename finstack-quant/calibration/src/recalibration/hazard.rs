@@ -1386,7 +1386,10 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
-        let changed = market.clone().insert(replacement);
+        let changed = market
+            .clone()
+            .try_insert(replacement)
+            .expect("insert market curve");
         HAZARD_REPLAY_CALLS.set(0);
         let shocked = recalibrate_from_par_spreads_cached(
             &cache,
@@ -1432,7 +1435,8 @@ mod tests {
 
         let different_seed = market
             .clone()
-            .insert(hazard.with_parallel_hazard_rate_bump_bp(1.0).expect("seed"));
+            .try_insert(hazard.with_parallel_hazard_rate_bump_bp(1.0).expect("seed"))
+            .expect("insert market curve");
         HAZARD_REPLAY_CALLS.set(0);
         recalibrate_from_par_spreads_cached(
             &cache,

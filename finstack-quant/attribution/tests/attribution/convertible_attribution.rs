@@ -132,8 +132,10 @@ fn market_with_rate(credit_spread_bp: f64, rf: f64) -> MarketContext {
     )
     .unwrap();
     MarketContext::new()
-        .insert(ois)
-        .insert(credit_curve)
+        .try_insert(ois)
+        .expect("insert market curve")
+        .try_insert(credit_curve)
+        .expect("insert market curve")
         // Spot well below the $100 conversion price → bond-like, so the credit
         // factor is material rather than swamped by equity optionality.
         .insert_price("AAPL", MarketScalar::unitless(50.0).expect("valid scalar"))

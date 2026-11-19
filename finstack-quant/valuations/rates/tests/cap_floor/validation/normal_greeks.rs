@@ -123,8 +123,10 @@ fn normal_market(as_of: Date, fwd_rate: f64) -> MarketContext {
     let fwd = build_flat_forward_curve(fwd_rate, as_of, "USD_FWD");
     let vol = build_normal_vol_surface(0.005, as_of, "NORMAL_VOL");
     MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_surface(vol)
 }
 
@@ -353,16 +355,22 @@ fn normal_vega_matches_finite_difference() {
     let vol_up = build_normal_vol_surface(base_vol + vol_bump, as_of, "NORMAL_VOL");
 
     let ctx_down = MarketContext::new()
-        .insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(0.05, as_of, "USD_FWD"))
+        .try_insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.05, as_of, "USD_FWD"))
+        .expect("insert market curve")
         .insert_surface(vol_down);
     let ctx_mid = MarketContext::new()
-        .insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(0.05, as_of, "USD_FWD"))
+        .try_insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.05, as_of, "USD_FWD"))
+        .expect("insert market curve")
         .insert_surface(vol_mid);
     let ctx_up = MarketContext::new()
-        .insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(0.05, as_of, "USD_FWD"))
+        .try_insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.05, as_of, "USD_FWD"))
+        .expect("insert market curve")
         .insert_surface(vol_up);
 
     let pv_down = caplet.value(&ctx_down, as_of).unwrap().amount();
@@ -433,8 +441,10 @@ fn normal_greeks_with_negative_forward() {
     let fwd = build_flat_forward_curve(-0.005, as_of, "USD_FWD");
     let vol = build_normal_vol_surface(0.005, as_of, "NORMAL_VOL");
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_surface(vol);
 
     let pv = cap.value(&ctx, as_of).unwrap();

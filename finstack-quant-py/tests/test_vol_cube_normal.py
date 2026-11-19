@@ -41,9 +41,10 @@ def test_cube_queries_reject_shifted_lognormal_output() -> None:
     shifted = {"shifted_lognormal": {"shift": 0.01}}
     with pytest.raises(ValueError, match="shifted"):
         get_cube_vol(cube, 1.0, 2.0, FORWARD, shifted)
-    assert math.isnan(get_cube_vol_clamped(cube, 1.0, 2.0, FORWARD, shifted))
+    with pytest.raises(ValueError, match=r"shifted"):
+        get_cube_vol_clamped(cube, 1.0, 2.0, FORWARD, shifted)
     with pytest.raises(ValueError, match="shifted"):
-        materialize_cube_tenor_slice(cube, 2.0, [FORWARD], shifted)
+        materialize_cube_tenor_slice(cube, 2.0, [FORWARD], shifted, "vol")
     with pytest.raises(ValueError, match="shifted"):
         materialize_cube_expiry_slice(cube, 1.0, [FORWARD], shifted)
 
@@ -70,7 +71,7 @@ def test_materialize_normal_slices_preserve_their_axes() -> None:
     cube = _example_cube()
     strikes = [0.02, FORWARD, 0.04]
 
-    tenor_slice = materialize_cube_tenor_slice(cube, 2.0, strikes, "normal")
+    tenor_slice = materialize_cube_tenor_slice(cube, 2.0, strikes, "normal", "vol")
     assert isinstance(tenor_slice, VolSurface)
     assert tenor_slice.quote_type == "normal"
 
@@ -139,7 +140,8 @@ def test_normal_sabr_rejects_nonpositive_shifted_levels_for_positive_beta() -> N
     cube = VolCube("CEV", [1.0], [2.0], cev, [-0.01])
     with pytest.raises(ValueError, match=r"(?i)sabr"):
         get_cube_vol(cube, 1.0, 2.0, -0.01, "normal")
-    assert math.isnan(get_cube_vol_clamped(cube, 1.0, 2.0, -0.01, "normal"))
+    with pytest.raises(ValueError, match=r"(?i)sabr"):
+        get_cube_vol_clamped(cube, 1.0, 2.0, -0.01, "normal")
 
     normal = [{"alpha": 0.01, "beta": 0.0, "rho": -0.2, "nu": 0.4}]
     normal_cube = VolCube("NORMAL", [1.0], [2.0], normal, [-0.01])
@@ -154,4 +156,5 @@ def test_mixed_beta_endpoints_and_interpolation() -> None:
     for tenor in [7.5, 7.50000001]:
         with pytest.raises(ValueError, match="different beta"):
             get_cube_vol(cube, 1.0, tenor, 0.04, "lognormal")
-        assert math.isnan(get_cube_vol_clamped(cube, 1.0, tenor, 0.04, "lognormal"))
+        with pytest.raises(ValueError, match=r"different beta"):
+            get_cube_vol_clamped(cube, 1.0, tenor, 0.04, "lognormal")

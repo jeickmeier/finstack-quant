@@ -545,7 +545,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(disc.clone());
+        let market = MarketContext::new()
+            .try_insert(disc.clone())
+            .expect("insert market curve");
 
         let mut loan = TermLoan::example().expect("TermLoan example is valid");
         loan.coupon_type = CouponType::Pik;
@@ -660,7 +662,11 @@ mod tests {
         let fwd = ForwardCurve::flat("USD-SOFR-3M", date(2024, 1, 1), 0.05, DayCount::Act360)
             .expect("forward curve");
 
-        MarketContext::new().insert(disc).insert(fwd)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve")
     }
 
     /// Build market context with discount + forward curves + historical fixings.

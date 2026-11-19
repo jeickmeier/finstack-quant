@@ -49,8 +49,10 @@ fn vanna_is_reported_per_vol_point() -> finstack_quant_core::Result<()> {
     let expiries = [0.25, 0.5, 1.0, 2.0, 5.0];
     let strikes = [0.9, 1.0, 1.1, 1.2, 1.3];
     let market = MarketContext::new()
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
-        .insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 5.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
+        .expect("insert market curve")
+        .try_insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 5.0))
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface("EURUSD-VOL", &expiries, &strikes, 0.15))
         .insert_price(
             "EURUSD-SPOT",

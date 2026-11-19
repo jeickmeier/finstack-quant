@@ -61,7 +61,9 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let hazard = credit_support::calibrated_hazard_curve_with_pillars(
         &source_market,
         base,
@@ -77,7 +79,9 @@ fn create_market() -> MarketContext {
     )
     .unwrap();
 
-    source_market.insert(hazard)
+    source_market
+        .try_insert(hazard)
+        .expect("insert market curve")
 }
 
 fn bench_cds_pv(c: &mut Criterion) {

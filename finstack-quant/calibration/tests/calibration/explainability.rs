@@ -62,7 +62,9 @@ fn forward_quotes() -> Vec<MarketQuote> {
 fn explanation_not_computed_by_default() {
     let base_date = create_date(2025, Month::January, 15).unwrap();
 
-    let ctx = MarketContext::new().insert(base_discount_curve(base_date));
+    let ctx = MarketContext::new()
+        .try_insert(base_discount_curve(base_date))
+        .expect("insert market curve");
     let fwd_quotes = forward_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&ctx);
     cal_utils::extend_market_data(&mut market_data, &fwd_quotes);
@@ -112,7 +114,9 @@ fn explanation_not_computed_by_default() {
 fn explanation_is_present_when_enabled() {
     let base_date = create_date(2025, Month::January, 15).unwrap();
 
-    let ctx = MarketContext::new().insert(base_discount_curve(base_date));
+    let ctx = MarketContext::new()
+        .try_insert(base_discount_curve(base_date))
+        .expect("insert market curve");
     let fwd_quotes = forward_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&ctx);
     cal_utils::extend_market_data(&mut market_data, &fwd_quotes);

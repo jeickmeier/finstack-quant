@@ -118,20 +118,20 @@
     "route": "stored-knots",
     "fields": [
       "base",
+      "calendar_id",
       "day_count",
       "extrapolation",
       "id",
       "interp_style",
       "knot_points",
-      "spot_level",
-      "spot_price",
+      "level_kind",
       "type"
     ],
     "source": {
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/5",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "7f6184ff3a168211375a06e4ab5246ea2415af131b246b4386f78f79b8425479",
+      "sha256": "4fed86678b2968e083dd88b546fceae1fe7cd897ab5cd9cde4133e55a73236af",
       "description": "Price curve state"
     }
   },

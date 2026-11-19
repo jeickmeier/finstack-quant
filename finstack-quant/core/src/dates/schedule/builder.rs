@@ -367,14 +367,7 @@ fn build_spec(spec: &ScheduleSpec) -> crate::Result<Schedule> {
         .map(calendar_by_id_strict)
         .transpose()?;
 
-    let dates = BuilderInternal {
-        start: spec.start,
-        end: spec.end,
-        frequency: spec.frequency,
-        stub: spec.stub,
-        roll: spec.grid,
-    }
-    .generate()?;
+    let dates = BuilderInternal::from(spec).generate()?;
 
     let (payment_dates, fixing_dates) = build_payment_and_fixing_dates(
         &dates,

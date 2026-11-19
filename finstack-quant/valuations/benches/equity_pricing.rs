@@ -172,9 +172,10 @@ fn create_equity_market() -> MarketContext {
 
     // VIX forward curve: spot at 18.5, mean-reverting to ~22 at 1Y
     let vix_curve = PriceCurve::builder("VIX")
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .kind(PriceCurveKind::VolIndex)
         .base_date(base)
-        .spot_price(18.5)
         .knots([(0.0, 18.5), (0.25, 20.0), (0.5, 21.0), (1.0, 22.0)])
         .interp(InterpStyle::Linear)
         .build()
@@ -196,9 +197,12 @@ fn create_equity_market() -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
-        .insert(vix_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
+        .try_insert(vix_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_surface(vix_volvol)
         .insert_price(

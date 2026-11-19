@@ -48,6 +48,7 @@ pub mod closed_form;
 pub mod correlation;
 pub mod credit;
 pub mod fourier;
+mod gaussian;
 pub mod liquidity;
 pub mod monte_carlo;
 pub mod pde;

@@ -600,15 +600,15 @@ class TestCoreBenchmarks:
 
     def test_forward_curve_rate(self, benchmark) -> None:
         zero_rates = [(1.0, 0.05), (5.0, 0.055), (10.0, 0.06)]
-        curve = ForwardCurve(
-            "USD-SOFR-3M",
-            date(2024, 1, 1),
-            [(t, math.exp(-r * t)) for t, r in zero_rates],
-            interp="log_linear",
-            extrapolation="extend",
-            day_count="act_360",
-            index_tenor="3M",
-        )
+        curve = ForwardCurve({
+            "id": "USD-SOFR-3M",
+            "base_date": date(2024, 1, 1),
+            "knots": [(t, math.exp(-r * t)) for t, r in zero_rates],
+            "interp": "log_linear",
+            "extrapolation": "extend",
+            "day_count": "act_360",
+            "index_tenor": "3M",
+        })
         assert curve.interp_style == "log_linear"
         # Log-linear on [1, 5]: ln P falls by (0.275 - 0.05) / 4 per year.
         expected = math.expm1(0.25 * (0.275 - 0.05) / 4.0) / 0.25

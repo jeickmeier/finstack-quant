@@ -20,7 +20,13 @@ fn sabr(alpha: f64, beta: f64, nu: f64, rho: f64) -> JsSabrParameters {
 #[wasm_bindgen_test]
 fn sabr_model_computes_atm_vol() {
     let p = sabr(0.2, 1.0, 0.3, -0.2);
-    let smile = JsSabrSmile::new(&p, JsValue::from(100.0), JsValue::from(1.0)).expect("smile");
+    let smile = JsSabrSmile::new(
+        &p,
+        JsValue::from(100.0),
+        JsValue::from(1.0),
+        JsValue::from("black_lognormal"),
+    )
+    .expect("smile");
     let atm = smile.atm_vol().expect("atm_vol");
     assert!(atm > 0.0 && atm < 1.0);
 }
@@ -29,7 +35,12 @@ fn sabr_model_computes_atm_vol() {
 fn sabr_parameters_computes_implied_vol() {
     let p = sabr(0.2, 0.5, 0.3, -0.2);
     let vol = p
-        .implied_vol(JsValue::from(0.03), JsValue::from(0.03), JsValue::from(1.0))
+        .implied_vol(
+            JsValue::from(0.03),
+            JsValue::from(0.03),
+            JsValue::from(1.0),
+            JsValue::from("black_lognormal"),
+        )
         .expect("implied_vol");
     assert!(vol > 0.0 && vol < 5.0);
     assert!(!p.supports_negative_rates());
@@ -39,7 +50,13 @@ fn sabr_parameters_computes_implied_vol() {
 fn sabr_calibrator_with_tolerance_calibrates() {
     let p = sabr(0.05, 0.5, 0.4, -0.1);
     let strikes = vec![0.01_f64, 0.02, 0.03, 0.04, 0.05];
-    let smile = JsSabrSmile::new(&p, JsValue::from(0.03), JsValue::from(1.0)).expect("smile");
+    let smile = JsSabrSmile::new(
+        &p,
+        JsValue::from(0.03),
+        JsValue::from(1.0),
+        JsValue::from("black_lognormal"),
+    )
+    .expect("smile");
     let vols = smile
         .generate_smile(JsValue::from(strikes.clone()))
         .expect("smile");
@@ -58,6 +75,7 @@ fn sabr_calibrator_with_tolerance_calibrates() {
             JsValue::from(vols.into_vec()),
             JsValue::from(1.0),
             JsValue::from(0.5),
+            JsValue::from("black_lognormal"),
         )
         .expect("calibrate");
     let fitted: finstack_quant_models::volatility::sabr::SabrCalibrationOutcome =

@@ -208,6 +208,20 @@ def test_path_summary_round_trips_through_json_and_pickle() -> None:
             [0.02],
             ["short_rate"],
         ),
+        (
+            {
+                "type": "cheyette_rough",
+                "kappa": 0.03,
+                "sigma_base": {"interpolation": "constant_intervals", "amplitudes": [[0.5, 0.0], [1.0, 0.005]]},
+                "hurst": {"h": 0.1},
+                "eta": 1.2,
+                "rho": -0.3,
+                "phi_times": [0.0],
+                "phi_values": [0.02],
+            },
+            [0.0, 0.0],
+            ["x", "y"],
+        ),
         ({"type": "cir", "kappa": 0.5, "theta": 0.04, "sigma": 0.1}, [0.03], ["short_rate"]),
         (
             {

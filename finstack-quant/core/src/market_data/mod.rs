@@ -59,7 +59,7 @@
 //!     .build()?;
 //!
 //! // Add to market context
-//! let market = MarketContext::new().insert(curve);
+//! let market = MarketContext::new().try_insert(curve).expect("insert market curve");
 //! assert!(market.get_discount("USD-OIS").is_ok());
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```

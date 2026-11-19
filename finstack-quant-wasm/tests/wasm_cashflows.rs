@@ -69,7 +69,9 @@ fn market_context_json() -> String {
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(disc);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     serde_json::to_string(&ctx).unwrap()
 }
 
@@ -219,7 +221,11 @@ fn floating_market_context_json() -> String {
         .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
     serde_json::to_string(&ctx).unwrap()
 }
 

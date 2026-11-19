@@ -88,12 +88,14 @@ fn cdx_ig_46_production_integrand_converges_at_quadrature_step() {
         bloomberg_cdso::Z_STEP,
         z_limit(ctx.sigma, t_expiry),
         integrand,
-    );
+    )
+    .expect("valid integration grid");
     let fine = normal_integral(
         bloomberg_cdso::Z_STEP * 0.5,
         z_limit(ctx.sigma, t_expiry),
         integrand,
-    );
+    )
+    .expect("valid integration grid");
     let dollar_diff = (production - fine).abs() * option.notional.amount();
 
     assert!(
@@ -244,6 +246,7 @@ fn cdx_ig_46_convention_matrix() {
                     let vol_time = sigma * t.sqrt();
                     let black_delta = |forward: f64| {
                         norm_cdf(((forward / strike).ln() + 0.5 * vol_time * vol_time) / vol_time)
+                            .expect("valid normal variate")
                     };
                     let forward = ctx.forward_par_spread;
                     let delta = black_delta(forward);

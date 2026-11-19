@@ -391,3 +391,101 @@ fn test_credit_index_issuer_recovery_rates_reject_unknown_issuer() {
 
     assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
 }
+
+#[test]
+fn issuer_keys_and_weight_mass_are_validated_before_pricing() {
+    let hazard = Arc::new(sample_hazard_curve("CDX"));
+    let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
+    let base = |count| {
+        CreditIndexData::builder()
+            .num_constituents(count)
+            .recovery_rate(0.4)
+            .index_credit_curve(Arc::clone(&hazard))
+            .base_correlation_curve(Arc::clone(&base_corr))
+    };
+
+    let single = || base(1).issuer_curves([("A".into(), Arc::clone(&hazard))]);
+    assert!(
+        base(1)
+            .issuer_curves([(" ".into(), Arc::clone(&hazard))])
+            .build()
+            .is_err()
+    );
+    assert!(
+        base(1)
+            .issuer_curves([
+                ("A".into(), Arc::clone(&hazard)),
+                ("A".into(), Arc::clone(&hazard))
+            ])
+            .build()
+            .is_err()
+    );
+    assert!(
+        single()
+            .issuer_recovery_rates([("A".into(), 0.3), ("A".into(), 0.4)])
+            .build()
+            .is_err()
+    );
+    assert!(
+        single()
+            .issuer_weights([("A".into(), 0.9), ("A".into(), 1.0)])
+            .build()
+            .is_err()
+    );
+    assert!(
+        single()
+            .issuer_weights([("A".into(), 1.0_f64.next_up())])
+            .build()
+            .is_err()
+    );
+    assert!(
+        single()
+            .issuer_weights([("A".into(), 1.0 - 2.0 * f64::EPSILON)])
+            .build()
+            .is_err()
+    );
+
+    let equal = base(49)
+        .issuer_curves((0..49).map(|i| (i.to_string(), Arc::clone(&hazard))))
+        .issuer_weights((0..49).map(|i| (i.to_string(), 1.0 / 49.0)))
+        .build()
+        .expect("compensated sum admits 49 equal weights");
+    assert_eq!(equal.get_issuer_weight("10").unwrap(), 1.0 / 49.0);
+}
+
+#[test]
+fn credit_index_state_rejects_duplicate_and_blank_issuer_keys_in_wire_maps() {
+    use finstack_quant_core::market_data::context::CreditIndexState;
+    for (field, entries) in [
+        ("issuer_credit_curve_ids", r#""A":"one","A":"two""#),
+        ("issuer_recovery_rates", r#""A":0.3,"A":0.4"#),
+        ("issuer_weights", r#""A":0.5,"A":1.0"#),
+        ("issuer_weights", r#"" ":1.0"#),
+    ] {
+        let wire = format!(
+            r#"{{"id":"CDX","num_constituents":1,"recovery_rate":0.4,"index_credit_curve_id":"CDX","base_correlation_curve_id":"BC","{field}":{{{entries}}}}}"#
+        );
+        assert!(
+            serde_json::from_str::<CreditIndexState>(&wire).is_err(),
+            "{wire}"
+        );
+    }
+}
+
+#[test]
+fn credit_index_in_tagged_envelope_accepts_null_issuer_maps() {
+    use finstack_quant_core::market_data::context::CreditIndexState;
+
+    #[derive(serde::Deserialize)]
+    #[serde(tag = "kind")]
+    enum Envelope {
+        Index(CreditIndexState),
+    }
+    let wire = r#"{"kind":"Index","id":"CDX","num_constituents":1,"recovery_rate":0.4,
+        "index_credit_curve_id":"CDX","base_correlation_curve_id":"BC",
+        "issuer_credit_curve_ids":null,"issuer_recovery_rates":null,"issuer_weights":null}"#;
+    let Envelope::Index(state) = serde_json::from_str(wire).expect("homogeneous pool");
+    assert!(state.issuer_credit_curve_ids.is_none());
+    assert!(state.issuer_recovery_rates.is_none());
+    assert!(state.issuer_weights.is_none());
+}

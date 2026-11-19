@@ -24,7 +24,7 @@
 //! drift is identically zero, is simulated from its exact lognormal law.
 //! The time grid must contain the process's fixing dates and volatility knots.
 //! The engine rejects grids that cross these boundaries; direct steps on an
-//! unaligned interval return nonfinite state to signal invalid discretization.
+//! unaligned interval return a validation error.
 //!
 //! # References
 //!
@@ -66,10 +66,11 @@ impl Discretization<LmmProcess> for LmmPredictorCorrector {
         x: &mut [f64],
         z: &[f64],
         work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         if !process.step_is_aligned(t, dt) {
-            x.fill(f64::NAN);
-            return;
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "LMM step at {t} with length {dt} is invalid or crosses a fixing or volatility knot"
+            )));
         }
         let params = process.params();
         let n = params.num_forwards;
@@ -142,6 +143,7 @@ impl Discretization<LmmProcess> for LmmPredictorCorrector {
             x[i] = x_disp * ((avg_m - 0.5 * lam_sq) * dt + diff_sum * sqrt_dt).exp()
                 - params.displacements[i];
         }
+        Ok(())
     }
 
     fn work_size(&self, process: &LmmProcess) -> usize {
@@ -190,7 +192,8 @@ mod tests {
         let mut x = vec![0.03, 0.03, 0.03];
         let z = vec![0.5, -0.3]; // 2 normal shocks
 
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // All forwards should remain > -displacement
         for (i, &f) in x.iter().enumerate() {
@@ -208,7 +211,8 @@ mod tests {
         let mut x = vec![0.03, 0.03, 0.03];
         let z = vec![0.0, 0.0]; // zero shocks
 
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // The terminal forward is driftless under the terminal measure; the
         // log-Euler step at zero shock lands on the lognormal MEDIAN:
@@ -253,8 +257,9 @@ mod tests {
             let mut work = vec![0.0; ws];
             let mut z = vec![0.0; 2];
             for step in 0..num_steps {
-                rng.fill_std_normals(&mut z);
-                disc.step(&process, step as f64 * dt, dt, &mut x, &z, &mut work);
+                rng.fill_std_normals(&mut z).expect("normal draws");
+                disc.step(&process, step as f64 * dt, dt, &mut x, &z, &mut work)
+                    .expect("valid simulation step");
             }
             let payoff = (x[2] - strike).max(0.0);
             sum += payoff;
@@ -269,7 +274,8 @@ mod tests {
         let sigma = 0.02_f64.sqrt();
         let d1 = ((x0 / k_disp).ln() + 0.5 * sigma * sigma * t_expiry) / (sigma * t_expiry.sqrt());
         let d2 = d1 - sigma * t_expiry.sqrt();
-        let black = x0 * norm_cdf(d1) - k_disp * norm_cdf(d2);
+        let black = x0 * norm_cdf(d1).expect("valid Gaussian variate")
+            - k_disp * norm_cdf(d2).expect("valid Gaussian variate");
 
         assert!(
             (mean - black).abs() < 4.0 * stderr,
@@ -292,7 +298,8 @@ mod tests {
         // At t=1.5, forward 0 is dead (T_0=0.0) and forward 1 is dead (T_1=1.0)
         let x0_before = x[0];
         let x1_before = x[1];
-        disc.step(&process, 1.5, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 1.5, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert!(
             (x[0] - x0_before).abs() < 1e-15,
@@ -310,7 +317,8 @@ mod tests {
         let disc = LmmPredictorCorrector::new();
         for (time, fixed) in [(0.0, 1), (1.0, 2), (2.0, 3)] {
             let mut rates = [0.03; 3];
-            disc.step(&process, time, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9]);
+            disc.step(&process, time, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9])
+                .expect("valid simulation step");
             assert!(rates[..fixed].iter().all(|&rate| rate == 0.03));
         }
     }
@@ -323,9 +331,11 @@ mod tests {
         let process = LmmProcess::new(params);
         let disc = LmmPredictorCorrector::new();
         let mut rates = [0.03; 3];
-        disc.step(&process, 0.0, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9]);
+        disc.step(&process, 0.0, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9])
+            .expect("valid simulation step");
         assert!(rates.iter().all(|&rate| (rate - 0.03).abs() < 1e-15));
-        disc.step(&process, 0.5, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9]);
+        disc.step(&process, 0.5, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9])
+            .expect("valid simulation step");
         assert_eq!(rates[0], 0.03);
         assert_ne!(rates[1], 0.03);
     }
@@ -339,8 +349,10 @@ mod tests {
         let disc = LmmPredictorCorrector::new();
         for (t, dt) in [(0.0, 0.75), (0.5, 0.75)] {
             let mut rates = [0.03; 3];
-            disc.step(&process, t, dt, &mut rates, &[0.0; 2], &mut [0.0; 9]);
-            assert!(rates.iter().all(|rate| rate.is_nan()));
+            assert!(
+                disc.step(&process, t, dt, &mut rates, &[0.0; 2], &mut [0.0; 9])
+                    .is_err()
+            );
         }
     }
 }

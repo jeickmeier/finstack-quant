@@ -3546,7 +3546,7 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve",
-    "description": "A finite, left-continuous piecewise-constant curve."
+    "description": "A finite, right-continuous piecewise-constant curve."
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times",
@@ -3555,7 +3555,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/times/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values",
@@ -3564,7 +3565,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_d2986402f9d59a555abc",
@@ -3782,7 +3784,7 @@ export default [
   {
     "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/spot_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/spot_id",
-    "description": "Optional spot price ID (for delta calculations)."
+    "description": "Optional observed spot identifier. At maturity the scalar is the delivery\nobservation. After maturity use the exact delivery observation in the\ncorresponding `FIXING:{spot_id}` series. Before maturity an explicitly\nidentified spot can supply the cost-of-carry input if the forward curve is absent."
   },
   {
     "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/spot_id/anyOf/0",

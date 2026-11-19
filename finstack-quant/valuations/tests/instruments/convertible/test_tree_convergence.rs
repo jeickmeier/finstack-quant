@@ -112,7 +112,8 @@ fn create_test_market(base_date: Date) -> MarketContext {
         .expect("should build curve");
 
     MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price(
             "EQUITY",
             MarketScalar::unitless(100.0).expect("valid scalar"),

@@ -346,6 +346,9 @@ def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
                 [0.10, 0.11, 0.12],
                 [0.01, 0.012, 0.012],
                 [0.003, 0.004, 0.004],
+                delta_convention="forward_unadjusted",
+                atm_convention="delta_neutral_straddle",
+                butterfly_convention="smile",
             )
         )
         market.insert(

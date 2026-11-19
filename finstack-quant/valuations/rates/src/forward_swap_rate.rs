@@ -167,7 +167,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(discount_curve);
+        let market = MarketContext::new()
+            .try_insert(discount_curve)
+            .expect("insert market curve");
         let start = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2031, Month::January, 1).expect("valid date");
 
@@ -208,7 +210,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let disc = market.get_discount("USD-OIS").expect("curve");
         let calendar_id = finstack_quant_core::dates::WEEKENDS_ONLY_ID;
         let calendar = calendar_by_id_strict(calendar_id).expect("calendar");

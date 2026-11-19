@@ -62,7 +62,9 @@ mod tests {
             .build()
             .expect("valid curve");
 
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     #[test]

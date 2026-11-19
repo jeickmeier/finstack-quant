@@ -104,7 +104,7 @@ test('COS reports invalid market inputs as exceptions without a panic', () => {
 
 test('SABR diagnostics accept a flat smile on uneven strikes', () => {
   const params = new facade.models.volatility.SabrParameters(0.2, 1, 0, 0);
-  const smile = new facade.models.volatility.SabrSmile(params, 100, 1);
+  const smile = new facade.models.volatility.SabrSmile(params, 100, 1, 'black_lognormal');
   try {
     const result = smile.validateNoArbitrage([99, 100, 120], 0);
     assert.equal(result.arbitrage_free, true);

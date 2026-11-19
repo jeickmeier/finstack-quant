@@ -29,6 +29,7 @@ function WorkbenchRoute() {
             initialConvention: "normal",
             colorDomains: { normal: [0, 0.1], lognormal: [0, 2] },
             slice: {
+              interpolationMode: "vol",
               initialStrikes: [0.03, 0.04, 0.05, 0.06, 0.07],
               initialRate: 0.04,
               repairIterations: 10,
@@ -36,6 +37,7 @@ function WorkbenchRoute() {
           })}
           fxOptions={(surface) => ({
             coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }],
+            interpolationMode: "total_variance",
             initialDeliveryForwards: surface.expiries.map(() => 1.12),
             colorDomain: [0, 1],
           })}

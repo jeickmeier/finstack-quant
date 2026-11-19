@@ -56,7 +56,11 @@ fn test_zero_notional() {
     let end = date!(2029 - 01 - 01);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_NOTIONAL",
@@ -79,7 +83,11 @@ fn test_zero_spread() {
     let end = date!(2029 - 01 - 01);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_SPREAD",
@@ -108,7 +116,11 @@ fn test_negative_spread() {
     let end = date!(2029 - 01 - 01);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "NEG_SPREAD",
@@ -139,7 +151,11 @@ fn test_very_high_spread() {
     let end = date!(2029 - 01 - 01);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "HIGH_SPREAD",
@@ -181,7 +197,11 @@ fn test_zero_recovery_rate() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_RECOVERY",
@@ -224,7 +244,11 @@ fn test_full_recovery_rate_is_rejected() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "FULL_RECOVERY",
@@ -264,7 +288,11 @@ fn test_very_short_tenor() {
     let end = date!(2024 - 01 - 02);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ONE_DAY",
@@ -287,7 +315,11 @@ fn test_maturity_equals_valuation_date() {
     let end = as_of; // Maturity = valuation date
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "EXPIRED",
@@ -315,7 +347,11 @@ fn test_valuation_after_maturity() {
     let as_of = date!(2026 - 01 - 01); // After maturity
     let (disc, hazard) = build_curves(start);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "PAST_MATURITY",
@@ -358,7 +394,11 @@ fn test_very_high_hazard_rate() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "HIGH_HAZARD",
@@ -400,7 +440,11 @@ fn test_zero_hazard_rate() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_HAZARD",
@@ -428,12 +472,14 @@ fn test_metrics_with_zero_notional() {
     let end = date!(2029 - 01 - 01);
     let (disc, _) = build_curves(as_of);
 
-    let source = MarketContext::new().insert(disc);
+    let source = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_METRICS",
@@ -480,7 +526,7 @@ fn test_par_spread_with_mismatched_curves_errors() {
 
     let market = MarketContext::new()
         // Intentionally insert under IDs that *do not* match the instrument's curve IDs.
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD_OIS_ACTUAL")
                 .base_date(as_of)
                 .day_count(DayCount::Act360)
@@ -490,7 +536,8 @@ fn test_par_spread_with_mismatched_curves_errors() {
                 .build()
                 .unwrap(),
         )
-        .insert(
+        .expect("insert discount curve")
+        .try_insert(
             HazardCurve::builder("CORP_ACTUAL")
                 .base_date(as_of)
                 .recovery_rate(0.40)
@@ -498,7 +545,8 @@ fn test_par_spread_with_mismatched_curves_errors() {
                 .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .unwrap(),
-        );
+        )
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "MISMATCH_TEST",
@@ -531,7 +579,11 @@ fn test_numerical_stability_with_extreme_dates() {
     let end = date!(2054 - 01 - 01);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "LONG_DATED",
@@ -557,7 +609,11 @@ fn test_very_small_notional() {
     let end = date!(2029 - 01 - 01);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "TINY_NOTIONAL",
@@ -592,7 +648,9 @@ fn test_missing_discount_curve_error() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "MISSING_DISC",
@@ -624,7 +682,9 @@ fn test_missing_hazard_curve_error() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "MISSING_HAZARD",
@@ -647,7 +707,11 @@ fn test_settlement_delay_zero_is_valid() {
     let end = date!(2029 - 01 - 01);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_DELAY",
@@ -673,7 +737,11 @@ fn test_recovery_rate_bounds_not_enforced() {
     let end = date!(2029 - 01 - 01);
     let (disc, hazard) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     // Test with negative recovery (invalid)
     let mut cds = crate::instruments::test_support::credit::cds_buy_protection(

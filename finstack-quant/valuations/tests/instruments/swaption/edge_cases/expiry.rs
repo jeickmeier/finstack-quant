@@ -10,8 +10,10 @@ use finstack_quant_valuations::pricer::ModelKey;
 
 fn curve_only_market(as_of: Date, rate: f64) -> MarketContext {
     MarketContext::new()
-        .insert(build_flat_discount_curve(rate, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(rate, as_of, "USD_LIBOR_3M"))
+        .try_insert(build_flat_discount_curve(rate, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(rate, as_of, "USD_LIBOR_3M"))
+        .expect("insert market curve")
 }
 
 #[test]

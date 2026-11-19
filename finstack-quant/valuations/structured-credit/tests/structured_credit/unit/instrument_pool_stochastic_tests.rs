@@ -225,7 +225,9 @@ fn spread_sensitivity_raises_draws_and_losses_on_stress_paths() {
             Some(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
         deal
     };
-    let market = market_with_curves(CLOSING).insert(widening_hazard_curve());
+    let market = market_with_curves(CLOSING)
+        .try_insert(widening_hazard_curve())
+        .expect("insert market curve");
 
     let unlinked = build(0.0)
         .price_stochastic_with_mode(&market, CLOSING, monte_carlo(200))
@@ -279,16 +281,18 @@ fn same_seed_is_bit_identical_across_thread_counts() {
     });
     deal.credit_model.stochastic_default_spec =
         Some(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
-    let market = market_with_curves(CLOSING).insert(
-        HazardCurve::flat(
-            HAZARD_ID,
-            CLOSING,
-            0.05,
-            0.4,
-            finstack_quant_core::dates::DayCount::Act365F,
+    let market = market_with_curves(CLOSING)
+        .try_insert(
+            HazardCurve::flat(
+                HAZARD_ID,
+                CLOSING,
+                0.05,
+                0.4,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .expect("hazard curve"),
         )
-        .expect("hazard curve"),
-    );
+        .expect("insert market curve");
 
     let price = || {
         deal.price_stochastic_with_mode(&market, CLOSING, monte_carlo(32))

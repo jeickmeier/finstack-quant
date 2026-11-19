@@ -265,9 +265,11 @@ fn black76_pv(
     let d1 = ((forward / strike).ln() + 0.5 * volatility * volatility * t) / vol_sqrt_t;
     let d2 = d1 - vol_sqrt_t;
     let price = if is_payer {
-        forward * norm_cdf(d1) - strike * norm_cdf(d2)
+        forward * norm_cdf(d1).expect("valid normal variate")
+            - strike * norm_cdf(d2).expect("valid normal variate")
     } else {
-        strike * norm_cdf(-d2) - forward * norm_cdf(-d1)
+        strike * norm_cdf(-d2).expect("valid normal variate")
+            - forward * norm_cdf(-d1).expect("valid normal variate")
     };
 
     price * annuity * swaption.notional.amount()
@@ -315,8 +317,10 @@ fn test_quantlib_parity_vol_smile() {
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
 
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(smile_surface);
 
     // Test different strikes pick up smile

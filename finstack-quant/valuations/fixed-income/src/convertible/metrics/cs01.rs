@@ -78,7 +78,7 @@ fn cs01_setup(bond: &ConvertibleBond, market: &MarketContext) -> Result<Cs01Setu
     shocked.recovery_rate = Some(0.0);
     Ok(Cs01Setup {
         bond: shocked,
-        market: market.clone().insert(synthetic),
+        market: market.clone().try_insert(synthetic)?,
         curve_id,
     })
 }
@@ -272,7 +272,8 @@ mod tests {
         // Busted-convert setup (spot=50, conversion value=500 vs face=1000):
         // the cash component dominates, so the z-spread CS01 must be material.
         let market = finstack_quant_core::market_data::context::MarketContext::new()
-            .insert(discount_curve)
+            .try_insert(discount_curve)
+            .expect("insert market curve")
             .insert_price("AAPL", MarketScalar::unitless(50.0).expect("valid scalar"))
             .insert_price(
                 "AAPL-VOL",

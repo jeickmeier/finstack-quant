@@ -74,7 +74,7 @@ proptest! {
         // Build market curves
         let disc = build_test_discount_curve(0.03, base_date, "USD-OIS");
         let fwd = build_test_forward_curve(0.03, base_date, "USD-SOFR-3M");
-        let context = MarketContext::new().insert(disc).insert(fwd);
+        let context = MarketContext::new().try_insert(disc).expect("insert market curve").try_insert(fwd).expect("insert market curve");
 
         // Create two receiver swaps with different fixed rates
         let irs_low = InterestRateSwap::builder()
@@ -177,7 +177,7 @@ proptest! {
         // Build market curves
         let disc = build_test_discount_curve(0.04, base_date, "USD-OIS");
         let fwd = build_test_forward_curve(0.04, base_date, "USD-SOFR-3M");
-        let context = MarketContext::new().insert(disc).insert(fwd);
+        let context = MarketContext::new().try_insert(disc).expect("insert market curve").try_insert(fwd).expect("insert market curve");
 
         let payer = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-PAYER"))
@@ -302,7 +302,7 @@ proptest! {
         let disc = disc_res.unwrap();
         let fwd = fwd_res.unwrap();
 
-        let context = MarketContext::new().insert(disc).insert(fwd);
+        let context = MarketContext::new().try_insert(disc).expect("insert market curve").try_insert(fwd).expect("insert market curve");
 
         let irs = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-EXTREME"))

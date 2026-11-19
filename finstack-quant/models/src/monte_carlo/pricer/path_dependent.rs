@@ -19,8 +19,7 @@ use crate::monte_carlo::traits::{RandomStream, StochasticProcess};
 use crate::types::OptionMarketParams;
 use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::math::random::BrownianBridge;
-use finstack_quant_core::math::random::{MAX_SOBOL_DIMENSION, SobolRng};
+use finstack_quant_core::math::random::{MAX_SOBOL_DIMENSION, SOBOL_PERIOD, SobolRng};
 use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
@@ -30,19 +29,10 @@ use finstack_quant_core::{Error, Result};
 /// from any other component keyed on the same user seed.
 const SOBOL_AUX_DOMAIN_SALT: u64 = 0x5350_4448_5F41_5558; // "SPDH_AUX"
 
-/// Domain-separation salt for the Sobol Owen-scrambling seed. XORing the user
-/// seed with this constant (and flooring at 1) guarantees scrambling is never
-/// silently disabled by a zero seed.
+/// Domain-separation salt for Sobol prefix hash digit permutations.
 const SOBOL_SCRAMBLE_DOMAIN_SALT: u64 = 0x534F_424F_4C53_4352; // "SOBOLSCR"
 
-/// Number of independently scrambled Sobol replicates used for the
-/// randomized-QMC error estimate.
-///
-/// Points within one scrambled Sobol sequence are deliberately dependent, so
-/// `sample_std/√n` over them is not a valid standard error. The standard
-/// remedy (Owen 1997; Glasserman 2003, §5.4) is R independent randomizations:
-/// the run is split into R replicates, each with its own Owen-scrambling
-/// seed, and the standard error is computed across the R replicate means.
+/// Number of distinct permutation seeds used to estimate variation among replicate means.
 const SOBOL_QMC_REPLICATES: usize = 16;
 
 /// Upper bound on captured path points (`num_paths x (num_steps + 1)`) in
@@ -55,7 +45,7 @@ pub(crate) const MAX_LRM_CAPTURED_POINTS: usize = 4_000_000;
 pub struct PathDependentPricerConfig {
     /// Independent Monte Carlo estimators; at least two are required. With
     /// antithetic sampling each estimator averages two physical paths. For
-    /// Sobol sampling this is the total point budget across independent scrambles.
+    /// Sobol sampling this is the total point budget across separately seeded scrambles.
     pub num_paths: usize,
     /// Random seed
     pub seed: u64,
@@ -168,7 +158,7 @@ impl PathDependentPricerConfig {
     /// * `time_to_maturity` - Simulation horizon in years from the valuation
     ///   date; must be positive and finite.
     /// * `required_times` - Event times in years (fixings, observations,
-    ///   exercise dates) in `(0, time_to_maturity]` merged into the uniform
+    ///   exercise dates) in `[0, time_to_maturity]` merged into the uniform
     ///   grid as exact knots, so the result may be non-uniform.
     ///
     /// # Errors
@@ -180,10 +170,20 @@ impl PathDependentPricerConfig {
         time_to_maturity: f64,
         required_times: &[f64],
     ) -> Result<TimeGrid> {
+        if !self.steps_per_year.is_finite() || self.steps_per_year <= 0.0 || self.min_steps == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "MC grid step density and minimum count must be positive".into(),
+            ));
+        }
+        let steps = (time_to_maturity * self.steps_per_year).round();
+        if !steps.is_finite() || steps >= usize::MAX as f64 || time_to_maturity <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "MC grid horizon or step count is outside the supported range".into(),
+            ));
+        }
         TimeGrid::uniform_with_required_times(
             time_to_maturity,
-            self.steps_per_year,
-            self.min_steps,
+            self.min_steps.max(steps as usize),
             required_times,
         )
     }
@@ -354,7 +354,10 @@ impl PathDependentPricer {
         let sobol_dimension = if self.config.use_brownian_bridge {
             time_grid.num_steps()
         } else {
-            time_grid.num_steps() * num_factors
+            time_grid
+                .num_steps()
+                .checked_mul(num_factors)
+                .ok_or_else(|| Error::Validation("Sobol path dimension overflow".into()))?
         };
 
         if sobol_dimension == 0 || sobol_dimension > MAX_SOBOL_DIMENSION {
@@ -364,6 +367,12 @@ impl PathDependentPricer {
             )));
         }
 
+        let replicates = SOBOL_QMC_REPLICATES.min(self.config.num_paths);
+        if replicates == 0 || self.config.num_paths.div_ceil(replicates) as u64 > SOBOL_PERIOD {
+            return Err(Error::Validation(format!(
+                "Sobol replicates must contain 1 through {SOBOL_PERIOD} points"
+            )));
+        }
         Ok(sobol_dimension)
     }
 
@@ -424,17 +433,13 @@ impl PathDependentPricer {
             Vec::new()
         };
 
-        // Randomized QMC: split the run into R independently scrambled
-        // replicates. The standard error comes from the R replicate means
-        // — the statistically valid error estimate for
-        // QMC (points within one scrambled sequence are dependent by
-        // construction, so a plain sample stderr over them is meaningless).
+        // Estimate variation across replicate means. Each replicate consumes
+        // a complete sequence block under its own prefix hash permutation.
         let mut replicate_means = OnlineStats::new();
         let mut overall = OnlineStats::new();
         let mut replicate_stats = OnlineStats::new();
         self.for_each_sobol_path(
             &time_grid,
-            process.num_factors(),
             sobol_dimension,
             |path_id, last_in_replicate, adapter| {
                 let discounted_value = engine.simulate_discounted(
@@ -456,8 +461,8 @@ impl PathDependentPricer {
             },
         )?;
 
-        // Unbiased point estimate across all simulated paths (`overall.get_mean()`),
-        // with RQMC standard error across the R independently scrambled replicate
+        // Point estimate across all simulated paths (`overall.get_mean()`),
+        // with variation estimated across the R permuted replicate
         // means (`replicate_means.get_stderr()`). When `num_paths % replicates != 0`,
         // an unweighted mean of replicate means would overweight shorter replicates.
         // The 95% half-width is the Student-t interval over the R replicate
@@ -493,48 +498,40 @@ impl PathDependentPricer {
     fn for_each_sobol_path<F>(
         &self,
         time_grid: &TimeGrid,
-        num_factors: usize,
         sobol_dimension: usize,
         mut visit: F,
     ) -> Result<()>
     where
         F: for<'a> FnMut(usize, bool, &mut SobolPathStream<'a>) -> Result<()>,
     {
-        let num_steps = time_grid.num_steps();
         let bridge = self
             .config
             .use_brownian_bridge
-            .then(|| BrownianBridge::new(num_steps));
+            .then(|| SobolBridge::new(time_grid));
         let mut z_path = vec![0.0; sobol_dimension];
-        let mut z_increments = vec![0.0; num_steps * num_factors];
-        let mut w_path = vec![0.0; num_steps + 1];
+        let mut z_increments = vec![0.0; sobol_dimension];
         let replicates = SOBOL_QMC_REPLICATES.min(self.config.num_paths);
         let base_paths = self.config.num_paths / replicates;
         let remainder = self.config.num_paths % replicates;
         let mut path_id = 0usize;
         for replicate in 0..replicates {
-            // A zero scramble seed disables Owen scrambling. The Weyl
-            // increment assigns a distinct, nonzero seed to each replicate.
+            // The Weyl increment assigns a distinct permutation seed to each replicate.
             let scramble_seed = (self.config.seed ^ SOBOL_SCRAMBLE_DOMAIN_SALT)
-                .wrapping_add((replicate as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
-                .max(1);
-            let mut sobol = SobolRng::try_new(sobol_dimension, scramble_seed)
-                .map_err(|err| Error::Validation(err.to_string()))?;
+                .wrapping_add((replicate as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            let mut sobol = SobolRng::new(sobol_dimension, Some(scramble_seed))?;
             let replicate_paths = base_paths + usize::from(replicate < remainder);
             for point in 0..replicate_paths {
-                sobol.fill_std_normals(&mut z_path);
-                fill_sobol_increments(
-                    &z_path,
-                    &mut z_increments,
-                    &mut w_path,
-                    bridge.as_ref(),
-                    time_grid,
-                    num_factors,
-                )?;
+                sobol.fill_std_normals(&mut z_path)?;
+                let increments = if let Some(bridge) = &bridge {
+                    bridge.fill(&z_path, &mut z_increments)?;
+                    &z_increments
+                } else {
+                    &z_path
+                };
                 // Auxiliary uniforms use disjoint per-path Philox counter
                 // streams; Sobol carries only the asset normals.
                 let mut adapter = SobolPathStream::new(
-                    &z_increments,
+                    increments,
                     PhiloxRng::with_stream(
                         self.config.seed ^ SOBOL_AUX_DOMAIN_SALT,
                         path_id as u64,
@@ -645,22 +642,17 @@ impl PathDependentPricer {
         };
         let mut scratch = PathScratch::new(inputs, &pair, false);
         let mut moments = OnlineCovariance::new();
-        self.for_each_sobol_path(
-            &time_grid,
-            process.num_factors(),
-            sobol_dimension,
-            |path_id, _, adapter| {
-                let (arithmetic, geometric) = engine.simulate_discounted_pair(
-                    adapter,
-                    inputs,
-                    &mut scratch,
-                    path_id,
-                    &AsianPair::control_value,
-                )?;
-                moments.update(arithmetic, geometric)?;
-                Ok(())
-            },
-        )?;
+        self.for_each_sobol_path(&time_grid, sobol_dimension, |path_id, _, adapter| {
+            let (arithmetic, geometric) = engine.simulate_discounted_pair(
+                adapter,
+                inputs,
+                &mut scratch,
+                path_id,
+                &AsianPair::control_value,
+            )?;
+            moments.update(arithmetic, geometric)?;
+            Ok(())
+        })?;
         Ok(moments)
     }
 
@@ -1053,7 +1045,11 @@ impl PathDependentPricer {
             ));
         }
         let num_steps = time_grid.num_steps();
-        let time_to_maturity = time_grid.t_max();
+        if num_steps == 0 {
+            return Err(Error::Validation(
+                "price_with_lrm_greeks needs at least one transition".into(),
+            ));
+        }
         // LRM Greeks require full path capture, which is incompatible with
         // antithetic pairing; fail loudly rather than silently changing the
         // estimator the caller configured.
@@ -1124,9 +1120,8 @@ impl PathDependentPricer {
         // Build undiscounted payoffs and per-path joint-density scores by
         // reconstructing each step's standardized shock from consecutive
         // captured spots (exact under the ExactGbm step used above).
-        let dt = time_to_maturity / num_steps as f64;
-        let sqrt_dt = dt.sqrt();
-        let mu_dt = (rate - div_yield - 0.5 * vol * vol) * dt;
+        let dts = engine.config().time_grid.dts();
+        let drift = rate - div_yield - 0.5 * vol * vol;
 
         let mut payoffs: Vec<f64> = Vec::with_capacity(paths.len());
         let mut first_shocks: Vec<f64> = Vec::with_capacity(paths.len());
@@ -1151,7 +1146,9 @@ impl PathDependentPricer {
             let mut first_shock = 0.0;
             let mut score_sum = 0.0;
             for (k, w) in spots.windows(2).enumerate() {
-                let z = ((w[1] / w[0]).ln() - mu_dt) / (vol * sqrt_dt);
+                let dt = dts[k];
+                let sqrt_dt = dt.sqrt();
+                let z = ((w[1] / w[0]).ln() - drift * dt) / (vol * sqrt_dt);
                 if k == 0 {
                     first_shock = z;
                 }
@@ -1171,7 +1168,7 @@ impl PathDependentPricer {
             &first_shocks,
             initial_spot,
             vol,
-            dt,
+            dts[0],
             discount_factor,
         )?;
         let vega = lrm_vega_from_scores(&payoffs, &vega_scores, discount_factor)?;
@@ -1206,43 +1203,81 @@ impl PathDependentPricer {
     }
 }
 
-/// Fill `z_increments` with per-step standard normals derived from a single
-/// Sobol path draw.
-///
-/// Without a Brownian bridge the Sobol draw is already laid out in
-/// `step-major × factor-major` order, so it is copied directly. With a
-/// Brownian bridge (single-factor only, as enforced by
-/// [`PathDependentPricer::validate_sobol_configuration`]) the draw is
-/// converted to a scalar Brownian motion `w_path` and then scaled to standard
-/// normals per step by `(w[i+1] - w[i]) / sqrt(dt_i)`.
-fn fill_sobol_increments(
-    z_path: &[f64],
-    z_increments: &mut [f64],
-    w_path: &mut [f64],
-    bridge: Option<&BrownianBridge>,
-    time_grid: &TimeGrid,
-    num_factors: usize,
-) -> Result<()> {
-    let num_steps = time_grid.num_steps();
-    match bridge {
-        Some(bridge) => {
-            debug_assert_eq!(num_factors, 1, "Brownian bridge only supports 1 factor");
-            bridge.construct_path(z_path, w_path, time_grid.times())?;
-            for step in 0..num_steps {
-                let dt = time_grid.dt(step);
-                z_increments[step] = (w_path[step + 1] - w_path[step]) / dt.sqrt();
+/// Split standardized interval increments directly on the actual grid.
+struct SobolBridge {
+    splits: Vec<BridgeSplit>,
+}
+
+struct BridgeSplit {
+    left: usize,
+    mid: usize,
+    left_weight: f64,
+    right_weight: f64,
+}
+
+impl SobolBridge {
+    fn new(grid: &TimeGrid) -> Self {
+        fn append(times: &[f64], left: usize, right: usize, splits: &mut Vec<BridgeSplit>) {
+            if right - left <= 1 {
+                return;
             }
+            let mid = left + (right - left) / 2;
+            let root_span = (times[right] - times[left]).sqrt();
+            splits.push(BridgeSplit {
+                left,
+                mid,
+                left_weight: (times[mid] - times[left]).sqrt() / root_span,
+                right_weight: (times[right] - times[mid]).sqrt() / root_span,
+            });
+            append(times, left, mid, splits);
+            append(times, mid, right, splits);
         }
-        None => {
-            z_increments.copy_from_slice(&z_path[..num_steps * num_factors]);
-        }
+        // Sobol admission bounds the number of intervals to 1..=40.
+        let mut splits = Vec::with_capacity(grid.num_steps() - 1);
+        append(grid.times(), 0, grid.num_steps(), &mut splits);
+        Self { splits }
     }
-    Ok(())
+
+    fn fill(&self, z: &[f64], increments: &mut [f64]) -> Result<()> {
+        // Each parent occupies its leftmost output slot until its split.
+        // The one-step bridge therefore returns its terminal shock exactly.
+        increments[0] = z[0];
+        for (split, &innovation) in self.splits.iter().zip(&z[1..]) {
+            let parent = increments[split.left];
+            let left = weighted_shock(split.left_weight, parent, split.right_weight, innovation);
+            let right = weighted_shock(split.right_weight, parent, -split.left_weight, innovation);
+            if !left.is_finite() || !right.is_finite() {
+                return Err(Error::Internal(
+                    "Brownian bridge increment is out of range".into(),
+                ));
+            }
+            increments[split.left] = left;
+            increments[split.mid] = right;
+        }
+        Ok(())
+    }
+}
+
+fn weighted_shock(a: f64, parent: f64, b: f64, innovation: f64) -> f64 {
+    let combine = |p: f64, z: f64| {
+        let product = a * p;
+        // Include the rounding error of the first product in a near cancellation.
+        b.mul_add(z, product) + a.mul_add(p, -product)
+    };
+    let value = combine(parent, innovation);
+    // Subnormal terms may lose bits even before the final sum. Exact binary
+    // scaling allows the two terms to round together on return to the grid.
+    const UP: f64 = (1_u64 << 54) as f64;
+    if value.abs() < f64::MIN_POSITIVE && parent.abs().max(innovation.abs()) <= f64::MAX / UP {
+        combine(parent * UP, innovation * UP) / UP
+    } else {
+        value
+    }
 }
 
 /// Per-path [`RandomStream`] adapter that feeds pre-computed standard normals
 /// from a Sobol draw into the generic [`McEngine`] step loop while routing
-/// uniform draws to an independent Philox stream.
+/// uniform draws to a separate Philox stream.
 ///
 /// The adapter cannot be split: each path gets a fresh adapter constructed by
 /// the Sobol pricer outer loop, so the engine's per-path `rng.split(..)` call
@@ -1276,13 +1311,18 @@ impl<'a> RandomStream for SobolPathStream<'a> {
         self.aux.fill_u01(out);
     }
 
-    fn fill_std_normals(&mut self, out: &mut [f64]) {
-        // The pricer sizes `z_increments` to every normal one path draws
-        // (`num_steps * num_factors`), so the slice below never overruns; if it
-        // did, the slice index panics with the requested range and the length.
-        let end = self.cursor + out.len();
-        out.copy_from_slice(&self.z_increments[self.cursor..end]);
-        self.cursor = end;
+    fn fill_std_normals(&mut self, out: &mut [f64]) -> Result<()> {
+        let remaining = &self.z_increments[self.cursor..];
+        let draws = remaining.get(..out.len()).ok_or_else(|| {
+            Error::Validation(format!(
+                "Sobol path requires {} normals but only {} coordinates remain",
+                out.len(),
+                remaining.len()
+            ))
+        })?;
+        out.copy_from_slice(draws);
+        self.cursor += draws.len();
+        Ok(())
     }
 
     fn supports_splitting(&self) -> bool {
@@ -1293,6 +1333,77 @@ impl<'a> RandomStream for SobolPathStream<'a> {
 #[cfg(test)]
 mod tests {
     use super::{PathDependentPricer, PathDependentPricerConfig};
+
+    #[test]
+    fn bridge_keeps_standardized_increments_when_levels_round_together() {
+        use finstack_quant_core::math::time_grid::TimeGrid;
+        let eta = f64::from_bits(1);
+        let one_step = super::SobolBridge::new(&TimeGrid::from_times(vec![0.0, eta]).unwrap());
+        let mut single = [0.0];
+        for shock in [eta, -eta, 0.0] {
+            one_step.fill(&[shock], &mut single).unwrap();
+            assert_eq!(single[0], shock);
+        }
+
+        let two_steps =
+            super::SobolBridge::new(&TimeGrid::from_times(vec![0.0, eta, 2.0 * eta]).unwrap());
+        let mut pair = [0.0; 2];
+        for (shocks, expected) in [
+            ([0.0, eta], [eta, -eta]),
+            ([eta, eta], [eta, 0.0]),
+            ([0.0, 0.0], [0.0, 0.0]),
+        ] {
+            two_steps.fill(&shocks, &mut pair).unwrap();
+            assert_eq!(pair, expected);
+        }
+
+        // A unit terminal shock on this irregular grid gives a midpoint
+        // level of eta/2, rounding to zero, and a standard shock of sqrt(eta)/2.
+        let irregular = TimeGrid::from_times(vec![0.0, eta, 4.0]).unwrap();
+        super::SobolBridge::new(&irregular)
+            .fill(&[1.0, 0.0], &mut pair)
+            .unwrap();
+        assert_eq!(pair, [eta.sqrt() / 2.0, 1.0]);
+
+        // The first two positive-time levels both round to 2. The second
+        // interval still has a representable standardized innovation.
+        let grid = TimeGrid::from_times(vec![0.0, 1.0, 1.0_f64.next_up(), 4.0]).unwrap();
+        let mut increments = [0.0; 3];
+        super::SobolBridge::new(&grid)
+            .fill(&[1.0, 1.5 / 0.75_f64.sqrt(), 1e-10], &mut increments)
+            .unwrap();
+        assert!((increments[1] - 1e-10).abs() <= 5e-24);
+    }
+
+    #[test]
+    fn bridge_splits_actual_intervals_in_depth_first_order() {
+        use finstack_quant_core::math::time_grid::TimeGrid;
+        let grid = TimeGrid::from_times(vec![0.0, 1.0, 2.0, 5.0, 6.0]).unwrap();
+        let mut out = [0.0; 4];
+        let bridge = super::SobolBridge::new(&grid);
+        bridge.fill(&[0.0, 0.0, 1.0, 2.0], &mut out).unwrap();
+        let left = 1.0 / 2.0_f64.sqrt();
+        assert_eq!(out, [left, -left, 1.0, -3.0_f64.sqrt()]);
+        let equal_steps = TimeGrid::from_times(vec![0.0, 1.0, 2.0]).unwrap();
+        assert!(
+            super::SobolBridge::new(&equal_steps)
+                .fill(&[f64::MAX, f64::MAX], &mut out[..2])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn incomplete_sobol_path_draw_preserves_the_adapter_cursor() {
+        use crate::monte_carlo::rng::philox::PhiloxRng;
+        use crate::monte_carlo::traits::RandomStream;
+
+        let mut stream = super::SobolPathStream::new(&[1.0, -1.5], PhiloxRng::new(42));
+        let mut output = [99.0; 3];
+        assert!(stream.fill_std_normals(&mut output).is_err());
+        assert_eq!(output, [99.0; 3]);
+        stream.fill_std_normals(&mut output[..2]).unwrap();
+        assert_eq!(&output[..2], &[1.0, -1.5]);
+    }
 
     #[test]
     fn test_validate_rejects_sobol_plus_parallel() {
@@ -1703,8 +1814,9 @@ mod tests {
 
         let d1 = ((s0 / k).ln() + (r - q + 0.5 * sigma * sigma) * tau) / (sigma * tau.sqrt());
         let growth = ((r - q) * tau).exp();
-        let delta_true = df * growth * norm_cdf(d1);
-        let vega_true = df * growth * s0 * norm_pdf(d1) * tau.sqrt() * 0.01;
+        let delta_true = df * growth * norm_cdf(d1).expect("valid Gaussian variate");
+        let vega_true =
+            df * growth * s0 * norm_pdf(d1).expect("valid Gaussian variate") * tau.sqrt() * 0.01;
 
         // ≈5σ/8σ statistical tolerances at 100k paths; the old terminal-score
         // estimator was off by ≈50% (≈0.3 absolute in delta), far outside.
@@ -1845,10 +1957,8 @@ mod tests {
         }
     }
 
-    /// Randomized-QMC error estimate: the stderr across independently
-    /// scrambled replicates must be finite, positive, and cover the true
-    /// error against the Black-Scholes closed form. (A single-scramble
-    /// "stderr" over dependent Sobol points has no such guarantee.)
+    /// For this seed and path budget, compare the observed replicate spread
+    /// and price error against the Black-Scholes closed form.
     #[test]
     fn test_sobol_rqmc_stderr_covers_true_error() {
         let (s0, k, r, q, sigma, t) = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0);
@@ -2152,48 +2262,48 @@ mod tests {
         assert!(estimate.mean.amount() > 0.0);
     }
 
-    /// Seeded GBM Asian convenience prices (mean and standard error) are
-    /// pinned for calls and puts on macOS and the observed Linux builds used
-    /// by GitHub Actions.
+    /// The references use an independent Philox-4x32-10 and reflected Box–Muller
+    /// implementation, direct GBM averaging, and two-pass sample standard errors.
+    /// They cover call/put, ordinary/antithetic sampling, and both joint-density scores.
     #[test]
-    fn gbm_asian_call_and_put_are_bit_stable() {
-        const EXPECTED: &[u64] = &[
-            0x40195cdbec2b01c4,
-            0x3fdc249afb33387a,
-            0x40176ee1abd3fb0a,
-            0x3fd593ce944bf327,
-            0x4027c98e1c4e20cc,
-            0x3fe31c6bc20af5c2,
-            0x40027bb6f761ef02,
-            0x3fcb758de16af18e,
-            0x3fff484575b19363,
-            0x3fd05d4dc80f367e,
-            0x402ec1b62a42dd2e,
-            0x3fe04e9f5a5800d4,
-            0x401bd9967d816613,
-            0x3fce5f17b4811b71,
-            0x40155dfccc84297c,
-            0x3fc45f08a6f61eaa,
-            0x402a9e8a223bfe8b,
-            0x3fcbdb8abd307aec,
-            0x400061190e6e3a50,
-            0x3fc0720e85396db7,
-            0x3fff670343656927,
-            0x3fc56479aab3b6e9,
-            0x402d4a5a81aee858,
-            0x3fb5f30fcc19ac92,
-            0x4019f174aceea582,
-            0x3fe50d0985e19da9,
-            0x3fe521515a7bdef1,
-            0x3fc142f4470e821c,
-            0x3fcebd9d3d2cc032,
-            0x3fc5c2462919b2c4,
-            0x40143d71cec9488b,
-            0x3fdb41a13d264d1e,
-            0xbfd3e8b6c02d1c02,
-            0x3facdadbb65e9911,
-            0x3f9cbc02b2a93ef0,
-            0x3fb4c48e3872a8e8,
+    fn seeded_gbm_asian_prices_and_scores_match_independent_reference() {
+        const EXPECTED: [f64; 36] = [
+            6.917895688676028,
+            0.4987205883794049,
+            6.351896473050624,
+            0.3701560025674384,
+            12.442001387555337,
+            0.6525223654989073,
+            2.730854558423357,
+            0.23512676151583928,
+            2.425365368573234,
+            0.29871951989664663,
+            15.77033155046684,
+            0.5328260622224886,
+            7.695843219801653,
+            0.2743338158588275,
+            5.756545624462204,
+            0.17678004245987322,
+            13.926293553001408,
+            0.2550450012457795,
+            2.3766187264277625,
+            0.1423359093765034,
+            2.3505780520822483,
+            0.17955158417434333,
+            14.852697294079867,
+            0.09422589104155085,
+            7.2652723643646695,
+            0.6738587120298595,
+            0.5737309142702524,
+            0.11179889485760279,
+            0.2844740978108626,
+            0.13266242988559637,
+            5.614876535584638,
+            0.5226074174710704,
+            -0.47141690055608493,
+            0.092812477014451,
+            0.501221875748187,
+            0.14008795855369172,
         ];
         let mut actual = Vec::new();
         for antithetic in [false, true] {
@@ -2235,8 +2345,8 @@ mod tests {
                     )
                     .expect("put");
                 for estimate in [call, put] {
-                    actual.push(estimate.mean.amount().to_bits());
-                    actual.push(estimate.stderr.to_bits());
+                    actual.push(estimate.mean.amount());
+                    actual.push(estimate.stderr);
                 }
             }
         }
@@ -2265,94 +2375,22 @@ mod tests {
                     Some(Currency::USD),
                 )
                 .expect("lrm greeks");
-            actual.push(greeks.price.mean.amount().to_bits());
-            actual.push(greeks.price.stderr.to_bits());
-            actual.push(greeks.delta.mean.to_bits());
-            actual.push(greeks.delta.stderr.to_bits());
-            actual.push(greeks.vega.mean.to_bits());
-            actual.push(greeks.vega.stderr.to_bits());
+            actual.push(greeks.price.mean.amount());
+            actual.push(greeks.price.stderr);
+            actual.push(greeks.delta.mean);
+            actual.push(greeks.delta.stderr);
+            actual.push(greeks.vega.mean);
+            actual.push(greeks.vega.stderr);
         }
-        const LINUX: &[u64] = &[
-            0x40195cdbec2b01c3,
-            0x3fdc249afb333879,
-            0x40176ee1abd3fb0a,
-            0x3fd593ce944bf327,
-            0x4027c98e1c4e20d6,
-            0x3fe31c6bc20af5c3,
-            0x40027bb6f761ef02,
-            0x3fcb758de16af18e,
-            0x3fff484575b19363,
-            0x3fd05d4dc80f367e,
-            0x402ec1b62a42dd33,
-            0x3fe04e9f5a5800d4,
-            0x401bd9967d816614,
-            0x3fce5f17b4811b70,
-            0x40155dfccc842988,
-            0x3fc45f08a6f61ea9,
-            0x402a9e8a223bfe87,
-            0x3fcbdb8abd307aed,
-            0x400061190e6e3a55,
-            0x3fc0720e85396db7,
-            0x3fff670343656928,
-            0x3fc56479aab3b6e9,
-            0x402d4a5a81aee853,
-            0x3fb5f30fcc19ac91,
-            0x4019f174aceea582,
-            0x3fe50d0985e19da9,
-            0x3fe521515a7bdef1,
-            0x3fc142f4470e821c,
-            0x3fcebd9d3d2cc036,
-            0x3fc5c2462919b2c4,
-            0x40143d71cec9488b,
-            0x3fdb41a13d264d1d,
-            0xbfd3e8b6c02d1c02,
-            0x3facdadbb65e9911,
-            0x3f9cbc02b2a93f0b,
-            0x3fb4c48e3872a8e9,
-        ];
-        // Ubuntu 24.04.5, runner image 20261111.127.1, Rust 1.97.1.
-        const UBUNTU_24_04_5: &[u64] = &[
-            0x40195cdbec2b01c4,
-            0x3fdc249afb33387a,
-            0x40176ee1abd3fb0a,
-            0x3fd593ce944bf327,
-            0x4027c98e1c4e20cc,
-            0x3fe31c6bc20af5c2,
-            0x40027bb6f761ef02,
-            0x3fcb758de16af18e,
-            0x3fff484575b19363,
-            0x3fd05d4dc80f367e,
-            0x402ec1b62a42dd2e,
-            0x3fe04e9f5a5800d4,
-            0x401bd9967d816613,
-            0x3fce5f17b4811b71,
-            0x40155dfccc84297c,
-            0x3fc45f08a6f61eab,
-            0x402a9e8a223bfe8b,
-            0x3fcbdb8abd307aec,
-            0x400061190e6e3a50,
-            0x3fc0720e85396db6,
-            0x3fff670343656927,
-            0x3fc56479aab3b6e9,
-            0x402d4a5a81aee858,
-            0x3fb5f30fcc19ac91,
-            0x4019f174aceea582,
-            0x3fe50d0985e19da9,
-            0x3fe521515a7bdef1,
-            0x3fc142f4470e821c,
-            0x3fcebd9d3d2cc036,
-            0x3fc5c2462919b2c4,
-            0x40143d71cec9488b,
-            0x3fdb41a13d264d1e,
-            0xbfd3e8b6c02d1c02,
-            0x3facdadbb65e9911,
-            0x3f9cbc02b2a93ef8,
-            0x3fb4c48e3872a8e9,
-        ];
-        assert!(
-            [EXPECTED, LINUX, UBUNTU_24_04_5].contains(&actual.as_slice()),
-            "GBM Asian prices moved off the macOS and Linux libm pins:\n{actual:#x?}"
-        );
+        assert_eq!(actual.len(), EXPECTED.len());
+        for (i, (actual, expected)) in actual.into_iter().zip(EXPECTED).enumerate() {
+            // libm evaluation, statistics summation and decimal currency
+            // conversion can vary by a few ULP across supported targets.
+            assert!(
+                (actual - expected).abs() <= 5e-13 * expected.abs().max(1.0),
+                "Asian estimator {i}: got {actual}, reference {expected}"
+            );
+        }
     }
 }
 

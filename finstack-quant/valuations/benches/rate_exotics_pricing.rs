@@ -81,9 +81,12 @@ fn hw1f_market(as_of: Date) -> MarketContext {
         Some(finstack_quant_core::dates::Tenor::quarterly()),
     );
     MarketContext::new()
-        .insert(discount)
-        .insert(fwd_6m)
-        .insert(fwd_3m)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(fwd_6m)
+        .expect("insert market curve")
+        .try_insert(fwd_3m)
+        .expect("insert market curve")
         .insert_price(
             "SOFR-RATE",
             MarketScalar::unitless(0.03).expect("valid scalar"),
@@ -121,7 +124,8 @@ fn equity_range_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
     MarketContext::new()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_surface(surface)
         .insert_price(
             "SPX-SPOT",
@@ -351,7 +355,7 @@ fn bench_range_accrual_analytic(c: &mut Criterion) {
 
 fn quanto_range_fixture(as_of: Date) -> (RangeAccrual, MarketContext) {
     let market = equity_range_market(as_of)
-        .insert(
+        .try_insert(
             DiscountCurve::builder("EUR-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (2.0, (-0.2_f64).exp())])
@@ -361,6 +365,7 @@ fn quanto_range_fixture(as_of: Date) -> (RangeAccrual, MarketContext) {
                 .build()
                 .unwrap(),
         )
+        .expect("insert market curve")
         .insert_price(
             "SPX-SPOT",
             MarketScalar::price(Money::from((100_i64, Currency::EUR))),

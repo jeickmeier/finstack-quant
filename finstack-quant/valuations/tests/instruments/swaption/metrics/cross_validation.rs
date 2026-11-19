@@ -131,12 +131,15 @@ fn positive_time_greeks_match_frozen_annuity_formulas_and_bumps() {
                     } else {
                         ((f / k).ln() + 0.5 * sigma * sigma * t) / (sigma * sqrt_t)
                     };
-                    let expected_delta =
-                        scale * (norm_cdf(d) - if side == OptionType::Put { 1.0 } else { 0.0 });
-                    let expected_gamma =
-                        scale * norm_pdf(d) / (sigma * sqrt_t * if normal { 1.0 } else { f });
-                    let expected_vega =
-                        scale * norm_pdf(d) * sqrt_t * if normal { 0.01 } else { f * 0.01 };
+                    let expected_delta = scale
+                        * (norm_cdf(d).expect("valid normal variate")
+                            - if side == OptionType::Put { 1.0 } else { 0.0 });
+                    let expected_gamma = scale * norm_pdf(d).expect("valid normal variate")
+                        / (sigma * sqrt_t * if normal { 1.0 } else { f });
+                    let expected_vega = scale
+                        * norm_pdf(d).expect("valid normal variate")
+                        * sqrt_t
+                        * if normal { 0.01 } else { f * 0.01 };
                     let result = option
                         .price_with_metrics(
                             &market,

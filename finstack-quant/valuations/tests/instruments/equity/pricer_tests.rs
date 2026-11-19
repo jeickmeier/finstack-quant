@@ -135,10 +135,13 @@ fn test_equity_forward_price() {
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.05, base_date, "USD");
 
-    let market = MarketContext::new().insert(curve).insert_price(
-        "AAPL-DIVYIELD",
-        MarketScalar::unitless(0.02).expect("valid scalar"),
-    );
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        );
 
     // Forward price at t=1 year: S0 * exp((r - q) * t) = 100 * exp((0.05 - 0.02) * 1)
     let forward_price = equity
@@ -165,7 +168,9 @@ fn test_simple_equity_pricer_price_dyn() {
 
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.05, base_date, "USD");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let pricer = GenericInstrumentPricer::<Equity>::discounting(InstrumentType::Equity);
     let instrument: &dyn Instrument = &equity;
@@ -269,7 +274,9 @@ fn test_equity_forward_price_zero_rates() {
 
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.0, base_date, "USD");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     // With zero rates and no dividend, forward = spot
     let forward_price = equity
@@ -288,10 +295,13 @@ fn test_equity_forward_price_high_dividend() {
     let curve = build_flat_curve(0.05, base_date, "USD");
 
     // High dividend yield (10%) exceeds risk-free rate
-    let market = MarketContext::new().insert(curve).insert_price(
-        "AAPL-DIVYIELD",
-        MarketScalar::unitless(0.10).expect("valid scalar"),
-    );
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.10).expect("valid scalar"),
+        );
 
     // Forward should be lower than spot when div yield > r
     let forward_price = equity
@@ -313,7 +323,9 @@ fn test_equity_forward_price_with_discrete_dividend() {
     )];
 
     let curve = build_flat_curve(0.05, base_date, "USD");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let forward_price = equity
         .forward_price_per_share(&market, base_date, 1.0)

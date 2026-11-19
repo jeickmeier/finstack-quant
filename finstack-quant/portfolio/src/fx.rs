@@ -341,8 +341,10 @@ mod tests {
             .set_quotes(&[(Currency::JPY, Currency::USD, 0.0067)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
-            .insert(flat_discount("JPY", as_of, 0.99))
-            .insert(flat_discount("USD", as_of, 0.95))
+            .try_insert(flat_discount("JPY", as_of, 0.99))
+            .expect("insert market curve")
+            .try_insert(flat_discount("USD", as_of, 0.95))
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(provider, None));
 
         let converted = convert_to_base_forward(
@@ -369,8 +371,10 @@ mod tests {
             .set_quotes(&[(Currency::JPY, Currency::USD, 0.0067)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
-            .insert(flat_discount("JPY-OIS", as_of, 0.99))
-            .insert(flat_discount("USD-OIS", as_of, 0.95))
+            .try_insert(flat_discount("JPY-OIS", as_of, 0.99))
+            .expect("insert market curve")
+            .try_insert(flat_discount("USD-OIS", as_of, 0.95))
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(provider, None));
         let mut curves = HashMap::new();
         curves.insert(Currency::JPY, CurveId::new("JPY-OIS"));

@@ -41,16 +41,18 @@ fn bond_with_coupon(coupon: f64) -> Bond {
 }
 
 fn discount_only() -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(AS_OF)
-            .knots([(0.0, 1.0), (5.0, 0.86), (10.0, 0.74)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount"),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(AS_OF)
+                .knots([(0.0, 1.0), (5.0, 0.86), (10.0, 0.74)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount"),
+        )
+        .expect("insert market curve")
 }
 
 /// 250bp flat par spreads, wide enough for the recovery effect to show.
@@ -78,12 +80,19 @@ fn hazard_at(recovery_rate: f64) -> HazardCurve {
 fn recovery01_is_the_central_difference_across_recalibrated_curves() {
     let bond = bond();
     let pv_at = |recovery: f64| {
-        bond.value_raw(&discount_only().insert(hazard_at(recovery)), AS_OF)
-            .expect("pv")
+        bond.value_raw(
+            &discount_only()
+                .try_insert(hazard_at(recovery))
+                .expect("insert market curve"),
+            AS_OF,
+        )
+        .expect("pv")
     };
     let expected = (pv_at(0.41) - pv_at(0.39)) / 2.0;
 
-    let market = discount_only().insert(hazard_at(0.40));
+    let market = discount_only()
+        .try_insert(hazard_at(0.40))
+        .expect("insert market curve");
     let recalibrated = bond
         .price_with_metrics(&market, AS_OF, &[MetricId::Recovery01], pricing_options())
         .expect("recovery01")
@@ -99,8 +108,14 @@ fn recovery01_is_the_central_difference_across_recalibrated_curves() {
         let up = market.get_hazard("USD-CREDIT").expect("curve");
         let pv = |recovery: f64| {
             let curve = up.with_recovery_rate(recovery).expect("curve");
-            bond.value_raw(&market.clone().insert(curve), AS_OF)
-                .expect("pv")
+            bond.value_raw(
+                &market
+                    .clone()
+                    .try_insert(curve)
+                    .expect("insert market curve"),
+                AS_OF,
+            )
+            .expect("pv")
         };
         (pv(0.41) - pv(0.39)) / 2.0
     };
@@ -110,7 +125,9 @@ fn recovery01_is_the_central_difference_across_recalibrated_curves() {
 
 #[test]
 fn a_recipe_with_no_recalibration_provider_is_an_error_not_a_frozen_bump() {
-    let market = discount_only().insert(hazard_at(0.40));
+    let market = discount_only()
+        .try_insert(hazard_at(0.40))
+        .expect("insert market curve");
     let error = bond()
         .price_with_metrics(
             &market,
@@ -125,7 +142,9 @@ fn a_recipe_with_no_recalibration_provider_is_an_error_not_a_frozen_bump() {
 
 #[test]
 fn a_premium_bond_loses_when_recovery_rises_at_fixed_spreads() {
-    let market = discount_only().insert(hazard_at(0.40));
+    let market = discount_only()
+        .try_insert(hazard_at(0.40))
+        .expect("insert market curve");
     let recovery01 = bond_with_coupon(0.12)
         .price_with_metrics(&market, AS_OF, &[MetricId::Recovery01], pricing_options())
         .expect("recovery01")

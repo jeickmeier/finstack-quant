@@ -210,7 +210,11 @@ fn minimal_market() -> MarketContext {
         .build()
         .expect("valid forward curve");
 
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 // Bond Contract Tests

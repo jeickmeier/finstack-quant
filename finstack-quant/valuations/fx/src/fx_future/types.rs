@@ -266,7 +266,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("foreign curve");
-        let market = MarketContext::new().insert(domestic).insert(foreign);
+        let market = MarketContext::new()
+            .try_insert(domestic)
+            .expect("insert market curve")
+            .try_insert(foreign)
+            .expect("insert market curve");
         let future = FxFuture::builder()
             .id(InstrumentId::new("6E"))
             .base_currency(Currency::EUR)

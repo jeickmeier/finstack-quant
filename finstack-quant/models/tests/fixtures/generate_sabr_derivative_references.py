@@ -37,12 +37,11 @@ def ratio(z: Decimal, rho: Decimal, normal: bool) -> Decimal:
 def vol(alpha: Decimal, beta: Decimal, nu: Decimal, rho: Decimal, forward: Decimal, strike: Decimal) -> Decimal:
     """Evaluate a two-year Hagan/Obloj volatility at fixed forward and strike."""
     time = Decimal(2)
-    if beta < Decimal("1e-4"):
+    # The reference grid samples Normal at beta zero and Black elsewhere.
+    if beta == 0:
         return (
             alpha * ratio(nu / alpha * (forward - strike), rho, True) * (1 + (2 - 3 * rho * rho) * nu * nu * time / 24)
         )
-    if abs(1 - beta) < Decimal("1e-4"):
-        beta = Decimal(1)
     if abs(forward - strike) / max(abs(forward), abs(strike)) < Decimal("1e-8"):
         fb = forward ** (1 - beta)
         return (

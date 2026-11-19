@@ -280,8 +280,12 @@ fn attribute_bond_over_coupon(method: AttributionMethod) -> PnlAttribution {
     )
     .expect("bond");
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
-    let market_t0 = MarketContext::new().insert(flat_curve(as_of_t0, 0.0400));
-    let market_t1 = MarketContext::new().insert(flat_curve(as_of_t1, 0.0425));
+    let market_t0 = MarketContext::new()
+        .try_insert(flat_curve(as_of_t0, 0.0400))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(flat_curve(as_of_t1, 0.0425))
+        .expect("insert market curve");
     let config = FinstackConfig::default();
     attribute_pnl(
         &method,

@@ -514,7 +514,7 @@ impl CopulaSpec {
             CopulaSpec::Gaussian
             | CopulaSpec::RandomFactorLoading { .. }
             | CopulaSpec::MultiFactor => {
-                Ok(finstack_quant_core::math::special_functions::standard_normal_inv_cdf(pd))
+                finstack_quant_core::math::special_functions::standard_normal_inv_cdf(pd)
             }
         }
     }
@@ -587,14 +587,6 @@ fn select_quadrature(order: u8) -> GaussHermiteQuadrature {
     GaussHermiteQuadrature::new(order as usize).unwrap_or_else(|_| {
         unreachable!("copula quadrature orders are supported Gauss-Hermite orders")
     })
-}
-
-/// Integrate an infallible test integrand, panicking on a quadrature failure.
-#[cfg(test)]
-pub(crate) fn expect_integral<C: Copula + ?Sized>(copula: &C, f: &dyn Fn(&[f64]) -> f64) -> f64 {
-    copula
-        .integrate_fn(&|factors| Ok(f(factors)))
-        .expect("finite test integrand")
 }
 
 #[cfg(test)]

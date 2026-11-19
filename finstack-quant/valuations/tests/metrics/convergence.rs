@@ -57,7 +57,8 @@ fn create_option_market(as_of: Date, spot: f64, vol: f64, rate: f64) -> MarketCo
         .unwrap();
 
     MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "AAPL",
@@ -341,7 +342,9 @@ fn test_bucketed_dv01_sums_to_parallel() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
     let registry = STANDARD.metrics();
     let pv = bond.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(

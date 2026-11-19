@@ -60,7 +60,9 @@ fn bucketed_dv01_uses_configured_bucket_grid() {
         .discount_curve_id("USD-OIS".into())
         .build()
         .expect("bond");
-    let market = MarketContext::new().insert(build_discount_curve(0.04));
+    let market = MarketContext::new()
+        .try_insert(build_discount_curve(0.04))
+        .expect("insert market curve");
     let pv = bond.value(&market, as_of).expect("pv");
     let mut cfg = FinstackConfig::default();
     cfg.extensions
@@ -126,7 +128,7 @@ proptest! {
 
         // Build market
         let disc = build_discount_curve(flat_rate);
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new().try_insert(disc).expect("insert market curve");
 
         // Compute metrics
         let metrics = vec![MetricId::Dv01, MetricId::BucketedDv01];
@@ -202,7 +204,7 @@ proptest! {
             .expect("Bond construction should succeed");
 
         let disc = build_discount_curve(flat_rate);
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new().try_insert(disc).expect("insert market curve");
 
         let metrics = vec![MetricId::Dv01];
         let registry = finstack_quant_valuations::pricer::STANDARD.metrics();
@@ -277,7 +279,8 @@ mod mc_invariants {
             .unwrap();
 
         MarketContext::new()
-            .insert(disc)
+            .try_insert(disc)
+            .expect("insert market curve")
             .insert_surface(vol_surface)
             .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"))
     }
@@ -504,8 +507,8 @@ mod cds_invariants {
             cds_with_recovery.protection_leg.recovery_rate = recovery;
 
             let market = MarketContext::new()
-                .insert(disc)
-                .insert(hazard);
+                .try_insert(disc).expect("insert market curve")
+                .try_insert(hazard).expect("insert market curve");
             let ps = metric_value(&cds_with_recovery, &market, as_of, MetricId::ParSpread);
             prop_assert!(
                 ps > 0.0,
@@ -550,12 +553,12 @@ mod cds_invariants {
             // directly comparable.
             let (disc_low, hazard_low) = build_test_curves(0.04, hazard_rate, 0.30);
             let market_low = MarketContext::new()
-                .insert(disc_low)
-                .insert(hazard_low);
+                .try_insert(disc_low).expect("insert market curve")
+                .try_insert(hazard_low).expect("insert market curve");
             let (disc_high, hazard_high) = build_test_curves(0.04, hazard_rate, 0.50);
             let market_high = MarketContext::new()
-                .insert(disc_high)
-                .insert(hazard_high);
+                .try_insert(disc_high).expect("insert market curve")
+                .try_insert(hazard_high).expect("insert market curve");
             let prot_low = metric_value(&cds_low, &market_low, as_of, MetricId::ProtectionLegPv);
             let prot_high =
                 metric_value(&cds_high_recovery, &market_high, as_of, MetricId::ProtectionLegPv);
@@ -601,7 +604,9 @@ mod cs01_invariants {
             .build()
             .unwrap();
 
-        let source = MarketContext::new().insert(disc);
+        let source = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
         let spread_bp = hazard_rate * 0.6 * 10_000.0;
         let hazard = crate::metrics::credit_support::calibrated_hazard_curve_with_pillars(
             &source,
@@ -618,7 +623,7 @@ mod cs01_invariants {
         )
         .expect("hazard calibration should succeed");
 
-        source.insert(hazard)
+        source.try_insert(hazard).expect("insert market curve")
     }
 
     proptest! {
@@ -748,7 +753,11 @@ mod cs_gamma_consistency {
             .build()
             .unwrap();
 
-        let market = MarketContext::new().insert(disc).insert(hazard_no_par);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(hazard_no_par)
+            .expect("insert market curve");
         let error = compute_metric_error(&cds, &market, as_of, MetricId::CsGamma);
         assert!(error.contains("calibration recipe"));
     }
@@ -785,7 +794,9 @@ mod bucketed_cs01_invariants {
             .build()
             .unwrap();
 
-        let source = MarketContext::new().insert(disc);
+        let source = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
         let spread_bp = hazard_rate * 0.6 * 10_000.0;
         let hazard = crate::metrics::credit_support::calibrated_hazard_curve_with_pillars(
             &source,
@@ -802,7 +813,7 @@ mod bucketed_cs01_invariants {
         )
         .expect("hazard calibration should succeed");
 
-        source.insert(hazard)
+        source.try_insert(hazard).expect("insert market curve")
     }
 
     /// Test that bucketed CS01 values are consistent with parallel CS01.
@@ -881,7 +892,9 @@ mod additional_invariants {
     fn test_dv01_sum_invariant_across_maturities() {
         let as_of = date!(2025 - 01 - 01);
         let disc = build_discount_curve(0.04);
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
         let registry = finstack_quant_valuations::pricer::STANDARD.metrics();
 
         for years in [2, 5, 10, 15, 20] {

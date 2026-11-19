@@ -100,8 +100,10 @@ fn test_cap_theta_negative() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = cap
@@ -160,8 +162,10 @@ fn test_floor_theta() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = floor
@@ -190,8 +194,10 @@ fn test_theta_reasonable_magnitude() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = cap
@@ -232,8 +238,10 @@ fn test_short_maturity_higher_theta() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let short_theta = *short_cap
@@ -283,8 +291,10 @@ fn same_day_unpublished_fixing_caps_theta_without_historical_series() {
     })
     .expect("caplet");
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(0.07, as_of, "USD_LIBOR_3M"))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.07, as_of, "USD_LIBOR_3M"))
+        .expect("insert market curve")
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"));
 
     let result = caplet

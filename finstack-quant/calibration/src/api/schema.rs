@@ -1286,8 +1286,9 @@ pub enum SwaptionVolConvention {
     /// Example: `0.20` means 20% Black volatility on displaced forward/strike
     /// coordinates. Requires `shifted_black_lognormal` quotes.
     ShiftedLognormal {
-        /// Finite positive additive shift in decimal rate units, applied to
+        /// Finite signed additive shift in decimal rate units, applied to
         /// both forwards and strikes and retained in calibrated artifacts.
+        /// The effective forward and strikes must be positive.
         shift: f64,
     },
 }

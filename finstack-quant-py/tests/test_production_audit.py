@@ -222,18 +222,19 @@ def test_normal_sabr_beta_zero_uses_arithmetic_moneyness() -> None:
         z = nu * (forward - strike) / alpha
         chi = math.log((math.sqrt(1 - 2 * rho * z + z * z) + z - rho) / (1 - rho))
         expected = alpha * z / chi * (1 + (2 - 3 * rho * rho) * nu * nu * expiry / 24)
-        assert params.implied_vol(forward, strike, expiry) == pytest.approx(expected, abs=1e-14)
+        assert params.implied_vol(forward, strike, expiry, "normal") == pytest.approx(expected, abs=1e-14)
 
 
 def test_sabr_fit_rejects_large_quote_error() -> None:
     from finstack_quant.models.volatility import SabrCalibrator
 
     with pytest.raises(RuntimeError, match="no acceptable"):
-        SabrCalibrator().calibrate(100.0, [90.0, 95.0, 100.0, 105.0, 110.0], [0.22, 0.20, 0.19, 0.195, 0.21], 1.0, 0.5)
+        SabrCalibrator().calibrate(
+            100.0, [90.0, 95.0, 100.0, 105.0, 110.0], [0.22, 0.20, 0.19, 0.195, 0.21], 1.0, 0.5, "black_lognormal"
+        )
 
 
 def test_clamped_cube_preserves_quote_and_invalid_domain() -> None:
-    import math
 
     from finstack_quant.core.market_data import SabrParameterData, VolCube
     from finstack_quant.models.volatility import get_cube_vol, get_cube_vol_clamped
@@ -243,7 +244,8 @@ def test_clamped_cube_preserves_quote_and_invalid_domain() -> None:
         get_cube_vol(low, 1.0, 5.0, 0.02, "lognormal"), abs=1e-14
     )
     invalid = VolCube("INVALID", [1.0], [5.0], [SabrParameterData(0.008, 0.5, 0.3, 0.0)], [-0.01])
-    assert math.isnan(get_cube_vol_clamped(invalid, 1.0, 5.0, -0.01, "lognormal"))
+    with pytest.raises(ValueError, match=r"(?i)positive"):
+        get_cube_vol_clamped(invalid, 1.0, 5.0, -0.01, "lognormal")
 
 
 def test_hull_white_requires_a_quote_fit_budget() -> None:

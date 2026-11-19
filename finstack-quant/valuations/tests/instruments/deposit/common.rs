@@ -51,7 +51,9 @@ pub fn ctx_with_flat_rate(base: Date, id: &str, rate: f64) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
 }
 
 /// Creates a market context with a standard discount curve for testing.
@@ -69,7 +71,9 @@ pub fn ctx_with_standard_disc(base: Date, id: &str) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
 }
 
 /// Creates a market context with a steep discount curve for sensitivity testing.
@@ -82,7 +86,9 @@ pub fn ctx_with_steep_curve(base: Date, id: &str) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
 }
 
 /// Creates a standard 6-month USD deposit for testing.

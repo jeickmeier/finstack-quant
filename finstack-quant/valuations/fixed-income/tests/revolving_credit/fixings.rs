@@ -138,8 +138,10 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
 
     // Build market with fixings
     let market_with_fixings = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(fixing_series);
 
     // Generate cashflows WITH fixings
@@ -210,7 +212,11 @@ fn test_seasoned_facility_without_fixings_errors() {
     // the curve base now error under the default FloatingRateFallback.
     let fwd_curve = build_flat_forward_curve(0.04, issue_date, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     // No fixings provided: a past reset is already economically locked.
     let engine = CashflowEngine::new(&facility, Some(&market), as_of, None).unwrap();
@@ -283,8 +289,10 @@ fn test_fixings_respect_floor() {
     .unwrap();
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(fixing_series);
 
     let fixings =
@@ -339,11 +347,17 @@ fn test_non_seasoned_facility_ignores_fixings() {
     .unwrap();
 
     let market_with = MarketContext::new()
-        .insert(disc_curve.clone())
-        .insert(fwd_curve.clone())
+        .try_insert(disc_curve.clone())
+        .expect("insert market curve")
+        .try_insert(fwd_curve.clone())
+        .expect("insert market curve")
         .insert_series(fixing_series);
 
-    let market_without = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market_without = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let fixings =
         finstack_quant_core::market_data::fixings::get_fixing_series(&market_with, "USD-SOFR-3M")
@@ -401,8 +415,10 @@ fn valuation_date_reset_uses_contractual_t_minus_two_fixing() {
     )
     .unwrap();
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD-OIS"))
-        .insert(build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M", 0.25))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M", 0.25))
+        .expect("insert market curve")
         .insert_series(fixing_series);
     let fixings =
         finstack_quant_core::market_data::fixings::get_fixing_series(&market, "USD-SOFR-3M").ok();
@@ -453,8 +469,10 @@ fn test_pricer_integration_with_fixings() {
     .unwrap();
 
     let market_with = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(fixing_series);
 
     // Price with fixings (higher past rates)
@@ -486,13 +504,15 @@ fn stochastic_cashflow_engine_uses_current_period_contractual_fixing() {
         // the market must carry both curves; the first coupon below still
         // comes from the contractual fixing.
         let market = MarketContext::new()
-            .insert(build_flat_discount_curve(0.03, issue_date, "USD-OIS"))
-            .insert(build_flat_forward_curve(
+            .try_insert(build_flat_discount_curve(0.03, issue_date, "USD-OIS"))
+            .expect("insert market curve")
+            .try_insert(build_flat_forward_curve(
                 0.04,
                 issue_date,
                 "USD-SOFR-3M",
                 0.25,
             ))
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:USD-SOFR-3M",

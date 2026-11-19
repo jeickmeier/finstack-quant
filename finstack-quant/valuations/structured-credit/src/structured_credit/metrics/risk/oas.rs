@@ -241,7 +241,7 @@ pub fn tranche_oas(
                 config.hw1f_sigma,
                 num_months,
                 &mut sub,
-            ))
+            )?)
         } else {
             None
         };
@@ -268,7 +268,7 @@ pub fn tranche_oas(
         };
         let credit_z = if config.stochastic_credit {
             let mut sub = rng.substream(2 * path as u64 + 1);
-            Some(sub.next_std_normal())
+            Some(sub.next_std_normal()?)
         } else {
             None
         };
@@ -402,7 +402,7 @@ fn simulate_ou_deviation(
     sigma: f64,
     num_months: usize,
     rng: &mut PhiloxRng,
-) -> Vec<f64> {
+) -> Result<Vec<f64>> {
     let dt = 1.0 / 12.0;
     let exp_k = (-kappa * dt).exp();
     let vol = if kappa > 0.0 {
@@ -414,11 +414,11 @@ fn simulate_ou_deviation(
     let mut x = 0.0;
     deviation.push(x);
     for _ in 0..num_months {
-        let z = rng.next_std_normal();
+        let z = rng.next_std_normal()?;
         x = x * exp_k + vol * z;
         deviation.push(x);
     }
-    deviation
+    Ok(deviation)
 }
 
 /// Absolute Hull-White short-rate path, `r(t) = f(0,t) + alpha(t) + x(t)`.
@@ -607,7 +607,8 @@ mod tests {
             let mut sum = 0.0;
             for p in 0..n_paths {
                 let mut sub = rng.substream(p as u64);
-                let dev = simulate_ou_deviation(kappa, sigma, num_months, &mut sub);
+                let dev = simulate_ou_deviation(kappa, sigma, num_months, &mut sub)
+                    .expect("OU deviations");
                 sum += ou_discount_factor(&dev, month) * adj[month];
             }
             let mean = sum / f64::from(n_paths);

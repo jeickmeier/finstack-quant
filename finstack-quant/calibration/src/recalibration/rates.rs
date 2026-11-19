@@ -606,7 +606,7 @@ pub(crate) fn bump_market_via_rate_quote_shock(
     } else {
         bump_discount_curve_from_rate_calibration(discount.as_ref(), discount_cal, market, bump)?
     };
-    let target_market = market.clone().insert(bumped_discount.clone());
+    let target_market = market.clone().try_insert(bumped_discount.clone())?;
 
     let bumped_forward = if linked_single_curve {
         let bumped_discount = target_market.get_discount(discount_curve_id.as_str())?;
@@ -620,10 +620,10 @@ pub(crate) fn bump_market_via_rate_quote_shock(
             bump,
         )?
     };
-    Ok(market
+    market
         .clone()
-        .insert(bumped_discount)
-        .insert(bumped_forward))
+        .try_insert(bumped_discount)?
+        .try_insert(bumped_forward)
 }
 
 pub(crate) fn bump_market_via_rate_quote_shock_cached(
@@ -668,7 +668,7 @@ pub(crate) fn bump_single_ois_market_via_rate_quote_shock(
         bump,
         Some(curve_id.clone()),
     )?;
-    Ok(market.clone().insert(bumped))
+    market.clone().try_insert(bumped)
 }
 
 pub(crate) fn bump_single_ois_market_via_rate_quote_shock_cached(
@@ -863,7 +863,11 @@ mod tests {
             .expect("projection representation");
 
         (
-            MarketContext::new().insert(discount).insert(forward),
+            MarketContext::new()
+                .try_insert(discount)
+                .expect("insert market curve")
+                .try_insert(forward)
+                .expect("insert market curve"),
             discount_curve_id,
             forward_curve_id,
             projection_grid,
@@ -1022,7 +1026,7 @@ mod tests {
             .build()
             .unwrap();
         let error = bump_market_via_rate_quote_shock(
-            &market.insert(altered),
+            &market.try_insert(altered).expect("insert market curve"),
             &discount_id,
             &forward_id,
             &QuoteBump::ParallelBp(1.0),
@@ -1347,7 +1351,9 @@ mod tests {
             .rate_calibration_opt(None)
             .build()
             .expect("discount representation without recipe");
-        let market = market.insert(discount_without_recipe);
+        let market = market
+            .try_insert(discount_without_recipe)
+            .expect("insert market curve");
 
         let error = bump_market_via_rate_quote_shock(
             &market,
@@ -1375,7 +1381,9 @@ mod tests {
             .rate_calibration_opt(None)
             .build()
             .expect("discount representation without calibration metadata");
-        let market = market.insert(discount_without_metadata);
+        let market = market
+            .try_insert(discount_without_metadata)
+            .expect("insert market curve");
 
         let error = bump_market_via_rate_quote_shock(
             &market,
@@ -1415,7 +1423,9 @@ mod tests {
             .rate_calibration(mismatched_recipe)
             .build()
             .expect("mismatched discount representation");
-        let market = market.insert(mismatched_discount);
+        let market = market
+            .try_insert(mismatched_discount)
+            .expect("insert market curve");
 
         let error = bump_market_via_rate_quote_shock(
             &market,
@@ -1443,7 +1453,9 @@ mod tests {
             .rate_calibration_opt(None)
             .build()
             .expect("projection representation without recipe");
-        let market = market.insert(forward_without_recipe);
+        let market = market
+            .try_insert(forward_without_recipe)
+            .expect("insert market curve");
 
         let error = bump_market_via_rate_quote_shock(
             &market,
@@ -1476,7 +1488,9 @@ mod tests {
             .rate_calibration(partial_recipe)
             .build()
             .expect("projection representation with partial OIS metadata");
-        let market = market.insert(partial_forward);
+        let market = market
+            .try_insert(partial_forward)
+            .expect("insert market curve");
 
         let error = bump_market_via_rate_quote_shock(
             &market,
@@ -1525,7 +1539,11 @@ mod tests {
             .rate_calibration(forward_recipe)
             .build()
             .expect("term-index projection representation");
-        let market = market.insert(discount).insert(forward);
+        let market = market
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve");
 
         let mismatch = bump_market_via_rate_quote_shock(
             &market,
@@ -1599,7 +1617,9 @@ mod tests {
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()
             .expect("discount curve");
-        let context = MarketContext::new().insert(discount);
+        let context = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve");
         let params = ForwardCurveParams {
             curve_id: CurveId::new("USD-TERM"),
             base_date,

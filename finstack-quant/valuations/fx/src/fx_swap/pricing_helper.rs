@@ -260,8 +260,10 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("FX quote");
         let market = MarketContext::new()
-            .insert(usd)
-            .insert(eur)
+            .try_insert(usd)
+            .expect("insert market curve")
+            .try_insert(eur)
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(Arc::new(provider), None));
         let mut swap = FxSwap::builder()
             .id(InstrumentId::new("FUTURE-NEAR"))
@@ -385,8 +387,10 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         let market = MarketContext::new()
-            .insert(usd)
-            .insert(eur)
+            .try_insert(usd)
+            .expect("insert market curve")
+            .try_insert(eur)
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(Arc::new(provider), None));
 
         // Off-market swap: both legs priced away from model spot/forward.

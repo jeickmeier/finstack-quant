@@ -6,7 +6,7 @@
 use super::{RecoveryModel, Result, validate_correlated_inputs, validate_finite_recovery_input};
 use finstack_quant_core::math::{
     integration::adaptive_simpson,
-    special_functions::{norm_cdf, norm_pdf},
+    special_functions::{norm_cdf, norm_cdf_unchecked, norm_pdf_unchecked},
 };
 
 /// Hard limit on integrand evaluations per recovery expectation.
@@ -109,7 +109,7 @@ impl CorrelatedRecovery {
                     Ok((self.sample_unchecked(shock_mean + shock_std * x)
                         + self.sample_unchecked(shock_mean - shock_std * x)
                         - 2.0 * baseline)
-                        * norm_pdf(x))
+                        * norm_pdf_unchecked(x))
                 },
                 0.0,
                 10.0,
@@ -124,13 +124,17 @@ impl CorrelatedRecovery {
         // Pair around Phi(C/d); the logistic tail beyond 36 is below 5e-16.
         // This coordinate remains resolved for arbitrarily steep logits.
         let a = shock_mean / shock_std + self.center() / deviation;
-        let base = norm_cdf(a);
+        let base = norm_cdf(a)?;
+        // The checked CDF excludes NaN in `a`. Integrating over [0,36] with
+        // deviation > 1 keeps both offsets finite even with an infinite limit.
         let correction = adaptive_simpson(
             |x| {
                 let tail = (-x).exp();
                 let logistic_density = tail / (1.0 + tail).powi(2);
                 Ok(logistic_density
-                    * (norm_cdf(a + x / deviation) + norm_cdf(a - x / deviation) - 2.0 * base))
+                    * (norm_cdf_unchecked(a + x / deviation)
+                        + norm_cdf_unchecked(a - x / deviation)
+                        - 2.0 * base))
             },
             0.0,
             36.0,

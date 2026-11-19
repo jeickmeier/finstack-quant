@@ -354,8 +354,10 @@ mod settlement_and_sigma_tests {
 
     fn market(as_of: Date) -> MarketContext {
         MarketContext::new()
-            .insert(flat_discount(as_of))
-            .insert(flat_hazard(as_of))
+            .try_insert(flat_discount(as_of))
+            .expect("insert market curve")
+            .try_insert(flat_hazard(as_of))
+            .expect("insert market curve")
     }
 
     fn spread_option(as_of: Date, settlement: SettlementType, vol: Option<f64>) -> CdsOption {

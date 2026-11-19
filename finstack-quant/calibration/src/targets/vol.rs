@@ -17,7 +17,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
-use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters, SabrShift};
+use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters};
 use std::collections::BTreeMap;
 
 use crate::constants::OrderedF64;
@@ -157,8 +157,14 @@ pub(crate) fn solve(
             .with_tolerance(config.vol_surface.validation_tolerance / min_quote)
             .with_max_iterations(config.solver.max_iterations());
         let outcome = sabr_calibrator
-            .with_shift(SabrShift::Auto)
-            .calibrate(f, &strikes, &vols, t, params.beta)
+            .calibrate(
+                f,
+                &strikes,
+                &vols,
+                t,
+                params.beta,
+                VolQuoteType::BlackLognormal,
+            )
             .map_err(|e| finstack_quant_core::Error::Calibration {
                 message: format!("SABR calibration failed at t={t:.6}: {e}"),
                 category: "vol_surface".to_string(),
@@ -299,7 +305,7 @@ fn interpolate_total_variance_vol(
     let slice_total_variance = |slice_expiry: f64, slice_params: &SabrParameters| -> Result<f64> {
         let forward = forward_fn(slice_expiry)?;
         let sigma = slice_params
-            .implied_vol(forward, target_strike, slice_expiry)
+            .implied_vol(forward, target_strike, slice_expiry, VolQuoteType::BlackLognormal)
             .map_err(|e| finstack_quant_core::Error::Calibration {
                 message: format!(
                     "Failed to compute SABR implied vol at t={slice_expiry:.6}, k={target_strike:.6}: {e}"
@@ -337,18 +343,13 @@ mod tests {
     use finstack_quant_models::volatility::sabr::SabrParameters;
     use time::Month;
 
-    fn params(alpha: f64, beta: f64, nu: f64, rho: f64, shift: f64) -> SabrParameters {
-        SabrParameters {
-            alpha,
-            beta,
-            nu,
-            rho,
-            shift: Some(shift),
-        }
+    fn params(alpha: f64, beta: f64, nu: f64, rho: f64) -> SabrParameters {
+        SabrParameters::new(alpha, beta, nu, rho).expect("unshifted Black SABR fixture")
     }
 
     fn slice_vol(p: &SabrParameters, forward: f64, strike: f64, expiry: f64) -> f64 {
-        p.implied_vol(forward, strike, expiry).expect("SABR vol")
+        p.implied_vol(forward, strike, expiry, VolQuoteType::BlackLognormal)
+            .expect("SABR vol")
     }
 
     fn slice_total_variance(p: &SabrParameters, forward: f64, strike: f64, expiry: f64) -> f64 {
@@ -359,8 +360,8 @@ mod tests {
     #[test]
     fn interpolate_total_variance_out_of_bounds_errors_by_default() {
         let mut map = BTreeMap::new();
-        map.insert(OrderedF64(1.0), params(0.10, 0.5, 0.30, -0.20, 0.01));
-        map.insert(OrderedF64(2.0), params(0.20, 0.5, 0.40, -0.10, 0.01));
+        map.insert(OrderedF64(1.0), params(0.10, 0.5, 0.30, -0.20));
+        map.insert(OrderedF64(2.0), params(0.20, 0.5, 0.40, -0.10));
         let forward_fn = |_t: f64| Ok(100.0);
 
         let err = interpolate_total_variance_vol(
@@ -376,8 +377,8 @@ mod tests {
 
     #[test]
     fn interpolate_total_variance_out_of_bounds_clamps_when_configured() {
-        let p1 = params(0.10, 0.5, 0.30, -0.20, 0.01);
-        let p2 = params(0.20, 0.5, 0.40, -0.10, 0.01);
+        let p1 = params(0.10, 0.5, 0.30, -0.20);
+        let p2 = params(0.20, 0.5, 0.40, -0.10);
         let mut map = BTreeMap::new();
         map.insert(OrderedF64(1.0), p1.clone());
         map.insert(OrderedF64(2.0), p2.clone());
@@ -415,8 +416,8 @@ mod tests {
 
     #[test]
     fn interpolate_total_variance_matches_calibrated_knots() {
-        let p1 = params(0.10, 0.5, 0.30, -0.20, 0.01);
-        let p2 = params(0.20, 0.5, 0.50, 0.10, 0.01);
+        let p1 = params(0.10, 0.5, 0.30, -0.20);
+        let p2 = params(0.20, 0.5, 0.50, 0.10);
         let mut map = BTreeMap::new();
         map.insert(OrderedF64(1.0), p1.clone());
         map.insert(OrderedF64(2.0), p2.clone());
@@ -463,9 +464,9 @@ mod tests {
         let t3 = 3.0_f64;
         // β = 1 keeps ATM vol ≈ α (independent of F), so a non-flat forward
         // cannot hide a calendar violation behind CEV backbone drift.
-        let p1 = params(0.25, 1.0, 0.20, -0.20, 0.01);
-        let p2 = params(0.22, 1.0, 0.18, -0.15, 0.01);
-        let p3 = params(0.20, 1.0, 0.16, -0.10, 0.01);
+        let p1 = params(0.25, 1.0, 0.20, -0.20);
+        let p2 = params(0.22, 1.0, 0.18, -0.15);
+        let p3 = params(0.20, 1.0, 0.16, -0.10);
         let mut map = BTreeMap::new();
         map.insert(OrderedF64(t1), p1.clone());
         map.insert(OrderedF64(t2), p2.clone());
@@ -554,7 +555,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let params = VolSurfaceParams {
             vol_surface_id: "SPX-VOL".to_string(),

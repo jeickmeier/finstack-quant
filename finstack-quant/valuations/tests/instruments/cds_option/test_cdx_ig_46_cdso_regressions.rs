@@ -101,7 +101,7 @@ fn cdx_ig_46_zero_rebootstrap_preserves_supplied_curve_npv() {
         Some(CdsValuationConvention::BloombergCdswClean),
     )
     .expect("zero-bump hazard rebootstrap");
-    let zero_market = market.insert(zero_hazard);
+    let zero_market = market.try_insert(zero_hazard).expect("insert market curve");
     let zero_pv = option
         .value(&zero_market, as_of)
         .expect("zero-bump market npv")

@@ -68,7 +68,9 @@ fn create_test_market(base_date: Date) -> Result<MarketContext> {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
 
-    Ok(MarketContext::new().insert(curve))
+    Ok(MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve"))
 }
 
 fn rates_factor() -> FactorDefinition {
@@ -185,7 +187,7 @@ fn create_two_currency_market(base_date: Date) -> Result<MarketContext> {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
 
-    Ok(create_test_market(base_date)?.insert(eur_curve))
+    create_test_market(base_date)?.try_insert(eur_curve)
 }
 
 fn create_two_currency_market_with_fx(base_date: Date) -> Result<MarketContext> {
@@ -386,7 +388,8 @@ fn equity_vol_market(as_of: Date) -> Result<MarketContext> {
         surface = surface.row(&[VOL_LEVEL; 5]);
     }
     Ok(MarketContext::new()
-        .insert(discount)
+        .try_insert(discount)
+        .expect("insert market curve")
         .insert_surface(surface.build()?)
         .insert_price(
             "EQUITY-SPOT",
@@ -449,8 +452,12 @@ fn vol_factor_delta_matches_equity_option_vega() -> Result<()> {
     let t = (expiry - as_of).whole_days() as f64 / 365.0;
     let d1 = ((VOL_SPOT / 100.0).ln() + (VOL_RATE - VOL_DIV + 0.5 * VOL_LEVEL * VOL_LEVEL) * t)
         / (VOL_LEVEL * t.sqrt());
-    let bs_vega_per_point =
-        100.0 * VOL_SPOT * (-VOL_DIV * t).exp() * norm_pdf(d1) * t.sqrt() * 0.01;
+    let bs_vega_per_point = 100.0
+        * VOL_SPOT
+        * (-VOL_DIV * t).exp()
+        * norm_pdf(d1).expect("valid normal variate")
+        * t.sqrt()
+        * 0.01;
 
     let positions = vec![("opt-pos".to_string(), &option as &dyn Instrument, 1.0)];
     let factors = vec![equity_vol_factor()];

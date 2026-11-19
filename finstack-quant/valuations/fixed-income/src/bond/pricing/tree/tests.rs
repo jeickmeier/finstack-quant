@@ -109,8 +109,10 @@ fn create_test_market_context() -> MarketContext {
             .build()
             .expect("Treasury curve should build");
     MarketContext::new()
-        .insert(discount_curve)
-        .insert(treasury_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(treasury_curve)
+        .expect("insert market curve")
 }
 #[test]
 fn test_bond_valuator_creation() {
@@ -357,8 +359,10 @@ fn test_rates_credit_default_lowers_price() {
         .expect("Curve builder should succeed with valid test data");
 
     let ctx_low = MarketContext::new()
-        .insert(discount_curve)
-        .insert(low_hazard);
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(low_hazard)
+        .expect("insert market curve");
     let discount_curve2 =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
@@ -377,8 +381,10 @@ fn test_rates_credit_default_lowers_price() {
             .build()
             .expect("Curve builder should succeed with valid test data");
     let ctx_high = MarketContext::new()
-        .insert(discount_curve2)
-        .insert(high_hazard2);
+        .try_insert(discount_curve2)
+        .expect("insert market curve")
+        .try_insert(high_hazard2)
+        .expect("insert market curve");
 
     let as_of = base_date;
     let time_to_maturity = bond
@@ -724,7 +730,9 @@ fn frn_market() -> MarketContext {
         finstack_quant_core::dates::DayCount::Act365F,
     )
     .expect("forward curve");
-    create_test_market_context().insert(forward)
+    create_test_market_context()
+        .try_insert(forward)
+        .expect("insert market curve")
 }
 
 #[test]

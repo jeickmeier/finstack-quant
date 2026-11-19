@@ -531,13 +531,13 @@
     {
       "name": "fx-surface-chart",
       "type": "registry:component",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. The strike grid materializes the quotes natively (models.volatility.materializeFxDeltaSurface) from editable qualified delivery forwards aligned with surface.expiries, seeded only from initialDeliveryForwards. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. The strike grid materializes the quotes natively (models.volatility.materializeFxDeltaSurface) from editable qualified delivery forwards aligned with surface.expiries, seeded from initialDeliveryForwards, using the supplied interpolationMode (vol or total_variance). Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
       "worker": "host"
     },
     {
       "name": "vol-cube-slice",
       "type": "registry:component",
-      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice in the selected convention (\"normal\" or \"lognormal\"), rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
+      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice in the selected convention (\"normal\" or \"lognormal\"), with an explicit interpolationMode for the fixed-tenor surface and a color extent per convention. The node smile uses the selected convention. Black smiles use the node's displacement when supplied. The arbitrage check takes a continuously compounded decimal rate (initialRate) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
       "worker": "host"
     },
     {
@@ -549,7 +549,7 @@
     {
       "name": "vol-cube-explorer",
       "type": "registry:component",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Supplying slice (explicit initialStrikes, optional initialRate and repairIterations) adds vol-cube-slice. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Supplying slice (explicit initialStrikes and interpolationMode, optional initialRate and repairIterations) adds vol-cube-slice. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
       "worker": "host"
     },
     {
@@ -1696,27 +1696,27 @@
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
-      "sha256": "eeea11af1642b3ac038b5b0ade802d3bd37457b658a8d06d3c7b4e0635a290d2"
+      "sha256": "f4fbaa3cc011a7c4aa0721811e7aa4c8fc15f21ad60bfaf3810551d4f7a011d8"
     },
     {
       "path": "finstack-quant-ui/tests/core/curve-query/cases.json",
-      "sha256": "4022edc03ba3f830d08245c36059947ef98003bf25336b9da73fa042979964f2"
+      "sha256": "49d3304c1a17880d1dbc93ab6a90dd42e17b0cc251e77407d4997ce7cbc11216"
     },
     {
       "path": "finstack-quant-ui/tests/core/cubes/cases.json",
-      "sha256": "85f10ab0b4b3ec51cc2b7d2c3e51d06ebb97d32a88833393a65086ae53c9b4c9"
+      "sha256": "7a6ba6fec9bad6088f6fe3ef5516e45eececf7035d89a8b297fabecbddd0944c"
     },
     {
       "path": "finstack-quant-ui/tests/calibration/cases.json",
-      "sha256": "2c82b7b4cf1ec27ba3610dc5b43b33bd890035f387dcd0b8e0d25195cbd47967"
+      "sha256": "97f486d8527b9dc38f20fe8ca2bad6ab111c15edca0842857445d63237175643"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
-      "sha256": "0e125c3b09821affcb02599806541ff4fa7a80eea7adb75c3a327a6c961f49cd"
+      "sha256": "f3bde1c0e687814619449fcb7d25dbc0c41ad9b2592c4795acf9ea6d90cb4a9d"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
-      "sha256": "e9061312392233d909f03aa376cbdf3ad883712a5431e47980f9c5069f4e84e3"
+      "sha256": "985fda05cf32dfd6b6142b690b0052d43f5d2e4b0e41803e190f8553e0ddb160"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/pool-report.json",
@@ -1724,39 +1724,39 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/waterfall-report.json",
-      "sha256": "30c059734d029e6cf10ce05b48964ae1a6fa37d1aaf734ffbb9f9f111805b116"
+      "sha256": "5bebfe1d759d3e563f1266dcf5525abacf2910991c2aff9378ddad8e72fdd935"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json",
-      "sha256": "17912e0d004ab34a13b731b3b38aaee7417839eded64d04b0992ad8b1015bbbb"
+      "sha256": "97d4f8ec253e63572dfc9b2dd8a13d9fb2c17d41df697bd2e266b444157d882b"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
-      "sha256": "80467c695f83836f8fbeb6035ca206396eb49f0698866036e743153ba63e9240"
+      "sha256": "e92195b1f8b8f1d3dd70fa3279c02a6eaf59af9be0065220272cfae5fd38788d"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "1c17db917f8778c2fcbe7c95fa977c878475d6bbcbd0ffc579373968c6c5ea1d"
+      "sha256": "ae5f69560defefbbbffe12312293ddc64fe8594cc52806925000fef8e1bdb50a"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
-      "sha256": "4ba729bccc8dfd530275cd10c81bfb66d6dbc91ee0f83d9ea4e992da203b979f"
+      "sha256": "bd97e3da7d0825c6b12ba7699019531e823f35eef822546ee4046ed44c536828"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
-      "sha256": "4979aa6d4d4b9653526db67cc3241272afdf2aed96cec62a5448419ae331a10f"
+      "sha256": "820f429a9165e387f0a7f511bacea8bb2af1b094f7fac1a8029df50c14a1307a"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/convertible/cases.json",
-      "sha256": "fc93ca2313462d9e68ea81666f2c304b125b3ccbd74e8e3fc7d283635865bc4b"
+      "sha256": "705c0ef9f9e4fe13908e2e39070f0ac6bafc1cc8f6ef5ac581bf03e51af30270"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
-      "sha256": "28371277ad21e75c9812fd0f4632356245462a8674a4616b988f32f00b812c73"
+      "sha256": "8288b5f67b3be8448d2269c033c1e86eb42da944c58244055c7ea972a7f439fc"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/quote-converter/cases.json",
-      "sha256": "0c4c56d8580fda7f3d6fdeaecbd5e2d00239232b251570525e68fc967527971c"
+      "sha256": "5fc3ee00b81d6077e0c7e60730192050d246e9bc28746363ddb2948224361858"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
@@ -1780,7 +1780,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/analytics/benchmark.json",
-      "sha256": "1fbaa734507dd395bac4fa88e14e7935ed2d990062442fc81f64578974e9a9ec"
+      "sha256": "0cdfc09a8238c801731805c36c994f21c1bba23f9a4416d44513f96d09d04d9e"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/correlation/cases.json",
@@ -1812,7 +1812,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/models/recovery/cases.json",
-      "sha256": "051a38c43bce582f4ed62efce2e3a5afb81abd10f300e24f76b22f4c3d2e4fb9"
+      "sha256": "8aa26f30b6488a61d680b731bab4c8f9cf61dfb2d7147284bcc9f7e531f68d24"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",
@@ -1832,19 +1832,19 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-      "sha256": "385d3a704f4ee9f5bb8831f7724f8fe6f9ffeac52da7f350152602eefe05305d"
+      "sha256": "7e2853476a9c75b2d81678ace0f624d147bd3565466bdcfd5fd6d3e1e45e5f68"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "bb442cc92f7e8589c173cf28fff620b0399095c201eea9d15fcfbbd640a7637f"
+      "sha256": "ee07483240389b6904228429fc6c1afafed211c740e81a23ebeebc0b8daed8e0"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/exposures/cases.json",
-      "sha256": "4c20ca305b344ed72f696b0c043612074de4f77faf3544f5041a0a9784763f27"
+      "sha256": "a8e12d7cf48f746ec271331cbd8e174f15b78592371839733fe24cf365ce51da"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "ef0026e69b38b45bd71abc0a67664e58bd22875104e3201ae46fd46ac4d6278d"
+      "sha256": "c24fae872b813535ce80d3416945c5c41ab6a0b905348a71ee69a413cdb12308"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
@@ -1856,7 +1856,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "c13b875afcb8da1e67434bbba09143206eb60e0b1a2bc0d119f3ae7a4d544f24"
+      "sha256": "ae6fe1f7f63db1de7a1c0eec7cea80c854792385f437a59b4c3645553a19c018"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -1864,7 +1864,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "e136cc5320c3bfad8ad06fd111b6866ccfee6cd52e4c223521e10b065f36d4ff"
+      "sha256": "9199e3197ac1576ea82e0195430f69085c95344d8189c5a8ec1acced641ade1d"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
@@ -1940,11 +1940,11 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
-      "sha256": "ab3fe6af3773a68074ea9a17ca8252a2f3313655566622868ee19c1514280855"
+      "sha256": "188e83b166e3d2b536f916b0ad827e82cea7c0c92c0ad72892eb2eab1eda0b4a"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",
-      "sha256": "405600e4509ab62d12da2089d57d5632607aeba04bdcf16e7d312551bc733232"
+      "sha256": "89b2a80d33565cad1cb7063e44ce1c7c8105a9885f36a25eb8b7f49298b29fa2"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",
@@ -2000,7 +2000,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-breach-forecast.json",
-      "sha256": "01f0595f02dfe75fac819d6659ecd75d62e3d9a083b9b0e205b441093e0c495b"
+      "sha256": "7d96b237b279a0e8978698e7454b1b373a5198011b8fd187db147ee4e36fa6e5"
     }
   ]
 }

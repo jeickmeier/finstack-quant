@@ -419,7 +419,7 @@
             "shifted_lognormal": {
               "properties": {
                 "shift": {
-                  "description": "Finite positive additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.",
+                  "description": "Finite signed additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.\nThe effective forward and strikes must be positive.",
                   "format": "double",
                   "type": "number"
                 }

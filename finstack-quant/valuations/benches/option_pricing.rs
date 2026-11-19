@@ -81,7 +81,8 @@ fn create_market() -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(disc)
+        .try_insert(disc)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",
@@ -153,7 +154,8 @@ fn create_barrier_market() -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(disc)
+        .try_insert(disc)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "SPX",

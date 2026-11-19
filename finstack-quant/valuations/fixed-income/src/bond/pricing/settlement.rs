@@ -283,7 +283,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         let quote_date = settlement_date(&bond, as_of).expect("settlement date");
         assert!(
@@ -387,7 +389,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let dirty_at_quote = 100.0;
         let pv_as_of =
             quote_dirty_at_as_of(&bond, &market, as_of, quote_ctx.quote_date, dirty_at_quote)

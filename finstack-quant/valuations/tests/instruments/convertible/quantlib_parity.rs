@@ -67,7 +67,8 @@ fn create_convertible_market(
     let discount_curve = create_flat_discount_curve(base_date, risk_free_rate, "USD-OIS");
 
     MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price(
             "EQUITY",
             MarketScalar::unitless(equity_spot).expect("valid scalar"),

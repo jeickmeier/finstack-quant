@@ -256,7 +256,8 @@ pub trait ModelTimeSeries: Send + Sync {
 /// without a bound and threshold. Returns `NotFound` when a required metric is
 /// absent for any active period, and rejects non-finite observations, unordered
 /// dates, dates before the reference date, and fewer than two independent MC
-/// samples. Inactive tests skip metric and springing lookups.
+/// samples. An undefined standardized lognormal threshold also returns an
+/// error. Inactive tests skip metric and springing lookups.
 pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
     covenant: &CovenantSpec,
     model: &MTS,
@@ -431,7 +432,7 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
 
             if config.num_paths == 0 {
                 breach_probability[i] =
-                    lognormal_breach_probability(bound_kind, base, thr, sigma, t_years);
+                    lognormal_breach_probability(bound_kind, base, thr, sigma, t_years)?;
             } else {
                 eligible.push(i);
                 horizons.push(t_years);
@@ -448,7 +449,7 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
                 &horizons,
                 sigma,
                 &config,
-            );
+            )?;
             for (k, &i) in eligible.iter().enumerate() {
                 breach_probability[i] = probs[k];
                 breach_probability_stderr[i] = stderrs[k];
@@ -701,19 +702,19 @@ fn lognormal_breach_probability(
     threshold: f64,
     sigma: f64,
     t_years: f64,
-) -> f64 {
-    match bound_kind {
-        BoundKind::AtMost if threshold <= 0.0 => 1.0,
-        BoundKind::AtLeast if threshold <= 0.0 => 0.0,
-        _ => {
-            let drift = -0.5 * sigma * sigma * t_years;
-            let z = ((threshold / base).ln() - drift) / (sigma * t_years.sqrt());
-            match bound_kind {
-                BoundKind::AtMost => 1.0 - norm_cdf(z),
-                BoundKind::AtLeast => norm_cdf(z),
-            }
-        }
+) -> Result<f64> {
+    if threshold <= 0.0 {
+        return Ok(match bound_kind {
+            BoundKind::AtMost => 1.0,
+            BoundKind::AtLeast => 0.0,
+        });
     }
+    let drift = -0.5 * sigma * sigma * t_years;
+    let z = ((threshold / base).ln() - drift) / (sigma * t_years.sqrt());
+    norm_cdf(match bound_kind {
+        BoundKind::AtMost => -z,
+        BoundKind::AtLeast => z,
+    })
 }
 
 /// Path-consistent Monte Carlo breach probabilities for the eligible dates.
@@ -729,7 +730,7 @@ fn lognormal_breach_probability(
 /// The marginal law of `W(T_k)` is `N(0, T_k)`, so each date's estimator
 /// converges to the analytic closed form while paths stay jointly consistent
 /// across test dates. Deterministic: path `p` draws from
-/// `Pcg64Rng::new_with_stream(seed, p)`, so results are reproducible and
+/// `Pcg64Rng::new(seed, p)`, so results are reproducible and
 /// independent of evaluation order. With `antithetic`, `(Z, -Z)` pairs are
 /// simulated and `num_paths` is rounded up to a whole number of pairs
 /// (Glasserman 2003, *Monte Carlo Methods in Financial Engineering*, §4.1).
@@ -742,7 +743,7 @@ fn mc_breach_probabilities(
     horizons: &[f64],
     sigma: f64,
     config: &CovenantForecastConfig,
-) -> (Vec<f64>, Vec<f64>) {
+) -> Result<(Vec<f64>, Vec<f64>)> {
     let n_dates = bases.len();
     let seed = config.random_seed.unwrap_or(DEFAULT_MC_SEED);
     let n_units = if config.antithetic {
@@ -755,14 +756,14 @@ fn mc_breach_probabilities(
     let mut sum_sq = vec![0.0_f64; n_dates];
 
     for unit in 0..n_units {
-        let mut rng = Pcg64Rng::new_with_stream(seed, unit as u64);
+        let mut rng = Pcg64Rng::new(seed, unit as u64);
         let mut w_pos = 0.0_f64;
         let mut w_neg = 0.0_f64;
         let mut t_prev = 0.0_f64;
 
         for k in 0..n_dates {
             let dt = horizons[k] - t_prev;
-            let step = dt.sqrt() * rng.normal(0.0, 1.0);
+            let step = dt.sqrt() * rng.normal(0.0, 1.0)?;
             w_pos += step;
             w_neg -= step;
             t_prev = horizons[k];
@@ -803,7 +804,7 @@ fn mc_breach_probabilities(
         probs.push(mean);
         stderrs.push((variance / n).sqrt());
     }
-    (probs, stderrs)
+    Ok((probs, stderrs))
 }
 
 fn springing_condition_active<MTS: ModelTimeSeries>(
@@ -936,6 +937,15 @@ mod tests {
                 .all(|&p| (p - 0.0).abs() < 1e-12)
         );
         assert!(fc.first_breach_date.is_none());
+    }
+
+    #[test]
+    fn upper_bound_breach_keeps_the_ten_sigma_normal_tail() {
+        let probability =
+            lognormal_breach_probability(BoundKind::AtMost, 1.0, 9.5_f64.exp(), 1.0, 1.0)
+                .expect("valid stochastic forecast");
+        let reference = 7.619_853_024_160_526e-24;
+        assert!((probability / reference - 1.0).abs() < 1e-10);
     }
 
     #[test]

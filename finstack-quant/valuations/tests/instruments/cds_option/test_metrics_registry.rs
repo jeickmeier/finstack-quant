@@ -105,7 +105,11 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
         .knots([(1.0, 0.02), (5.0, 0.02), (10.0, 0.02)])
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let result = option
         .price_with_metrics(
@@ -124,7 +128,10 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
         let calibration = base_discount.rate_calibration().unwrap();
         let bumped_discount =
             bump_quote_calibrated_discount(base_discount.as_ref(), calibration, &market, bump_bp);
-        let bumped_market = market.clone().insert(bumped_discount);
+        let bumped_market = market
+            .clone()
+            .try_insert(bumped_discount)
+            .expect("insert market curve");
         option.value_raw(&bumped_market, as_of).unwrap()
     };
     let expected = (bumped_pv(1.0) - bumped_pv(-1.0)) / 2.0;
@@ -153,7 +160,11 @@ fn test_cds_option_dv01_falls_back_to_direct_bump_without_calibration() {
         .build()
         .unwrap();
     let hazard = flat_hazard("HZ-SN", as_of, 0.4, 0.02);
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let option = CdsOptionBuilder::new().build(as_of);
 
     let result = option
@@ -247,7 +258,11 @@ fn test_cds_option_cs01_requires_replay_recipe() {
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let option = CdsOptionBuilder::new().build(as_of);
 
     let pv = option.value(&market, as_of).unwrap();

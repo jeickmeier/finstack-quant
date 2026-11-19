@@ -281,7 +281,7 @@ impl MigrationSimulator {
                 n_states,
             });
         }
-        let mut rng = Pcg64Rng::new(seed);
+        let mut rng = Pcg64Rng::new(seed, 0);
         let scale = Arc::new(self.generator.scale.clone());
         Ok((0..n_paths)
             .map(|_| {
@@ -320,7 +320,7 @@ impl MigrationSimulator {
         if n_paths_per_state == 0 {
             return Err(MigrationError::InvalidPathCount);
         }
-        let mut rng = Pcg64Rng::new(seed);
+        let mut rng = Pcg64Rng::new(seed, 0);
         let n = self.generator.n_states();
         // Flat row-major counts (index `from * n + to`) for cache-friendly
         // accumulation and a single allocation.

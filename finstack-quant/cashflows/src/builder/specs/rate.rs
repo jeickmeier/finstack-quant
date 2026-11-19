@@ -297,7 +297,9 @@ mod tests {
         let expected_proj = fwd
             .rate_between_dates(start, end, 91.0 / 360.0)
             .expect("factor projection");
-        let market = MarketContext::new().insert(fwd);
+        let market = MarketContext::new()
+            .try_insert(fwd)
+            .expect("insert market curve");
 
         assert!(
             RateSpec::Fixed { rate: f64::NAN }

@@ -82,7 +82,8 @@ fn create_market_context(spot: f64, vol: f64, div_yield: f64) -> MarketContext {
         .unwrap();
 
     MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",

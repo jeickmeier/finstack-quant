@@ -65,8 +65,10 @@ fn flat_hazard_curve(as_of: Date, hazard_rate: f64) -> HazardCurve {
 
 fn test_market(as_of: Date) -> MarketContext {
     MarketContext::new()
-        .insert(flat_discount_curve(as_of, 0.02))
-        .insert(flat_hazard_curve(as_of, HAZARD_RATE))
+        .try_insert(flat_discount_curve(as_of, 0.02))
+        .expect("insert market curve")
+        .try_insert(flat_hazard_curve(as_of, HAZARD_RATE))
+        .expect("insert market curve")
 }
 
 /// Create a 5Y CDS (buy protection).
@@ -204,7 +206,7 @@ fn test_cds_cs01_vs_risky_annuity() {
         "USD-OIS",
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
     let cds = create_5y_cds_buy(as_of);
 
     let metrics = vec![MetricId::Cs01, MetricId::RiskyAnnuity];

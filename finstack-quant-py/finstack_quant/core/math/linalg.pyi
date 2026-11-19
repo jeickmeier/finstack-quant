@@ -249,7 +249,7 @@ def ledoit_wolf_shrinkage(
     -------
     tuple[list[list[float]], float]
         ``(covariance, shrinkage)``: the ``n x n`` shrunk covariance
-        ``delta * mu * I + (1 - delta) * S`` and the optimal intensity
+        ``delta * mu * I + (1 - delta) * S`` and the estimated intensity
         ``delta`` in ``[0, 1]``. The covariance is unannualized and restored
         to squared observation units. Constant observations produce a zero
         covariance matrix and zero intensity.
@@ -260,8 +260,9 @@ def ledoit_wolf_shrinkage(
         If ``observations`` is not a numeric sequence/array or contains ``bool`` values.
     ValueError
         If ``t < 2``, ``n == 0``, rows are ragged, or any entry is
-        non-finite; also if centered observations or covariance entries
-        exceed the finite ``float64`` range.
+        non-finite.
+    RuntimeError
+        If the estimated intensity or a covariance entry cannot be resolved in the representable range.
 
     Examples
     --------

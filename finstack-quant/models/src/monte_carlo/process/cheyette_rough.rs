@@ -59,15 +59,14 @@
 //!
 //! ```
 //! use finstack_quant_models::monte_carlo::process::cheyette_rough::{
-//!     CheyetteRoughVolProcess, CheyetteRoughVolParams,
+//!     BaseVolatility, CheyetteRoughVolProcess, CheyetteRoughVolParams,
 //! };
 //! use finstack_quant_models::monte_carlo::traits::StochasticProcess;
-//! use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
 //! use finstack_quant_core::math::fractional::HurstExponent;
 //!
 //! let params = CheyetteRoughVolParams::new(
 //!     0.03,                                       // κ = 3% mean reversion
-//!     ForwardVarianceCurve::flat(0.005).unwrap(),  // σ₀ = 50bps base vol
+//!     BaseVolatility::flat(0.005).unwrap(),  // σ₀ = 50bps base vol
 //!     HurstExponent::new(0.1).unwrap(),            // H = 0.1 (rough)
 //!     1.5,                                         // η = vol-of-vol
 //!     -0.3,                                        // ρ = rate-vol correlation
@@ -86,7 +85,8 @@ use super::super::traits::state_keys;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
 use super::credit_line::interpolate_rate;
 use crate::monte_carlo::traits::ProcessMetadata;
-use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
+mod base_volatility;
+pub use base_volatility::BaseVolatility;
 use finstack_quant_core::math::fractional::HurstExponent;
 
 /// Cheyette + rough stochastic volatility model parameters.
@@ -103,7 +103,7 @@ pub struct CheyetteRoughVolParams {
     /// Mean reversion of the short rate (κ > 0).
     pub kappa: f64,
     /// Base volatility term structure σ₀(t) for the rate process.
-    pub sigma_base: ForwardVarianceCurve,
+    pub sigma_base: BaseVolatility,
     /// Hurst exponent H ∈ (0, 0.5) for the rough vol driver.
     pub hurst: HurstExponent,
     /// Vol-of-vol scaling (η > 0).
@@ -120,7 +120,7 @@ pub struct CheyetteRoughVolParams {
 #[serde(deny_unknown_fields)]
 struct RawCheyetteRoughVolParams {
     kappa: f64,
-    sigma_base: ForwardVarianceCurve,
+    sigma_base: BaseVolatility,
     hurst: HurstExponent,
     eta: f64,
     rho: f64,
@@ -155,7 +155,7 @@ impl CheyetteRoughVolParams {
     /// # Arguments
     ///
     /// * `kappa` - Mean reversion speed (must be positive and finite)
-    /// * `sigma_base` - Base volatility term structure σ₀(t)
+    /// * `sigma_base` - Deterministic rate volatility σ₀(t), in decimal rate units per square-root model year.
     /// * `hurst` - Hurst exponent; warns if not rough (H ≥ 0.5)
     /// * `eta` - Vol-of-vol (must be positive and finite)
     /// * `rho` - Rate-vol correlation (must be in \[-1, 1\] and finite)
@@ -168,7 +168,7 @@ impl CheyetteRoughVolParams {
     /// of range.
     pub fn new(
         kappa: f64,
-        sigma_base: ForwardVarianceCurve,
+        sigma_base: BaseVolatility,
         hurst: HurstExponent,
         eta: f64,
         rho: f64,
@@ -228,11 +228,11 @@ impl CheyetteRoughVolParams {
 
         if !hurst.is_rough() {
             tracing::warn!(
-                h = hurst.value(),
+                h = hurst.get_value(),
                 "CheyetteRoughVol Hurst exponent H = {:.4} is not rough (H >= 0.5). \
                  The model is designed for rough volatility; results may not \
                  match empirical behavior.",
-                hurst.value()
+                hurst.get_value()
             );
         }
 
@@ -246,11 +246,6 @@ impl CheyetteRoughVolParams {
     pub fn phi(&self, t: f64) -> f64 {
         debug_assert!(!self.phi_times.is_empty());
         interpolate_rate(t, &self.phi_times, &self.phi_values)
-    }
-
-    /// Evaluate the base volatility σ₀(t) at time `t`.
-    pub fn sigma_base_value(&self, t: f64) -> f64 {
-        self.sigma_base.value(t)
     }
 }
 
@@ -313,9 +308,10 @@ impl StochasticProcess for CheyetteRoughVolProcess {
     }
 
     /// Formal no-op: actual diffusion is applied by the Cheyette rough vol discretization.
-    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         out[0] = 0.0;
         out[1] = 0.0;
+        Ok(())
     }
 
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
@@ -329,7 +325,7 @@ impl ProcessMetadata for CheyetteRoughVolProcess {
     fn metadata(&self) -> ProcessParams {
         let mut params = ProcessParams::new("CheyetteRoughVol");
         params.add_param("kappa", self.params.kappa);
-        params.add_param("H", self.params.hurst.value());
+        params.add_param("H", self.params.hurst.get_value());
         params.add_param("eta", self.params.eta);
         params.add_param("rho", self.params.rho);
 
@@ -341,8 +337,8 @@ impl ProcessMetadata for CheyetteRoughVolProcess {
 mod tests {
     use super::*;
 
-    fn make_sigma_base() -> ForwardVarianceCurve {
-        ForwardVarianceCurve::flat(0.005).expect("valid flat curve")
+    fn make_sigma_base() -> BaseVolatility {
+        BaseVolatility::flat(0.005).expect("valid flat curve")
     }
 
     fn make_hurst(h: f64) -> HurstExponent {
@@ -370,7 +366,7 @@ mod tests {
     fn serde_round_trip_preserves_required_curves_and_path_state() {
         let params = CheyetteRoughVolParams::new(
             0.03,
-            ForwardVarianceCurve::from_points(&[(0.0, 0.005), (2.0, 0.008)]).expect("valid curve"),
+            BaseVolatility::from_points(&[(0.0, 0.005), (2.0, 0.008)]).expect("valid curve"),
             make_hurst(0.1),
             1.5,
             -0.3,
@@ -383,8 +379,8 @@ mod tests {
         for time in [0.0, 0.5, 2.0, 10.0, 35.0] {
             assert_eq!(params.phi(time), restored.phi(time));
             assert_eq!(
-                params.sigma_base.value(time),
-                restored.sigma_base.value(time)
+                params.sigma_base.get_value(time).unwrap(),
+                restored.sigma_base.get_value(time).unwrap()
             );
         }
         let process = CheyetteRoughVolProcess::new(restored);
@@ -711,7 +707,9 @@ mod tests {
         let mut diff = [f64::NAN, f64::NAN];
 
         process.drift(0.5, &x, &mut drift);
-        process.diffusion(0.5, &x, &mut diff);
+        process
+            .diffusion(0.5, &x, &mut diff)
+            .expect("valid diffusion");
 
         assert_eq!(drift[0], 0.0);
         assert_eq!(drift[1], 0.0);

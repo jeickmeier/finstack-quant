@@ -17,7 +17,7 @@
     { "type": "easter_offset", "name": "Good Friday", "days": -3, "from_year": 2024, "to_year": 2025 },
     { "type": "easter_offset", "name": "Good Friday", "days": -3, "from_year": 2027 },
     { "type": "nth_weekday", "name": "Columbus Day", "n": 2, "weekday": "monday", "month": "october", "from_year": 1971 },
-    { "type": "fixed", "name": "Veterans Day", "month": "november", "day": 11, "observed": "fri_if_sat_mon_if_sun" }
+    { "type": "fixed", "name": "Veterans Day", "month": "november", "day": 11, "observed": "mon_if_sun" }
   ],
   "notes": "U.S. bond-market full-day trading closures; early closes remain business days, including December 31, 2021 (SIFMA U.S. Holiday Archive). Good Friday 2021 (April 2), 2023 (April 7), and 2026 (April 3) were Employment Situation release early-close sessions, not full closures. Published annual fixture: 2026. Other year-specific exceptions require published-schedule maintenance. This is not the SOFR publication calendar or the exact MBS settlement-date table. <https://www.sifma.org/resources/guides-playbook/holiday-schedule>"
 }

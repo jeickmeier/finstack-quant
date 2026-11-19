@@ -94,12 +94,12 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 ///
 /// # let as_of = Date::from_calendar_date(2024, time::Month::January, 15).unwrap();
 /// # let bond = Bond::example().unwrap();
-/// # let curves = MarketContext::new().insert(
+/// # let curves = MarketContext::new().try_insert(
 /// #     DiscountCurve::builder("USD-TREASURY")
 /// #         .base_date(as_of)
 /// #         .knots([(0.0, 1.0), (10.0, 0.6)])
 /// #         .build()?,
-/// # );
+/// # )?;
 /// let quotes = compute_quotes(
 ///     &bond,
 ///     &curves,

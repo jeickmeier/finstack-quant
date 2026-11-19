@@ -4,7 +4,8 @@ use crate::irs::{InterestRateSwap, resolve_fixed_leg, resolve_float_leg};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
+    BusinessDayConvention, Date, DayCount, DayCountContext, DayCountContextState, StubKind, Tenor,
+    VolatilityClock,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -71,7 +72,8 @@ pub struct Swaption {
     pub cash_settlement_method: CashSettlementMethod,
     /// Volatility model (Black or Normal)
     pub vol_model: VolatilityModel,
-    /// Volatility surface ID for option pricing
+    /// Volatility source ID for option pricing. A dated SABR cube needs an
+    /// ACT/365F expiry clock anchored at the valuation date.
     pub vol_surface_id: CurveId,
     /// Complete fixed leg of the underlying swap.
     pub underlying_fixed_leg: FixedLegSpec,
@@ -106,6 +108,10 @@ pub struct Swaption {
     /// Attributes for scenario selection and grouping
     #[builder(default)]
     pub attributes: Attributes,
+    /// Opening source date for the market-frozen theta reprice.
+    #[serde(skip)]
+    #[builder(skip)]
+    pub(super) theta_cube_source_date: Option<Date>,
 }
 
 pub(super) struct VanillaSwaptionUnderlier {
@@ -324,6 +330,7 @@ impl Swaption {
             scenario_pricing_overrides: Default::default(),
             sabr_params: None,
             attributes: Attributes::new(),
+            theta_cube_source_date: None,
         })
     }
 
@@ -431,7 +438,7 @@ impl Swaption {
         Money::from_model_value(pv, self.notional.currency())
     }
 
-    fn price_quote_at_raw(
+    pub(crate) fn price_quote_at_raw(
         &self,
         curves: &MarketContext,
         quote: ResolvedVolatility,
@@ -506,28 +513,9 @@ impl Swaption {
                 strike: self.strike_f64()?,
                 convention: Some(convention),
                 clamp: true,
+                required_cube_clock: None,
             },
         )
-    }
-
-    /// Pre-expiry PV in the configured `vol_model` for an already-resolved
-    /// volatility, reusing the caller's forward swap rate and expiry time.
-    pub(crate) fn price_with_vol_at_raw(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        forward_rate: f64,
-        time_to_expiry: f64,
-        volatility: f64,
-    ) -> Result<f64> {
-        let quote = match self.vol_model {
-            VolatilityModel::Black => self.black_quote(market, volatility, time_to_expiry)?,
-            VolatilityModel::Normal => ResolvedVolatility {
-                sigma: validate_sigma(volatility)?,
-                convention: VolatilityConvention::Normal,
-            },
-        };
-        self.price_quote_at_raw(market, quote, as_of, forward_rate, time_to_expiry)
     }
 
     /// Pre-expiry SABR PV (callers handle `terminal_value`).
@@ -546,8 +534,8 @@ impl Swaption {
         as_of: Date,
     ) -> Result<f64> {
         let forward_rate = self.forward_swap_rate(market, as_of)?;
-        let time_to_expiry = self.time_to_expiry(as_of)?;
-        let quote = self.resolve_volatility_quote(market, forward_rate, time_to_expiry)?;
+        let (quote, time_to_expiry) =
+            self.resolve_volatility_quote_on_date(market, forward_rate, as_of)?;
         self.price_quote_at_raw(market, quote, as_of, forward_rate, time_to_expiry)
     }
 
@@ -850,7 +838,8 @@ impl Swaption {
     ///
     /// * `market` - Market context containing the configured volatility source.
     /// * `forward` - Unshifted forward swap rate as a decimal.
-    /// * `time_to_expiry` - Finite positive remaining option expiry in years.
+    /// * `time_to_expiry` - Finite positive expiry in years on the source's
+    ///   numeric axis. Dated pricing separately qualifies the calibration clock.
     ///
     /// # Errors
     ///
@@ -862,8 +851,31 @@ impl Swaption {
         time_to_expiry: f64,
     ) -> Result<f64> {
         Ok(self
-            .resolve_volatility_quote(market, forward, time_to_expiry)?
+            .resolve_volatility_quote(market, forward, time_to_expiry, None)?
             .sigma)
+    }
+
+    pub(crate) fn resolve_volatility_quote_on_date(
+        &self,
+        market: &MarketContext,
+        forward: f64,
+        as_of: Date,
+    ) -> Result<(ResolvedVolatility, f64)> {
+        let time_to_expiry = self.time_to_expiry(as_of)?;
+        let source_date = self.theta_cube_source_date.unwrap_or(as_of);
+        let source_clock = VolatilityClock::try_new(
+            source_date,
+            DayCount::Act365F,
+            DayCountContextState::default(),
+        )?;
+        let source_expiry = if self.theta_cube_source_date.is_some() {
+            source_clock.expiry_time(self.expiry)?
+        } else {
+            time_to_expiry
+        };
+        let quote =
+            self.resolve_volatility_quote(market, forward, source_expiry, Some(source_clock))?;
+        Ok((quote, time_to_expiry))
     }
 
     fn resolve_volatility_quote(
@@ -871,6 +883,7 @@ impl Swaption {
         curves: &MarketContext,
         forward: f64,
         time_to_expiry: f64,
+        required_cube_clock: Option<VolatilityClock>,
     ) -> Result<ResolvedVolatility> {
         let convention = match self.vol_model {
             VolatilityModel::Normal => VolatilityConvention::Normal,
@@ -895,13 +908,7 @@ impl Swaption {
                     params.implied_vol_normal(forward, strike, time_to_expiry)?
                 }
                 VolatilityModel::Black => {
-                    let sigma = params.implied_vol(forward, strike, time_to_expiry)?;
-                    if params.quote_convention() == VolatilityConvention::Normal {
-                        return Err(Error::Validation(
-                            "normal SABR cannot supply a Black volatility quote".to_owned(),
-                        ));
-                    }
-                    sigma
+                    params.implied_vol_lognormal(forward, strike, time_to_expiry)?
                 }
             };
             let quote = ResolvedVolatility {
@@ -926,6 +933,7 @@ impl Swaption {
                         .vol_surface_extrapolation,
                     VolSurfaceExtrapolation::Error
                 ),
+                required_cube_clock,
             },
         )?;
         quote.model_rates(forward, strike)?;
@@ -949,15 +957,9 @@ impl Swaption {
             return Ok(None);
         }
         let disc = market.get_discount(self.get_discount_curve_id().as_ref())?;
-        let t = self.time_to_expiry(as_of)?;
-
-        if t <= 0.0 {
-            return Ok(None);
-        }
-
         let forward = self.forward_swap_rate(market, as_of)?;
         let annuity = self.annuity(disc.as_ref(), as_of, forward)?;
-        let quote = self.resolve_volatility_quote(market, forward, t)?;
+        let (quote, t) = self.resolve_volatility_quote_on_date(market, forward, as_of)?;
 
         Ok(Some(GreekInputs {
             forward,
@@ -1078,10 +1080,35 @@ impl finstack_quant_valuations_core::instruments::Instrument for Swaption {
             return self.price_sabr_before_expiry_raw(curves, as_of);
         }
 
-        let time_to_expiry = self.time_to_expiry(as_of)?;
         let forward = self.forward_swap_rate(curves, as_of)?;
-        let vol = self.resolve_volatility(curves, forward, time_to_expiry)?;
-        self.price_with_vol_at_raw(curves, as_of, forward, time_to_expiry, vol)
+        let (quote, time_to_expiry) =
+            self.resolve_volatility_quote_on_date(curves, forward, as_of)?;
+        self.price_quote_at_raw(curves, quote, as_of, forward, time_to_expiry)
+    }
+
+    fn theta_observed_state(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> Result<Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>> {
+        // Direct dated pricing admits the cube against the opening valuation
+        // before the theta calculator prepares this rolled copy. The held quote
+        // uses the same contractual expiry and source-clock coordinates.
+        if rolled_date >= self.expiry
+            || (self.sabr_params.is_some()
+                && self
+                    .instrument_pricing_overrides
+                    .market_quotes
+                    .implied_volatility
+                    .is_none())
+            || market.get_vol_cube(self.vol_surface_id.as_str()).is_err()
+        {
+            return Ok(None);
+        }
+        let mut rolled = self.clone();
+        rolled.theta_cube_source_date = Some(as_of);
+        Ok(Some(Box::new(rolled)))
     }
 
     fn market_dependencies(

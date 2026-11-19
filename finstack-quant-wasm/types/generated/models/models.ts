@@ -81,6 +81,22 @@ export type AssetDynamics =
  */
 export type AveragingMethod = "arithmetic" | "geometric";
 /**
+ * Cheyette base volatility in decimal rate units per square-root model year.
+ *
+ * A level of 0.005 is a 50 basis point rate amplitude. The process samples
+ * the amplitude at the left endpoint of each step and squares it for the
+ * variance-state drift.
+ */
+export type BaseVolatility =
+  | {
+      amplitudes: [number, number][];
+      interpolation: "linear";
+    }
+  | {
+      amplitudes: [number, number][];
+      interpolation: "constant_intervals";
+    };
+/**
  * Supported regression basis families for LSMC pricers.
  */
 export type BasisKind = "laguerre" | "polynomial" | "normalized_polynomial";
@@ -136,7 +152,6 @@ export type CashflowType =
   | "recovery"
   | "mark_to_market"
   | "other";
-export type Interpolation = "linear" | "constant_intervals";
 /**
  * Finite JSON number in the closed interval `[0, 1]`.
  */
@@ -969,6 +984,7 @@ export type FbmSpec =
       near_field_size?: number | null;
       type: "windowed_conditional";
     };
+export type Interpolation = "linear" | "constant_intervals";
 /**
  * Factor model specification for configuration and serialization.
  */
@@ -1737,13 +1753,6 @@ export type PositionRiskSource =
        */
       pnls: number[][];
     };
-/**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
 /**
  * Prepayment curve shape.
  */
@@ -2536,7 +2545,7 @@ export interface CheyetteRoughVolParams {
   /**
    * Base volatility term structure σ₀(t) for the rate process.
    */
-  sigma_base: ForwardVarianceCurve;
+  sigma_base: BaseVolatility;
   [k: string]: unknown;
 }
 /**
@@ -2546,36 +2555,10 @@ export interface CheyetteRoughVolParams {
  *
  * - H < 0.5 — rough (anti-persistent increments)
  * - H = 0.5 — standard Brownian motion
- * - H > 0.5 — smooth (persistent increments)
+ * - H > 0.5 — more regular paths with persistent increments
  */
 export interface HurstExponent {
   h: number;
-}
-/**
- * Forward variance curve ξ₀(t) for rough volatility models.
- *
- * Represents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under
- * the consuming model's pricing measure. Values are supplied or calibrated by
- * the caller. The integral sets the model's expected accumulated variance.
- *
- * Differencing ATM implied total variance is an optional proxy, not an exact
- * variance-swap bootstrap. This type interpolates the supplied curve; it does
- * not perform market calibration.
- */
-export interface ForwardVarianceCurve {
-  /**
-   * Interpolation contract used by the constructor.
-   */
-  interpolation: Interpolation;
-  /**
-   * Point times or interval ends (strictly increasing year fractions).
-   */
-  times: number[];
-  /**
-   * Point samples or constant interval variances (all > 0).
-   */
-  values: number[];
-  [k: string]: unknown;
 }
 /**
  * CIR process parameters.
@@ -4042,6 +4025,31 @@ export interface ForwardGreeks {
   vega: number;
 }
 /**
+ * Forward variance curve ξ₀(t) for rough volatility models.
+ *
+ * Represents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under
+ * the consuming model's pricing measure. Values are supplied or calibrated by
+ * the caller. The integral sets the model's expected accumulated variance.
+ *
+ * Differencing ATM implied total variance is an optional proxy, not an exact
+ * variance-swap bootstrap. This type interpolates the supplied curve; it does
+ * not perform market calibration.
+ */
+export interface ForwardVarianceCurve {
+  /**
+   * Interpolation contract used by the constructor.
+   */
+  interpolation: Interpolation;
+  /**
+   * Point times or interval ends (strictly increasing year fractions).
+   */
+  times: number[];
+  /**
+   * Point samples or constant interval variances (all nonnegative).
+   */
+  values: number[];
+}
+/**
  * Inputs of the GBM European Monte Carlo finite-difference Greeks.
  */
 export interface GbmEuropeanFdSpec {
@@ -4249,11 +4257,17 @@ export interface HullWhite1FParams {
   [k: string]: unknown;
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface PiecewiseConstantCurve {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Validated constant-parameter Hull-White one-factor model.
@@ -6136,29 +6150,29 @@ export interface SabrCalibrationOutcome {
   winning_start: [number, number, number];
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface SabrParameters {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
-  alpha: PositiveF64Wire;
+  alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
-  beta: ClosedUnitIntervalF64Wire;
+  beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
-  nu: NonNegativeF64Wire;
+  nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
-  rho: CorrelationWire;
+  rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: PositiveF64Wire | null;
+  shift?: number | null;
 }
 /**
  * Schwartz-Smith process parameters.

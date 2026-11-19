@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any, Optional, Sequence, Union
+from typing import Any, NotRequired, Optional, Sequence, TypedDict, Union
 import pandas as pd
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DateLike, TimeOrDate
 from finstack_quant.core.market_data._curves.discount import DiscountCurve
+
+class _ForwardCurveOptions(TypedDict):
+    id: str
+    base_date: DateLike
+    knots: Sequence[tuple[float, float]]
+    interp: str
+    extrapolation: str
+    day_count: Union[DayCount, str]
+    calendar_id: NotRequired[Optional[str]]
+    index_tenor: NotRequired[Optional[Union[Tenor, str]]]
 
 class ForwardCurve:
     """
@@ -25,15 +35,15 @@ class ForwardCurve:
     --------
     >>> import math
     >>> from finstack_quant.core.market_data import ForwardCurve
-    >>> curve = ForwardCurve(
-    ...     "USD-SOFR-3M",
-    ...     "2025-01-01",
-    ...     [(0.0, 1.0), (1.0, math.exp(-0.04))],
-    ...     interp="log_linear",
-    ...     extrapolation="extend",
-    ...     day_count="act_360",
-    ...     index_tenor="3M",
-    ... )
+    >>> curve = ForwardCurve({
+    ...     "id": "USD-SOFR-3M",
+    ...     "base_date": "2025-01-01",
+    ...     "knots": [(0.0, 1.0), (1.0, math.exp(-0.04))],
+    ...     "interp": "log_linear",
+    ...     "extrapolation": "extend",
+    ...     "day_count": "act_360",
+    ...     "index_tenor": "3M",
+    ... })
     >>> round(curve.rate_between(0.0, 0.25, 0.25), 6)
     0.040201
     >>> str(curve.index_tenor)
@@ -41,71 +51,35 @@ class ForwardCurve:
 
     """
 
-    def __init__(
-        self,
-        id: str,
-        base_date: DateLike,
-        knots: Sequence[tuple[float, float]],
-        *,
-        interp: str,
-        extrapolation: str,
-        day_count: Union[DayCount, str],
-        index_tenor: Optional[Union[Tenor, str]] = None,
-    ) -> None:
+    def __init__(self, options: _ForwardCurveOptions) -> None:
         """
-        Construct a forward curve from ``(time_years, projection_factor)`` knots.
+        Construct a projection-factor curve from a dictionary of explicit options.
 
         Parameters
         ----------
-        id : str
-            Unique curve identifier (e.g. ``"USD-SOFR-3M"``).
-        base_date : datetime.date or str
-            Valuation date anchoring ``t = 0``; ISO ``"YYYY-MM-DD"`` strings are accepted.
-        knots : Sequence[tuple[float, float]]
-            Strictly ascending ``(time_years, projection_factor)`` pairs with
-            finite, strictly positive factors. ``(0.0, 1.0)`` is prepended
-            when absent; a supplied ``t = 0`` knot must have factor ``1.0``.
-        interp : str
-            Interpolation style (``"log_linear"``, ``"linear"``,
-            ``"monotone_convex"``, ``"cubic_hermite"``,
-            ``"piecewise_quadratic_forward"``). Keyword-only and required.
-        extrapolation : str
-            Tail policy outside the knots (``"extend"``, ``"flat"``, or
-            ``"error"``, which raises outside the pillar range). Keyword-only
-            and required.
-        day_count : DayCount or str
-            Day-count convention used to convert query dates to curve time.
-            Keyword-only and required (never inferred from ``id``).
-        index_tenor : Tenor or str, optional
-            Accrual tenor of the projected index (for example ``"3M"``).
-            Term-rate consumers such as statement rate bindings require it;
-            ``None`` leaves the curve without index-period metadata.
+        options : dict
+            Supply a unique ``id``, a ``base_date`` as a date or ISO string,
+            strictly ascending ``knots`` of finite ``(time_years, factor)``
+            pairs, an ``interp`` style, an ``extrapolation`` policy and a
+            ``day_count`` convention or label. Factors must be positive. A
+            zero-time factor must equal one, and ``(0.0, 1.0)`` is prepended
+            when absent. Supported interpolation styles are ``"log_linear"``,
+            ``"linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` and
+            ``"piecewise_quadratic_forward"``. Tail policies are ``"flat"``,
+            ``"extend"`` and ``"error"``. Optional ``calendar_id`` is a registered ID
+            or a ``+``-joined union and is required for ``"bus_252"``. Optional
+            ``index_tenor`` accepts a ``Tenor`` or label such as ``"3M"``. It
+            supplies index accrual metadata used by term-rate consumers.
 
         Raises
         ------
-        ValueError
-            If a knot is non-finite, non-positive, unsorted or duplicated, a
-            ``t = 0`` factor is not ``1.0``, a label is unknown, or the day
-            count needs a holiday calendar.
         TypeError
-            If ``index_tenor`` is neither a ``Tenor`` nor a string.
-
-        Examples
-        --------
-        >>> import math
-        >>> from finstack_quant.core.market_data import ForwardCurve
-        >>> curve = ForwardCurve(
-        ...     "USD-SOFR-3M",
-        ...     "2025-01-01",
-        ...     [(1.0, math.exp(-0.04))],
-        ...     interp="log_linear",
-        ...     extrapolation="extend",
-        ...     day_count="act_360",
-        ...     index_tenor="3M",
-        ... )
-        >>> curve.knots
-        [0.0, 1.0]
-
+            If a key is missing or unknown or an option has the wrong type.
+        ValueError
+            If the knots are invalid, a convention label is unknown, or
+            the day count requires an omitted holiday calendar.
+        KeyError
+            If the calendar ID or any member of a calendar union is unknown.
         """
         ...
 

@@ -348,7 +348,9 @@ fn test_accrued_interest_amortizing_schedule_driven() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let curves = MarketContext::new().insert(disc);
+    let curves = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Midway through last coupon period (year2 to maturity): outstanding notional
     // is 1/3 of original. We verify that accrued interest uses the actual

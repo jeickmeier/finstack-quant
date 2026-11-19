@@ -117,8 +117,9 @@ mod tests {
         key: PricerKey,
     ) -> std::result::Result<ValuationResult, PricingError> {
         let as_of = date(2024, 1, 2);
-        let market =
-            MarketContext::new().insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 10.0));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 10.0))
+            .expect("insert market curve");
         let registry = CREDIT.build_pricers().expect("credit pricers register");
         registry
             .get_pricer(key)

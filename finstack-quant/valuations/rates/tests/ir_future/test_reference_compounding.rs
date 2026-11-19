@@ -74,7 +74,8 @@ fn one_month_sofr_uses_calendar_day_weighted_arithmetic_average() {
     )
     .expect("fixings");
     let market = MarketContext::new()
-        .insert(flat_forward(curve_id, as_of, 0.10, DayCount::Act360))
+        .try_insert(flat_forward(curve_id, as_of, 0.10, DayCount::Act360))
+        .expect("insert market curve")
         .insert_series(fixings);
 
     let rate = future
@@ -108,7 +109,8 @@ fn one_month_sofr_carries_the_prior_fixing_when_month_starts_on_weekend() {
     )
     .expect("fixings");
     let market = MarketContext::new()
-        .insert(flat_forward(curve_id, as_of, 0.10, DayCount::Act360))
+        .try_insert(flat_forward(curve_id, as_of, 0.10, DayCount::Act360))
+        .expect("insert market curve")
         .insert_series(fixings);
 
     let rate = future
@@ -146,7 +148,8 @@ fn corra_compounds_on_actual_365_with_weekend_weights() {
     )
     .expect("fixings");
     let market = MarketContext::new()
-        .insert(flat_forward(curve_id, as_of, 0.10, DayCount::Act365F))
+        .try_insert(flat_forward(curve_id, as_of, 0.10, DayCount::Act365F))
+        .expect("insert market curve")
         .insert_series(fixings);
 
     let rate = future
@@ -181,7 +184,8 @@ fn seasoned_overnight_future_requires_every_published_fixing() {
     )
     .expect("fixings");
     let market = MarketContext::new()
-        .insert(flat_forward(curve_id, as_of, 0.05, DayCount::Act360))
+        .try_insert(flat_forward(curve_id, as_of, 0.05, DayCount::Act360))
+        .expect("insert market curve")
         .insert_series(incomplete);
 
     let error = future
@@ -229,10 +233,12 @@ fn realized_arithmetic_observations_drop_out_of_forward_risk() {
         .expect("simple forward curve")
     };
     let low = MarketContext::new()
-        .insert(simple_forward(0.03))
+        .try_insert(simple_forward(0.03))
+        .expect("insert market curve")
         .insert_series(fixings.clone());
     let high = MarketContext::new()
-        .insert(simple_forward(0.05))
+        .try_insert(simple_forward(0.05))
+        .expect("insert market curve")
         .insert_series(fixings);
 
     let low_rate = future

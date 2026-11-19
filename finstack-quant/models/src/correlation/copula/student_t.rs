@@ -65,21 +65,12 @@ use finstack_quant_core::math::distributions::chi_squared_quantile;
 #[cfg(test)]
 use finstack_quant_core::math::special_functions::student_t_inv_cdf;
 use finstack_quant_core::math::{
-    integration::GaussHermiteQuadrature,
-    special_functions::{norm_cdf, student_t_cdf},
+    integration::GaussHermiteQuadrature, special_functions::student_t_cdf,
 };
 use nalgebra::{DMatrix, SymmetricEigen};
 use std::sync::Arc;
 
-/// Evaluate the Student-t CDF, returning a loudly-logged NaN when the
-/// distribution itself is invalid.
-///
-/// `student_t_cdf` only fails for non-finite / non-positive degrees of
-/// freedom — unreachable for a constructed [`StudentTCopula`]. If it ever
-/// fires, NaN is the safer failure mode: it poisons downstream tranche-loss
-/// quadrature unmistakably, whereas a normal-CDF substitute would produce a
-/// plausible-but-wrong probability that understates the t distribution's
-/// tails.
+/// The trait's scalar diagnostics use NaN for an invalid or unresolved CDF.
 fn t_cdf_or_nan(x: f64, nu: f64) -> f64 {
     student_t_cdf(x, nu).unwrap_or_else(|err| {
         tracing::error!(%err, nu, "Student-t CDF evaluation failed; propagating NaN");
@@ -321,7 +312,7 @@ impl Copula for StudentTCopula {
 
         if correlation == 0.0 {
             // No systematic channel: Aᵢ = εᵢ/√W, so default ⟺ εᵢ ≤ c·√W.
-            return norm_cdf(default_threshold * w.sqrt());
+            return crate::gaussian::norm_cdf_or_nan(default_threshold * w.sqrt());
         }
         if correlation >= 1.0 {
             return f64::from(z / w.sqrt() <= default_threshold);
@@ -332,7 +323,7 @@ impl Copula for StudentTCopula {
 
         let conditional_threshold = (default_threshold * w.sqrt() - sqrt_rho * z) / sqrt_1mr;
 
-        norm_cdf(conditional_threshold)
+        crate::gaussian::norm_cdf_or_nan(conditional_threshold)
     }
 
     fn integrate_fn(
@@ -350,16 +341,12 @@ impl Copula for StudentTCopula {
         // impose conditional independence in the correct (Z, W)
         // sigma-algebra (names are NOT conditionally independent given M
         // alone).
-        let mut result = 0.0;
+        let mut result = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for &(w_val, w_weight) in &self.gamma_quadrature {
-            let inner = self
-                .inner_quadrature
-                .integrate(|z_gauss| f(&[z_gauss, w_val]))?;
-
-            result += w_weight * inner;
+            let inner = self.inner_quadrature.integrate(|z| f(&[z, w_val]))?;
+            result.add(w_weight * inner)?;
         }
-
-        Ok(result)
+        result.get_total()
     }
 
     fn try_integrate_pair(
@@ -466,6 +453,7 @@ impl Copula for StudentTCopula {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::math::special_functions::norm_cdf;
     use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
     #[test]
@@ -653,9 +641,9 @@ mod tests {
             let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
             let correlation = 0.30;
 
-            let integrated_prob = super::super::expect_integral(&copula, &|z| {
-                copula.conditional_default_prob(threshold, z, correlation)
-            });
+            let integrated_prob = copula
+                .integrate_fn(&|z| Ok(copula.conditional_default_prob(threshold, z, correlation)))
+                .unwrap();
 
             assert!(
                 (integrated_prob - pd).abs() < 0.005,
@@ -676,9 +664,9 @@ mod tests {
             let threshold = student_t_inv_cdf(pd, 5.0).expect("valid Student-t inputs");
             let correlation = 0.30;
 
-            let integrated_prob = super::super::expect_integral(&copula, &|z| {
-                copula.conditional_default_prob(threshold, z, correlation)
-            });
+            let integrated_prob = copula
+                .integrate_fn(&|z| Ok(copula.conditional_default_prob(threshold, z, correlation)))
+                .unwrap();
 
             assert!(
                 (integrated_prob - pd).abs() < 0.005,
@@ -807,23 +795,29 @@ mod tests {
         let gaussian = GaussianCopula::new();
         let rho = 0.30;
         let pd = 0.05;
-        let threshold = standard_normal_inv_cdf(pd);
-        let gaussian_joint = super::super::expect_integral(&gaussian, &|factors| {
-            gaussian
-                .conditional_default_prob(threshold, factors, rho)
-                .powi(2)
-        });
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
+        let gaussian_joint = gaussian
+            .integrate_fn(&|factors| {
+                Ok(gaussian
+                    .conditional_default_prob(threshold, factors, rho)
+                    .powi(2))
+            })
+            .unwrap();
         for df in [200.0, 500.0, 1000.0, 10_000.0] {
             let copula = StudentTCopula::new(df).expect("valid df");
             let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
-            let marginal = super::super::expect_integral(&copula, &|factors| {
-                copula.conditional_default_prob(threshold, factors, rho)
-            });
-            let joint = super::super::expect_integral(&copula, &|factors| {
-                copula
-                    .conditional_default_prob(threshold, factors, rho)
-                    .powi(2)
-            });
+            let marginal = copula
+                .integrate_fn(&|factors| {
+                    Ok(copula.conditional_default_prob(threshold, factors, rho))
+                })
+                .unwrap();
+            let joint = copula
+                .integrate_fn(&|factors| {
+                    Ok(copula
+                        .conditional_default_prob(threshold, factors, rho)
+                        .powi(2))
+                })
+                .unwrap();
             assert!((marginal - pd).abs() < 1e-6, "df={df}: PD={marginal}");
             assert!(
                 (joint - gaussian_joint).abs() < 5e-4,
@@ -846,6 +840,7 @@ mod tests {
                     f64::from(z / mixing.sqrt() <= threshold)
                 } else {
                     norm_cdf((threshold * mixing.sqrt() - rho.sqrt() * z) / (1.0 - rho).sqrt())
+                        .expect("valid Gaussian variate")
                 };
                 let actual = copula
                     .conditional_default_prob_checked(threshold, &[z, mixing], rho)
@@ -924,10 +919,12 @@ mod tests {
         let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let rho = 0.30;
 
-        let quad_joint = super::super::expect_integral(&copula, &|factors| {
-            let p = copula.conditional_default_prob(threshold, factors, rho);
-            p * p
-        });
+        let quad_joint = copula
+            .integrate_fn(&|factors| {
+                let p = copula.conditional_default_prob(threshold, factors, rho);
+                Ok(p * p)
+            })
+            .unwrap();
 
         let mut rng = PhiloxRng::new(31337);
         let trials = 2_000_000usize;
@@ -936,9 +933,9 @@ mod tests {
             let w = copula
                 .sample_mixing(rng.next_u01())
                 .expect("valid mixing draw");
-            let z = rng.next_std_normal();
-            let a1 = copula.latent_variable(z, rng.next_std_normal(), w, rho);
-            let a2 = copula.latent_variable(z, rng.next_std_normal(), w, rho);
+            let z = rng.next_std_normal().expect("normal draw");
+            let a1 = copula.latent_variable(z, rng.next_std_normal().expect("normal draw"), w, rho);
+            let a2 = copula.latent_variable(z, rng.next_std_normal().expect("normal draw"), w, rho);
             if a1 <= threshold && a2 <= threshold {
                 joint += 1;
             }
@@ -978,9 +975,9 @@ mod tests {
             let w = copula
                 .sample_mixing(rng.next_u01())
                 .expect("valid mixing draw");
-            let z = rng.next_std_normal();
+            let z = rng.next_std_normal().expect("normal draw");
             for _ in 0..names {
-                let eps = rng.next_std_normal();
+                let eps = rng.next_std_normal().expect("normal draw");
                 let a = copula.latent_variable(z, eps, w, rho);
                 if a <= threshold {
                     defaults += 1;
@@ -998,8 +995,6 @@ mod tests {
 
     #[test]
     fn test_high_df_converges_to_gaussian() {
-        use finstack_quant_core::math::special_functions::norm_cdf;
-
         let df = 50.0;
         let copula = StudentTCopula::new(df).expect("valid df");
         let pd = 0.05;
@@ -1008,10 +1003,11 @@ mod tests {
 
         let t_prob = copula.conditional_default_prob(threshold, &[0.0], correlation);
 
-        let gauss_threshold = standard_normal_inv_cdf(pd);
+        let gauss_threshold = standard_normal_inv_cdf(pd).expect("valid probability");
         let sqrt_rho = correlation.sqrt();
         let sqrt_1mr = (1.0 - correlation).sqrt();
-        let gauss_prob = norm_cdf((gauss_threshold - sqrt_rho * 0.0) / sqrt_1mr);
+        let gauss_prob = norm_cdf((gauss_threshold - sqrt_rho * 0.0) / sqrt_1mr)
+            .expect("valid Gaussian variate");
 
         assert!(
             (t_prob - gauss_prob).abs() < 0.02,
@@ -1039,9 +1035,8 @@ mod tests {
         };
 
         let integrate = |c: &StudentTCopula| {
-            super::super::expect_integral(c, &|z| {
-                c.conditional_default_prob(threshold, z, correlation)
-            })
+            c.integrate_fn(&|z| Ok(c.conditional_default_prob(threshold, z, correlation)))
+                .unwrap()
         };
 
         let result_default = integrate(&copula_default);

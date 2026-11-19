@@ -113,13 +113,11 @@ pub(crate) fn price(
         .map(|term| term.loading.abs())
         .fold(0.0_f64, f64::max)
         + 12.0;
-    let tail_bound: f64 = terms
-        .iter()
-        .map(|term| {
-            (term.log_abs + 0.5 * term.loading * term.loading).exp()
-                * (norm_cdf(-bound - term.loading) + norm_cdf(term.loading - bound))
-        })
-        .sum();
+    let mut tail_bound = 0.0;
+    for term in &terms {
+        tail_bound += (term.log_abs + 0.5 * term.loading * term.loading).exp()
+            * (norm_cdf(-bound - term.loading)? + norm_cdf(term.loading - bound)?);
+    }
     if !tail_bound.is_finite() || tail_bound > TOLERANCE * 0.1 || bound > 1024.0 {
         return Err(Error::Validation(
             "contractual HW swaption cannot bound its Gaussian integration error".into(),
@@ -214,7 +212,8 @@ mod tests {
             let ratio_vol =
                 (hw_b(params.kappa, expiry, end) - hw_b(params.kappa, expiry, start)) * state_std;
             let d1 = (positive_mean / negative_mean).ln() / ratio_vol + 0.5 * ratio_vol;
-            let expected = positive_mean * norm_cdf(d1) - negative_mean * norm_cdf(d1 - ratio_vol);
+            let expected = positive_mean * norm_cdf(d1).expect("valid normal variate")
+                - negative_mean * norm_cdf(d1 - ratio_vol).expect("valid normal variate");
             let actual = price(params, &df, expiry, strike, &schedule).expect("contractual price");
             assert!(
                 (actual - expected).abs() < 2e-12,

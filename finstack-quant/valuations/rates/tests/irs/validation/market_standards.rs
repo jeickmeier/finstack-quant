@@ -62,7 +62,11 @@ fn test_irs_par_rate_market_standard() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_PAR_TEST",
@@ -114,7 +118,11 @@ fn test_irs_annuity_calculation() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_ANNUITY_TEST",
@@ -163,7 +171,11 @@ fn test_irs_dv01_market_standard() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let notional = 1_000_000.0;
 
@@ -233,7 +245,11 @@ fn test_irs_receive_vs_pay_fixed() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.06, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let fixed_leg = FixedLegSpec {
         discount_curve_id: "USD-OIS".into(),
@@ -389,7 +405,11 @@ fn test_irs_rate_sensitivity() {
         let fwd_cont = 4.0 * (1.0 + rate * 0.25).ln();
         let fwd_curve = build_flat_forward_curve(fwd_cont, as_of, "USD-SOFR-3M");
 
-        let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve")
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let npv = swap.value(&market, as_of).unwrap();
         npvs.push((rate, npv.amount()));
@@ -429,7 +449,11 @@ fn test_irs_leg_pvs_consistency() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.06, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = InterestRateSwap {
         adjust_fixed_accrual_dates: false,
@@ -508,7 +532,11 @@ fn test_daycount_convention_impact_on_annuity() {
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     // Swap with ACT/360 fixed leg
     let swap_act360 = InterestRateSwap::builder()
@@ -734,8 +762,10 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
     .expect("fixings series");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(fixings);
 
     // Create ISDA-standard USD swap with explicit fixing calendar
@@ -956,12 +986,16 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
         .unwrap();
 
     let market_365 = MarketContext::new()
-        .insert(disc_curve.clone())
-        .insert(fwd_curve_365);
+        .try_insert(disc_curve.clone())
+        .expect("insert market curve")
+        .try_insert(fwd_curve_365)
+        .expect("insert market curve");
 
     let market_360 = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve_360);
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve_360)
+        .expect("insert market curve");
 
     // Create identical swap specs but with different forward curve references
     // Use fixed rate below forward to create positive floating leg NPV
@@ -1140,7 +1174,9 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
 
     let curve_id = "USD-SOFR-OIS";
     let disc = build_flat_discount_curve(0.05, as_of, curve_id);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let swap = InterestRateSwap::builder()
         .id("SOFR-OIS-QL-PARITY".into())
@@ -1284,7 +1320,11 @@ fn test_eom_pricer_cashflow_consistency() {
     let disc_curve = build_flat_discount_curve(0.04, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     // Build swap with end_of_month = true (ISDA 2006 §4.18 convention)
     let swap_eom = InterestRateSwap::builder()
@@ -1452,7 +1492,9 @@ fn test_ois_identity_with_eom() {
         .build()
         .expect("discount curve");
 
-    let market = MarketContext::new().insert(disc.clone());
+    let market = MarketContext::new()
+        .try_insert(disc.clone())
+        .expect("insert market curve");
 
     // Create OIS swap with EOM convention, no lookback, no spread, no payment delay
     let swap = InterestRateSwap::builder()

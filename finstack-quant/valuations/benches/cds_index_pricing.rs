@@ -94,7 +94,9 @@ fn create_market_single_curve() -> MarketContext {
         .build()
         .unwrap();
 
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let hazard = credit_support::calibrated_hazard_curve_with_pillars(
         &source_market,
         base,
@@ -110,7 +112,9 @@ fn create_market_single_curve() -> MarketContext {
     )
     .expect("calibrated index hazard with replay metadata");
 
-    source_market.insert(hazard)
+    source_market
+        .try_insert(hazard)
+        .expect("insert market curve")
 }
 
 fn create_market_constituents(num_names: usize) -> MarketContext {
@@ -133,7 +137,7 @@ fn create_market_constituents(num_names: usize) -> MarketContext {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
-        market = market.insert(hazard);
+        market = market.try_insert(hazard).expect("insert market curve");
     }
 
     market

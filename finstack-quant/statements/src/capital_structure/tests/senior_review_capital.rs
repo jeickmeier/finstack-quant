@@ -47,7 +47,11 @@ fn swap_market(forward_rate: f64) -> MarketContext {
         .expect("valid discount curve");
     let forward = ForwardCurve::flat("USD-SOFR-3M", as_of, forward_rate, DayCount::Act360)
         .expect("valid signed forward curve");
-    MarketContext::new().insert(discount).insert(forward)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
 }
 
 #[test]

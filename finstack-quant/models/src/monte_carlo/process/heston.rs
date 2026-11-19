@@ -235,7 +235,7 @@ impl StochasticProcess for HestonProcess {
         out[1] = self.params.model.kappa * (self.params.model.theta - v);
     }
 
-    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         let s = x[0];
         let v = x[1].max(0.0); // Ensure non-negative for sqrt
         let sqrt_v = v.sqrt();
@@ -245,6 +245,7 @@ impl StochasticProcess for HestonProcess {
 
         // Diffusion for v: σ_v √v
         out[1] = self.params.model.sigma_v * sqrt_v;
+        Ok(())
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
@@ -330,7 +331,9 @@ mod tests {
         let mut diffusion = vec![0.0_f64; 2];
 
         heston.drift(0.0, &x, &mut drift);
-        heston.diffusion(0.0, &x, &mut diffusion);
+        heston
+            .diffusion(0.0, &x, &mut diffusion)
+            .expect("valid diffusion");
 
         // S drift: (r-q)S = 0.03 * 100 = 3.0
         assert!((drift[0] - 3.0).abs() < 1e-10);

@@ -56,8 +56,9 @@ fn five_point_smile_evaluates_and_clamps_wings() {
     let r_for: f64 = 0.01;
     let fwd_05 = spot * ((r_dom - r_for) * 0.5).exp();
     let fwd_10 = spot * ((r_dom - r_for) * 1.0).exp();
-    let materialized = materialize_fx_delta_surface(&delta_surface, &[fwd_05, fwd_10])
-        .expect("materialization must succeed");
+    let materialized =
+        materialize_fx_delta_surface(&delta_surface, &[fwd_05, fwd_10], VolInterpolationMode::Vol)
+            .expect("materialization must succeed");
     assert_eq!(materialized.expiries(), &[0.5, 1.0]);
     assert_eq!(materialized.interpolation_mode(), VolInterpolationMode::Vol);
 
@@ -228,7 +229,8 @@ fn materialized_strike_union_does_not_coalesce_close_strikes() {
     let target_k_atm_1 = k_atm_0 * (1.0 + 1e-12);
     let fwd1 = target_k_atm_1 * (-0.5 * 0.10 * 0.10 * 2.0_f64).exp();
     let materialized =
-        materialize_fx_delta_surface(&surface, &[fwd0, fwd1]).expect("materialization succeeds");
+        materialize_fx_delta_surface(&surface, &[fwd0, fwd1], VolInterpolationMode::Vol)
+            .expect("materialization succeeds");
     let strikes = materialized.secondary_values();
     let near_k0 = strikes
         .iter()
@@ -252,7 +254,8 @@ fn materialized_vol_grid_diverges_off_knot_from_direct_delta_eval() {
     let fwd0 = 1.10;
     let fwd1 = 1.20;
     let materialized =
-        materialize_fx_delta_surface(&surface, &[fwd0, fwd1]).expect("materialization succeeds");
+        materialize_fx_delta_surface(&surface, &[fwd0, fwd1], VolInterpolationMode::Vol)
+            .expect("materialization succeeds");
     assert_eq!(materialized.interpolation_mode(), VolInterpolationMode::Vol);
 
     // Exact match on stored expiry knot with matching delivery forward.
@@ -308,8 +311,25 @@ fn models_analytic_17_table_fixtures_hold() {
     let query_k = 0.04_f64.exp();
     let direct = get_fx_delta_vol(&div_surface, 2.0, query_k, 1.0).expect("direct eval at T=2");
     assert!((direct - 0.20).abs() < 1e-12);
-    let mat = materialize_fx_delta_surface(&div_surface, &[1.0, 1.0])
+    let mat = materialize_fx_delta_surface(&div_surface, &[1.0, 1.0], VolInterpolationMode::Vol)
         .expect("materialization for ADR fixture 3 succeeds");
     let grid = get_surface_vol_clamped(&mat, 2.0, query_k);
     assert!((grid - 0.20473735).abs() < 1e-6);
+}
+
+#[test]
+fn materialized_fx_grid_applies_the_selected_interpolation() {
+    let surface = build_surface_3pt("FX", &[1.0, 2.0], &[0.20, 0.15], &[0.0; 2], &[0.0; 2]);
+    for (mode, expected) in [
+        (VolInterpolationMode::Vol, 0.175),
+        (
+            VolInterpolationMode::TotalVariance,
+            ((0.20_f64.powi(2) + 2.0 * 0.15_f64.powi(2)) / 3.0).sqrt(),
+        ),
+    ] {
+        let grid = materialize_fx_delta_surface(&surface, &[1.0; 2], mode).unwrap();
+        assert_eq!(grid.interpolation_mode(), mode);
+        let vol = finstack_quant_models::volatility::get_surface_vol(&grid, 1.5, 1.0).unwrap();
+        assert!((vol - expected).abs() < 1e-14);
+    }
 }

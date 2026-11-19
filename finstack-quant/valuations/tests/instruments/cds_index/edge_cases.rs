@@ -131,7 +131,9 @@ fn test_missing_hazard_curve() {
 
     // Context with only discount curve
     let disc = flat_discount_curve("USD-OIS", as_of, 0.03);
-    let ctx = MarketContext::new().insert(disc);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let result = idx.value(&ctx, as_of);
     assert!(result.is_err(), "Should error with missing hazard curve");
@@ -233,13 +235,15 @@ fn test_recovery_rate_zero() {
     // The hazard curve's bootstrap recovery must agree with the index trade
     // recovery (ISDA "same R in both legs"); build HZ-INDEX at 0.0 to match.
     let ctx = MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, 0.03))
-        .insert(flat_hazard_curve(
+        .try_insert(flat_discount_curve("USD-OIS", as_of, 0.03))
+        .expect("insert market curve")
+        .try_insert(flat_hazard_curve(
             "HZ-INDEX",
             as_of,
             0.0,
             STANDARD_HAZARD_RATE,
-        ));
+        ))
+        .expect("insert market curve");
     let result = idx.value(&ctx, as_of);
 
     assert!(result.is_ok(), "Zero recovery should be valid");
@@ -270,13 +274,15 @@ fn test_recovery_rate_one() {
     // The hazard curve's bootstrap recovery must agree with the index trade
     // recovery (ISDA "same R in both legs"); build HZ-INDEX at 1.0 to match.
     let ctx = MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, 0.03))
-        .insert(flat_hazard_curve(
+        .try_insert(flat_discount_curve("USD-OIS", as_of, 0.03))
+        .expect("insert market curve")
+        .try_insert(flat_hazard_curve(
             "HZ-INDEX",
             as_of,
             1.0,
             STANDARD_HAZARD_RATE,
-        ));
+        ))
+        .expect("insert market curve");
     let result = idx.value(&ctx, as_of);
 
     assert!(result.is_ok(), "Full recovery should be valid");
@@ -496,7 +502,11 @@ fn test_extremely_high_hazard_rate() {
     // Create context with very high hazard rate
     let disc = flat_discount_curve("USD-OIS", as_of, 0.03);
     let hz = flat_hazard_curve("HZ-INDEX", as_of, 0.40, 0.50); // 50% hazard rate
-    let ctx = MarketContext::new().insert(disc).insert(hz);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hz)
+        .expect("insert market curve");
 
     let result = idx.value(&ctx, as_of);
     assert!(result.is_ok(), "High hazard rate should be handled");
@@ -514,7 +524,11 @@ fn test_zero_hazard_rate() {
     // Create context with zero hazard rate
     let disc = flat_discount_curve("USD-OIS", as_of, 0.03);
     let hz = flat_hazard_curve("HZ-INDEX", as_of, 0.40, 0.0); // Zero hazard
-    let ctx = MarketContext::new().insert(disc).insert(hz);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hz)
+        .expect("insert market curve");
 
     let result = idx.value(&ctx, as_of);
     assert!(result.is_ok(), "Zero hazard rate should be handled");

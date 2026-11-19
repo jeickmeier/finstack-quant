@@ -36,7 +36,7 @@ fn test_adaptive_simpson_smooth_function() {
     // For a=2: √π · erf(2) ≈ 1.7641 (not √π ≈ 1.7725 which is for infinite limits)
     let f = |x: f64| (-x * x).exp();
     let result = adaptive_simpson(|x| Ok(f(x)), -2.0, 2.0, 1e-4, 20, MAX_EVALS).unwrap();
-    let expected = PI.sqrt() * erf(2.0);
+    let expected = PI.sqrt() * erf(2.0).expect("valid variate");
     assert!(
         (result - expected).abs() < 1e-3,
         "Adaptive Simpson {} vs expected {}",
@@ -74,7 +74,7 @@ fn test_financial_application_option_payoff() {
 
     // Use Gauss-Hermite for integration over normal distribution
     let quad = GaussHermiteQuadrature::new(10).expect("valid order");
-    let result = quad.integrate(|x| Ok(f(x))).unwrap();
+    let result = quad.integrate(|x| Ok(f(x))).expect("finite integral");
 
     // Result should be positive (call option value component)
     assert!(result > 0.0);
@@ -83,7 +83,8 @@ fn test_financial_application_option_payoff() {
     // BS call = S·N(d1) - K·N(d2) where r=q=0
     let d1 = ((spot / strike).ln() + 0.5 * vol * vol * time) / (vol * time.sqrt());
     let d2 = d1 - vol * time.sqrt();
-    let bs_price = spot * norm_cdf(d1) - strike * norm_cdf(d2);
+    let bs_price = spot * norm_cdf(d1).expect("valid normal variate")
+        - strike * norm_cdf(d2).expect("valid normal variate");
 
     // Gauss-Hermite should be within 0.5 of Black-Scholes for this ATM option.
     // Option payoffs have a kink so GH is less accurate than for smooth functions,
@@ -145,7 +146,9 @@ fn gauss_hermite_supported_orders_match_standard_normal_moments() {
     for order in [5, 7, 10, 15, 20] {
         let quad = GaussHermiteQuadrature::new(order).expect("supported order");
         for (power, expected) in moments {
-            let actual = quad.integrate(|x| Ok(x.powi(power))).unwrap();
+            let actual = quad
+                .integrate(|x| Ok(x.powi(power)))
+                .expect("finite integral");
             assert!(
                 (actual - expected).abs() <= 1e-12,
                 "order {order}, E[X^{power}]: got {actual:.16e}, expected {expected:.16e}"
@@ -384,7 +387,9 @@ fn test_convergence_behavior() {
 fn test_gauss_hermite_order20_cancellation_accuracy() {
     let quad = GaussHermiteQuadrature::new(20).expect("order 20 valid");
     // E[X^2 - 1] = 1 - 1 = 0
-    let result = quad.integrate(|x| Ok(x * x - 1.0)).unwrap();
+    let result = quad
+        .integrate(|x| Ok(x * x - 1.0))
+        .expect("finite integral");
     assert!(
         result.abs() < 1e-10,
         "E[X^2-1] should be 0; compensated sum got {result}"
@@ -1051,4 +1056,43 @@ fn gauss_hermite_returns_normal_moments_and_does_not_overflow_a_representable_me
         let large = quad.integrate(|_| Ok(constant)).unwrap();
         assert!((large / constant - 1.0).abs() < 1e-14);
     }
+}
+
+#[test]
+fn fixed_rules_reject_invalid_samples_and_stop_at_the_first_callback_error() {
+    let hermite = GaussHermiteQuadrature::new(7).unwrap();
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(hermite.integrate(|_| Ok(bad)).is_err());
+        assert!(simpson_rule(|_| Ok(bad), 0.0, 1.0, 4).is_err());
+        assert!(gauss_legendre_integrate_composite(|_| Ok(bad), 0.0, 1.0, 4, 2).is_err());
+        assert!(simpson_rule(|_| panic!("invalid bounds must fail first"), bad, 1.0, 4).is_err());
+    }
+    let marker = finstack_quant_core::Error::Validation("callback sentinel".into());
+    let mut calls = 0;
+    let mut fail = |_| {
+        calls += 1;
+        Err(marker.clone())
+    };
+    assert_eq!(hermite.integrate(&mut fail), Err(marker.clone()));
+    assert_eq!(simpson_rule(&mut fail, 5.0, 2.0, 4), Err(marker.clone()));
+    assert_eq!(
+        gauss_legendre_integrate_composite(&mut fail, 5.0, 2.0, 4, 2),
+        Err(marker)
+    );
+    assert_eq!(calls, 3);
+    assert_eq!(simpson_rule(|_| unreachable!(), 1.0, 1.0, 4).unwrap(), 0.0);
+    assert_eq!(
+        gauss_legendre_integrate_composite(|_| unreachable!(), 1.0, 1.0, 4, 2).unwrap(),
+        0.0
+    );
+}
+
+#[test]
+fn fixed_simpson_keeps_representable_integrals_when_a_weight_is_out_of_range() {
+    let extreme = f64::MAX;
+    let v = simpson_rule(|_| Ok(0.25), -extreme, extreme, 2).unwrap();
+    assert!((v / (extreme * 0.5) - 1.0).abs() < 4.0 * f64::EPSILON);
+    let step = f64::from_bits(1);
+    let subnormal = simpson_rule(|_| Ok(3.0), 0.0, 2.0 * step, 2).unwrap();
+    assert_eq!(subnormal.to_bits(), 6);
 }

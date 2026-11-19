@@ -112,18 +112,22 @@ fn market(case: &Case) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("benchmark discount curve");
-    let mut market = MarketContext::new().insert(discount);
+    let mut market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     for (id, spot, carry) in [
         ("WTI-FWD", 75.0, 0.05),
         ("CL-FORWARD", 75.0, 0.05),
         ("NG-FORWARD", 3.5, 0.02),
         ("RBOB-FORWARD", 90.0, 0.04),
     ] {
-        market = market.insert(if id == "CL-FORWARD" && case.flat_forward {
-            flat_price_curve(id, base, spot, 5.0)
-        } else {
-            contango_price_curve(id, base, spot, carry, 5.0)
-        });
+        market = market
+            .try_insert(if id == "CL-FORWARD" && case.flat_forward {
+                flat_price_curve(id, base, spot, 5.0)
+            } else {
+                contango_price_curve(id, base, spot, carry, 5.0)
+            })
+            .expect("insert market curve");
     }
     for (id, strikes, sigma) in [
         ("WTI-VOL", [50.0, 60.0, 70.0, 80.0, 90.0], 0.30),
@@ -239,8 +243,10 @@ fn lognormal_payoffs(mean: f64, log_variance: f64, strike: f64) -> (f64, f64) {
     let d2 = (mean_log - strike.ln()) / deviation;
     let d1 = d2 + deviation;
     (
-        mean * norm_cdf(d1) - strike * norm_cdf(d2),
-        strike * norm_cdf(-d2) - mean * norm_cdf(-d1),
+        mean * norm_cdf(d1).expect("valid normal variate")
+            - strike * norm_cdf(d2).expect("valid normal variate"),
+        strike * norm_cdf(-d2).expect("valid normal variate")
+            - mean * norm_cdf(-d1).expect("valid normal variate"),
     )
 }
 
@@ -783,8 +789,11 @@ fn adjacent_forward_option_market(volatility: f64) -> (CommodityAsianOption, Mar
         as_of + time::Duration::days(730),
     ];
     let forward = PriceCurve::builder("CL-FORWARD")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(as_of)
-        .spot_price(1.0)
         .knots([(0.0, 1.0), (1.0, 1.0), (2.0, 1.0 + f64::EPSILON)])
         .build()
         .expect("adjacent forwards curve");
@@ -803,8 +812,10 @@ fn adjacent_forward_option_market(volatility: f64) -> (CommodityAsianOption, Mar
         .build()
         .expect("unit discount curve");
     let market = MarketContext::new()
-        .insert(forward)
-        .insert(discount)
+        .try_insert(forward)
+        .expect("insert market curve")
+        .try_insert(discount)
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface(
             "CL-VOL",
             &[1.0, 3.0],
@@ -884,7 +895,8 @@ fn tiny_atm_reference(forwards: &[(f64, f64)], sigma: f64) -> TinyAtmReference {
     assert!(variance.is_finite() && variance > 0.0);
     let log_variance = (variance / mean.powi(2)).ln_1p();
     assert!(log_variance.is_finite() && log_variance > 0.0);
-    let payoff = mean * erf(log_variance.sqrt() / (2.0 * std::f64::consts::SQRT_2));
+    let payoff =
+        mean * erf(log_variance.sqrt() / (2.0 * std::f64::consts::SQRT_2)).expect("finite variate");
     assert!(payoff.is_finite() && payoff > 0.0);
     TinyAtmReference {
         variance,
@@ -1128,7 +1140,9 @@ fn fully_observed_before_payment() {
     assert!(df < 1.0);
     // No forward curve or volatility surface: a fully observed average must
     // reach only the realized-payoff and payment-discounting path.
-    let market = MarketContext::new().insert(discount);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     for method in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
         let average = match method {
             AveragingMethod::Arithmetic => {

@@ -47,9 +47,13 @@ fn spec_with_config(config: Option<AttributionConfig>) -> AttributionSpec {
     )
     .expect("bond construction");
 
-    let market_t0 = MarketContext::new().insert(flat_discount(t0, 0.03));
+    let market_t0 = MarketContext::new()
+        .try_insert(flat_discount(t0, 0.03))
+        .expect("insert market curve");
     // +10bp parallel move so the rates leg is materially nonzero.
-    let market_t1 = MarketContext::new().insert(flat_discount(t1, 0.031));
+    let market_t1 = MarketContext::new()
+        .try_insert(flat_discount(t1, 0.031))
+        .expect("insert market curve");
 
     AttributionSpec {
         instrument: InstrumentJson::Bond(bond),

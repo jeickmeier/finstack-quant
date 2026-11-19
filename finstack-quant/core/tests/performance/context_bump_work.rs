@@ -143,7 +143,9 @@ fn curve(id: &str) -> DiscountCurve {
 fn curve_fixture(count: usize) -> MarketContext {
     let mut market = MarketContext::new();
     for index in 0..count {
-        market.insert_mut(curve(&format!("CURVE_{index}")));
+        market
+            .try_insert_mut(curve(&format!("CURVE_{index}")))
+            .expect("insert market curve");
     }
     market
 }
@@ -203,9 +205,12 @@ fn credit_fixture() -> MarketContext {
         .build()
         .expect("credit index");
     mixed_fixture(8)
-        .insert(hazard)
-        .insert(issuer)
-        .insert(correlation)
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(issuer)
+        .expect("insert market curve")
+        .try_insert(correlation)
+        .expect("insert market curve")
         .insert_credit_index("CDX", index)
         .expect("canonical credit index")
 }

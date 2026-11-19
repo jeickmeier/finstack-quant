@@ -112,7 +112,7 @@ def test_cos_rejects_invalid_process_parameters() -> None:
 
 
 def test_sabr_diagnostics_accept_uneven_strike_spacing() -> None:
-    smile = SabrSmile(SabrParameters(0.2, 1.0, 0.0, 0.0), 100.0, 1.0)
+    smile = SabrSmile(SabrParameters(0.2, 1.0, 0.0, 0.0), 100.0, 1.0, "black_lognormal")
     # Rust `SabrSmile::validate_no_arbitrage(strikes, r)`, the twin of WASM `validateNoArbitrage`.
     result = smile.validate_no_arbitrage([99.0, 100.0, 120.0], 0.0)
     assert result["arbitrage_free"]
@@ -167,15 +167,19 @@ def test_implied_vol_black_matches_undiscounted_black76() -> None:
 # MODB-020: the SABR typed surface binds the Rust members.
 def test_sabr_parameters_round_trip_compare_and_pickle() -> None:
     strikes = [0.02, 0.025, 0.03, 0.035, 0.04]
-    vols = SabrSmile(SabrParameters(0.05, 0.5, 0.4, -0.2), 0.03, 1.0).generate_smile(strikes)
-    fitted = SabrCalibrator().calibrate(forward=0.03, strikes=strikes, market_vols=vols, t=1.0, beta=0.5).parameters
+    vols = SabrSmile(SabrParameters(0.05, 0.5, 0.4, -0.2), 0.03, 1.0, "black_lognormal").generate_smile(strikes)
+    fitted = (
+        SabrCalibrator()
+        .calibrate(forward=0.03, strikes=strikes, market_vols=vols, t=1.0, beta=0.5, quote_type="black_lognormal")
+        .parameters
+    )
     assert SabrParameters.from_json(fitted.to_json()) == fitted
     assert pickle.loads(pickle.dumps(fitted)) == fitted  # noqa: S301 - round-trips our own bytes
     assert copy.deepcopy(fitted) == fitted
     params, same_params = SabrParameters(0.2, 1.0, 0.3, -0.3), SabrParameters(0.2, 1.0, 0.3, -0.3)
     assert params == same_params
     assert params != SabrParameters(0.2, 1.0, 0.3, -0.3, shift=0.01)
-    with pytest.raises(ValueError, match="greater than zero"):
+    with pytest.raises(ValueError, match="positive"):
         SabrParameters.from_json('{"alpha": -0.2, "beta": 1.0, "nu": 0.3, "rho": -0.3}')
 
 
@@ -187,12 +191,13 @@ def test_sabr_parameter_factories_fix_beta_and_shift() -> None:
     shifted = SabrParameters.shifted_normal(0.01, 0.3, -0.2, 0.02)
     assert (shifted.beta, shifted.shift) == (0.0, 0.02)
     assert SabrParameters.shifted_lognormal(0.2, 0.3, -0.2, 0.02).shift == 0.02
-    with pytest.raises(ValueError, match="shift"):
-        SabrParameters.shifted_lognormal(0.2, 0.3, -0.2, -0.01)
+    negative_shift = SabrParameters.shifted_lognormal(0.2, 0.3, -0.2, -0.01)
+    assert negative_shift.shift == -0.01
+    assert not negative_shift.supports_negative_rates()
 
 
 def test_sabr_smile_delta_strike_and_arbitrage_methods() -> None:
-    smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0)
+    smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0, "black_lognormal")
     call_strike = smile.strike_from_delta(0.25, True)
     put_strike = smile.strike_from_delta(0.25, False)
     assert put_strike < 100.0 < call_strike
@@ -216,9 +221,9 @@ def test_sabr_calibrator_getters_read_back_settings() -> None:
 def test_sabr_smile_dataframe_log_moneyness_is_shift_aware() -> None:
     """MODB-006: ``log_moneyness`` is ``ln((K+s)/(F+s))``, computed in Rust."""
     shifted = SabrParameters(alpha=0.01, beta=0.5, nu=0.3, rho=-0.2, shift=0.02)
-    frame = SabrSmile(shifted, -0.001, 1.0).to_dataframe(strikes=[-0.005, 0.0, 0.005])
+    frame = SabrSmile(shifted, -0.001, 1.0, "shifted_black_lognormal").to_dataframe(strikes=[-0.005, 0.0, 0.005])
     expected = [math.log((k + 0.02) / (-0.001 + 0.02)) for k in (-0.005, 0.0, 0.005)]
     assert list(frame["log_moneyness"]) == pytest.approx(expected, abs=1e-14)
-    positive = SabrSmile(shifted, 0.01, 1.0).to_dataframe(strikes=[0.005, 0.01, 0.02])
+    positive = SabrSmile(shifted, 0.01, 1.0, "shifted_black_lognormal").to_dataframe(strikes=[0.005, 0.01, 0.02])
     expected = [math.log((k + 0.02) / 0.03) for k in (0.005, 0.01, 0.02)]
     assert list(positive["log_moneyness"]) == pytest.approx(expected, abs=1e-14)

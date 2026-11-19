@@ -83,7 +83,9 @@ fn test_bond_with_custom_cashflows() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
-    let curves = MarketContext::new().insert(disc_curve);
+    let curves = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Build schedule and verify it uses custom cashflows
     let flows = bond
@@ -282,7 +284,9 @@ fn test_custom_cashflows_override_regular_generation() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
-    let curves = MarketContext::new().insert(disc_curve);
+    let curves = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Build schedules
     let regular_flows = regular_bond
@@ -339,7 +343,11 @@ fn test_bond_floating_value() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let bond = Bond::floating(crate::bond::FloatingBondParams {
         id: "FRN-TEST".into(),
@@ -405,7 +413,11 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("ForwardCurve builder should succeed in test");
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let mut bond = Bond::floating(crate::bond::FloatingBondParams {
         id: "FRN-EX-COUPON".into(),
@@ -555,7 +567,9 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("DiscountCurve builder should succeed in test");
-    let ctx = MarketContext::new().insert(disc_curve);
+    let ctx = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Use the full schedule to locate the first coupon end date
     let full_schedule = bond
@@ -672,7 +686,11 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     // Get full schedule to verify it includes Floating CFKind
     let full_schedule = frn
@@ -743,7 +761,9 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Get full schedule to check internal representation
     let full_schedule = bond
@@ -827,7 +847,9 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("DiscountCurve builder should succeed in test");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Bullet bond: 3-year annual, 1% coupon, full principal at maturity
     let bullet_cashflow_spec =

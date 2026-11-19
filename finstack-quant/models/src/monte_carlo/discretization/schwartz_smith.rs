@@ -89,9 +89,9 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         x: &mut [f64],
         z: &[f64],
         _work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         if dt == 0.0 {
-            return;
+            return Ok(());
         }
         let params = process.params();
         let kappa = params.kappa;
@@ -119,6 +119,7 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
 
         let y_shock = consts.transition_rho * z[0] + consts.independent_weight * z[1];
         x[1] = x[1] + mu_y * dt + sigma_y * consts.sqrt_dt * y_shock;
+        Ok(())
     }
 
     fn prepare(
@@ -162,7 +163,8 @@ mod tests {
         let z = [0.0, 0.0]; // No shock
         let mut work = vec![];
 
-        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // With z=0, X should decay: X(1) = 0 * exp(-2) = 0
         assert!((x[0] - 0.0).abs() < 1e-10);
@@ -180,7 +182,8 @@ mod tests {
         let z = [0.0, 0.0];
         let mut work = vec![];
 
-        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         let spot = process.spot_from_state(&x);
         // S = exp(X + Y) = exp(0 + 4.52) ≈ 91.8
