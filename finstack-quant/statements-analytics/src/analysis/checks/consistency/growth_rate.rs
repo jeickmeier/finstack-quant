@@ -43,7 +43,7 @@ impl Check for GrowthRateConsistency {
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let mut findings = Vec::new();
-        let periods = &context.model.periods;
+        let periods = context.periods();
 
         for node in &self.nodes {
             for i in 1..periods.len() {
@@ -100,7 +100,7 @@ impl Check for GrowthRateConsistency {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

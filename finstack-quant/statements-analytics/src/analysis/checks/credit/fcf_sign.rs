@@ -45,7 +45,7 @@ impl Check for FcfSignCheck {
         let mut findings = Vec::new();
         let mut consecutive_negative: usize = 0;
 
-        for period_spec in &context.model.periods {
+        for period_spec in context.periods() {
             let pid = &period_spec.id;
 
             let Some(fcf) = get_finite_node_value(context.results, &self.fcf_node, pid) else {
@@ -85,7 +85,7 @@ impl Check for FcfSignCheck {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

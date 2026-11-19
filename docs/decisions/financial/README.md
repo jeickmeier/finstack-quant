@@ -311,8 +311,8 @@ implemented and qualified.
 The Statements typed forecast and validation staging contract was accepted
 on 2026-11-15. It covers explicit method parameters, shared static checks,
 runtime history and horizon checks, and exact stochastic seeds.
-The typed specification, static checks and exact seeds are implemented and
-qualified; JavaScript `bigint` seeds and the runtime horizon checks remain.
+The typed specification, static and runtime checks and exact seeds,
+including a JavaScript `bigint`, are implemented and qualified.
 [STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
 
 The Statements formula grammar and dispatch contract was accepted on
@@ -482,7 +482,7 @@ It is implemented and qualified across Rust, Python and WASM.
 The Statements period rollup contract was accepted on 2026-11-15. It covers
 explicit methods, complete coarser periods, typed flow sums, closing cells,
 formula reevaluation and source provenance.
-It is implemented and qualified; check suites over a rolled result remain.
+It is implemented and qualified, including check suites over a rolled result.
 [STATEMENTS-EVALUATION-014](statements-evaluation/14-period-rollup.md#accepted-decision-for-period-rollup).
 
 The Statements normalization bridge contract was accepted on 2026-11-15.

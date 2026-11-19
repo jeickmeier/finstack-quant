@@ -8,7 +8,7 @@ All 16 contracts in this scope were accepted on 2026-11-15. Each owning record d
 
 The authoring and availability contract was also accepted on 2026-11-15. It covers named atomic edits, validated period-label imports and explicit publication snapshots and cutoffs. Implementation and independent qualification remain pending. [Accepted authoring and availability contract](02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
 
-The typed forecast contract was accepted on 2026-11-15. It covers explicit method choices, static and runtime validation, and exact stochastic seeds. The typed specification, static checks and exact seeds are implemented and qualified; JavaScript `bigint` seeds and the runtime horizon checks remain. [Accepted forecast parameter contract](03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
+The typed forecast contract was accepted on 2026-11-15. It covers explicit method choices, static and runtime validation, and exact stochastic seeds. The typed specification, static and runtime checks and exact seeds, including a JavaScript `bigint`, are implemented and qualified. [Accepted forecast parameter contract](03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
 
 The formula grammar and dispatch contract was accepted on 2026-11-15. It covers canonical syntax, shared identifiers, checked signatures and bounded expression validation. It is implemented and qualified, including the typed `cs` selectors. [Accepted formula contract](04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation).
 

@@ -814,8 +814,9 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
         Typed ``finstack_quant.statements.CheckSuiteSpec``, its serde dict, or
         JSON string.
     results : StatementResult | str | None
-        Pre-computed evaluation results; when provided the model is not
-        re-evaluated. Accounting identity checks require supplied node-unit
+        Pre-computed evaluation results, or a rollup of them
+        (``StatementResult.rollup``), which is checked at its target periods;
+        when provided the model is not re-evaluated. Accounting identity checks require supplied node-unit
         metadata to agree with the model's declarations or explicit monetary values.
 
     Returns

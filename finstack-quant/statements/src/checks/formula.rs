@@ -78,14 +78,14 @@ impl Check for FormulaCheckSpec {
             None => None,
         };
 
-        let history = Arc::new(period_history(context.results, context.model));
-        let historical_cashflows = Arc::new(period_cashflows(context.results, context.model));
+        let history = Arc::new(period_history(context.results, context.periods()));
+        let historical_cashflows = Arc::new(period_cashflows(context.results, context.periods()));
         let tolerance = self.tolerance.unwrap_or(0.0);
         let mut findings = Vec::new();
         let mut comparisons = Vec::new();
         let mut evaluated = 0_usize;
 
-        for period in &context.model.periods {
+        for period in context.periods() {
             let in_scope = match self.scope {
                 PeriodScope::AllPeriods => true,
                 PeriodScope::ActualsOnly => period.is_actual,
@@ -273,10 +273,10 @@ fn node_columns(results: &StatementResult) -> IndexMap<NodeId, usize> {
 
 fn period_history(
     results: &StatementResult,
-    model: &crate::types::FinancialModelSpec,
+    periods: &finstack_quant_core::dates::PeriodPlan,
 ) -> PeriodHistory {
-    let mut history = PeriodHistory::with_periods(Arc::new(node_columns(results)), &model.periods);
-    for period in &model.periods {
+    let mut history = PeriodHistory::with_periods(Arc::new(node_columns(results)), periods);
+    for period in periods {
         let cells: Vec<Option<crate::evaluator::cell::Cell>> = results
             .cells
             .values()
@@ -293,14 +293,13 @@ fn period_history(
 
 fn period_cashflows(
     results: &StatementResult,
-    model: &crate::types::FinancialModelSpec,
+    periods: &finstack_quant_core::dates::PeriodPlan,
 ) -> IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows> {
     let Some(cashflows) = results.cs_cashflows.as_ref() else {
         return IndexMap::new();
     };
 
-    model
-        .periods
+    periods
         .iter()
         .map(|period| (period.id, cashflows.period_snapshot(period.id)))
         .collect()

@@ -95,7 +95,7 @@ impl Check for RetainedEarningsReconciliation {
             self.tolerance,
             core.iter().chain(&dividends).chain(&self.other_adjustments),
         )?;
-        let periods = &context.model.periods;
+        let periods = context.periods();
         if let Some(first) = periods.first()
             && self.opening_balance.date != first.start
         {

@@ -107,7 +107,7 @@ impl Check for CashReconciliation {
                 .chain(&self.adjustment_nodes)
                 .chain(&components),
         )?;
-        let periods = &context.model.periods;
+        let periods = context.periods();
         if let Some(first) = periods.first()
             && self.opening_balance.date != first.start
         {

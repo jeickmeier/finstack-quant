@@ -664,7 +664,7 @@ pub fn credit_assessment(
 /// @returns Structured check report with individual results and aggregate summary.
 /// @param modelJson - Financial-model specification JSON.
 /// @param suiteSpecJson - Check-suite specification JSON.
-/// @param resultsJson - Evaluated statement-result JSON.
+/// @param resultsJson - Evaluated statement-result JSON, or a rollup of it (`statementResultRollup`), which is checked at its target periods.
 #[wasm_bindgen(js_name = runChecks, unchecked_return_type = "CheckReport")]
 pub fn run_checks(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,

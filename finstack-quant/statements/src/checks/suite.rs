@@ -93,8 +93,66 @@ impl CheckSuite {
         model: &FinancialModelSpec,
         results: &StatementResult,
     ) -> Result<CheckReport> {
-        self.config.validate()?;
         results.verified_run_of(model, None)?;
+        self.execute(model, results)
+    }
+
+    /// Run every check against a rollup of a verified run, at the rollup's
+    /// target periods.
+    ///
+    /// The checks read the rolled cells and iterate the target period plan,
+    /// so a flow identity is judged on the rolled sums and a level on its
+    /// period-end cells. Verdicts and filters are those of [`Self::run`].
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - Validated model the source run evaluated.
+    /// * `rolled` - Result of [`StatementResult::rollup`]. Its provenance
+    ///   must name a run of this model: the same content, source snapshot
+    ///   and run identity under the cutoff and valuation date it records.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `rolled` carries no rollup
+    /// provenance or its source run is not a run of `model`, and propagates
+    /// the first configuration or execution error of a check.
+    pub fn run_rolled(
+        &self,
+        model: &FinancialModelSpec,
+        rolled: &StatementResult,
+    ) -> Result<CheckReport> {
+        let not_a_rollup = |what: &str| {
+            crate::error::Error::invalid_input(format!(
+                "supplied results are not a rollup of a verified run of model '{}': {what}",
+                model.id
+            ))
+        };
+        let provenance = rolled
+            .rollup_provenance
+            .as_ref()
+            .ok_or_else(|| not_a_rollup("they record no rollup provenance"))?;
+        let source = &provenance.source_run;
+        let expected = crate::evaluator::RunProvenance::for_run(
+            model,
+            source.observation_cutoff,
+            source.valuation_date,
+        )
+        .map_err(|error| not_a_rollup(&format!("the model does not validate ({error})")))?;
+        if expected != *source {
+            return Err(not_a_rollup(
+                "their source run's model content, source snapshot or run identity differs",
+            ));
+        }
+        self.execute(model, rolled)
+    }
+
+    /// Execute the checks against results the caller has admitted.
+    fn execute(
+        &self,
+        model: &FinancialModelSpec,
+        results: &StatementResult,
+    ) -> Result<CheckReport> {
+        self.config.validate()?;
         let context = CheckContext {
             model,
             results,
@@ -176,10 +234,12 @@ impl CheckSuite {
     ///   check context.
     /// * `observation_cutoff` - The requested evaluation context: which
     ///   observations the run may read.
-    /// * `results` - Optional results of that run. They are accepted only
-    ///   with verified identity: this model's content, source snapshot and
-    ///   period plan, and the requested cutoff. When absent, the model is
-    ///   evaluated under `observation_cutoff`.
+    /// * `results` - Optional results of that run, or a rollup of it
+    ///   ([`StatementResult::rollup`]), which is checked at its target
+    ///   periods as [`Self::run_rolled`] does. They are accepted only with
+    ///   verified identity: this model's content, source snapshot and period
+    ///   plan, and the requested cutoff. When absent, the model is evaluated
+    ///   under `observation_cutoff`.
     ///
     /// # Returns
     ///
@@ -197,6 +257,21 @@ impl CheckSuite {
         results: Option<&StatementResult>,
     ) -> Result<CheckReport> {
         match results {
+            Some(rolled) if rolled.rollup_provenance.is_some() => {
+                let report = self.run_rolled(model, rolled)?;
+                let source_cutoff = rolled
+                    .rollup_provenance
+                    .as_ref()
+                    .map(|provenance| &provenance.source_run.observation_cutoff);
+                if source_cutoff != Some(observation_cutoff) {
+                    return Err(crate::error::Error::invalid_input(format!(
+                        "supplied results are not a rollup of a verified run of model '{}': \
+                         their observation cutoff is not the requested one",
+                        model.id
+                    )));
+                }
+                Ok(report)
+            }
             Some(results) => {
                 results.verified_run_of(model, Some(observation_cutoff))?;
                 self.run(model, results)

@@ -58,7 +58,7 @@ impl Check for DepreciationReconciliation {
         let tolerance = self.tolerance.unwrap_or(context.config.default_tolerance);
         let mut findings = Vec::new();
         let mut comparisons = Vec::new();
-        let periods = &context.model.periods;
+        let periods = context.periods();
 
         for i in 1..periods.len() {
             let prev_pid = &periods[i - 1].id;
@@ -164,7 +164,7 @@ impl Check for DepreciationReconciliation {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

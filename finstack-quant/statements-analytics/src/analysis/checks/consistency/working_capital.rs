@@ -46,7 +46,7 @@ impl Check for WorkingCapitalConsistency {
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let tolerance = self.tolerance.unwrap_or(context.config.default_tolerance);
         let mut findings = Vec::new();
-        let periods = &context.model.periods;
+        let periods = context.periods();
 
         for i in 1..periods.len() {
             let prev_pid = &periods[i - 1].id;
@@ -132,7 +132,7 @@ impl Check for WorkingCapitalConsistency {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

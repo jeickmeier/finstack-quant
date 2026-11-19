@@ -66,7 +66,7 @@ impl Check for CapexReconciliation {
             return Ok(CheckResult::new(self, 0, findings, Vec::new()));
         }
 
-        for period_spec in &context.model.periods {
+        for period_spec in context.periods() {
             let pid = &period_spec.id;
 
             let Some(capex_cf) = get_finite_node_value(context.results, &self.capex_cf_node, pid)
@@ -163,7 +163,7 @@ impl Check for CapexReconciliation {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

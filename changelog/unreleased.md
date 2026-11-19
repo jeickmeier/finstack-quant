@@ -1317,6 +1317,18 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements: checks on rolled-up results, `bigint` seeds
+
+- A check suite runs against a rollup at its target periods:
+  `CheckSuite::run_rolled(model, rolled)`, and `run_model` (the entry point
+  behind Python and WASM `run_checks`) when the supplied results are a
+  rollup. The rollup must come from a verified run of the model
+  (STATEMENTS-EVALUATION-014). Checks iterate the period plan of the results
+  they are given (`CheckContext::periods`).
+- WASM Statements inputs accept a JavaScript `bigint` for a seed in a plain
+  object; it is read as the seed's decimal wire text
+  (STATEMENTS-CONTRACTS-003).
+
 ### Statements: located load diagnostics, typed waterfall inputs, `numeric_series`
 
 Breaking, with no compatibility path.

@@ -53,7 +53,7 @@ impl Check for SignConventionCheck {
         let mut findings = Vec::new();
         let mut evaluated = 0_usize;
 
-        for period in &context.model.periods {
+        for period in context.periods() {
             let pid = &period.id;
             // Positive-node findings come before negative-node findings.
             for (nodes, positive) in [(&self.positive_nodes, true), (&self.negative_nodes, false)] {

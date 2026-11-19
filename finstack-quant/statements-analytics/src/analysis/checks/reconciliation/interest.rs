@@ -45,7 +45,7 @@ impl Check for InterestExpenseReconciliation {
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let tol = self.tolerance_pct.unwrap_or(0.05);
         let mut findings = Vec::new();
-        let periods = &context.model.periods;
+        let periods = context.periods();
 
         for (period_idx, period_spec) in periods.iter().enumerate() {
             let pid = &period_spec.id;
@@ -166,7 +166,7 @@ impl Check for InterestExpenseReconciliation {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

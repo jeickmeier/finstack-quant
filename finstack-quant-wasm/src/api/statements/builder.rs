@@ -323,7 +323,7 @@ impl JsModelBuilder {
         #[wasm_bindgen(unchecked_param_type = "generated.statements.NodeSpec | string")]
         node: JsValue,
     ) -> Result<(), JsValue> {
-        let spec: NodeSpec = from_js_json(&node, "node")?;
+        let spec: NodeSpec = crate::utils::input::from_js_json_exact(&node, "node")?;
         self.builder_mut()?.insert_node(spec);
         Ok(())
     }
@@ -341,7 +341,7 @@ impl JsModelBuilder {
         #[wasm_bindgen(unchecked_param_type = "generated.statements.NodeSpec | string")]
         node: JsValue,
     ) -> Result<(), JsValue> {
-        let spec: NodeSpec = from_js_json(&node, "node")?;
+        let spec: NodeSpec = crate::utils::input::from_js_json_exact(&node, "node")?;
         self.builder_mut()?.replace_node(spec).map_err(to_js_err)?;
         Ok(())
     }
@@ -402,7 +402,8 @@ impl JsModelBuilder {
         forecast_spec: JsValue,
     ) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
-        let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
+        let spec: ForecastSpec =
+            crate::utils::input::from_js_json_exact(&forecast_spec, "forecastSpec")?;
         self.builder_mut()?.forecast(node_id, spec);
         Ok(())
     }
@@ -719,7 +720,8 @@ impl JsMixedNodeBuilder {
         )]
         forecast_spec: JsValue,
     ) -> Result<(), JsValue> {
-        let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
+        let spec: ForecastSpec =
+            crate::utils::input::from_js_json_exact(&forecast_spec, "forecastSpec")?;
         self.builder_mut()?.forecast(spec);
         Ok(())
     }

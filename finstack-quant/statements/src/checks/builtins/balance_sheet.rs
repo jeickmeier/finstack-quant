@@ -87,7 +87,7 @@ impl Check for BalanceSheetArticulation {
         let mut findings = Vec::new();
         let mut comparisons = Vec::new();
 
-        for period in &context.model.periods {
+        for period in context.periods() {
             let pid = period.id;
             let operands: Vec<&NodeId> = self
                 .assets_nodes
@@ -132,7 +132,7 @@ impl Check for BalanceSheetArticulation {
             findings.extend(finding);
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

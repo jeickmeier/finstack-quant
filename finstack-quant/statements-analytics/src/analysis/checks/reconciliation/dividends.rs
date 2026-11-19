@@ -51,7 +51,7 @@ impl Check for DividendReconciliation {
         let mut findings = Vec::new();
         let mut comparisons = Vec::new();
 
-        for period_spec in &context.model.periods {
+        for period_spec in context.periods() {
             let pid = &period_spec.id;
 
             // `get_finite_node_value`: a NaN/Inf operand poisons the diff
@@ -147,7 +147,7 @@ impl Check for DividendReconciliation {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

@@ -28,6 +28,14 @@ impl<'a> CheckContext<'a> {
             config: CheckConfig::default(),
         }
     }
+
+    /// The periods the checks examine: the period plan of the results (the
+    /// model's plan for a run, the coarser target plan for a rollup), or the
+    /// model's plan for results that carry none.
+    #[must_use]
+    pub fn periods(&self) -> &finstack_quant_core::dates::PeriodPlan {
+        self.results.periods.as_ref().unwrap_or(&self.model.periods)
+    }
 }
 
 /// A single validation check that can be executed against a financial model.

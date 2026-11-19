@@ -1007,3 +1007,80 @@ fn a_formula_invalid_at_the_target_cadence_is_an_error() {
     let quarterly = monthly.rollup(&model, &spec).expect("rollup");
     assert_eq!(quarterly.get("sales_qtd", &q(2025, 1)), Some(6.0));
 }
+
+/// A check suite runs against a rollup at its target periods: the identity
+/// `ebitda = revenue - opex` holds on the annual sums, and a check on the
+/// annual sum of revenue sees one finding per year, not per quarter.
+#[test]
+fn a_check_suite_runs_against_a_rolled_result_at_the_target_periods() {
+    use finstack_quant_statements::checks::{
+        CheckCategory, CheckOutcome, CheckSuite, FormulaCheckMode, FormulaCheckSpec, PeriodScope,
+        Severity,
+    };
+    let formula = |id: &str, formula: &str| FormulaCheckSpec {
+        id: id.into(),
+        name: id.into(),
+        category: CheckCategory::InternalConsistency,
+        severity: Severity::Error,
+        formula: formula.into(),
+        message_template: "{period}".into(),
+        mode: FormulaCheckMode::Predicate,
+        scope: PeriodScope::AllPeriods,
+        eligibility: None,
+        tolerance: None,
+    };
+    let suite = CheckSuite::builder("annual")
+        .add_check(formula("identity", "ebitda == revenue - opex"))
+        .add_check(formula("thin", "margin < 0.44"))
+        .build()
+        .expect("suite");
+    let model = quarterly_model();
+    let run = Evaluator::new().evaluate(&model).expect("evaluation");
+    let rolled = run.rollup(&model, &annual_spec()).expect("rollup");
+
+    let report = suite.run_rolled(&model, &rolled).expect("rolled checks");
+    let result = |id: &str| {
+        report
+            .results
+            .iter()
+            .find(|result| result.check_id == id)
+            .expect("check result")
+    };
+    assert_eq!(result("identity").outcome, CheckOutcome::Pass);
+    // The annual margin is 200 / 460 and 280 / 620, re-evaluated on the
+    // rolled sums: only the second year reaches 0.44.
+    let breaches = |report: &finstack_quant_statements::checks::CheckReport| -> Vec<String> {
+        report
+            .results
+            .iter()
+            .find(|result| result.check_id == "thin")
+            .expect("check result")
+            .findings
+            .iter()
+            .filter_map(|finding| finding.period.map(|period| period.to_string()))
+            .collect()
+    };
+    assert_eq!(breaches(&report), ["2025"]);
+    // The same suite on the source run judges the eight quarters.
+    let quarterly = suite.run(&model, &run).expect("source checks");
+    // Four quarters reach 0.44 (40/88, 60/130, 70/150 and 80/170 of revenue).
+    assert_eq!(breaches(&quarterly).len(), 4);
+
+    // The model-level entry point every host uses takes a rollup too.
+    let cutoff = finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot;
+    let through_model = suite
+        .run_model(&model, &cutoff, Some(&rolled))
+        .expect("rolled checks through run_model");
+    assert_eq!(breaches(&through_model), ["2025"]);
+
+    // A rollup is not a run, a run is not a rollup, and a rollup of another
+    // model's run is refused.
+    assert!(suite.run(&model, &rolled).is_err());
+    assert!(suite.run_rolled(&model, &run).is_err());
+    let mut other = model;
+    other.id = "other".into();
+    let error = suite
+        .run_rolled(&other, &rolled)
+        .expect_err("another model");
+    assert!(error.to_string().contains("not a rollup"), "{error}");
+}

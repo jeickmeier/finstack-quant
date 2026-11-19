@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **620 review items across 33 source scopes with open items**
+This backlog consolidates **618 review items across 32 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (476): implementation and verification work against an
+- **Reconciliation** (474): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (36): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -68,8 +68,7 @@ product consequences remain in their product scope.
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 6 |
-| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 2 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 1 |
+| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 1 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1030,15 +1029,7 @@ product consequences remain in their product scope.
 
 [Scope inventory](statements-contracts/README.md).
 
-- **Reconciliation — JavaScript `bigint` forecast seeds and evaluation-time forecast checks.** Accept a JavaScript `bigint` for a forecast seed at the WASM boundary; today a seed crosses as its decimal wire text, and a `bigint` is written as a bare JSON integer that the exact string codec rejects. Verify the actual horizon and the supplied history and the selected execution mode when each forecast method runs, with the forecast suffix and method slices. The one typed specification, explicit method choices, static validation at build and load and exact string seeds in Rust, Python and JSON are reconciled. [Accepted STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging) · [Forecast suffix and anchoring](statements-evaluation/05-forecast-segments-and-bounds.md).
-
 - **Reconciliation — Typed comparison values and coverage in analytics checks.** Record a comparison's actual, expected, difference and tolerance as typed values (exact `Money` or scalar) at the compared precision; today they are floats in the compared nodes' units, with compatible units checked for identity inputs, and a [formula check's](statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage) residual and its tolerance are floats in the residual's units. The accounting identities already sum exactly (money) or with compensation (scalars) and compare one exact residual; the recorded values are its float views, and a relative residual that is undefined (a zero reference) is recorded as zero. Define, with their owning records, when a statements-analytics check that lacks an input is incomplete rather than not applicable; today those checks report the periods they examined and never a coverage finding. Zero default tolerance with the inclusive `max(absolute, relative × reference)` allowance and absolute override, pass, fail, incomplete and unevaluated verdicts from unfiltered outcomes, advisory-only filters, declared order with unique identifiers, compatible merges, and supplied results accepted only as a verified run under the requested cutoff are reconciled. [Accepted STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
-
-## Statements: evaluation, forecasts and reporting
-
-[Scope inventory](statements-evaluation/README.md).
-
-- **Reconciliation — Check suites over rolled-up results.** Evaluate a check suite against a rolled result at the target periods; today a suite accepts only a verified evaluation run, and a rolled result is not one, so target checks cannot run and source check reports stay on the source run. Explicit methods with no automatic sum, verified source runs, complete canonical coarser periods, exact money and compensated scalar sums, final-cell status for period-end, formula and mask re-evaluation at the target cadence and provenance to the source run, methods and source periods are reconciled. [Accepted STATEMENTS-EVALUATION-014](statements-evaluation/14-period-rollup.md#accepted-decision-for-period-rollup) · [Check suites](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 
 ## Statements analytics: valuation, comparisons and templates
 

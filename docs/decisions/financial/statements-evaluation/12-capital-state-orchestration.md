@@ -43,4 +43,4 @@ The accepted orchestration uses the existing capital rules for cashflow and FX c
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-evaluation-forecasts-and-reporting).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

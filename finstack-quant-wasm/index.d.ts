@@ -10581,7 +10581,7 @@ export interface StatementsAnalyticsNamespace {
    * @returns Structured check report with individual results and aggregate summary.
    * @param modelJson - Financial-model specification JSON.
    * @param suiteSpecJson - Check-suite specification JSON.
-   * @param resultsJson - Evaluated statement-result JSON.
+   * @param resultsJson - Evaluated statement-result JSON, or a rollup of it (`statementResultRollup`), which is checked at its target periods.
    */
   readonly runChecks: typeof wasm.runChecks;
   /**

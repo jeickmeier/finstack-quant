@@ -54,7 +54,7 @@ impl Check for MissingValueCheck {
         let mut findings = Vec::new();
         let mut evaluated = 0_usize;
 
-        for period in &context.model.periods {
+        for period in context.periods() {
             let in_scope = match self.scope {
                 PeriodScope::AllPeriods => true,
                 PeriodScope::ActualsOnly => period.is_actual,

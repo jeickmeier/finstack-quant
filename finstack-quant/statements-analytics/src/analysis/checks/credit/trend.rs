@@ -59,7 +59,7 @@ impl Check for TrendCheck {
         }
 
         let mut findings = Vec::new();
-        let periods = &context.model.periods;
+        let periods = context.periods();
         let mut consecutive_bad: usize = 0;
 
         for i in 1..periods.len() {
@@ -122,7 +122,7 @@ impl Check for TrendCheck {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

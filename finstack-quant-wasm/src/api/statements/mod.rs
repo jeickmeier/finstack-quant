@@ -37,7 +37,7 @@ use wasm_bindgen::prelude::*;
 /// A decode failure is a `ContractValidationError` with its `report`; a
 /// model that is not runnable is the Rust error with its kind.
 pub(crate) fn load_model(value: &JsValue, label: &str) -> Result<FinancialModelSpec, JsValue> {
-    load_model_text(&json_text(value, label)?)
+    load_model_text(&crate::utils::input::json_text_exact(value, label)?)
 }
 
 /// [`load_model`] for model JSON already held as text.
@@ -64,7 +64,7 @@ pub(crate) fn load_model_text(json: &str) -> Result<FinancialModelSpec, JsValue>
 pub fn validate_financial_model_json(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
 ) -> Result<String, JsValue> {
-    let json: &str = &json_text(&json, "json")?;
+    let json: &str = &crate::utils::input::json_text_exact(&json, "json")?;
     let model = crate::api::statements::load_model_text(json)?;
     serde_json::to_string(&model).map_err(to_js_err)
 }
@@ -87,7 +87,7 @@ pub fn validate_financial_model_json(
 pub fn model_node_ids(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let json: &str = &json_text(&json, "json")?;
+    let json: &str = &crate::utils::input::json_text_exact(&json, "json")?;
     let model = crate::api::statements::load_model_text(json)?;
     let ids: Vec<&str> = model.nodes.keys().map(|k| k.as_str()).collect();
     crate::utils::to_js_value(&ids)

@@ -50,7 +50,7 @@ impl Check for LeverageRangeCheck {
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let mut findings = Vec::new();
 
-        for period_spec in &context.model.periods {
+        for period_spec in context.periods() {
             let pid = &period_spec.id;
             crate::analysis::units::validate_matching_units(
                 context.results,
@@ -135,7 +135,7 @@ impl Check for LeverageRangeCheck {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

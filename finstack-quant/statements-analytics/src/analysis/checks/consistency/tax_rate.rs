@@ -41,7 +41,7 @@ impl Check for EffectiveTaxRateCheck {
         let mut findings = Vec::new();
         let (lo, hi) = self.expected_range;
 
-        for period_spec in &context.model.periods {
+        for period_spec in context.periods() {
             let pid = &period_spec.id;
 
             let Some(tax) = get_finite_node_value(context.results, &self.tax_expense_node, pid)
@@ -82,7 +82,7 @@ impl Check for EffectiveTaxRateCheck {
             }
         }
 
-        let evaluated = context.model.periods.len();
+        let evaluated = context.periods().len();
         Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }
