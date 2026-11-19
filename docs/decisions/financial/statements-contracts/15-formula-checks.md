@@ -42,4 +42,4 @@ The accepted check contract uses lazy observation consumption and distinguishes 
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

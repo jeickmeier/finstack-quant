@@ -1880,7 +1880,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
-      "sha256": "47702776e77b4e5d46ff3a883c19bca6dfbd4cd8854c33b2cd829d9f45981941"
+      "sha256": "5ce3d028f6eee3a910bbbe3c25c1e736eff7cbd328545dc14b3f920129777819"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-pl-summary.json",

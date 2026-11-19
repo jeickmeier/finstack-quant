@@ -36,6 +36,6 @@ Owning sources: [aggregates](../../../../finstack-quant/statements/src/evaluator
 
 ## Follow-up tracking
 
-The formula contract requires one argument for all seven full-history and cumulative functions. The contracts scope owns the shared compiler and evaluator reconciliation. [Accepted formula contract](../statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Contracts follow-ups](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+The formula contract requires one argument for all seven full-history and cumulative functions. The contracts scope owns the shared compiler and evaluator reconciliation. [Accepted formula contract](../statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Contracts follow-ups](../FOLLOW_UPS.md).
 
 This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

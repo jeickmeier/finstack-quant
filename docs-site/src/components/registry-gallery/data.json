@@ -92278,58 +92278,162 @@
           {
             "identity": "debt_corkscrew_ties",
             "period": "2024Q1",
-            "actual": 0,
-            "expected": 0,
-            "tolerance": 1
+            "actual": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "expected": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "difference": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "tolerance": {
+              "amount": "1",
+              "currency": "USD"
+            }
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2024Q2",
-            "actual": 0,
-            "expected": 0,
-            "tolerance": 1
+            "actual": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "expected": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "difference": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "tolerance": {
+              "amount": "1",
+              "currency": "USD"
+            }
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2024Q3",
-            "actual": 0,
-            "expected": 0,
-            "tolerance": 1
+            "actual": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "expected": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "difference": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "tolerance": {
+              "amount": "1",
+              "currency": "USD"
+            }
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2024Q4",
-            "actual": 0,
-            "expected": 0,
-            "tolerance": 1
+            "actual": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "expected": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "difference": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "tolerance": {
+              "amount": "1",
+              "currency": "USD"
+            }
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2025Q1",
-            "actual": 0,
-            "expected": 0,
-            "tolerance": 1
+            "actual": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "expected": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "difference": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "tolerance": {
+              "amount": "1",
+              "currency": "USD"
+            }
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2025Q2",
-            "actual": 0,
-            "expected": 0,
-            "tolerance": 1
+            "actual": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "expected": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "difference": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "tolerance": {
+              "amount": "1",
+              "currency": "USD"
+            }
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2025Q3",
-            "actual": 0,
-            "expected": 0,
-            "tolerance": 1
+            "actual": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "expected": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "difference": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "tolerance": {
+              "amount": "1",
+              "currency": "USD"
+            }
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2025Q4",
-            "actual": 0,
-            "expected": 0,
-            "tolerance": 1
+            "actual": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "expected": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "difference": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "tolerance": {
+              "amount": "1",
+              "currency": "USD"
+            }
           }
         ]
       }

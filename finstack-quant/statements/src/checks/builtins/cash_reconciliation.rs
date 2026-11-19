@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 use crate::checks::identity::{
-    Comparison, DatedOpening, Term, incomplete, read_cells, require_known_distinct, signed_sum,
+    Comparison, DatedOpening, Term, coverage_finding, read_cells, require_known_distinct,
+    signed_sum,
 };
 use crate::checks::{Check, CheckCategory, CheckContext, CheckResult};
 use crate::types::{AmountOrScalar, NodeId};
@@ -162,7 +163,12 @@ impl Check for CashReconciliation {
                 }
             };
             let (Some(opening), Some(values)) = (opening, values) else {
-                findings.push(incomplete(self.id(), "Cash roll-forward", pid, missing));
+                findings.push(coverage_finding(
+                    self.id(),
+                    "Cash roll-forward",
+                    pid,
+                    missing,
+                ));
                 continue;
             };
             let closing = [Term::plus(values[0])];
@@ -200,7 +206,7 @@ impl Check for CashReconciliation {
                 let values = match read_cells(self.id(), context, &operands, &pid)? {
                     Ok(values) => values,
                     Err(missing) => {
-                        findings.push(incomplete(
+                        findings.push(coverage_finding(
                             self.id(),
                             "Cash flow component reconciliation",
                             pid,

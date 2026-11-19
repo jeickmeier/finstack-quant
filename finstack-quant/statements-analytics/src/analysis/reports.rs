@@ -274,6 +274,24 @@ impl fmt::Display for PLSummaryReport<'_> {
     }
 }
 
+/// Whether the trailing twelve months ending at `at` lie wholly inside the
+/// results' period plan. `false` in the warm-up periods, where a trailing
+/// sum does not exist rather than being incomplete, and for results without
+/// a plan.
+///
+/// # Errors
+///
+/// Propagates a malformed trailing window, as [`trailing_sum_at`] does.
+pub(crate) fn trailing_window_is_complete(
+    results: &StatementResult,
+    at: &PeriodId,
+) -> finstack_quant_statements::Result<bool> {
+    match results.periods.as_ref() {
+        Some(plan) => Ok(finstack_quant_core::dates::ltm_window(*at, plan)?.is_complete()),
+        None => Ok(false),
+    }
+}
+
 /// Trailing-twelve-month sum of `node_id` ending at (and including) `at`.
 ///
 /// Sums the window of [`ltm_window`](finstack_quant_core::dates::ltm_window)

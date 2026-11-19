@@ -106,7 +106,7 @@ export default [
   {
     "path": "#/$defs/d_60e7f94bf13dea34e179/properties/relative_pct",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/Materiality/properties/relative_pct",
-    "description": "Discrepancy as a percentage of the reference value.",
+    "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
     "format": "double"
   },
   {
@@ -1111,6 +1111,24 @@ export default [
     "description": "Naira (566)"
   },
   {
+    "path": "#/$defs/d_897cb2f33ded7ef3d8c5",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar",
+    "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+  },
+  {
+    "path": "#/$defs/d_897cb2f33ded7ef3d8c5/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar/anyOf/0",
+    "description": "Currency-aware amount",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_897cb2f33ded7ef3d8c5/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar/anyOf/1",
+    "description": "Unitless scalar (ratio, percentage, count, etc.)",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_8cf6a34771f30e7523cf",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary",
     "description": "Aggregate counts for a completed check run."
@@ -1328,19 +1346,28 @@ export default [
   {
     "path": "#/$defs/d_e423eb660d927a5db922",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison",
-    "description": "The two numbers a check compared, and the tolerance it allowed.\n\nRecorded for every numeric comparison a check performs — whether it passed\nor failed — so the verdict can be reconstructed from exported data:\nthe comparison fails exactly when `|actual - expected| > tolerance`.\n\n`actual`, `expected` and `tolerance` are all in the units of the compared\nnodes (currency units for monetary nodes, the same units as\n[`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not\na fraction or percentage."
+    "description": "The two values a check compared, their difference and the tolerance it\nallowed.\n\nRecorded for every numeric comparison a check performs, whether it passed\nor failed, so the verdict can be reconstructed from exported data: the\ncomparison fails exactly when `|difference| > tolerance`.\n\nEvery value is typed in the units of the compared nodes: exact money in\ntheir currency, or a scalar. `difference` is the one exact residual the\ncheck computed (an exact sum for money), not a difference of the two\nrecorded sides; `tolerance` is an absolute amount in the same units."
   },
   {
     "path": "#/$defs/d_e423eb660d927a5db922/properties/actual",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison/properties/actual",
     "description": "Observed (left-hand) value, in the compared nodes' units.",
-    "format": "double"
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_e423eb660d927a5db922/properties/difference",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison/properties/difference",
+    "description": "Signed residual `actual - expected`, in the same units.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_e423eb660d927a5db922/properties/expected",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison/properties/expected",
     "description": "Value the identity requires (right-hand side), in the same units.",
-    "format": "double"
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_e423eb660d927a5db922/properties/identity",
@@ -1355,8 +1382,9 @@ export default [
   {
     "path": "#/$defs/d_e423eb660d927a5db922/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison/properties/tolerance",
-    "description": "Absolute tolerance applied to `|actual - expected|`, in the same units.\nThis is the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
-    "format": "double"
+    "description": "Absolute tolerance applied to `|difference|`, in the same units. This\nis the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_f0101272ae2f9a75933d",

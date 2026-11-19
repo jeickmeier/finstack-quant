@@ -156,7 +156,7 @@ export interface DC7D556Ba6Ae95916518C {
  *   once: in an already-restated opening balance or as one such entry.
  *
  * Omit a dividend or adjustment series only when it does not apply; a
- * configured series without a value makes the period incomplete, and a
+ * configured series without a value makes the period coverage_finding, and a
  * known zero is a typed zero. Monetary comparisons are exact and scalar
  * ones compensated. The relative reference of the tolerance is
  * `|opening retained earnings|`, with no floor. The check passes only when

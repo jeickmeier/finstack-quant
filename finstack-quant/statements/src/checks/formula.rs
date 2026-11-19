@@ -14,7 +14,7 @@ use crate::evaluator::value::Value;
 use crate::evaluator::{
     EvaluationContext, PeriodHistory, StatementResult, formula::evaluate_value,
 };
-use crate::types::NodeId;
+use crate::types::{AmountOrScalar, NodeId};
 
 impl Check for FormulaCheckSpec {
     fn id(&self) -> &str {
@@ -144,16 +144,28 @@ impl Check for FormulaCheckSpec {
                 (FormulaCheckMode::Predicate, Value::Bool(true)) => continue,
                 (FormulaCheckMode::Predicate, Value::Bool(false)) => None,
                 (FormulaCheckMode::Residual, residual) => {
-                    let actual = residual.float();
+                    // The residual and its tolerance keep the formula's
+                    // units: exact money, or a scalar.
+                    let typed = |value: f64| match residual {
+                        Value::Money(money) => AmountOrScalar::amount(value, money.currency()),
+                        _ => Ok(AmountOrScalar::scalar(value)),
+                    };
                     let comparison = CheckComparison {
                         identity: self.id.clone(),
                         period: Some(period.id),
-                        actual,
-                        expected: 0.0,
-                        tolerance,
+                        actual: match residual {
+                            Value::Money(money) => AmountOrScalar::Amount(money),
+                            other => AmountOrScalar::scalar(other.float()),
+                        },
+                        expected: typed(0.0)?,
+                        difference: match residual {
+                            Value::Money(money) => AmountOrScalar::Amount(money),
+                            other => AmountOrScalar::scalar(other.float()),
+                        },
+                        tolerance: typed(tolerance)?,
                     };
                     comparisons.push(comparison.clone());
-                    if actual.abs() <= tolerance {
+                    if comparison.within_tolerance() {
                         continue;
                     }
                     Some(comparison)

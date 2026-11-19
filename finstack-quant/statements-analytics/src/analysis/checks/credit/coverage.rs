@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };
@@ -54,12 +53,22 @@ impl Check for CoverageFloorCheck {
                 pid,
             )?;
 
-            let Some(num) = get_finite_node_value(context.results, &self.numerator_node, pid)
-            else {
+            let Some(num) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.numerator_node,
+                pid,
+                &mut findings,
+            ) else {
                 continue;
             };
-            let Some(denom) = get_finite_node_value(context.results, &self.denominator_node, pid)
-            else {
+            let Some(denom) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.denominator_node,
+                pid,
+                &mut findings,
+            ) else {
                 continue;
             };
 
@@ -75,7 +84,7 @@ impl Check for CoverageFloorCheck {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: denom,
-                        relative_pct: 0.0,
+                        relative_pct: None,
                         reference_value: denom,
                         reference_label: "denominator".to_string(),
                     }),
@@ -121,7 +130,7 @@ impl Check for CoverageFloorCheck {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: ratio,
-                        relative_pct: 0.0,
+                        relative_pct: None,
                         reference_value: denom,
                         reference_label: "denominator".to_string(),
                     }),

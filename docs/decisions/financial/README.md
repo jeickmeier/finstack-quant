@@ -380,8 +380,9 @@ The Statements numerical comparison and check-suite contract was accepted on
 2026-11-15. It covers typed tolerances, unfiltered coverage verdicts, advisory
 filters, ordered suites and supplied-result provenance.
 The tolerance rule, four-state verdicts, advisory-only filters, unique ordered
-identifiers, compatible merges and verified result provenance are implemented
-and qualified; typed comparison values remain.
+identifiers, compatible merges, verified result provenance, typed comparison
+values and coverage findings in the analytics checks are implemented and
+qualified.
 [STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 
 The Statements formula-check contract was accepted on 2026-11-15.

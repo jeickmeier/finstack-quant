@@ -30,7 +30,7 @@ The retained-earnings reconciliation contract was accepted on 2026-11-15. It cov
 
 The data-quality contract was accepted on 2026-11-15. It covers explicit required scope, missing and unavailable values, input validity and advisory sign diagnostics. It is implemented and qualified. [Accepted data-quality contract](13-data-quality-checks.md#accepted-decision-for-data-quality-coverage-and-validity).
 
-The numerical comparison and check-suite contract was accepted on 2026-11-15. It covers typed comparisons, unfiltered coverage verdicts, advisory filters, ordered suites and supplied-result provenance. The tolerance rule, four-state verdicts, advisory-only filters, unique ordered identifiers, compatible merges and verified result provenance are implemented and qualified; typed comparison values remain. [Accepted comparison and suite contract](14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+The numerical comparison and check-suite contract was accepted on 2026-11-15. It covers typed comparisons, unfiltered coverage verdicts, advisory filters, ordered suites and supplied-result provenance. The tolerance rule, four-state verdicts, advisory-only filters, unique ordered identifiers, compatible merges, verified result provenance, typed comparison values and coverage findings in the analytics checks are implemented and qualified. [Accepted comparison and suite contract](14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 
 The formula-check contract was accepted on 2026-11-15. It covers explicit predicate and residual modes, period eligibility, lazy observation consumption and execution errors. Implementation and independent qualification remain pending. [Accepted formula-check contract](15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage).
 
@@ -101,4 +101,4 @@ The audited embedded metrics and tests use separate D&A deductions with ex-D&A O
 
 ## Verification
 
-The static slice check verifies 36 exact manifest entries, unchanged source hashes, 16 unique and referenced records, and local document targets/anchors. Financial tests and numerical qualification remain unexecuted. The [scoped backlog](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts) distinguishes static discrepancies from choices and missing independent evidence; [central follow-ups](../../FOLLOW_UPS.md#financial-methodology-audit) coordinate cross-domain work.
+The static slice check verifies 36 exact manifest entries, unchanged source hashes, 16 unique and referenced records, and local document targets/anchors. Financial tests and numerical qualification remain unexecuted. The [scoped backlog](../FOLLOW_UPS.md) distinguishes static discrepancies from choices and missing independent evidence; [central follow-ups](../../FOLLOW_UPS.md#financial-methodology-audit) coordinate cross-domain work.

@@ -2326,7 +2326,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 50979
+            "bytes": 50985
           },
           {
             "path": "schemas/statements/1/dated_cell.schema.json",
@@ -2417,7 +2417,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 108390
+            "bytes": 108676
           }
         ]
       },
@@ -5150,7 +5150,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 50979
+            "bytes": 50985
           },
           {
             "domain": "statements",
@@ -5254,7 +5254,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 108390
+            "bytes": 108676
           },
           {
             "domain": "valuations",

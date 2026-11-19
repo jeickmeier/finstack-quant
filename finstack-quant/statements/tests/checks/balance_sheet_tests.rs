@@ -63,10 +63,10 @@ fn balanced_passes() {
     let q1 = &result.comparisons[0];
     assert_eq!(q1.identity, "balance_sheet_articulation");
     assert_eq!(q1.period, Some(q(1)));
-    assert_eq!(q1.actual, 1000.0);
-    assert_eq!(q1.expected, 1000.0);
+    assert_eq!(q1.actual.value(), 1000.0);
+    assert_eq!(q1.expected.value(), 1000.0);
     // No tolerance is stated, so the identity must hold exactly.
-    assert_eq!(q1.tolerance, 0.0);
+    assert_eq!(q1.tolerance.value(), 0.0);
     assert!(result.comparisons.iter().all(|c| c.within_tolerance()));
 }
 
@@ -123,7 +123,7 @@ fn imbalanced_fails_with_materiality() {
 
     let mat = q1_findings[0].materiality.as_ref().unwrap();
     assert!((mat.absolute - 100.0).abs() < 0.01);
-    assert!((mat.relative_pct - 10.0).abs() < 0.01); // 100/1000 * 100 = 10%
+    assert!((mat.relative_pct.unwrap() - 10.0).abs() < 0.01); // 100/1000 * 100 = 10%
     assert!((mat.reference_value - 1000.0).abs() < 0.01);
     assert_eq!(mat.reference_label, "total_assets");
 
@@ -131,18 +131,18 @@ fn imbalanced_fails_with_materiality() {
     // with the reported materiality: |actual - expected| == absolute > tolerance.
     let comparison = q1_findings[0].comparison.as_ref().unwrap();
     assert_eq!(comparison.period, Some(q(1)));
-    assert_eq!(comparison.actual, 1000.0);
-    assert_eq!(comparison.expected, 900.0);
-    assert_eq!(comparison.tolerance, 0.0);
-    assert_eq!(comparison.difference().abs(), mat.absolute);
+    assert_eq!(comparison.actual.value(), 1000.0);
+    assert_eq!(comparison.expected.value(), 900.0);
+    assert_eq!(comparison.tolerance.value(), 0.0);
+    assert_eq!(comparison.difference.value().abs(), mat.absolute);
     assert!(!comparison.within_tolerance());
 
     // Both periods are listed on the result: Q1 failed, Q2 passed.
     assert_eq!(result.comparisons.len(), 2);
     assert_eq!(&result.comparisons[0], comparison);
     assert_eq!(result.comparisons[1].period, Some(q(2)));
-    assert_eq!(result.comparisons[1].actual, 1100.0);
-    assert_eq!(result.comparisons[1].expected, 1100.0);
+    assert_eq!(result.comparisons[1].actual.value(), 1100.0);
+    assert_eq!(result.comparisons[1].expected.value(), 1100.0);
     assert!(result.comparisons[1].within_tolerance());
 
     // Old reports (no comparison fields) still deserialize.
@@ -497,7 +497,7 @@ fn a_three_statement_model_satisfies_all_three_identities() {
             .results
             .iter()
             .flat_map(|r| &r.comparisons)
-            .all(|c| c.tolerance == 0.0 && c.difference() == 0.0)
+            .all(|c| c.tolerance.value() == 0.0 && c.difference.value() == 0.0)
     );
 
     // One unit of unexplained Q2 cash breaks the balance sheet and the cash
@@ -509,10 +509,13 @@ fn a_three_statement_model_satisfies_all_three_identities() {
         [CheckOutcome::Fail, CheckOutcome::Fail, CheckOutcome::Pass]
     );
     let sheet = report.results[0].findings[0].comparison.as_ref().unwrap();
-    assert_eq!((sheet.actual, sheet.expected), (281.0, 280.0));
+    assert_eq!(
+        (sheet.actual.value(), sheet.expected.value()),
+        (281.0, 280.0)
+    );
     let materiality = report.results[0].findings[0].materiality.as_ref().unwrap();
     assert_eq!(materiality.absolute, 1.0);
-    assert!((materiality.relative_pct - 100.0 / 281.0).abs() < 1e-12);
+    assert!((materiality.relative_pct.unwrap() - 100.0 / 281.0).abs() < 1e-12);
 }
 
 /// Large balances that cancel are compared on one compensated sum, so a
@@ -547,7 +550,7 @@ fn large_cancelling_balances_keep_small_differences() {
     };
     let balanced = run(3.0);
     assert!(balanced.passed(), "{:?}", balanced.findings);
-    assert_eq!(balanced.comparisons[0].actual, 3.0);
+    assert_eq!(balanced.comparisons[0].actual.value(), 3.0);
     let off = run(4.0);
     assert!(!off.passed());
     assert_eq!(off.findings[0].materiality.as_ref().unwrap().absolute, 1.0);

@@ -22,7 +22,7 @@ const CHECK_RESULT_COLUMNS: [ColumnSchema<'static>; 6] = [
 ];
 
 /// Columns emitted by [`PyCheckReport::to_findings_dataframe`].
-const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 14] = [
+const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 15] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
@@ -37,10 +37,11 @@ const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 14] = [
     ("comparison_actual", "float64"),
     ("comparison_expected", "float64"),
     ("comparison_tolerance", "float64"),
+    ("comparison_currency", "str"),
 ];
 
 /// Columns emitted by [`PyCheckReport::to_comparisons_dataframe`].
-const CHECK_COMPARISON_COLUMNS: [ColumnSchema<'static>; 10] = [
+const CHECK_COMPARISON_COLUMNS: [ColumnSchema<'static>; 11] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
@@ -50,8 +51,19 @@ const CHECK_COMPARISON_COLUMNS: [ColumnSchema<'static>; 10] = [
     ("expected", "float64"),
     ("difference", "float64"),
     ("tolerance", "float64"),
+    ("currency", "str"),
     ("within_tolerance", "bool"),
 ];
+
+/// ISO code of a comparison's currency; `None` for a scalar comparison.
+fn comparison_currency(
+    comparison: &finstack_quant_statements::checks::CheckComparison,
+) -> Option<String> {
+    comparison
+        .difference
+        .as_money()
+        .map(|money| money.currency().to_string())
+}
 
 /// Parse a severity discriminant (``"info"`` / ``"warning"`` / ``"error"``).
 fn parse_severity(severity: &str) -> PyResult<Severity> {
@@ -574,7 +586,7 @@ impl PyCheckFinding {
     /// reference value, or ``None``.
     #[getter]
     fn materiality_relative_pct(&self) -> Option<f64> {
-        self.inner.materiality.as_ref().map(|m| m.relative_pct)
+        self.inner.materiality.as_ref().and_then(|m| m.relative_pct)
     }
 
     /// Reference (denominator) value used for the relative measure, or
@@ -598,13 +610,16 @@ impl PyCheckFinding {
     /// Returns
     /// -------
     /// dict | None
-    ///     ``{"identity", "period", "actual", "expected", "tolerance"}``:
+    ///     ``{"identity", "period", "actual", "expected", "difference",
+    ///     "tolerance"}``:
     ///     ``identity`` names the tested identity (e.g.
     ///     ``"balance_sheet_articulation"``), ``period`` is the period id
     ///     (omitted when not period-specific), ``actual`` and ``expected``
-    ///     are the two compared values and ``tolerance`` is the absolute
-    ///     tolerance applied to ``|actual - expected|`` — all three in the
-    ///     compared nodes' own units (currency amounts for monetary nodes).
+    ///     are the two compared values, ``difference`` the exact residual
+    ///     and ``tolerance`` the absolute tolerance applied to
+    ///     ``|difference|``. Each is typed in the compared nodes' units: a
+    ///     number for a scalar, ``{"amount": "<decimal>", "currency": "<ISO>"}``
+    ///     for money.
     ///     ``None`` for findings that do not compare two numbers (skipped
     ///     periods, missing or non-finite inputs, sign-convention warnings,
     ///     formula checks without a tolerance) and for findings serialized
@@ -833,13 +848,14 @@ impl PyCheckReport {
                             .collect::<Vec<_>>()
                             .join(","),
                         "materiality_absolute": materiality.map(|m| m.absolute),
-                        "materiality_relative_pct": materiality.map(|m| m.relative_pct),
+                        "materiality_relative_pct": materiality.and_then(|m| m.relative_pct),
                         "materiality_reference_value": materiality.map(|m| m.reference_value),
                         "materiality_reference_label": materiality
                             .map(|m| m.reference_label.clone()),
-                        "comparison_actual": comparison.map(|c| c.actual),
-                        "comparison_expected": comparison.map(|c| c.expected),
-                        "comparison_tolerance": comparison.map(|c| c.tolerance),
+                        "comparison_actual": comparison.map(|c| c.actual.value()),
+                        "comparison_expected": comparison.map(|c| c.expected.value()),
+                        "comparison_tolerance": comparison.map(|c| c.tolerance.value()),
+                        "comparison_currency": comparison.and_then(comparison_currency),
                     })
                 })
             })
@@ -860,11 +876,12 @@ impl PyCheckReport {
     /// ``cash_flow_components``), ``period`` (period identifier string,
     /// ``None`` when not period-specific), ``actual`` (observed value),
     /// ``expected`` (value the identity requires), ``difference``
-    /// (``actual - expected``), ``tolerance`` (absolute tolerance applied to
-    /// ``|difference|``) and ``within_tolerance`` (``True`` when
-    /// ``|difference| <= tolerance``). ``actual``, ``expected``,
-    /// ``difference`` and ``tolerance`` are in the compared nodes' own units
-    /// (currency amounts for monetary nodes).
+    /// (the exact residual the check computed), ``tolerance`` (absolute
+    /// tolerance applied to ``|difference|``), ``currency`` (ISO code of the
+    /// compared amounts, ``None`` for a scalar comparison) and
+    /// ``within_tolerance`` (``True`` when ``|difference| <= tolerance``,
+    /// judged on the exact values). ``actual``, ``expected``, ``difference``
+    /// and ``tolerance`` are float views in the compared nodes' own units.
     ///
     /// Checks that do not compare two numbers, and periods a check skipped
     /// for missing inputs, contribute no rows. A report with no comparisons
@@ -883,10 +900,11 @@ impl PyCheckReport {
                         "category": result.category,
                         "identity": comparison.identity,
                         "period": comparison.period.map(|p| p.to_string()),
-                        "actual": comparison.actual,
-                        "expected": comparison.expected,
-                        "difference": comparison.difference(),
-                        "tolerance": comparison.tolerance,
+                        "actual": comparison.actual.value(),
+                        "expected": comparison.expected.value(),
+                        "difference": comparison.difference.value(),
+                        "tolerance": comparison.tolerance.value(),
+                        "currency": comparison_currency(comparison),
                         "within_tolerance": comparison.within_tolerance(),
                     })
                 })

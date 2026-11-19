@@ -29,6 +29,7 @@
             "period": "2025Q4",
             "actual": 1150.0,
             "expected": 1145.0,
+            "difference": 5.0,
             "tolerance": 0.0
           }
         }
@@ -39,6 +40,7 @@
           "period": "2025Q1",
           "actual": 1000.0,
           "expected": 1000.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -46,6 +48,7 @@
           "period": "2025Q2",
           "actual": 1050.0,
           "expected": 1050.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -53,6 +56,7 @@
           "period": "2025Q3",
           "actual": 1100.0,
           "expected": 1100.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -60,6 +64,7 @@
           "period": "2025Q4",
           "actual": 1150.0,
           "expected": 1145.0,
+          "difference": 5.0,
           "tolerance": 0.0
         }
       ]
@@ -77,6 +82,7 @@
           "period": "2025Q1",
           "actual": 200.0,
           "expected": 200.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -84,6 +90,7 @@
           "period": "2025Q2",
           "actual": 220.0,
           "expected": 220.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -91,6 +98,7 @@
           "period": "2025Q3",
           "actual": 240.0,
           "expected": 240.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -98,6 +106,7 @@
           "period": "2025Q4",
           "actual": 255.0,
           "expected": 255.0,
+          "difference": 0.0,
           "tolerance": 0.0
         }
       ]
@@ -115,6 +124,7 @@
           "period": "2025Q1",
           "actual": 100.0,
           "expected": 100.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -122,6 +132,7 @@
           "period": "2025Q2",
           "actual": 120.0,
           "expected": 120.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -129,6 +140,7 @@
           "period": "2025Q3",
           "actual": 135.0,
           "expected": 135.0,
+          "difference": 0.0,
           "tolerance": 0.0
         },
         {
@@ -136,6 +148,7 @@
           "period": "2025Q4",
           "actual": 150.0,
           "expected": 150.0,
+          "difference": 0.0,
           "tolerance": 0.0
         }
       ]
@@ -186,7 +199,7 @@
           "period": "2025Q4",
           "materiality": {
             "absolute": 7.0,
-            "relative_pct": 0.0,
+            "relative_pct": null,
             "reference_value": 317.0,
             "reference_label": "ttm_ebitda"
           },

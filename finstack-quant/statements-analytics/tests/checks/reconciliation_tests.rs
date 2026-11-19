@@ -4,7 +4,7 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::checks::{Check, CheckContext, Severity};
+use finstack_quant_statements::checks::{Check, CheckContext};
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 use finstack_quant_statements_analytics::analysis::{
@@ -404,7 +404,7 @@ fn dividends_nan_operand_warns_and_skips() {
         result
             .findings
             .iter()
-            .any(|f| f.severity == Severity::Warning && f.message.contains("non-finite")),
+            .any(|f| f.coverage && f.message.contains("no value")),
         "a NaN dividend value must warn and skip, not silently pass: {:?}",
         result.findings
     );

@@ -3,7 +3,7 @@
 use finstack_quant_core::dates::PeriodId;
 use serde::{Deserialize, Serialize};
 
-use crate::types::NodeId;
+use crate::types::{AmountOrScalar, NodeId};
 
 /// Declared sign convention for a flow / magnitude input to a reconciliation
 /// check.
@@ -151,24 +151,26 @@ pub enum PeriodScope {
 pub struct Materiality {
     /// Absolute amount of the discrepancy.
     pub absolute: f64,
-    /// Discrepancy as a percentage of the reference value.
-    pub relative_pct: f64,
+    /// Discrepancy as a percentage of the reference value; `None` when the
+    /// percentage is undefined (a zero reference) or does not apply.
+    pub relative_pct: Option<f64>,
     /// The reference (denominator) value used when computing `relative_pct`.
     pub reference_value: f64,
     /// Human-readable label for the reference (e.g. "total_assets").
     pub reference_label: String,
 }
 
-/// The two numbers a check compared, and the tolerance it allowed.
+/// The two values a check compared, their difference and the tolerance it
+/// allowed.
 ///
-/// Recorded for every numeric comparison a check performs — whether it passed
-/// or failed — so the verdict can be reconstructed from exported data:
-/// the comparison fails exactly when `|actual - expected| > tolerance`.
+/// Recorded for every numeric comparison a check performs, whether it passed
+/// or failed, so the verdict can be reconstructed from exported data: the
+/// comparison fails exactly when `|difference| > tolerance`.
 ///
-/// `actual`, `expected` and `tolerance` are all in the units of the compared
-/// nodes (currency units for monetary nodes, the same units as
-/// [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
-/// a fraction or percentage.
+/// Every value is typed in the units of the compared nodes: exact money in
+/// their currency, or a scalar. `difference` is the one exact residual the
+/// check computed (an exact sum for money), not a difference of the two
+/// recorded sides; `tolerance` is an absolute amount in the same units.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CheckComparison {
@@ -181,28 +183,67 @@ pub struct CheckComparison {
     #[cfg_attr(feature = "json-schema", schemars(with = "Option<String>"))]
     pub period: Option<PeriodId>,
     /// Observed (left-hand) value, in the compared nodes' units.
-    pub actual: f64,
+    pub actual: AmountOrScalar,
     /// Value the identity requires (right-hand side), in the same units.
-    pub expected: f64,
-    /// Absolute tolerance applied to `|actual - expected|`, in the same units.
-    /// This is the effective tolerance: the per-check override when one is
+    pub expected: AmountOrScalar,
+    /// Signed residual `actual - expected`, in the same units.
+    pub difference: AmountOrScalar,
+    /// Absolute tolerance applied to `|difference|`, in the same units. This
+    /// is the effective tolerance: the per-check override when one is
     /// configured, otherwise
     /// `max(default_tolerance, default_relative_tolerance * |reference|)`.
-    pub tolerance: f64,
+    pub tolerance: AmountOrScalar,
 }
 
 impl CheckComparison {
-    /// Signed difference `actual - expected`, in the compared nodes' units.
-    #[must_use]
-    pub fn difference(&self) -> f64 {
-        self.actual - self.expected
+    /// Record a comparison from float views in one unit.
+    ///
+    /// # Arguments
+    ///
+    /// * `identity` - Stable snake_case name of the identity tested.
+    /// * `period` - Period the comparison belongs to.
+    /// * `currency` - Currency of the compared amounts; `None` for scalars.
+    /// * `values` - `(actual, expected, tolerance)`, each a finite number in
+    ///   the compared units; the difference is `actual - expected`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a value is not a representable amount of
+    /// `currency`.
+    pub fn from_floats(
+        identity: impl Into<String>,
+        period: PeriodId,
+        currency: Option<finstack_quant_core::currency::Currency>,
+        (actual, expected, tolerance): (f64, f64, f64),
+    ) -> crate::Result<Self> {
+        let typed = |value: f64| match currency {
+            Some(currency) => AmountOrScalar::amount(value, currency).map_err(crate::Error::from),
+            None => Ok(AmountOrScalar::scalar(value)),
+        };
+        Ok(Self {
+            identity: identity.into(),
+            period: Some(period),
+            actual: typed(actual)?,
+            expected: typed(expected)?,
+            difference: typed(actual - expected)?,
+            tolerance: typed(tolerance)?,
+        })
     }
 
-    /// True when `|actual - expected| <= tolerance`, i.e. the comparison
-    /// passed. A non-finite difference is never within tolerance.
+    /// True when `|difference| <= tolerance`, i.e. the comparison passed.
+    /// Money is compared exactly; values in different units never pass.
     #[must_use]
     pub fn within_tolerance(&self) -> bool {
-        self.difference().abs() <= self.tolerance
+        match (self.difference, self.tolerance) {
+            (AmountOrScalar::Amount(difference), AmountOrScalar::Amount(tolerance)) => {
+                difference.currency() == tolerance.currency()
+                    && difference.amount_decimal().abs() <= tolerance.amount_decimal()
+            }
+            (AmountOrScalar::Scalar(difference), AmountOrScalar::Scalar(tolerance)) => {
+                difference.abs() <= tolerance
+            }
+            _ => false,
+        }
     }
 }
 

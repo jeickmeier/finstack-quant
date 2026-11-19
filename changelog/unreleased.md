@@ -1317,6 +1317,27 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements checks: typed comparisons, coverage in the analytics checks
+
+Breaking, with no compatibility path (STATEMENTS-CONTRACTS-014).
+
+- `CheckComparison` records `actual`, `expected`, `difference` and
+  `tolerance` as typed values: a number for a scalar, `{amount, currency}`
+  for money. `difference` is a recorded field (the exact residual), not a
+  method, and the verdict is judged on the exact values.
+  `CheckComparison::from_floats` builds one from float views in one unit.
+- `Materiality.relative_pct` is optional: absent when the percentage is
+  undefined (a zero reference) or does not apply. It used to be `0.0`.
+- Python `CheckReport.to_dataframe()` gains `comparison_currency` and
+  `to_comparisons_dataframe()` gains `currency`; their value columns stay
+  float views.
+- The statements-analytics checks (leverage, coverage, liquidity, FCF sign,
+  trend, growth, tax rate, working capital, capex, depreciation, dividends,
+  interest) report a configured input without a value as a coverage finding
+  and are incomplete; they used to skip the period and could pass. An
+  optional component node that is configured but has no value is a gap too
+  (it was read as zero). `checks::coverage_finding` is public.
+
 ### Statements: checks on rolled-up results, `bigint` seeds
 
 - A check suite runs against a rollup at its target periods:

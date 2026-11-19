@@ -62,10 +62,16 @@ pub fn render_check_report_text(report: &CheckReport) -> String {
             out.push_str(&format!("  {}\n", f.message));
 
             if let Some(ref m) = f.materiality {
-                out.push_str(&format!(
-                    "  Materiality: {:.2} ({:.2}% of {})\n",
-                    m.absolute, m.relative_pct, m.reference_label,
-                ));
+                out.push_str(&match m.relative_pct {
+                    Some(pct) => format!(
+                        "  Materiality: {:.2} ({pct:.2}% of {})\n",
+                        m.absolute, m.reference_label,
+                    ),
+                    None => format!(
+                        "  Materiality: {:.2} (reference {})\n",
+                        m.absolute, m.reference_label,
+                    ),
+                });
             }
 
             if !f.nodes.is_empty() {
@@ -128,12 +134,17 @@ pub fn render_check_report_html(report: &CheckReport) -> String {
             ));
 
             if let Some(ref m) = f.materiality {
-                out.push_str(&format!(
-                    "<br/><em>Materiality: {:.2} ({:.2}% of {})</em>\n",
-                    m.absolute,
-                    m.relative_pct,
-                    escape_html_text(&m.reference_label),
-                ));
+                let label = escape_html_text(&m.reference_label);
+                out.push_str(&match m.relative_pct {
+                    Some(pct) => format!(
+                        "<br/><em>Materiality: {:.2} ({pct:.2}% of {label})</em>\n",
+                        m.absolute,
+                    ),
+                    None => format!(
+                        "<br/><em>Materiality: {:.2} (reference {label})</em>\n",
+                        m.absolute,
+                    ),
+                });
             }
 
             if !f.nodes.is_empty() {

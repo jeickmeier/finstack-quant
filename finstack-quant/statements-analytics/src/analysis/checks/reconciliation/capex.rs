@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use finstack_quant_statements::Result;
-use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
     Severity, SignConventionPolicy,
@@ -69,8 +68,13 @@ impl Check for CapexReconciliation {
         for period_spec in context.periods() {
             let pid = &period_spec.id;
 
-            let Some(capex_cf) = get_finite_node_value(context.results, &self.capex_cf_node, pid)
-            else {
+            let Some(capex_cf) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.capex_cf_node,
+                pid,
+                &mut findings,
+            ) else {
                 continue;
             };
 
@@ -87,11 +91,19 @@ impl Check for CapexReconciliation {
                 findings.push(f);
             }
 
-            let ppe_add = self
-                .ppe_additions_node
-                .as_ref()
-                .and_then(|n| get_finite_node_value(context.results, n, pid))
-                .unwrap_or(0.0);
+            // A configured node contributes its value; without a value the
+            // period cannot be judged.
+            let ppe_add = match self.ppe_additions_node.as_ref() {
+                Some(node) => {
+                    let Some(value) =
+                        crate::analysis::checks::required(context, self, node, pid, &mut findings)
+                    else {
+                        continue;
+                    };
+                    value
+                }
+                None => 0.0,
+            };
 
             if let Some(node) = self.ppe_additions_node.as_ref()
                 && let Some(f) =
@@ -101,11 +113,17 @@ impl Check for CapexReconciliation {
                 findings.push(f);
             }
 
-            let intangible_add = self
-                .intangible_additions_node
-                .as_ref()
-                .and_then(|n| get_finite_node_value(context.results, n, pid))
-                .unwrap_or(0.0);
+            let intangible_add = match self.intangible_additions_node.as_ref() {
+                Some(node) => {
+                    let Some(value) =
+                        crate::analysis::checks::required(context, self, node, pid, &mut findings)
+                    else {
+                        continue;
+                    };
+                    value
+                }
+                None => 0.0,
+            };
 
             if let Some(node) = self.intangible_additions_node.as_ref()
                 && let Some(f) = self.sign_convention.validate(
@@ -120,13 +138,12 @@ impl Check for CapexReconciliation {
 
             let expected = ppe_add + intangible_add;
             let diff = capex_cf - expected;
-            let comparison = CheckComparison {
-                identity: "capex_reconciliation".to_string(),
-                period: Some(*pid),
-                actual: capex_cf,
-                expected,
-                tolerance,
-            };
+            let comparison = CheckComparison::from_floats(
+                "capex_reconciliation",
+                *pid,
+                crate::analysis::checks::currency_of(context, &self.capex_cf_node, pid),
+                (capex_cf, expected, tolerance),
+            )?;
             comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
@@ -152,7 +169,7 @@ impl Check for CapexReconciliation {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: diff.abs(),
-                        relative_pct: relative,
+                        relative_pct: Some(relative),
                         reference_value: expected,
                         reference_label: "balance_sheet_additions".to_string(),
                     }),

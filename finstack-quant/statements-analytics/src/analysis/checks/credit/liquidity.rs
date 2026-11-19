@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use finstack_quant_statements::Result;
-use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };
@@ -53,11 +52,22 @@ impl Check for LiquidityRunwayCheck {
         for period_spec in context.periods() {
             let pid = &period_spec.id;
 
-            let Some(cash) = get_finite_node_value(context.results, &self.cash_node, pid) else {
+            let Some(cash) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.cash_node,
+                pid,
+                &mut findings,
+            ) else {
                 continue;
             };
-            let Some(burn) = get_finite_node_value(context.results, &self.cash_burn_node, pid)
-            else {
+            let Some(burn) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.cash_burn_node,
+                pid,
+                &mut findings,
+            ) else {
                 continue;
             };
 
@@ -101,7 +111,7 @@ impl Check for LiquidityRunwayCheck {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: months,
-                        relative_pct: 0.0,
+                        relative_pct: None,
                         reference_value: burn,
                         reference_label: "cash_burn".to_string(),
                     }),

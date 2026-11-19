@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use finstack_quant_statements::Result;
-use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity,
 };
@@ -44,13 +43,22 @@ impl Check for EffectiveTaxRateCheck {
         for period_spec in context.periods() {
             let pid = &period_spec.id;
 
-            let Some(tax) = get_finite_node_value(context.results, &self.tax_expense_node, pid)
-            else {
+            let Some(tax) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.tax_expense_node,
+                pid,
+                &mut findings,
+            ) else {
                 continue;
             };
-            let Some(pretax) =
-                get_finite_node_value(context.results, &self.pretax_income_node, pid)
-            else {
+            let Some(pretax) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.pretax_income_node,
+                pid,
+                &mut findings,
+            ) else {
                 continue;
             };
 

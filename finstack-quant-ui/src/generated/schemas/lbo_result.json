@@ -165,14 +165,16 @@
           "type": "number"
         },
         "relative_pct": {
-          "description": "Discrepancy as a percentage of the reference value.",
+          "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "absolute",
-        "relative_pct",
         "reference_value",
         "reference_label"
       ],
@@ -1014,6 +1016,20 @@
         }
       ]
     },
+    "d_897cb2f33ded7ef3d8c5": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Currency-aware amount"
+        },
+        {
+          "description": "Unitless scalar (ratio, percentage, count, etc.)",
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+    },
     "d_8cf6a34771f30e7523cf": {
       "description": "Aggregate counts for a completed check run.",
       "properties": {
@@ -1212,17 +1228,19 @@
       ]
     },
     "d_e423eb660d927a5db922": {
-      "description": "The two numbers a check compared, and the tolerance it allowed.\n\nRecorded for every numeric comparison a check performs — whether it passed\nor failed — so the verdict can be reconstructed from exported data:\nthe comparison fails exactly when `|actual - expected| > tolerance`.\n\n`actual`, `expected` and `tolerance` are all in the units of the compared\nnodes (currency units for monetary nodes, the same units as\n[`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not\na fraction or percentage.",
+      "description": "The two values a check compared, their difference and the tolerance it\nallowed.\n\nRecorded for every numeric comparison a check performs, whether it passed\nor failed, so the verdict can be reconstructed from exported data: the\ncomparison fails exactly when `|difference| > tolerance`.\n\nEvery value is typed in the units of the compared nodes: exact money in\ntheir currency, or a scalar. `difference` is the one exact residual the\ncheck computed (an exact sum for money), not a difference of the two\nrecorded sides; `tolerance` is an absolute amount in the same units.",
       "properties": {
         "actual": {
-          "description": "Observed (left-hand) value, in the compared nodes' units.",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/d_897cb2f33ded7ef3d8c5",
+          "description": "Observed (left-hand) value, in the compared nodes' units."
+        },
+        "difference": {
+          "$ref": "#/$defs/d_897cb2f33ded7ef3d8c5",
+          "description": "Signed residual `actual - expected`, in the same units."
         },
         "expected": {
-          "description": "Value the identity requires (right-hand side), in the same units.",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/d_897cb2f33ded7ef3d8c5",
+          "description": "Value the identity requires (right-hand side), in the same units."
         },
         "identity": {
           "description": "Stable snake_case name of the identity that was tested (for example\n`\"balance_sheet_articulation\"` or `\"cash_flow_components\"`); a check\nthat tests several identities per period uses a distinct label for each.",
@@ -1236,15 +1254,15 @@
           ]
         },
         "tolerance": {
-          "description": "Absolute tolerance applied to `|actual - expected|`, in the same units.\nThis is the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/d_897cb2f33ded7ef3d8c5",
+          "description": "Absolute tolerance applied to `|difference|`, in the same units. This\nis the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`."
         }
       },
       "required": [
         "identity",
         "actual",
         "expected",
+        "difference",
         "tolerance"
       ],
       "type": "object"

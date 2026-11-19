@@ -475,10 +475,14 @@ fn identity_tolerance_is_zero_unless_stated_and_inclusive_at_the_allowance() {
     assert_eq!(at.outcome, CheckOutcome::Pass);
     let comparison = &at.results[0].comparisons[0];
     assert_eq!(
-        (comparison.actual, comparison.expected, comparison.tolerance),
+        (
+            comparison.actual.value(),
+            comparison.expected.value(),
+            comparison.tolerance.value()
+        ),
         (100.0, 99.5, 0.5)
     );
-    assert_eq!(comparison.difference(), 0.5);
+    assert_eq!(comparison.difference.value(), 0.5);
     assert_eq!(
         run(&model, &suite(absolute(0.499))).outcome,
         CheckOutcome::Fail
@@ -716,7 +720,7 @@ fn a_configured_suite_runs_at_single_run_finalization() {
         .unwrap();
     let report = balanced.check_report.as_ref().unwrap();
     assert_eq!(report.outcome, CheckOutcome::Pass);
-    assert_eq!(report.results[0].comparisons[0].tolerance, 0.0);
+    assert_eq!(report.results[0].comparisons[0].tolerance.value(), 0.0);
     let off = Evaluator::new()
         .with_checks(suite())
         .evaluate(&balance_model(0.005))

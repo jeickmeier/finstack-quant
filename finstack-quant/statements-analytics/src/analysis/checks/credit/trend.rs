@@ -66,29 +66,20 @@ impl Check for TrendCheck {
             let prev_pid = &periods[i - 1].id;
             let curr_pid = &periods[i].id;
 
-            // `get_finite_node_value`: NaN comparisons are all false, so a
-            // NaN period would silently reset the deterioration streak. Treat it
-            // like a missing value (reset + skip) but report it.
-            let prev_val = get_finite_node_value(context.results, &self.node, prev_pid);
-            let curr_val = get_finite_node_value(context.results, &self.node, curr_pid);
-            let (Some(prev_val), Some(curr_val)) = (prev_val, curr_val) else {
-                if crate::cell_float(context.results, self.node.as_str(), curr_pid)
-                    .is_some_and(|v| !v.is_finite())
-                {
-                    findings.push(CheckFinding {
-                        check_id: self.id().to_string(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "Trend check skipped for {curr_pid}: '{}' is non-finite",
-                            self.node.as_str()
-                        ),
-                        period: Some(*curr_pid),
-                        materiality: None,
-                        nodes: vec![self.node.clone()],
-                        comparison: None,
-                        coverage: false,
-                    });
-                }
+            // A period without a value breaks the streak and is reported as
+            // a coverage gap; the gap is reported once, in its own period.
+            let Some(curr_val) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.node,
+                curr_pid,
+                &mut findings,
+            ) else {
+                consecutive_bad = 0;
+                continue;
+            };
+            let Some(prev_val) = get_finite_node_value(context.results, &self.node, prev_pid)
+            else {
                 consecutive_bad = 0;
                 continue;
             };

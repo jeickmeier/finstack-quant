@@ -54,4 +54,4 @@ The audited endpoint balances, duplicate earnings expressions and reported-tax a
 
 ## Follow-up tracking
 
-Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
+This scope has no open follow-ups; the [follow-up register](../FOLLOW_UPS.md) tracks the other scopes.

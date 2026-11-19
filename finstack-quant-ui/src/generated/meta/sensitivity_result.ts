@@ -313,7 +313,7 @@ export default [
   {
     "path": "#/$defs/d_288b30976e4551573cdd/properties/relative_pct",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/relative_pct",
-    "description": "Discrepancy as a percentage of the reference value.",
+    "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
     "format": "double"
   },
   {
@@ -3321,19 +3321,28 @@ export default [
   {
     "path": "#/$defs/d_f881e913e411c3be88e6",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison",
-    "description": "The two numbers a check compared, and the tolerance it allowed.\n\nRecorded for every numeric comparison a check performs — whether it passed\nor failed — so the verdict can be reconstructed from exported data:\nthe comparison fails exactly when `|actual - expected| > tolerance`.\n\n`actual`, `expected` and `tolerance` are all in the units of the compared\nnodes (currency units for monetary nodes, the same units as\n[`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not\na fraction or percentage."
+    "description": "The two values a check compared, their difference and the tolerance it\nallowed.\n\nRecorded for every numeric comparison a check performs, whether it passed\nor failed, so the verdict can be reconstructed from exported data: the\ncomparison fails exactly when `|difference| > tolerance`.\n\nEvery value is typed in the units of the compared nodes: exact money in\ntheir currency, or a scalar. `difference` is the one exact residual the\ncheck computed (an exact sum for money), not a difference of the two\nrecorded sides; `tolerance` is an absolute amount in the same units."
   },
   {
     "path": "#/$defs/d_f881e913e411c3be88e6/properties/actual",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison/properties/actual",
     "description": "Observed (left-hand) value, in the compared nodes' units.",
-    "format": "double"
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_f881e913e411c3be88e6/properties/difference",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison/properties/difference",
+    "description": "Signed residual `actual - expected`, in the same units.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_f881e913e411c3be88e6/properties/expected",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison/properties/expected",
     "description": "Value the identity requires (right-hand side), in the same units.",
-    "format": "double"
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_f881e913e411c3be88e6/properties/identity",
@@ -3348,8 +3357,9 @@ export default [
   {
     "path": "#/$defs/d_f881e913e411c3be88e6/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison/properties/tolerance",
-    "description": "Absolute tolerance applied to `|actual - expected|`, in the same units.\nThis is the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
-    "format": "double"
+    "description": "Absolute tolerance applied to `|difference|`, in the same units. This\nis the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_feab1608ae875b3fa417",

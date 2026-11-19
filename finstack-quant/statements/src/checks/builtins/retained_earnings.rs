@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 use crate::checks::identity::{
-    Comparison, DatedOpening, Term, incomplete, read_cells, require_known_distinct,
+    Comparison, DatedOpening, Term, coverage_finding, read_cells, require_known_distinct,
 };
 use crate::checks::{Check, CheckCategory, CheckContext, CheckResult, SignConventionPolicy};
 use crate::types::{AmountOrScalar, NodeId};
@@ -31,7 +31,7 @@ use crate::types::{AmountOrScalar, NodeId};
 ///   once: in an already-restated opening balance or as one such entry.
 ///
 /// Omit a dividend or adjustment series only when it does not apply; a
-/// configured series without a value makes the period incomplete, and a
+/// configured series without a value makes the period coverage_finding, and a
 /// known zero is a typed zero. Monetary comparisons are exact and scalar
 /// ones compensated. The relative reference of the tolerance is
 /// `|opening retained earnings|`, with no floor. The check passes only when
@@ -148,7 +148,7 @@ impl Check for RetainedEarningsReconciliation {
                 }
             };
             let (Some(opening), Some(values)) = (opening, values) else {
-                findings.push(incomplete(
+                findings.push(coverage_finding(
                     self.id(),
                     "Retained earnings reconciliation",
                     pid,

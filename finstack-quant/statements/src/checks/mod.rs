@@ -20,7 +20,7 @@ mod traits;
 pub(crate) mod types;
 
 pub use helpers::{get_finite_node_value, sum_nodes};
-pub use identity::DatedOpening;
+pub use identity::{DatedOpening, coverage_finding};
 
 pub use suite::{
     BuiltinCheckSpec, CheckSuite, CheckSuiteBuilder, CheckSuiteSpec, FormulaCheckMode,

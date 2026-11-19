@@ -583,7 +583,8 @@ class CheckReport:
         ``total_assets``), and ``comparison_actual``, ``comparison_expected``,
         ``comparison_tolerance`` (the two values the check compared and the
         absolute tolerance it allowed on their difference, all in the compared
-        nodes' own units).
+        nodes' own units) with ``comparison_currency`` (their ISO currency code,
+        ``None`` for a scalar comparison).
 
         The four materiality columns are ``None`` for findings that carry no
         materiality context, and the three comparison columns are ``None`` for
@@ -617,11 +618,12 @@ class CheckReport:
         ``cash_flow_components``), ``period`` (period identifier string,
         ``None`` when not period-specific), ``actual`` (observed value),
         ``expected`` (value the identity requires), ``difference``
-        (``actual - expected``), ``tolerance`` (absolute tolerance applied to
-        ``|difference|``) and ``within_tolerance`` (``True`` when
-        ``|difference| <= tolerance``). ``actual``, ``expected``,
-        ``difference`` and ``tolerance`` are in the compared nodes' own units
-        (currency amounts for monetary nodes).
+        (the exact residual the check computed), ``tolerance`` (absolute
+        tolerance applied to ``|difference|``), ``currency`` (ISO code of the
+        compared amounts, ``None`` for a scalar comparison) and
+        ``within_tolerance`` (``True`` when ``|difference| <= tolerance``,
+        judged on the exact values). ``actual``, ``expected``, ``difference``
+        and ``tolerance`` are float views in the compared nodes' own units.
 
         Checks that do not compare two numbers, and periods a check skipped
         for missing inputs, contribute no rows. A report with no comparisons
@@ -1244,13 +1246,16 @@ class CheckFinding:
         Returns
         -------
         dict[str, Any] | None
-            ``{"identity", "period", "actual", "expected", "tolerance"}``:
+            ``{"identity", "period", "actual", "expected", "difference",
+            "tolerance"}``:
             ``identity`` names the tested identity (e.g.
             ``"balance_sheet_articulation"``), ``period`` is the period id
             (omitted when not period-specific), ``actual`` and ``expected``
-            are the two compared values and ``tolerance`` is the absolute
-            tolerance applied to ``|actual - expected|`` — all three in the
-            compared nodes' own units (currency amounts for monetary nodes).
+            are the two compared values, ``difference`` the exact residual
+            and ``tolerance`` the absolute tolerance applied to
+            ``|difference|``. Each is typed in the compared nodes' units: a
+            number for a scalar, ``{"amount": "<decimal>", "currency": "<ISO>"}``
+            for money.
             ``None`` for findings that do not compare two numbers (skipped
             periods, missing or non-finite inputs, sign-convention warnings,
             formula checks without a tolerance) and for findings serialized

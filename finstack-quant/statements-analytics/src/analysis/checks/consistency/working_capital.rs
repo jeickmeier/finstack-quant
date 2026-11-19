@@ -2,10 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
+use finstack_quant_statements::checks::sum_nodes;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };
-use finstack_quant_statements::checks::{get_finite_node_value, sum_nodes};
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements::{Error, Result};
 
@@ -75,9 +75,13 @@ impl Check for WorkingCapitalConsistency {
                 }
             }
 
-            let Some(wc_cf) =
-                get_finite_node_value(context.results, &self.wc_change_cf_node, curr_pid)
-            else {
+            let Some(wc_cf) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.wc_change_cf_node,
+                curr_pid,
+                &mut findings,
+            ) else {
                 continue;
             };
 
@@ -121,7 +125,7 @@ impl Check for WorkingCapitalConsistency {
                     period: Some(*curr_pid),
                     materiality: Some(Materiality {
                         absolute: diff.abs(),
-                        relative_pct: relative,
+                        relative_pct: Some(relative),
                         reference_value: expected_wc_change,
                         reference_label: "expected_wc_change".to_string(),
                     }),

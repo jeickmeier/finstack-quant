@@ -124,21 +124,30 @@ pub(crate) fn read_cells(
 
 /// The exact signed sum of `terms`, as its float view.
 ///
+/// # Errors
+///
+/// As [`signed_total`].
+pub(crate) fn signed_sum(check_id: &str, terms: &[Term]) -> Result<f64> {
+    signed_total(check_id, terms).map(|total| total.value())
+}
+
+/// The exact signed sum of `terms` in their own units.
+///
 /// Money in one currency is summed exactly; scalars with compensated
-/// summation.
+/// summation. No terms sum to a scalar zero.
 ///
 /// # Errors
 ///
 /// Returns an invalid-input error for mixed units or currencies and an
 /// evaluation error for a sum that cannot be represented.
-pub(crate) fn signed_sum(check_id: &str, terms: &[Term]) -> Result<f64> {
+pub(crate) fn signed_total(check_id: &str, terms: &[Term]) -> Result<AmountOrScalar> {
     let unrepresentable = || {
         crate::Error::eval(format!(
             "{check_id}: the identity's sum cannot be represented"
         ))
     };
     let Some(first) = terms.first() else {
-        return Ok(0.0);
+        return Ok(AmountOrScalar::scalar(0.0));
     };
     if let Some(money) = first.value.as_money() {
         let mut total = Money::new(0.0, money.currency())?;
@@ -155,8 +164,11 @@ pub(crate) fn signed_sum(check_id: &str, terms: &[Term]) -> Result<f64> {
             }
             .map_err(|error| crate::Error::invalid_input(format!("{check_id}: {error}")))?;
         }
-        let view = total.amount();
-        return view.is_finite().then_some(view).ok_or_else(unrepresentable);
+        return total
+            .amount()
+            .is_finite()
+            .then_some(AmountOrScalar::Amount(total))
+            .ok_or_else(unrepresentable);
     }
     if terms.iter().any(|term| term.value.is_amount()) {
         return Err(crate::Error::invalid_input(format!(
@@ -167,7 +179,7 @@ pub(crate) fn signed_sum(check_id: &str, terms: &[Term]) -> Result<f64> {
         .map_err(|_| unrepresentable())?;
     total
         .is_finite()
-        .then_some(total)
+        .then_some(AmountOrScalar::scalar(total))
         .ok_or_else(unrepresentable)
 }
 
@@ -205,41 +217,60 @@ impl Comparison<'_> {
         context: &CheckContext<'_>,
         describe: impl FnOnce(f64, f64, f64) -> String,
     ) -> Result<(CheckComparison, Option<CheckFinding>)> {
-        let actual = signed_sum(self.check_id, self.actual)?;
-        let expected = signed_sum(self.check_id, self.expected)?;
         let all: Vec<Term> = self
             .actual
             .iter()
             .copied()
             .chain(self.expected.iter().map(|term| term.negated()))
             .collect();
-        let residual = signed_sum(self.check_id, &all)?;
+        let residual = signed_total(self.check_id, &all)?;
+        // Each side is recorded in the residual's units; a side with no
+        // terms is a zero of those units.
+        let side = |terms: &[Term]| -> Result<AmountOrScalar> {
+            match (terms.is_empty(), residual) {
+                (true, AmountOrScalar::Amount(money)) => {
+                    Ok(AmountOrScalar::Amount(Money::new(0.0, money.currency())?))
+                }
+                _ => signed_total(self.check_id, terms),
+            }
+        };
+        let actual = side(self.actual)?;
+        let expected = side(self.expected)?;
         let tolerance = effective_tolerance(&context.config, self.tolerance, self.reference);
-        if !tolerance.is_finite() {
-            return Err(crate::Error::eval(format!(
+        let unrepresentable = || {
+            crate::Error::eval(format!(
                 "{}: the tolerance cannot be represented",
                 self.check_id
-            )));
+            ))
+        };
+        if !tolerance.is_finite() {
+            return Err(unrepresentable());
         }
         let comparison = CheckComparison {
             identity: self.identity.to_string(),
             period: Some(self.period),
             actual,
             expected,
-            tolerance,
+            difference: residual,
+            tolerance: match residual {
+                AmountOrScalar::Amount(money) => {
+                    AmountOrScalar::amount(tolerance, money.currency())
+                        .map_err(|_| unrepresentable())?
+                }
+                AmountOrScalar::Scalar(_) => AmountOrScalar::scalar(tolerance),
+            },
         };
-        if residual.abs() <= tolerance {
+        if comparison.within_tolerance() {
             return Ok((comparison, None));
         }
-        // The relative residual is reported when the reference is non-zero
-        // and the percentage is representable; zero otherwise.
+        let residual = residual.value();
+        // The relative residual is undefined on a zero reference.
         let relative_pct = Some((residual / self.reference).abs() * 100.0)
-            .filter(|pct| self.reference != 0.0 && pct.is_finite())
-            .unwrap_or(0.0);
+            .filter(|pct| self.reference != 0.0 && pct.is_finite());
         let finding = CheckFinding {
             check_id: self.check_id.to_string(),
             severity: Severity::Error,
-            message: describe(actual, expected, residual),
+            message: describe(actual.value(), expected.value(), residual),
             period: Some(self.period),
             materiality: Some(Materiality {
                 absolute: residual.abs(),
@@ -256,8 +287,18 @@ impl Comparison<'_> {
 }
 
 /// A coverage finding: the comparison of `period` could not be evaluated
-/// because the listed inputs have no value.
-pub(crate) fn incomplete(
+/// because the listed inputs have no value. A check with a coverage finding
+/// is incomplete, never a pass.
+///
+/// # Arguments
+///
+/// * `check_id` - Identifier of the check that owns the finding.
+/// * `what` - Name of what could not be judged, as the message's subject (for
+///   example `"Cash reconciliation"`).
+/// * `period` - Period the check could not judge.
+/// * `missing` - The input nodes that have no value in `period`; they are
+///   named in the message and attached to the finding.
+pub fn coverage_finding(
     check_id: &str,
     what: &str,
     period: PeriodId,

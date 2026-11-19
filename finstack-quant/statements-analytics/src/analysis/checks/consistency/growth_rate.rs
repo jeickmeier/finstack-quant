@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use finstack_quant_statements::Result;
-use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, PeriodScope,
     Severity,
@@ -57,10 +56,14 @@ impl Check for GrowthRateConsistency {
                 let prev_pid = &prev_spec.id;
                 let curr_pid = &curr_spec.id;
 
-                let Some(prev_val) = get_finite_node_value(context.results, node, prev_pid) else {
+                let Some(prev_val) =
+                    crate::analysis::checks::required(context, self, node, prev_pid, &mut findings)
+                else {
                     continue;
                 };
-                let Some(curr_val) = get_finite_node_value(context.results, node, curr_pid) else {
+                let Some(curr_val) =
+                    crate::analysis::checks::required(context, self, node, curr_pid, &mut findings)
+                else {
                     continue;
                 };
 
@@ -88,7 +91,7 @@ impl Check for GrowthRateConsistency {
                         period: Some(*curr_pid),
                         materiality: Some(Materiality {
                             absolute: abs_change,
-                            relative_pct: growth.abs() * 100.0,
+                            relative_pct: Some(growth.abs() * 100.0),
                             reference_value: prev_val,
                             reference_label: format!("prior_{}", node.as_str()),
                         }),

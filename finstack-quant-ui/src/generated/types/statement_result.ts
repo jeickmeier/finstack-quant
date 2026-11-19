@@ -945,26 +945,43 @@ export interface D_4F32370227B1985D85E9 {
   [k: string]: unknown;
 }
 /**
- * The two numbers a check compared, and the tolerance it allowed.
+ * The two values a check compared, their difference and the tolerance it
+ * allowed.
  *
- * Recorded for every numeric comparison a check performs — whether it passed
- * or failed — so the verdict can be reconstructed from exported data:
- * the comparison fails exactly when `|actual - expected| > tolerance`.
+ * Recorded for every numeric comparison a check performs, whether it passed
+ * or failed, so the verdict can be reconstructed from exported data: the
+ * comparison fails exactly when `|difference| > tolerance`.
  *
- * `actual`, `expected` and `tolerance` are all in the units of the compared
- * nodes (currency units for monetary nodes, the same units as
- * [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
- * a fraction or percentage.
+ * Every value is typed in the units of the compared nodes: exact money in
+ * their currency, or a scalar. `difference` is the one exact residual the
+ * check computed (an exact sum for money), not a difference of the two
+ * recorded sides; `tolerance` is an absolute amount in the same units.
  */
 export interface DF881E913E411C3Be88E6 {
   /**
-   * Observed (left-hand) value, in the compared nodes' units.
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
    */
-  actual: number;
+  actual: D_1B5716Dde9957A614F3C | number;
   /**
-   * Value the identity requires (right-hand side), in the same units.
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
    */
-  expected: number;
+  difference: D_1B5716Dde9957A614F3C | number;
+  /**
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
+   */
+  expected: D_1B5716Dde9957A614F3C | number;
   /**
    * Stable snake_case name of the identity that was tested (for example
    * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
@@ -976,12 +993,13 @@ export interface DF881E913E411C3Be88E6 {
    */
   period?: string | null;
   /**
-   * Absolute tolerance applied to `|actual - expected|`, in the same units.
-   * This is the effective tolerance: the per-check override when one is
-   * configured, otherwise
-   * `max(default_tolerance, default_relative_tolerance * |reference|)`.
+   * Value that can be currency-aware or unitless.
+   *
+   * Used for node values that can represent:
+   * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+   * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
    */
-  tolerance: number;
+  tolerance: D_1B5716Dde9957A614F3C | number;
   [k: string]: unknown;
 }
 /**
@@ -1047,9 +1065,10 @@ export interface D_288B30976E4551573Cdd {
    */
   reference_value: number;
   /**
-   * Discrepancy as a percentage of the reference value.
+   * Discrepancy as a percentage of the reference value; `None` when the
+   * percentage is undefined (a zero reference) or does not apply.
    */
-  relative_pct: number;
+  relative_pct?: number | null;
   [k: string]: unknown;
 }
 /**

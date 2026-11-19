@@ -54,6 +54,34 @@ fn leverage_within_range_passes() {
     assert!(result.findings.is_empty());
 }
 
+/// A configured input with no value leaves the check incomplete: it names
+/// the gap and does not pass the period unexamined.
+#[test]
+fn leverage_without_a_debt_value_is_incomplete_not_a_pass() {
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value_scalar("debt", &[]);
+        model_builder.value("ebitda", &[(y(), s(200.0))]);
+        model_builder.build().unwrap()
+    };
+    let results = Evaluator::new().evaluate(&model).unwrap();
+    let check = LeverageRangeCheck {
+        debt_node: NodeId::new("debt"),
+        ebitda_node: NodeId::new("ebitda"),
+        warn_range: (0.0, 6.0),
+        error_range: (0.0, 10.0),
+    };
+    let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
+    assert!(!result.passed());
+    assert_eq!(
+        result.outcome,
+        finstack_quant_statements::checks::CheckOutcome::Incomplete
+    );
+    assert!(result.findings[0].coverage);
+    assert_eq!(result.findings[0].nodes, vec![NodeId::new("debt")]);
+}
+
 #[test]
 fn leverage_above_warn_flags_warning() {
     // Annual window size 1: Debt/TTM EBITDA = 1400/200 = 7.0x → above warn 6.0, below error 10.0
@@ -779,7 +807,7 @@ fn trend_nan_period_warns_and_resets() {
         result
             .findings
             .iter()
-            .any(|f| f.severity == Severity::Warning && f.message.contains("non-finite")),
+            .any(|f| f.coverage && f.message.contains("no value")),
         "a NaN period must be reported: {:?}",
         result.findings
     );

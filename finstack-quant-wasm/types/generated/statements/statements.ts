@@ -4415,7 +4415,7 @@ export interface BoundsParams {
  *   once: in an already-restated opening balance or as one such entry.
  *
  * Omit a dividend or adjustment series only when it does not apply; a
- * configured series without a value makes the period incomplete, and a
+ * configured series without a value makes the period coverage_finding, and a
  * known zero is a typed zero. Monetary comparisons are exact and scalar
  * ones compensated. The relative reference of the tolerance is
  * `|opening retained earnings|`, with no floor. The check passes only when
@@ -7224,26 +7224,31 @@ export interface PikElectionSpec {
   pik_fraction: DecimalWire;
 }
 /**
- * The two numbers a check compared, and the tolerance it allowed.
+ * The two values a check compared, their difference and the tolerance it
+ * allowed.
  *
- * Recorded for every numeric comparison a check performs — whether it passed
- * or failed — so the verdict can be reconstructed from exported data:
- * the comparison fails exactly when `|actual - expected| > tolerance`.
+ * Recorded for every numeric comparison a check performs, whether it passed
+ * or failed, so the verdict can be reconstructed from exported data: the
+ * comparison fails exactly when `|difference| > tolerance`.
  *
- * `actual`, `expected` and `tolerance` are all in the units of the compared
- * nodes (currency units for monetary nodes, the same units as
- * [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
- * a fraction or percentage.
+ * Every value is typed in the units of the compared nodes: exact money in
+ * their currency, or a scalar. `difference` is the one exact residual the
+ * check computed (an exact sum for money), not a difference of the two
+ * recorded sides; `tolerance` is an absolute amount in the same units.
  */
 export interface CheckComparison {
   /**
    * Observed (left-hand) value, in the compared nodes' units.
    */
-  actual: number;
+  actual: AmountOrScalar;
+  /**
+   * Signed residual `actual - expected`, in the same units.
+   */
+  difference: AmountOrScalar;
   /**
    * Value the identity requires (right-hand side), in the same units.
    */
-  expected: number;
+  expected: AmountOrScalar;
   /**
    * Stable snake_case name of the identity that was tested (for example
    * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
@@ -7255,12 +7260,12 @@ export interface CheckComparison {
    */
   period?: string | null;
   /**
-   * Absolute tolerance applied to `|actual - expected|`, in the same units.
-   * This is the effective tolerance: the per-check override when one is
+   * Absolute tolerance applied to `|difference|`, in the same units. This
+   * is the effective tolerance: the per-check override when one is
    * configured, otherwise
    * `max(default_tolerance, default_relative_tolerance * |reference|)`.
    */
-  tolerance: number;
+  tolerance: AmountOrScalar;
   [k: string]: unknown;
 }
 /**
@@ -7365,9 +7370,10 @@ export interface Materiality {
    */
   reference_value: number;
   /**
-   * Discrepancy as a percentage of the reference value.
+   * Discrepancy as a percentage of the reference value; `None` when the
+   * percentage is undefined (a zero reference) or does not apply.
    */
-  relative_pct: number;
+  relative_pct?: number | null;
   [k: string]: unknown;
 }
 /**

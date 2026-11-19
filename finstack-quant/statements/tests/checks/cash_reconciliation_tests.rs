@@ -71,9 +71,9 @@ fn every_period_reconciles_from_the_explicit_opening() {
         (
             first.identity.as_str(),
             first.period,
-            first.actual,
-            first.expected,
-            first.tolerance
+            first.actual.value(),
+            first.expected.value(),
+            first.tolerance.value()
         ),
         ("cash_roll_forward", Some(q(1)), 100.0, 100.0, 0.0)
     );
@@ -90,7 +90,7 @@ fn every_period_reconciles_from_the_explicit_opening() {
     // Residual 10 against the opening of 70, with no floor on the reference.
     assert_eq!(materiality.absolute, 10.0);
     assert_eq!(materiality.reference_value, 70.0);
-    assert!((materiality.relative_pct - 100.0 / 7.0).abs() < 1e-12);
+    assert!((materiality.relative_pct.unwrap() - 100.0 / 7.0).abs() < 1e-12);
     assert_eq!(materiality.reference_label, "opening_cash");
 }
 
@@ -153,7 +153,10 @@ fn components_reconcile_in_every_period() {
     assert_eq!(finding.period, Some(q(1)));
     let comparison = finding.comparison.as_ref().unwrap();
     assert_eq!(comparison.identity, "cash_flow_components");
-    assert_eq!((comparison.actual, comparison.expected), (20.0, 21.0));
+    assert_eq!(
+        (comparison.actual.value(), comparison.expected.value()),
+        (20.0, 21.0)
+    );
     assert_eq!(
         finding.materiality.as_ref().unwrap().reference_label,
         "total_cash_flow"

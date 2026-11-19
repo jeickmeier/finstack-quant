@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **618 review items across 32 source scopes with open items**
+This backlog consolidates **617 review items across 31 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (474): implementation and verification work against an
+- **Reconciliation** (473): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (36): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -68,7 +68,6 @@ product consequences remain in their product scope.
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 6 |
-| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 1 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1024,12 +1023,6 @@ product consequences remain in their product scope.
 - **Evidence — Margin reference provenance needs qualification beyond the checked tables.** Historical source comparisons cover the specified CQ and commodity entries. Complete parameter coverage, the recorded historical PDF digest and independent portfolio and host qualification remain open. Inspected formula, transcription and transport fixtures retain their own evidence scope. Records: [MARGIN-COLLATERAL-IM-001](margin-collateral-im/01-registry-and-defaults.md), [MARGIN-COLLATERAL-IM-002](margin-collateral-im/02-simm-parameter-validation.md), [MARGIN-COLLATERAL-IM-022](margin-collateral-im/22-wire-tables-and-provenance.md).
 
 - **Investigate — Margin aggregation under extreme and offsetting inputs.** Quantify overflow, cancellation and insertion-order effects in ordinary sensitivity sums, concentration-adjusted SIMM quadratics and schedule gross-by-class/notional totals. Include large cancelling IR/FX inputs and floored quadratic sums; deterministic serialization alone does not establish numerical accuracy or invariance. Qualify affected outputs against independent scaled/offsetting cases before drawing an impact conclusion. Records: [MARGIN-COLLATERAL-IM-003](margin-collateral-im/03-sensitivity-inputs.md), [MARGIN-COLLATERAL-IM-004](margin-collateral-im/04-simm-interest-rate.md), [MARGIN-COLLATERAL-IM-008](margin-collateral-im/08-simm-fx.md), [MARGIN-COLLATERAL-IM-010](margin-collateral-im/10-simm-curvature.md), [MARGIN-COLLATERAL-IM-011](margin-collateral-im/11-simm-total-and-mpor.md), [MARGIN-COLLATERAL-IM-013](margin-collateral-im/13-schedule-net-gross.md).
-
-## Statements: model, formula and check contracts
-
-[Scope inventory](statements-contracts/README.md).
-
-- **Reconciliation — Typed comparison values and coverage in analytics checks.** Record a comparison's actual, expected, difference and tolerance as typed values (exact `Money` or scalar) at the compared precision; today they are floats in the compared nodes' units, with compatible units checked for identity inputs, and a [formula check's](statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage) residual and its tolerance are floats in the residual's units. The accounting identities already sum exactly (money) or with compensation (scalars) and compare one exact residual; the recorded values are its float views, and a relative residual that is undefined (a zero reference) is recorded as zero. Define, with their owning records, when a statements-analytics check that lacks an input is incomplete rather than not applicable; today those checks report the periods they examined and never a coverage finding. Zero default tolerance with the inclusive `max(absolute, relative × reference)` allowance and absolute override, pass, fail, incomplete and unevaluated verdicts from unfiltered outcomes, advisory-only filters, declared order with unique identifiers, compatible merges, and supplied results accepted only as a verified run under the requested cutoff are reconciled. [Accepted STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 
 ## Statements analytics: valuation, comparisons and templates
 

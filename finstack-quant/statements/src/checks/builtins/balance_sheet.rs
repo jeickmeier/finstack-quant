@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
-use crate::checks::identity::{Comparison, Term, incomplete, read_cells, require_known_distinct};
+use crate::checks::identity::{
+    Comparison, Term, coverage_finding, read_cells, require_known_distinct,
+};
 use crate::checks::{Check, CheckCategory, CheckContext, CheckResult};
 use crate::error::Error;
 use crate::types::NodeId;
@@ -98,7 +100,7 @@ impl Check for BalanceSheetArticulation {
             let values = match read_cells(self.id(), context, &operands, &pid)? {
                 Ok(values) => values,
                 Err(missing) => {
-                    findings.push(incomplete(
+                    findings.push(coverage_finding(
                         self.id(),
                         "Balance sheet articulation",
                         pid,

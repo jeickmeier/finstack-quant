@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use finstack_quant_statements::Result;
-use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
     Severity, SignConventionPolicy,
@@ -64,29 +63,60 @@ impl Check for DepreciationReconciliation {
             let prev_pid = &periods[i - 1].id;
             let curr_pid = &periods[i].id;
 
-            let Some(ppe_prev) = get_finite_node_value(context.results, &self.ppe_node, prev_pid)
-            else {
+            let Some(ppe_prev) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.ppe_node,
+                prev_pid,
+                &mut findings,
+            ) else {
                 continue;
             };
-            let Some(ppe_curr) = get_finite_node_value(context.results, &self.ppe_node, curr_pid)
-            else {
+            let Some(ppe_curr) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.ppe_node,
+                curr_pid,
+                &mut findings,
+            ) else {
                 continue;
             };
-            let Some(capex) = get_finite_node_value(context.results, &self.capex_node, curr_pid)
-            else {
+            let Some(capex) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.capex_node,
+                curr_pid,
+                &mut findings,
+            ) else {
                 continue;
             };
-            let Some(da) =
-                get_finite_node_value(context.results, &self.depreciation_expense_node, curr_pid)
-            else {
+            let Some(da) = crate::analysis::checks::required(
+                context,
+                self,
+                &self.depreciation_expense_node,
+                curr_pid,
+                &mut findings,
+            ) else {
                 continue;
             };
 
-            let disposals = self
-                .disposals_node
-                .as_ref()
-                .and_then(|n| get_finite_node_value(context.results, n, curr_pid))
-                .unwrap_or(0.0);
+            // A configured node contributes its value; without a value the
+            // period cannot be judged.
+            let disposals = match self.disposals_node.as_ref() {
+                Some(node) => {
+                    let Some(value) = crate::analysis::checks::required(
+                        context,
+                        self,
+                        node,
+                        curr_pid,
+                        &mut findings,
+                    ) else {
+                        continue;
+                    };
+                    value
+                }
+                None => 0.0,
+            };
 
             // Flag magnitude-positive violations before the
             // reconciliation math.
@@ -119,13 +149,12 @@ impl Check for DepreciationReconciliation {
 
             let expected = ppe_prev + capex - da - disposals;
             let diff = ppe_curr - expected;
-            let comparison = CheckComparison {
-                identity: "ppe_roll_forward".to_string(),
-                period: Some(*curr_pid),
-                actual: ppe_curr,
-                expected,
-                tolerance,
-            };
+            let comparison = CheckComparison::from_floats(
+                "ppe_roll_forward",
+                *curr_pid,
+                crate::analysis::checks::currency_of(context, &self.ppe_node, curr_pid),
+                (ppe_curr, expected, tolerance),
+            )?;
             comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
@@ -153,7 +182,7 @@ impl Check for DepreciationReconciliation {
                     period: Some(*curr_pid),
                     materiality: Some(Materiality {
                         absolute: diff.abs(),
-                        relative_pct: relative,
+                        relative_pct: Some(relative),
                         reference_value: ppe_prev,
                         reference_label: "prior_ppe".to_string(),
                     }),
