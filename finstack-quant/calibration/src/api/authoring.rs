@@ -8,6 +8,7 @@
 //! only restate the struct (`CdsQuote::CdsUpfront`, [`crate::quotes::CdsTrancheQuote`]) are
 //! built as literals (or deserialized) and checked with their `validate()`.
 
+use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::api::schema::{CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepWithQuotes};
 use crate::config::CalibrationConfig;
@@ -70,45 +71,183 @@ impl CalibrationEnvelope {
         let mut step_ids = HashSet::new();
         let mut datum_ids = HashSet::new();
         let mut market_data = Vec::new();
-        for StepWithQuotes { step, quotes } in steps {
-            if step.id.trim().is_empty() || step.quote_set.trim().is_empty() {
-                return Err(Error::Validation(
-                    "Calibration steps require nonempty step and quote set ids".into(),
-                ));
-            }
-            if !step_ids.insert(step.id.clone()) {
-                return Err(Error::Validation(format!(
-                    "Duplicate calibration step '{}'",
-                    step.id
-                )));
-            }
-            if !quotes.is_empty() || !plan.quote_sets.contains_key(&step.quote_set) {
-                let mut ids = Vec::with_capacity(quotes.len());
-                for quote in quotes {
-                    let id = quote.id();
-                    if id.trim().is_empty() || !datum_ids.insert(id.to_owned()) {
-                        return Err(Error::Validation(format!(
-                            "Invalid or duplicate calibration market input '{id}'"
-                        )));
-                    }
-                    ids.push(QuoteId::from(id));
-                    market_data.push(quote);
-                }
-                if plan
-                    .quote_sets
-                    .insert(step.quote_set.clone(), ids)
-                    .is_some()
-                {
-                    return Err(Error::Validation(format!(
-                        "Duplicate definition of calibration quote set '{}'",
-                        step.quote_set
-                    )));
-                }
-            }
-            plan.steps.push(step);
+        for entry in steps {
+            append_step(
+                &mut plan,
+                &mut market_data,
+                &mut step_ids,
+                &mut datum_ids,
+                entry,
+            )?;
         }
         Ok(Self::new(plan, market_data, prior_market))
     }
+
+    /// Derive an envelope with one more step at the end of the execution order.
+    ///
+    /// # Arguments
+    /// * `entry` - Step and inline market inputs. An empty list references an
+    ///   existing quote set when the step names that set.
+    ///
+    /// # Errors
+    /// Rejects blank or duplicate step and quote identifiers, and duplicate
+    /// quote-set definitions. The original envelope stays available on error.
+    pub fn with_step(&self, entry: StepWithQuotes) -> Result<Self> {
+        let mut next = self.clone();
+        let mut step_ids = next.plan.steps.iter().map(|step| step.id.clone()).collect();
+        let mut datum_ids = next
+            .market_data
+            .iter()
+            .map(|datum| datum.id().to_owned())
+            .collect();
+        append_step(
+            &mut next.plan,
+            &mut next.market_data,
+            &mut step_ids,
+            &mut datum_ids,
+            entry,
+        )?;
+        Ok(next)
+    }
+
+    /// Derive an envelope with one quoted observation and all its set references removed.
+    ///
+    /// # Arguments
+    /// * `quote_id` - Stable identifier of a calibration quote, not a market snapshot.
+    ///
+    /// # Errors
+    /// Rejects unknown quote IDs and IDs that refer to non-quote market data.
+    pub fn without_quote(&self, quote_id: &str) -> Result<Self> {
+        let mut next = self.clone();
+        let index = next
+            .market_data
+            .iter()
+            .position(|datum| datum.id() == quote_id && datum.is_quote())
+            .ok_or_else(|| Error::Validation(format!("Unknown calibration quote '{quote_id}'")))?;
+        next.market_data.remove(index);
+        for ids in next.plan.quote_sets.values_mut() {
+            ids.retain(|id| id.as_str() != quote_id);
+        }
+        Ok(next)
+    }
+
+    /// Derive an envelope with an additive rate or spread shock on selected quotes.
+    ///
+    /// # Arguments
+    /// * `quote_set` - Optional named set. An omitted set selects every quote once,
+    ///   excluding independent observations such as fixings and spot prices.
+    /// * `bp` - Finite signed basis points. One basis point adds 0.0001 to decimal
+    ///   rates, subtracts 0.01 from rate-futures prices, or adds 1 to spreads
+    ///   expressed in basis points.
+    ///
+    /// # Errors
+    /// Rejects unknown sets, unresolved set references, invalid bumped quotes,
+    /// and selected quotes without a rate or spread basis, such as volatility,
+    /// upfront CDS and tranche quotes.
+    pub fn bump_quotes_bp(&self, quote_set: Option<&str>, bp: f64) -> Result<Self> {
+        if !bp.is_finite() {
+            return Err(Error::Validation(
+                "Calibration quote bump must be finite".into(),
+            ));
+        }
+        let mut next = self.clone();
+        if let Some(name) = quote_set {
+            let ids = self.plan.quote_sets.get(name).ok_or_else(|| {
+                Error::Validation(format!("Unknown calibration quote set '{name}'"))
+            })?;
+            let mut pending: HashSet<_> = ids.iter().map(QuoteId::as_str).collect();
+            for datum in &mut next.market_data {
+                if pending.remove(datum.id()) {
+                    bump_quote(datum, bp)?;
+                }
+            }
+            if !pending.is_empty() {
+                return Err(Error::Validation(format!(
+                    "Unresolved quote in set '{name}'"
+                )));
+            }
+        } else {
+            for datum in &mut next.market_data {
+                if datum.is_quote() {
+                    bump_quote(datum, bp)?;
+                }
+            }
+        }
+        Ok(next)
+    }
+}
+
+fn bump_quote(datum: &mut MarketDatum, bp: f64) -> Result<()> {
+    match datum {
+        MarketDatum::RateQuote(quote) => {
+            *quote = quote.bump_rate_bp(bp);
+            quote.validate()
+        }
+        MarketDatum::CdsQuote(quote @ CdsQuote::CdsParSpread { .. }) => {
+            if let CdsQuote::CdsParSpread { spread_bp, .. } = quote {
+                *spread_bp += bp;
+            }
+            quote.validate()
+        }
+        MarketDatum::InflationQuote(quote) => {
+            match quote {
+                InflationQuote::InflationSwap { rate, .. }
+                | InflationQuote::YoYInflationSwap { rate, .. } => *rate += bp / 10_000.0,
+            }
+            quote.validate()
+        }
+        MarketDatum::XccyQuote(quote) => {
+            quote.basis_spread_bp += bp;
+            quote.validate()
+        }
+        _ => Err(Error::Validation(format!(
+            "Calibration input '{}' does not have a rate or spread bump basis",
+            datum.id()
+        ))),
+    }
+}
+
+fn append_step(
+    plan: &mut CalibrationPlan,
+    market_data: &mut Vec<MarketDatum>,
+    step_ids: &mut HashSet<String>,
+    datum_ids: &mut HashSet<String>,
+    entry: StepWithQuotes,
+) -> Result<()> {
+    let StepWithQuotes { step, quotes } = entry;
+    if step.id.trim().is_empty() || step.quote_set.trim().is_empty() {
+        return Err(Error::Validation(
+            "Calibration steps require nonempty step and quote set ids".into(),
+        ));
+    }
+    if !step_ids.insert(step.id.clone()) {
+        return Err(Error::Validation(format!(
+            "Duplicate calibration step '{}'",
+            step.id
+        )));
+    }
+    if !quotes.is_empty() || !plan.quote_sets.contains_key(&step.quote_set) {
+        if plan.quote_sets.contains_key(&step.quote_set) {
+            return Err(Error::Validation(format!(
+                "Duplicate definition of calibration quote set '{}'",
+                step.quote_set
+            )));
+        }
+        let mut ids = Vec::with_capacity(quotes.len());
+        for quote in quotes {
+            let id = quote.id();
+            if id.trim().is_empty() || !datum_ids.insert(id.to_owned()) {
+                return Err(Error::Validation(format!(
+                    "Invalid or duplicate calibration market input '{id}'"
+                )));
+            }
+            ids.push(QuoteId::from(id));
+            market_data.push(quote);
+        }
+        plan.quote_sets.insert(step.quote_set.clone(), ids);
+    }
+    plan.steps.push(step);
+    Ok(())
 }
 
 /// Step kinds whose produced object is identified by `curve_id`.

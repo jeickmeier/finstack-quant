@@ -308,6 +308,25 @@ test('inline quotes produce the same envelope as explicit calibration inputs', (
   assert.deepEqual(plain(authored.plan.quote_sets), plan.quote_sets);
   assert.deepEqual(plain(authored.market_data), quotes);
   assert.equal(calibration.calibrate(authored).result.report.success, true);
+  const next = calibration.calibrationStepDiscount('USD-OIS-2', RATES, 'USD-OIS');
+  const entry = { step: next, quotes: [] };
+  const extended = calibration.calibrationEnvelopeWithStep(authored, entry);
+  assert.deepEqual(
+    plain(extended),
+    plain(calibration.calibrationEnvelopeFromSteps(plan.id, [{ step, quotes }, entry]))
+  );
+  assert.equal(authored.plan.steps.length, 1);
+  const shifted = calibration.calibrationEnvelopeBumpQuotesBp(extended, 'USD-OIS', 2.5);
+  assert.ok(Math.abs(shifted.market_data[0].rate - quotes[0].rate - 0.00025) < 1e-12);
+  assert.equal(extended.market_data[0].rate, quotes[0].rate);
+  const removed = calibration.calibrationEnvelopeWithoutQuote(extended, quotes[0].id);
+  assert.ok(!removed.market_data.some((quote) => quote.id === quotes[0].id));
+  assert.ok(!removed.plan.quote_sets['USD-OIS'].includes(quotes[0].id));
+
+  assert.throws(
+    () => calibration.calibrationEnvelopeWithStep(authored, { step: next, quotes }),
+    /Duplicate definition of calibration quote set/
+  );
   assert.throws(
     () =>
       calibration.calibrationEnvelopeFromSteps(plan.id, [{ step, quotes: [quotes[0], quotes[0]] }]),

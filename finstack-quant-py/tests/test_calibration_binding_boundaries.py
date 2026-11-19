@@ -458,5 +458,23 @@ def test_inline_calibration_preserves_quote_set_reuse_and_rejects_duplicate_inpu
     envelope = CalibrationEnvelope.from_steps("reuse", [StepWithQuotes(first, [quote]), StepWithQuotes(next_step, [])])
     assert envelope.plan.quote_sets == {"deposits": ["USD-DEP-3M"]}
     assert len(envelope.market_data) == 1
+    original = CalibrationEnvelope.from_steps("reuse", [StepWithQuotes(first, [quote])])
+    assert original.with_step(StepWithQuotes(next_step, [])).content_hash() == envelope.content_hash()
+    with pytest.raises(ValueError, match="Duplicate definition of calibration quote set"):
+        original.with_step(StepWithQuotes(next_step, [quote]))
+    assert len(original.plan.steps) == 1
+    bumped = envelope.bump_quotes_bp(2.5, quote_set="deposits")
+    shifted = RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.04025)
+    expected = CalibrationEnvelope.from_steps(
+        "reuse", [StepWithQuotes(first, [shifted]), StepWithQuotes(next_step, [])]
+    )
+    assert bumped.content_hash() == expected.content_hash()
+    assert original.with_step(StepWithQuotes(next_step, [])).content_hash() == envelope.content_hash()
+    removed = envelope.without_quote(quote.id)
+    assert removed.plan.quote_sets == {"deposits": []}
+    assert not removed.market_data
+    with pytest.raises(ValueError, match="bump must be finite"):
+        envelope.bump_quotes_bp(float("nan"))
+
     with pytest.raises(ValueError, match="duplicate calibration market input"):
         CalibrationEnvelope.from_steps("duplicate", [StepWithQuotes(first, [quote, quote])])

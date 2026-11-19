@@ -225,8 +225,11 @@
       "calibrateBermudanLmmBaseVol",
       "calibrateHullWhiteToCapFloors",
       "calibrateHullWhiteToSwaptions",
+      "calibrationEnvelopeBumpQuotesBp",
       "calibrationEnvelopeContentHash",
       "calibrationEnvelopeFromSteps",
+      "calibrationEnvelopeWithStep",
+      "calibrationEnvelopeWithoutQuote",
       "calibrationResultContentHash",
       "calibrationResultResiduals",
       "calibrationResultStepReport",
@@ -283,6 +286,15 @@
     "kind": "function"
   },
   "calibration.calibrationEnvelopeFromSteps": {
+    "kind": "function"
+  },
+  "calibration.calibrationEnvelopeWithStep": {
+    "kind": "function"
+  },
+  "calibration.calibrationEnvelopeWithoutQuote": {
+    "kind": "function"
+  },
+  "calibration.calibrationEnvelopeBumpQuotesBp": {
     "kind": "function"
   },
   "calibration.calibrationResultContentHash": {

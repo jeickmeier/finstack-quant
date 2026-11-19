@@ -2399,6 +2399,31 @@ export interface CalibrationNamespace {
    */
   readonly calibrationEnvelopeFromSteps: typeof wasm.calibrationEnvelopeFromSteps;
   /**
+   * Derive an envelope with one more step at the end of the execution order.
+   * @param envelope - Envelope whose existing steps and settings are retained.
+   * @param entry - Step and inline quotes. An empty list can reference an existing quote set.
+   * @returns Independent calibration envelope with the appended step.
+   * @throws `TypeError` for malformed argument shapes and `FinstackError` for invalid or duplicate identifiers or a redefined quote set.
+   */
+  readonly calibrationEnvelopeWithStep: typeof wasm.calibrationEnvelopeWithStep;
+  /**
+   * Derive an envelope without one quote or any references to it.
+   * @param envelope - Calibration envelope containing the quoted observation.
+   * @param quoteId - Exact stable ID of the quote.
+   * @returns Independent envelope with matching references removed.
+   * @throws `TypeError` for malformed arguments or `FinstackError` for an unknown or non-quote ID.
+   */
+  readonly calibrationEnvelopeWithoutQuote: typeof wasm.calibrationEnvelopeWithoutQuote;
+  /**
+   * Apply a signed rate or spread shock to a derived calibration envelope.
+   * @param envelope - Calibration envelope with the original market inputs.
+   * @param quoteSet - Exact quote-set name or null to select every quote once.
+   * @param bp - Finite signed basis points. One basis point adds 0.0001 to decimal rates, lowers rate-futures prices by 0.01, or adds one to spreads quoted in basis points.
+   * @returns Independent envelope with the selected quotes shifted.
+   * @throws `TypeError` for malformed arguments or `FinstackError` for nonfinite shocks, unknown sets or references, or quotes without a rate or spread bump basis.
+   */
+  readonly calibrationEnvelopeBumpQuotesBp: typeof wasm.calibrationEnvelopeBumpQuotesBp;
+  /**
    * Canonical content hash of a calibration result envelope.
    *
    * Free-function twin of Python `CalibrationResultEnvelope.content_hash` (Rust

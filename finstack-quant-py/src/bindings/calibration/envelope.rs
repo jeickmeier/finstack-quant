@@ -515,6 +515,31 @@ impl PyCalibrationEnvelope {
         .map_err(core_to_py)
     }
 
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.with_step")]
+    fn with_step(&self, entry: PyRef<'_, PyStepWithQuotes>) -> PyResult<Self> {
+        self.inner
+            .with_step(entry.inner.clone())
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.without_quote")]
+    fn without_quote(&self, quote_id: &str) -> PyResult<Self> {
+        self.inner
+            .without_quote(quote_id)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.bump_quotes_bp")]
+    #[pyo3(signature=(bp, *, quote_set=None))]
+    fn bump_quotes_bp(&self, bp: f64, quote_set: Option<&str>) -> PyResult<Self> {
+        self.inner
+            .bump_quotes_bp(quote_set, bp)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.__init__")]
     #[new]
     #[pyo3(signature = (plan, market_data = None, prior_market = None))]

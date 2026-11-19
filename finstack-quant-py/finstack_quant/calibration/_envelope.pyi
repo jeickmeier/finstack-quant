@@ -1220,6 +1220,71 @@ class CalibrationEnvelope:
         """
         ...
 
+    def with_step(self, entry: StepWithQuotes) -> CalibrationEnvelope:
+        """Append one step to a new calibration envelope in execution order.
+
+        Parameters
+        ----------
+        entry : StepWithQuotes
+            Native step and its inline quotes. An empty list can reference
+            a quote set already registered on this envelope.
+
+        Returns
+        -------
+        CalibrationEnvelope
+            Independent envelope with the appended step and existing settings.
+
+        Raises
+        ------
+        ValueError
+            If step or market input identifiers are blank or duplicated, or
+            the entry tries to define an existing quote set again.
+        """
+        ...
+    def without_quote(self, quote_id: str) -> CalibrationEnvelope:
+        """Remove a quote and every reference to it from a derived envelope.
+
+        Parameters
+        ----------
+        quote_id : str
+            Exact identifier of a quoted calibration observation.
+
+        Returns
+        -------
+        CalibrationEnvelope
+            Independent envelope with matching quote-set references removed.
+
+        Raises
+        ------
+        ValueError
+            If the ID is unknown or names a non-quote market observation.
+        """
+        ...
+    def bump_quotes_bp(self, bp: float, *, quote_set: str | None = None) -> CalibrationEnvelope:
+        """Apply signed basis points to rates and spreads in a derived envelope.
+
+        Parameters
+        ----------
+        bp : float
+            Finite shock in basis points. A positive basis point adds 0.0001
+            to a decimal rate, subtracts 0.01 from a rate-futures price, or
+            adds one to a spread already quoted in basis points.
+        quote_set : str, optional
+            Exact name of a quote set. The default selects all quotes once.
+
+        Returns
+        -------
+        CalibrationEnvelope
+            Independent envelope with the selected quotes shifted.
+
+        Raises
+        ------
+        ValueError
+            For nonfinite shocks, unknown sets or references, or selected
+            entries without a rate or spread bump basis, such as volatility
+            and upfront credit quotes.
+        """
+        ...
     def __init__(
         self,
         plan: CalibrationPlan,
