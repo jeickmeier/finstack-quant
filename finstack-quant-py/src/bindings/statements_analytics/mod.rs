@@ -152,6 +152,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "VarianceConfig",
             "VarianceReport",
             "VarianceRow",
+            "EclScenario",
+            "EclScenarioOutcome",
             "WeightedEclResult",
             "add_ncf_buildup",
             "add_noi_buildup",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
@@ -86,31 +87,32 @@ def test_classify_then_measure_workflow() -> None:
 
 def test_compute_ecl_weighted_validates_scenario_weights() -> None:
     """Weighted ECL rejects malformed scenario probabilities from Rust."""
-    from finstack_quant.statements_analytics import compute_ecl_weighted
+    from finstack_quant.statements_analytics import EclScenario, compute_ecl_weighted
 
     scenarios = [
-        (0.75, [(0.0, 0.0), (1.0, 0.02)]),
-        (0.20, [(0.0, 0.0), (1.0, 0.05)]),
+        EclScenario(id="base", weight="0.75", pd_schedule=[(0.0, 0.0), (1.0, 0.02)]),
+        EclScenario(id="downside", weight="0.20", pd_schedule=[(0.0, 0.0), (1.0, 0.05)]),
     ]
 
-    with pytest.raises(ValueError, match=r"[Ss]cenario weights must sum to 1\.0"):
+    with pytest.raises(ValueError, match=r"(?i)probabilities must sum"):
         compute_ecl_weighted(_exposure(), scenarios, "stage1")
 
 
 def test_compute_ecl_weighted_preserves_public_error_mapping() -> None:
     """Missing scenarios and PD schedules remain public ValueError failures."""
-    from finstack_quant.statements_analytics import compute_ecl_weighted
+    from finstack_quant.statements_analytics import EclScenario, compute_ecl_weighted
 
     with pytest.raises(ValueError, match="At least one scenario is required for weighted ECL"):
         compute_ecl_weighted(_exposure(), [], "stage1")
 
-    with pytest.raises(ValueError, match="At least two data points are required"):
-        compute_ecl_weighted(_exposure(), [(1.0, [])], "stage1")
+    incomplete = compute_ecl_weighted(_exposure(), [EclScenario(id="absent", weight="1")], "stage1")
+    assert incomplete.ecl is None
+    assert incomplete.scenario_breakdown[0].id == "absent"
 
 
 def test_compute_ecl_weighted_returns_probability_weighted_ecl() -> None:
     """Weighted ECL binding delegates the scenario aggregation to Rust."""
-    from finstack_quant.statements_analytics import compute_ecl, compute_ecl_weighted
+    from finstack_quant.statements_analytics import EclScenario, compute_ecl, compute_ecl_weighted
 
     base_curve = [(0.0, 0.0), (1.0, 0.02)]
     downside_curve = [(0.0, 0.0), (1.0, 0.05)]
@@ -118,20 +120,27 @@ def test_compute_ecl_weighted_returns_probability_weighted_ecl() -> None:
 
     base = compute_ecl(exposure, base_curve, "stage1").ecl
     downside = compute_ecl(exposure, downside_curve, "stage1").ecl
-    weighted = compute_ecl_weighted(exposure, [(0.70, base_curve), (0.30, downside_curve)], "stage1")
+    weighted = compute_ecl_weighted(
+        exposure,
+        [
+            EclScenario(id="base", weight="0.70", pd_schedule=base_curve),
+            EclScenario(id="downside", weight="0.30", pd_schedule=downside_curve),
+        ],
+        "stage1",
+    )
 
     assert weighted.ecl == pytest.approx(0.70 * base + 0.30 * downside, rel=1e-12)
     assert len(weighted.scenario_breakdown) == 2
-    assert [w for _, w, _ in weighted.scenario_breakdown] == pytest.approx([0.70, 0.30])
+    assert [row.weight for row in weighted.scenario_breakdown] == [Decimal("0.70"), Decimal("0.30")]
 
 
 def test_weighted_result_exposes_bucket_audit_trail() -> None:
     """``WeightedEclResult`` carries the per-scenario bucket table."""
-    from finstack_quant.statements_analytics import WeightedEclResult, compute_ecl_weighted
+    from finstack_quant.statements_analytics import EclScenario, WeightedEclResult, compute_ecl_weighted
 
     result = compute_ecl_weighted(
         _exposure(remaining_maturity_years=2.0),
-        [(1.0, [(0.0, 0.0), (2.0, 0.04)])],
+        [EclScenario(id="base", weight="1", pd_schedule=[(0.0, 0.0), (2.0, 0.04)])],
         stage="stage2",
     )
     frame = result.to_dataframe()
@@ -139,7 +148,8 @@ def test_weighted_result_exposes_bucket_audit_trail() -> None:
     assert not frame.empty
     assert frame["ecl"].sum() == pytest.approx(result.ecl)
 
-    scenario_result = result.scenario_breakdown[0][2]
+    scenario_result = result.scenario_breakdown[0].result
+    assert scenario_result is not None
     assert scenario_result.buckets
     assert scenario_result.buckets[0].ead > 0.0
     assert WeightedEclResult.from_json(result.to_json()).ecl == pytest.approx(result.ecl)
@@ -155,9 +165,9 @@ def test_compute_ecl_prices_undrawn_commitment() -> None:
     assert revolver == pytest.approx(1.5 * drawn, rel=1e-9)
 
 
-def test_compute_ecl_weighted_anchors_unanchored_schedules() -> None:
-    """Both ECL entry points accept schedules without an explicit (0, 0) knot."""
-    from finstack_quant.statements_analytics import compute_ecl, compute_ecl_weighted
+def test_compute_ecl_weighted_requires_the_authored_anchor() -> None:
+    """Named scenarios require the explicit (0, 0) knot."""
+    from finstack_quant.statements_analytics import EclScenario, compute_ecl, compute_ecl_weighted
 
     anchored = [(0.0, 0.0), (1.0, 0.02)]
     unanchored = [(1.0, 0.02)]
@@ -166,9 +176,8 @@ def test_compute_ecl_weighted_anchors_unanchored_schedules() -> None:
     assert compute_ecl(exposure, unanchored, "stage1").ecl == pytest.approx(
         compute_ecl(exposure, anchored, "stage1").ecl
     )
-    assert compute_ecl_weighted(exposure, [(1.0, unanchored)], "stage1").ecl == pytest.approx(
-        compute_ecl_weighted(exposure, [(1.0, anchored)], "stage1").ecl
-    )
+    with pytest.raises(ValueError, match=r"(?i)anchor|start"):
+        compute_ecl_weighted(exposure, [EclScenario(id="base", weight="1", pd_schedule=unanchored)], "stage1")
 
 
 def test_compute_ecl_ead_schedule_reduces_lifetime_ecl() -> None:
@@ -228,6 +237,7 @@ def test_compute_ecl_requires_stage_and_honours_custom_staging_policy() -> None:
     is a ``TypeError`` rather than a silent ``StagingConfig()`` classification.
     """
     from finstack_quant.statements_analytics import (
+        EclScenario,
         Stage,
         StagingConfig,
         classify_stage,
@@ -242,7 +252,7 @@ def test_compute_ecl_requires_stage_and_honours_custom_staging_policy() -> None:
     with pytest.raises(TypeError):
         compute_ecl(exposure, schedule)  # type: ignore[call-arg]
     with pytest.raises(TypeError):
-        compute_ecl_weighted(exposure, [(1.0, schedule)])  # type: ignore[call-arg]
+        compute_ecl_weighted(exposure, [EclScenario(id="base", weight="1", pd_schedule=[(0.0, 0.0), *schedule])])  # type: ignore[call-arg]
 
     assert classify_stage(exposure).stage is Stage.Stage2
     stage = classify_stage(exposure, lenient).stage
@@ -250,7 +260,9 @@ def test_compute_ecl_requires_stage_and_honours_custom_staging_policy() -> None:
     lenient_ecl = compute_ecl(exposure, schedule, stage)
     assert lenient_ecl.stage is Stage.Stage1
     assert lenient_ecl.ecl == pytest.approx(8742.732176751271, rel=1e-12)
-    assert compute_ecl_weighted(exposure, [(1.0, schedule)], stage).ecl == pytest.approx(lenient_ecl.ecl)
+    assert compute_ecl_weighted(
+        exposure, [EclScenario(id="base", weight="1", pd_schedule=[(0.0, 0.0), *schedule])], stage
+    ).ecl == pytest.approx(lenient_ecl.ecl)
 
 
 def test_exposure_counters_default_from_rust() -> None:

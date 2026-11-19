@@ -157,8 +157,8 @@ test('statements_analytics matches the cross-host golden', () => {
       weighted: sa.computeEclWeighted(
         exposure,
         [
-          [0.6, schedule],
-          [0.4, stressed],
+          { id: 'base', weight: '0.6', pd_schedule: schedule },
+          { id: 'stress', weight: '0.4', pd_schedule: stressed },
         ],
         'stage2'
       ).ecl,

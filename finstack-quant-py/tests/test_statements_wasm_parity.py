@@ -344,7 +344,14 @@ def analytics_cases() -> dict[str, Any]:
             "stage": sa.classify_stage(exposure).stage.value,
             "single": sa.compute_ecl(exposure, schedule, stage="stage1").ecl,
             "lifetime": sa.compute_ecl(exposure, schedule, stage="stage2").ecl,
-            "weighted": sa.compute_ecl_weighted(exposure, [(0.6, schedule), (0.4, stressed)], stage="stage2").ecl,
+            "weighted": sa.compute_ecl_weighted(
+                exposure,
+                [
+                    sa.EclScenario(id="base", weight="0.6", pd_schedule=schedule),
+                    sa.EclScenario(id="stress", weight="0.4", pd_schedule=stressed),
+                ],
+                stage="stage2",
+            ).ecl,
         },
         "dcf": {
             "enterprise_value": float(dcf.enterprise_value.amount),

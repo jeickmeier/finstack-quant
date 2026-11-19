@@ -149,12 +149,12 @@ fn cecl_engine_rejects_invalid_pd_source_weights() {
     let curve = bbb_curve();
     let s1 = MacroScenario {
         id: "base".to_string(),
-        weight: 0.5,
+        weight: finstack_quant_core::wire::DecimalWire("0.5".parse().unwrap()),
         lgd_override: None,
     };
     let s2 = MacroScenario {
         id: "downside".to_string(),
-        weight: 0.3, // sums to 0.8, not 1.0
+        weight: finstack_quant_core::wire::DecimalWire("0.3".parse().unwrap()), // sums to 0.8, not 1.0
         lgd_override: None,
     };
     let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![
@@ -189,7 +189,7 @@ fn cecl_impaired_dpd_uses_lgd_ead_shortcut() {
     let curve = bbb_curve();
     let scenario = MacroScenario {
         id: "base".to_string(),
-        weight: 1.0,
+        weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
         lgd_override: None,
     };
     let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -219,7 +219,7 @@ fn cecl_discount_toggle_controls_expected_loss_discounting() {
     let curve = bbb_curve();
     let scenario = MacroScenario {
         id: "base".to_string(),
-        weight: 1.0,
+        weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
         lgd_override: None,
     };
     let discounted_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -256,7 +256,7 @@ fn cecl_linear_reversion_does_not_query_forecast_after_rs_horizon() {
     };
     let scenario = MacroScenario {
         id: "base".to_string(),
-        weight: 1.0,
+        weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
         lgd_override: None,
     };
     let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -286,7 +286,7 @@ fn cecl_impaired_still_validates_pd_curve_rating() {
     let wrong_curve = RawPdCurve::new("AAA", vec![(0.0, 0.0), (1.0, 0.005), (5.0, 0.02)]).unwrap();
     let scenario = MacroScenario {
         id: "base".to_string(),
-        weight: 1.0,
+        weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
         lgd_override: None,
     };
     let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -326,7 +326,7 @@ fn amortizing_ead_schedule_reduces_lifetime_ecl_in_ifrs9_and_cecl() {
     // CECL (always lifetime)
     let scenario = MacroScenario {
         id: "base".to_string(),
-        weight: 1.0,
+        weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
         lgd_override: None,
     };
     let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -423,7 +423,7 @@ fn impaired_full_loss_is_not_discounted_and_delayed_recovery_increases_loss() {
     exp.days_past_due = 90;
     let scenario = MacroScenario {
         id: "base".into(),
-        weight: 1.0,
+        weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
         lgd_override: None,
     };
     let engine = CeclEngine::new(CeclConfig::default(), vec![(&scenario, &curve)]).unwrap();
@@ -462,7 +462,7 @@ fn ecl_rejects_non_finite_curves_and_configs() {
         );
         let scenario = MacroScenario {
             id: "base".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: Some(invalid),
         };
         assert!(CeclEngine::new(CeclConfig::default(), vec![(&scenario, &bbb_curve())]).is_err());

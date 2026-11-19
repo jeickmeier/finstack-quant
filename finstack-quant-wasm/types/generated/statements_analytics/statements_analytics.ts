@@ -632,6 +632,31 @@ export type PositiveF64Wire = number;
  */
 export type Stage = "stage1" | "stage2" | "stage3";
 /**
+ * Availability of one scenario allowance.
+ */
+export type EclScenarioMeasurement =
+  | {
+      status: "zero_weight";
+    }
+  | {
+      /**
+       * Complete same-basis allowance from the admitted PD and LGD.
+       */
+      result: EclResult;
+      status: "measured";
+      /**
+       * Weighted contribution to the total on the same basis.
+       */
+      weighted_allowance: number;
+    }
+  | {
+      /**
+       * Explanation of the required source evidence that is missing.
+       */
+      reason: string;
+      status: "unavailable";
+    };
+/**
  * An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
  * otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
  *
@@ -3482,6 +3507,50 @@ export interface ToleranceConfig {
   generic_epsilon?: PositiveF64Wire;
 }
 /**
+ * Named cumulative-PD and LGD assumptions with an exact scenario probability.
+ */
+export interface EclScenario {
+  /**
+   * Nonempty scenario identifier, distinct within one scenario set.
+   */
+  id: string;
+  /**
+   * Elected nonnegative loss fraction in [0, 1] for this scenario.
+   */
+  lgd_override?: number | null;
+  /**
+   * Ordered year and cumulative PD observations from valuation.
+   * Omit when the scenario evidence is missing. An explicitly present
+   * schedule must cover the measurement horizon.
+   */
+  pd_schedule?: [number, number][] | null;
+  /**
+   * Exact decimal probability in [0, 1]; the admitted set sums to one.
+   */
+  weight: DecimalWire;
+}
+/**
+ * A scenario weight and its measured or unavailable allowance.
+ */
+export interface EclScenarioOutcome {
+  /**
+   * Explicit scenario identity in the portfolio policy's declared order.
+   */
+  id: string;
+  /**
+   * Elected scenario LGD override as a decimal fraction.
+   */
+  lgd_override?: number | null;
+  /**
+   * Underlying reserve calculation and status.
+   */
+  measurement: EclScenarioMeasurement;
+  /**
+   * Exact scenario probability as supplied, including any zero-weight rows.
+   */
+  weight: DecimalWire;
+}
+/**
  * Verifies that the effective tax rate (tax expense / pretax income) falls within an expected range.
  */
 export interface EffectiveTaxRateCheck {
@@ -5502,26 +5571,25 @@ export interface WaccInputs {
  */
 export interface WeightedEclResult {
   /**
-   * Probability-weighted ECL.
+   * Aggregate allowance, absent when any positive-probability scenario is missing.
    */
-  ecl: number;
+  ecl?: number | null;
   /**
    * Exposure identifier.
    */
   exposure_id: string;
   /**
-   * Audit stamp: numeric mode, rounding context, and FX policy in force.
+   * Numeric and reporting provenance of the complete or partial calculation.
    */
   meta?: ResultsMeta;
   /**
-   * Per-scenario breakdown: (scenario_id, weight, result).
+   * Elected scenarios in caller order, including zero-weight entries.
    */
-  scenario_breakdown: [string, number, EclResult][];
+  scenario_breakdown: EclScenarioOutcome[];
   /**
-   * Assigned IFRS 9 stage.
+   * Assigned impairment stage.
    */
   stage: Stage;
-  [k: string]: unknown;
 }
 /**
  * Verifies that the change in working capital on the cash flow statement equals the negative delta of net working capital on the balance sheet.

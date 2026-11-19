@@ -277,7 +277,7 @@ For impairment, use the shared physical PD assumptions, quarterly cumulative-PD 
 
 {/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="staged-borrower-ecl" role="build" */}
 ```python exec id=staged-borrower-ecl role=build
-from finstack_quant.statements_analytics import Exposure, StagingConfig, QualitativeFlags, classify_stage, compute_ecl, compute_ecl_weighted
+from finstack_quant.statements_analytics import EclScenario, Exposure, StagingConfig, QualitativeFlags, classify_stage, compute_ecl, compute_ecl_weighted
 
 ead43 = credit_data["loan"]["holding_notional"]
 eir43, maturity43, lgd43 = 0.075,5.0,credit_data["credit"]["base"]["lgd"]
@@ -296,13 +296,26 @@ for exposure in [performing_comparator,watched_borrower,defaulted_comparator]:
 base_ecl = compute_ecl(performing_comparator,physical_schedules["base"],stage="stage1",bucket_width_years=0.25)
 lifetime_ecl = compute_ecl(watched_borrower,physical_schedules["base"],stage="stage2",bucket_width_years=0.25)
 manual_stage1 = sum((physical_schedules["base"][i+1][1]-physical_schedules["base"][i][1])*ead43*lgd43/(1+eir43)**((quarterly_times[i]+quarterly_times[i+1])/2) for i in range(4))
-scenario_weights = {"base":0.60,"downside":0.25,"severe":0.15}
-weighted_native = compute_ecl_weighted(watched_borrower,[(scenario_weights[name],physical_schedules[name]) for name in scenario_weights],stage="stage2",bucket_width_years=0.25)
-manual_weighted = sum(weight*compute_ecl(watched_borrower,physical_schedules[name],stage="stage2",bucket_width_years=0.25).ecl for name,weight in scenario_weights.items())
-joint_pd_lgd_ecl = 0.0
-for name,weight in scenario_weights.items():
-    exposure = Exposure(id=name,ead=ead43,lgd=credit_data["credit"][name]["lgd"],eir=eir43,remaining_maturity_years=maturity43,current_pd=physical_schedules[name][-1][1],origination_pd=base_lifetime_pd)
-    joint_pd_lgd_ecl += weight*compute_ecl(exposure,physical_schedules[name],stage="stage2",bucket_width_years=0.25).ecl
+scenario_weights = {"base":"0.60","downside":"0.25","severe":"0.15"}
+fixed_lgd_scenarios = [
+    EclScenario(id=name, weight=weight, pd_schedule=physical_schedules[name])
+    for name, weight in scenario_weights.items()
+]
+joint_scenarios = [
+    EclScenario(
+        id=name,
+        weight=weight,
+        pd_schedule=physical_schedules[name],
+        lgd_override=credit_data["credit"][name]["lgd"],
+    )
+    for name, weight in scenario_weights.items()
+]
+weighted_native = compute_ecl_weighted(watched_borrower, fixed_lgd_scenarios, stage="stage2", bucket_width_years=0.25)
+joint_native = compute_ecl_weighted(watched_borrower, joint_scenarios, stage="stage2", bucket_width_years=0.25)
+joint_pd_lgd_ecl = joint_native.ecl
+assert weighted_native.ecl is not None and joint_pd_lgd_ecl is not None
+assert joint_pd_lgd_ecl > weighted_native.ecl
+assert all(row.status == "measured" for row in joint_native.scenario_breakdown)
 stage3_ecl = compute_ecl(defaulted_comparator,physical_schedules["base"],stage="stage3",stage3_time_to_recovery_years=1.0)
 print("Stage1 / lifetime / fixed-LGD weighted lifetime / joint PD-LGD weighted lifetime / Stage3 ECL USD:",base_ecl.ecl,lifetime_ecl.ecl,weighted_native.ecl,joint_pd_lgd_ecl,stage3_ecl.ecl)
 print(base_ecl.to_dataframe().to_string(index=False))

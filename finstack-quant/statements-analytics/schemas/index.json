@@ -235,6 +235,24 @@
       "type_name": "EclConfig"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_scenario.schema.json",
+      "bytes": 2023,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/ecl_scenario.schema.json",
+      "summary": "Named cumulative-PD and LGD assumptions with an exact scenario probability.",
+      "title": "EclScenario",
+      "type_name": "EclScenario"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_scenario_outcome.schema.json",
+      "bytes": 14130,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/ecl_scenario_outcome.schema.json",
+      "summary": "A scenario weight and its measured or unavailable allowance.",
+      "title": "EclScenarioOutcome",
+      "type_name": "EclScenarioOutcome"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/effective_tax_rate_check.schema.json",
       "bytes": 2439,
       "kind": "component",
@@ -569,7 +587,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/weighted_ecl_result.schema.json",
-      "bytes": 12356,
+      "bytes": 15665,
       "kind": "output",
       "path": "schemas/statements_analytics/1/weighted_ecl_result.schema.json",
       "summary": "Probability-weighted ECL across macro scenarios with the per-scenario audit trail.",

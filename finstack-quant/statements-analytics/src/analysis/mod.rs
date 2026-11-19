@@ -94,9 +94,10 @@ pub use checks::{
 
 pub use ecl::{
     CeclConfig, CeclEngine, CeclMethodology, CeclResult, DEFAULT_REVOLVER_CCF, EclBucket,
-    EclConfig, EclConfigBuilder, EclResult, Exposure, LgdType, MacroScenario, PdTermStructure,
-    QualitativeFlags, RatingPdMap, RawPdCurve, ReversionMethod, Stage, StageResult, StagingConfig,
-    StagingTrigger, WeightedEclResult, classify_stage, classify_stage_from_curves, compute_ecl,
+    EclConfig, EclConfigBuilder, EclResult, EclScenario, EclScenarioMeasurement,
+    EclScenarioOutcome, Exposure, LgdType, MacroScenario, PdTermStructure, QualitativeFlags,
+    RatingPdMap, RawPdCurve, ReversionMethod, Stage, StageResult, StagingConfig, StagingTrigger,
+    WeightedEclResult, classify_stage, classify_stage_from_curves, compute_ecl,
     compute_ecl_from_curve, compute_ecl_weighted, compute_ecl_weighted_from_curves,
 };
 

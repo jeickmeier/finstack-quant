@@ -558,6 +558,7 @@
     "ead_schedule": null
   },
   "pd_schedule": [
+    [0.0, 0.0],
     [
       1.0,
       0.02

@@ -66,8 +66,9 @@ use crate::{
     analysis::DcfSensitivityGridResult, analysis::DcfSensitivityGridSpec,
     analysis::DcfSensitivityResult, analysis::DcfSensitivityShocks, analysis::DcfShockReport,
     analysis::DependencyTree, analysis::DepreciationReconciliation,
-    analysis::DividendReconciliation, analysis::EclConfig, analysis::EffectiveTaxRateCheck,
-    analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
+    analysis::DividendReconciliation, analysis::EclConfig, analysis::EclScenario,
+    analysis::EclScenarioOutcome, analysis::EffectiveTaxRateCheck, analysis::Explanation,
+    analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GoalSeekSpec, analysis::GrowthRateConsistency,
     analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboResult,
     analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
@@ -587,6 +588,22 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "wacc_inputs",
         Input,
         "Capital-structure inputs of a weighted-average cost of capital calculation."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        EclScenario,
+        "statements_analytics",
+        "ecl_scenario",
+        Input,
+        "Named cumulative-PD and LGD assumptions with an exact scenario probability."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        EclScenarioOutcome,
+        "statements_analytics",
+        "ecl_scenario_outcome",
+        Output,
+        "A scenario weight and its measured or unavailable allowance."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

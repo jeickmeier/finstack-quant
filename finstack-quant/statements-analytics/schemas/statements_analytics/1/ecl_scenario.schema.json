@@ -1,0 +1,59 @@
+{
+  "$defs": {
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_scenario.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Named cumulative-PD and LGD assumptions with an exact scenario probability.",
+  "properties": {
+    "id": {
+      "description": "Nonempty scenario identifier, distinct within one scenario set.",
+      "type": "string"
+    },
+    "lgd_override": {
+      "description": "Elected nonnegative loss fraction in [0, 1] for this scenario.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "pd_schedule": {
+      "description": "Ordered year and cumulative PD observations from valuation.\nOmit when the scenario evidence is missing. An explicitly present\nschedule must cover the measurement horizon.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "format": "double",
+            "type": "number"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "weight": {
+      "$ref": "#/$defs/DecimalWire",
+      "description": "Exact decimal probability in [0, 1]; the admitted set sums to one."
+    }
+  },
+  "required": [
+    "id",
+    "weight"
+  ],
+  "title": "EclScenario",
+  "type": "object"
+}

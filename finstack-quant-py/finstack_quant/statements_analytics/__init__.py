@@ -162,6 +162,8 @@ StagingConfig = _sa.StagingConfig
 TerminalValueSpec = _sa.TerminalValueSpec
 ThreeStatementMapping = _sa.ThreeStatementMapping
 ValuationDiscounts = _sa.ValuationDiscounts
+EclScenario = _sa.EclScenario
+EclScenarioOutcome = _sa.EclScenarioOutcome
 WeightedEclResult = _sa.WeightedEclResult
 pl_summary_report = _sa.pl_summary_report
 
@@ -195,6 +197,8 @@ __all__: list[str] = [
     "DimensionScore",
     "EclBucket",
     "EclResult",
+    "EclScenario",
+    "EclScenarioOutcome",
     "EquityBridge",
     "Explanation",
     "ExplanationStep",

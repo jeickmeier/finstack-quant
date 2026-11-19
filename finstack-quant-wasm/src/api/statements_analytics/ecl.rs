@@ -105,28 +105,22 @@ pub fn compute_ecl(
     to_js_value(&result)
 }
 
-/// Probability-weighted expected credit loss across macro scenarios.
-///
-/// Twin of Python and Rust `compute_ecl_weighted`. Classify with
-/// `classifyStage` first and pass its `stage`.
-/// @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
-/// @param scenarios - `[weight, schedule]` pairs whose weights sum to `1.0`; each schedule holds `[timeYears, cumulativePd]` knots ascending in time and non-decreasing in PD.
-/// @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).
-/// @param bucketWidthYears - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
-/// @param stage3TimeToRecoveryYears - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
-/// @returns `WeightedEclResult`: the probability-weighted ECL in the exposure's currency units and one `scenario_breakdown` entry per scenario.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if an input is malformed, `scenarios` is
-/// empty, the weights do not sum to `1.0`, `stage` is not a stage name, a
-/// schedule violates the cumulative-PD invariants, or the exposure fails
-/// validation.
+/// Measure ECL under named, jointly weighted macroeconomic scenarios.
+/// @param exposure - Credit exposure whose allowance will be calculated.
+/// @param scenarios - Unique scenario identifiers, exact decimal weights summing to one,
+///   optional cumulative-PD schedules anchored at (0,0), and optional LGD fractions.
+/// @param stage - Already resolved IFRS 9 impairment stage.
+/// @param bucketWidthYears - Integration width in years, defaulting to the Rust policy.
+/// @param stage3TimeToRecoveryYears - Elected discount horizon for Stage 3 recovery.
+/// @returns Scenario evidence and total allowance. The total is null if required evidence is unavailable.
+/// @throws Validation error for invalid exposure, stage, scenario weights, or supplied PD or LGD data.
 #[wasm_bindgen(js_name = computeEclWeighted, unchecked_return_type = "generated.statements_analytics.WeightedEclResult")]
 pub fn compute_ecl_weighted(
     #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.Exposure | string")]
     exposure: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "[number, [number, number][]][] | string")]
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly generated.statements_analytics.EclScenario[] | string"
+    )]
     scenarios: JsValue,
     #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.Stage")] stage: JsValue,
     #[wasm_bindgen(
@@ -141,7 +135,7 @@ pub fn compute_ecl_weighted(
     stage3_time_to_recovery_years: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let exposure: ecl::Exposure = from_js_json(&exposure, "exposure")?;
-    let scenarios: Vec<(f64, Vec<(f64, f64)>)> = from_js_json(&scenarios, "scenarios")?;
+    let scenarios: Vec<ecl::EclScenario> = from_js_json(&scenarios, "scenarios")?;
     let result = ecl::compute_ecl_weighted(
         &exposure,
         js_wire::<ecl::Stage>(&stage, "stage")?,

@@ -1,8 +1,9 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/statements_analytics/ecl.rs``."""
 
 from __future__ import annotations
+from decimal import Decimal
 
-from typing import Any, ClassVar
+from typing import Any, Literal, ClassVar
 import pandas as pd
 
 class EclBucket:
@@ -1221,6 +1222,158 @@ class StagingConfig:
         ValueError: ...
         """
 
+class EclScenario:
+    """Named cumulative-PD curve and optional scenario-specific LGD.
+
+    Examples
+    --------
+    >>> from decimal import Decimal
+    >>> from finstack_quant.statements_analytics import EclScenario
+    >>> downside = EclScenario(
+    ...     id="downside",
+    ...     weight=Decimal("0.2"),
+    ...     pd_schedule=[(0.0, 0.0), (1.0, 0.08)],
+    ...     lgd_override=0.55,
+    ... )
+    >>> isinstance(downside, EclScenario)
+    True
+    """
+
+    def __init__(
+        self,
+        *,
+        id: str,
+        weight: Decimal | str,
+        pd_schedule: list[tuple[float, float]] | None = None,
+        lgd_override: float | None = None,
+    ) -> None:
+        """Author the joint scenario inputs used by the Rust measurement engine.
+
+        Parameters
+        ----------
+        id : str
+            Unique nonempty identifier within the elected scenario set.
+        weight : Decimal or str
+            Exact decimal probability in [0, 1]. The request weights must sum exactly to one.
+        pd_schedule : list of pairs or None
+            Sorted year and cumulative default probability pairs. Start at (0, 0)
+            and cover the selected horizon. None records absent evidence.
+        lgd_override : float or None
+            Scenario loss fraction in [0, 1]. None uses the exposure's LGD.
+
+        Raises
+        ------
+        ValueError
+            If the weight has invalid decimal syntax or cannot be represented exactly.
+        TypeError
+            If the weight or schedule is given in an unsupported host type.
+        """
+        ...
+
+class EclScenarioOutcome:
+    """One authored scenario, its exact weight, and its allowance evidence.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import EclScenarioOutcome
+    >>> hasattr(EclScenarioOutcome, "status")
+    True
+    """
+
+    @property
+    def id(self) -> str:
+        """Get the scenario's unique request identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Same identifier that was supplied in the request.
+        """
+        ...
+
+    @property
+    def weight(self) -> Decimal:
+        """Get the exact scenario probability.
+
+        Returns
+        -------
+        Decimal
+            Decimal probability from the authored scenario set.
+
+        Raises
+        ------
+        ImportError
+            If the standard decimal module is unavailable.
+        """
+        ...
+
+    @property
+    def lgd_override(self) -> float | None:
+        """Get the scenario's elected LGD override.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float or None
+            Loss fraction in [0, 1], or None when the exposure LGD applies.
+        """
+        ...
+
+    @property
+    def status(self) -> Literal["measured", "unavailable", "zero_weight"]:
+        """Identify this scenario’s appraisal status.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Literal["measured", "unavailable", "zero_weight"]
+            The measured, unavailable or zero-weight state.
+        """
+        ...
+
+    @property
+    def result(self) -> EclResult | None:
+        """Get the reserve calculation and dated buckets.
+
+        This property does not raise.
+
+        Returns
+        -------
+        EclResult | None
+            The scenario calculation, or None when no measurement was made.
+        """
+        ...
+
+    @property
+    def weighted_allowance(self) -> float | None:
+        """Get the scenario’s contribution to the total reserve.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            Allowance in exposure currency, zero for zero-weight rows, or None if unavailable.
+        """
+        ...
+
+    @property
+    def reason(self) -> str | None:
+        """Identify the evidence missing from this scenario.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Explanation for an unavailable row, or None otherwise.
+        """
+        ...
+
 class WeightedEclResult:
     """Probability-weighted ECL across macro scenarios with the per-scenario
     audit trail.
@@ -1268,28 +1421,28 @@ class WeightedEclResult:
             Stage used for the measurement horizon.
         """
     @property
-    def ecl(self) -> float:
+    def ecl(self) -> float | None:
         """
-        Probability-weighted ECL in the exposure's base currency.
+        Probability-weighted ECL in exposure currency when all required evidence is present.
 
         This property does not raise.
 
         Returns
         -------
-        float
-            Probability-weighted ECL in the exposure's base currency.
+        float or None
+            Probability-weighted ECL in exposure currency when all required evidence is present, or None when a positive-weight scenario is unavailable.
         """
     @property
-    def scenario_breakdown(self) -> list[tuple[str, float, EclResult]]:
+    def scenario_breakdown(self) -> list[EclScenarioOutcome]:
         """
-        Per-scenario ``(scenario_id, weight, EclResult)`` triples.
+        Named scenarios in request order, including rows with missing or zero-weight evidence.
 
         This property does not raise.
 
         Returns
         -------
-        list[tuple[str, float, EclResult]]
-            Per-scenario ``(scenario_id, weight, EclResult)`` triples.
+        list[EclScenarioOutcome]
+            Named scenarios in request order, including rows with missing or zero-weight evidence.
         """
     @property
     def meta(self) -> Any:
@@ -1307,7 +1460,7 @@ class WeightedEclResult:
         """
         Export the scenario x bucket audit trail as a pandas ``DataFrame``.
 
-        Columns: ``scenario`` (scenario id), ``weight`` (decimal probability),
+        Columns: ``scenario`` (scenario id), ``weight`` (decimal probability string),
         ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals),
         ``ead``, ``ecl`` (base currency, unweighted per scenario),
         ``discount_factor``. One row per (scenario, bucket).
@@ -1315,7 +1468,7 @@ class WeightedEclResult:
         Returns
         -------
         pd.DataFrame
-            Export the scenario x bucket audit trail as a pandas ``DataFrame``. Columns: ``scenario`` (scenario id), ``weight`` (decimal probability), ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals), ``ead``, ``ecl`` (base currency, unweighted per scenario), ``discount_factor``. One row per (scenario, bucket).
+            Export the scenario x bucket audit trail as a pandas ``DataFrame``. Columns: ``scenario`` (scenario id), ``weight`` (decimal probability string), ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals), ``ead``, ``ecl`` (base currency, unweighted per scenario), ``discount_factor``. One row per (scenario, bucket).
 
         Raises
         ------
@@ -1480,7 +1633,7 @@ def compute_ecl(
 
 def compute_ecl_weighted(
     exposure: Exposure,
-    scenarios: list[tuple[float, list[tuple[float, float]]]],
+    scenarios: list[EclScenario],
     stage: Stage | str,
     bucket_width_years: float | None = None,
     stage3_time_to_recovery_years: float | None = None,
@@ -1491,9 +1644,10 @@ def compute_ecl_weighted(
     ----------
     exposure : Exposure
         The credit exposure to measure (EAD is ``ead + undrawn * ccf``).
-    scenarios : list[tuple[float, list[tuple[float, float]]]]
-        ``(weight, pd_schedule)`` pairs; weights must sum to ``1.0`` and each
-        schedule follows the ``compute_ecl`` conventions.
+    scenarios : list[EclScenario]
+        Unique named scenarios with exact weights summing to one. Positive
+        schedules start at (0, 0) and cover the measurement horizon, and LGD
+        may be elected separately for each scenario.
     stage : Stage | str
         Measurement stage (required); classify first with ``classify_stage``
         under the desk's ``StagingConfig`` and pass ``result.stage``.
@@ -1505,8 +1659,8 @@ def compute_ecl_weighted(
     Returns
     -------
     WeightedEclResult
-        Probability-weighted ``ecl`` with one ``scenario_breakdown`` entry per
-        scenario.
+        Per-scenario allowance evidence and aggregate ECL. The aggregate is
+        None when any positive-weight scenario lacks required evidence.
 
     Raises
     ------
@@ -1516,7 +1670,7 @@ def compute_ecl_weighted(
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import Exposure, compute_ecl_weighted
+    >>> from finstack_quant.statements_analytics import EclScenario, Exposure, compute_ecl_weighted
     >>> exp = Exposure(
     ...     id="loan",
     ...     ead=1_000_000.0,
@@ -1526,7 +1680,10 @@ def compute_ecl_weighted(
     ...     current_pd=0.02,
     ...     origination_pd=0.015,
     ... )
-    >>> scenarios = [(0.7, [(1.0, 0.02)]), (0.3, [(1.0, 0.05)])]
+    >>> scenarios = [
+    ...     EclScenario(id="base", weight="0.7", pd_schedule=[(0.0, 0.0), (1.0, 0.02)]),
+    ...     EclScenario(id="down", weight="0.3", pd_schedule=[(0.0, 0.0), (1.0, 0.05)]),
+    ... ]
     >>> len(compute_ecl_weighted(exp, scenarios, stage="stage1").scenario_breakdown)
     2
     """
