@@ -45,7 +45,8 @@ fn market(as_of: Date) -> MarketContext {
         .build()
         .expect("surface");
     MarketContext::new()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_surface(surface)
         .insert_price(
             "SPX-SPOT",

@@ -30,11 +30,12 @@ fn reference_path(z: &[f64], times: &[f64]) -> Vec<f64> {
             return;
         }
         let mid = (left + right) / 2;
-        let alpha = (times[mid] - times[left]) / (times[right] - times[left]);
-        let mean = out[left] + alpha * (out[right] - out[left]);
-        let variance = ((times[mid] - times[left]) * (times[right] - times[mid]))
-            / (times[right] - times[left]);
-        out[mid] = mean + variance.sqrt() * z[*next_shock];
+        let a = times[mid] - times[left];
+        let b = times[right] - times[mid];
+        let span = times[right] - times[left];
+        let mean = (b / span) * out[left] + (a / span) * out[right];
+        let sd = a.min(b).sqrt() * (a.max(b) / span).sqrt();
+        out[mid] = sd.mul_add(z[*next_shock], mean);
         *next_shock += 1;
         fill_midpoints(left, mid, z, times, out, next_shock);
         fill_midpoints(mid, right, z, times, out, next_shock);
@@ -59,7 +60,7 @@ fn bench_construct_path(c: &mut Criterion) {
             &num_steps,
             |b, _| {
                 // Criterion selects the case before constructing its fixture.
-                let bridge = BrownianBridge::new(num_steps);
+                let bridge = BrownianBridge::new(num_steps).expect("valid bridge");
                 let z = shocks(num_steps);
                 let times: Vec<f64> = (0..=num_steps)
                     .map(|i| i as f64 / num_steps as f64)
@@ -88,7 +89,7 @@ fn bench_construct_path(c: &mut Criterion) {
         BenchmarkId::new("irregular", num_steps),
         &num_steps,
         |b, &num_steps| {
-            let bridge = BrownianBridge::new(num_steps);
+            let bridge = BrownianBridge::new(num_steps).expect("valid bridge");
             let z = shocks(num_steps);
             let times: Vec<f64> = (0..=num_steps)
                 .map(|i| (i * i) as f64 / (num_steps * num_steps) as f64)

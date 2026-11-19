@@ -306,7 +306,9 @@ fn test_pv_at_maturity() {
 #[test]
 fn test_pv_with_flat_curve() {
     let flat_curve = create_flat_discount_curve();
-    let context = create_standard_market_context().insert(flat_curve);
+    let context = create_standard_market_context()
+        .try_insert(flat_curve)
+        .expect("insert market curve");
 
     let collateral = treasury_collateral();
 

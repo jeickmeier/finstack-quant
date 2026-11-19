@@ -96,7 +96,7 @@ impl MertonModel {
         let survivals: Vec<f64> = sorted_tenors
             .iter()
             .map(|&t| {
-                let survival = 1.0 - self.default_probability(t);
+                let survival = 1.0 - self.default_probability(t)?;
                 if survival <= 0.0 {
                     return Err(Error::Validation(format!(
                         "Merton hazard bootstrap: survival is zero at {t:.6}y (default \
@@ -173,7 +173,7 @@ mod tests {
             .expect("hc");
         // Survival at 5Y should match 1 - PD(5)
         let sp5 = hc.sp(5.0).expect("valid sp");
-        let pd5 = m.default_probability(5.0);
+        let pd5 = m.default_probability(5.0).expect("valid model horizon");
         assert!(
             (sp5 - (1.0 - pd5)).abs() < 0.02,
             "sp5={sp5}, 1-pd5={}",
@@ -228,8 +228,8 @@ mod tests {
             finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
                 .expect("valid date");
 
-        let survival_1y = 1.0 - m.default_probability(1.0);
-        let survival_5y = 1.0 - m.default_probability(5.0);
+        let survival_1y = 1.0 - m.default_probability(1.0).expect("valid model horizon");
+        let survival_5y = 1.0 - m.default_probability(5.0).expect("valid model horizon");
         assert!(
             survival_5y > survival_1y,
             "fixture must have increasing survival: 1Y={survival_1y}, 5Y={survival_5y}"

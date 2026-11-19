@@ -963,7 +963,7 @@ mod tests {
         );
         assert!(eval(Function::Sqrt, &[Expr::literal(-4.0)], &mut context).is_nan());
 
-        // clamp: inclusive bounds, NaN-safe, inverted range → NaN (no panic)
+        // Clamp checks finite bounds after propagating missing values.
         let clamp_args =
             |x: f64, lo: f64, hi: f64| [Expr::literal(x), Expr::literal(lo), Expr::literal(hi)];
         assert_eq!(
@@ -978,7 +978,32 @@ mod tests {
             eval(Function::Clamp, &clamp_args(15.0, 0.0, 10.0), &mut context),
             10.0
         );
-        assert!(eval(Function::Clamp, &clamp_args(5.0, 10.0, 0.0), &mut context).is_nan());
+        assert!(
+            evaluate_function(
+                &Function::Clamp,
+                &clamp_args(5.0, 10.0, 0.0),
+                &mut context,
+                None
+            )
+            .is_err()
+        );
+        assert!(
+            eval(
+                Function::Clamp,
+                &clamp_args(f64::NAN, 10.0, 0.0),
+                &mut context
+            )
+            .is_nan()
+        );
+        assert!(
+            evaluate_function(
+                &Function::Clamp,
+                &clamp_args(f64::NAN, f64::INFINITY, 1.0),
+                &mut context,
+                None
+            )
+            .is_err()
+        );
 
         // is_missing: non-finite (NaN or ±inf) → 1, finite → 0
         assert_eq!(

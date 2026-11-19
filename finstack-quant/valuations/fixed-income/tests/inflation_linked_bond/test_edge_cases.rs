@@ -167,7 +167,9 @@ fn test_missing_inflation_data() {
         .build()
         .unwrap();
 
-    let ctx = finstack_quant_core::market_data::context::MarketContext::new().insert(disc);
+    let ctx = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Act & Assert
     let result = ilb.value(&ctx, as_of);
@@ -216,16 +218,19 @@ fn test_extreme_deflation() {
 
     // Extreme deflation scenario
     let index = simple_index("US-CPI-U", d(2025, 1, 2), 100.0, Currency::USD);
-    ctx = ctx.insert_inflation_index(index).insert(
-        finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
-            .base_date(d(2025, 1, 2))
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(InterpStyle::LogLinear)
-            .extrapolation(ExtrapolationPolicy::Flat)
-            .knots([(0.0, 100.0), (2.0, 100.0)])
-            .build()
-            .unwrap(),
-    );
+    ctx = ctx
+        .insert_inflation_index(index)
+        .try_insert(
+            finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
+                .base_date(d(2025, 1, 2))
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
+                .knots([(0.0, 100.0), (2.0, 100.0)])
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
 
     let as_of = d(2025, 1, 2);
 
@@ -249,16 +254,19 @@ fn test_extreme_inflation() {
 
     // Extreme inflation scenario
     let index = simple_index("US-CPI-U", d(2025, 1, 2), 1000.0, Currency::USD);
-    ctx = ctx.insert_inflation_index(index).insert(
-        finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
-            .base_date(d(2025, 1, 2))
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(InterpStyle::LogLinear)
-            .extrapolation(ExtrapolationPolicy::Flat)
-            .knots([(0.0, 1000.0), (2.0, 1000.0)])
-            .build()
-            .unwrap(),
-    );
+    ctx = ctx
+        .insert_inflation_index(index)
+        .try_insert(
+            finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
+                .base_date(d(2025, 1, 2))
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
+                .knots([(0.0, 1000.0), (2.0, 1000.0)])
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
 
     let as_of = d(2025, 1, 2);
 

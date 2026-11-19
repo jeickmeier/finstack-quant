@@ -51,7 +51,9 @@ fn lmm_extreme_zero_shock_step_stays_finite() {
     let process = LmmProcess::new(params);
     let scheme = LmmPredictorCorrector::new();
     let mut work = vec![0.0; scheme.work_size(&process)];
-    scheme.step(&process, 0.0, 0.5, &mut actual, &[0.0; 2], &mut work);
+    scheme
+        .step(&process, 0.0, 0.5, &mut actual, &[0.0; 2], &mut work)
+        .expect("valid simulation step");
     assert!(actual.iter().all(|value| value.is_finite()), "{actual:?}");
     assert_eq!(actual, expected);
 }

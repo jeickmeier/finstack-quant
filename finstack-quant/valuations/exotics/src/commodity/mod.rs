@@ -102,7 +102,7 @@ pub(crate) fn bump_price_curve_pct(
         id: finstack_quant_core::types::CurveId::new(curve_id),
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
-            mode: BumpMode::Additive,
+            mode: BumpMode::Multiplicative,
             units: BumpUnits::Percent,
             value: pct * 100.0,
         },

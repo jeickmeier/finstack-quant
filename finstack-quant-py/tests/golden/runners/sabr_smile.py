@@ -14,13 +14,18 @@ from tests.golden.schema import GoldenFixture
 
 def run(fixture: GoldenFixture) -> dict[str, float]:
     body = fixture.body
+    shift = body.get("shift")
     params = SabrParameters(
         float(body["alpha"]),
         float(body["beta"]),
         float(body["nu"]),
         float(body["rho"]),
+        shift=float(shift) if shift is not None else None,
     )
-    smile = SabrSmile(params, float(body["forward"]), float(body["time_to_expiry"]))
+    quote_type = (
+        "normal" if params.beta == 0.0 else "shifted_black_lognormal" if params.is_shifted() else "black_lognormal"
+    )
+    smile = SabrSmile(params, float(body["forward"]), float(body["time_to_expiry"]), quote_type)
     strikes = body["strikes"]
     keys = [entry["key"] for entry in strikes]
     strike_values = [float(entry["strike"]) for entry in strikes]

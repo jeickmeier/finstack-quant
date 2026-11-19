@@ -27,7 +27,14 @@ def test_base_correlation_stress_and_zero_survive_wire_roundtrip() -> None:
     restored = BaseCorrelationCurve.from_json(curve.to_json())
     assert restored.correlations == [0.0, 1.0, 0.6]
     for detachment in [0.0, 3.0, 7.0, 50.0, 100.0]:
-        assert restored.correlation(detachment) == curve.correlation(detachment)
+        assert restored.get_correlation(detachment) == curve.get_correlation(detachment)
+
+
+@pytest.mark.parametrize("detachment", [-1.0, 300.0, float("nan"), float("inf")])
+def test_base_correlation_rejects_invalid_detachments(detachment: float) -> None:
+    curve = BaseCorrelationCurve("CDX", [(3.0, 0.25), (7.0, 0.45)])
+    with pytest.raises(ValueError, match="detachment"):
+        curve.get_correlation(detachment)
 
 
 def test_sabr_zero_vol_of_vol_preserves_exact_black_cube() -> None:

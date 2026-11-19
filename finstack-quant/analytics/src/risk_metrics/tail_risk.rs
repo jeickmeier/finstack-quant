@@ -303,7 +303,8 @@ pub(crate) fn parametric_var(
         return Ok(f64::NAN);
     }
     let moment = moments(returns, 2)?;
-    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
+    let z =
+        finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence)?;
     horizon_quantile(&moment, &rational(z)?, horizon)
 }
 
@@ -373,7 +374,8 @@ pub(crate) fn cornish_fisher_var(
             "required CF moments are unavailable after admission",
         ));
     };
-    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
+    let z =
+        finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence)?;
     horizon_quantile(&moment, &cf_polynomial(z, skew, kurt, horizon)?, horizon)
 }
 
@@ -486,7 +488,8 @@ mod tests {
     #[test]
     fn valid_cf_matches_the_selected_polynomial() {
         let sample = [-0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05)
+            .expect("valid probability");
         let kurt = 4.5;
         let sd = (0.08_f64 / 9.0).sqrt();
         let expected = sd * (z + (z * z * z - 3.0 * z) * kurt / 24.0);

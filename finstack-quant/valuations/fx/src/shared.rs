@@ -655,8 +655,10 @@ mod tests {
             .expect("valid rate");
         let fx = FxMatrix::new(provider, None);
         MarketContext::new()
-            .insert(discount)
-            .insert(foreign)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(foreign)
+            .expect("insert market curve")
             .insert_surface(vol)
             .insert_fx(fx)
             .insert_price(

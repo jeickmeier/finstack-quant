@@ -14,7 +14,7 @@ import pytest
 
 from finstack_quant.core.dates import DayCount, DayCountContext, Tenor
 from finstack_quant.core.market_data import HazardCurve, VolCube
-from finstack_quant.core.math.stats import realized_variance, realized_variance_ohlc
+from finstack_quant.core.math.stats import log_returns, realized_variance, realized_variance_ohlc
 from finstack_quant.core.types import Bps, Rate
 
 PRICES = [100.0, 101.0, 99.5, 100.2, 102.0]
@@ -25,12 +25,20 @@ CLOSE = [101.0, 99.5, 100.2, 100.6]
 
 
 def test_realized_variance_defaults_are_rust_owned() -> None:
-    assert realized_variance(PRICES) == 0.04341008921510013
-    assert realized_variance(PRICES, 52.0) == 0.008957637457084153
-    assert (
-        realized_variance_ohlc(OPEN[1:], HIGH[1:], LOW[1:], CLOSE[1:], previous_close=CLOSE[0]) == 0.04489594471070698
+    assert realized_variance(PRICES) == pytest.approx(0.04341008921510013, rel=1e-13)
+    assert realized_variance(PRICES, 52.0) == pytest.approx(0.008957637457084153, rel=1e-13)
+    assert realized_variance_ohlc(OPEN[1:], HIGH[1:], LOW[1:], CLOSE[1:], previous_close=CLOSE[0]) == pytest.approx(
+        0.04489594471070698, rel=1e-13
     )
-    assert realized_variance_ohlc(OPEN, HIGH, LOW, CLOSE, "parkinson") == 0.04439216444474536
+    assert realized_variance_ohlc(OPEN, HIGH, LOW, CLOSE, "parkinson") == pytest.approx(0.04439216444474536, rel=1e-13)
+
+
+def test_realized_variance_availability_and_log_domain() -> None:
+    assert realized_variance([100.0]) is None
+    assert realized_variance([100.0, 100.0]) == 0.0
+    assert log_returns([1e-300, 1e300]) == pytest.approx([600 * math.log(10)])
+    with pytest.raises(ValueError, match=r"positive"):
+        log_returns([0.0])
 
 
 def test_rate_family_values_match_wasm() -> None:

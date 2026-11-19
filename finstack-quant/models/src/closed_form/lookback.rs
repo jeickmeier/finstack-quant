@@ -3,6 +3,8 @@
 //! This module provides closed-form solutions for lookback options with continuous monitoring
 //! under the Black-Scholes framework.
 //!
+//! The scalar formulas return NaN for a non-finite input or an undefined Gaussian term.
+//!
 //! # Conventions
 //!
 //! | Parameter | Convention | Units |
@@ -33,7 +35,9 @@
 //! The formulas handle the special case where r = q (rate equals dividend yield) using
 //! L'Hôpital's rule limiting forms to avoid division by zero.
 
-use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf, norm_pdf};
+use crate::gaussian::{log_norm_cdf_or_nan, norm_cdf_or_nan, norm_pdf_or_nan};
+#[cfg(test)]
+use finstack_quant_core::math::special_functions::norm_cdf;
 
 /// Absolute carry threshold for the L'Hôpital limit of the reflection term.
 /// Below this threshold, evaluating the general 0/0 expression loses precision.
@@ -104,22 +108,23 @@ pub fn fixed_strike_lookback_call(
     let d1 = ((spot / strike).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
     let d2 = d1 - vol_sqrt_t;
 
-    let term1 = spot * df_q * norm_cdf(d1);
-    let term2 = -strike * df * norm_cdf(d2);
+    let term1 = spot * df_q * norm_cdf_or_nan(d1);
+    let term2 = -strike * df * norm_cdf_or_nan(d2);
     let term3 = if b.abs() < RATE_EQ_DIV_TOL {
         // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
         let log_ratio = (spot / strike).ln();
         spot * df
-            * (vol * sqrt_t * norm_pdf(d1)
-                + log_ratio * norm_cdf(d1)
-                + 0.5 * vol2 * time * norm_cdf(d1))
+            * (vol * sqrt_t * norm_pdf_or_nan(d1)
+                + log_ratio * norm_cdf_or_nan(d1)
+                + 0.5 * vol2 * time * norm_cdf_or_nan(d1))
     } else {
         let d_corr = d1 - 2.0 * b * sqrt_t / vol;
         // Combine the reflection power and Gaussian tail before exponentiating:
         // separately they can overflow and underflow even when their product is finite.
-        let reflected =
-            (-rate * time - 2.0 * b / vol2 * (spot / strike).ln() + log_norm_cdf(d_corr)).exp();
-        let direct = (-div_yield * time + log_norm_cdf(d1)).exp();
+        let reflected = (-rate * time - 2.0 * b / vol2 * (spot / strike).ln()
+            + log_norm_cdf_or_nan(d_corr))
+        .exp();
+        let direct = (-div_yield * time + log_norm_cdf_or_nan(d1)).exp();
         spot * (vol2 / (2.0 * b)) * (direct - reflected)
     };
 
@@ -191,20 +196,21 @@ pub fn fixed_strike_lookback_put(
     let d1 = ((spot / strike).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
     let d2 = d1 - vol_sqrt_t;
 
-    let term1 = strike * df * norm_cdf(-d2);
-    let term2 = -spot * df_q * norm_cdf(-d1);
+    let term1 = strike * df * norm_cdf_or_nan(-d2);
+    let term2 = -spot * df_q * norm_cdf_or_nan(-d1);
     let term3 = if b.abs() < RATE_EQ_DIV_TOL {
         // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
         let log_ratio = (spot / strike).ln();
         spot * df
-            * (vol * sqrt_t * norm_pdf(d1)
-                - log_ratio * norm_cdf(-d1)
-                - 0.5 * vol2 * time * norm_cdf(-d1))
+            * (vol * sqrt_t * norm_pdf_or_nan(d1)
+                - log_ratio * norm_cdf_or_nan(-d1)
+                - 0.5 * vol2 * time * norm_cdf_or_nan(-d1))
     } else {
         let d_corr = d1 - 2.0 * b * sqrt_t / vol;
-        let reflected =
-            (-rate * time - 2.0 * b / vol2 * (spot / strike).ln() + log_norm_cdf(-d_corr)).exp();
-        let direct = (-div_yield * time + log_norm_cdf(-d1)).exp();
+        let reflected = (-rate * time - 2.0 * b / vol2 * (spot / strike).ln()
+            + log_norm_cdf_or_nan(-d_corr))
+        .exp();
+        let direct = (-div_yield * time + log_norm_cdf_or_nan(-d1)).exp();
         spot * (vol2 / (2.0 * b)) * (reflected - direct)
     };
 
@@ -281,20 +287,20 @@ pub fn floating_strike_lookback_call(
     let a1 = ((spot / s_min).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
     let a2 = a1 - vol_sqrt_t;
 
-    let term1 = spot * df_q * norm_cdf(a1);
-    let term2 = -s_min * df * norm_cdf(a2);
+    let term1 = spot * df_q * norm_cdf_or_nan(a1);
+    let term2 = -s_min * df * norm_cdf_or_nan(a2);
     let term3 = if b.abs() < RATE_EQ_DIV_TOL {
         // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
         let log_ratio = (spot / s_min).ln();
         spot * df
-            * (vol * sqrt_t * norm_pdf(a1)
-                - log_ratio * norm_cdf(-a1)
-                - 0.5 * vol2 * time * norm_cdf(-a1))
+            * (vol * sqrt_t * norm_pdf_or_nan(a1)
+                - log_ratio * norm_cdf_or_nan(-a1)
+                - 0.5 * vol2 * time * norm_cdf_or_nan(-a1))
     } else {
         let d3 = a1 - 2.0 * b * sqrt_t / vol;
         let reflected =
-            (-rate * time - 2.0 * b / vol2 * (spot / s_min).ln() + log_norm_cdf(-d3)).exp();
-        let direct = (-div_yield * time + log_norm_cdf(-a1)).exp();
+            (-rate * time - 2.0 * b / vol2 * (spot / s_min).ln() + log_norm_cdf_or_nan(-d3)).exp();
+        let direct = (-div_yield * time + log_norm_cdf_or_nan(-a1)).exp();
         spot * (vol2 / (2.0 * b)) * (reflected - direct)
     };
 
@@ -464,8 +470,9 @@ mod tests {
         let d1 =
             ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time) / (vol * sqrt_t);
         let d2 = d1 - vol * sqrt_t;
-        let vanilla = spot * (-div_yield * time).exp() * norm_cdf(d1)
-            - strike * (-rate * time).exp() * norm_cdf(d2);
+        let vanilla =
+            spot * (-div_yield * time).exp() * norm_cdf(d1).expect("valid Gaussian variate")
+                - strike * (-rate * time).exp() * norm_cdf(d2).expect("valid Gaussian variate");
 
         assert!(
             lookback >= vanilla - 0.01,

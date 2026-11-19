@@ -299,7 +299,7 @@ impl MarketScenario {
                     deal_quote_override: None,
                     action: HazardRecalibrationAction::SpreadBump(QuoteBump::TenorsBp(targets)),
                 })?;
-                bumped_market = bumped_market.insert(rebuilt.as_ref().clone());
+                bumped_market.try_insert_mut(rebuilt.as_ref().clone())?;
             }
         }
         Ok(bumped_market)
@@ -565,7 +565,9 @@ mod tests {
             .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
-        let base_market = MarketContext::new().insert(curve);
+        let base_market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         let scenario = MarketScenario::new(
             date!(2024 - 01 - 02),
@@ -606,7 +608,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
 
-        let base_market = MarketContext::new().insert(base_curve);
+        let base_market = MarketContext::new()
+            .try_insert(base_curve)
+            .expect("insert market curve");
 
         // Create scenario with rate shift
         let scenario = MarketScenario::new(

@@ -159,7 +159,7 @@ impl SwaptionLsmcPricer {
         initial_rate: f64,
         time_grid: &TimeGrid,
     ) -> Result<Vec<Vec<f64>>> {
-        let prepared = ExactHullWhite1F::prepare_grid(&self.hw_process, time_grid);
+        let prepared = ExactHullWhite1F::prepare_grid(&self.hw_process, time_grid)?;
         if self.config.antithetic {
             self.generate_antithetic_paths(initial_rate, prepared.get_steps())
         } else {
@@ -173,17 +173,17 @@ impl SwaptionLsmcPricer {
     fn rate_path_with_innovations(
         initial_rate: f64,
         intervals: &[HullWhiteStep],
-        mut innovation: impl FnMut(usize) -> f64,
-    ) -> Vec<f64> {
+        mut innovation: impl FnMut(usize) -> Result<f64>,
+    ) -> Result<Vec<f64>> {
         let mut rate_path = Vec::with_capacity(intervals.len() + 1);
         let mut rate = initial_rate;
         rate_path.push(initial_rate);
 
         for (step, interval) in intervals.iter().enumerate() {
-            rate = interval.apply(rate, innovation(step));
+            rate = interval.apply(rate, innovation(step)?);
             rate_path.push(rate);
         }
-        rate_path
+        Ok(rate_path)
     }
 
     /// Generate standard paths using the prepared simulation intervals.
@@ -197,16 +197,11 @@ impl SwaptionLsmcPricer {
 
         for path_id in 0..self.config.num_paths {
             let mut path_rng = rng.substream(path_id as u64);
-            let mut z = vec![0.0];
-            // Keep the standard stream's length-one fills in their original order.
             paths.push(Self::rate_path_with_innovations(
                 initial_rate,
                 intervals,
-                |_| {
-                    path_rng.fill_std_normals(&mut z);
-                    z[0]
-                },
-            ));
+                |_| path_rng.next_std_normal(),
+            )?);
         }
         Ok(paths)
     }
@@ -225,17 +220,17 @@ impl SwaptionLsmcPricer {
             let mut path_rng = rng.substream(pair_id as u64);
             // Preserve the original batched fill and Box-Muller spare-normal use.
             let mut z_draws = vec![0.0; num_steps];
-            path_rng.fill_std_normals(&mut z_draws);
+            path_rng.fill_std_normals(&mut z_draws)?;
             paths.push(Self::rate_path_with_innovations(
                 initial_rate,
                 intervals,
-                |step| z_draws[step],
-            ));
+                |step| Ok(z_draws[step]),
+            )?);
             paths.push(Self::rate_path_with_innovations(
                 initial_rate,
                 intervals,
-                |step| -z_draws[step],
-            ));
+                |step| Ok(-z_draws[step]),
+            )?);
         }
         Ok(paths)
     }
@@ -451,8 +446,9 @@ mod tests {
                 let t = time_grid.time(step);
                 let dt = time_grid.dt(step);
 
-                path_rng.fill_std_normals(&mut z);
-                disc.step(&pricer.hw_process, t, dt, &mut state, &z, &mut work);
+                path_rng.fill_std_normals(&mut z).expect("normal draws");
+                disc.step(&pricer.hw_process, t, dt, &mut state, &z, &mut work)
+                    .expect("valid simulation step");
 
                 rate_path.push(state[0]);
             }
@@ -490,7 +486,9 @@ mod tests {
             // same sequence as `num_steps` length-1 fills did — but without the
             // per-step heap allocation.
             let mut z_draws: Vec<f64> = vec![0.0; num_steps];
-            path_rng.fill_std_normals(&mut z_draws);
+            path_rng
+                .fill_std_normals(&mut z_draws)
+                .expect("normal draws");
 
             // Reusable single-factor innovation buffer (HW1F: one factor).
             let mut z_step = [0.0_f64];
@@ -513,7 +511,8 @@ mod tests {
                     &mut state_orig,
                     &z_step,
                     &mut work,
-                );
+                )
+                .expect("valid simulation step");
                 rate_path_orig.push(state_orig[0]);
             }
 
@@ -534,7 +533,8 @@ mod tests {
                     &mut state_anti,
                     &z_step,
                     &mut work,
-                );
+                )
+                .expect("valid simulation step");
                 rate_path_anti.push(state_anti[0]);
             }
 

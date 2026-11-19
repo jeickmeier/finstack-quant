@@ -28,8 +28,11 @@ fn create_test_market() -> MarketContext {
 
     // Create a price curve for WTI forward prices
     let price_curve = PriceCurve::builder("WTI-FORWARD")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(base_date)
-        .spot_price(75.0)
         .knots([
             (0.0, 75.0),
             (0.25, 76.0),
@@ -41,8 +44,10 @@ fn create_test_market() -> MarketContext {
         .expect("price curve should build");
 
     MarketContext::new()
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
 }
 
 #[test]

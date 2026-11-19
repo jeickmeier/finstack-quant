@@ -73,9 +73,13 @@ pub fn market(unrelated_curves: usize) -> MarketContext {
             .build()
             .expect("valid CCM curve")
     };
-    let mut market = MarketContext::new().insert(make_curve("CCM-USD-OIS".into()));
+    let mut market = MarketContext::new()
+        .try_insert(make_curve("CCM-USD-OIS".into()))
+        .expect("insert market curve");
     for index in 0..unrelated_curves {
-        market.insert_mut(make_curve(format!("CCM-UNUSED-{index}")));
+        market
+            .try_insert_mut(make_curve(format!("CCM-UNUSED-{index}")))
+            .expect("insert market curve");
     }
     market.insert_surface_mut(
         VolSurface::from_grid(

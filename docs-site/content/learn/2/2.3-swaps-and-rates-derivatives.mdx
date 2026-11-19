@@ -138,7 +138,7 @@ from finstack_quant.valuations.instruments import FixedLegSpec,FloatLegSpec,Inte
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 fixed=FixedLegSpec(discount_curve_id='USD-OIS', rate="0.045", frequency=Tenor.semi_annual(), day_count=DayCount.THIRTY_360, start='2025-04-15', end='2028-04-15', calendar_id='weekends_only')
-floating=FloatLegSpec(discount_curve_id='USD-OIS', forward_curve_id='USD-SOFR-3M', spread_bp="0", frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, start='2025-04-15', end='2028-04-15', calendar_id='weekends_only')
+floating=FloatLegSpec(discount_curve_id='USD-OIS', index_id='USD-SOFR-3M', forward_curve_id='USD-SOFR-3M', spread_bp="0", frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, start='2025-04-15', end='2028-04-15', calendar_id='weekends_only')
 leg_swap=(InterestRateSwap.builder().id('TYPED-IRS').notional(Money(2_000_000,'USD')).side('pay').fixed_leg(fixed).float_leg(floating).build())
 leg_market=build_market('rates');leg_value=price_instrument(leg_swap,leg_market,AS_OF,metrics=['par_rate'])
 leg_flows=json.loads(instrument_cashflows(leg_swap,leg_market,AS_OF,'discounting').to_json())['flows']
@@ -167,9 +167,21 @@ AS_OF = date(2025, 1, 15)
 
 market = build_market('rates')
 boundaries = [AS_OF, date(2025, 4, 15), date(2025, 7, 15), date(2025, 10, 15), date(2026, 1, 15), date(2026, 4, 15)]
-projection_grid = [DayCount.ACT_360.year_fraction(AS_OF, boundary) for boundary in boundaries]
-matched_forward = ForwardCurve('USD-SOFR-3M', 0.25, AS_OF, [(0.0, 0.05), (projection_grid[-1], 0.05)],
-    day_count='act_360', projection_grid=projection_grid)
+knot_times = [DayCount.ACT_360.year_fraction(AS_OF, boundary) for boundary in boundaries]
+factors = [1.0]
+for t0, t1 in zip(knot_times, knot_times[1:]):
+    factors.append(factors[-1] / (1.0 + 0.05 * (t1 - t0)))
+matched_forward = ForwardCurve(
+    {
+        "id": 'USD-SOFR-3M',
+        "base_date": AS_OF,
+        "knots": list(zip(knot_times, factors)),
+        "interp": 'log_linear',
+        "extrapolation": 'extend',
+        "day_count": 'act_360',
+        "index_tenor": '3M',
+    }
+)
 parity_market = MarketContext.from_json(market.to_json()).insert(matched_forward)
 cap = (CapFloor.builder().id('LESSON-CAP').rate_option_type('cap').notional(Money(2_000_000.0, 'USD'))
     .strike(0.045).start_date(date(2025, 4, 15)).maturity(date(2026, 4, 15))
@@ -220,7 +232,7 @@ from finstack_quant.valuations.instruments import Swaption,FixedLegSpec,FloatLeg
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 fixed=FixedLegSpec(discount_curve_id='USD-OIS', rate="0.045", frequency=Tenor.semi_annual(), day_count=DayCount.THIRTY_360, start='2026-01-15', end='2029-01-15', calendar_id='weekends_only')
-floating=FloatLegSpec(discount_curve_id='USD-OIS', forward_curve_id='USD-SOFR-3M', spread_bp="0", frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, start='2026-01-15', end='2029-01-15', calendar_id='weekends_only')
+floating=FloatLegSpec(discount_curve_id='USD-OIS', index_id='USD-SOFR-3M', forward_curve_id='USD-SOFR-3M', spread_bp="0", frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, start='2026-01-15', end='2029-01-15', calendar_id='weekends_only')
 payer=(Swaption.builder().id('TYPED-PAYER-SWAPTION').option_type('call').notional(Money(2_000_000,'USD'))
  .expiry('2026-01-13').settlement('physical').cash_settlement_method('collateralized_cash_price')
  .vol_model('black').vol_surface_id('USD-SWPNVOL').underlying_fixed_leg(fixed).underlying_float_leg(floating).build())
@@ -277,9 +289,21 @@ AS_OF = date(2025, 1, 15)
 
 market = build_market('rates')
 boundaries = [AS_OF, date(2025, 4, 15), date(2025, 7, 15), date(2025, 10, 15), date(2026, 1, 15), date(2026, 4, 15)]
-projection_grid = [DayCount.ACT_360.year_fraction(AS_OF, boundary) for boundary in boundaries]
-matched_forward = ForwardCurve('USD-SOFR-3M', 0.25, AS_OF, [(0.0, 0.05), (projection_grid[-1], 0.05)],
-    day_count='act_360', projection_grid=projection_grid)
+knot_times = [DayCount.ACT_360.year_fraction(AS_OF, boundary) for boundary in boundaries]
+factors = [1.0]
+for t0, t1 in zip(knot_times, knot_times[1:]):
+    factors.append(factors[-1] / (1.0 + 0.05 * (t1 - t0)))
+matched_forward = ForwardCurve(
+    {
+        "id": 'USD-SOFR-3M',
+        "base_date": AS_OF,
+        "knots": list(zip(knot_times, factors)),
+        "interp": 'log_linear',
+        "extrapolation": 'extend',
+        "day_count": 'act_360',
+        "index_tenor": '3M',
+    }
+)
 parity_market = MarketContext.from_json(market.to_json()).insert(matched_forward)
 cap = (CapFloor.builder().id('LESSON-CAP').rate_option_type('cap').notional(Money(2_000_000.0, 'USD'))
     .strike(0.045).start_date(date(2025, 4, 15)).maturity(date(2026, 4, 15))

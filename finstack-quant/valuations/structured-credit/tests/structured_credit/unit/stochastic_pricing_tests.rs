@@ -92,7 +92,9 @@ fn build_sc(id: &str, pool_balance: f64) -> StructuredCredit {
 fn stochastic_pricing_zero_notional_returns_validation_error() {
     let sc = build_sc("ABS-ZERO", 0.0);
     let mut market = MarketContext::new();
-    market = market.insert(discount_curve(closing_date()));
+    market = market
+        .try_insert(discount_curve(closing_date()))
+        .expect("insert market curve");
 
     let err = sc
         .price_stochastic_with_mode(
@@ -109,7 +111,9 @@ fn stochastic_pricing_zero_notional_returns_validation_error() {
 fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
     let sc = build_sc("ABS-DETERMINISTIC", 1_000_000.0);
     let mut market = MarketContext::new();
-    market = market.insert(discount_curve(closing_date()));
+    market = market
+        .try_insert(discount_curve(closing_date()))
+        .expect("insert market curve");
 
     let as_of = closing_date();
     let first = sc
@@ -149,7 +153,9 @@ fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
 #[test]
 fn monte_carlo_rejects_fewer_than_two_independent_estimators() {
     let sc = build_sc("ABS-MC-TOO-FEW", 1_000_000.0);
-    let market = MarketContext::new().insert(discount_curve(closing_date()));
+    let market = MarketContext::new()
+        .try_insert(discount_curve(closing_date()))
+        .expect("insert market curve");
 
     for num_paths in [0, 1] {
         for antithetic in [false, true] {
@@ -191,7 +197,9 @@ fn cleanup_call_validation_rejects_invalid_thresholds() {
 fn monte_carlo_parallel_path_evaluation_is_reproducible() {
     let sc = build_sc("ABS-MC-REPRO", 1_000_000.0);
     let mut market = MarketContext::new();
-    market = market.insert(discount_curve(closing_date()));
+    market = market
+        .try_insert(discount_curve(closing_date()))
+        .expect("insert market curve");
     let mode = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 4,
         antithetic: true,
@@ -309,7 +317,9 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
 fn price_with_metrics_returns_base_value_when_no_metrics_or_hedges() {
     let sc = build_sc("ABS-STANDALONE", 1_000_000.0).with_calendar_id("nyse");
     let mut market = MarketContext::new();
-    market = market.insert(discount_curve(closing_date()));
+    market = market
+        .try_insert(discount_curve(closing_date()))
+        .expect("insert market curve");
 
     let result = sc
         .price_with_metrics(&market, closing_date(), &[], Default::default())
@@ -327,7 +337,9 @@ fn price_with_metrics_returns_base_value_when_no_metrics_or_hedges() {
 #[test]
 fn standalone_pricing_applies_scenario_price_shock_once() {
     let mut sc = build_sc("ABS-STANDALONE-SCENARIO", 1_000_000.0);
-    let market = MarketContext::new().insert(discount_curve(closing_date()));
+    let market = MarketContext::new()
+        .try_insert(discount_curve(closing_date()))
+        .expect("insert market curve");
     let baseline = sc
         .price_with_metrics(&market, closing_date(), &[], Default::default())
         .expect("baseline standalone pricing")
@@ -347,7 +359,9 @@ fn standalone_pricing_applies_scenario_price_shock_once() {
 
 #[test]
 fn tranche_and_stochastic_pricing_apply_scenario_price_shock_once() {
-    let market = MarketContext::new().insert(discount_curve(closing_date()));
+    let market = MarketContext::new()
+        .try_insert(discount_curve(closing_date()))
+        .expect("insert market curve");
     let baseline = build_sc("ABS-SPECIALIZED-SCENARIO", 1_000_000.0);
     let baseline_tranche = baseline
         .value_tranche("SENIOR", &market, closing_date())
@@ -556,16 +570,18 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
     sc.credit_model.correlation_structure =
         Some(CorrelationStructure::flat(0.3, 0.0).expect("valid correlation"));
 
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(close)
-            .knots(vec![(0.0, 1.0), (2.0, 0.96), (5.0, 0.90)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(close)
+                .knots(vec![(0.0, 1.0), (2.0, 0.96), (5.0, 0.90)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
 
     let result = sc
         .price_stochastic_with_mode(
@@ -665,16 +681,18 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
     sc.credit_model.correlation_structure =
         Some(CorrelationStructure::flat(0.3, 0.0).expect("valid correlation"));
 
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(close)
-            .knots(vec![(0.0, 1.0), (2.0, 0.96), (5.0, 0.90)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(close)
+                .knots(vec![(0.0, 1.0), (2.0, 0.96), (5.0, 0.90)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
 
     let mode_4 = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 4,
@@ -727,7 +745,7 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
     // 24 months (2-year deal, monthly)
     let month_count = 24usize;
     let philox_normals: Vec<f64> = (0..month_count)
-        .map(|_| philox_path0.next_std_normal())
+        .map(|_| philox_path0.next_std_normal().expect("normal draw"))
         .collect();
 
     for (i, &z) in philox_normals.iter().enumerate() {
@@ -757,7 +775,9 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
 fn explicit_monte_carlo_mode_prices_canonical_deal() {
     let sc = build_sc("ABS-MODE-PARITY", 1_000_000.0);
     let close = closing_date();
-    let market = MarketContext::new().insert(discount_curve(close));
+    let market = MarketContext::new()
+        .try_insert(discount_curve(close))
+        .expect("insert market curve");
 
     let mc = sc
         .price_stochastic_with_mode(
@@ -929,7 +949,9 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
                 Some(CorrelationStructure::flat(0.3, 0.0).expect("valid correlation"));
         }
 
-        let market = MarketContext::new().insert(discount_curve(closing_date()));
+        let market = MarketContext::new()
+            .try_insert(discount_curve(closing_date()))
+            .expect("insert market curve");
         let result = sc
             .price_stochastic_with_mode(&market, closing_date(), case.mode.clone())
             .unwrap_or_else(|err| panic!("{} should price: {err}", case.label));
@@ -956,16 +978,18 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
     use finstack_quant_core::dates::{DayCount, Tenor};
     use time::macros::date;
     let start = date!(2024 - 01 - 02);
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(start)
-            .knots([(0.0, 1.0), (5.0, 1.0)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(start)
+                .knots([(0.0, 1.0), (5.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
     for periods in [1_usize, 4] {
         let end = if periods == 1 {
             date!(2024 - 04 - 02)
@@ -1098,7 +1122,9 @@ fn stochastic_estimator_count_deal() -> StructuredCredit {
 #[test]
 fn default_monte_carlo_matches_explicit_estimator_count_and_honors_override() {
     let sc = stochastic_estimator_count_deal();
-    let market = MarketContext::new().insert(discount_curve(closing_date()));
+    let market = MarketContext::new()
+        .try_insert(discount_curve(closing_date()))
+        .expect("insert market curve");
 
     let result = sc
         .price_stochastic(&market, closing_date(), None, None)

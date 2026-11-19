@@ -33,16 +33,18 @@ fn as_of() -> Date {
 }
 
 fn market() -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of())
-            .knots([(0.0, 1.0), (2.0, 0.90)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of())
+                .knots([(0.0, 1.0), (2.0, 0.90)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve")
 }
 
 fn european_option() -> InterestRateFutureOption {

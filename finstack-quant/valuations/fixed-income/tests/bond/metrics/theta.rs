@@ -31,7 +31,9 @@ fn test_theta_finite() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -81,7 +83,9 @@ fn test_theta_sign_diagnostic() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let base_pv = Instrument::value(&bond, &market, as_of).unwrap();
     let rolled_date = as_of + time::Duration::days(1);
@@ -175,16 +179,18 @@ fn theta_receives_coupon_and_redemption_once_at_maturity() {
         "USD-OIS",
     )
     .unwrap();
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (1.0, 1.0), (10.0, 1.0)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (1.0, 1.0), (10.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
     let metrics = [MetricId::Theta, MetricId::ThetaCarry];
     let result = bond
         .price_with_metrics(&market, as_of, &metrics, PricingOptions::default())

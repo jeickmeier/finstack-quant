@@ -1081,7 +1081,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed");
-        let ctx = MarketContext::new().insert(disc_curve);
+        let ctx = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve");
 
         // Verify PV stability within 1e-6 tolerance
         let pv_weekend = repo_weekend.pv(&ctx, as_of).expect("PV should compute");

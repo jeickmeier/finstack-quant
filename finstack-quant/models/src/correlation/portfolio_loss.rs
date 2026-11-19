@@ -523,7 +523,7 @@ impl ValidatedSimulation {
                 ))
             })?;
         factors.resize(self.factor_count, 0.0);
-        rng.fill_std_normals(&mut factors);
+        rng.fill_std_normals(&mut factors)?;
 
         let mut total_loss = 0.0;
         for ((exposure, threshold), rho) in exposures
@@ -542,7 +542,7 @@ impl ValidatedSimulation {
             };
             let latent =
                 self.copula
-                    .latent_variable(systematic, rng.next_std_normal(), mixing, rho);
+                    .latent_variable(systematic, rng.next_std_normal()?, mixing, rho);
             if !latent.is_finite() {
                 return Err(invalid_input(
                     "portfolio copula produced a non-finite latent default variable",
@@ -557,7 +557,7 @@ impl ValidatedSimulation {
             // survivors, whenever the model has residual dispersion.
             let lgd = if let Some(model) = recovery {
                 let eps = if model.has_idiosyncratic_dispersion() {
-                    rng.next_std_normal()
+                    rng.next_std_normal()?
                 } else {
                     0.0
                 };

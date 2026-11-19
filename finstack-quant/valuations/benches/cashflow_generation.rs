@@ -113,7 +113,11 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 fn validate_dated_cashflows(flows: &[(Date, Money)], as_of: Date) {

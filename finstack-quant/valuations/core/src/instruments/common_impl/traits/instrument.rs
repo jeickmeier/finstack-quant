@@ -89,12 +89,12 @@ use super::pricing_options::PricingOptions;
 ///     curve: "USD-OIS".into(),
 ///     attributes: Attributes::default(),
 /// };
-/// let market = MarketContext::new().insert(
+/// let market = MarketContext::new().try_insert(
 ///     DiscountCurve::builder("USD-OIS")
 ///         .base_date(date!(2026-01-01))
 ///         .knots([(0.0, 1.0), (1.0, 0.95)])
 ///         .build()?,
-/// );
+/// )?;
 /// let value = note.value(&market, date!(2026-01-01))?;
 /// assert_eq!(value.currency(), Currency::USD);
 /// assert!((value.amount() - 950_000.0).abs() < 1.0);

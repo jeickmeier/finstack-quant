@@ -160,11 +160,11 @@ impl RoughBergomiParams {
 
         if !hurst.is_rough() {
             tracing::warn!(
-                h = hurst.value(),
+                h = hurst.get_value(),
                 "rBergomi Hurst exponent H = {:.4} is not rough (H >= 0.5). \
                  The model is designed for rough volatility; results may not \
                  match empirical skew behavior.",
-                hurst.value()
+                hurst.get_value()
             );
         }
 
@@ -234,8 +234,9 @@ impl StochasticProcess for RoughBergomiProcess {
     }
 
     /// Formal no-op: actual diffusion is applied by the rBergomi discretization.
-    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         out[0] = 0.0;
+        Ok(())
     }
 
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
@@ -248,7 +249,7 @@ impl ProcessMetadata for RoughBergomiProcess {
         let mut params = ProcessParams::new("rBergomi");
         params.add_param("r", self.params.r);
         params.add_param("q", self.params.q);
-        params.add_param("H", self.params.hurst.value());
+        params.add_param("H", self.params.hurst.get_value());
         params.add_param("eta", self.params.eta);
         params.add_param("rho", self.params.rho);
 
@@ -363,7 +364,9 @@ mod tests {
         let mut diff = [f64::NAN];
 
         process.drift(0.5, &x, &mut drift);
-        process.diffusion(0.5, &x, &mut diff);
+        process
+            .diffusion(0.5, &x, &mut diff)
+            .expect("valid diffusion");
 
         assert_eq!(drift[0], 0.0);
         assert_eq!(diff[0], 0.0);

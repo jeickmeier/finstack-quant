@@ -574,7 +574,9 @@ mod tests {
             .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
-        Ok(MarketContext::new().insert(curve))
+        Ok(MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve"))
     }
 
     #[test]
@@ -1093,7 +1095,7 @@ mod tests {
             }
             let instrument: Arc<dyn Instrument> = Arc::new(bond);
             let market = MarketContext::new()
-                .insert(
+                .try_insert(
                     DiscountCurve::builder("USD-OIS")
                         .base_date(origin)
                         .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)])
@@ -1104,12 +1106,14 @@ mod tests {
                         )
                         .build()?,
                 )
-                .insert(ForwardCurve::flat(
+                .expect("insert market curve")
+                .try_insert(ForwardCurve::flat(
                     "USD-SOFR-3M",
                     origin,
                     0.03,
                     DayCount::Act360,
-                )?);
+                )?)
+                .expect("insert market curve");
             let scenario = ScenarioSpec {
                 id: "crossed-reset".into(),
                 operations: vec![OperationSpec::TimeRollForward {

@@ -35,8 +35,9 @@ fn hazard_market(spot: f64) -> MarketContext {
         .build()
         .unwrap();
     MarketContext::new()
-        .insert(rf)
-        .insert(
+        .try_insert(rf)
+        .expect("insert market curve")
+        .try_insert(
             HazardCurve::flat(
                 "USD-CREDIT",
                 dates::base_date(),
@@ -46,6 +47,7 @@ fn hazard_market(spot: f64) -> MarketContext {
             )
             .unwrap(),
         )
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
@@ -93,8 +95,8 @@ fn convertible_frp_matches_european_closed_form() {
                 / (vol * time.sqrt());
             let d2 = d1 - vol * time.sqrt();
             let call = ratio
-                * (spot * (-dividend * time).exp() * norm_cdf(d1)
-                    - strike * (-rate * time).exp() * norm_cdf(d2));
+                * (spot * (-dividend * time).exp() * norm_cdf(d1).expect("valid normal variate")
+                    - strike * (-rate * time).exp() * norm_cdf(d2).expect("valid normal variate"));
             let expected = face * (-rate * time).exp()
                 + call
                 + recovery * face * LAMBDA / rate * (1.0 - (-rate * time).exp());
@@ -163,8 +165,10 @@ fn quantlib_hazard_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
     MarketContext::new()
-        .insert(ois)
-        .insert(hazard)
+        .try_insert(ois)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(1.0).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",

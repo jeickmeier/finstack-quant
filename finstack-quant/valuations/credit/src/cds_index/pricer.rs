@@ -743,8 +743,10 @@ mod tests {
             .expect("hazard curve should build");
 
         MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
-            .insert(hazard)
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve")
     }
 
     #[test]
@@ -919,26 +921,30 @@ mod tests {
         let mut market = sample_market(as_of);
         // Add per-constituent hazard curves (re-use the index curve id for
         // simplicity since flat hazards make modes agree).
-        market = market.insert(
-            HazardCurve::builder("HZ-A")
-                .base_date(as_of)
-                .currency(Currency::USD)
-                .recovery_rate(0.40)
-                .knots([(5.0, 0.02)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .build()
-                .expect("hazard A"),
-        );
-        market = market.insert(
-            HazardCurve::builder("HZ-B")
-                .base_date(as_of)
-                .currency(Currency::USD)
-                .recovery_rate(0.40)
-                .knots([(5.0, 0.02)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .build()
-                .expect("hazard B"),
-        );
+        market = market
+            .try_insert(
+                HazardCurve::builder("HZ-A")
+                    .base_date(as_of)
+                    .currency(Currency::USD)
+                    .recovery_rate(0.40)
+                    .knots([(5.0, 0.02)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .build()
+                    .expect("hazard A"),
+            )
+            .expect("insert market curve");
+        market = market
+            .try_insert(
+                HazardCurve::builder("HZ-B")
+                    .base_date(as_of)
+                    .currency(Currency::USD)
+                    .recovery_rate(0.40)
+                    .knots([(5.0, 0.02)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .build()
+                    .expect("hazard B"),
+            )
+            .expect("insert market curve");
 
         let mut index = CdsIndex::example().expect("example");
         index.pricing = IndexPricing::Constituents;

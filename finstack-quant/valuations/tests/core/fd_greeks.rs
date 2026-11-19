@@ -25,7 +25,7 @@ fn generic_greeks_follow_the_active_override_without_a_surface() {
     option.vol_surface_id = "EQ-VOL".into();
     option.div_yield_id = None;
     let bare = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, 1.0)])
@@ -35,6 +35,7 @@ fn generic_greeks_follow_the_active_override_without_a_surface() {
                 .build()
                 .expect("curve"),
         )
+        .expect("insert market curve")
         .insert_price(
             "EQ-SPOT",
             MarketScalar::unitless(100.0).expect("valid scalar"),
@@ -126,7 +127,7 @@ mod asian {
         let as_of = date!(2025 - 01 - 01);
         let option = option();
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
@@ -136,6 +137,7 @@ mod asian {
                     .build()
                     .expect("discount curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("SPX-VOL")
                     .secondary_axis(VolSurfaceAxis::Strike)

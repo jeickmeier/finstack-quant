@@ -224,9 +224,9 @@ impl<'a, S: PeriodShockSource> InstrumentPathFlowSource<'a, S> {
     }
 
     /// One standard normal draw, negated on the antithetic partner.
-    fn draw(&mut self) -> f64 {
-        let raw = self.rng.next_std_normal();
-        if self.antithetic { -raw } else { raw }
+    fn draw(&mut self) -> Result<f64> {
+        let raw = self.rng.next_std_normal()?;
+        Ok(if self.antithetic { -raw } else { raw })
     }
 
     /// Advance every live stochastic revolver's spread and utilization over
@@ -258,8 +258,8 @@ impl<'a, S: PeriodShockSource> InstrumentPathFlowSource<'a, S> {
             }
             // Two draws per live revolver per period, always consumed so the
             // stream stays order-stable whatever the states do.
-            let eta_spread = self.draw();
-            let eta_util = self.draw();
+            let eta_spread = self.draw()?;
+            let eta_util = self.draw()?;
             let spread_shock = -(rho.sqrt() * systematic_z + (1.0 - rho).sqrt() * eta_spread);
             let c = terms.util_credit_corr;
             let util_shock = c * spread_shock + (1.0 - c * c).max(0.0).sqrt() * eta_util;
@@ -270,7 +270,7 @@ impl<'a, S: PeriodShockSource> InstrumentPathFlowSource<'a, S> {
                 let mut x = [spread_bop.max(0.0)];
                 let mut work = [0.0_f64; 0];
                 self.cir
-                    .step(process, 0.0, dt, &mut x, &[spread_shock], &mut work);
+                    .step(process, 0.0, dt, &mut x, &[spread_shock], &mut work)?;
                 name.spread = x[0].max(0.0);
             }
             if terms.sigma.abs() >= FROZEN_UTILIZATION_VOL {
@@ -463,8 +463,10 @@ mod tests {
             .map(|days| (AS_OF - time::Duration::days(days), 0.04))
             .collect();
         MarketContext::new()
-            .insert(discount)
-            .insert(forward)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:USD-SOFR-3M",

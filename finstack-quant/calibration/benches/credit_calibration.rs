@@ -8,6 +8,7 @@ mod checked;
 #[path = "../../valuations/benches/support/record.rs"]
 mod record;
 use checked::checked_calibrate;
+use finstack_quant_core::market_data::surfaces::VolQuoteType;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_calibration::api::{
@@ -428,7 +429,7 @@ fn bench_credit_vol(c: &mut Criterion) {
             ids.push(id.clone());
             quotes.push(serde_json::json!({"kind":"vol_quote","option_vol":{
                 "id":id,"underlying":underlying,"expiry":expiry,"strike":strike,
-                "vol":parameters.implied_vol(0.01,strike,t).expect("quote"),"option_type":"call"
+                "vol":parameters.implied_vol(0.01,strike,t, VolQuoteType::BlackLognormal).expect("quote"),"option_type":"call"
             }}));
         }
     }
@@ -453,13 +454,24 @@ fn bench_credit_vol(c: &mut Criterion) {
     let truth = SabrParameters::new(0.3, 1.0, 0.5, -0.25).expect("truth");
     let vols: Vec<_> = strikes
         .iter()
-        .map(|&k| truth.implied_vol(0.01, k, 2.0).expect("vol"))
+        .map(|&k| {
+            truth
+                .implied_vol(0.01, k, 2.0, VolQuoteType::BlackLognormal)
+                .expect("vol")
+        })
         .collect();
     for pinned in [false, true] {
         let calibrator = SabrCalibrator::new().with_atm_pinning(pinned);
         if let Ok(directory) = std::env::var("FQ_CREDIT_EVIDENCE_DIR") {
             let outcome = calibrator
-                .calibrate(0.01, &strikes, &vols, 2.0, 1.0)
+                .calibrate(
+                    0.01,
+                    &strikes,
+                    &vols,
+                    2.0,
+                    1.0,
+                    VolQuoteType::BlackLognormal,
+                )
                 .expect("fit");
             let off_grid: Vec<_> = (0..41)
                 .map(|i| {
@@ -468,7 +480,7 @@ fn bench_credit_vol(c: &mut Criterion) {
                         strike,
                         outcome
                             .parameters
-                            .implied_vol(0.01, strike, 2.0)
+                            .implied_vol(0.01, strike, 2.0, VolQuoteType::BlackLognormal)
                             .expect("off grid"),
                     )
                 })
@@ -497,6 +509,7 @@ fn bench_credit_vol(c: &mut Criterion) {
                             black_box(&vols),
                             black_box(2.0),
                             black_box(1.0),
+                            VolQuoteType::BlackLognormal,
                         )
                         .expect("fit")
                 })
@@ -519,7 +532,12 @@ fn bench_sabr_formula(c: &mut Criterion) {
                 for &strike in &strikes {
                     black_box(
                         parameters
-                            .implied_vol(black_box(0.01), black_box(strike), black_box(2.0))
+                            .implied_vol(
+                                black_box(0.01),
+                                black_box(strike),
+                                black_box(2.0),
+                                VolQuoteType::BlackLognormal,
+                            )
                             .expect("valid vol"),
                     );
                 }

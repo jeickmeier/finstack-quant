@@ -222,7 +222,7 @@ The holder receives the benefit of replacing a negative reference rate with zero
 ```python exec id=c2-exercise-floor role=exercise
 from finstack_quant.core.market_data import ForwardCurve
 low=tracks.build_market("credit")
-low.insert(ForwardCurve("USD-SOFR-3M",.25,AS_OF,[(0.,-.005),(1.,-.005),(5.,-.005),(10.,-.005)]))
+low.insert(ForwardCurve.flat("USD-SOFR-3M",AS_OF,-.005,"act_360"))
 floor_case=deepcopy(contract)
 floor_case["instrument"]["spec"]["rate"]["floating"]["index_floor_bp"]="0"
 no_floor=deepcopy(floor_case);no_floor["instrument"]["spec"]["rate"]["floating"]["index_floor_bp"]=None

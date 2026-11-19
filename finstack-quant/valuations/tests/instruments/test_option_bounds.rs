@@ -61,7 +61,8 @@ fn create_option_market(
     .unwrap();
 
     MarketContext::new()
-        .insert(disc)
+        .try_insert(disc)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",

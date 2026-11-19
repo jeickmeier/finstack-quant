@@ -123,7 +123,8 @@ pub fn build_market_with_day_count(
     let vol_surface = build_flat_vol_surface(vol, as_of, VOL_ID);
 
     MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,

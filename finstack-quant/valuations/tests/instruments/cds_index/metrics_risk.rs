@@ -116,7 +116,11 @@ fn dv01_rebootstraps_calibrated_index_hazard_from_unchanged_spreads() {
             &bumped, as_of, "HZ-INDEX", "INDEX", "USD-OIS",
         )
         .expect("re-bootstrap on bumped discount");
-        idx.value_raw(&bumped.insert(hazard), as_of).expect("pv")
+        idx.value_raw(
+            &bumped.try_insert(hazard).expect("insert market curve"),
+            as_of,
+        )
+        .expect("pv")
     };
     let expected = (pv_at(1.0) - pv_at(-1.0)) / 2.0;
     assert!(expected.abs() > 1e-6, "fixture must carry rate risk");
@@ -331,7 +335,9 @@ fn test_bucketed_cs01_requires_replay_recipe() {
 fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
     let as_of = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
-    let source = MarketContext::new().insert(flat_discount_curve("USD-OIS", as_of, 0.03));
+    let source = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", as_of, 0.03))
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
@@ -352,7 +358,7 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
         .expect("replayable index hazard")
         .spread_risk_inputs()
         .len();
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
     let index = standard_single_curve_index("CDX-QUOTE-OFFGRID", as_of, end, 10_000_000.0);
 
     let result = index
@@ -395,7 +401,9 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
 fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
     let as_of = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
-    let source = MarketContext::new().insert(flat_discount_curve("USD-OIS", as_of, 0.03));
+    let source = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", as_of, 0.03))
+        .expect("insert market curve");
     let hz1 = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
@@ -431,12 +439,18 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
         .expect("replayable constituent hazard")
         .spread_risk_inputs()
         .len();
-    let market = source.insert(hz1).insert(hz2).insert(flat_hazard_curve(
-        "HZ-INDEX",
-        as_of,
-        STANDARD_RECOVERY_SENIOR,
-        STANDARD_HAZARD_RATE,
-    ));
+    let market = source
+        .try_insert(hz1)
+        .expect("insert market curve")
+        .try_insert(hz2)
+        .expect("insert market curve")
+        .try_insert(flat_hazard_curve(
+            "HZ-INDEX",
+            as_of,
+            STANDARD_RECOVERY_SENIOR,
+            STANDARD_HAZARD_RATE,
+        ))
+        .expect("insert market curve");
     let index = standard_constituents_index("CDX-CONSTITUENT-OFFGRID", as_of, end, 10_000_000.0, 2);
 
     let result = index
@@ -720,12 +734,14 @@ fn single_curve_metrics_ignore_attached_constituents() {
     // Constituent curves deliberately differ from the index curve.
     let mut ctx = standard_market_context(as_of);
     for i in 1..=5 {
-        ctx = ctx.insert(flat_hazard_curve(
-            &format!("HZ{i}"),
-            as_of,
-            STANDARD_RECOVERY_SENIOR,
-            0.03,
-        ));
+        ctx = ctx
+            .try_insert(flat_hazard_curve(
+                &format!("HZ{i}"),
+                as_of,
+                STANDARD_RECOVERY_SENIOR,
+                0.03,
+            ))
+            .expect("insert market curve");
     }
     let plain = standard_single_curve_index("CDX-MODE", start, end, 10_000_000.0);
     let mut attached = plain.clone();
@@ -812,9 +828,12 @@ fn parallel_cs01_uses_the_configured_credit_spread_bump() {
             None,
         )
         .expect("re-bootstrap");
-        idx.value(&ctx.clone().insert(bumped), as_of)
-            .expect("pv")
-            .amount()
+        idx.value(
+            &ctx.clone().try_insert(bumped).expect("insert market curve"),
+            as_of,
+        )
+        .expect("pv")
+        .amount()
     };
     let expected = (pv_at(bump_bp) - pv_at(-bump_bp)) / (2.0 * bump_bp);
     relative_eq(cs01, expected, 1e-9, "parallel CS01 at the configured bump");

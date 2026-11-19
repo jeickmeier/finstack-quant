@@ -365,7 +365,7 @@ struct ParsedFxSurfaceOptions {
     expiry_clock: Option<finstack_quant_core::dates::VolatilityClock>,
 }
 
-fn parse_fx_surface_options(value: Option<&JsValue>) -> Result<ParsedFxSurfaceOptions, JsValue> {
+fn parse_fx_surface_options(opts_val: &JsValue) -> Result<ParsedFxSurfaceOptions, JsValue> {
     const ALLOWED_KEYS: [&str; 6] = [
         "rr10d",
         "bf10d",
@@ -374,21 +374,10 @@ fn parse_fx_surface_options(value: Option<&JsValue>) -> Result<ParsedFxSurfaceOp
         "butterflyConvention",
         "expiryClock",
     ];
-    let mut parsed = ParsedFxSurfaceOptions {
-        rr10d: None,
-        bf10d: None,
-        delta_convention: FxDeltaConvention::ForwardUnadjusted,
-        atm_convention: FxAtmConvention::DeltaNeutralStraddle,
-        butterfly_convention: FxButterflyConvention::Smile,
-        expiry_clock: None,
-    };
-    let Some(opts_val) = value.filter(|v| !v.is_undefined() && !v.is_null()) else {
-        return Ok(parsed);
-    };
     if !is_plain_object(opts_val) {
         return Err(invalid_type(
             "options",
-            "expected a plain FxDeltaVolSurfaceOptions object or null",
+            "expected a plain FxDeltaVolSurfaceOptions object",
         ));
     }
     let obj = js_sys::Object::from(opts_val.clone());
@@ -407,23 +396,15 @@ fn parse_fx_surface_options(value: Option<&JsValue>) -> Result<ParsedFxSurfaceOp
         js_sys::Reflect::get(&obj, &JsValue::from(name))
             .map_err(|_| invalid_type(&format!("options.{name}"), "could not read property"))
     };
-    parsed.rr10d = js_opt_f64_seq(Some(&field("rr10d")?), "options.rr10d")?;
-    parsed.bf10d = js_opt_f64_seq(Some(&field("bf10d")?), "options.bf10d")?;
-    if let Some(s) = js_opt_string(Some(&field("deltaConvention")?), "options.deltaConvention")? {
-        parsed.delta_convention = parse_label::<FxDeltaConvention>(&s)?;
-    }
-    if let Some(s) = js_opt_string(Some(&field("atmConvention")?), "options.atmConvention")? {
-        parsed.atm_convention = parse_label::<FxAtmConvention>(&s)?;
-    }
-    if let Some(s) = js_opt_string(
-        Some(&field("butterflyConvention")?),
-        "options.butterflyConvention",
-    )? {
-        parsed.butterfly_convention = parse_label::<FxButterflyConvention>(&s)?;
-    }
-    parsed.expiry_clock =
-        js_opt_volatility_clock(Some(&field("expiryClock")?), "options.expiryClock")?;
-    Ok(parsed)
+    let label = |name: &str| js_string(&field(name)?, &format!("options.{name}"));
+    Ok(ParsedFxSurfaceOptions {
+        delta_convention: parse_label(&label("deltaConvention")?)?,
+        atm_convention: parse_label(&label("atmConvention")?)?,
+        butterfly_convention: parse_label(&label("butterflyConvention")?)?,
+        rr10d: js_opt_f64_seq(Some(&field("rr10d")?), "options.rr10d")?,
+        bf10d: js_opt_f64_seq(Some(&field("bf10d")?), "options.bf10d")?,
+        expiry_clock: js_opt_volatility_clock(Some(&field("expiryClock")?), "options.expiryClock")?,
+    })
 }
 
 /// FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional
@@ -446,7 +427,8 @@ fn parse_fx_surface_options(value: Option<&JsValue>) -> Result<ParsedFxSurfaceOp
 ///   [1],
 ///   [0.12],
 ///   [0.01],
-///   [0.002]
+///   [0.002],
+///   { deltaConvention: "forward_unadjusted", atmConvention: "delta_neutral_straddle", butterflyConvention: "smile" }
 /// );
 /// console.log(surface.id, surface.pair, surface.quoteType, surface.expiries.length);
 /// surface.free();
@@ -461,8 +443,8 @@ impl JsFxDeltaVolSurface {
     /// Construct an FX delta-quoted vol surface with 25-delta wings and
     /// explicit pair and convention options (Rust `FxDeltaVolSurface::from_params`).
     ///
-    /// Optional `options` supplies 10-delta wings (`rr10d`/`bf10d`, which must
-    /// appear together), explicit closed-profile convention labels, or an
+    /// The required `options` object supplies all three convention labels.
+    /// It also accepts paired 10-delta wings (`rr10d` and `bf10d`) and an
     /// optional `expiryClock`. Unknown option keys are rejected.
     ///
     /// # Arguments
@@ -472,7 +454,7 @@ impl JsFxDeltaVolSurface {
     /// * `atm_vols` - Positive ATM delta-neutral straddle vols per expiry (decimal).
     /// * `rr25d`    - 25-delta risk reversal per expiry (call vol − put vol, decimal).
     /// * `bf25d`    - 25-delta butterfly per expiry (wing avg − ATM, decimal).
-    /// * `options`  - Optional `FxDeltaVolSurfaceOptions` bag (`rr10d`, `bf10d`, `deltaConvention`, `atmConvention`, `butterflyConvention`, `expiryClock`).
+    /// * `options`  - Required `FxDeltaVolSurfaceOptions` bag (`rr10d`, `bf10d`, `deltaConvention`, `atmConvention`, `butterflyConvention`, `expiryClock`).
     ///
     /// # Errors
     ///
@@ -487,7 +469,7 @@ impl JsFxDeltaVolSurface {
     /// @param atmVols - ATM delta-neutral straddle vols per expiry (decimal).
     /// @param rr25d - 25-delta risk reversal per expiry (call vol − put vol, decimal).
     /// @param bf25d - 25-delta butterfly per expiry (wing avg − ATM, decimal).
-    /// @param options - Optional 10-delta wings, closed conventions, and expiry clock.
+    /// @param options - Three required FX convention labels, optional paired 10-delta wings, and an optional expiry clock.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
@@ -497,8 +479,7 @@ impl JsFxDeltaVolSurface {
         atm_vols: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] rr25d: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] bf25d: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "FxDeltaVolSurfaceOptions | null")]
-        options: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "FxDeltaVolSurfaceOptions")] options: JsValue,
     ) -> Result<JsFxDeltaVolSurface, JsValue> {
         let id = js_string(&id, "id")?;
         let pair = parse_currency_pair(&pair)?;
@@ -506,7 +487,7 @@ impl JsFxDeltaVolSurface {
         let atm_vols = js_f64_seq(&atm_vols, "atmVols")?;
         let rr25d = js_f64_seq(&rr25d, "rr25d")?;
         let bf25d = js_f64_seq(&bf25d, "bf25d")?;
-        let opts = parse_fx_surface_options(options.as_ref())?;
+        let opts = parse_fx_surface_options(&options)?;
         let surface = RustFxDeltaVolSurface::from_params(FxDeltaVolSurfaceParams {
             id: CurveId::new(id),
             pair,

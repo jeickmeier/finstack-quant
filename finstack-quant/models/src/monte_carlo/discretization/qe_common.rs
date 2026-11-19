@@ -117,15 +117,20 @@ pub(crate) enum QeRegime {
 impl QeRegime {
     /// Sample `v_{t+Δt}` from this regime given a standard normal shock `z`.
     #[inline]
-    pub(crate) fn sample(&self, z: f64) -> f64 {
-        match *self {
+    pub(crate) fn sample(&self, z: f64) -> finstack_quant_core::Result<f64> {
+        if !z.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "QE variance shock must be finite".into(),
+            ));
+        }
+        let value = match *self {
             QeRegime::Deterministic { value } => value,
             QeRegime::Quadratic { a, mean_square } => (mean_square.sqrt() + a.sqrt() * z).powi(2),
             QeRegime::Exponential { p, beta } => {
                 // Clamp u away from 1 so the inverse CDF stays finite when
                 // `norm_cdf` saturates to exactly 1.0 for extreme shocks
                 // (z ≳ 8).
-                let u = norm_cdf(z).min(1.0 - f64::EPSILON);
+                let u = norm_cdf(z)?.min(1.0 - f64::EPSILON);
                 if u <= p {
                     0.0
                 } else {
@@ -136,7 +141,13 @@ impl QeRegime {
                     (((1.0 - p) / (1.0 - u)).ln() / beta).max(0.0)
                 }
             }
+        };
+        if !value.is_finite() {
+            return Err(finstack_quant_core::Error::Internal(
+                "QE variance step overflowed".into(),
+            ));
         }
+        Ok(value)
     }
 
     /// Exact conditional moment-generating function
@@ -244,13 +255,19 @@ pub(crate) fn qe_step_variance(
     dt: f64,
     z: f64,
     psi_c: f64,
-) -> f64 {
+) -> finstack_quant_core::Result<f64> {
     qe_regime(v_t, kappa, theta, sigma, dt, psi_c).sample(z)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exponential_regime_rejects_nonfinite_shock() {
+        let regime = QeRegime::Exponential { p: 0.2, beta: 1.0 };
+        assert!(regime.sample(f64::NAN).is_err());
+    }
 
     #[test]
     fn small_kappa_dt_converges_to_zero_mean_reversion_limit() {
@@ -275,7 +292,12 @@ mod tests {
         };
         assert!(p < 1.0 && p > 0.999_999_999);
         assert!(beta.is_finite() && beta > 0.0);
-        assert!(qe_regime(0.0, 1e-9, 0.04, 1.0, 1.0, 1.5).sample(8.0) > 0.0);
+        assert!(
+            qe_regime(0.0, 1e-9, 0.04, 1.0, 1.0, 1.5)
+                .sample(8.0)
+                .expect("QE sample")
+                > 0.0
+        );
     }
 
     #[test]
@@ -290,17 +312,17 @@ mod tests {
 
     #[test]
     fn zero_shock_mean_revert_toward_theta() {
-        let v_high = qe_step_variance(0.08, 2.0, 0.04, 0.3, 0.1, 0.0, 1.5);
+        let v_high = qe_step_variance(0.08, 2.0, 0.04, 0.3, 0.1, 0.0, 1.5).expect("QE sample");
         assert!(v_high > 0.04 && v_high < 0.08, "expected mean reversion");
 
-        let v_low = qe_step_variance(0.02, 2.0, 0.04, 0.3, 0.1, 0.0, 1.5);
+        let v_low = qe_step_variance(0.02, 2.0, 0.04, 0.3, 0.1, 0.0, 1.5).expect("QE sample");
         assert!(v_low > 0.02 && v_low < 0.04, "expected mean reversion");
     }
 
     #[test]
     fn variance_stays_non_negative_across_shocks() {
         for z in [-5.0, -3.0, -1.0, 0.0, 1.0, 3.0, 5.0] {
-            let v = qe_step_variance(0.04, 2.0, 0.04, 0.8, 0.25, z, 1.5);
+            let v = qe_step_variance(0.04, 2.0, 0.04, 0.8, 0.25, z, 1.5).expect("QE sample");
             assert!(
                 v >= 0.0,
                 "QE scheme produced negative variance at z={z}: {v}"
@@ -310,13 +332,13 @@ mod tests {
 
     #[test]
     fn small_mean_triggers_case_b_without_panicking() {
-        let v = qe_step_variance(0.0, 1.0, 0.0, 0.3, 0.01, -3.0, 1.5);
+        let v = qe_step_variance(0.0, 1.0, 0.0, 0.3, 0.01, -3.0, 1.5).expect("QE sample");
         assert!(v >= 0.0 && v.is_finite());
     }
 
     #[test]
     fn extreme_psi_uses_case_b() {
-        let v = qe_step_variance(0.001, 0.01, 1e-6, 2.0, 1.0, 4.0, 1.5);
+        let v = qe_step_variance(0.001, 0.01, 1e-6, 2.0, 1.0, 4.0, 1.5).expect("QE sample");
         assert!(v.is_finite() && v >= 0.0);
     }
 
@@ -334,14 +356,22 @@ mod tests {
         assert!((mixture_mean / mean - 1.0).abs() < 1e-14);
         assert!((mixture_variance / variance - 1.0).abs() < 1e-14);
         assert!((p - (psi - 1.0) / (psi + 1.0)).abs() < 1e-14);
-        assert_eq!(qe_step_variance(v, kappa, theta, sigma, dt, 1.2, 1.5), 0.0);
+        assert_eq!(
+            qe_step_variance(v, kappa, theta, sigma, dt, 1.2, 1.5).expect("QE sample"),
+            0.0
+        );
     }
 
     #[test]
     fn tiny_positive_mean_is_not_replaced_by_an_absorbing_state() {
         let regime = qe_regime(1e-12, 1.0, 1e-12, 1e-6, 0.1, 1.5);
-        assert!(regime.sample(1.0) > 0.0);
-        assert_eq!(qe_regime(0.04, 2.0, 0.04, 0.0, 1.0, 1.5).sample(3.0), 0.04);
+        assert!(regime.sample(1.0).expect("QE sample") > 0.0);
+        assert_eq!(
+            qe_regime(0.04, 2.0, 0.04, 0.0, 1.0, 1.5)
+                .sample(3.0)
+                .expect("QE sample"),
+            0.04
+        );
     }
 
     #[test]
@@ -349,7 +379,7 @@ mod tests {
         for sigma in [1e-80, 1e-160] {
             let regime = qe_regime(0.04, 2.0, 0.04, sigma, 1.0, 1.5);
             for shock in [-8.0, 0.0, 8.0] {
-                let sampled = regime.sample(shock);
+                let sampled = regime.sample(shock).expect("QE sample");
                 assert!((sampled - 0.04).abs() < 1e-16, "σ={sigma}, draw={sampled}");
             }
             let moment = regime
@@ -391,11 +421,11 @@ mod tests {
 
         let mut rng = PhiloxRng::new(0xC0FF_EE01);
         let mut draws = vec![0.0; n];
-        rng.fill_std_normals(&mut draws);
+        rng.fill_std_normals(&mut draws).expect("normal draws");
 
         let sum: f64 = draws
             .iter()
-            .map(|z| qe_step_variance(v0, kappa, theta, sigma, dt, *z, psi_c))
+            .map(|z| qe_step_variance(v0, kappa, theta, sigma, dt, *z, psi_c).expect("QE sample"))
             .sum();
         let mean = sum / n as f64;
         let tol = 4.0 * (s2 / n as f64).sqrt();
@@ -421,8 +451,8 @@ mod tests {
         assert!(p < 1.0 && beta > 0.0);
 
         for z in [-1.0, 0.0, 0.5, 1.0, 2.0, 3.5, 5.0] {
-            let u = norm_cdf(z);
-            let v = regime.sample(z);
+            let u = norm_cdf(z).expect("valid Gaussian variate");
+            let v = regime.sample(z).expect("QE sample");
             if u <= p {
                 assert_eq!(v, 0.0, "atom at zero for u <= p");
             } else {
@@ -445,7 +475,7 @@ mod tests {
         let mut prev = f64::NEG_INFINITY;
         let mut z = -4.0;
         while z <= 8.5 {
-            let v = regime.sample(z);
+            let v = regime.sample(z).expect("QE sample");
             assert!(
                 v >= prev,
                 "Case B draw must be non-decreasing in z: v({z})={v} < {prev}"
@@ -471,8 +501,9 @@ mod tests {
         let psi_c = 1.5;
 
         for z in [-2.5, -1.0, -0.1, 0.0, 0.2, 1.3, 3.1] {
-            let heston = qe_step_variance(v_t, kappa, theta, sigma, dt, z, psi_c);
-            let cir = qe_step_variance(v_t, kappa, theta, sigma, dt, z, psi_c);
+            let heston =
+                qe_step_variance(v_t, kappa, theta, sigma, dt, z, psi_c).expect("QE sample");
+            let cir = qe_step_variance(v_t, kappa, theta, sigma, dt, z, psi_c).expect("QE sample");
             assert_eq!(
                 heston.to_bits(),
                 cir.to_bits(),

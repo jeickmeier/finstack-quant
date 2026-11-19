@@ -45,7 +45,9 @@ fn create_market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
 }
 
 // Waterfall specs

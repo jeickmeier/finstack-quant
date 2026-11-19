@@ -218,7 +218,9 @@ fn test_time_roll_with_bond_carry() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

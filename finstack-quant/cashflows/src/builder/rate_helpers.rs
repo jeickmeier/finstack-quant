@@ -546,7 +546,9 @@ mod tests {
             finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         )
         .expect("ForwardCurve builder should succeed with valid test data");
-        MarketContext::new().insert(fwd_curve)
+        MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve")
     }
 
     #[test]
@@ -570,7 +572,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("USD-LIBOR-3M", reset, 0.001, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 100.0,
@@ -594,7 +598,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("USD-LIBOR-3M", reset, 0.08, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 200.0,
@@ -618,7 +624,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.0001, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 100.0,
@@ -642,7 +650,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.03, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 100.0,
@@ -667,7 +677,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.02, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 100.0,

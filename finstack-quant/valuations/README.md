@@ -113,12 +113,12 @@ fn main() -> finstack_quant_core::Result<()> {
     let as_of = date!(2025 - 01 - 15);
     let bond = Bond::example()?; // 10y USD Treasury-style, discounts off "USD-TREASURY"
 
-    let market = MarketContext::new().insert(
+    let market = MarketContext::new().try_insert(
         DiscountCurve::builder("USD-TREASURY")
             .base_date(as_of)
             .knots([(0.0, 1.0), (30.0, 0.40)])
             .build()?,
-    );
+    )?;
 
     let result = bond.price_with_metrics(
         &market,
@@ -273,12 +273,12 @@ let bond = Bond::with_convention(
     "USD-OIS",
 )?;
 
-let market = MarketContext::new().insert(
+let market = MarketContext::new().try_insert(
     DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (30.0, 0.40)])
         .build()?,
-);
+)?;
 let metrics = vec![MetricId::BucketedDv01];
 
 let result = bond.price_with_metrics(&market, as_of, &metrics, PricingOptions::default())?;
@@ -317,18 +317,18 @@ let swap = InterestRateSwap::example()?;
 // A seasoned swap needs a discount curve, a projection curve for the
 // floating leg, and the historical fixings its past resets already consumed.
 let market = MarketContext::new()
-    .insert(
+    .try_insert(
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (30.0, 0.40)])
             .build()?,
-    )
-    .insert(
+    )?
+    .try_insert(
         ForwardCurve::builder("USD-SOFR-3M", 0.25)
             .base_date(as_of)
             .knots([(0.0, 0.04), (30.0, 0.04)])
             .build()?,
-    )
+    )?
     .insert_series(ScalarTimeSeries::new(
         "FIXING:USD-SOFR-3M",
         (0..400)
@@ -386,12 +386,12 @@ let option = EquityOption::european(
 // `european` binds the standard ids: USD-OIS, EQUITY-SPOT,
 // EQUITY-VOL, and EQUITY-DIVYIELD.
 let market = MarketContext::new()
-    .insert(
+    .try_insert(
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()?,
-    )
+    )?
     .insert_price("EQUITY-SPOT", MarketScalar::unitless(4500.0)?)
     .insert_price("EQUITY-DIVYIELD", MarketScalar::unitless(0.015)?)
     .insert_surface(
@@ -446,12 +446,12 @@ let option = EquityOption::european(
     OptionType::Call,
 )?;
 let market = MarketContext::new()
-    .insert(
+    .try_insert(
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()?,
-    )
+    )?
     .insert_price("EQUITY-SPOT", MarketScalar::unitless(4500.0)?)
     .insert_price("EQUITY-DIVYIELD", MarketScalar::unitless(0.015)?)
     .insert_surface(

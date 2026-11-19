@@ -128,8 +128,10 @@ pub fn market_context_with_index() -> (MarketContext, InflationIndex) {
 
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())
-        .insert(disc)
-        .insert(index_projection(&index))
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(index_projection(&index))
+        .expect("insert market curve")
         .insert_inflation_index(index.clone());
 
     (ctx, index)
@@ -180,8 +182,10 @@ pub fn market_context_with_curve() -> (MarketContext, InflationCurve) {
                 Currency::USD,
             ),
         )
-        .insert(disc)
-        .insert(curve);
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(curve)
+        .expect("insert market curve");
 
     (
         ctx,
@@ -230,8 +234,10 @@ pub fn uk_market_context() -> (MarketContext, InflationIndex) {
 
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())
-        .insert(disc)
-        .insert(index_projection(&index))
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(index_projection(&index))
+        .expect("insert market curve")
         .insert_inflation_index(index.clone());
 
     (ctx, index)

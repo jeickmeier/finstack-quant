@@ -251,26 +251,10 @@ impl BermudanSwaptionPricerConfig {
             }
             previous = time;
         }
-        let grid = TimeGrid::uniform_with_required_times(
-            maturity,
-            base_steps as f64 / maturity,
-            base_steps,
-            exercise_times,
-        )?;
-        // Resolve contractual events once, using the grid builder's merge
-        // tolerance. No event lookup occurs inside the path-stepping loop.
+        let grid = TimeGrid::uniform_with_required_times(maturity, base_steps, exercise_times)?;
         let exercise_indices = exercise_times
             .iter()
-            .map(|time| {
-                grid.times()
-                    .iter()
-                    .position(|node| (node - time).abs() < 1e-10)
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(format!(
-                            "LSMC exercise time {time} is missing from the simulation grid"
-                        ))
-                    })
-            })
+            .map(|&time| grid.get_index(time))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
         Ok((grid, exercise_indices))
     }
@@ -595,7 +579,7 @@ impl BermudanSwaptionPricer {
             exercise_cashflows[slot].evaluate(
                 t,
                 hw_params.model.kappa,
-                hw_params.sigma_at_time(t),
+                hw_params.sigma_at_time(t)?,
                 |maturity| hw_bond_price(&hw_params, short_rate, t, maturity, discount_fn),
                 terms,
             )
@@ -977,15 +961,17 @@ mod lsmc_diagnostics_tests {
         model.hw1f_mean_reversion = Some(0.03);
         model.hw1f_sigma = Some(0.012);
         model.mc_paths = Some(64);
-        let market = MarketContext::new().insert(
-            DiscountCurve::flat(
-                "USD-OIS",
-                as_of,
-                0.03,
-                finstack_quant_core::dates::DayCount::Act365F,
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::flat(
+                    "USD-OIS",
+                    as_of,
+                    0.03,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("discount curve"),
             )
-            .expect("discount curve"),
-        );
+            .expect("insert market curve");
 
         for mc_base_steps in [None, Some(64)] {
             for antithetic in [false, true] {

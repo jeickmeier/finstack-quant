@@ -301,7 +301,10 @@ mod expected_variance_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(disc).insert_series(series);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .insert_series(series);
 
         // Everything that borrows `market` must be evaluated before it is moved
         // into the `MetricContext`.

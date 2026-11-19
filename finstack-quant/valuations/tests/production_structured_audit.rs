@@ -13,16 +13,18 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use time::macros::date;
 
 fn market(as_of: Date) -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (20.0, (-0.03_f64 * 20.0).exp())])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount curve"),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (20.0, (-0.03_f64 * 20.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount curve"),
+        )
+        .expect("insert market curve")
 }
 
 #[test]

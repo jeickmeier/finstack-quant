@@ -38,8 +38,10 @@ fn test_forward_variance_flat_surface() {
     let fx_matrix = FxMatrix::new(fx_provider, None);
 
     let ctx = MarketContext::new()
-        .insert(dom_curve)
-        .insert(for_curve)
+        .try_insert(dom_curve)
+        .expect("insert market curve")
+        .try_insert(for_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_fx(fx_matrix);
 

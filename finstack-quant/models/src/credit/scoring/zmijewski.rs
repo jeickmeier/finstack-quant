@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use finstack_quant_core::math::special_functions::norm_cdf;
+use finstack_quant_core::math::special_functions::norm_cdf_unchecked;
 
 use super::types::{CreditScoringError, ScoringResult, ScoringZone, check_finite};
 
@@ -86,7 +86,8 @@ pub fn zmijewski_score(input: &ZmijewskiInput) -> Result<ScoringResult, CreditSc
         + 0.004 * input.current_assets_to_current_liabilities;
 
     // Probit transform: PD = Phi(Y)
-    let implied_pd = norm_cdf(y);
+    check_finite("probit score", y)?;
+    let implied_pd = norm_cdf_unchecked(y);
 
     let zone = if implied_pd < 0.10 {
         ScoringZone::Safe

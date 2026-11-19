@@ -21,6 +21,13 @@ def test_credit_non_finite_inputs_raise_value_error(invalid: float) -> None:
         credit.pd.pit_to_ttc(0.02, 0.2, invalid)
 
 
+def test_recovery_sampling_extreme_concentration() -> None:
+    with pytest.raises(ValueError, match="finite, positive Beta shapes"):
+        credit.lgd.BetaRecovery(0.5, 1e-300)
+    recovery = credit.lgd.BetaRecovery(0.5, 3e-155)
+    assert recovery.sample_seeded(4, 173) == [0.5] * 4
+
+
 def test_lgd_typed_surface() -> None:
     stats = credit.lgd.seniority_recovery_stats("senior_secured", "moodys_recovery_1982_2023")
     assert isinstance(stats, credit.lgd.BetaRecovery)

@@ -375,7 +375,13 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(disc).insert(fwd).insert(fwd_1m)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
+        .try_insert(fwd_1m)
+        .expect("insert market curve")
 }
 
 fn create_monthly_market() -> MarketContext {
@@ -523,13 +529,13 @@ fn create_ois_control(control: OisControl) -> (InterestRateSwap, MarketContext, 
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("valid explicit overnight forward curve");
-            market = market.insert(forward);
+            market = market.try_insert(forward).expect("insert market curve");
         }
         OisControl::DiscountDerivedForward => {
             swap.float_leg.forward_curve_id = CurveId::new("USD-SOFR-OIS");
             let disc = market.get_discount("USD-OIS").expect("OIS discount curve");
             let forward = ForwardCurve::from_discount_curve("USD-SOFR-OIS", disc.as_ref(), None);
-            market = market.insert(forward);
+            market = market.try_insert(forward).expect("insert market curve");
         }
     }
 

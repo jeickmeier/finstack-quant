@@ -109,9 +109,11 @@ mod tests {
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
         });
-        let market = MarketContext::new().insert(
-            ForwardCurve::flat("USD-SOFR-OIS", as_of, 0.05, DayCount::Act360).expect("forward"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                ForwardCurve::flat("USD-SOFR-OIS", as_of, 0.05, DayCount::Act360).expect("forward"),
+            )
+            .expect("insert market curve");
 
         let next = next_option_theta_expiry(&option, &market, as_of)
             .expect("theta expiry")

@@ -265,10 +265,13 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        let market = MarketContext::new().insert(curve).insert_price(
-            option.spot_id.as_str(),
-            MarketScalar::unitless(100.0).expect("valid scalar"),
-        );
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve")
+            .insert_price(
+                option.spot_id.as_str(),
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            );
         for volatility in [0.04, 0.02, 0.01] {
             option.instrument_pricing_overrides = option
                 .instrument_pricing_overrides

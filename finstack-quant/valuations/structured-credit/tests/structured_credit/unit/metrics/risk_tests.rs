@@ -210,8 +210,10 @@ mod discount_margin_tests {
             .build()
             .unwrap();
         MarketContext::new()
-            .insert(disc)
-            .insert(sofr)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(sofr)
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:SOFR-3M",
@@ -502,7 +504,9 @@ mod breakeven_cdr_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// 80% senior / 20% equity ABS, no prepayment, 40% recovery: the senior is
@@ -621,7 +625,9 @@ mod scenario_table_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     fn deal() -> StructuredCredit {
@@ -775,7 +781,9 @@ mod oas_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// A steeply curved discount curve (sharp short-end roll-down then a flat
@@ -797,7 +805,9 @@ mod oas_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     fn deal() -> StructuredCredit {

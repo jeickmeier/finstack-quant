@@ -188,8 +188,11 @@ mod tests {
         as_of: finstack_quant_core::dates::Date,
     ) -> PriceCurve {
         PriceCurve::builder(id)
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(price)
             .knots([(0.0, price), (1.0, price), (2.0, price)])
             .build()
             .expect("flat price curve")
@@ -230,11 +233,14 @@ mod tests {
         let disc = flat_discount_curve("USD-OIS", rate, as_of);
 
         MarketContext::new()
-            .insert(leg1_fwd)
-            .insert(leg2_fwd)
+            .try_insert(leg1_fwd)
+            .expect("insert market curve")
+            .try_insert(leg2_fwd)
+            .expect("insert market curve")
             .insert_surface(leg1_vol)
             .insert_surface(leg2_vol)
-            .insert(disc)
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     fn make_spread_option(

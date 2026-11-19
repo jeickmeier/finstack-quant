@@ -64,12 +64,16 @@ fn hazard_curve() -> HazardCurve {
 
 fn market() -> MarketContext {
     MarketContext::new()
-        .insert(discount_curve())
-        .insert(hazard_curve())
+        .try_insert(discount_curve())
+        .expect("insert market curve")
+        .try_insert(hazard_curve())
+        .expect("insert market curve")
 }
 
 fn replayable_market() -> MarketContext {
-    let source = MarketContext::new().insert(discount_curve());
+    let source = MarketContext::new()
+        .try_insert(discount_curve())
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of(),
@@ -78,7 +82,7 @@ fn replayable_market() -> MarketContext {
         "USD-OIS",
     )
     .expect("hazard calibration should succeed");
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 /// Fixed-rate callable bond routed onto the rates-credit tree by an explicit
@@ -504,8 +508,10 @@ fn callable_credit_term_loan_structural_baselines() {
         .build()
         .unwrap();
     let stressed = MarketContext::new()
-        .insert(discount_curve())
-        .insert(high_hazard);
+        .try_insert(discount_curve())
+        .expect("insert market curve")
+        .try_insert(high_hazard)
+        .expect("insert market curve");
     let stressed_pv = pricer
         .price_callable(&base, &stressed, as_of())
         .unwrap()

@@ -47,7 +47,7 @@
 //!   ACM Transactions on Mathematical Software, 33(4), Article 22. `docs/REFERENCES.md#salmon-2011-philox`
 
 use super::super::traits::RandomStream;
-use finstack_quant_core::math::random::box_muller_transform;
+use finstack_quant_core::math::random::box_muller;
 
 /// Philox 4x32-10 random number generator.
 ///
@@ -219,10 +219,10 @@ impl RandomStream for PhiloxRng {
     ///
     /// Uses Box-Muller transform in pairs.
     #[inline]
-    fn fill_std_normals(&mut self, out: &mut [f64]) {
+    fn fill_std_normals(&mut self, out: &mut [f64]) -> finstack_quant_core::Result<()> {
         let mut i = 0;
-        if let Some(spare) = self.spare_normal.take()
-            && let Some(first) = out.first_mut()
+        if let Some(first) = out.first_mut()
+            && let Some(spare) = self.spare_normal.take()
         {
             *first = spare;
             i = 1;
@@ -232,7 +232,7 @@ impl RandomStream for PhiloxRng {
             let u1 = self.next_u01();
             let u2 = self.next_u01();
 
-            let (z1, z2) = box_muller_transform(u1, u2);
+            let (z1, z2) = box_muller(u1, u2)?;
             out[i] = z1;
             i += 1;
 
@@ -243,6 +243,7 @@ impl RandomStream for PhiloxRng {
                 self.spare_normal = Some(z2);
             }
         }
+        Ok(())
     }
 }
 
@@ -295,8 +296,8 @@ mod tests {
         let mut b = PhiloxRng::with_stream(42, 2);
         let mut za = vec![0.0; n];
         let mut zb = vec![0.0; n];
-        a.fill_std_normals(&mut za);
-        b.fill_std_normals(&mut zb);
+        a.fill_std_normals(&mut za).unwrap();
+        b.fill_std_normals(&mut zb).unwrap();
 
         let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
         let (ma, mb) = (mean(&za), mean(&zb));
@@ -352,7 +353,7 @@ mod tests {
     fn test_philox_normals() {
         let mut rng = PhiloxRng::new(42);
         let mut normals = vec![0.0; 1000];
-        rng.fill_std_normals(&mut normals);
+        rng.fill_std_normals(&mut normals).unwrap();
 
         let mean: f64 = normals.iter().sum::<f64>() / normals.len() as f64;
         let variance: f64 =
@@ -391,6 +392,7 @@ mod tests {
                 assert!(uniform > 0.0 && uniform < 1.0);
                 assert!(
                     finstack_quant_core::math::special_functions::standard_normal_inv_cdf(uniform)
+                        .expect("valid probability")
                         .is_finite()
                 );
             }
@@ -399,7 +401,7 @@ mod tests {
         rng.block = [0, 0, u32::MAX, u32::MAX];
         rng.idx = 0;
         let mut normals = [0.0; 2];
-        rng.fill_std_normals(&mut normals);
+        rng.fill_std_normals(&mut normals).unwrap();
         assert!(normals.iter().all(|z| z.is_finite()));
     }
 
@@ -409,11 +411,11 @@ mod tests {
         let mut rng_even = PhiloxRng::new(42);
 
         let mut odd = [0.0; 1];
-        rng_odd.fill_std_normals(&mut odd);
-        let next_from_odd = rng_odd.next_std_normal();
+        rng_odd.fill_std_normals(&mut odd).unwrap();
+        let next_from_odd = rng_odd.next_std_normal().unwrap();
 
         let mut even = [0.0; 2];
-        rng_even.fill_std_normals(&mut even);
+        rng_even.fill_std_normals(&mut even).unwrap();
 
         assert_eq!(odd[0], even[0]);
         assert_eq!(next_from_odd, even[1]);

@@ -123,6 +123,21 @@ const SPEC_BASE: &str = r#"{
         "calendar_id":"weekends_only""#;
 
 #[test]
+fn both_wire_schedules_and_direct_nominal_references_reject_off_grid_anchors() {
+    let mut spec: ScheduleSpec = serde_json::from_str(&format!("{SPEC_BASE}}}")).unwrap();
+    spec.grid = GridMode::EndOfMonth;
+    assert!(spec.validate().is_err());
+    assert!(serde_json::from_value::<ScheduleSpec>(serde_json::to_value(&spec).unwrap()).is_err());
+    let reference = finstack_quant_core::dates::NominalReference {
+        anchor: spec.start,
+        frequency: spec.frequency,
+        grid: spec.grid,
+    };
+    assert!(reference.roll_date(0).is_err());
+    assert!(reference.roll_date(1).is_err());
+}
+
+#[test]
 fn schedule_spec_rejects_retired_policy_booleans() {
     for retired in [
         "\"allow_missing_calendar\":true",

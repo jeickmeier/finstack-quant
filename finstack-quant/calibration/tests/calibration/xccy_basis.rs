@@ -51,7 +51,9 @@ fn market(day_count: DayCount, base: Date) -> MarketContext {
         .extrapolation(ExtrapolationPolicy::Flat)
         .build()
         .expect("domestic discount curve");
-    MarketContext::new().insert(discount)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
 }
 
 fn deposit(rate: f64) -> MarketQuote {

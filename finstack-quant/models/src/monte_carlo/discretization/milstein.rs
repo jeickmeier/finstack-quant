@@ -68,14 +68,22 @@ impl Milstein {
 }
 
 impl<P: StochasticProcess + ProportionalDiffusion> Discretization<P> for Milstein {
-    fn step(&self, process: &P, t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]) {
+    fn step(
+        &self,
+        process: &P,
+        t: f64,
+        dt: f64,
+        x: &mut [f64],
+        z: &[f64],
+        work: &mut [f64],
+    ) -> finstack_quant_core::Result<()> {
         let dim = process.dim();
 
         // Compute drift: work[0..dim] = μ(t, x)
         process.drift(t, x, &mut work[0..dim]);
 
         // Compute diffusion: work[dim..2*dim] = σ(t, x)
-        process.diffusion(t, x, &mut work[dim..2 * dim]);
+        process.diffusion(t, x, &mut work[dim..2 * dim])?;
 
         // For diagonal diffusion, we need ∂σ/∂x.
         // WARNING: This approximation σ' ≈ σ/X is only exact for GBM.
@@ -102,6 +110,7 @@ impl<P: StochasticProcess + ProportionalDiffusion> Discretization<P> for Milstei
             // Milstein step
             x[i] += mu * dt + sigma * sqrt_dt * z[i] + correction;
         }
+        Ok(())
     }
 
     fn work_size(&self, process: &P) -> usize {
@@ -127,7 +136,8 @@ mod tests {
         let z = vec![1.0]; // One std dev
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert!(x[0] > 0.0);
         // Should have moved up (positive drift + positive shock)
@@ -151,10 +161,14 @@ mod tests {
 
         let mut x_milstein = vec![x0];
         let mut work = vec![0.0; 2];
-        Milstein::new().step(&process, t, dt, &mut x_milstein, &[z_val], &mut work);
+        Milstein::new()
+            .step(&process, t, dt, &mut x_milstein, &[z_val], &mut work)
+            .expect("valid simulation step");
 
         let mut x_euler = vec![x0];
-        EulerMaruyama::new().step(&process, t, dt, &mut x_euler, &[z_val], &mut work);
+        EulerMaruyama::new()
+            .step(&process, t, dt, &mut x_euler, &[z_val], &mut work)
+            .expect("valid simulation step");
 
         let milstein_error = (x_milstein[0] - exact).abs();
         let euler_error = (x_euler[0] - exact).abs();

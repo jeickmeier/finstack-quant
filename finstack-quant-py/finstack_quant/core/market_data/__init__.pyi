@@ -7,9 +7,9 @@ scalar series and the unified :class:`MarketContext` container.
 
 Every curve query (``df``, ``zero_rate``, ``rate``, ``sp``,
 ``hazard_rate``, ``price``, ``cpi``) accepts either a year fraction (``float``)
-or a date (``datetime.date`` or ISO ``"YYYY-MM-DD"`` string); dates are
-converted with the curve's own day count by Rust. Constructor options after
-``knots`` are keyword-only.
+or a date (``datetime.date`` or ISO ``"YYYY-MM-DD"`` string). Rust converts
+dates with the curve's own time axis. ``ForwardCurve`` takes one options
+dictionary.
 
 Examples
 --------

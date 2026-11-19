@@ -40,7 +40,9 @@ fn market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 const CLOSE: (i32, u8, u8) = (2024, 1, 1);

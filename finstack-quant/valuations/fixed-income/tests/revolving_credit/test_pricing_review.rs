@@ -87,8 +87,12 @@ fn test_pricing_recovery_consistency() {
         .unwrap();
 
     let mut market = MarketContext::new();
-    market = market.insert(discount_curve);
-    market = market.insert(hazard_curve);
+    market = market
+        .try_insert(discount_curve)
+        .expect("insert market curve");
+    market = market
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     // 3. Price
     let pv = facility.value(&market, as_of).unwrap();
@@ -293,8 +297,10 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
         .unwrap();
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:USD-SOFR-3M",
@@ -364,7 +370,9 @@ fn test_upfront_fee_excluded_after_commitment() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let pv = facility.value(&market, after_commitment).unwrap();
     assert!(

@@ -931,26 +931,30 @@ pub(super) mod tests {
         use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
         use time::macros::date;
 
-        let mut market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(date!(2024 - 01 - 01))
-                .day_count(DayCount::Act365F)
-                .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.85)])
-                .interp(InterpStyle::MonotoneConvex)
-                .extrapolation(ExtrapolationPolicy::Extend)
-                .build()
-                .expect("discount curve"),
-        );
-        if with_credit {
-            market = market.insert(
-                HazardCurve::builder("USD-HZ")
+        let mut market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
                     .base_date(date!(2024 - 01 - 01))
                     .day_count(DayCount::Act365F)
-                    .recovery_rate(0.4)
-                    .knots([(1.0, 0.02), (5.0, 0.02)])
+                    .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.85)])
+                    .interp(InterpStyle::MonotoneConvex)
+                    .extrapolation(ExtrapolationPolicy::Extend)
                     .build()
-                    .expect("hazard curve"),
-            );
+                    .expect("discount curve"),
+            )
+            .expect("insert market curve");
+        if with_credit {
+            market = market
+                .try_insert(
+                    HazardCurve::builder("USD-HZ")
+                        .base_date(date!(2024 - 01 - 01))
+                        .day_count(DayCount::Act365F)
+                        .recovery_rate(0.4)
+                        .knots([(1.0, 0.02), (5.0, 0.02)])
+                        .build()
+                        .expect("hazard curve"),
+                )
+                .expect("insert market curve");
         }
         market
     }
@@ -1222,7 +1226,9 @@ pub(super) mod tests {
             .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
         serde_json::to_string(&ctx).expect("serialize")
     }
 
@@ -1238,10 +1244,15 @@ pub(super) mod tests {
             DiscountCurve::flat("USD-OIS", base, 0.02, DayCount::Act365F).expect("discount curve");
         let fwd = ForwardCurve::flat("USD-SOFR-6M", base, 0.03, DayCount::Act365F)
             .expect("forward curve");
-        let ctx = MarketContext::new().insert(disc).insert(fwd).insert_price(
-            "SOFR-RATE",
-            MarketScalar::unitless(0.03).expect("unitless scalar"),
-        );
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve")
+            .insert_price(
+                "SOFR-RATE",
+                MarketScalar::unitless(0.03).expect("unitless scalar"),
+            );
         serde_json::to_string(&ctx).expect("serialize")
     }
 
@@ -1284,8 +1295,10 @@ pub(super) mod tests {
         )
         .expect("forward curve");
         let ctx = MarketContext::new()
-            .insert(disc)
-            .insert(fwd)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve")
             .insert_surface(flat_surface("USD-SWAPTION-VOL-10Y", 0.25))
             .insert_surface(flat_surface("USD-SWAPTION-VOL-2Y", 0.20));
         serde_json::to_string(&ctx).expect("serialize")
@@ -1588,7 +1601,12 @@ pub(super) mod tests {
             .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .expect("valid discount curve");
-        serde_json::to_string(&MarketContext::new().insert(curve)).expect("serialize market")
+        serde_json::to_string(
+            &MarketContext::new()
+                .try_insert(curve)
+                .expect("insert market curve"),
+        )
+        .expect("serialize market")
     }
 
     #[test]

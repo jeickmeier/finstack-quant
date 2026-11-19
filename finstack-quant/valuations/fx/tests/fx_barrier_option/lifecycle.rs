@@ -15,8 +15,10 @@ fn fx_barrier_generic_theta_horizon_caps_at_expiry() -> finstack_quant_core::Res
     let as_of = date(2024, 12, 30);
     let expiry = date(2025, 1, 1);
     let market = MarketContext::new()
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
-        .insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 5.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
+        .expect("insert market curve")
+        .try_insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 5.0))
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface(
             "EURUSD-VOL",
             &[0.25, 0.5, 1.0, 2.0, 5.0],

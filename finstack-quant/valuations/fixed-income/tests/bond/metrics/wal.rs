@@ -25,7 +25,9 @@ fn flat_curve(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 fn wal(bond: &Bond, market: &MarketContext, as_of: Date) -> f64 {

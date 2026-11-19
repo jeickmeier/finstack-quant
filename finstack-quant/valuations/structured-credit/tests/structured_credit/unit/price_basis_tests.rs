@@ -40,7 +40,9 @@ fn market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// Two-class CLO closed 2022-01-01, valued 2024-01-01. `seasoned` halves the

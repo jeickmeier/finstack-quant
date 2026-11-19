@@ -182,7 +182,7 @@ impl MetricCalculator for UnderlyingSpreadDv01Calculator {
             .curves
             .as_ref()
             .clone()
-            .insert(bumped_hazard.as_ref().clone());
+            .try_insert(bumped_hazard.as_ref().clone())?;
         let base_pv = cds.value(&context.curves, context.as_of)?.amount();
         let bumped_pv = cds.value(&bumped_market, context.as_of)?.amount();
         Ok(bumped_pv - base_pv)

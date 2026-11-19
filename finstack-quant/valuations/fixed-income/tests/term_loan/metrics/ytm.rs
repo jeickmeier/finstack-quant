@@ -44,7 +44,9 @@ fn test_ytm_par_loan() {
         .unwrap();
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let result = loan.price_with_metrics(
@@ -109,7 +111,9 @@ fn test_ytm_discount_loan() {
         .unwrap();
 
     let disc_curve = flat_discount_curve(0.06, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let result = loan.price_with_metrics(
@@ -156,7 +160,9 @@ fn test_ytm_uses_quoted_clean_price_pct_when_present() {
         .unwrap();
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let base = loan
         .price_with_metrics(
@@ -232,7 +238,9 @@ fn test_ytm_quoted_price_applies_to_outstanding_not_commitment() {
         InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = loan
         .price_with_metrics(
@@ -334,8 +342,10 @@ fn test_ytm_current_period_coupon_uses_fixing() {
         )
         .unwrap();
         MarketContext::new()
-            .insert(disc_curve)
-            .insert(fwd_curve)
+            .try_insert(disc_curve)
+            .expect("insert market curve")
+            .try_insert(fwd_curve)
+            .expect("insert market curve")
             .insert_series(fixings)
     };
 

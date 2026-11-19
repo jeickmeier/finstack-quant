@@ -208,7 +208,7 @@ struct TaylorAttributionResult {
     /// All realized period receipts, including returned principal.
     pub theta_cash_paid: Option<Money>,
     /// Diagnostic notes accumulated during factor computation (failed factors,
-    /// surface-averaged vol moves, missing T0 FX). Threaded into
+    /// missing volatility references, missing T0 FX). Threaded into
     /// `PnlAttribution::meta.notes` by `attribute_pnl_taylor`.
     pub notes: Vec<String>,
     /// True when a factor backed by a declared market dependency or the theta
@@ -376,16 +376,7 @@ fn compute_taylor_result(
         acc.record("credit", curve_id.as_str(), result, repricings);
     }
 
-    // Volatility sensitivities (vega) — one factor per vol-surface dependency.
-    // The realized vol move is measured at the instrument's own reference
-    // point (expiry from `Instrument::expiry`, strike from the dependency)
-    // when available; otherwise it falls back to the surface average and the
-    // fallback is recorded in the notes, because an averaged move nets a
-    // term-structure twist toward zero.
-    let reference_expiry_years = instrument_t0
-        .expiry()
-        .map(|expiry| (expiry - as_of_t0).whole_days() as f64 / 365.0)
-        .filter(|t| *t > 0.0);
+    // Measure each declared surface at its contractual expiry and strike.
     let surface_dependencies: Vec<_> = market_deps
         .volatility_dependencies
         .iter()
@@ -395,15 +386,6 @@ fn compute_taylor_result(
         })
         .cloned()
         .collect();
-    for dependency in &surface_dependencies {
-        if reference_expiry_years.is_none() || dependency.reference_strike.is_none() {
-            acc.notes.push(format!(
-                "Taylor vol factor '{}': no reference expiry/strike available; \
-                 vol move is surface-averaged",
-                dependency.vol_surface_id
-            ));
-        }
-    }
     let compute_vol =
         |dependency: &finstack_quant_valuations::instruments::VolatilityDependency| {
             let mut repricings = 0;
@@ -414,7 +396,6 @@ fn compute_taylor_result(
                 as_of_t0,
                 pv_t0,
                 dependency,
-                reference_expiry_years,
                 config,
                 repricings: &mut repricings,
             });
@@ -629,7 +610,7 @@ pub(crate) fn attribute_pnl_taylor(
     let ccy = attribution.total_pnl.currency();
 
     // Surface the factor-level diagnostics collected during computation
-    // (failed factors, surface-averaged vol moves, missing T0 FX) and
+    // (failed factors, missing volatility references, missing T0 FX) and
     // propagate the invalid flag when a dependency-backed factor or theta failed.
     attribution.meta.notes.extend(taylor.notes.iter().cloned());
     if taylor.result_invalid {
@@ -981,7 +962,7 @@ fn bump_credit_market(
             deal_quote_override: None,
             action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bump_bp)),
         })?;
-        return Ok(market.clone().insert(bumped.as_ref().clone()));
+        return market.clone().try_insert(bumped.as_ref().clone());
     }
     market.get_discount(curve_id.as_str())?;
     market.bump([MarketBump::DiscountCurve {
@@ -1022,7 +1003,7 @@ fn bump_credit_keyrates(
                     bump_bp: bucket.move_bp * scale,
                 },
             })?;
-            bumped = bumped.insert(rebuilt);
+            bumped.try_insert_mut(rebuilt)?;
         }
         Ok(bumped)
     } else {
@@ -1163,21 +1144,13 @@ struct VolFactorInputs<'a> {
     as_of_t0: Date,
     pv_t0: Money,
     dependency: &'a finstack_quant_valuations::instruments::VolatilityDependency,
-    reference_expiry_years: Option<f64>,
     config: &'a TaylorAttributionConfig,
     repricings: &'a mut usize,
 }
 
 /// Compute volatility (vega) attribution for a single vol-surface dependency.
 ///
-/// The realized move is measured at the instrument's own reference point when
-/// available — `reference_expiry_years` derived from [`Instrument::expiry`]
-/// (Act/365) and the dependency's `reference_strike` — because the fallback
-/// surface-averaged move (sampled across expiries at the middle strike) nets a
-/// term-structure twist toward zero and mis-states the move the instrument
-/// actually experienced. When either reference coordinate is missing,
-/// `measure_vol_surface_shift` falls back to the surface average and the
-/// caller records a metadata note.
+/// Measures both surfaces at the instrument's contractual expiry and strike.
 fn compute_vol_factor(inputs: VolFactorInputs<'_>) -> Result<TaylorFactorResult> {
     let VolFactorInputs {
         instrument,
@@ -1186,11 +1159,26 @@ fn compute_vol_factor(inputs: VolFactorInputs<'_>) -> Result<TaylorFactorResult>
         as_of_t0,
         pv_t0,
         dependency,
-        reference_expiry_years,
         config,
         repricings,
     } = inputs;
     let vol_surface_id = &dependency.vol_surface_id;
+    let (expiry, strike) = instrument
+        .expiry()
+        .zip(dependency.reference_strike)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "Taylor volatility factor requires a reference expiry and strike".into(),
+            )
+        })?;
+    let opening = market_t0.get_surface(vol_surface_id)?;
+    let closing = market_t1.get_surface(vol_surface_id)?;
+    opening.require_secondary_axis(
+        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+    )?;
+    let (t0, t1) = volatility_expiry_times(&opening, &closing, expiry, as_of_t0)?;
+    let vol_move =
+        100.0 * measure_vol_surface_shift(vol_surface_id, market_t0, market_t1, t0, t1, strike)?;
     let bumped_up = bump_surface_vol_absolute(market_t0, vol_surface_id.as_str(), config.vol_bump)?;
     *repricings += 1;
     let pv_up = instrument.value(&bumped_up, as_of_t0)?;
@@ -1200,28 +1188,9 @@ fn compute_vol_factor(inputs: VolFactorInputs<'_>) -> Result<TaylorFactorResult>
     *repricings += 1;
     let pv_down = instrument.value(&bumped_down, as_of_t0)?;
 
-    // Central difference vega in $ per vol point.
-    //
-    // `measure_vol_surface_shift` returns the move in *percentage points* (absolute
-    // move × 100). To keep units consistent we must express vega in the same
-    // per-point basis: divide by `vol_bump_abs × 100` rather than `vol_bump_abs`.
-    //
-    //   vega_per_point [$/vol-point] = ΔPV / (2 × vol_bump_abs × 100)
-    //   explained [$]               = vega_per_point × vol_move_points
-    let vol_bump_points = config.vol_bump * 100.0; // convert bump to vol-point units
+    // The ledger reports Vega per 0.01 native sigma and Volga per (0.01 sigma)².
+    let vol_bump_points = config.vol_bump * 100.0;
     let vega_per_point = (pv_up.amount() - pv_down.amount()) / (2.0 * vol_bump_points);
-
-    // vol_move is in vol points (percentage points of absolute vol), measured
-    // at the instrument's reference point when both coordinates are known
-    // (surface-averaged otherwise — see the function docs).
-    let vol_move = measure_vol_surface_shift(
-        vol_surface_id.as_str(),
-        market_t0,
-        market_t1,
-        reference_expiry_years,
-        dependency.reference_strike,
-    )?;
-
     let explained = vega_per_point * vol_move;
 
     let gamma_pnl = if config.include_gamma {
@@ -1562,8 +1531,12 @@ mod tests {
         let fwd_t1 = ForwardCurve::flat("TEST-FWD", as_of_t0, 0.04, DayCount::Act360)
             .expect("forward curve");
 
-        let market_t0 = MarketContext::new().insert(fwd_t0);
-        let market_t1 = MarketContext::new().insert(fwd_t1);
+        let market_t0 = MarketContext::new()
+            .try_insert(fwd_t0)
+            .expect("insert market curve");
+        let market_t1 = MarketContext::new()
+            .try_insert(fwd_t1)
+            .expect("insert market curve");
 
         let instrument: Arc<dyn Instrument> = Arc::new(
             TestInstrument::new("FWDI", Money::from((0_i64, Currency::USD)))
@@ -1827,8 +1800,12 @@ mod tests {
                 .build()
                 .expect("discount curve")
         };
-        let market_t0 = MarketContext::new().insert(curve(as_of_t0, 0.98));
-        let market_t1 = MarketContext::new().insert(curve(as_of_t1, 0.97));
+        let market_t0 = MarketContext::new()
+            .try_insert(curve(as_of_t0, 0.98))
+            .expect("insert market curve");
+        let market_t1 = MarketContext::new()
+            .try_insert(curve(as_of_t1, 0.97))
+            .expect("insert market curve");
 
         for bad in [
             TaylorAttributionConfig {
@@ -2178,7 +2155,7 @@ mod tests {
                 } => {
                     let corr = market
                         .get_base_correlation(*curve)?
-                        .correlation(*detachment);
+                        .get_correlation(*detachment)?;
                     Ok(Money::new(scale * corr, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::ModelCpr { scale } => {
@@ -2278,8 +2255,12 @@ mod tests {
         let tenor = 1.5;
         let (z0, z1) = (0.03, 0.04);
 
-        let market_t0 = MarketContext::new().insert(flat_zero_curve("USD-OIS", as_of_t0, z0));
-        let market_t1 = MarketContext::new().insert(flat_zero_curve("USD-OIS", as_of_t1, z1));
+        let market_t0 = MarketContext::new()
+            .try_insert(flat_zero_curve("USD-OIS", as_of_t0, z0))
+            .expect("insert market curve");
+        let market_t1 = MarketContext::new()
+            .try_insert(flat_zero_curve("USD-OIS", as_of_t1, z1))
+            .expect("insert market curve");
 
         let mut mock = MockInstrument::new(
             "ZC-1.5Y",
@@ -2336,7 +2317,9 @@ mod tests {
         let mut mock = MockInstrument::new("NEUTRAL", MockPayoff::HedgedZeros { short_notional });
         mock.discount_curves = vec![CurveId::new("HEDGE")];
         let instrument: Arc<dyn Instrument> = Arc::new(mock);
-        let opening = MarketContext::new().insert(flat_zero_curve("HEDGE", start, rate));
+        let opening = MarketContext::new()
+            .try_insert(flat_zero_curve("HEDGE", start, rate))
+            .expect("insert market curve");
         let mut moves = vec![0.0; STANDARD_BUCKETS_YEARS.len()];
         for (tenor, movement) in [(1.0, 10.0), (5.0, -10.0)] {
             let i = STANDARD_BUCKETS_YEARS
@@ -2430,8 +2413,12 @@ mod tests {
         let tenor = 1.5;
         let (r0, r1) = (0.03, 0.04);
 
-        let market_t0 = MarketContext::new().insert(flat_forward_curve("TEST-FWD", as_of_t0, r0));
-        let market_t1 = MarketContext::new().insert(flat_forward_curve("TEST-FWD", as_of_t1, r1));
+        let market_t0 = MarketContext::new()
+            .try_insert(flat_forward_curve("TEST-FWD", as_of_t0, r0))
+            .expect("insert market curve");
+        let market_t1 = MarketContext::new()
+            .try_insert(flat_forward_curve("TEST-FWD", as_of_t1, r1))
+            .expect("insert market curve");
 
         let mut mock = MockInstrument::new(
             "FWD-CONVEX",
@@ -2508,7 +2495,11 @@ mod tests {
             &[(1, 110.0), (3, 130.0), (5, 160.0)],
         )
         .unwrap();
-        let market = MarketContext::new().insert(discount).insert(hazard);
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve");
         let bumped = bump_credit_market(
             &market,
             &CurveId::new("HAZ"),
@@ -2527,7 +2518,7 @@ mod tests {
             .knots([(1.0, 0.02), (5.0, 0.02)])
             .build()
             .unwrap();
-        let missing = market.insert(bare);
+        let missing = market.try_insert(bare).expect("insert market curve");
         let error = bump_credit_market(
             &missing,
             &CurveId::new("BARE"),
@@ -2549,8 +2540,12 @@ mod tests {
         let tenor = 5.0;
         let (z0, z1) = (0.02, 0.03);
 
-        let market_t0 = MarketContext::new().insert(flat_zero_curve("CR-DISC", as_of_t0, z0));
-        let market_t1 = MarketContext::new().insert(flat_zero_curve("CR-DISC", as_of_t1, z1));
+        let market_t0 = MarketContext::new()
+            .try_insert(flat_zero_curve("CR-DISC", as_of_t0, z0))
+            .expect("insert market curve");
+        let market_t1 = MarketContext::new()
+            .try_insert(flat_zero_curve("CR-DISC", as_of_t1, z1))
+            .expect("insert market curve");
 
         let pv0 = notional * (-z0 * tenor).exp();
         // Analytic zero-rate CS01 ($/bp) for the 5y bucket.
@@ -2636,9 +2631,10 @@ mod tests {
             },
         );
         mock.vol_deps = vec![
-            VolatilityDependency::new("VOL-A", None, None),
-            VolatilityDependency::new("VOL-B", None, None),
+            VolatilityDependency::new("VOL-A", None, Some(100.0)),
+            VolatilityDependency::new("VOL-B", None, Some(100.0)),
         ];
+        mock.expiry = Some(date!(2026 - 01 - 15));
         let instrument: Arc<dyn Instrument> = Arc::new(mock);
 
         let config = TaylorAttributionConfig::default();
@@ -2738,10 +2734,37 @@ mod tests {
         );
     }
 
-    /// Without a reference expiry/strike the vol move stays surface-averaged,
-    /// and the attribution metadata must say so.
     #[test]
-    fn vol_without_reference_point_notes_surface_average() {
+    fn volatility_expiry_times_follow_each_explicit_clock() {
+        use finstack_quant_core::dates::{DayCountContextState, VolatilityClock};
+        let opening_date = date!(2025 - 01 - 01);
+        let closing_date = date!(2025 - 01 - 02);
+        let expiry = date!(2025 - 07 - 01);
+        let surface = two_expiry_surface("VOL", 0.20, 0.21);
+        let clocked = |anchor| {
+            surface.clone().with_expiry_clock(
+                VolatilityClock::try_new(anchor, DayCount::Act360, DayCountContextState::default())
+                    .unwrap(),
+            )
+        };
+        let (opening, closing) = volatility_expiry_times(
+            &clocked(opening_date),
+            &clocked(closing_date),
+            expiry,
+            opening_date,
+        )
+        .unwrap();
+        assert!((opening - 181.0 / 360.0).abs() < 1e-14);
+        assert!((closing - 180.0 / 360.0).abs() < 1e-14);
+        let (opening, closing) =
+            volatility_expiry_times(&surface, &surface, expiry, opening_date).unwrap();
+        assert_eq!(opening.to_bits(), closing.to_bits());
+        assert!((opening - 181.0 / 365.0).abs() < 1e-14);
+    }
+
+    /// A missing reference prevents attribution and is recorded on the result.
+    #[test]
+    fn vol_without_reference_point_reports_missing_factor() {
         let as_of_t0 = date!(2025 - 01 - 15);
         let as_of_t1 = date!(2025 - 01 - 16);
 
@@ -2777,12 +2800,10 @@ mod tests {
         .expect("taylor attribution should succeed");
 
         assert!(
-            attribution
-                .meta
-                .notes
-                .iter()
-                .any(|n| n.contains("VOL-X") && n.contains("surface-averaged")),
-            "metadata must note that the vol move is surface-averaged, got {:?}",
+            attribution.meta.notes.iter().any(
+                |n| n.contains("VOL-X") && n.contains("requires a reference expiry and strike")
+            ),
+            "metadata must identify the missing volatility reference, got {:?}",
             attribution.meta.notes
         );
     }
@@ -2810,7 +2831,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market_t0 = MarketContext::new().insert(curve);
+        let market_t0 = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         // T1 lacks the curve entirely → the rates factor must fail.
         let market_t1 = MarketContext::new();
 
@@ -3140,8 +3163,12 @@ mod tests {
                 scale: 1_000.0,
             },
         ));
-        let market_t0 = MarketContext::new().insert(infl(325.0));
-        let market_t1 = MarketContext::new().insert(infl(350.0));
+        let market_t0 = MarketContext::new()
+            .try_insert(infl(325.0))
+            .expect("insert market curve");
+        let market_t1 = MarketContext::new()
+            .try_insert(infl(350.0))
+            .expect("insert market curve");
 
         let attribution = crate::attribute_pnl(
             &AttributionMethod::Taylor(TaylorAttributionConfig::default()),
@@ -3191,8 +3218,12 @@ mod tests {
                 scale: 1_000_000.0,
             },
         ));
-        let market_t0 = MarketContext::new().insert(corr(0.40));
-        let market_t1 = MarketContext::new().insert(corr(0.50));
+        let market_t0 = MarketContext::new()
+            .try_insert(corr(0.40))
+            .expect("insert market curve");
+        let market_t1 = MarketContext::new()
+            .try_insert(corr(0.50))
+            .expect("insert market curve");
 
         let attribution = crate::attribute_pnl(
             &AttributionMethod::Taylor(TaylorAttributionConfig::default()),

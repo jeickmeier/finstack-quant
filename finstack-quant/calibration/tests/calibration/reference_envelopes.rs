@@ -302,7 +302,7 @@ fn example_05_cdx_base_correlation_builds_queryable_curve() {
         .expect("base correlation curve present after calibration");
 
     // detachment_pct is in percentage units: 7.0 means the 7% detachment point.
-    let corr_7pct = bc.correlation(7.0);
+    let corr_7pct = bc.get_correlation(7.0).expect("valid detachment");
     assert!(
         (0.0..=1.0).contains(&corr_7pct),
         "base correlation at 7% detachment should be in [0, 1], got {corr_7pct}"
@@ -365,8 +365,11 @@ fn example_07_swaption_vol_surface_builds_queryable_surface() {
     let vol = surface
         .get_normal_vol(1.0, 5.0, 0.05)
         .expect("vol query at 1y × 5y × ATM should succeed");
-    // The input quotes and reconstructed cube both use decimal normal volatility.
-    assert!(surface.get_vol(1.0, 5.0, 0.05).is_err());
+    assert!(surface.get_convention(1.0, 5.0).is_err());
+    let black = surface
+        .get_vol(1.0, 5.0, 0.05)
+        .expect("explicit relative quote");
+    assert!(black > vol);
     assert!(
         vol > 0.0 && vol < 0.05,
         "normal volatility must be below 500 bp, got {vol}"

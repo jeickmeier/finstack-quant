@@ -184,10 +184,11 @@ impl StochasticProcess for GbmWithDividends {
         out[0] = (self.params.r - self.params.q) * x[0];
     }
 
-    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         // Diffusion is same as standard GBM
         // σ(S) = σ S
         out[0] = self.params.sigma * x[0];
+        Ok(())
     }
 
     /// Only [`ExactGbmWithDividends`](crate::monte_carlo::discretization::exact_gbm_dividends::ExactGbmWithDividends)

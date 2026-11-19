@@ -371,7 +371,8 @@ fn compare_paths(fixture: &Fixture) -> Value {
         for stream in 0..PATH_STREAMS {
             let mut rng = root.substream(stream as u64);
             let mut innovations = vec![0.0; fixture.grid.num_steps() * params.num_factors];
-            rng.fill_std_normals(&mut innovations);
+            rng.fill_std_normals(&mut innovations)
+                .expect("normal draws");
             innovations_hash.values(&innovations);
             for mirror in [false, true] {
                 let mut actual = params.initial_forwards.clone();
@@ -390,7 +391,9 @@ fn compare_paths(fixture: &Fixture) -> Value {
                         .collect();
                     let before = actual.clone();
                     let reference_before = expected.clone();
-                    scheme.step(&process, t, dt, &mut actual, &z, &mut work);
+                    scheme
+                        .step(&process, t, dt, &mut actual, &z, &mut work)
+                        .expect("valid simulation step");
                     reference::step(params, t, dt, &mut expected, &z, &mut reference_work);
                     let first = reference::first_alive(params, t);
                     for i in 0..n {
@@ -489,7 +492,8 @@ fn caplet_seed(params: &LmmParams, seed: u64, streams: usize) -> Value {
     for stream in 0..streams {
         let mut rng = root.substream(stream as u64);
         let mut innovations = vec![0.0; grid.num_steps() * params.num_factors];
-        rng.fill_std_normals(&mut innovations);
+        rng.fill_std_normals(&mut innovations)
+            .expect("normal draws");
         innovations_hash.values(&innovations);
         let mut actual = params.initial_forwards.clone();
         let mut expected = params.initial_forwards.clone();
@@ -498,14 +502,16 @@ fn caplet_seed(params: &LmmParams, seed: u64, streams: usize) -> Value {
         for step in 0..grid.num_steps() {
             let start = step * params.num_factors;
             let z = &innovations[start..start + params.num_factors];
-            scheme.step(
-                &process,
-                grid.time(step),
-                grid.dt(step),
-                &mut actual,
-                z,
-                &mut work,
-            );
+            scheme
+                .step(
+                    &process,
+                    grid.time(step),
+                    grid.dt(step),
+                    &mut actual,
+                    z,
+                    &mut work,
+                )
+                .expect("valid simulation step");
             reference::step(
                 params,
                 grid.time(step),
@@ -637,7 +643,7 @@ fn validation_panel() {
         let mut expected = actual.clone();
         let mut work = vec![0.0; scheme.work_size(&process)];
         let mut reference_work = vec![0.0; 3 * params.num_forwards];
-        scheme.step(&process, t, dt, &mut actual, &[0.4, -0.2], &mut work);
+        assert_validation(scheme.step(&process, t, dt, &mut actual, &[0.4, -0.2], &mut work));
         reference::step(
             params,
             t,
@@ -646,7 +652,7 @@ fn validation_panel() {
             &[0.4, -0.2],
             &mut reference_work,
         );
-        assert!(actual.iter().all(|value| value.is_nan()));
+        assert_eq!(actual, params.initial_forwards);
         assert!(expected.iter().all(|value| value.is_nan()));
     }
     // The displaced boundary is legal as a runtime absorbed state, while the
@@ -656,7 +662,9 @@ fn validation_panel() {
     let mut expected = actual.clone();
     let mut work = vec![0.0; 3 * base.num_forwards];
     let mut reference_work = work.clone();
-    scheme.step(&process, 0.0, 0.25, &mut actual, &[0.4, -0.2], &mut work);
+    scheme
+        .step(&process, 0.0, 0.25, &mut actual, &[0.4, -0.2], &mut work)
+        .expect("valid simulation step");
     reference::step(
         &base,
         0.0,

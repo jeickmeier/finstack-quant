@@ -9,6 +9,7 @@ export function Example({ width = 880 }: ExampleProps) {
       cube={cubes.vol_cubes.find((cube) => cube.id !== "SHIFTED-BLACK")!}
       initialStrikes={[0.04, 0.045, 0.05, 0.055, 0.06]}
       initialConvention="normal"
+      interpolationMode="vol"
       initialRate={0.04}
       repairIterations={10}
       colorDomains={{ normal: [0.003, 0.012], lognormal: [0.1, 0.7] }}

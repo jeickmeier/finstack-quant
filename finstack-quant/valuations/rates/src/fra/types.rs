@@ -556,7 +556,11 @@ mod tests {
             / fwd.df(t_end).expect("end projection DF")
             - 1.0)
             / accrual;
-        let ctx = MarketContext::new().insert(disc).insert(fwd);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve");
         let fra = ForwardRateAgreement::builder()
             .id("FRA-3x6".into())
             .notional(Money::from((1_000_000_i64, Currency::USD)))
@@ -626,7 +630,11 @@ mod tests {
             / fwd.df(t_end).expect("end projection DF")
             - 1.0)
             / accrual;
-        let ctx = MarketContext::new().insert(disc).insert(fwd);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve");
 
         let fra = ForwardRateAgreement::builder()
             .id("FRA-TEST".into())
@@ -704,7 +712,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
             .build()
             .expect("forward curve");
-        let ctx = MarketContext::new().insert(disc).insert(fwd);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve");
         let fra = ForwardRateAgreement::builder()
             .id("FRA-PRE-BASE".into())
             .notional(Money::from((1_000_000_i64, Currency::USD)))

@@ -8,9 +8,10 @@ use finstack_quant_core::math::Compounding;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::math::interp::InterpStyle;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 use super::discount::PyDiscountCurve;
-use super::helpers::{TimePoint, columns_to_dataframe, extract_time_point};
+use super::helpers::{CurveSourceOptions, TimePoint, columns_to_dataframe, extract_time_point};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
@@ -30,15 +31,15 @@ use crate::errors::core_to_py;
 /// -------
 /// >>> import math
 /// >>> from finstack_quant.core.market_data import ForwardCurve
-/// >>> curve = ForwardCurve(
-/// ...     "USD-SOFR-3M",
-/// ...     "2025-01-01",
-/// ...     [(0.0, 1.0), (1.0, math.exp(-0.04))],
-/// ...     interp="log_linear",
-/// ...     extrapolation="extend",
-/// ...     day_count="act_360",
-/// ...     index_tenor="3M",
-/// ... )
+/// >>> curve = ForwardCurve({
+/// ...     "id": "USD-SOFR-3M",
+/// ...     "base_date": "2025-01-01",
+/// ...     "knots": [(0.0, 1.0), (1.0, math.exp(-0.04))],
+/// ...     "interp": "log_linear",
+/// ...     "extrapolation": "extend",
+/// ...     "day_count": "act_360",
+/// ...     "index_tenor": "3M",
+/// ... })
 /// >>> round(curve.rate_between(0.0, 0.25, 0.25), 6)
 /// 0.040201
 #[pyclass(
@@ -62,80 +63,45 @@ impl PyForwardCurve {
 
 #[pymethods]
 impl PyForwardCurve {
-    /// Construct a forward curve from ``(time_years, projection_factor)`` knots.
+    /// Construct a projection-factor curve from a dictionary of explicit options.
     ///
     /// Parameters
     /// ----------
-    /// id : str
-    ///     Unique curve identifier (e.g. ``"USD-SOFR-3M"``).
-    /// base_date : datetime.date | str
-    ///     Valuation date anchoring ``t = 0``; ISO ``"YYYY-MM-DD"`` strings are accepted.
-    /// knots : list[tuple[float, float]]
-    ///     Strictly ascending ``(time_years, projection_factor)`` pairs with
-    ///     finite, strictly positive factors. ``(0.0, 1.0)`` is prepended when
-    ///     absent; a supplied ``t = 0`` knot must have factor ``1.0``.
-    /// interp : str
-    ///     Interpolation style (``"log_linear"``, ``"linear"``,
-    ///     ``"monotone_convex"``, ``"cubic_hermite"``,
-    ///     ``"piecewise_quadratic_forward"``). Keyword-only and required.
-    /// extrapolation : str
-    ///     Tail policy outside the knots (``"extend"``, ``"flat"``, or
-    ///     ``"error"``, which raises outside the pillar range). Keyword-only and required.
-    /// day_count : DayCount | str
-    ///     Day-count convention used to convert query dates to curve time.
-    ///     Keyword-only and required (never inferred from ``id``).
-    /// index_tenor : Tenor | str, optional
-    ///     Accrual tenor of the projected index (for example ``"3M"``).
-    ///     Term-rate consumers such as statement rate bindings require it;
-    ///     ``None`` leaves the curve without index-period metadata.
+    /// options : dict
+    ///     Required keys: ``id`` (curve identifier), ``base_date`` (ISO date or
+    ///     ``datetime.date``), ``knots`` (strictly ordered time/projection-factor
+    ///     pairs), ``interp`` (interpolation style), ``extrapolation`` (tail
+    ///     policy) and ``day_count`` (a ``DayCount`` or label). Factors must be
+    ///     finite and positive. A supplied zero-time factor must be one. If
+    ///     omitted, ``(0.0, 1.0)`` is prepended. Optional ``calendar_id`` is
+    ///     required for ``"bus_252"``. Optional ``index_tenor`` accepts a
+    ///     ``Tenor`` or a label such as ``"3M"`` for index accrual metadata.
     ///
     /// Raises
     /// ------
-    /// ValueError
-    ///     If a knot is non-finite, non-positive, unsorted or duplicated, a
-    ///     ``t = 0`` factor is not ``1.0``, a label is unknown, or the day count
-    ///     needs a holiday calendar.
     /// TypeError
-    ///     If ``index_tenor`` is neither a ``Tenor`` nor a string.
-    ///
-    /// Example
-    /// -------
-    /// >>> import math
-    /// >>> from finstack_quant.core.market_data import ForwardCurve
-    /// >>> curve = ForwardCurve(
-    /// ...     "USD-SOFR-3M",
-    /// ...     "2025-01-01",
-    /// ...     [(1.0, math.exp(-0.04))],
-    /// ...     interp="log_linear",
-    /// ...     extrapolation="extend",
-    /// ...     day_count="act_360",
-    /// ...     index_tenor="3M",
-    /// ... )
-    /// >>> curve.knots
-    /// [0.0, 1.0]
+    ///     If a key is missing or unknown or any option has the wrong type.
+    /// ValueError
+    ///     If the knots, day-count context or a convention label are invalid.
+    /// KeyError
+    ///     If a supplied holiday calendar or union member is unknown.
     #[new]
-    #[pyo3(signature = (id, base_date, knots, *, interp, extrapolation, day_count, index_tenor=None))]
-    fn new(
-        id: &str,
-        base_date: &Bound<'_, PyAny>,
-        knots: Vec<(f64, f64)>,
-        interp: &str,
-        extrapolation: &str,
-        day_count: &Bound<'_, PyAny>,
-        index_tenor: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<Self> {
-        let base = py_to_date(base_date)?;
-        ForwardCurve::builder(id)
-            .base_date(base)
-            .knots(knots)
-            .index_tenor_opt(index_tenor.map(extract_tenor).transpose()?)
-            .interp(interp.parse::<InterpStyle>().map_err(core_to_py)?)
-            .extrapolation(
-                extrapolation
-                    .parse::<ExtrapolationPolicy>()
-                    .map_err(core_to_py)?,
-            )
-            .day_count(extract_day_count(day_count)?)
+    fn new(options: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let source = CurveSourceOptions::extract(options, "ForwardCurve", "index_tenor")?;
+        let index_tenor = options
+            .get_item("index_tenor")?
+            .filter(|value| !value.is_none())
+            .as_ref()
+            .map(extract_tenor)
+            .transpose()?;
+        ForwardCurve::builder(source.id)
+            .base_date(source.base_date)
+            .knots(source.knots)
+            .index_tenor_opt(index_tenor)
+            .interp(source.interp)
+            .extrapolation(source.extrapolation)
+            .day_count(source.day_count)
+            .calendar_id_opt(source.calendar_id)
             .build()
             .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)

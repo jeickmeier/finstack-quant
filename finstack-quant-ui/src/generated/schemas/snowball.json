@@ -3570,20 +3570,24 @@
     },
     "d_cdb8fddc0106047270c4": {
       "additionalProperties": false,
-      "description": "A finite, left-continuous piecewise-constant curve.",
+      "description": "A finite, right-continuous piecewise-constant curve.",
       "properties": {
         "times": {
           "items": {
             "format": "double",
+            "minimum": 0,
             "type": "number"
           },
+          "minItems": 1,
           "type": "array"
         },
         "values": {
           "items": {
             "format": "double",
+            "minimum": 0,
             "type": "number"
           },
+          "minItems": 1,
           "type": "array"
         }
       },

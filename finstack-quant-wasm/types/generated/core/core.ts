@@ -371,6 +371,10 @@ export type CurveState =
        */
       base: DateWire;
       /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
+      /**
        * Day count convention
        */
       day_count: DayCount;
@@ -391,13 +395,9 @@ export type CurveState =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
       type: "price";
     }
   | {
@@ -814,6 +814,12 @@ export type RateCalibrationCurveRole =
  * vs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.
  */
 export type Seniority = "senior_secured" | "senior" | "subordinated" | "junior";
+/**
+ * Level family a [`PriceCurve`] represents.
+ *
+ * The kind determines level validation and the typed market-context lookup.
+ */
+export type PriceCurveKind = "price" | "vol_index";
 /**
  * Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters.
  */
@@ -1953,6 +1959,7 @@ export interface VolCube {
    * Option expiries in years, strictly increasing. Indexes the first axis.
    */
   expiries: number[];
+  expiry_clock?: VolatilityClock | null;
   /**
    * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
    */
@@ -2175,6 +2182,7 @@ export interface TableEnvelope {
 export interface VolCubeExpirySlice {
   displacements?: number[] | null;
   expiry: number;
+  expiry_clock?: VolatilityClock | null;
   id: string;
   quote_type: VolQuoteType;
   strikes: number[];

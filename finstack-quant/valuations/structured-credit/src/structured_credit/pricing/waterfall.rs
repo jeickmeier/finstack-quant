@@ -1409,7 +1409,7 @@ fn calculate_payment_amount(
         let val = raw_amount;
         let rounded_val = match convention {
             RoundingConvention::Nearest => {
-                finstack_quant_core::math::round_half_away(val, decimals)
+                finstack_quant_core::math::round_half_away(val, decimals)?
             }
             RoundingConvention::Floor => (val * scale).floor() / scale,
             RoundingConvention::Ceiling => (val * scale).ceil() / scale,

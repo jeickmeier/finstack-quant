@@ -59,8 +59,20 @@ fn vol_cube_accessors_reject_each_out_of_bounds_axis_before_flattening() {
 }
 
 #[test]
+fn volatility_objects_reject_blank_ids_before_context_insertion() {
+    let mut wire = serde_json::to_value(sample_vol_surface()).expect("surface state");
+    wire["id"] = serde_json::Value::String(" ".to_owned());
+    assert!(serde_json::from_value::<VolSurface>(wire).is_err());
+
+    let node = SabrParameterData::new(0.03, 0.5, 0.3, -0.2, None).expect("SABR node");
+    assert!(VolCube::from_grid(" ", &[1.0], &[1.0], &[node], &[0.01]).is_err());
+}
+
+#[test]
 fn condition_rejects_dates_before_source_base_date() {
-    let context = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
+    let context = MarketContext::new()
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve");
     for date in [Date::MIN, sample_base_date() - time::Duration::days(1)] {
         assert!(context.condition(date).is_err());
     }
@@ -97,11 +109,16 @@ fn curve_storage_helpers() {
 #[test]
 fn market_context_inserts_and_retrieves_curves() {
     let ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .insert(sample_forward_curve("USD-LIBOR"))
-        .insert(sample_hazard_curve("CDX"))
-        .insert(sample_inflation_curve("USD-CPI"))
-        .insert(sample_base_correlation_curve("CDX-BC"));
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(sample_forward_curve("USD-LIBOR"))
+        .expect("insert market curve")
+        .try_insert(sample_hazard_curve("CDX"))
+        .expect("insert market curve")
+        .try_insert(sample_inflation_curve("USD-CPI"))
+        .expect("insert market curve")
+        .try_insert(sample_base_correlation_curve("CDX-BC"))
+        .expect("insert market curve");
 
     let stats = ctx.stats();
     assert_eq!(stats.total_curves, 5);
@@ -128,9 +145,12 @@ fn market_context_inserts_and_retrieves_curves() {
 #[test]
 fn market_context_getters_accept_preparsed_curve_ids() {
     let ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .insert(sample_forward_curve("USD-LIBOR"))
-        .insert(sample_hazard_curve("CDX"));
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(sample_forward_curve("USD-LIBOR"))
+        .expect("insert market curve")
+        .try_insert(sample_hazard_curve("CDX"))
+        .expect("insert market curve");
 
     assert_eq!(
         ctx.get_discount(CurveId::from("USD-OIS").as_str())
@@ -160,7 +180,11 @@ fn market_context_typed_mut_variants_store_curves() {
     let discount = sample_discount_curve("USD-OIS");
     let forward = sample_forward_curve("USD-LIBOR");
 
-    let ctx = MarketContext::new().insert(discount).insert(forward);
+    let ctx = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve");
 
     assert_eq!(
         ctx.get_discount("USD-OIS").unwrap().id().as_str(),
@@ -235,12 +259,15 @@ fn market_context_manages_fx_and_scalars() {
 
     let ctx = MarketContext::new()
         .insert_fx(sample_fx_matrix())
-        .insert(sample_discount_curve("USD-OIS"))
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
         .insert_series(series)
         .insert_inflation_index(index)
         .insert_dividends(dividends)
-        .insert(Arc::clone(credit_index.index_credit_curve()))
-        .insert(Arc::clone(credit_index.base_correlation_curve()))
+        .try_insert(Arc::clone(credit_index.index_credit_curve()))
+        .expect("insert market curve")
+        .try_insert(Arc::clone(credit_index.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX", credit_index)
         .expect("canonical credit index")
         .insert_surface(vol_surface.clone())
@@ -276,8 +303,10 @@ fn market_context_manages_fx_and_scalars() {
 #[test]
 fn market_context_supports_curve_bumps() {
     let ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .insert(sample_forward_curve("USD-LIBOR"));
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(sample_forward_curve("USD-LIBOR"))
+        .expect("insert market curve");
 
     // Get the original discount factor for verification
     let orig_disc = ctx.get_discount("USD-OIS").unwrap();
@@ -405,8 +434,10 @@ fn market_context_roll_forward_keeps_credit_index_curves_consistent() {
         .unwrap();
 
     let rolled = MarketContext::new()
-        .insert(hazard)
-        .insert(base_corr)
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(base_corr)
+        .expect("insert market curve")
         .insert_credit_index("CDX-IG", credit_index)
         .expect("canonical credit index")
         .condition(sample_base_date() + time::Duration::days(30))
@@ -443,11 +474,14 @@ fn generic_curve_replace_rebinds_credit_index_dependencies() {
             .unwrap();
 
     let ctx = MarketContext::new()
-        .insert(original_hazard)
-        .insert(base_corr)
+        .try_insert(original_hazard)
+        .expect("insert market curve")
+        .try_insert(base_corr)
+        .expect("insert market curve")
         .insert_credit_index("CDX-IG", credit_index)
         .expect("canonical credit index")
-        .insert(replacement_hazard);
+        .try_insert(replacement_hazard)
+        .expect("insert market curve");
 
     let direct_hazard = ctx.get_hazard("CDX").unwrap();
     let bundled_credit_index = ctx.get_credit_index("CDX-IG").unwrap();
@@ -469,8 +503,10 @@ fn generic_cross_type_curve_replacement_is_rejected_and_preserves_credit_index()
         .build()
         .expect("valid index");
     let market = MarketContext::new()
-        .insert(hazard)
-        .insert(correlation)
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(correlation)
+        .expect("insert market curve")
         .insert_credit_index("CDX-IG", index)
         .expect("valid canonical index");
     assert!(
@@ -479,10 +515,9 @@ fn generic_cross_type_curve_replacement_is_rejected_and_preserves_credit_index()
             .try_insert(sample_discount_curve("CDX"))
             .is_err()
     );
-    let preserved = market.insert(sample_discount_curve("CDX"));
-    assert!(preserved.get_hazard("CDX").is_ok());
-    assert!(preserved.get_discount("CDX").is_err());
-    assert!(preserved.get_credit_index("CDX-IG").is_ok());
+    assert!(market.get_hazard("CDX").is_ok());
+    assert!(market.get_discount("CDX").is_err());
+    assert!(market.get_credit_index("CDX-IG").is_ok());
 }
 
 #[test]
@@ -522,9 +557,12 @@ fn credit_index_insert_uses_canonical_dependencies_before_roundtrip_or_other_ins
         .build()
         .expect("index");
     let context = MarketContext::new()
-        .insert(Arc::clone(&canonical_hazard))
-        .insert(Arc::clone(&canonical_issuer))
-        .insert(Arc::clone(&canonical_correlation))
+        .try_insert(Arc::clone(&canonical_hazard))
+        .expect("insert market curve")
+        .try_insert(Arc::clone(&canonical_issuer))
+        .expect("insert market curve")
+        .try_insert(Arc::clone(&canonical_correlation))
+        .expect("insert market curve")
         .insert_credit_index("INDEX", index)
         .expect("all dependencies present");
     let index = context.get_credit_index("INDEX").expect("index");
@@ -541,7 +579,10 @@ fn credit_index_insert_uses_canonical_dependencies_before_roundtrip_or_other_ins
     let restored: MarketContext =
         serde_json::from_str(&serde_json::to_string(&context).expect("serialize canonical market"))
             .expect("restore canonical market");
-    let unrelated = context.clone().insert(sample_discount_curve("UNRELATED"));
+    let unrelated = context
+        .clone()
+        .try_insert(sample_discount_curve("UNRELATED"))
+        .expect("insert market curve");
     for market in [&context, &restored, &unrelated] {
         let index = market.get_credit_index("INDEX").expect("index");
         assert!((index.index_credit_curve().sp(5.0).expect("sp") - (-0.1_f64).exp()).abs() < 1e-14);
@@ -573,10 +614,14 @@ fn credit_index_insert_rejects_missing_or_wrong_type_dependencies_atomically() {
         .expect("index");
     for mut context in [
         MarketContext::new(),
-        MarketContext::new().insert(Arc::clone(&hazard)),
         MarketContext::new()
-            .insert(sample_discount_curve("CDX"))
-            .insert(Arc::clone(&correlation)),
+            .try_insert(Arc::clone(&hazard))
+            .expect("insert market curve"),
+        MarketContext::new()
+            .try_insert(sample_discount_curve("CDX"))
+            .expect("insert market curve")
+            .try_insert(Arc::clone(&correlation))
+            .expect("insert market curve"),
     ] {
         let before = serde_json::to_string(&context).expect("before");
         assert!(
@@ -588,8 +633,10 @@ fn credit_index_insert_rejects_missing_or_wrong_type_dependencies_atomically() {
     }
 
     let mut context = MarketContext::new()
-        .insert(hazard)
-        .insert(correlation)
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(correlation)
+        .expect("insert market curve")
         .insert_credit_index("INDEX", index.clone())
         .expect("index dependencies");
     let original = context.get_credit_index("INDEX").expect("original index");
@@ -676,10 +723,14 @@ fn retaining_curves_removes_dangling_indices() {
         .build()
         .expect("index");
     let context = MarketContext::new()
-        .insert(hazard)
-        .insert(issuer)
-        .insert(correlation)
-        .insert(sample_discount_curve("USD-OIS"))
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(issuer)
+        .expect("insert market curve")
+        .try_insert(correlation)
+        .expect("insert market curve")
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
         .insert_credit_index("INDEX", index)
         .expect("index dependencies");
 
@@ -728,8 +779,10 @@ fn cross_type_curve_replacement_rejects_atomically_and_preserves_credit_index() 
         .unwrap();
 
     let mut ctx = MarketContext::new()
-        .insert(original_hazard)
-        .insert(base_corr)
+        .try_insert(original_hazard)
+        .expect("insert market curve")
+        .try_insert(base_corr)
+        .expect("insert market curve")
         .insert_credit_index("CDX-IG", credit_index)
         .expect("canonical credit index");
 
@@ -738,10 +791,10 @@ fn cross_type_curve_replacement_rejects_atomically_and_preserves_credit_index() 
     assert!(ctx.get_discount("CDX").is_err());
     assert!(ctx.get_credit_index("CDX-IG").is_ok());
 
-    let ctx = ctx.insert(replacement_discount);
-    assert!(ctx.get_hazard("CDX").is_ok());
-    assert!(ctx.get_discount("CDX").is_err());
-    assert!(ctx.get_credit_index("CDX-IG").is_ok());
+    let err = ctx
+        .try_insert(replacement_discount)
+        .expect_err("cross-family replacement must fail");
+    assert!(err.to_string().contains("CDX"));
 }
 
 #[test]
@@ -794,7 +847,8 @@ fn inflation_key_rate_bump_preserves_curve_metadata() {
             .unwrap();
 
     let bumped = MarketContext::new()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .bump([MarketBump::InflationCurve {
             id: CurveId::from("US-CPI"),
             spec: BumpSpec::triangular_key_rate_bp(0.0, 1.0, 2.0, 25.0),
@@ -822,7 +876,9 @@ fn market_context_handles_additional_introspection() {
     let mut ctx = MarketContext::new();
     assert!(ctx.is_empty());
 
-    ctx = ctx.insert(sample_discount_curve("USD-OIS"));
+    ctx = ctx
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve");
     assert!(!ctx.is_empty());
     assert!(ctx.curve("USD-OIS").is_some());
 
@@ -846,8 +902,10 @@ fn market_context_update_and_bump_failures() {
         .unwrap();
 
     let ctx = MarketContext::new()
-        .insert(hazard.as_ref().clone())
-        .insert(base_corr.as_ref().clone())
+        .try_insert(hazard.as_ref().clone())
+        .expect("insert market curve")
+        .try_insert(base_corr.as_ref().clone())
+        .expect("insert market curve")
         .insert_credit_index("CDX", credit_index)
         .expect("canonical credit index");
     assert!(
@@ -872,8 +930,10 @@ fn market_context_mutations_preserve_and_report_credit_index_rebind_status() {
         .unwrap();
 
     let ctx = MarketContext::new()
-        .insert(hazard)
-        .insert(base_corr)
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(base_corr)
+        .expect("insert market curve")
         .insert_credit_index("CDX-IG", credit_index)
         .expect("canonical credit index");
 
@@ -899,7 +959,9 @@ fn market_context_mutations_preserve_and_report_credit_index_rebind_status() {
 
 #[test]
 fn market_context_roll_forward_propagates_errors_and_metadata() {
-    let stable = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
+    let stable = MarketContext::new()
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve");
     let rolled = stable
         .condition(sample_base_date() + time::Duration::days(30))
         .expect("short condition should succeed");
@@ -916,7 +978,8 @@ fn market_context_roll_forward_propagates_errors_and_metadata() {
             .build()
             .unwrap();
     MarketContext::new()
-        .insert(sparse)
+        .try_insert(sparse)
+        .expect("insert market curve")
         .condition(sample_base_date() + time::Duration::days(400))
         .expect_err("conditioning past sparse curve support should fail");
 }
@@ -1002,8 +1065,10 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
     .unwrap();
 
     let mut ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .insert(sample_forward_curve("USD-LIBOR"))
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(sample_forward_curve("USD-LIBOR"))
+        .expect("insert market curve")
         .insert_surface(sample_vol_surface())
         .insert_vol_cube(cube)
         .insert_price("SPOT", MarketScalar::unitless(100.0).unwrap())
@@ -1092,8 +1157,10 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
 #[test]
 fn market_context_getters_type_mismatch_and_not_found() {
     let ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .insert(sample_forward_curve("USD-LIBOR"))
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(sample_forward_curve("USD-LIBOR"))
+        .expect("insert market curve")
         .insert_surface(sample_vol_surface())
         .insert_price("EQ-SPOT", MarketScalar::unitless(1.0).unwrap());
 
@@ -1157,11 +1224,16 @@ fn market_context_surface_and_dividends_arc_variants_preserve_identity() {
 fn market_context_roll_forward_preserves_ids_and_clones_non_curves() {
     let surface = sample_vol_surface();
     let ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .insert(sample_forward_curve("USD-LIBOR"))
-        .insert(sample_hazard_curve("CDX"))
-        .insert(sample_inflation_curve("USD-CPI"))
-        .insert(sample_base_correlation_curve("CDX-BC"))
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(sample_forward_curve("USD-LIBOR"))
+        .expect("insert market curve")
+        .try_insert(sample_hazard_curve("CDX"))
+        .expect("insert market curve")
+        .try_insert(sample_inflation_curve("USD-CPI"))
+        .expect("insert market curve")
+        .try_insert(sample_base_correlation_curve("CDX-BC"))
+        .expect("insert market curve")
         .insert_surface(surface)
         .insert_price("EQ-SPOT", MarketScalar::unitless(1.0).unwrap())
         .insert_fx(sample_fx_matrix());
@@ -1259,7 +1331,9 @@ fn market_context_bump_fx_spot_error_and_success_paths() {
 
 #[test]
 fn market_context_bumps_inflation_triangular_key_rate_branch() {
-    let ctx = MarketContext::new().insert(sample_inflation_curve("USD-CPI"));
+    let ctx = MarketContext::new()
+        .try_insert(sample_inflation_curve("USD-CPI"))
+        .expect("insert market curve");
 
     let orig = ctx.get_inflation_curve("USD-CPI").unwrap();
     let orig_levels = orig.cpi_levels().to_vec();
@@ -1285,8 +1359,10 @@ fn market_context_apply_bumps_exercises_all_variants() {
     let date = sample_base_date();
 
     let ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .insert(sample_base_correlation_curve("CDX-BC"))
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(sample_base_correlation_curve("CDX-BC"))
+        .expect("insert market curve")
         .insert_surface(sample_vol_surface())
         .insert_fx(sample_fx_matrix());
 
@@ -1425,15 +1501,18 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
         .unwrap();
 
     let mut ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
         .insert_surface(surface_by_value)
         .insert_dividends(dividends_by_value)
         .insert_fx(sample_fx_matrix());
 
     // insert_credit_index + insert_fx
     ctx = ctx
-        .insert(Arc::clone(credit_index.index_credit_curve()))
-        .insert(Arc::clone(credit_index.base_correlation_curve()))
+        .try_insert(Arc::clone(credit_index.index_credit_curve()))
+        .expect("insert market curve")
+        .try_insert(Arc::clone(credit_index.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX", credit_index)
         .expect("canonical credit index")
         .insert_fx(sample_fx_matrix());
@@ -1501,11 +1580,16 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
 fn market_context_bump_more_curve_types_and_error_paths() {
     // Cover additional bump branches: forward multiplicative, hazard, inflation parallel, base correlation.
     let ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .insert(sample_forward_curve("USD-LIBOR"))
-        .insert(sample_hazard_curve("CDX"))
-        .insert(sample_inflation_curve("USD-CPI"))
-        .insert(sample_base_correlation_curve("CDX-BC"))
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(sample_forward_curve("USD-LIBOR"))
+        .expect("insert market curve")
+        .try_insert(sample_hazard_curve("CDX"))
+        .expect("insert market curve")
+        .try_insert(sample_inflation_curve("USD-CPI"))
+        .expect("insert market curve")
+        .try_insert(sample_base_correlation_curve("CDX-BC"))
+        .expect("insert market curve")
         .insert_surface(sample_vol_surface());
 
     let df_before = ctx.get_discount("USD-OIS").unwrap().df(2.0);
@@ -1534,7 +1618,12 @@ fn market_context_bump_more_curve_types_and_error_paths() {
             },
             MarketBump::BaseCorrelation {
                 id: CurveId::from("CDX-BC"),
-                spec: BumpSpec::inflation_shift_pct(10.0),
+                spec: BumpSpec {
+                    mode: BumpMode::Additive,
+                    units: BumpUnits::Fraction,
+                    value: 0.10,
+                    bump_type: BumpType::Parallel,
+                },
             },
         ])
         .unwrap();
@@ -1635,7 +1724,9 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
     let date = sample_base_date();
 
     // FxPct error branch (missing FX)
-    let ctx = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
+    let ctx = MarketContext::new()
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve");
     assert!(
         ctx.bump([MarketBump::FxPct {
             base: Currency::USD,
@@ -1679,7 +1770,9 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
     );
 
     // BaseCorrBucketPts "all buckets" (detachments None) path
-    let ctx = MarketContext::new().insert(sample_base_correlation_curve("CDX-BC"));
+    let ctx = MarketContext::new()
+        .try_insert(sample_base_correlation_curve("CDX-BC"))
+        .expect("insert market curve");
     let before = ctx.get_base_correlation("CDX-BC").unwrap().correlations()[0];
     let bumped = ctx
         .bump([MarketBump::BaseCorrBucketPts {
@@ -1709,7 +1802,9 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
 #[test]
 fn market_context_clone_thread_safe_smoke() {
     // MarketContext is cheap to clone and safe to use across threads when wrapped in Arc.
-    let ctx = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
+    let ctx = MarketContext::new()
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve");
     let cloned = ctx;
 
     let handle = std::thread::spawn(move || {
@@ -1734,7 +1829,9 @@ fn discount_stress_and_invalid_bumps_preserve_scratch_restoration() {
         .knots([(0.0, 1.0), (0.5, 0.999), (1.0, 0.998)])
         .build()
         .unwrap();
-    let mut context = MarketContext::new().insert(curve.clone());
+    let mut context = MarketContext::new()
+        .try_insert(curve.clone())
+        .expect("insert market curve");
     for spec in [
         BumpSpec::parallel_bp(f64::NAN),
         BumpSpec::parallel_bp(-1e308),
@@ -1785,7 +1882,9 @@ fn inflation_bumps_match_direct_curve_and_context_entry_points() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .build()
         .unwrap();
-    let context = MarketContext::new().insert(curve.clone());
+    let context = MarketContext::new()
+        .try_insert(curve.clone())
+        .expect("insert market curve");
     for (mode, units, value) in [
         (BumpMode::Additive, BumpUnits::RateBp, 100.0),
         (BumpMode::Additive, BumpUnits::Percent, -0.5),
@@ -1870,7 +1969,8 @@ fn market_context_len_counts_fx_and_dividends() {
     );
 
     let mixed = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
+        .try_insert(sample_discount_curve("USD-OIS"))
+        .expect("insert market curve")
         .insert_fx(sample_fx_matrix());
     assert_eq!(mixed.len(), 2);
 }

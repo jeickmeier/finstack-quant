@@ -91,8 +91,9 @@ fn simulate_zcb_prices(
         for step in 0..num_steps {
             let t = grid.time(step);
             let dt = grid.dt(step);
-            rng.fill_std_normals(&mut z);
-            disc.step(&process, t, dt, core::slice::from_mut(&mut r), &z, &mut []);
+            rng.fill_std_normals(&mut z).expect("normal draws");
+            disc.step(&process, t, dt, core::slice::from_mut(&mut r), &z, &mut [])
+                .expect("valid simulation step");
             // Trapezoidal accumulation of ∫r dt over [t, t+dt].
             integral += 0.5 * (prev_r + r) * dt;
             prev_r = r;
@@ -387,7 +388,8 @@ fn fitted_theta_reprices_every_interpolation_style() {
                 core::slice::from_mut(&mut rate),
                 &[0.0],
                 &mut [],
-            );
+            )
+            .expect("valid simulation step");
             integral += 0.5 * (previous + rate) * dt;
             let t = (step + 1) as f64 * dt;
             if next < maturities.len() && (t - maturities[next]).abs() < 1e-9 {

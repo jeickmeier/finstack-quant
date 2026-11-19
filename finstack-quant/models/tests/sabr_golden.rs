@@ -1,5 +1,6 @@
 //! SABR volatility-model golden tests and fixture validation.
 
+use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_models::volatility::sabr::SabrParameters;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -142,7 +143,18 @@ fn run_fixture(fixture: &SabrFixture) -> Result<Vec<String>, String> {
     let mut failures = Vec::new();
     for strike in &fixture.strikes {
         let actual = params
-            .implied_vol(fixture.forward, strike.strike, fixture.time_to_expiry)
+            .implied_vol(
+                fixture.forward,
+                strike.strike,
+                fixture.time_to_expiry,
+                if fixture.beta == 0.0 {
+                    VolQuoteType::Normal
+                } else if fixture.shift.is_some() {
+                    VolQuoteType::ShiftedBlackLognormal
+                } else {
+                    VolQuoteType::BlackLognormal
+                },
+            )
             .map_err(|error| format!("price strike '{}': {error}", strike.key))?;
         let expected = fixture.expected[&strike.key];
         let tolerance = &fixture.tolerances[&strike.key];

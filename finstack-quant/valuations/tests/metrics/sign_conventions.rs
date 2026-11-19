@@ -47,7 +47,9 @@ fn calibrated_cds_market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let source = MarketContext::new().insert(disc_curve);
+    let source = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
     let hazard = crate::metrics::credit_support::calibrated_hazard_curve(
         &source,
         as_of,
@@ -56,7 +58,7 @@ fn calibrated_cds_market(as_of: Date) -> MarketContext {
         "USD-OIS",
     )
     .expect("hazard calibration should succeed");
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 fn create_option_market(
@@ -92,7 +94,8 @@ fn create_option_market(
         .unwrap();
 
     MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "AAPL",
@@ -285,7 +288,9 @@ fn test_bond_dv01_negative() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
     let registry = STANDARD.metrics();
     let pv = bond.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(

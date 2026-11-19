@@ -745,7 +745,9 @@ mod tests {
         let sqrt_t = t.sqrt();
         let d1 = ((fwd / strike).ln() + 0.5 * sigma * sigma * t) / (sigma * sqrt_t);
         let d2 = d1 - sigma * sqrt_t;
-        (-r * t).exp() * (fwd * norm_cdf(d1) - strike * norm_cdf(d2))
+        (-r * t).exp()
+            * (fwd * norm_cdf(d1).expect("valid Gaussian variate")
+                - strike * norm_cdf(d2).expect("valid Gaussian variate"))
     }
 
     fn bs_put_price(spot: f64, strike: f64, r: f64, q: f64, t: f64, sigma: f64) -> f64 {

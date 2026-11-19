@@ -131,7 +131,7 @@ impl StochasticPrepayment for RichardRollPrepay {
         capped_annual_to_monthly(shocked_cpr)
     }
 
-    fn expected_smm(&self, seasoning: u32) -> f64 {
+    fn expected_smm(&self, seasoning: u32) -> finstack_quant_core::Result<f64> {
         // Expected SMM assuming the market rate sits at the pool coupon
         // (zero refi incentive). The refi multiplier is kept explicit so the
         // expectation stays consistent with `conditional_smm` if the
@@ -192,7 +192,7 @@ mod tests {
                 model.conditional_smm(30, &[z], 0.05, 1.0) * density * step
             })
             .sum();
-        assert!((model.expected_smm(30) - integrated).abs() < 2e-6);
+        assert!((model.expected_smm(30).unwrap() - integrated).abs() < 2e-6);
         assert!(model.has_burnout());
     }
 

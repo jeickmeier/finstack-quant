@@ -88,17 +88,21 @@ fn build_test_hazard(hz: f64, rec: f64, base: Date, id: &str) -> HazardCurve {
 
 fn create_test_market(as_of: Date) -> MarketContext {
     MarketContext::new()
-        .insert(build_test_discount(0.05, as_of, "USD_OIS"))
-        .insert(build_test_hazard(0.015, 0.40, as_of, "CORP"))
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_test_hazard(0.015, 0.40, as_of, "CORP"))
+        .expect("insert market curve")
 }
 
 fn create_replayable_test_market(as_of: Date) -> MarketContext {
-    let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
+    let source = MarketContext::new()
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 fn create_test_cds(as_of: Date, maturity: Date) -> CreditDefaultSwap {
@@ -147,12 +151,16 @@ fn test_cs01_positive_for_buyer() {
 fn standard_cs01_without_deal_quote_matches_direct_up_down_replay() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
-    let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
+    let source = MarketContext::new()
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard.clone());
+    let market = source
+        .try_insert(hazard.clone())
+        .expect("insert market curve");
     let cds = create_test_cds(as_of, maturity);
 
     let result = cds
@@ -185,11 +193,20 @@ fn standard_cs01_without_deal_quote_matches_direct_up_down_replay() {
     )
     .expect("down replay");
     let pv_up = cds
-        .value(&market.clone().insert(bumped_up), as_of)
+        .value(
+            &market
+                .clone()
+                .try_insert(bumped_up)
+                .expect("insert market curve"),
+            as_of,
+        )
         .expect("up valuation")
         .amount();
     let pv_down = cds
-        .value(&market.insert(bumped_down), as_of)
+        .value(
+            &market.try_insert(bumped_down).expect("insert market curve"),
+            as_of,
+        )
         .expect("down valuation")
         .amount();
     let direct_up_down = (pv_up - pv_down) / 2.0;
@@ -207,12 +224,14 @@ fn deal_quote_override_is_shared_by_cs01_and_cs_gamma() {
     // A deal quote replays at a calibrated pillar date; maturities are literal
     // (record CALIBRATION-FRAMEWORK-007, O7).
     let maturity = date!(2028 - 12 - 30);
-    let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
+    let source = MarketContext::new()
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
     let base = create_test_cds(as_of, maturity);
 
     let spread_risk_at_quote = |quote_bp: f64| {
@@ -296,12 +315,16 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
     // (record CALIBRATION-FRAMEWORK-007, O7).
     let maturity = date!(2028 - 12 - 30);
     let discount_id = CurveId::new("USD_OIS");
-    let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
+    let source = MarketContext::new()
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard.clone());
+    let market = source
+        .try_insert(hazard.clone())
+        .expect("insert market curve");
     let base = create_test_cds(as_of, maturity);
 
     let override_quote_bp = 130.0;
@@ -322,7 +345,10 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
         None,
     )
     .expect("replay the materially wider deal-quote center");
-    let centered_market = market.clone().insert(centered_hazard.clone());
+    let centered_market = market
+        .clone()
+        .try_insert(centered_hazard.clone())
+        .expect("insert market curve");
     let bumped_up = bump_hazard_spreads(
         &centered_hazard,
         &centered_market,
@@ -342,7 +368,13 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
     )
     .expect("down replay around deal quote");
     let pv_up = base
-        .value(&centered_market.clone().insert(bumped_up), as_of)
+        .value(
+            &centered_market
+                .clone()
+                .try_insert(bumped_up)
+                .expect("insert market curve"),
+            as_of,
+        )
         .expect("up valuation")
         .amount();
     let pv_center = base
@@ -350,7 +382,12 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
         .expect("deal-center valuation")
         .amount();
     let pv_down = base
-        .value(&centered_market.insert(bumped_down), as_of)
+        .value(
+            &centered_market
+                .try_insert(bumped_down)
+                .expect("insert market curve"),
+            as_of,
+        )
         .expect("down valuation")
         .amount();
     let bump_decimal = 1.0e-4;
@@ -395,7 +432,9 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
 fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
-    let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
+    let source = MarketContext::new()
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
@@ -415,7 +454,7 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
         .hazard_calibration()
         .expect("replayable hazard curve");
     let expected_bucket_count = recipe.spread_risk_inputs().len();
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
     let cds = create_test_cds(as_of, maturity);
 
     let result = cds
@@ -462,7 +501,9 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
 fn deal_quote_override_rejects_non_matching_replay_maturity() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2034 - 01 - 01);
-    let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
+    let source = MarketContext::new()
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
@@ -472,7 +513,7 @@ fn deal_quote_override_rejects_non_matching_replay_maturity() {
         &[(5 * 365, 100.0)],
     )
     .expect("5Y-only hazard calibration should succeed");
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
     let mut cds = create_test_cds(as_of, maturity);
     cds.instrument_pricing_overrides.market_quotes.cds_quote_bp = Some(150.0);
 
@@ -504,7 +545,9 @@ fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
     cds.doc_clause = Some(CdsDocClause::IsdaNa);
 
     let discount = build_test_discount(0.035, as_of, discount_id.as_str());
-    let source = MarketContext::new().insert(discount);
+    let source = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
@@ -519,7 +562,7 @@ fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
         ],
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
 
     let result = cds
         .price_with_metrics(
@@ -654,12 +697,14 @@ fn test_recovery01_uses_deal_quote_replay_inputs() {
     // A deal quote replays at a calibrated pillar date; maturities are literal
     // (record CALIBRATION-FRAMEWORK-007, O7).
     let maturity = date!(2028 - 12 - 30);
-    let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
+    let source = MarketContext::new()
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
     let base = create_test_cds(as_of, maturity);
 
     let recovery01_at_quote = |quote_bp: f64| {
@@ -773,8 +818,10 @@ fn test_expected_loss_formula() {
     cds.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
-        .insert(build_test_discount(0.05, as_of, "USD_OIS"))
-        .insert(build_test_hazard(hazard_rate, recovery, as_of, "CORP"));
+        .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_test_hazard(hazard_rate, recovery, as_of, "CORP"))
+        .expect("insert market curve");
 
     let result = cds
         .price_with_metrics(
@@ -813,8 +860,10 @@ fn test_expected_loss_conditions_on_as_of() {
 
     // Curves can be based at `base` (safer for df_on_date on older dates).
     let market = MarketContext::new()
-        .insert(build_test_discount(0.05, base, "USD_OIS"))
-        .insert(build_test_hazard(hazard_rate, recovery, base, "CORP"));
+        .try_insert(build_test_discount(0.05, base, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_test_hazard(hazard_rate, recovery, base, "CORP"))
+        .expect("insert market curve");
 
     let result = cds
         .price_with_metrics(
@@ -1037,7 +1086,11 @@ fn test_cds_dv01_keeps_unreplayable_hazard_curve_frozen() {
         .knots([(1.0, 0.0080), (3.0, 0.0120), (5.0, 0.0180), (7.0, 0.0200)])
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let result = cds
         .price_with_metrics(
@@ -1076,7 +1129,11 @@ fn test_cds_dv01_uses_discount_quote_bump_when_calibration_exists() {
     let cds = create_test_cds(as_of, maturity);
     let discount = build_quote_calibrated_discount(0.04, as_of, discount_id.as_str());
     let hazard = build_test_hazard(0.015, 0.4, as_of, hazard_id.as_str());
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let result = cds
         .price_with_metrics(
@@ -1093,8 +1150,14 @@ fn test_cds_dv01_uses_discount_quote_bump_when_calibration_exists() {
         let calibration = base_discount.rate_calibration().unwrap();
         let bumped_discount =
             bump_quote_calibrated_discount(base_discount.as_ref(), calibration, &market, bump_bp);
-        cds.value_raw(&market.clone().insert(bumped_discount), as_of)
-            .unwrap()
+        cds.value_raw(
+            &market
+                .clone()
+                .try_insert(bumped_discount)
+                .expect("insert market curve"),
+            as_of,
+        )
+        .unwrap()
     };
     let expected = (bumped_pv(1.0) - bumped_pv(-1.0)) / 2.0;
 
@@ -1115,7 +1178,9 @@ fn test_cds_dv01_recalibrates_hazard_on_bumped_discount_market() {
 
     let cds = create_test_cds(as_of, maturity);
     let discount = build_quote_calibrated_discount(0.04, as_of, discount_id.as_str());
-    let source = MarketContext::new().insert(discount);
+    let source = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
@@ -1124,7 +1189,7 @@ fn test_cds_dv01_recalibrates_hazard_on_bumped_discount_market() {
         discount_id.as_str(),
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
 
     let result = cds
         .price_with_metrics(
@@ -1160,8 +1225,10 @@ fn test_cdsw_clean_value_uses_first_class_valuation_convention() {
     let clean_cds: CreditDefaultSwap = serde_json::from_value(encoded).unwrap();
 
     let market = MarketContext::new()
-        .insert(build_test_discount(0.035, as_of, "USD_OIS"))
-        .insert(build_test_hazard(0.010, 0.40, as_of, "CORP"));
+        .try_insert(build_test_discount(0.035, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_test_hazard(0.010, 0.40, as_of, "CORP"))
+        .expect("insert market curve");
 
     let mut direct_clean_cds = dirty_cds;
     direct_clean_cds.valuation_convention =
@@ -1186,8 +1253,10 @@ fn test_cdsw_convention_values_premium_leg_with_adjusted_cashflow_accrual_dates(
         finstack_quant_valuations::market::conventions::CdsValuationConvention::BloombergCdswClean;
 
     let market = MarketContext::new()
-        .insert(build_test_discount(0.0, as_of, "USD_OIS"))
-        .insert(build_test_hazard(0.0, 0.40, as_of, "CORP"));
+        .try_insert(build_test_discount(0.0, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_test_hazard(0.0, 0.40, as_of, "CORP"))
+        .expect("insert market curve");
 
     let value = cds.value_raw(&market, as_of).unwrap();
     let expected_premium: f64 = 10_000_000.0 * 0.01 * ((94.0 + 91.0) / 360.0);
@@ -1212,8 +1281,9 @@ fn test_cdsw_par_spread_metric_uses_full_premium_denominator_when_requested() {
         finstack_quant_valuations::market::conventions::CdsValuationConvention::BloombergCdswCleanFullPremium;
 
     let market = MarketContext::new()
-        .insert(build_test_discount(0.035, as_of, "USD_OIS"))
-        .insert(
+        .try_insert(build_test_discount(0.035, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(
             HazardCurve::builder("CORP")
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
@@ -1221,7 +1291,8 @@ fn test_cdsw_par_spread_metric_uses_full_premium_denominator_when_requested() {
                 .knots([(0.5, 0.01), (3.0, 0.012), (5.0, 0.014), (7.0, 0.015)])
                 .build()
                 .unwrap(),
-        );
+        )
+        .expect("insert market curve");
 
     let standard = cds
         .price_with_metrics(
@@ -1522,8 +1593,9 @@ fn test_bucketed_dv01_metric() {
 /// Market whose `CORP` hazard curve is calibrated from quotes keyed by
 /// `doc_clause`, with that clause stored on the replay recipe.
 fn market_with_clause_recipe(as_of: Date, doc_clause: CdsDocClause) -> MarketContext {
-    let source =
-        MarketContext::new().insert(build_quote_calibrated_discount(0.04, as_of, "USD_OIS"));
+    let source = MarketContext::new()
+        .try_insert(build_quote_calibrated_discount(0.04, as_of, "USD_OIS"))
+        .expect("insert market curve");
     let pillars: Vec<(Date, f64)> = [365, 3 * 365, 5 * 365, 10 * 365]
         .into_iter()
         .map(|days| (as_of + time::Duration::days(days), 100.0))
@@ -1542,7 +1614,7 @@ fn market_with_clause_recipe(as_of: Date, doc_clause: CdsDocClause) -> MarketCon
         },
     )
     .expect("hazard calibration should succeed");
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 const RECALIBRATED_METRICS: [MetricId; 5] = [

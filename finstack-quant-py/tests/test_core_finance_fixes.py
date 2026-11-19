@@ -17,18 +17,36 @@ def test_icma_rejects_an_adjusted_reference_that_changes_the_nominal_roll() -> N
 
 
 @pytest.mark.parametrize("kind", ["price", "vol_index"])
-def test_future_price_quotes_interpolate_from_spot(kind: str) -> None:
-    curve = PriceCurve("SPOT", "2025-01-01", [(1.0, 80.0), (2.0, 100.0)], spot_price=75.0, kind=kind)
+def test_future_price_quotes_preserve_supplied_pillars(kind: str) -> None:
+    curve = PriceCurve({
+        "id": "SPOT",
+        "base_date": "2025-01-01",
+        "knots": [(1.0, 80.0), (2.0, 100.0)],
+        "kind": kind,
+        "day_count": "act_365f",
+        "interp": "linear",
+        "extrapolation": "error",
+    })
     for reconstructed in (curve, PriceCurve.from_json(curve.to_json())):
-        assert reconstructed.price(0.0) == 75.0
-        assert reconstructed.price(0.5) == pytest.approx(77.5)
-        assert reconstructed.price(1e-6) == pytest.approx(75.000005)
-        assert reconstructed.price(1.0) == 80.0
+        assert reconstructed.knots == [1.0, 2.0]
+        assert reconstructed.price(1.5) == 90.0
+        with pytest.raises(ValueError, match="below minimum knot"):
+            reconstructed.price(0.0)
 
 
-def test_price_quote_at_zero_must_agree_with_spot() -> None:
-    with pytest.raises(ValueError, match="spot_price"):
-        PriceCurve("SPOT", "2025-01-01", [(0.0, 80.0), (1.0, 100.0)], spot_price=75.0)
+def test_business_day_price_curve_uses_registered_calendar() -> None:
+    curve = PriceCurve({
+        "id": "P",
+        "base_date": "2025-01-03",
+        "knots": [(0.0, 0.0), (1.0, 252.0)],
+        "kind": "price",
+        "day_count": "bus_252",
+        "calendar_id": "weekends_only",
+        "interp": "linear",
+        "extrapolation": "error",
+    })
+    assert curve.calendar_id == "weekends_only"
+    assert curve.price("2025-01-06") == pytest.approx(1.0)
 
 
 def test_future_cpi_quotes_interpolate_from_explicit_origin() -> None:
@@ -122,10 +140,26 @@ def test_rootless_xirr_is_rejected_with_earlier_zero(amounts: tuple[float, float
 @pytest.mark.parametrize("policy", ["extend", "error"])
 def test_vol_index_price_rejects_invalid_tail(policy: str) -> None:
     knots = [(0.0, 30.0), (0.25, 20.0)]
-    curve = PriceCurve("VIX", "2025-01-01", knots, kind="vol_index", extrapolation=policy)
+    curve = PriceCurve({
+        "id": "VIX",
+        "base_date": "2025-01-01",
+        "knots": knots,
+        "kind": "vol_index",
+        "extrapolation": policy,
+        "day_count": "act_365f",
+        "interp": "linear",
+    })
     assert [curve.price(0), curve.price(0.25)] == [30, 20]
     for query in (1.0, "2026-01-01"):
         with pytest.raises(ValueError, match="Invalid vol_index level" if policy == "extend" else "maximum knot"):
             curve.price(query)
-    commodity = PriceCurve("OIL", "2025-01-01", knots, extrapolation="extend")
+    commodity = PriceCurve({
+        "id": "OIL",
+        "base_date": "2025-01-01",
+        "knots": knots,
+        "extrapolation": "extend",
+        "kind": "price",
+        "day_count": "act_365f",
+        "interp": "linear",
+    })
     assert commodity.price(1) == pytest.approx(-10)

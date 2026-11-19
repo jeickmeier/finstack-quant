@@ -38,7 +38,7 @@
 //! let context = SimpleContext::new(["x"]).expect("unique columns");
 //! let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
 //! let cols = [data.as_slice()];
-//! let result = compiled.eval(&context, &cols)?;
+//! let result = compiled.eval(&context, &cols, data.len())?;
 //! assert_eq!(result, vec![2.0, 1.0, 0.0, 1.0, 2.0]);
 //!
 //! // Windowed functions belong to the statements evaluator.

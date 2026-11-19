@@ -1192,8 +1192,9 @@ mod tests {
         let as_of = date!(2025 - 01 - 31);
         let maturity = date!(2025 - 02 - 01);
         let market = MarketContext::new()
-            .insert(sample_discount_curve(as_of))
-            .insert(
+            .try_insert(sample_discount_curve(as_of))
+            .expect("insert market curve")
+            .try_insert(
                 InflationCurve::builder("US-CPI")
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
@@ -1203,6 +1204,7 @@ mod tests {
                     .build()
                     .expect("CPI curve"),
             )
+            .expect("insert market curve")
             .insert_inflation_index(
                 finstack_quant_valuations_test_support::inflation::simple_index(
                     "US-CPI",
@@ -1283,8 +1285,10 @@ mod tests {
         let swap = sample_swap(start, maturity);
         let inflation_curve = sample_inflation_curve(curve_base);
         let market = MarketContext::new()
-            .insert(sample_discount_curve(discount_base))
-            .insert(inflation_curve.clone())
+            .try_insert(sample_discount_curve(discount_base))
+            .expect("insert market curve")
+            .try_insert(inflation_curve.clone())
+            .expect("insert market curve")
             .insert_inflation_index(flat_historical_index());
 
         let ratio = swap
@@ -1302,8 +1306,10 @@ mod tests {
     fn yoy_swap_prices_with_curve_only_market() {
         let as_of = d(2025, Month::January, 1);
         let market = MarketContext::new()
-            .insert(sample_discount_curve(as_of))
-            .insert(sample_inflation_curve(as_of))
+            .try_insert(sample_discount_curve(as_of))
+            .expect("insert market curve")
+            .try_insert(sample_inflation_curve(as_of))
+            .expect("insert market curve")
             .insert_inflation_index(flat_historical_index());
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-CURVE-ONLY"))
@@ -1340,8 +1346,10 @@ mod tests {
         swap.calendar_id = Some("nyse".into());
 
         let market = MarketContext::new()
-            .insert(sample_discount_curve(as_of))
-            .insert(sample_inflation_curve(d(2024, Month::January, 1)))
+            .try_insert(sample_discount_curve(as_of))
+            .expect("insert market curve")
+            .try_insert(sample_inflation_curve(d(2024, Month::January, 1)))
+            .expect("insert market curve")
             .insert_inflation_index(
                 InflationIndex::new(
                     "US-CPI",
@@ -1375,8 +1383,10 @@ mod tests {
         let as_of = d(2025, Month::January, 1);
         let maturity = d(2027, Month::January, 1);
         let market = MarketContext::new()
-            .insert(sample_discount_curve(as_of))
-            .insert(sample_inflation_curve(as_of))
+            .try_insert(sample_discount_curve(as_of))
+            .expect("insert market curve")
+            .try_insert(sample_inflation_curve(as_of))
+            .expect("insert market curve")
             .insert_inflation_index(flat_historical_index());
         let swap = InflationSwap::builder()
             .id(InstrumentId::new("INFL-CF"))
@@ -1449,8 +1459,10 @@ mod tests {
             .build()
             .expect("inflation curve should build");
         let market = MarketContext::new()
-            .insert(disc.clone())
-            .insert(infl)
+            .try_insert(disc.clone())
+            .expect("insert market curve")
+            .try_insert(infl)
+            .expect("insert market curve")
             .insert_inflation_index(flat_historical_index());
 
         let swap = YoYInflationSwap::builder()
@@ -1512,8 +1524,10 @@ mod tests {
             .expect("inflation curve should build");
 
         let market_no_index = MarketContext::new()
-            .insert(disc.clone())
-            .insert(infl.clone())
+            .try_insert(disc.clone())
+            .expect("insert market curve")
+            .try_insert(infl.clone())
+            .expect("insert market curve")
             .insert_inflation_index(flat_historical_index());
 
         // A future version cannot be admitted to the earlier information snapshot.
@@ -1531,8 +1545,10 @@ mod tests {
             .is_err()
         );
         let market_with_future_fixing = MarketContext::new()
-            .insert(disc)
-            .insert(infl)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(infl)
+            .expect("insert market curve")
             .insert_inflation_index(flat_historical_index());
 
         let swap = YoYInflationSwap::builder()
@@ -1570,8 +1586,10 @@ mod tests {
     fn yoy_swap_cashflow_provider_emits_two_flows_per_period() {
         let as_of = d(2025, Month::January, 1);
         let market = MarketContext::new()
-            .insert(sample_discount_curve(as_of))
-            .insert(sample_inflation_curve(as_of))
+            .try_insert(sample_discount_curve(as_of))
+            .expect("insert market curve")
+            .try_insert(sample_inflation_curve(as_of))
+            .expect("insert market curve")
             .insert_inflation_index(flat_historical_index());
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-CF"))

@@ -78,10 +78,14 @@ fn build_fx_matrix(spot_eur_to_usd: f64) -> FxMatrix {
 fn build_market_context() -> MarketContext {
     let base = base_date();
     MarketContext::new()
-        .insert(build_discount("USD-OIS", base, USD_ZERO))
-        .insert(build_discount("EUR-OIS", base, EUR_ZERO))
-        .insert(build_forward("USD-SOFR-3M", base, USD_ZERO))
-        .insert(build_forward("EUR-EURIBOR-3M", base, EUR_ZERO))
+        .try_insert(build_discount("USD-OIS", base, USD_ZERO))
+        .expect("insert market curve")
+        .try_insert(build_discount("EUR-OIS", base, EUR_ZERO))
+        .expect("insert market curve")
+        .try_insert(build_forward("USD-SOFR-3M", base, USD_ZERO))
+        .expect("insert market curve")
+        .try_insert(build_forward("EUR-EURIBOR-3M", base, EUR_ZERO))
+        .expect("insert market curve")
         .insert_fx(build_fx_matrix(SPOT_USD_PER_EUR))
 }
 
@@ -184,10 +188,14 @@ fn cip_invariance_holds_when_as_of_after_curve_base_date() {
     let eur_fwd = build_forward("EUR-EURIBOR-3M", curve_base, EUR_ZERO);
 
     let ctx = MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(usd_fwd)
-        .insert(eur_fwd)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_fwd)
+        .expect("insert market curve")
         .insert_fx(build_fx_matrix(SPOT_USD_PER_EUR));
 
     // `as_of` is 90 days AFTER the curve base date. With the bug, MtM-reset PV picks up
@@ -670,10 +678,14 @@ fn cip_invariance_holds_under_reversed_rate_ordering() {
     let fx = build_fx_matrix(SPOT_USD_PER_EUR);
 
     let ctx = MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(usd_fwd)
-        .insert(eur_fwd)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_fwd)
+        .expect("insert market curve")
         .insert_fx(fx);
 
     let as_of = base_date();

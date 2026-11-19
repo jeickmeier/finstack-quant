@@ -43,8 +43,10 @@ fn tag_filter_matching_parent_and_child_shocks_each_curve_once() {
             .expect("curve should build")
     };
     let mut market = MarketContext::new()
-        .insert(curve("BANK-5Y"))
-        .insert(curve("OXY-5Y"));
+        .try_insert(curve("BANK-5Y"))
+        .expect("insert market curve")
+        .try_insert(curve("OXY-5Y"))
+        .expect("insert market curve");
     market.set_hierarchy(hierarchy);
 
     let scenario = ScenarioSpec {
@@ -176,7 +178,11 @@ fn hierarchy_curve_parallel_bp_resolves_to_individual_bumps() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(ois).insert(tsy);
+    let mut market = MarketContext::new()
+        .try_insert(ois)
+        .expect("insert market curve")
+        .try_insert(tsy)
+        .expect("insert market curve");
     market.set_hierarchy(h);
 
     let mut model = FinancialModelSpec::new(
@@ -272,7 +278,11 @@ fn cumulative_mode_stacks_shocks_down_tree() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(jpm).insert(oxy);
+    let mut market = MarketContext::new()
+        .try_insert(jpm)
+        .expect("insert market curve")
+        .try_insert(oxy)
+        .expect("insert market curve");
     market.set_hierarchy(h);
 
     let mut model = FinancialModelSpec::new(
@@ -401,7 +411,11 @@ fn most_specific_wins_keeps_only_deepest_shock() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(jpm).insert(oxy);
+    let mut market = MarketContext::new()
+        .try_insert(jpm)
+        .expect("insert market curve")
+        .try_insert(oxy)
+        .expect("insert market curve");
     market.set_hierarchy(h);
 
     let mut model = FinancialModelSpec::new(
@@ -507,7 +521,11 @@ fn engine_works_with_resolution_mode_field() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(ois).insert(tsy);
+    let mut market = MarketContext::new()
+        .try_insert(ois)
+        .expect("insert market curve")
+        .try_insert(tsy)
+        .expect("insert market curve");
     market.set_hierarchy(h);
 
     let mut model = FinancialModelSpec::new(
@@ -751,9 +769,13 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
         .build()
         .unwrap();
 
-    let mut hierarchy_market = MarketContext::new().insert(curve.clone());
+    let mut hierarchy_market = MarketContext::new()
+        .try_insert(curve.clone())
+        .expect("insert market curve");
     hierarchy_market.set_hierarchy(hierarchy);
-    let mut direct_market = MarketContext::new().insert(curve);
+    let mut direct_market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let hierarchy_scenario = ScenarioSpec {
         id: "hier-depth".into(),
@@ -1049,7 +1071,11 @@ fn mixed_family_subtree_projects_declared_family_and_errors_on_zero_compatible_t
     let orig_ois_df = ois.df(5.0).unwrap();
     let orig_sofr = sofr.df(2.0).unwrap();
 
-    let mut market = MarketContext::new().insert(ois).insert(sofr);
+    let mut market = MarketContext::new()
+        .try_insert(ois)
+        .expect("insert market curve")
+        .try_insert(sofr)
+        .expect("insert market curve");
     market.set_hierarchy(hierarchy);
 
     // Discount bump projects out the ForwardCurve without error.
@@ -1133,10 +1159,13 @@ fn hierarchy_execution_rolls_back_market_and_as_of_on_missing_or_wrong_kind_acti
         .unwrap();
     let orig_df = ois.df(5.0).unwrap();
 
-    let mut market = MarketContext::new().insert(ois).insert_price(
-        "SPX",
-        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money")),
-    );
+    let mut market = MarketContext::new()
+        .try_insert(ois)
+        .expect("insert market curve")
+        .insert_price(
+            "SPX",
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money")),
+        );
     market.set_hierarchy(hierarchy);
 
     // Prior TimeRollForward + USD-OIS bump must not survive failure on later active equity target.

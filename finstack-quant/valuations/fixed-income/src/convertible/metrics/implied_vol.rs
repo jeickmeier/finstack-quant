@@ -219,7 +219,8 @@ mod tests {
             .expect("should succeed");
 
         finstack_quant_core::market_data::context::MarketContext::new()
-            .insert(discount_curve)
+            .try_insert(discount_curve)
+            .expect("insert market curve")
             .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
             .insert_price(
                 "AAPL-VOL",

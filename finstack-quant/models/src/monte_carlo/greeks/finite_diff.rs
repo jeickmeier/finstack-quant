@@ -411,8 +411,9 @@ mod tests {
             / (VOLATILITY * root_t);
         let carry_discount = (-DIVIDEND_YIELD * EXPIRY).exp();
         (
-            carry_discount * norm_cdf(d1),
-            carry_discount * norm_pdf(d1) / (SPOT * VOLATILITY * root_t),
+            carry_discount * norm_cdf(d1).expect("valid Gaussian variate"),
+            carry_discount * norm_pdf(d1).expect("valid Gaussian variate")
+                / (SPOT * VOLATILITY * root_t),
         )
     }
 

@@ -19,10 +19,10 @@
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let base = date!(2025 - 01 - 01);
-//! let c0 = DiscountCurve::flat("USD-OIS", base, 0.04)?;
-//! let c1 = DiscountCurve::flat("USD-OIS", base, 0.0425)?;
-//! let m0 = MarketContext::new().insert(c0);
-//! let m1 = MarketContext::new().insert(c1);
+//! let c0 = DiscountCurve::flat("USD-OIS", base, 0.04, DayCount::Act365F)?;
+//! let c1 = DiscountCurve::flat("USD-OIS", base, 0.0425, DayCount::Act365F)?;
+//! let m0 = MarketContext::new().try_insert(c0)?;
+//! let m1 = MarketContext::new().try_insert(c1)?;
 //!
 //! let intervals = [DateInterval::new(date!(2025 - 07 - 01), date!(2026 - 07 - 01))?];
 //! let query = FactorRateDiffQuery::new(
@@ -1645,6 +1645,9 @@ fn proportional_f64_change(x0: f64, x1: f64, scale: ProportionalDiffScale) -> Re
             "proportional change baseline cannot be zero".to_string(),
         ));
     }
+    if exact_f64_eq(x1, 0.0) {
+        return Ok(-scale.scale_factor());
+    }
     if exact_f64_eq(x1, x0) {
         return Ok(0.0);
     }
@@ -1683,6 +1686,16 @@ mod tests {
     use crate::money::fx::{FxMatrix, FxProvider};
     use std::sync::Arc;
     use time::macros::date;
+
+    #[test]
+    fn proportional_move_to_zero_is_a_complete_loss() {
+        for baseline in [1.0, -0.01, f64::from_bits(1)] {
+            assert_eq!(
+                proportional_f64_change(baseline, -0.0, ProportionalDiffScale::Percent).unwrap(),
+                -100.0
+            );
+        }
+    }
 
     #[test]
     fn diff_enum_serde_uses_canonical_snake_case() {
@@ -1826,8 +1839,12 @@ mod tests {
         let c1_raw = DiscountCurve::flat("USD-OIS", base0, 0.0425, DayCount::Act365F).expect("c1");
         let c1_cond = c1_raw.condition(cond_date).expect("conditioned c1");
 
-        let m0 = MarketContext::new().insert(c0);
-        let m1 = MarketContext::new().insert(c1_cond);
+        let m0 = MarketContext::new()
+            .try_insert(c0)
+            .expect("insert market curve");
+        let m1 = MarketContext::new()
+            .try_insert(c1_cond)
+            .expect("insert market curve");
 
         let intervals = [DateInterval::new(v, t).expect("valid interval")];
         let query = FactorRateDiffQuery::new(
@@ -1850,7 +1867,9 @@ mod tests {
             .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("fwd");
-        let mf = MarketContext::new().insert(fwd);
+        let mf = MarketContext::new()
+            .try_insert(fwd)
+            .expect("insert market curve");
         let fwd_query = FactorRateDiffQuery::new(
             "FWD-ONLY",
             &intervals,
@@ -1871,7 +1890,8 @@ mod tests {
     fn factor_diff_rejects_empty_duplicate_and_out_of_domain_intervals() {
         let base = date!(2025 - 01 - 01);
         let m0 = MarketContext::new()
-            .insert(DiscountCurve::flat("C0", base, 0.04, DayCount::Act365F).unwrap());
+            .try_insert(DiscountCurve::flat("C0", base, 0.04, DayCount::Act365F).unwrap())
+            .expect("insert market curve");
         let empty: [DateInterval; 0] = [];
         let q_empty =
             FactorRateDiffQuery::new("C0", &empty, DayCount::Act365F, RateDiffScale::Decimal);
@@ -1911,8 +1931,12 @@ mod tests {
             .condition(cond_date)
             .unwrap();
 
-        let m0 = MarketContext::new().insert(h0);
-        let m1 = MarketContext::new().insert(h1);
+        let m0 = MarketContext::new()
+            .try_insert(h0)
+            .expect("insert market curve");
+        let m1 = MarketContext::new()
+            .try_insert(h1)
+            .expect("insert market curve");
         let q = HazardDiffQuery::new("ACME", &[1.0, 5.0], HazardDiffScale::IntensityBp);
         let res = measure_hazard_intensity_diff(&q, &m0, &m1).expect("hazard diff");
         assert!((res.rows()[0].diff - 20.0).abs() < 1e-12);
@@ -1998,8 +2022,12 @@ mod tests {
             .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .unwrap();
-        let m0 = MarketContext::new().insert(c0);
-        let m1 = MarketContext::new().insert(c1);
+        let m0 = MarketContext::new()
+            .try_insert(c0)
+            .expect("insert market curve");
+        let m1 = MarketContext::new()
+            .try_insert(c1)
+            .expect("insert market curve");
 
         let d1 = date!(2026 - 01 - 01);
         let dates = [d1];

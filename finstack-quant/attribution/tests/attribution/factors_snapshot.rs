@@ -72,20 +72,26 @@ fn restoring_credit_curves_preserves_complete_canonical_index_dependencies() {
         .build()
         .expect("index");
     let current = MarketContext::new()
-        .insert(index_hazard)
-        .insert(issuer_hazard)
-        .insert(correlation)
+        .try_insert(index_hazard)
+        .expect("insert market curve")
+        .try_insert(issuer_hazard)
+        .expect("insert market curve")
+        .try_insert(correlation)
+        .expect("insert market curve")
         .insert_credit_index("INDEX", index)
         .expect("canonical index");
     let source = MarketContext::new()
-        .insert(hazard("INDEX-HAZ", 0.02))
-        .insert(hazard("ISSUER-HAZ", 0.03))
-        .insert(
+        .try_insert(hazard("INDEX-HAZ", 0.02))
+        .expect("insert market curve")
+        .try_insert(hazard("ISSUER-HAZ", 0.03))
+        .expect("insert market curve")
+        .try_insert(
             BaseCorrelationCurve::builder("CORR")
                 .knots([(3.0, 0.25), (100.0, 0.35)])
                 .build()
                 .expect("replacement correlation"),
-        );
+        )
+        .expect("insert market curve");
     let flags = MarketRestoreFlags::HAZARD | MarketRestoreFlags::CORRELATION;
     let snapshot = MarketSnapshot::extract(&source, flags);
     let restored = MarketSnapshot::restore_market(&current, &snapshot, flags)
@@ -182,8 +188,10 @@ fn create_test_base_correlation_curve(id: &str, _base_date: Date) -> BaseCorrela
 fn test_extract_and_restore_rates_curves() {
     let base_date = date!(2025 - 01 - 15);
     let market = MarketContext::new()
-        .insert(create_test_discount_curve("USD-OIS", base_date))
-        .insert(create_test_discount_curve("EUR-OIS", base_date));
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_discount_curve("EUR-OIS", base_date))
+        .expect("insert market curve");
 
     let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::RATES);
     assert_eq!(snapshot.discount_curves.len(), 2);
@@ -235,9 +243,12 @@ fn test_market_restore_flags_all_and_empty() {
 fn test_market_snapshot_extract_single_discount() {
     let base_date = date!(2025 - 01 - 15);
     let market = MarketContext::new()
-        .insert(create_test_discount_curve("USD-OIS", base_date))
-        .insert(create_test_forward_curve("USD-SOFR", base_date))
-        .insert(create_test_hazard_curve("CORP-A", base_date));
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_forward_curve("USD-SOFR", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("CORP-A", base_date))
+        .expect("insert market curve");
 
     let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::DISCOUNT);
 
@@ -251,11 +262,16 @@ fn test_market_snapshot_extract_single_discount() {
 fn test_market_snapshot_extract_all_curve_types() {
     let base_date = date!(2025 - 01 - 15);
     let market = MarketContext::new()
-        .insert(create_test_discount_curve("USD-OIS", base_date))
-        .insert(create_test_forward_curve("USD-SOFR", base_date))
-        .insert(create_test_hazard_curve("CORP-A", base_date))
-        .insert(create_test_inflation_curve("US-CPI", base_date))
-        .insert(create_test_base_correlation_curve("CDX-IG", base_date));
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_forward_curve("USD-SOFR", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("CORP-A", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_inflation_curve("US-CPI", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_base_correlation_curve("CDX-IG", base_date))
+        .expect("insert market curve");
 
     let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::all());
 
@@ -269,7 +285,9 @@ fn test_market_snapshot_extract_all_curve_types() {
 #[test]
 fn test_market_snapshot_extract_empty_flags_and_empty_market() {
     let base_date = date!(2025 - 01 - 15);
-    let market = MarketContext::new().insert(create_test_discount_curve("USD-OIS", base_date));
+    let market = MarketContext::new()
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve");
 
     let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::empty());
     assert!(snapshot.discount_curves.is_empty());
@@ -282,9 +300,12 @@ fn test_market_snapshot_extract_empty_flags_and_empty_market() {
 fn test_restore_market_unified_discount_only() {
     let base_date = date!(2025 - 01 - 15);
     let current_market = MarketContext::new()
-        .insert(create_test_discount_curve("USD-OIS", base_date))
-        .insert(create_test_forward_curve("USD-SOFR", base_date))
-        .insert(create_test_hazard_curve("CORP-A", base_date));
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_forward_curve("USD-SOFR", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("CORP-A", base_date))
+        .expect("insert market curve");
 
     let snapshot = MarketSnapshot {
         discount_curves: vec![(
@@ -310,9 +331,12 @@ fn test_restore_market_unified_discount_only() {
 fn test_restore_market_unified_rates() {
     let base_date = date!(2025 - 01 - 15);
     let current_market = MarketContext::new()
-        .insert(create_test_discount_curve("USD-OIS", base_date))
-        .insert(create_test_forward_curve("USD-SOFR", base_date))
-        .insert(create_test_hazard_curve("CORP-A", base_date));
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_forward_curve("USD-SOFR", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("CORP-A", base_date))
+        .expect("insert market curve");
 
     let snapshot = MarketSnapshot {
         discount_curves: vec![(
@@ -343,7 +367,9 @@ fn test_restore_market_unified_rates() {
 #[test]
 fn test_restore_market_empty_snapshot_and_empty_market() {
     let base_date = date!(2025 - 01 - 15);
-    let market = MarketContext::new().insert(create_test_discount_curve("USD-OIS", base_date));
+    let market = MarketContext::new()
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve");
 
     let restored = MarketSnapshot::restore_market(
         &market,
@@ -373,12 +399,18 @@ fn test_restore_equivalence_mixed_curve_types() {
     let base_date = date!(2025 - 01 - 15);
 
     let market = MarketContext::new()
-        .insert(create_test_discount_curve("USD-OIS", base_date))
-        .insert(create_test_discount_curve("EUR-OIS", base_date))
-        .insert(create_test_forward_curve("USD-SOFR", base_date))
-        .insert(create_test_hazard_curve("CORP-A", base_date))
-        .insert(create_test_inflation_curve("US-CPI", base_date))
-        .insert(create_test_base_correlation_curve("CDX-IG", base_date));
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_discount_curve("EUR-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_forward_curve("USD-SOFR", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("CORP-A", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_inflation_curve("US-CPI", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_base_correlation_curve("CDX-IG", base_date))
+        .expect("insert market curve");
 
     let rates_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::RATES);
     let credit_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::HAZARD);
@@ -386,8 +418,10 @@ fn test_restore_equivalence_mixed_curve_types() {
     let corr_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::CORRELATION);
 
     let target = MarketContext::new()
-        .insert(create_test_discount_curve("GBP-OIS", base_date))
-        .insert(create_test_hazard_curve("CORP-B", base_date));
+        .try_insert(create_test_discount_curve("GBP-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("CORP-B", base_date))
+        .expect("insert market curve");
 
     let after_rates =
         MarketSnapshot::restore_market(&target, &rates_snap, MarketRestoreFlags::RATES)
@@ -422,15 +456,21 @@ fn test_restore_equivalence_mixed_curve_types() {
 fn test_combined_restore_matches_stacked_restore_for_cross_factor_flags() {
     let base_date = date!(2025 - 01 - 15);
     let market_t0 = MarketContext::new()
-        .insert(create_test_discount_curve("USD-OIS", base_date))
-        .insert(create_test_forward_curve("USD-SOFR", base_date))
-        .insert(create_test_hazard_curve("CORP-A", base_date))
+        .try_insert(create_test_discount_curve("USD-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_forward_curve("USD-SOFR", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("CORP-A", base_date))
+        .expect("insert market curve")
         .insert_fx(sample_fx_matrix());
 
     let market_t1 = MarketContext::new()
-        .insert(create_test_discount_curve("EUR-OIS", base_date))
-        .insert(create_test_forward_curve("EUR-ESTR", base_date))
-        .insert(create_test_hazard_curve("CORP-B", base_date));
+        .try_insert(create_test_discount_curve("EUR-OIS", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_forward_curve("EUR-ESTR", base_date))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("CORP-B", base_date))
+        .expect("insert market curve");
 
     let flags = MarketRestoreFlags::RATES | MarketRestoreFlags::HAZARD | MarketRestoreFlags::FX;
     let combined_snapshot = MarketSnapshot::extract(&market_t0, flags);
@@ -532,15 +572,20 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
 
     let as_of = date!(2025 - 01 - 15);
     let price_curve = PriceCurve::builder("WTI")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(as_of)
-        .spot_price(70.0)
         .knots([(0.0, 70.0), (1.0, 72.0)])
         .build()
         .unwrap();
     let vol_index = PriceCurve::builder("VIX")
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .kind(PriceCurveKind::VolIndex)
         .base_date(as_of)
-        .spot_price(15.0)
         .knots([(0.0, 15.0), (1.0, 18.0)])
         .build()
         .unwrap();
@@ -548,13 +593,19 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
     let cube = VolCube::from_grid("USD-SWAPTION", &[1.0], &[5.0], &[sabr], &[0.03]).unwrap();
 
     let market_t1 = MarketContext::new()
-        .insert(create_test_discount_curve("USD-OIS", as_of))
-        .insert(create_test_hazard_curve("ACME-HAZ", as_of))
-        .insert(price_curve)
-        .insert(vol_index)
+        .try_insert(create_test_discount_curve("USD-OIS", as_of))
+        .expect("insert market curve")
+        .try_insert(create_test_hazard_curve("ACME-HAZ", as_of))
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
+        .try_insert(vol_index)
+        .expect("insert market curve")
         .insert_vol_cube(cube);
 
-    let market_t0 = MarketContext::new().insert(create_test_discount_curve("USD-OIS", as_of));
+    let market_t0 = MarketContext::new()
+        .try_insert(create_test_discount_curve("USD-OIS", as_of))
+        .expect("insert market curve");
 
     // Restore the rates family to T0: everything else must survive.
     let snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::RATES);

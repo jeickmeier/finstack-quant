@@ -50,7 +50,9 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// Five bullet first-lien loans at 8%: 30/20/20/15/15M, each its own obligor.
@@ -774,7 +776,10 @@ fn floating_facility_interest_is_tagged_floating() {
         finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixing");
-    let market = market().insert(fwd).insert_series(fixing);
+    let market = market()
+        .try_insert(fwd)
+        .expect("insert market curve")
+        .insert_series(fixing);
     let kinds = |f: &AssetBackedFacility| -> Vec<CFKind> {
         f.cashflow_schedule(&market, close())
             .expect("schedule")

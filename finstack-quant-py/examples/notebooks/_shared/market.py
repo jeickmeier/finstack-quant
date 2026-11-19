@@ -62,15 +62,15 @@ def build_demo_market(as_of: date = DEMO_AS_OF) -> MarketContext:
         )
     )
     market.insert(
-        ForwardCurve(
-            "USD-SOFR-3M",
-            as_of,
-            _projection_factors([(0.0, 0.045), (1.0, 0.047), (3.0, 0.049), (10.0, 0.052)]),
-            interp="log_linear",
-            extrapolation="extend",
-            day_count="act_360",
-            index_tenor="3M",
-        )
+        ForwardCurve({
+            "id": "USD-SOFR-3M",
+            "base_date": as_of,
+            "knots": _projection_factors([(0.0, 0.045), (1.0, 0.047), (3.0, 0.049), (10.0, 0.052)]),
+            "interp": "log_linear",
+            "extrapolation": "extend",
+            "day_count": "act_360",
+            "index_tenor": "3M",
+        })
     )
     market.insert(
         HazardCurve(
@@ -124,15 +124,15 @@ def usd_ois_curve(as_of: date) -> DiscountCurve:
 
 def usd_sofr_curve(as_of: date) -> ForwardCurve:
     """Return the 5-knot downward-sloping USD-SOFR-3M forward curve."""
-    return ForwardCurve(
-        "USD-SOFR-3M",
-        as_of,
-        _projection_factors([(0.0, 0.052), (1.0, 0.048), (3.0, 0.045), (5.0, 0.043), (10.0, 0.041)]),
-        interp="log_linear",
-        extrapolation="extend",
-        day_count="act_360",
-        index_tenor="3M",
-    )
+    return ForwardCurve({
+        "id": "USD-SOFR-3M",
+        "base_date": as_of,
+        "knots": _projection_factors([(0.0, 0.052), (1.0, 0.048), (3.0, 0.045), (5.0, 0.043), (10.0, 0.041)]),
+        "interp": "log_linear",
+        "extrapolation": "extend",
+        "day_count": "act_360",
+        "index_tenor": "3M",
+    })
 
 
 def usd_sofr_fixings(as_of: date) -> ScalarTimeSeries:

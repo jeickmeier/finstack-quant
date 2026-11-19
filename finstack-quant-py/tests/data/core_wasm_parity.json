@@ -441,7 +441,7 @@
             70.5
           ]
         ],
-        "spot_price": 72.0,
+        "level_kind": "price",
         "type": "price"
       }
     ],
@@ -650,7 +650,7 @@
         70.5
       ]
     ],
-    "spot_price": 72.0
+    "level_kind": "price"
   },
   "price_curve_queries": [
     71.25,

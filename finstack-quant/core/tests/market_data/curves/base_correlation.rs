@@ -109,8 +109,12 @@ fn bucket_stress_survives_serde_and_identity_bumps() {
         assert_eq!(candidate.correlations(), stressed.correlations());
         for detachment in [0.0, 3.0, 5.0, 7.0, 8.5, 10.0, 100.0] {
             assert_eq!(
-                candidate.correlation(detachment),
-                stressed.correlation(detachment)
+                candidate
+                    .get_correlation(detachment)
+                    .expect("valid detachment"),
+                stressed
+                    .get_correlation(detachment)
+                    .expect("valid detachment")
             );
         }
     }
@@ -122,9 +126,9 @@ fn correlation_boundaries_are_supported_by_construction_bumps_and_serde() {
         .knots([(0.0, 0.0), (3.0, 0.0), (100.0, 1.0)])
         .build()
         .unwrap();
-    assert_eq!(curve.correlation(0.0), 0.0);
-    assert_eq!(curve.correlation(3.0), 0.0);
-    assert_eq!(curve.correlation(100.0), 1.0);
+    assert_eq!(curve.get_correlation(0.0).expect("valid detachment"), 0.0);
+    assert_eq!(curve.get_correlation(3.0).expect("valid detachment"), 0.0);
+    assert_eq!(curve.get_correlation(100.0).expect("valid detachment"), 1.0);
     let restored: BaseCorrelationCurve =
         serde_json::from_str(&serde_json::to_string(&curve).unwrap()).unwrap();
     assert_eq!(restored.correlations(), &[0.0, 0.0, 1.0]);
@@ -176,4 +180,40 @@ fn shape_report_makes_no_arbitrage_certification() {
     let wire = serde_json::to_value(report).unwrap();
     assert_eq!(wire["is_monotonic"], true);
     assert!(wire.get("is_arbitrage_free").is_none());
+}
+
+#[test]
+fn base_correlation_lookup_checks_the_financial_domain_before_flat_tails() {
+    let curve = BaseCorrelationCurve::builder("CDX")
+        .knots([(3.0, 0.25), (7.0, 0.45)])
+        .build()
+        .unwrap();
+    assert_eq!(curve.get_correlation(0.0).unwrap(), 0.25);
+    assert_eq!(curve.get_correlation(100.0).unwrap(), 0.45);
+    for bad in [
+        -1.0,
+        101.0,
+        300.0,
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+    ] {
+        assert!(curve.get_correlation(bad).is_err());
+    }
+}
+
+#[test]
+fn multiplication_distinguishes_zero_shocks_from_underflow() {
+    let zero = BaseCorrelationCurve::builder("ZERO")
+        .knots([(3.0, 0.0), (7.0, 0.0)])
+        .build()
+        .unwrap();
+    assert!(zero.apply_bump(BumpSpec::multiplier(-1.0)).is_err());
+    let tiny = BaseCorrelationCurve::builder("TINY")
+        .knots([(3.0, f64::from_bits(1)), (7.0, 0.2)])
+        .build()
+        .unwrap();
+    assert!(tiny.apply_bump(BumpSpec::multiplier(0.5)).is_err());
+    let zeroed = tiny.apply_bump(BumpSpec::multiplier(0.0)).unwrap();
+    assert_eq!(zeroed.correlations(), &[0.0, 0.0]);
 }

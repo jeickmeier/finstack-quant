@@ -50,7 +50,8 @@ fn build_context(n_curves: usize) -> (MarketContext, CurveId) {
         if first.is_none() {
             first = Some(CurveId::from(id.as_str()));
         }
-        ctx.insert_mut(discount_curve(&id));
+        ctx.try_insert_mut(discount_curve(&id))
+            .expect("insert market curve");
     }
     (ctx, first.expect("at least one curve"))
 }

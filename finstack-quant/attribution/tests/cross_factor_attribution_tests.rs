@@ -258,10 +258,12 @@ fn synthetic_parallel_instrument_surfaces_credit_vol_cross_factor() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
     let market_t0 = MarketContext::new()
-        .insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01))
+        .try_insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01))
+        .expect("insert market curve")
         .insert_surface(build_vol_surface("EQ-VOL", 0.20));
     let market_t1 = MarketContext::new()
-        .insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.02))
+        .try_insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.02))
+        .expect("insert market curve")
         .insert_surface(build_vol_surface("EQ-VOL", 0.30));
 
     let instrument =
@@ -312,8 +314,12 @@ fn synthetic_parallel_instrument_surfaces_credit_vol_cross_factor() {
 fn single_factor_instrument_has_zero_cross_factor() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
-    let market_t0 = MarketContext::new().insert(build_discount_curve("USD-OIS", as_of_t0, 0.03));
-    let market_t1 = MarketContext::new().insert(build_discount_curve("USD-OIS", as_of_t1, 0.031));
+    let market_t0 = MarketContext::new()
+        .try_insert(build_discount_curve("USD-OIS", as_of_t0, 0.03))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(build_discount_curve("USD-OIS", as_of_t1, 0.031))
+        .expect("insert market curve");
 
     let deposit = Arc::new(
         Deposit::builder()
@@ -358,11 +364,15 @@ fn synthetic_parallel_instrument_surfaces_rates_credit_cross_factor() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
     let market_t0 = MarketContext::new()
-        .insert(build_discount_curve("USD-OIS", as_of_t0, 0.01))
-        .insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01));
+        .try_insert(build_discount_curve("USD-OIS", as_of_t0, 0.01))
+        .expect("insert market curve")
+        .try_insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(build_discount_curve("USD-OIS", as_of_t1, 0.02))
-        .insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.02));
+        .try_insert(build_discount_curve("USD-OIS", as_of_t1, 0.02))
+        .expect("insert market curve")
+        .try_insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.02))
+        .expect("insert market curve");
 
     let instrument =
         Arc::new(RatesCreditInteractionInstrument::new("PARALLEL-XFACTOR")) as Arc<dyn Instrument>;
@@ -439,11 +449,15 @@ fn serial_execution_policy_matches_parallel_cross_factor_attribution() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
     let market_t0 = MarketContext::new()
-        .insert(build_discount_curve("USD-OIS", as_of_t0, 0.01))
-        .insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01));
+        .try_insert(build_discount_curve("USD-OIS", as_of_t0, 0.01))
+        .expect("insert market curve")
+        .try_insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(build_discount_curve("USD-OIS", as_of_t1, 0.02))
-        .insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.02));
+        .try_insert(build_discount_curve("USD-OIS", as_of_t1, 0.02))
+        .expect("insert market curve")
+        .try_insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.02))
+        .expect("insert market curve");
 
     let instrument =
         Arc::new(RatesCreditInteractionInstrument::new("POLICY-XFACTOR")) as Arc<dyn Instrument>;
@@ -488,11 +502,15 @@ fn synthetic_metrics_based_instrument_surfaces_rates_credit_cross_factor() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
     let market_t0 = MarketContext::new()
-        .insert(build_discount_curve("USD-OIS", as_of_t0, 0.01))
-        .insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01));
+        .try_insert(build_discount_curve("USD-OIS", as_of_t0, 0.01))
+        .expect("insert market curve")
+        .try_insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(build_discount_curve("USD-OIS", as_of_t1, 0.0101))
-        .insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.0102));
+        .try_insert(build_discount_curve("USD-OIS", as_of_t1, 0.0101))
+        .expect("insert market curve")
+        .try_insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.0102))
+        .expect("insert market curve");
 
     let instrument =
         Arc::new(RatesCreditInteractionInstrument::new("METRICS-XFACTOR")) as Arc<dyn Instrument>;

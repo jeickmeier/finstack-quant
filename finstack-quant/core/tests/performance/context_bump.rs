@@ -152,7 +152,9 @@ fn series(id: &str) -> ScalarTimeSeries {
 fn fixture(unrelated_curves: usize) -> MarketContext {
     let mut market = MarketContext::new();
     for index in 0..unrelated_curves {
-        market.insert_mut(discount_curve(&format!("CURVE_{index}")));
+        market
+            .try_insert_mut(discount_curve(&format!("CURVE_{index}")))
+            .expect("insert market curve");
     }
     market.insert_surface_mut(surface("EQ-VOL"));
     market.insert_price_mut(
@@ -298,7 +300,9 @@ fn assert_other_content_unchanged(
     let mut restored = bumped.clone();
     match family {
         "curve" => {
-            restored.insert_mut(base.curve(id).expect("original curve").clone());
+            restored
+                .try_insert_mut(base.curve(id).expect("original curve").clone())
+                .expect("insert market curve");
         }
         "surface" => {
             restored.insert_surface_mut((*base.get_surface(id).expect("original surface")).clone());
@@ -488,7 +492,8 @@ fn target_resolution_records() -> Vec<Value> {
     ] {
         let mut base = fixture(8);
         if has_curve {
-            base.insert_mut(discount_curve("SHARED"));
+            base.try_insert_mut(discount_curve("SHARED"))
+                .expect("insert market curve");
         }
         if has_surface {
             base.insert_surface_mut(surface("SHARED"));
@@ -730,9 +735,12 @@ fn credit_fixture() -> MarketContext {
         .build()
         .expect("credit index");
     fixture(8)
-        .insert(hazard)
-        .insert(issuer)
-        .insert(correlation)
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(issuer)
+        .expect("insert market curve")
+        .try_insert(correlation)
+        .expect("insert market curve")
         .insert_credit_index("CDX", index)
         .expect("canonical index")
 }

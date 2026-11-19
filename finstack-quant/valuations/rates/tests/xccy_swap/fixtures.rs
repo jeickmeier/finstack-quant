@@ -64,10 +64,14 @@ pub fn market_with_fx() -> MarketContext {
     let fx = FxMatrix::new(provider, None);
 
     MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(usd_fwd)
-        .insert(eur_fwd)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_fwd)
+        .expect("insert market curve")
         .insert_fx(fx)
 }
 
@@ -107,10 +111,14 @@ pub fn market_without_fx() -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(usd_fwd)
-        .insert(eur_fwd)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_fwd)
+        .expect("insert market curve")
 }
 
 pub fn leg_usd_receive(
@@ -334,9 +342,13 @@ pub fn market_with_extended_curves() -> MarketContext {
     let fx = FxMatrix::new(provider, None);
 
     MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(usd_fwd)
-        .insert(eur_fwd)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_fwd)
+        .expect("insert market curve")
         .insert_fx(fx)
 }

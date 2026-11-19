@@ -33,6 +33,13 @@ def test_params_constant_and_piecewise_agree_with_scalars() -> None:
     stepped = HullWhiteParams.piecewise(0.05, [0.0, 1.0], [0.01, 0.02])
     assert stepped.get_sigma(1.0) == 0.02
     assert stepped.get_sigma(1.5) == 0.02
+    for bad_time in (-1.0, float("inf"), float("nan")):
+        with pytest.raises(ValueError, match=r"finite nonnegative time"):
+            stepped.get_sigma(bad_time)
+    with pytest.raises(ValueError, match="finite nonnegative"):
+        stepped.state_covariance(1.0, -1.0)
+    with pytest.raises(RuntimeError):
+        HullWhiteParams(0.05, 1e200).state_variance(1.0)
     with pytest.raises(ValueError, match=r"kappa must be positive and finite"):
         HullWhiteParams(0.0, 0.01)
     with pytest.raises(ValueError, match=r"first knot must be 0.0"):

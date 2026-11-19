@@ -97,8 +97,10 @@ fn test_cap_dv01_signed_negative() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = cap
@@ -161,8 +163,10 @@ fn test_floor_dv01_signed_negative() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = floor
@@ -192,8 +196,10 @@ fn test_dv01_scales_with_maturity() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let short_dv01 = *short_cap
@@ -243,8 +249,10 @@ fn test_dv01_scales_with_notional() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let small_dv01 = *small_cap
@@ -312,8 +320,10 @@ fn test_rfr_cap_dv01_reports_raw_model_curve_risk_without_quote_scalar() {
         attributes: Default::default(),
     };
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(0.05, as_of, "USD-SOFR-OIS"))
+        .try_insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.05, as_of, "USD-SOFR-OIS"))
+        .expect("insert market curve")
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"));
 
     let metric_dv01 = *cap

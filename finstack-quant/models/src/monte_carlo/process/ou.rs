@@ -158,17 +158,28 @@ impl HullWhite1FParams {
     }
 
     /// Instantaneous short-rate volatility at `t`.
-    #[must_use]
-    pub fn sigma_at_time(&self, t: f64) -> f64 {
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Finite nonnegative time from the model origin, in years.
+    pub fn sigma_at_time(&self, t: f64) -> Result<f64> {
         self.model.get_sigma(t)
     }
 
     /// Exact OU state variance over `[t, t + dt]`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Nonnegative start time in years from the model origin.
+    /// * `dt` - Nonnegative interval in years. A positive interval must advance the start time.
     pub fn sigma_variance(&self, t: f64, dt: f64) -> Result<f64> {
-        if dt <= 0.0 {
-            return Ok(0.0);
+        let end = t + dt;
+        if !dt.is_finite() || dt < 0.0 || (dt > 0.0 && end <= t) {
+            return Err(finstack_quant_core::Error::Validation(
+                "unrepresentable Hull-White variance interval".into(),
+            ));
         }
-        self.model.state_variance_between(t, t + dt)
+        self.model.state_variance_between(t, end)
     }
 
     /// Theta schedule values.
@@ -181,19 +192,6 @@ impl HullWhite1FParams {
     #[must_use]
     pub fn theta_times(&self) -> &[f64] {
         &self.theta_times
-    }
-
-    /// Exact OU variance for an already-validated simulation step.
-    ///
-    /// Simulation grids provide finite `t >= 0` and `dt > 0`; invalid values
-    /// produce `NaN` so numerical validation can surface the error instead of
-    /// silently pricing with a different volatility.
-    #[must_use]
-    pub fn sigma_variance_for_step(&self, t: f64, dt: f64) -> f64 {
-        if !t.is_finite() || !dt.is_finite() || t < 0.0 || dt <= 0.0 {
-            return f64::NAN;
-        }
-        self.sigma_variance(t, dt).unwrap_or(f64::NAN)
     }
 
     /// Get θ(t) at a given time.
@@ -323,8 +321,9 @@ impl StochasticProcess for HullWhite1FProcess {
         out[0] = self.params.model.kappa * (theta - x[0]);
     }
 
-    fn diffusion(&self, t: f64, _x: &[f64], out: &mut [f64]) {
-        out[0] = self.params.sigma_at_time(t);
+    fn diffusion(&self, t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
+        out[0] = self.params.sigma_at_time(t)?;
+        Ok(())
     }
 
     /// Publish the short rate under both `SHORT_RATE` and `SPOT`.
@@ -506,14 +505,14 @@ where
     };
     let theta_curve = fit_theta_levels(kappa, &theta_boundaries, |t| {
         // ∫σ²·e^{−κ(t−s)} ds is the variance kernel evaluated at κ/2.
-        let single_decay = sigma_curve.integrate_squared_exp_weight(0.5 * kappa, t, 0.0, t)?;
-        let double_decay = sigma_curve.integrate_squared_exp_weight(kappa, t, 0.0, t)?;
+        let single_decay = sigma_curve.integrate(0.5 * kappa, t, 0.0, t)?;
+        let double_decay = sigma_curve.integrate(kappa, t, 0.0, t)?;
         Ok(instantaneous_forward(&discount_curve_fn, t)? + (single_decay - double_decay) / kappa)
     })?;
     HullWhite1FParams::with_piecewise_sigma(
         kappa,
-        sigma_curve.times().to_vec(),
-        sigma_curve.values().to_vec(),
+        sigma_curve.get_times().to_vec(),
+        sigma_curve.get_values().to_vec(),
         theta_curve,
         theta_boundaries,
     )
@@ -621,7 +620,7 @@ mod tests {
         let params = HullWhite1FParams::new(0.1, 0.01, 0.03).expect("valid parameters");
 
         assert_eq!(params.model.kappa, 0.1);
-        assert_eq!(params.sigma_at_time(0.0), 0.01);
+        assert_eq!(params.sigma_at_time(0.0).unwrap(), 0.01);
         assert_eq!(params.theta_at_time(0.0), 0.03);
         assert_eq!(params.theta_at_time(1.0), 0.03);
         assert_eq!(params.theta_at_time(10.0), 0.03);
@@ -666,7 +665,9 @@ mod tests {
         let x = vec![0.05];
         let mut diffusion = vec![0.0];
 
-        process.diffusion(0.0, &x, &mut diffusion);
+        process
+            .diffusion(0.0, &x, &mut diffusion)
+            .expect("valid diffusion");
 
         assert_eq!(diffusion[0], 0.01);
     }
@@ -678,7 +679,7 @@ mod tests {
             .expect("valid Vasicek parameters");
 
         assert_eq!(process.params().model.kappa, 0.1);
-        assert_eq!(process.params().sigma_at_time(0.0), 0.01);
+        assert_eq!(process.params().sigma_at_time(0.0).unwrap(), 0.01);
         assert_eq!(process.theta_at_time(0.0), 0.03);
     }
 
@@ -698,7 +699,7 @@ mod tests {
         // Actually for flat curve: θ(t) = κ·f + σ²/(2κ²)·(1-e^{-κt})²
 
         assert_eq!(params.model.kappa, 0.03);
-        assert_eq!(params.sigma_at_time(0.0), 0.01);
+        assert_eq!(params.sigma_at_time(0.0).unwrap(), 0.01);
         assert_eq!(params.theta_times().len(), 5);
 
         for &theta in params.theta_values() {
@@ -779,7 +780,8 @@ mod tests {
                     &mut rate,
                     &[0.0],
                     &mut work,
-                );
+                )
+                .expect("valid simulation step");
                 let expected = shift(discount, pair[1]);
                 assert!(
                     (rate[0] - expected).abs() < 1e-12,
@@ -804,7 +806,8 @@ mod tests {
                 &mut rate,
                 &[0.0],
                 &mut work,
-            );
+            )
+            .expect("valid simulation step");
         }
         assert!(
             (rate[0] - 0.04).abs() < 1e-3,
@@ -903,7 +906,8 @@ mod tests {
             let mut x = vec![r_flat];
             let z = vec![0.0_f64];
             let mut work = vec![0.0_f64; disc.work_size(&process)];
-            disc.step(&process, t, dt, &mut x, &z, &mut work);
+            disc.step(&process, t, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
 
             // Pre-fix: at r_flat = 5%, κ = 0.2, 1-step mean under θ = κ·r =
             // 1% gives E[r_1] ≈ 0.05·e^{−0.2} + 0.01·(1 − e^{−0.2}) ≈ 0.0409
@@ -932,9 +936,9 @@ mod tests {
         )
         .expect("valid schedule");
 
-        assert_eq!(params.sigma_at_time(0.5), 0.01);
-        assert_eq!(params.sigma_at_time(1.0), 0.02);
-        assert_eq!(params.sigma_at_time(10.0), 0.02);
+        assert_eq!(params.sigma_at_time(0.5).unwrap(), 0.01);
+        assert_eq!(params.sigma_at_time(1.0).unwrap(), 0.02);
+        assert_eq!(params.sigma_at_time(10.0).unwrap(), 0.02);
     }
 
     #[test]
@@ -986,7 +990,8 @@ mod tests {
                 &mut rate,
                 &[0.0],
                 &mut work,
-            );
+            )
+            .expect("valid simulation step");
             let decay = 1.0 - (-kappa * pair[1]).exp();
             let expected = instantaneous_forward(&kinked, pair[1]).expect("valid curve forward")
                 + sigma * sigma / (2.0 * kappa * kappa) * decay * decay;

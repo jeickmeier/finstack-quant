@@ -721,7 +721,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(discount);
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve");
         let rolled_flows = bullet
             .pricing_dated_cashflows(&market, as_of)
             .expect("rolled cashflows");

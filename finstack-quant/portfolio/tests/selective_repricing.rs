@@ -51,8 +51,10 @@ fn make_curve(id: &str, knots: &[(f64, f64)]) -> DiscountCurve {
 
 fn make_market(usd_knots: &[(f64, f64)], eur_knots: &[(f64, f64)]) -> MarketContext {
     MarketContext::new()
-        .insert(make_curve("USD", usd_knots))
-        .insert(make_curve("EUR", eur_knots))
+        .try_insert(make_curve("USD", usd_knots))
+        .expect("insert market curve")
+        .try_insert(make_curve("EUR", eur_knots))
+        .expect("insert market curve")
 }
 
 fn two_curve_market() -> MarketContext {

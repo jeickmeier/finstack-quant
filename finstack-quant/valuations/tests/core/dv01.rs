@@ -35,7 +35,9 @@ fn collect_curves_never_duplicates_a_dual_role_curve_id() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid discount curve");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let calc = UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined());
     let curves = calc

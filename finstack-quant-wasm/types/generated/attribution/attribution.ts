@@ -3077,17 +3077,6 @@ export type InflationVolatilityExpiry = "reference_date" | "publication_date";
  */
 export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
-/**
- * Finite JSON number greater than or equal to zero.
- */
-export type NonNegativeF64Wire = number;
-/**
  * Settlement type for options
  */
 export type SettlementType = "physical" | "cash";
@@ -3442,6 +3431,13 @@ export type BarrierDirection = "up" | "down";
  * Touch type: one-touch (pays if barrier is hit) or no-touch (pays if not hit).
  */
 export type TouchType = "one_touch" | "no_touch";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ */
+export type PositiveF64Wire = number;
 /**
  * Standard commodity market conventions by product type.
  *
@@ -4532,6 +4528,10 @@ export type CurveState =
        */
       base: DateWire;
       /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
+      /**
        * Day count convention
        */
       day_count: DayCount;
@@ -4552,13 +4552,9 @@ export type CurveState =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
       type: "price";
     }
   | {
@@ -4806,6 +4802,12 @@ export type RateCalibrationCurveRole =
  * vs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.
  */
 export type Seniority = "senior_secured" | "senior" | "subordinated" | "junior";
+/**
+ * Level family a [`PriceCurve`] represents.
+ *
+ * The kind determines level validation and the typed market-context lookup.
+ */
+export type PriceCurveKind = "price" | "vol_index";
 /**
  * Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters.
  */
@@ -5760,11 +5762,17 @@ export interface ModelConfig {
   vol_surface_extrapolation?: VolSurfaceExtrapolation;
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface PiecewiseConstantCurve {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Configuration for Monte Carlo PIK bond pricing.
@@ -11988,34 +11996,35 @@ export interface Swaption {
    */
   vol_model: VolatilityModel;
   /**
-   * Volatility surface ID for option pricing
+   * Volatility source ID for option pricing. A dated SABR cube needs an
+   * ACT/365F expiry clock anchored at the valuation date.
    */
   vol_surface_id: Id;
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface SabrParameters {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
-  alpha: PositiveF64Wire;
+  alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
-  beta: ClosedUnitIntervalF64Wire;
+  beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
-  nu: NonNegativeF64Wire;
+  nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
-  rho: CorrelationWire;
+  rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: PositiveF64Wire | null;
+  shift?: number | null;
 }
 /**
  * Bermudan swaption with multiple exercise dates.
@@ -15942,7 +15951,10 @@ export interface CommodityForward {
    */
   settlement_days?: number | null;
   /**
-   * Optional spot price ID (for delta calculations).
+   * Optional observed spot identifier. At maturity the scalar is the delivery
+   * observation. After maturity use the exact delivery observation in the
+   * corresponding `FIXING:{spot_id}` series. Before maturity an explicitly
+   * identified spot can supply the cost-of-carry input if the forward curve is absent.
    */
   spot_id?: Id | null;
   /**
@@ -20447,6 +20459,7 @@ export interface VolCube {
    * Option expiries in years, strictly increasing. Indexes the first axis.
    */
   expiries: number[];
+  expiry_clock?: VolatilityClock | null;
   /**
    * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
    */

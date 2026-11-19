@@ -24,7 +24,7 @@
 //!
 //! // Integrate x² over standard normal (expected value = 1.0)
 //! let quad = GaussHermiteQuadrature::new(7)?;
-//! let integral = quad.integrate(|x| x * x);
+//! let integral = quad.integrate(|x| Ok(x * x))?;
 //! assert!((integral - 1.0).abs() < 0.1);
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
@@ -48,8 +48,11 @@
 //!   - Lewis, A. L. (2000). *Option Valuation under Stochastic Volatility*.
 //!     Finance Press. (Fourier methods and quadrature)
 
+use crate::math::interp::exact_f64_eq;
+
 use crate::Error;
 use crate::InputError;
+use crate::math::summation::NeumaierAccumulator;
 
 /// Gauss-Hermite quadrature points and weights for numerical integration
 /// over the standard normal distribution.
@@ -253,7 +256,7 @@ impl GaussHermiteQuadrature {
     /// use finstack_quant_core::math::integration::GaussHermiteQuadrature;
     ///
     /// let quad = GaussHermiteQuadrature::new(7)?;
-    /// let integral = quad.integrate(|x| x * x);
+    /// let integral = quad.integrate(|x| Ok(x * x))?;
     /// assert!((integral - 1.0).abs() < 0.1); // E[X²] = 1 for standard normal
     ///
     /// // High-precision quadrature for demanding applications
@@ -295,7 +298,7 @@ impl GaussHermiteQuadrature {
     /// Integrate a function over the standard normal distribution.
     ///
     /// # Arguments
-    /// * `f` - Function to integrate, takes x (standard normal variate) as input
+    /// * `f` - Fallible function evaluated at standard-normal quadrature nodes.
     ///
     /// # Returns
     /// The approximate integral of f(x) * φ(x) dx from -∞ to +∞,
@@ -307,28 +310,47 @@ impl GaussHermiteQuadrature {
     /// for `∫ e^{-z^2} g(z) dz`. This helper converts that convention to a
     /// standard-normal expectation by evaluating `f(√2 z)` and dividing the
     /// weighted sum by `√π`.
-    pub fn integrate<F2>(&self, f: F2) -> f64
-    where
-        F2: Fn(f64) -> f64,
-    {
-        use crate::math::summation::NeumaierAccumulator;
-        let sqrt_2 = std::f64::consts::SQRT_2;
-        let mut acc = NeumaierAccumulator::new();
-        let mut fallback = false;
-        let mut raw = 0.0_f64;
-        for (i, &z) in self.points.iter().enumerate() {
-            let term = self.weights[i] * f(sqrt_2 * z);
-            raw += term;
-            if !fallback && acc.add(term).is_err() {
-                fallback = true;
-            }
+    ///
+    /// # Errors
+    ///
+    /// Propagates the first callback error and rejects non-finite samples or unusable weighted terms.
+    pub fn integrate(&self, mut f: impl FnMut(f64) -> crate::Result<f64>) -> crate::Result<f64> {
+        let mut total = NeumaierAccumulator::new();
+        for (&z, &weight) in self.points.iter().zip(self.weights) {
+            let sample = f(std::f64::consts::SQRT_2 * z)?;
+            total.add(weighted_sample(
+                weight / std::f64::consts::PI.sqrt(),
+                sample,
+            )?)?;
         }
-        let sum = if fallback {
-            raw
-        } else {
-            acc.get_total().unwrap_or(raw)
-        };
-        sum / std::f64::consts::PI.sqrt()
+        total.get_total()
+    }
+}
+
+// A positive weight cannot turn a finite nonzero sample into an exact zero.
+fn weighted_sample(weight: f64, sample: f64) -> crate::Result<f64> {
+    let term = weight * sample;
+    if !term.is_finite() || (term == 0.0 && sample != 0.0) {
+        return Err(Error::Internal(
+            "quadrature sample or weighted term is outside numerical range".into(),
+        ));
+    }
+    Ok(term)
+}
+
+// Convex combination also works when the full span overflows.
+fn interval_point(lo: f64, hi: f64, fraction: f64) -> f64 {
+    if fraction == 0.0 {
+        return lo;
+    }
+    if exact_f64_eq(fraction, 1.0) {
+        return hi;
+    }
+    let span = hi - lo;
+    if span.is_finite() {
+        fraction.mul_add(span, lo)
+    } else {
+        fraction.mul_add(hi, (1.0 - fraction) * lo)
     }
 }
 
@@ -338,7 +360,7 @@ impl GaussHermiteQuadrature {
 ///
 /// # Arguments
 ///
-/// * `f` - Function to integrate
+/// * `f` - Fallible scalar integrand evaluated once per Simpson node, including endpoints.
 /// * `a` - Lower endpoint of the integration interval, in the domain units
 ///   accepted by `f`.
 /// * `b` - Upper endpoint of the integration interval, in the domain units
@@ -353,7 +375,11 @@ impl GaussHermiteQuadrature {
 ///
 /// Returns [`Error::Validation`] when:
 /// - `n` is zero
-/// - `n` is not an even number
+/// - `n` is not an even number representable exactly in binary64
+/// - either endpoint is non-finite
+///
+/// The first callback error propagates. Non-finite samples, collapsed nodes and
+/// unrepresentable weighted terms or totals also return errors.
 ///
 /// # Complexity
 ///
@@ -366,35 +392,71 @@ impl GaussHermiteQuadrature {
 /// use finstack_quant_core::math::integration::simpson_rule;
 ///
 /// // Integrate x² from 0 to 1 (exact answer: 1/3)
-/// let integral = simpson_rule(|x| x * x, 0.0, 1.0, 100).expect("Valid parameters");
+/// let integral = simpson_rule(|x| Ok(x * x), 0.0, 1.0, 100).expect("Valid parameters");
 /// assert!((integral - 1.0/3.0).abs() < 1e-6);
 /// ```
-pub fn simpson_rule<F2>(f: F2, a: f64, b: f64, n: usize) -> Result<f64, Error>
-where
-    F2: Fn(f64) -> f64,
-{
-    if n == 0 || !n.is_multiple_of(2) {
-        return Err(crate::Error::Validation(format!(
-            "Simpson's rule needs a positive even number of intervals, got {n}"
-        )));
+pub fn simpson_rule(
+    mut f: impl FnMut(f64) -> crate::Result<f64>,
+    a: f64,
+    b: f64,
+    n: usize,
+) -> crate::Result<f64> {
+    if !a.is_finite() || !b.is_finite() || n == 0 || !n.is_multiple_of(2) || n as u128 > 1u128 << 53
+    {
+        return Err(Error::Validation("Simpson's rule requires finite bounds and a positive, exactly representable even count".into()));
     }
-
-    let h = (b - a) / n as f64;
-    let mut sum = f(a) + f(b);
-
-    // Add even terms (coefficient 2)
-    for i in (2..n).step_by(2) {
-        let x = a + i as f64 * h;
-        sum += 2.0 * f(x);
+    if exact_f64_eq(a, b) {
+        return Ok(0.0);
     }
-
-    // Add odd terms (coefficient 4)
-    for i in (1..n).step_by(2) {
-        let x = a + i as f64 * h;
-        sum += 4.0 * f(x);
+    let (lo, hi) = (a.min(b), a.max(b));
+    let step = half_width(lo, hi) / (n / 2) as f64;
+    let mut total = NeumaierAccumulator::new();
+    let mut previous = f64::NEG_INFINITY;
+    for i in 0..=n {
+        let x = interval_point(lo, hi, i as f64 / n as f64);
+        if x <= previous || (i < n && x >= hi) {
+            return Err(Error::Internal(
+                "Simpson abscissas are indistinguishable".into(),
+            ));
+        }
+        previous = x;
+        let factor = if i == 0 || i == n {
+            1.0
+        } else if i.is_multiple_of(2) {
+            2.0
+        } else {
+            4.0
+        };
+        let sample = f(x)?;
+        let weight = step * (factor / 3.0);
+        // Preserve a representable contribution even if its standalone weight
+        // overflows or loses precision in the subnormal range.
+        let term = if sample == 0.0 {
+            0.0
+        } else if weight.is_normal() {
+            weighted_sample(weight, sample)?
+        } else {
+            use crate::math::stats::{frexp_exp, ldexp};
+            if !sample.is_finite() || step == 0.0 {
+                return Err(Error::Internal(
+                    "unrepresentable Simpson sample or spacing".into(),
+                ));
+            }
+            let e_step = frexp_exp(step);
+            let e_sample = frexp_exp(sample);
+            let scaled = ldexp(step, -e_step) * ldexp(sample, -e_sample) * (factor / 3.0);
+            let term = ldexp(scaled, e_step + e_sample);
+            if term == 0.0 || !term.is_finite() {
+                return Err(Error::Internal(
+                    "unrepresentable Simpson contribution".into(),
+                ));
+            }
+            term
+        };
+        total.add(term)?;
     }
-
-    Ok(sum * h / 3.0)
+    let sum = total.get_total()?;
+    Ok(if a > b { -sum } else { sum })
 }
 
 #[inline]
@@ -408,8 +470,9 @@ fn midpoint(a: f64, b: f64) -> f64 {
 
 #[inline]
 fn half_width(a: f64, b: f64) -> f64 {
-    if (a >= 0.0) == (b >= 0.0) {
-        0.5 * (b - a)
+    let span = b - a;
+    if span.is_finite() {
+        0.5 * span
     } else {
         0.5 * b - 0.5 * a
     }
@@ -1008,17 +1071,31 @@ pub fn gauss_legendre_grid(
         ));
     }
     let (nodes, weights) = gl_nodes_weights(order)?;
-    let width = (b - a) / panels as f64;
-    let half = 0.5 * width;
-    let mut grid = Vec::with_capacity(nodes.len() * panels);
+    let count = order
+        .checked_mul(panels)
+        .filter(|_| panels as u128 <= 1u128 << 53)
+        .ok_or_else(|| Error::Validation("Legendre grid count exceeds capacity".into()))?;
+    let mut grid = Vec::new();
+    grid.try_reserve_exact(count)
+        .map_err(|e| Error::Validation(format!("Legendre grid allocation: {e}")))?;
+    let mut left = a;
     for panel in 0..panels {
-        let midpoint = a + (panel as f64 + 0.5) * width;
-        grid.extend(
-            nodes
-                .iter()
-                .zip(weights)
-                .map(|(&node, &weight)| (midpoint + half * node, half * weight)),
-        );
+        let right = interval_point(a, b, (panel + 1) as f64 / panels as f64);
+        let half = half_width(left, right);
+        let mid = midpoint(left, right);
+        let mut previous = left;
+        for (&node, &w) in nodes.iter().zip(weights) {
+            let point = half.mul_add(node, mid);
+            let weight = half * w;
+            if !(point > previous && point < right && weight > 0.0 && weight.is_finite()) {
+                return Err(Error::Internal(
+                    "unrepresentable Legendre node or weight".into(),
+                ));
+            }
+            grid.push((point, weight));
+            previous = point;
+        }
+        left = right;
     }
     Ok(grid)
 }
@@ -1031,40 +1108,49 @@ pub fn gauss_legendre_grid(
 ///
 /// # Arguments
 ///
-/// * `f` - Function to integrate
-/// * `a` - Lower bound of integration
-/// * `b` - Upper bound of integration
+/// * `f` - Fallible scalar integrand evaluated at each interior Gaussian node.
+/// * `a` - Finite first endpoint in the domain units of the integrand.
+/// * `b` - Finite second endpoint. Reversing the endpoints negates the integral.
 /// * `order` - Quadrature order per panel (supported: 2, 4, 8, 16)
 /// * `panels` - Number of sub-intervals (must be > 0)
 ///
 /// # Returns
 ///
-/// Approximate integral value.
+/// Approximate signed integral. Equal endpoints produce zero without sampling.
 ///
 /// # Errors
 ///
 /// Returns [`Error::Validation`] under the same conditions as
-/// [`gauss_legendre_grid`]: non-finite bounds, `b <= a`, zero `panels`, or an
-/// unsupported `order` (supported orders: 2, 4, 8, 16).
+/// [`gauss_legendre_grid`] for non-finite bounds, zero `panels`, or an
+/// unsupported `order` (supported orders: 2, 4, 8, 16). Callback and numerical evaluation failures propagate.
 ///
 /// # Complexity
 ///
 /// - **Time**: O(panels × order) function evaluations
 /// - **Space**: O(panels × order) for the node grid
-pub fn gauss_legendre_integrate_composite<F2>(
-    f: F2,
+pub fn gauss_legendre_integrate_composite(
+    mut f: impl FnMut(f64) -> crate::Result<f64>,
     a: f64,
     b: f64,
     order: usize,
     panels: usize,
-) -> Result<f64, Error>
-where
-    F2: Fn(f64) -> f64,
-{
-    Ok(gauss_legendre_grid(a, b, order, panels)?
-        .into_iter()
-        .map(|(x, w)| w * f(x))
-        .sum())
+) -> crate::Result<f64> {
+    if exact_f64_eq(a, b) {
+        gl_nodes_weights(order)?;
+        if panels == 0 || panels.checked_mul(order).is_none() || panels as u128 > 1u128 << 53 {
+            return Err(Error::Validation("invalid Legendre panel count".into()));
+        }
+        return Ok(0.0);
+    }
+    if !a.is_finite() || !b.is_finite() {
+        return Err(Error::Validation("Legendre bounds must be finite".into()));
+    }
+    let mut total = NeumaierAccumulator::new();
+    for (x, weight) in gauss_legendre_grid(a.min(b), a.max(b), order, panels)? {
+        total.add(weighted_sample(weight, f(x)?)?)?;
+    }
+    let sum = total.get_total()?;
+    Ok(if a > b { -sum } else { sum })
 }
 
 /// Adaptive Gauss–Legendre integration with automatic refinement.
@@ -1303,7 +1389,7 @@ mod tests {
         // Test Simpson's rule on a simple polynomial x² on [0, 1]
         // Exact integral = 1/3
         let f = |x: f64| x * x;
-        let integral = simpson_rule(f, 0.0, 1.0, 100)
+        let integral = simpson_rule(|x| Ok(f(x)), 0.0, 1.0, 100)
             .expect("Simpson rule integration should succeed in test");
         assert!((integral - 1.0 / 3.0).abs() < 1e-6);
     }

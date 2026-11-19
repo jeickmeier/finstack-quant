@@ -189,12 +189,24 @@ fn inflation_curve_parallel_shift_is_tenor_consistent_in_zero_rate_space() {
 }
 
 #[test]
-fn base_correlation_curve_uses_percent_bumps() {
+fn base_correlation_curve_accepts_only_native_shocks() {
     let curve = sample_base_correlation_curve("CDX");
     let bumped = curve
-        .apply_bump(BumpSpec::inflation_shift_pct(5.0))
-        .expect("base correlation supports percent bump");
-    assert_eq!(bumped.id().as_str(), "CDX_bump_5pct");
+        .apply_bump(BumpSpec {
+            mode: BumpMode::Additive,
+            units: BumpUnits::Fraction,
+            value: 0.01,
+            bump_type: BumpType::Parallel,
+        })
+        .expect("one correlation point");
+    assert_eq!(bumped.id(), curve.id());
+    assert_eq!(bumped.correlations()[0], curve.correlations()[0] + 0.01);
+    assert!(curve.apply_bump(BumpSpec::parallel_bp(1.0)).is_err());
+    assert!(
+        curve
+            .apply_bump(BumpSpec::inflation_shift_pct(1.0))
+            .is_err()
+    );
 }
 
 // Metadata threading through rebuild paths (// "Major — market data" item 4): bumps and rolls must preserve fx_policy and

@@ -146,7 +146,7 @@ fn create_multi_currency_market(as_of: Date) -> MarketContext {
 
     // USD curve
     let usd_curve = create_usd_discount_curve(as_of);
-    market = market.insert(usd_curve);
+    market = market.try_insert(usd_curve).expect("insert market curve");
 
     // EUR curve
     let eur_curve = DiscountCurve::builder("EUR-OIS")
@@ -163,7 +163,7 @@ fn create_multi_currency_market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("EUR curve should build");
-    market = market.insert(eur_curve);
+    market = market.try_insert(eur_curve).expect("insert market curve");
 
     // GBP curve
     let gbp_curve = DiscountCurve::builder("GBP-OIS")
@@ -180,7 +180,7 @@ fn create_multi_currency_market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("GBP curve should build");
-    market = market.insert(gbp_curve);
+    market = market.try_insert(gbp_curve).expect("insert market curve");
 
     market
 }

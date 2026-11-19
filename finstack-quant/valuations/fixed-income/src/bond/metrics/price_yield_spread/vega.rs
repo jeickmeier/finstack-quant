@@ -163,7 +163,7 @@ mod tests {
             .with_mc_paths(128);
 
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (5.0, 0.82)])
@@ -173,7 +173,8 @@ mod tests {
                     .build()
                     .expect("discount curve should build"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 HazardCurve::builder("USD-CREDIT")
                     .base_date(as_of)
                     .recovery_rate(0.4)
@@ -181,7 +182,8 @@ mod tests {
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .build()
                     .expect("hazard curve should build"),
-            );
+            )
+            .expect("insert market curve");
         let mut floor_only = bond.clone();
         floor_only.call_put = None;
         floor_only.return_floor = Some(ReturnFloorSpec::moic(1.0).window(
@@ -253,7 +255,7 @@ mod tests {
 
         let base = date!(2023 - 12 - 28);
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(base)
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -263,7 +265,8 @@ mod tests {
                     .build()
                     .expect("discount curve should build"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 HazardCurve::flat(
                     "ACME-HAZARD",
                     base,
@@ -272,7 +275,8 @@ mod tests {
                     finstack_quant_core::dates::DayCount::Act365F,
                 )
                 .expect("hazard curve"),
-            );
+            )
+            .expect("insert market curve");
         let mut context = MetricContext::new(
             Arc::new(bond),
             Arc::new(market),
@@ -317,16 +321,18 @@ mod tests {
             .instrument_pricing_overrides
             .model_config
             .hw1f_mean_reversion = Some(0.03);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (5.0, 0.82), (10.0, 0.65)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("discount curve should build"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (5.0, 0.82), (10.0, 0.65)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("discount curve should build"),
+            )
+            .expect("insert market curve");
         let quote_context =
             crate::bond::pricing::settlement::QuoteDateContext::new(&clean_bond, &market, as_of)
                 .expect("quote context");

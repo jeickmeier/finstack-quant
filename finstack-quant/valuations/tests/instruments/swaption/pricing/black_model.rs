@@ -53,8 +53,10 @@ fn test_black_formula_manual_validation() {
     let d1 = ((forward / strike).ln() + 0.5 * var) / sqrt_var;
     let d2 = d1 - sqrt_var;
 
-    let norm_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1);
-    let norm_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
+    let norm_d1 =
+        finstack_quant_core::math::special_functions::norm_cdf(d1).expect("valid normal variate");
+    let norm_d2 =
+        finstack_quant_core::math::special_functions::norm_cdf(d2).expect("valid normal variate");
 
     let expected = annuity * (forward * norm_d1 - strike * norm_d2) * swaption.notional.amount();
 
@@ -196,8 +198,10 @@ fn test_black_pricing_rejects_for_non_positive_forward() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(-0.005, as_of, "USD_LIBOR_3M"))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(-0.005, as_of, "USD_LIBOR_3M"))
+        .expect("insert market curve")
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_SWAPTION_VOL"));
 
     let error = swaption

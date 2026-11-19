@@ -49,7 +49,7 @@ pub(crate) fn compute_pv(
         inst.payout_type,
         inst.payout_amount.amount(),
         inst.notional.amount(),
-    );
+    )?;
 
     Money::from_model_value(price, inst.quote_currency)
 }
@@ -155,7 +155,7 @@ fn price_digital(
     payout_type: DigitalPayoutType,
     payout_amount: f64,
     notional: f64,
-) -> f64 {
+) -> Result<f64> {
     let &OptionMarketParams {
         spot,
         strike,
@@ -169,32 +169,32 @@ fn price_digital(
     let exp_rd_t = (-r_d * t).exp();
     let exp_rf_t = (-r_f * t).exp();
 
-    match payout_type {
+    Ok(match payout_type {
         DigitalPayoutType::CashOrNothing => match option_type {
             OptionType::Call => {
                 exp_rd_t
-                    * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                    * finstack_quant_core::math::special_functions::norm_cdf(d2)?
                     * payout_amount
             }
             OptionType::Put => {
                 exp_rd_t
-                    * finstack_quant_core::math::special_functions::norm_cdf(-d2)
+                    * finstack_quant_core::math::special_functions::norm_cdf(-d2)?
                     * payout_amount
             }
         },
         DigitalPayoutType::AssetOrNothing => match option_type {
             OptionType::Call => {
                 spot * exp_rf_t
-                    * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                    * finstack_quant_core::math::special_functions::norm_cdf(d1)?
                     * notional
             }
             OptionType::Put => {
                 spot * exp_rf_t
-                    * finstack_quant_core::math::special_functions::norm_cdf(-d1)
+                    * finstack_quant_core::math::special_functions::norm_cdf(-d1)?
                     * notional
             }
         },
-    }
+    })
 }
 
 /// Garman-Kohlhagen intermediates shared by the cash-or-nothing price and its
@@ -280,13 +280,13 @@ fn greeks_digital(
     let exp_rd_t = (-r_d * t).exp();
     let exp_rf_t = (-r_f * t).exp();
     let sqrt_t = t.sqrt();
-    let pdf_d1 = finstack_quant_core::math::special_functions::norm_pdf(d1);
-    let pdf_d2 = finstack_quant_core::math::special_functions::norm_pdf(d2);
-    let cdf_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1);
-    let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
+    let pdf_d1 = finstack_quant_core::math::special_functions::norm_pdf(d1)?;
+    let pdf_d2 = finstack_quant_core::math::special_functions::norm_pdf(d2)?;
+    let cdf_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1)?;
+    let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2)?;
     let sigma_sqrt_t = sigma * sqrt_t;
     // One-day finite difference, including a possible change in exercise state.
-    let asset_theta = |base_pv: f64| {
+    let asset_theta = |base_pv: f64| -> Result<f64> {
         let t_minus = (t - 1.0 / theta_days_per_year).max(0.0);
         let pv_t_minus = if t_minus > 0.0 {
             price_digital(
@@ -297,7 +297,7 @@ fn greeks_digital(
                 payout_type,
                 payout_amount,
                 notional,
-            )
+            )?
         } else {
             match option_type {
                 OptionType::Call if spot > strike => spot * notional,
@@ -305,7 +305,7 @@ fn greeks_digital(
                 _ => 0.0,
             }
         };
-        pv_t_minus - base_pv
+        Ok(pv_t_minus - base_pv)
     };
 
     if sigma_sqrt_t <= 0.0 {
@@ -334,7 +334,7 @@ fn greeks_digital(
                 let pv = spot * delta;
                 FxDigitalOptionGreeks {
                     delta,
-                    theta: asset_theta(pv),
+                    theta: asset_theta(pv)?,
                     rho_foreign: -t * pv / 100.0,
                     ..Default::default()
                 }
@@ -483,8 +483,10 @@ mod tests {
         let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
         MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_surface(vol_surface)
             .insert_fx(fx_matrix)
     }
@@ -549,6 +551,7 @@ mod tests {
                             100_000.0,
                             1_000_000.0,
                         )
+                        .expect("finite reference price")
                     };
                     let greeks = greeks_digital(
                         &fx_market(spot, strike, r_d, 0.01, 0.0, t, option_type),
@@ -710,8 +713,10 @@ mod tests {
         let (d1, d2) = d1_d2(spot, strike, r_d, sigma, t, r_f);
         let exp_rd_t = (-r_d * t).exp();
         let sqrt_t = t.sqrt();
-        let pdf_d2 = finstack_quant_core::math::special_functions::norm_pdf(d2);
-        let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
+        let pdf_d2 = finstack_quant_core::math::special_functions::norm_pdf(d2)
+            .expect("valid normal variate");
+        let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2)
+            .expect("valid normal variate");
         let base_pv_call = exp_rd_t * cdf_d2 * payout_amount;
 
         let terms = D2Terms {
@@ -738,7 +743,8 @@ mod tests {
         let t_minus_fine = t - dt_fine;
         let (_, d2_minus) = d1_d2(spot, strike, r_d, sigma, t_minus_fine, r_f);
         let exp_rd_t_minus = (-r_d * t_minus_fine).exp();
-        let cdf_d2_minus = finstack_quant_core::math::special_functions::norm_cdf(d2_minus);
+        let cdf_d2_minus = finstack_quant_core::math::special_functions::norm_cdf(d2_minus)
+            .expect("valid normal variate");
         let pv_call_t_minus_fine = exp_rd_t_minus * cdf_d2_minus * payout_amount;
         // (V(τ-ε) - V(τ)) / ε / 365  ≈  -(∂V/∂τ)/365 = analytic_theta
         let fd_theta_fine = (pv_call_t_minus_fine - base_pv_call) / dt_fine / theta_days_per_year;
@@ -770,7 +776,8 @@ mod tests {
         );
 
         // Verify the Put theta is also analytic (d1 is used in the put formula).
-        let cdf_neg_d2 = finstack_quant_core::math::special_functions::norm_cdf(-d2);
+        let cdf_neg_d2 = finstack_quant_core::math::special_functions::norm_cdf(-d2)
+            .expect("valid normal variate");
         let base_pv_put = exp_rd_t * cdf_neg_d2 * payout_amount;
         let analytic_theta_put = analytic_theta_cash_or_nothing(
             &put_market,

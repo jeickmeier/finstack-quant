@@ -3,8 +3,6 @@
 
 #[cfg(test)]
 use super::pool::HomogeneousPool;
-#[cfg(test)]
-use super::pool::PreparedBinomial;
 use super::pool::PreparedPool;
 use super::pricer::{
     CdsTranchePricer, ElWdPoint, INTEGRATION_TOLERANCE, PROBABILITY_CLIP, PoolExposure,
@@ -62,10 +60,10 @@ impl CdsTranchePricer {
         // Base correlation is sticky to the original structure
         let corr_attach = index_data
             .base_correlation_curve()
-            .correlation(tranche.attach_pct);
+            .get_correlation(tranche.attach_pct)?;
         let corr_detach = index_data
             .base_correlation_curve()
-            .correlation(tranche.detach_pct);
+            .get_correlation(tranche.detach_pct)?;
 
         // Apply enhanced correlation boundary handling for numerical stability
         let corr_attach = self.smooth_correlation_boundary(corr_attach);
@@ -306,13 +304,12 @@ impl CdsTranchePricer {
         dates: &[Date],
     ) -> Result<PreparedExpectedLoss> {
         let inv = self.el_invariants(tranche, index_data)?;
-        let mut binomial = None;
         let pools = if inv.eff_detach <= inv.eff_attach || inv.orig_width <= 1e-9 {
             Vec::new()
         } else {
             dates
                 .iter()
-                .map(|&date| PreparedPool::new(self, index_data, date, &mut binomial))
+                .map(|&date| PreparedPool::new(self, index_data, date))
                 .collect::<Result<Vec<_>>>()?
         };
         Ok(PreparedExpectedLoss {
@@ -351,7 +348,7 @@ impl CdsTranchePricer {
         maturity: Date,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        PreparedPool::new(self, index_data, maturity, &mut None)?.capped(
+        PreparedPool::new(self, index_data, maturity)?.capped(
             self,
             cap_pct / 100.0,
             self.smooth_correlation_boundary(correlation),
@@ -401,13 +398,12 @@ impl CdsTranchePricer {
         correlation: f64,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        HomogeneousPool::new(
+        HomogeneousPool::new(self, count, default_prob, base_recovery)?.capped(
             self,
-            Arc::new(PreparedBinomial::new(count)),
-            default_prob,
-            base_recovery,
+            cap,
+            correlation,
+            exposure,
         )
-        .capped(self, cap, correlation, exposure)
     }
     #[cfg(test)]
     fn homogeneous_capped_pair(
@@ -419,13 +415,12 @@ impl CdsTranchePricer {
         base_recovery: f64,
         correlation: f64,
     ) -> Result<(f64, f64)> {
-        HomogeneousPool::new(
+        HomogeneousPool::new(self, count, default_prob, base_recovery)?.pair(
             self,
-            Arc::new(PreparedBinomial::new(count)),
-            default_prob,
-            base_recovery,
+            loss_cap,
+            recovery_cap,
+            correlation,
         )
-        .pair(self, loss_cap, recovery_cap, correlation)
     }
 
     /// Expose the actual four caps used by projection to offline numerical tests.
@@ -449,23 +444,23 @@ impl CdsTranchePricer {
             return Ok([0.0; 4]);
         }
         let curve = index_data.base_correlation_curve();
-        let smoothed = |pct: f64| {
-            self.smooth_correlation_boundary(
-                self.smooth_correlation_boundary(curve.correlation(pct)),
-            )
+        let smoothed = |pct: f64| -> Result<f64> {
+            Ok(self.smooth_correlation_boundary(
+                self.smooth_correlation_boundary(curve.get_correlation(pct)?),
+            ))
         };
-        let pool = PreparedPool::new(self, index_data, date, &mut None)?;
+        let pool = PreparedPool::new(self, index_data, date)?;
         let attach = pool.pair(
             self,
             (inv.eff_attach * 100.0) / 100.0,
             ((1.0 - inv.eff_attach) * 100.0) / 100.0,
-            smoothed(inv.attach_pct),
+            smoothed(inv.attach_pct)?,
         )?;
         let detach = pool.pair(
             self,
             (inv.eff_detach * 100.0) / 100.0,
             ((1.0 - inv.eff_detach) * 100.0) / 100.0,
-            smoothed(inv.detach_pct),
+            smoothed(inv.detach_pct)?,
         )?;
         Ok([attach.0, attach.1, detach.0, detach.1])
     }
@@ -506,10 +501,10 @@ impl PreparedExpectedLoss {
         // Preserve both established smoothing passes, including their rounding
         // near boundaries. Preparation does not change the correlation model.
         let corr_attach = pricer.smooth_correlation_boundary(
-            pricer.smooth_correlation_boundary(correlation.correlation(inv.attach_pct)),
+            pricer.smooth_correlation_boundary(correlation.get_correlation(inv.attach_pct)?),
         );
         let corr_detach = pricer.smooth_correlation_boundary(
-            pricer.smooth_correlation_boundary(correlation.correlation(inv.detach_pct)),
+            pricer.smooth_correlation_boundary(correlation.get_correlation(inv.detach_pct)?),
         );
         let correlation_bits = corr_attach.to_bits();
         let cached_attachment = self.attachment.as_ref().and_then(|cache| {

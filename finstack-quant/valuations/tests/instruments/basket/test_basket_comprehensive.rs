@@ -54,7 +54,9 @@ fn minimal_market_context() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(discount_curve)
+    MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert market curve")
 }
 
 /// Create a market context with equity prices

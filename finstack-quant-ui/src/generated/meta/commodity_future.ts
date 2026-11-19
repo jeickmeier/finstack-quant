@@ -3670,7 +3670,7 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve",
-    "description": "A finite, left-continuous piecewise-constant curve."
+    "description": "A finite, right-continuous piecewise-constant curve."
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times",
@@ -3679,7 +3679,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/times/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values",
@@ -3688,7 +3689,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_d30540ea90ce7eca3dee",

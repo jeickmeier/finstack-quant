@@ -32,9 +32,9 @@ fn build_rng(seed: u64, stream_id: Option<u64>) -> Pcg64Rng {
             let state = splitmix64_finalize(node ^ path);
             let increment =
                 splitmix64_finalize(node.wrapping_add(path.rotate_left(32)) ^ GOLDEN_GAMMA);
-            Pcg64Rng::new_with_stream(state, increment)
+            Pcg64Rng::new(state, increment)
         }
-        None => Pcg64Rng::new(seed),
+        None => Pcg64Rng::new(seed, 0),
     }
 }
 
@@ -163,7 +163,7 @@ pub(crate) fn normal_forecast_with_stream(
     let mut prev = base_value;
 
     for period_id in forecast_periods {
-        let z = rng.normal(0.0, 1.0);
+        let z = rng.normal(0.0, 1.0)?;
         shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
         let value = normal_step(prev, p, z);
         if !value.is_finite() {
@@ -279,7 +279,7 @@ pub(crate) fn lognormal_forecast_with_stream(
     let mut prev = base_value;
 
     for period_id in forecast_periods {
-        let z = rng.normal(0.0, 1.0);
+        let z = rng.normal(0.0, 1.0)?;
         shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
         let value = lognormal_step(prev, p, z);
         if !value.is_finite() {
@@ -376,7 +376,7 @@ pub(crate) fn mean_reverting_forecast_with_stream(
     let mut prev = base_value;
 
     for period_id in forecast_periods {
-        let z = rng.normal(0.0, 1.0);
+        let z = rng.normal(0.0, 1.0)?;
         shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
         let value = mean_reverting_step(prev, p, z);
         if !value.is_finite() {
@@ -634,7 +634,7 @@ pub(crate) fn monte_carlo_correlated_series(
             ))
         })?;
 
-        let z_indep = rng.normal(0.0, 1.0);
+        let z_indep = rng.normal(0.0, 1.0)?;
         let z = rho * z_peer + indep_weight * z_indep;
         z_out.insert(*period_id, if sigma == 0.0 { 0.0 } else { z });
 
@@ -960,7 +960,10 @@ mod tests {
                 .expect("forecast");
         let mut rng = build_rng(42, Some(5));
         for pid in &periods {
-            assert_eq!(shocks[pid].to_bits(), rng.normal(0.0, 1.0).to_bits());
+            assert_eq!(
+                shocks[pid].to_bits(),
+                rng.normal(0.0, 1.0).unwrap().to_bits()
+            );
         }
     }
 
@@ -1028,18 +1031,30 @@ mod tests {
 
     #[test]
     fn bootstrap_is_deterministic_per_seed() {
-        let periods = vec![
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-        ];
-        let params = bootstrap_params();
-        let a = bootstrap_forecast(100.0, &periods, &params).expect("forecast");
-        let b = bootstrap_forecast(100.0, &periods, &params).expect("forecast");
-        assert_eq!(a, b);
-
-        let other_seed = BootstrapParams { seed: 43, ..params };
-        let c = bootstrap_forecast(100.0, &periods, &other_seed).expect("forecast");
-        assert_ne!(a, c);
+        let periods: Vec<_> = (1..=4)
+            .map(|q| PeriodId::quarter(2025, q).expect("valid quarter"))
+            .collect();
+        // Stream 0 of PCG XSL-RR 128/64, mapping the top 53 bits of each
+        // word to one of three bins, gives [0,1,0,1] and [0,1,1,1].
+        // The first two samples legitimately coincide. Integer increments
+        // 1, 10, and 100 make each accumulated level exactly representable.
+        for (seed, expected) in [
+            (42, [101.0, 111.0, 112.0, 122.0]),
+            (43, [101.0, 111.0, 121.0, 131.0]),
+        ] {
+            let params = BootstrapParams {
+                historical: vec![100.0, 101.0, 111.0, 211.0],
+                mode: ForecastBootstrapMode::Diff,
+                seed,
+                min: None,
+                max: None,
+            };
+            let path = bootstrap_forecast(100.0, &periods, &params).expect("forecast");
+            for (period, value) in periods.iter().zip(expected) {
+                assert_eq!(path[period], value, "seed {seed}, period {period}");
+            }
+            assert_eq!(bootstrap_forecast(100.0, &periods, &params).unwrap(), path);
+        }
     }
 
     /// Growth mode resamples the observed rates {+5%, -5%, +10%}; every step
@@ -1291,7 +1306,7 @@ mod tests {
                 assert_eq!(values[period], 1e16, "{method}");
                 assert_eq!(
                     shocks[period].to_bits(),
-                    rng.normal(0.0, 1.0).to_bits(),
+                    rng.normal(0.0, 1.0).unwrap().to_bits(),
                     "{method}"
                 );
             }

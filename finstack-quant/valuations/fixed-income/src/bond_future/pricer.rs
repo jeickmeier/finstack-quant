@@ -179,7 +179,7 @@ impl BondFuturePricer {
         let factor = a * (coupon / 2.0 + c + d) - b;
 
         // CME publishes conversion factors to 4 decimal places.
-        Ok(finstack_quant_core::math::round_half_away(factor, 4))
+        finstack_quant_core::math::round_half_away(factor, 4)
     }
 
     /// Calculate model futures price from the CTD bond, **carry-adjusted to
@@ -467,7 +467,9 @@ mod tests {
             .expect("Failed to build discount curve");
 
         // insert_discount consumes self and returns Self (builder pattern)
-        MarketContext::new().insert(curve)
+        MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve")
     }
 
     /// Helper to create a test bond with fixed semi-annual coupons
@@ -1100,16 +1102,18 @@ mod tests {
             date!(2020 - 01 - 15),
             date!(2030 - 01 - 15),
         );
-        let market = create_test_market(0.06).insert(
-            DiscountCurve::builder("USD-SPECIAL-REPO")
-                .base_date(as_of)
-                .knots(vec![(0.0, 1.0), (1.0, (-0.02_f64).exp())])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("repo curve"),
-        );
+        let market = create_test_market(0.06)
+            .try_insert(
+                DiscountCurve::builder("USD-SPECIAL-REPO")
+                    .base_date(as_of)
+                    .knots(vec![(0.0, 1.0), (1.0, (-0.02_f64).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("repo curve"),
+            )
+            .expect("insert market curve");
         let cf = 0.8234;
 
         let model = BondFuturePricer::fair_price_for_future(&future, &bond, cf, &market, as_of)

@@ -55,6 +55,7 @@ use crate::cds::CreditDefaultSwap;
 use crate::cs01::with_prepared_cds_risk_context;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::cs01::reprice_with_hazard;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
@@ -115,21 +116,12 @@ impl MetricCalculator for CsGammaCalculator {
                 let bumped_hazard_0 = rebuild(HazardRecalibrationAction::SpreadRiskCenterReplay)?;
 
                 let (pv_up, pv_0, pv_dn) = context.with_market_scratch(|ctx, scratch| {
-                    // PV at s + Δ
-                    scratch.insert_mut(bumped_hazard_up);
-                    let pv_up = ctx.reprice_raw(scratch, as_of)?;
-                    scratch.insert_mut(std::sync::Arc::clone(&hazard));
-
-                    // PV at s (re-bootstrapped base, so the base-effect is zero)
-                    scratch.insert_mut(bumped_hazard_0);
-                    let pv_0 = ctx.reprice_raw(scratch, as_of)?;
-                    scratch.insert_mut(std::sync::Arc::clone(&hazard));
-
-                    // PV at s - Δ
-                    scratch.insert_mut(bumped_hazard_dn);
-                    let pv_dn = ctx.reprice_raw(scratch, as_of)?;
-                    scratch.insert_mut(std::sync::Arc::clone(&hazard));
-
+                    let mut revalue = |market: &_| ctx.reprice_raw(market, as_of);
+                    let pv_up =
+                        reprice_with_hazard(scratch, bumped_hazard_up, &hazard, &mut revalue)?;
+                    let pv_0 =
+                        reprice_with_hazard(scratch, bumped_hazard_0, &hazard, &mut revalue)?;
+                    let pv_dn = reprice_with_hazard(scratch, bumped_hazard_dn, &hazard, revalue)?;
                     Ok((pv_up, pv_0, pv_dn))
                 })?;
 

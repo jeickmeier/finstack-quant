@@ -143,7 +143,7 @@ impl RiemannLiouvilleVolterra {
             ));
         }
 
-        let h_val = h.value();
+        let h_val = h.get_value();
         let gamma = h_val - 0.5; // kernel exponent γ = H − ½ ∈ (−½, ½)
         let dt = t_end / num_steps as f64;
         let sqrt_two_h = (2.0 * h_val).sqrt();

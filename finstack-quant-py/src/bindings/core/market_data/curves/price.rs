@@ -4,32 +4,18 @@ use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKi
 
 use std::sync::Arc;
 
-use finstack_quant_core::math::interp::ExtrapolationPolicy;
-use finstack_quant_core::math::interp::InterpStyle;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use super::helpers::{TimePoint, columns_to_dataframe, extract_time_point};
-use crate::bindings::core::dates::daycount::extract_day_count;
-use crate::bindings::date_utils::{date_to_py, py_to_date};
+use super::helpers::{
+    CurveSourceOptions, TimePoint, columns_to_dataframe, extract_time_point, required_option,
+};
+use crate::bindings::date_utils::date_to_py;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 
-/// Forward price curve for commodities, other price-based assets and
-/// volatility indices.
-///
-/// Stores ``(t, forward_price)`` knots in years from ``base_date`` in absolute
-/// price units (or index points for ``kind="vol_index"``). ``price`` accepts a
-/// year fraction or a date (converted with the curve day count by Rust).
-///
-/// Example
-/// -------
-/// >>> from finstack_quant.core.market_data import PriceCurve
-/// >>> curve = PriceCurve("WTI", "2025-01-01", [(0.0, 70.0), (1.0, 72.0)])
-/// >>> curve.price(0.5)
-/// 71.0
-/// >>> vix = PriceCurve("VIX", "2025-01-01", [(0.0, 18.0), (1.0, 21.0)], kind="vol_index")
-/// >>> vix.kind
-/// 'vol_index'
+#[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve")]
 #[pyclass(
     name = "PriceCurve",
     module = "finstack_quant.core.market_data",
@@ -51,107 +37,25 @@ impl PyPriceCurve {
 
 #[pymethods]
 impl PyPriceCurve {
-    /// Construct a price curve from ``(time_years, forward_price)`` knots.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique curve identifier (e.g. ``"WTI-FORWARD"`` or ``"VIX"``).
-    /// base_date : datetime.date | str
-    ///     Valuation date anchoring ``t = 0``.
-    /// knots : list[tuple[float, float]]
-    ///     ``(time_years, forward_price)`` pairs in absolute price units. At
-    ///     least two knots; the first must be at ``t = 0`` unless ``spot_price`` is given.
-    /// kind : str, optional
-    ///     ``"price"`` (default; signed prices allowed) or ``"vol_index"``
-    ///     (non-negative volatility-index levels in vol points, e.g. ``18.0``).
-    /// spot_price : float, optional
-    ///     Spot level at ``t = 0``; inferred from a ``t = 0`` knot when omitted.
-    ///     An explicit spot is inserted at zero if that knot is absent and
-    ///     must match any supplied zero-time knot.
-    /// extrapolation : str, optional
-    ///     Extrapolation policy; default ``"flat"``.
-    /// interp : str, optional
-    ///     Interpolation style; default ``"linear"``.
-    /// day_count : DayCount | str, optional
-    ///     Day-count convention; default ``"act_365f"``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If fewer than two knots are given, a knot is non-finite or
-    ///     duplicated, spot cannot be inferred or conflicts with a zero-time
-    ///     knot, a vol-index level is negative,
-    ///     or a label is unknown.
-    ///
-    /// Example
-    /// -------
-    /// >>> from finstack_quant.core.market_data import PriceCurve
-    /// >>> curve = PriceCurve("WTI", "2025-01-01", [(0.5, 70.0), (1.0, 72.0)], spot_price=69.5)
-    /// >>> curve.spot_price
-    /// 69.5
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.__init__")]
     #[new]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "keyword-only curve options mirror the Rust builder setters"
-    )]
-    #[pyo3(signature = (id, base_date, knots, *, kind=None, spot_price=None, extrapolation=None, interp=None, day_count=None))]
-    fn new(
-        id: &str,
-        base_date: &Bound<'_, PyAny>,
-        knots: Vec<(f64, f64)>,
-        kind: Option<&str>,
-        spot_price: Option<f64>,
-        extrapolation: Option<&str>,
-        interp: Option<&str>,
-        day_count: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<Self> {
-        let mut builder = PriceCurve::builder(id)
-            .base_date(py_to_date(base_date)?)
-            .knots(knots);
-        if let Some(kind) = kind {
-            builder = builder.kind(kind.parse::<PriceCurveKind>().map_err(core_to_py)?);
-        }
-        if let Some(spot) = spot_price {
-            builder = builder.spot_price(spot);
-        }
-        if let Some(extrapolation) = extrapolation {
-            builder = builder.extrapolation(
-                extrapolation
-                    .parse::<ExtrapolationPolicy>()
-                    .map_err(core_to_py)?,
-            );
-        }
-        if let Some(interp) = interp {
-            builder = builder.interp(interp.parse::<InterpStyle>().map_err(core_to_py)?);
-        }
-        if let Some(day_count) = day_count {
-            builder = builder.day_count(extract_day_count(day_count)?);
-        }
-        builder
+    fn new(options: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let source = CurveSourceOptions::extract(options, "PriceCurve", "kind")?;
+        let kind: String = required_option(options, "PriceCurve", "kind")?.extract()?;
+        PriceCurve::builder(source.id)
+            .base_date(source.base_date)
+            .knots(source.knots)
+            .kind(kind.parse::<PriceCurveKind>().map_err(core_to_py)?)
+            .day_count(source.day_count)
+            .calendar_id_opt(source.calendar_id)
+            .interp(source.interp)
+            .extrapolation(source.extrapolation)
             .build()
-            .map(|curve| Self {
-                inner: Arc::new(curve),
-            })
+            .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
     }
 
-    /// Forward price (or vol-index level) at a year fraction or date.
-    ///
-    /// Parameters
-    /// ----------
-    /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Price in the curve's units.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a date precedes ``base_date``.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.price")]
     #[pyo3(text_signature = "(self, t)")]
     fn price(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {
@@ -160,11 +64,7 @@ impl PyPriceCurve {
         }
     }
 
-    /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``price``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         columns_to_dataframe(
             py,
@@ -175,55 +75,55 @@ impl PyPriceCurve {
         )
     }
 
-    /// Curve identifier string.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.id")]
     #[getter]
     fn id(&self) -> &str {
         self.inner.id().as_str()
     }
 
-    /// Valuation base date (``datetime.date``).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.base_date")]
     #[getter]
     fn base_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.base_date())
     }
 
-    /// Curve kind label: ``"price"`` or ``"vol_index"``.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.kind")]
     #[getter]
     fn kind(&self) -> &'static str {
         self.inner.kind().as_str()
     }
 
-    /// Spot price (or vol-index level) at ``t = 0``.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.calendar_id")]
     #[getter]
-    fn spot_price(&self) -> f64 {
-        self.inner.spot_price()
+    fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id().map(str::to_owned)
     }
 
-    /// Knot times in years from ``base_date``, ascending.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.knots")]
     #[getter]
     fn knots(&self) -> Vec<f64> {
         self.inner.knots().to_vec()
     }
 
-    /// Forward prices at each knot (absolute price units or vol points).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.prices")]
     #[getter]
     fn prices(&self) -> Vec<f64> {
         self.inner.prices().to_vec()
     }
 
-    /// Day-count convention label (e.g. ``"act_365f"``).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.day_count")]
     #[getter]
     fn day_count(&self) -> String {
         self.inner.day_count().to_string()
     }
 
-    /// Interpolation style label (e.g. ``"linear"``).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.interp_style")]
     #[getter]
     fn interp_style(&self) -> String {
         self.inner.interp_style().to_string()
     }
 
-    /// Extrapolation policy label (e.g. ``"flat"``).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.extrapolation")]
     #[getter]
     fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()
@@ -231,15 +131,20 @@ impl PyPriceCurve {
 
     fn __repr__(&self) -> String {
         format!(
-            "PriceCurve(id='{}', kind='{}', base_date='{}', knots={}, spot_price={})",
+            "PriceCurve(id='{}', kind='{}', base_date='{}', knots={})",
             self.inner.id().as_str(),
             self.inner.kind(),
             self.inner.base_date(),
-            self.inner.knots().len(),
-            self.inner.spot_price()
+            self.inner.knots().len()
         )
     }
 }
 
-wire_methods!(PyPriceCurve, PriceCurve, "PriceCurve", arc);
+wire_methods!(
+    PyPriceCurve,
+    PriceCurve,
+    "PriceCurve",
+    module = "finstack_quant.core.market_data._curves.price",
+    arc
+);
 impl_repr_html_via_dataframe!(PyPriceCurve);

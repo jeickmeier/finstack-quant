@@ -46,7 +46,9 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// Two-year workout: 55% gross proceeds less 5% carry, 20% re-performs at 4%.

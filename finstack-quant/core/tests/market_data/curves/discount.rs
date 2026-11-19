@@ -1845,3 +1845,31 @@ mod negative_rate_stress {
         );
     }
 }
+
+#[test]
+fn conditioned_zero_rate_on_date_uses_source_clock_horizon() {
+    use finstack_quant_core::math::Compounding;
+    use time::macros::date;
+
+    let curve = DiscountCurve::builder("30U-360-ROLL")
+        .base_date(date!(2025 - 01 - 15))
+        .day_count(DayCount::Thirty360)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+        .build()
+        .expect("curve")
+        .condition(date!(2025 - 02 - 28))
+        .expect("condition");
+    // Source coordinates are 43/360 and 76/360. The re-anchored
+    // February month-end to March month-end fraction would be 30/360.
+    let rate = curve
+        .zero_rate_on_date(date!(2025 - 03 - 31), Compounding::Continuous)
+        .expect("dated zero rate");
+    assert!((rate - 0.04).abs() < 1e-13);
+    assert!(
+        curve
+            .zero_rate_on_date(date!(2025 - 02 - 28), Compounding::Continuous)
+            .is_err()
+    );
+}

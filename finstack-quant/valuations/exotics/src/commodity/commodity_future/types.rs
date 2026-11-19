@@ -418,12 +418,17 @@ mod tests {
 
     fn flat_market() -> MarketContext {
         let curve = PriceCurve::builder("INDEX-FWD")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(date!(2026 - 01 - 01))
-            .spot_price(100.0)
             .knots([(0.0, 100.0), (1.0, 100.0)])
             .build()
             .expect("valid price curve");
-        MarketContext::new().insert(curve)
+        MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve")
     }
 
     #[test]
@@ -465,14 +470,17 @@ mod tests {
     fn commodity_future_curve_delta_tracks_the_selected_mark() {
         let mut future = average_future(vec![(date!(2026 - 01 - 02), 80.0)]);
         let shifted_market = |shift: f64| {
-            MarketContext::new().insert(
+            MarketContext::new().try_insert(
                 PriceCurve::builder("INDEX-FWD")
+                    .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                     .base_date(date!(2026 - 01 - 01))
-                    .spot_price(100.0 + shift)
                     .knots([(0.0, 100.0 + shift), (1.0, 100.0 + shift)])
                     .build()
                     .expect("curve"),
-            )
+            ).expect("insert market curve")
         };
         for position in [Position::Long, Position::Short] {
             future.terms.position = position;

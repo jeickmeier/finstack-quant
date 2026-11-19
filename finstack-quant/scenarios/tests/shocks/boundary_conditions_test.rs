@@ -394,7 +394,9 @@ fn test_curve_parallel_shock_zero_bp() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

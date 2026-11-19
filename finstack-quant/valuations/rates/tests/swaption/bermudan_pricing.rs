@@ -395,7 +395,8 @@ fn build_market_context() -> MarketContext {
     let curve = test_discount_curve();
     let (kappa_key, sigma_key) = hw1f_scalar_keys("USD-OIS");
     MarketContext::new()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_price(
             &kappa_key,
             MarketScalar::unitless(0.05).expect("valid scalar"),
@@ -639,7 +640,9 @@ fn test_tree_rejects_missing_hw1f_parameters() {
     // Direct tree pricer call — no market context needed for this path
     // because we expect early return on the uncalibrated guard. Use the
     // dyn Pricer trait as the registry does.
-    let market = MarketContext::new().insert(test_discount_curve());
+    let market = MarketContext::new()
+        .try_insert(test_discount_curve())
+        .expect("insert market curve");
     let err = pricer
         .price_dyn(&swaption, &market, as_of)
         .expect_err("tree pricing must reject missing fitted parameters");
@@ -672,7 +675,9 @@ fn test_lsmc_rejects_partial_hw1f_parameters() {
         ..Default::default()
     });
 
-    let market = MarketContext::new().insert(test_discount_curve());
+    let market = MarketContext::new()
+        .try_insert(test_discount_curve())
+        .expect("insert market curve");
     let err = pricer
         .price_dyn(&swaption, &market, as_of)
         .expect_err("LSMC pricing must reject a partial explicit parameter pair");

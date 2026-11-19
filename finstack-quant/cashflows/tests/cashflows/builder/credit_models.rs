@@ -604,8 +604,10 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         .build()
         .unwrap();
     let market_with_recovery = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(disc.clone())
-        .insert(hazard);
+        .try_insert(disc.clone())
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     // Combining DefaultedNotional flows with recovery_rate > 0 is rejected
     // to prevent double-counting recovery from both explicit flows and the
@@ -632,8 +634,10 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         .build()
         .unwrap();
     let market_no_recovery = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(disc)
-        .insert(hazard_zero_recovery);
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard_zero_recovery)
+        .expect("insert market curve");
     let pv_map = schedule
         .pv_by_period(
             &periods,

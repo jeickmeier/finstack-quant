@@ -129,7 +129,7 @@ impl FactorBumper for CreditQuoteBumper {
                         self.bump_bp * direction,
                     )),
                 })?;
-            target = target.insert(rebuilt.as_ref().clone());
+            target.try_insert_mut(rebuilt.as_ref().clone())?;
         }
         Ok(target)
     }

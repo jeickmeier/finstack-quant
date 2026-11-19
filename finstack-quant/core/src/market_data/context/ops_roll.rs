@@ -59,7 +59,7 @@ impl MarketContext {
     ///     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
     ///     .build()?;
     ///
-    /// let ctx = MarketContext::new().insert(curve);
+    /// let ctx = MarketContext::new().try_insert(curve).expect("insert market curve");
     ///
     /// // Condition 6 months forward.
     /// let conditioned_ctx = ctx.condition(date!(2025 - 07 - 02))?;

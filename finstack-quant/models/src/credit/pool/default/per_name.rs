@@ -177,7 +177,7 @@ impl PerNameCopulaDefault {
 
         for &pd in marginal_pd {
             let threshold = self.threshold(pd)?;
-            let raw = rng.next_std_normal();
+            let raw = rng.next_std_normal()?;
             // Antithetic partner negates the idiosyncratic Gaussian draw so
             // its latent variable is the antithetic variate of its pair.
             let idiosyncratic = if antithetic { -raw } else { raw };
@@ -359,8 +359,11 @@ mod tests {
             0.0
         }
 
-        fn integrate_fn(&self, _f: &dyn Fn(&[f64]) -> f64) -> f64 {
-            0.0
+        fn integrate_fn(
+            &self,
+            _f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
+        ) -> finstack_quant_core::Result<f64> {
+            Ok(0.0)
         }
 
         fn sample_mixing(&self, _u01: f64) -> Result<f64> {
@@ -439,10 +442,12 @@ mod tests {
         assert_eq!(out.len(), marginals.len());
         for (pd, cond) in marginals.iter().zip(&out) {
             let threshold =
-                finstack_quant_core::math::special_functions::standard_normal_inv_cdf(*pd);
+                finstack_quant_core::math::special_functions::standard_normal_inv_cdf(*pd)
+                    .expect("valid probability");
             let expected = finstack_quant_core::math::special_functions::norm_cdf(
                 (threshold - rho.sqrt() * z) / (1.0 - rho).sqrt(),
-            );
+            )
+            .expect("valid Gaussian variate");
             assert!(
                 (cond - expected).abs() < 1e-12,
                 "pd {pd}: conditional {cond} vs closed form {expected}"
@@ -468,7 +473,7 @@ mod tests {
         let periods = 4_000usize;
         let mut total_defaults = 0usize;
         for _ in 0..periods {
-            let z = rng.next_std_normal();
+            let z = rng.next_std_normal().expect("normal draw");
             sim.simulate_period(z, &names, &mut rng, &mut out, false)
                 .expect("valid copula simulation");
             total_defaults += out.iter().filter(|d| **d).count();
@@ -578,7 +583,7 @@ mod tests {
         let periods = 5_000usize;
         let mut total = 0usize;
         for _ in 0..periods {
-            let z = rng.next_std_normal();
+            let z = rng.next_std_normal().expect("normal draw");
             sim.simulate_period(z, &names, &mut rng, &mut out, false)
                 .expect("valid copula simulation");
             total += out.iter().filter(|d| **d).count();
@@ -606,7 +611,7 @@ mod tests {
         let periods = 400_000usize;
         let mut sum = 0.0;
         for _ in 0..periods {
-            let z = rng.next_std_normal();
+            let z = rng.next_std_normal().expect("normal draw");
             sum += sim
                 .conditional_default_prob(z, pd, &mut rng)
                 .expect("valid copula simulation");
@@ -646,7 +651,7 @@ mod tests {
         let mut pn_defaults = 0usize;
         let mut lhp_sum = 0.0;
         for _ in 0..periods {
-            let z = pn_rng.next_std_normal();
+            let z = pn_rng.next_std_normal().expect("normal draw");
             sim.simulate_period(z, &names, &mut pn_rng, &mut out, false)
                 .expect("valid copula simulation");
             pn_defaults += out.iter().filter(|d| **d).count();
@@ -739,7 +744,7 @@ mod tests {
         let periods = 5_000usize;
         let mut total = 0usize;
         for _ in 0..periods {
-            let z = rng.next_std_normal();
+            let z = rng.next_std_normal().expect("normal draw");
             sim.simulate_period(z, &names, &mut rng, &mut out, false)
                 .expect("valid copula simulation");
             total += out.iter().filter(|d| **d).count();
@@ -796,7 +801,7 @@ mod tests {
             let mut out = Vec::new();
             let mut all = Vec::new();
             for _ in 0..10 {
-                let z = rng.next_std_normal();
+                let z = rng.next_std_normal().expect("normal draw");
                 sim.simulate_period(z, &names, &mut rng, &mut out, false)
                     .expect("valid copula simulation");
                 all.extend_from_slice(&out);

@@ -302,10 +302,13 @@ fn test_equity_fx_conversion() {
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let eur_curve = build_flat_curve(0.03, base_date, "EUR-OIS");
 
-    let market = MarketContext::new().insert(eur_curve).insert_price(
-        "SAP",
-        MarketScalar::price(Money::new(100.0, Currency::EUR).expect("valid money fixture")),
-    );
+    let market = MarketContext::new()
+        .try_insert(eur_curve)
+        .expect("insert market curve")
+        .insert_price(
+            "SAP",
+            MarketScalar::price(Money::new(100.0, Currency::EUR).expect("valid money fixture")),
+        );
 
     let price = equity.price_per_share(&market, base_date).unwrap();
     assert_eq!(price.amount(), 100.0);

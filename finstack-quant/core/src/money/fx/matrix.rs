@@ -320,10 +320,12 @@ impl FxMatrix {
                 triangulated: false,
             }),
             Err(error) => match self.config.pivot_currency {
-                Some(pivot) if is_not_found(&error) => Ok(FxRateResult {
-                    rate: self.triangulate_rate(query, pivot, &provider_calls)?,
-                    triangulated: true,
-                }),
+                Some(pivot) if pivot != query.from && pivot != query.to && is_not_found(&error) => {
+                    Ok(FxRateResult {
+                        rate: self.triangulate_rate(query, pivot, &provider_calls)?,
+                        triangulated: true,
+                    })
+                }
                 _ => Err(error),
             },
         }

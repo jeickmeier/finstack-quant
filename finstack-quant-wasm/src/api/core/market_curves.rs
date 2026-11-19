@@ -256,7 +256,7 @@ impl JsInflationCurve {
 ///   id: "WTI",
 ///   baseDate: "2025-01-02",
 ///   knots: [0.0, 72.0, 1.0, 70.5],
-///   spotPrice: 72.0,
+///   kind: "price", dayCount: "act_365f", interp: "linear", extrapolation: "flat",
 /// });
 /// curve.price(0.5); // forward price at 6 months
 /// curve.kind; // "price"
@@ -273,16 +273,11 @@ struct PriceCurveOptions {
     id: String,
     base_date: String,
     knots: Vec<f64>,
-    #[serde(default)]
-    kind: Option<String>,
-    #[serde(default)]
-    spot_price: Option<f64>,
-    #[serde(default)]
-    extrapolation: Option<String>,
-    #[serde(default)]
-    interp: Option<String>,
-    #[serde(default)]
-    day_count: Option<String>,
+    kind: String,
+    extrapolation: String,
+    interp: String,
+    day_count: String,
+    calendar_id: Option<String>,
 }
 
 impl JsPriceCurve {
@@ -291,29 +286,19 @@ impl JsPriceCurve {
     }
 
     fn build(options: PriceCurveOptions) -> Result<JsPriceCurve, JsValue> {
-        let mut builder = RustPriceCurve::builder(options.id)
+        RustPriceCurve::builder(options.id)
             .base_date(parse_iso_date(&options.base_date)?)
-            .knots(flat_pairs(&options.knots, "knots")?);
-        if let Some(kind) = options.kind.as_deref() {
-            builder = builder.kind(kind.parse::<PriceCurveKind>().map_err(to_js_err)?);
-        }
-        if let Some(spot_price) = options.spot_price {
-            builder = builder.spot_price(spot_price);
-        }
-        if let Some(extrapolation) = options.extrapolation.as_deref() {
-            builder = builder.extrapolation(
-                extrapolation
+            .knots(flat_pairs(&options.knots, "knots")?)
+            .kind(options.kind.parse::<PriceCurveKind>().map_err(to_js_err)?)
+            .day_count(options.day_count.parse::<DayCount>().map_err(to_js_err)?)
+            .calendar_id_opt(options.calendar_id)
+            .interp(options.interp.parse::<InterpStyle>().map_err(to_js_err)?)
+            .extrapolation(
+                options
+                    .extrapolation
                     .parse::<ExtrapolationPolicy>()
                     .map_err(to_js_err)?,
-            );
-        }
-        if let Some(interp) = options.interp.as_deref() {
-            builder = builder.interp(interp.parse::<InterpStyle>().map_err(to_js_err)?);
-        }
-        if let Some(day_count) = options.day_count.as_deref() {
-            builder = builder.day_count(day_count.parse::<DayCount>().map_err(to_js_err)?);
-        }
-        builder
+            )
             .build()
             .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(to_js_err)
@@ -326,23 +311,18 @@ impl JsPriceCurve {
     ///
     /// # Arguments
     ///
-    /// * `options` - PriceCurveOptions object (or its JSON text) with: `id`
-    ///   (curve identifier, the `MarketContext` lookup key); `baseDate`
-    ///   (ISO-8601; knot times are year fractions from it under `dayCount`);
-    ///   `knots` (flat `[t0, p0, t1, p1, …]` array, `t` in years, `p` the
-    ///   forward price or index level); and the optional `kind` (`"price"`,
-    ///   the default, accepts any finite level; `"vol_index"` requires
-    ///   non-negative levels), `spotPrice` (level at `t = 0`),
-    ///   `extrapolation`, `interp` and `dayCount`. Omitted options use the
-    ///   Rust builder defaults. Unknown keys are rejected.
+    /// * `options` - Source identifier, level family, ISO base date, ordered
+    ///   numeric time/level pairs, day-count clock, interpolation and tail policy.
+    ///   Bus/252 also requires a registered calendar identifier.
     ///
     /// @returns The constructed `PriceCurve`.
     /// @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON
     /// string or plain object; `FinstackError` (kind `validation`) for an
     /// unknown, missing or mistyped key, an odd-length `knots`, a malformed
     /// date, an unknown kind/day-count/interpolation/extrapolation name, or
-    /// levels the curve builder rejects.
-    /// @param options - PriceCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, p0, t1, p1, …]` array, `t` in years, `p` the forward price or index level); and the optional `kind` (`"price"`, the default, accepts any finite level; `"vol_index"` requires non-negative levels), `spotPrice` (level at `t = 0`), `extrapolation`, `interp` and `dayCount`. Omitted options use the Rust builder defaults. Unknown keys are rejected.
+    /// levels the curve builder rejects. An unknown calendar raises a
+    /// `FinstackError` with kind `not_found`.
+    /// @param options - Source ID, kind ("price" or "vol_index"), ISO baseDate, a flat array alternating nonnegative times and native levels, dayCount, interp and extrapolation. Supply calendarId for Bus/252.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "PriceCurveOptions | string")] options: JsValue,
@@ -383,15 +363,14 @@ impl JsPriceCurve {
     ///
     /// # Arguments
     ///
-    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
-    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    /// * `t` - Finite nonnegative years from the curve base date, or an ISO-8601
+    ///   date on or after it, converted with the source clock.
     ///
     /// @returns The interpolated forward price (or index level).
     /// @throws `TypeError` if `t` is neither a number nor a string;
-    /// `FinstackError` (kind `validation`) for a malformed date or a year
-    /// fraction that cannot be computed, forbidden extrapolation, a non-finite
-    /// result or a negative volatility-index level.
-    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    /// `FinstackError` (kind `validation`) for an invalid or pre-base time or
+    /// date, forbidden extrapolation, a non-finite result or an inadmissible level.
+    /// @param t - Finite nonnegative years from baseDate, or an ISO-8601 date on or after baseDate under the source clock.
     #[wasm_bindgen(js_name = price)]
     pub fn price(
         &self,
@@ -421,10 +400,10 @@ impl JsPriceCurve {
         self.inner.kind().to_string()
     }
 
-    /// Spot level at `t = 0` (a price, or index points for a vol-index curve).
-    #[wasm_bindgen(getter, js_name = spotPrice)]
-    pub fn spot_price(&self) -> f64 {
-        self.inner.spot_price()
+    /// Registered calendar identifier used by the source clock, or `undefined`.
+    #[wasm_bindgen(getter, js_name = calendarId)]
+    pub fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id().map(str::to_owned)
     }
 
     /// Pillar times in years from the base date, strictly increasing.
@@ -466,7 +445,7 @@ impl JsPriceCurve {
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const curve = new core.BaseCorrelationCurve("CDX-IG", [3.0, 0.25, 7.0, 0.45]);
-/// curve.correlation(5.0); // 0.35
+/// curve.getCorrelation(5.0); // 0.35
 /// ```
 #[wasm_bindgen(js_name = BaseCorrelationCurve)]
 pub struct JsBaseCorrelationCurve {
@@ -540,7 +519,7 @@ impl JsBaseCorrelationCurve {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Base correlation at a detachment point (Rust `BaseCorrelationCurve::correlation`).
+    /// Base correlation at a detachment point (Rust `BaseCorrelationCurve::get_correlation`).
     ///
     /// # Arguments
     ///
@@ -548,16 +527,17 @@ impl JsBaseCorrelationCurve {
     ///
     /// @returns The interpolated correlation as a decimal; flat beyond the
     /// first and last pillar.
-    /// @throws `TypeError` if `detachmentPct` is not a number.
+    /// @throws `TypeError` for a nonnumeric input, or `FinstackError` (kind
+    /// `validation`) for a nonfinite detachment or a value outside `[0, 100]`.
     /// @param detachmentPct - Tranche detachment point in percent (`7.0` is 7%).
-    #[wasm_bindgen(js_name = correlation)]
-    pub fn correlation(
+    #[wasm_bindgen(js_name = getCorrelation)]
+    pub fn get_correlation(
         &self,
         #[wasm_bindgen(js_name = "detachmentPct", unchecked_param_type = "number")] detachment_pct: JsValue,
     ) -> Result<f64, JsValue> {
-        Ok(self
-            .inner
-            .correlation(js_f64(&detachment_pct, "detachmentPct")?))
+        self.inner
+            .get_correlation(js_f64(&detachment_pct, "detachmentPct")?)
+            .map_err(to_js_err)
     }
 
     /// Curve identifier (the `MarketContext` lookup key).

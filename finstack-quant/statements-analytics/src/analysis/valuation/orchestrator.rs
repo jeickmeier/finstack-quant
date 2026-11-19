@@ -905,7 +905,9 @@ mod tests {
     #[test]
     fn test_dcf_analysis_with_as_of_and_capital_structure_succeeds() {
         let as_of = date!(2025 - 01 - 01);
-        let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+            .expect("insert market curve");
         let model = {
             let mut model_builder_1 = ModelBuilder::new("dcf-cs-test");
             model_builder_1
@@ -1137,7 +1139,9 @@ mod tests {
     #[test]
     fn test_ltv_value_node_on_builder_uses_per_period_values() {
         let as_of = date!(2025 - 01 - 01);
-        let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+            .expect("insert market curve");
         let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = {

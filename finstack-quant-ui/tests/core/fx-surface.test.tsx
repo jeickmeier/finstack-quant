@@ -53,6 +53,7 @@ it("makes no request without every forward, samples only explicit coordinates, a
   const view = (points = coordinates) => (
     <QueryClientProvider client={cache}>
       <FxSurfaceChart
+        interpolationMode="total_variance"
         surface={fxQuotes}
         coordinates={points}
         colorDomain={[0, 0.3]}
@@ -97,6 +98,7 @@ it("selects an evaluated sample by its FX surface, expiry and strike key", async
       <QueryClientProvider client={cache}>
         <output aria-label="key">{link.selectedKey}</output>
         <FxSurfaceChart
+          interpolationMode="total_variance"
           surface={fxQuotes}
           coordinates={coordinates}
           link={link}
@@ -133,7 +135,12 @@ it("materializes the strike grid natively only from explicit delivery forwards f
     );
   const view = (initial: { initialDeliveryForwards?: readonly number[] }) => (
     <QueryClientProvider client={cache}>
-      <FxSurfaceChart surface={fxQuotes} colorDomain={[0, 0.3]} {...initial} />
+      <FxSurfaceChart
+        interpolationMode="total_variance"
+        surface={fxQuotes}
+        colorDomain={[0, 0.3]}
+        {...initial}
+      />
     </QueryClientProvider>
   );
   const unseeded = render(view({ initialDeliveryForwards: [1.105] }));
@@ -153,6 +160,7 @@ it("materializes the strike grid natively only from explicit delivery forwards f
   expect(calls()).toHaveLength(1);
   expect(calls()[0]![1]).toEqual({
     surface: fxQuotes,
+    interpolationMode: "total_variance",
     deliveryForwards: [1.105, 1.11],
   });
   const native = unwrap(

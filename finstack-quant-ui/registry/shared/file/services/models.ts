@@ -130,6 +130,7 @@ export function createModelsService(
           const surface = native.models.volatility.materializeFxDeltaSurface(
             handle,
             [...request.deliveryForwards],
+            request.interpolationMode,
           );
           try {
             return JSON.parse(surface.toJson()) as FxStrikeSurface;
@@ -156,6 +157,7 @@ export function createModelsService(
                   request.at,
                   strikes,
                   request.convention,
+                  request.interpolationMode,
                 )
               : v.materializeCubeExpirySlice(
                   cube,
@@ -198,6 +200,7 @@ export function createModelsService(
               params,
               forward,
               expiry,
+              request.quoteType,
             );
             try {
               const strikes = [...request.strikes];

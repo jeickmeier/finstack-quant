@@ -283,20 +283,6 @@
       "description": "Exact schema marker accepted by calibration envelopes.",
       "type": "string"
     },
-    "ClosedUnitIntervalF64Wire": {
-      "description": "Finite JSON number in the closed interval `[0, 1]`.",
-      "format": "double",
-      "maximum": 1.0,
-      "minimum": 0.0,
-      "type": "number"
-    },
-    "CorrelationWire": {
-      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
-      "format": "double",
-      "maximum": 1.0,
-      "minimum": -1.0,
-      "type": "number"
-    },
     "CreditIndexState": {
       "additionalProperties": false,
       "description": "Serializable state for credit index data.\n\nInstead of serializing `Arc<Curve>` directly, we store curve IDs that\nreference curves present in the `MarketContextState`.",
@@ -317,6 +303,7 @@
           "additionalProperties": {
             "type": "string"
           },
+          "default": null,
           "description": "Optional map of issuer ID → hazard curve ID",
           "type": [
             "object",
@@ -328,6 +315,7 @@
             "format": "double",
             "type": "number"
           },
+          "default": null,
           "description": "Optional map of issuer ID → recovery rate",
           "type": [
             "object",
@@ -339,6 +327,7 @@
             "format": "double",
             "type": "number"
           },
+          "default": null,
           "description": "Optional map of issuer ID → weight",
           "type": [
             "object",
@@ -856,6 +845,13 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar for the source clock.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "day_count": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
               "description": "Day count convention"
@@ -891,21 +887,9 @@
               },
               "type": "array"
             },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
+            "level_kind": {
+              "$ref": "#/$defs/PriceCurveKind",
+              "description": "Native level family."
             },
             "type": {
               "const": "price",
@@ -917,6 +901,7 @@
             "id",
             "base",
             "day_count",
+            "level_kind",
             "knot_points",
             "interp_style",
             "extrapolation"
@@ -2312,12 +2297,6 @@
         }
       ]
     },
-    "NonNegativeF64Wire": {
-      "description": "Finite JSON number greater than or equal to zero.",
-      "format": "double",
-      "minimum": 0.0,
-      "type": "number"
-    },
     "PiecewiseLinearAdjustment": {
       "additionalProperties": false,
       "description": "A flat function representation: repeated shocks merge on a breakpoint union\nrather than forming a recursively nested transformation history.",
@@ -2346,6 +2325,21 @@
       "exclusiveMinimum": 0.0,
       "format": "double",
       "type": "number"
+    },
+    "PriceCurveKind": {
+      "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup.",
+      "oneOf": [
+        {
+          "const": "price",
+          "description": "Signed, finite forward prices, for example in USD per barrel.",
+          "type": "string"
+        },
+        {
+          "const": "vol_index",
+          "description": "Nonnegative volatility-index levels in index points.",
+          "type": "string"
+        }
+      ]
     },
     "QuoteQuality": {
       "additionalProperties": false,
@@ -3043,21 +3037,27 @@
       "properties": {
         "alpha": {
           "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0.0,
           "format": "double",
           "type": "number"
         },
         "beta": {
           "description": "CEV exponent in the closed interval `[0, 1]`.",
           "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
           "type": "number"
         },
         "nu": {
           "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
           "format": "double",
+          "minimum": 0.0,
           "type": "number"
         },
         "rho": {
           "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": -1.0,
           "format": "double",
           "type": "number"
         },
@@ -3080,41 +3080,48 @@
     },
     "SabrParameters": {
       "additionalProperties": false,
-      "description": "SABR model parameters",
+      "description": "Parameters of a SABR backbone, with an optional signed rate displacement.",
       "properties": {
         "alpha": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Initial volatility (alpha)"
+          "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0.0,
+          "format": "double",
+          "type": "number"
         },
         "beta": {
-          "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
-          "description": "CEV exponent (beta) - typically 0 to 1"
+          "description": "CEV exponent in the closed interval `[0, 1]`.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
         },
         "nu": {
-          "$ref": "#/$defs/NonNegativeF64Wire",
-          "description": "Volatility of volatility (nu/volvol)"
+          "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+          "format": "double",
+          "minimum": 0.0,
+          "type": "number"
         },
         "rho": {
-          "$ref": "#/$defs/CorrelationWire",
-          "description": "Correlation between asset and volatility (rho)"
+          "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": -1.0,
+          "format": "double",
+          "type": "number"
         },
         "shift": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/PositiveF64Wire"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Shift parameter for handling negative rates (optional)"
+          "description": "Optional finite displacement applied to forward and strike.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "alpha",
         "beta",
-        "nu",
-        "rho"
+        "rho",
+        "nu"
       ],
       "type": "object"
     },
@@ -3444,6 +3451,16 @@
             "type": "number"
           },
           "type": "array"
+        },
+        "expiry_clock": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VolatilityClock"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "forwards": {
           "description": "Row-major: forwards[expiry_idx * n_tenors + tenor_idx]",

@@ -70,7 +70,9 @@ fn test_fx_forward_dependencies_complete() {
 
     let mut market = MarketContext::new();
     for id in deps.curves.discount_curves {
-        market = market.insert(build_discount_curve(id.as_str(), 0.03));
+        market = market
+            .try_insert(build_discount_curve(id.as_str(), 0.03))
+            .expect("insert market curve");
     }
     market = market.insert_fx(build_fx_matrix(Currency::EUR, Currency::USD, 1.10));
 
@@ -102,7 +104,9 @@ fn test_missing_fx_matrix_fails() {
         .expect("from_instrument_json");
     let mut market = MarketContext::new();
     for id in deps.curves.discount_curves {
-        market = market.insert(build_discount_curve(id.as_str(), 0.03));
+        market = market
+            .try_insert(build_discount_curve(id.as_str(), 0.03))
+            .expect("insert market curve");
     }
 
     let result = forward.value(&market, as_of);

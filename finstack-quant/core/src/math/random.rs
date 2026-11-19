@@ -7,8 +7,8 @@
 //!
 //! - [`RandomNumberGenerator`]: Trait for pluggable RNG implementations
 //! - [`Pcg64Rng`]: Deterministic PCG64 generator
-//! - [`box_muller_transform`]: Normal variate generation from uniform samples
-//! - [`SobolRng`]: Sobol low-discrepancy sequence with Owen scrambling
+//! - [`box_muller`]: Normal variate generation from uniform samples
+//! - [`SobolRng`]: Sobol low-discrepancy sequence with optional prefix hash scrambling
 //! - [`BrownianBridge`]: Brownian bridge construction order
 //! - [`poisson_inverse_cdf`]: Poisson sampling utilities
 //!
@@ -18,32 +18,33 @@
 //! use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 //!
 //! // Create RNG with seed for reproducibility
-//! let mut rng = Pcg64Rng::new(42);
+//! let mut rng = Pcg64Rng::new(42, 0);
 //!
 //! // Generate samples
 //! let uniform = rng.uniform();       // U(0, 1)
-//! let normal = rng.normal(0.0, 1.0); // N(0, 1)
+//! let normal = rng.normal(0.0, 1.0)?; // N(0, 1)
 //! let event = rng.uniform() < 0.05;   // 5% probability
+//! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 //!
 //! # Statistical properties
 //!
 //! [`Pcg64Rng`] wraps `rand_pcg::Pcg64`:
 //! - **Period**: 2^128
-//! - **Streams**: [`Pcg64Rng::new_with_stream`] uses a stream-specific increment
-//! - **Deterministic**: Same seed always produces same sequence
+//! - **Streams**: [`Pcg64Rng::new`] uses a stream-specific increment
+//! - **Deterministic**: Equal seed, stream, and call order reproduce the same sequence in the same build
 //!
 //! # Parallel Simulations
 //!
-//! For parallel Monte Carlo, use independent streams:
+//! For parallel Monte Carlo, use distinct stream selectors:
 //!
 //! ```rust
 //! use finstack_quant_core::math::random::Pcg64Rng;
 //!
-//! // Each thread gets an independent stream (e.g., 4 threads)
+//! // Each thread gets a distinct stream selector (e.g., 4 threads)
 //! let num_threads = 4;
 //! let rngs: Vec<_> = (0..num_threads)
-//!     .map(|thread_id| Pcg64Rng::new_with_stream(42, thread_id as u64))
+//!     .map(|thread_id| Pcg64Rng::new(42, thread_id as u64))
 //!     .collect();
 //! ```
 //!
@@ -60,7 +61,7 @@ mod sobol;
 
 pub use brownian_bridge::BrownianBridge;
 pub use poisson::poisson_inverse_cdf;
-pub use sobol::{MAX_SOBOL_DIMENSION, SobolRng};
+pub use sobol::{MAX_SOBOL_DIMENSION, SOBOL_PERIOD, SobolRng};
 
 /// Random number generator trait for statistical sampling.
 ///
@@ -70,77 +71,21 @@ pub trait RandomNumberGenerator: Send + Sync {
     /// Generate uniform random number in [0, 1)
     fn uniform(&mut self) -> f64;
 
-    /// Generate normal random number with specified mean and standard deviation
-    fn normal(&mut self, mean: f64, std_dev: f64) -> f64;
+    /// Draw a normal variate or return a domain or numerical error.
+    ///
+    /// # Arguments
+    ///
+    /// * `mean` - Finite location in the caller's units.
+    /// * `std_dev` - Finite nonnegative standard deviation in the same units.
+    ///   Zero returns the mean and consumes no random variate.
+    fn normal(&mut self, mean: f64, std_dev: f64) -> crate::Result<f64>;
 }
 
-// PCG64 RNG: Pcg64Rng
-
-use rand::prelude::*;
+use rand::RngCore;
 use rand_pcg::Pcg64;
 
-/// Deterministic random number generator backed by PCG64.
-///
-/// PCG64 (Permuted Congruential Generator) is used for seeded Monte Carlo
-/// simulations and stochastic sampling:
-///
-/// - **Period**: 2^128
-/// - **Streams**: [`Pcg64Rng::new_with_stream`] uses a stream-specific increment
-/// - **Deterministic**: Same seed always produces same sequence
-///
-/// # Use Cases
-///
-/// - Monte Carlo option pricing
-/// - Value at Risk (VaR) simulations
-/// - Credit Valuation Adjustment (CVA) calculations
-/// - Scenario generation for risk analysis
-/// - Seeded financial simulations
-///
-/// # Stream Support
-///
-/// [`Pcg64Rng::new_with_stream`] creates deterministic stream-specific
-/// sequences for:
-/// - Parallel Monte Carlo paths
-/// - Multi-threaded simulations
-/// - Distributed computing scenarios
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
-///
-/// // Create RNG with seed for reproducibility
-/// let mut rng = Pcg64Rng::new(42);
-///
-/// // Generate uniform samples
-/// let u = rng.uniform();
-/// assert!((0.0..1.0).contains(&u));
-///
-/// // Generate normal samples for option pricing
-/// let z = rng.normal(0.0, 1.0);
-///
-/// // Bernoulli for binary events
-/// let default_occurred = rng.uniform() < 0.02; // 2% default probability
-/// ```
-///
-/// # Parallel Streams
-///
-/// ```rust
-/// use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
-///
-/// // Create independent streams for parallel simulation
-/// let mut rng_path_0 = Pcg64Rng::new_with_stream(42, 0);
-/// let mut rng_path_1 = Pcg64Rng::new_with_stream(42, 1);
-///
-/// // Each stream produces independent sequences
-/// assert_ne!(rng_path_0.uniform(), rng_path_1.uniform());
-/// ```
-///
-/// # References
-///
-/// - O'Neill, M. E. (2014). "PCG: A Family of Simple Fast Space-Efficient
-///   Statistically Good Algorithms for Random Number Generation."
-///   [https://www.pcg-random.org/](https://www.pcg-random.org/) `docs/REFERENCES.md#o-neill-2014-pcg`
+/// PCG XSL-RR 128/64 with an explicit seed and stream and a cached normal companion.
+/// A clone copies both the PCG state and any pending companion.
 #[derive(Clone, Debug)]
 pub struct Pcg64Rng {
     inner: Pcg64,
@@ -148,77 +93,16 @@ pub struct Pcg64Rng {
 }
 
 impl Pcg64Rng {
-    /// Create a new RNG with the given seed.
-    ///
-    /// The same seed will always produce the same sequence of random numbers,
-    /// making simulations deterministic and reproducible.
-    ///
-    /// Note: `new(seed)` and [`new_with_stream(seed, 0)`](Self::new_with_stream)
-    /// produce *different* sequences — `new` seeds the generator via
-    /// `Pcg64::seed_from_u64` (which expands the seed through SplitMix64),
-    /// while `new_with_stream` constructs the 128-bit state directly from the
-    /// (seed, stream) pair.
+    /// Select a deterministic PCG sequence.
     ///
     /// # Arguments
     ///
-    /// * `seed` - 64-bit seed value. Different seeds produce different sequences.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
-    ///
-    /// let mut rng1 = Pcg64Rng::new(42);
-    /// let mut rng2 = Pcg64Rng::new(42);
-    ///
-    /// // Same seed produces same sequence
-    /// assert_eq!(rng1.uniform(), rng2.uniform());
-    /// ```
+    /// * `seed` - Initial state input passed directly to the PCG constructor.
+    /// * `stream` - Sequence selector. PCG uses the odd increment `2 * stream + 1`.
     #[must_use]
-    pub fn new(seed: u64) -> Self {
+    pub fn new(seed: u64, stream: u64) -> Self {
         Self {
-            inner: Pcg64::seed_from_u64(seed),
-            cached_normal: None,
-        }
-    }
-
-    /// Create a new RNG with seed and stream for parallel simulations.
-    ///
-    /// Each (seed, stream) pair selects a distinct PCG64 stream via a unique
-    /// odd increment, so different streams traverse different permutations of
-    /// the state space. This makes overlap between streams statistically
-    /// negligible for practical sample counts, but — unlike generators with
-    /// explicitly partitioned counters (e.g. Philox) — there is no *hard*
-    /// mathematical guarantee that two streams never share a state window.
-    /// Use `finstack_quant_models::monte_carlo::rng::philox::PhiloxRng` (a counter-based RNG
-    /// with `split(path_id)` substreams) when provable non-overlap is required.
-    ///
-    /// Note: `new_with_stream(seed, 0)` is not the same sequence as
-    /// [`new(seed)`](Self::new); see the constructor docs.
-    ///
-    /// # Arguments
-    ///
-    /// * `seed` - Base seed for the generator
-    /// * `stream` - Stream identifier for parallel independence
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
-    ///
-    /// // Parallel Monte Carlo with independent paths
-    /// let paths: Vec<_> = (0..100)
-    ///     .map(|i| Pcg64Rng::new_with_stream(42, i))
-    ///     .collect();
-    /// ```
-    #[must_use]
-    pub fn new_with_stream(seed: u64, stream: u64) -> Self {
-        // PCG64 uses a 128-bit state. We combine seed and stream to create
-        // a unique starting point. The stream affects the increment, ensuring
-        // different streams produce non-overlapping sequences.
-        let state = ((stream as u128) << 64) | (seed as u128);
-        Self {
-            inner: Pcg64::new(state, ((stream as u128) << 1) | 1), // Unique odd increment per stream
+            inner: Pcg64::new(u128::from(seed), u128::from(stream)),
             cached_normal: None,
         }
     }
@@ -227,86 +111,53 @@ impl Pcg64Rng {
 impl RandomNumberGenerator for Pcg64Rng {
     #[inline]
     fn uniform(&mut self) -> f64 {
-        self.inner.random()
+        (self.inner.next_u64() >> 11) as f64 * (1.0 / (1_u64 << 53) as f64)
     }
 
-    fn normal(&mut self, mean: f64, std_dev: f64) -> f64 {
-        // Box-Muller transform with caching for efficiency
-        if let Some(cached) = self.cached_normal.take() {
-            return mean + std_dev * cached;
+    fn normal(&mut self, mean: f64, std_dev: f64) -> crate::Result<f64> {
+        if !mean.is_finite() || !std_dev.is_finite() || std_dev < 0.0 {
+            return Err(crate::Error::Validation(
+                "normal draws require finite mean and nonnegative finite standard deviation".into(),
+            ));
         }
-
-        let u1 = self.uniform();
-        let u2 = self.uniform();
-
-        let (z0, z1) = box_muller_transform(u1, u2);
-        self.cached_normal = Some(z1);
-        mean + std_dev * z0
+        if std_dev == 0.0 {
+            return Ok(mean);
+        }
+        let z = match self.cached_normal.take() {
+            Some(spare) => spare,
+            None => {
+                let (first, spare) = box_muller(self.uniform(), self.uniform())?;
+                self.cached_normal = Some(spare);
+                first
+            }
+        };
+        let value = std_dev.mul_add(z, mean);
+        if !value.is_finite() {
+            return Err(crate::Error::Internal(
+                "normal draw exceeds the finite range".into(),
+            ));
+        }
+        Ok(value)
     }
 }
 
-/// Box-Muller transform for generating normal random variables.
-///
-/// Transforms two independent uniform random variables into two independent
-/// standard normal random variables using the Box-Muller method. This is the
-/// classic algorithm for generating Gaussian samples in Monte Carlo simulations.
+/// Transform a pair of independent half-open uniform draws into standard normal coordinates.
+/// The finite binary64 grid bounds the radius by approximately 8.57.
 ///
 /// # Arguments
 ///
-/// * `u1` - First uniform random variable in (0, 1)
-/// * `u2` - Second uniform random variable in (0, 1)
-///
-/// # Returns
-///
-/// Tuple of two independent N(0,1) random variables (z₁, z₂).
-///
-/// # Algorithm
-///
-/// ```text
-/// z₁ = √(-2 ln u₁) cos(2π u₂)
-/// z₂ = √(-2 ln u₁) sin(2π u₂)
-/// ```
-///
-/// # Numerical Details
-///
-/// Uses `f64::MIN_POSITIVE` (~2.2e-308) for clamping to allow extreme tail
-/// values up to ±37σ while preventing -∞ from ln(0). The clamp at 1-ε
-/// prevents numerical issues when u1 is very close to 1.
-///
-/// Achievable range: |z| ≤ √(-2 ln(2.2e-308)) ≈ 37.7
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::random::box_muller_transform;
-///
-/// let (z1, z2) = box_muller_transform(0.5, 0.5);
-/// // z1 and z2 are independent N(0,1) samples
-/// ```
-///
-/// # References
-///
-/// - Box, G. E. P., & Muller, M. E. (1958). "A Note on the Generation of Random
-///   Normal Deviates." *The Annals of Mathematical Statistics*, 29(2), 610-611. `docs/REFERENCES.md#box-muller-1958`
+/// * `u1` - Finite uniform coordinate in `[0,1)` selecting the radius. Zero gives a zero radius.
+/// * `u2` - Finite uniform coordinate in `[0,1)` selecting the angle in turns.
 #[inline]
-pub fn box_muller_transform(u1: f64, u2: f64) -> (f64, f64) {
-    use std::f64::consts::PI;
-
-    // Use smallest positive f64 to allow extreme tail sampling (up to ~37σ)
-    // while preventing -inf from ln(0). The 1.0 - EPS upper bound prevents
-    // numerical issues when u1 rounds to exactly 1.0.
-    //
-    // With EPS = MIN_POSITIVE (~2.2e-308):
-    // -2 * ln(2.2e-308) ≈ 1418, so sqrt ≈ 37.7
-    // This allows sampling ~37σ events (probability ~1e-300)
-    const EPS: f64 = f64::MIN_POSITIVE;
-    let u1_safe = u1.clamp(EPS, 1.0 - f64::EPSILON);
-
-    let r = (-2.0 * u1_safe.ln()).sqrt();
-    let theta = 2.0 * PI * u2;
-    let z1 = r * theta.cos();
-    let z2 = r * theta.sin();
-    (z1, z2)
+pub fn box_muller(u1: f64, u2: f64) -> crate::Result<(f64, f64)> {
+    if !(0.0..1.0).contains(&u1) || !(0.0..1.0).contains(&u2) {
+        return Err(crate::Error::Validation(
+            "Box–Muller coordinates must lie in [0, 1)".into(),
+        ));
+    }
+    let radius = (-2.0 * (-u1).ln_1p()).sqrt();
+    let (sin, cos) = (std::f64::consts::TAU * u2).sin_cos();
+    Ok((radius * cos, radius * sin))
 }
 
 #[cfg(test)]
@@ -314,18 +165,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_box_muller_transform() {
-        let (z1, z2) = box_muller_transform(0.5, 0.5);
+    fn test_box_muller() {
+        let (z1, z2) = box_muller(0.5, 0.5).unwrap();
         assert!(z1.is_finite());
         assert!(z2.is_finite());
 
         // Test with many samples using Pcg64Rng
-        let mut rng = Pcg64Rng::new(42);
+        let mut rng = Pcg64Rng::new(42, 0);
         let mut samples = Vec::new();
         for _ in 0..500 {
             let u1 = rng.uniform();
             let u2 = rng.uniform();
-            let (z1, z2) = box_muller_transform(u1, u2);
+            let (z1, z2) = box_muller(u1, u2).unwrap();
             samples.push(z1);
             samples.push(z2);
         }
@@ -338,48 +189,42 @@ mod tests {
         assert!((var - 1.0).abs() < 0.2);
     }
 
-    // ── H4 documentation tests: Box-Muller clamping semantics ──
-    //
-    // The lower bound is f64::MIN_POSITIVE (~2.2e-308) so that deep tails
-    // (up to ~37σ) remain accessible for rare-event simulation.
-    // The reviewer suggested 1e-10 (truncates at ~6.8σ), but this was
-    // intentionally rejected to preserve tail sampling capability.
-    // These tests lock in the current intentional policy.
     #[test]
-    fn test_box_muller_boundary_u1_zero_is_clamped_to_finite() {
-        // u1 = 0.0 would cause ln(0) = -inf; clamping makes it finite.
-        let (z1, z2) = box_muller_transform(0.0, 0.5);
-        assert!(z1.is_finite(), "z1 must be finite when u1=0, got {z1}");
-        assert!(z2.is_finite(), "z2 must be finite when u1=0, got {z2}");
+    fn reflected_box_muller_obeys_the_half_open_domain() {
+        assert_eq!(box_muller(0.0, 0.0).unwrap(), (0.0, 0.0));
+        for bad in [-0.01, 1.0, f64::INFINITY, f64::NAN] {
+            assert!(box_muller(bad, 0.0).is_err());
+            assert!(box_muller(0.0, bad).is_err());
+        }
+        let (tail, _) = box_muller(1.0_f64.next_down(), 0.0).unwrap();
+        assert!((tail - 8.571674348652905).abs() < 1e-12);
     }
 
     #[test]
-    fn test_box_muller_boundary_u1_near_one_is_clamped_to_finite() {
-        // u1 very close to 1.0 (e.g., exactly 1.0 due to rounding) must stay finite.
-        let (z1, z2) = box_muller_transform(1.0, 0.5);
-        assert!(z1.is_finite(), "z1 must be finite when u1≈1, got {z1}");
-        assert!(z2.is_finite(), "z2 must be finite when u1≈1, got {z2}");
-    }
+    fn normal_cache_and_parameter_failures_preserve_draw_order() {
+        let mut rng = Pcg64Rng::new(42, 7);
+        let mut reference = rand_pcg::Pcg64::new(42, 7);
+        let mut uniform = || (reference.next_u64() >> 11) as f64 * 2.0_f64.powi(-53);
+        let (z0, z1) = box_muller(uniform(), uniform()).unwrap();
+        assert_eq!(rng.normal(0.0, 1.0).unwrap(), z0);
+        assert!(rng.normal(0.0, -1.0).is_err());
+        assert!(rng.normal(f64::NAN, 0.0).is_err());
+        assert_eq!(rng.normal(-3.0, 0.0).unwrap(), -3.0);
+        assert_eq!(rng.uniform(), uniform());
+        assert_eq!(rng.normal(1.0, 3.0).unwrap(), 3.0_f64.mul_add(z1, 1.0));
 
-    #[test]
-    fn test_box_muller_min_positive_clamp_allows_deep_tails() {
-        // With u1 = MIN_POSITIVE the radius is sqrt(-2 ln(2.2e-308)) ≈ 37.7.
-        // The tail is intentionally deep for rare-event simulation.
-        let (z1, _z2) = box_muller_transform(f64::MIN_POSITIVE, 0.0);
-        assert!(z1.is_finite());
-        // Radius ≈ 37.7σ; accepting anything > 30 as evidence the deep tail is reachable.
-        assert!(
-            z1.abs() > 30.0,
-            "Deep tail should be reachable with MIN_POSITIVE lower bound, got |z1|={}",
-            z1.abs()
-        );
+        rng.cached_normal = Some(1.5);
+        assert_eq!(rng.normal(-f64::MAX, f64::MAX).unwrap(), f64::MAX * 0.5);
+        rng.cached_normal = Some(2.0);
+        assert!(rng.normal(0.0, f64::MAX).is_err());
+        assert!(rng.cached_normal.is_none());
     }
 
     // Pcg64Rng Tests
 
     #[test]
     fn test_pcg64_rng_uniform() {
-        let mut rng = Pcg64Rng::new(42);
+        let mut rng = Pcg64Rng::new(42, 0);
 
         // Test that values are in [0, 1)
         for _ in 0..1000 {
@@ -394,8 +239,8 @@ mod tests {
 
     #[test]
     fn test_pcg64_rng_deterministic() {
-        let mut rng1 = Pcg64Rng::new(42);
-        let mut rng2 = Pcg64Rng::new(42);
+        let mut rng1 = Pcg64Rng::new(42, 0);
+        let mut rng2 = Pcg64Rng::new(42, 0);
 
         // Same seed should produce same sequence
         for _ in 0..100 {
@@ -404,19 +249,23 @@ mod tests {
     }
 
     #[test]
-    fn test_pcg64_rng_new_with_stream_deterministic() {
-        let mut rng1 = Pcg64Rng::new_with_stream(42, 7);
-        let mut rng2 = Pcg64Rng::new_with_stream(42, 7);
-
-        for _ in 0..100 {
-            assert_eq!(rng1.uniform(), rng2.uniform());
+    fn explicit_stream_matches_xsl_rr_known_answers() {
+        // Top 53 bits of the first four XSL-RR 128/64 words for state 42, sequence 7.
+        let mut rng = Pcg64Rng::new(42, 7);
+        for grid_index in [
+            0x9881280c50f7f_u64,
+            0x12c966fe585f27_u64,
+            0xd4b75b6d34757_u64,
+            0x190d84dcbf34a8_u64,
+        ] {
+            assert_eq!(rng.uniform(), grid_index as f64 / (1_u64 << 53) as f64);
         }
     }
 
     #[test]
     fn test_pcg64_rng_different_seeds() {
-        let mut rng1 = Pcg64Rng::new(42);
-        let mut rng2 = Pcg64Rng::new(123);
+        let mut rng1 = Pcg64Rng::new(42, 0);
+        let mut rng2 = Pcg64Rng::new(123, 0);
 
         // Different seeds should (almost certainly) produce different sequences
         let v1: Vec<f64> = (0..10).map(|_| rng1.uniform()).collect();
@@ -426,8 +275,8 @@ mod tests {
 
     #[test]
     fn test_pcg64_rng_streams_independent() {
-        let mut rng1 = Pcg64Rng::new_with_stream(42, 0);
-        let mut rng2 = Pcg64Rng::new_with_stream(42, 1);
+        let mut rng1 = Pcg64Rng::new(42, 0);
+        let mut rng2 = Pcg64Rng::new(42, 1);
 
         // Different streams should produce different sequences
         let v1: Vec<f64> = (0..10).map(|_| rng1.uniform()).collect();
@@ -441,8 +290,8 @@ mod tests {
         // distinct PCG increments and produce uncorrelated sequences.
         let pairs: &[(u64, u64)] = &[(0, 1), (2, 3), (100, 101), (0, 2), (1, 3)];
         for &(s1, s2) in pairs {
-            let mut rng1 = Pcg64Rng::new_with_stream(42, s1);
-            let mut rng2 = Pcg64Rng::new_with_stream(42, s2);
+            let mut rng1 = Pcg64Rng::new(42, s1);
+            let mut rng2 = Pcg64Rng::new(42, s2);
 
             let v1: Vec<f64> = (0..20).map(|_| rng1.uniform()).collect();
             let v2: Vec<f64> = (0..20).map(|_| rng2.uniform()).collect();
@@ -455,23 +304,23 @@ mod tests {
 
     #[test]
     fn test_pcg64_rng_normal() {
-        let mut rng = Pcg64Rng::new(42);
+        let mut rng = Pcg64Rng::new(42, 0);
 
         // Test basic properties
-        let sample = rng.normal(0.0, 1.0);
+        let sample = rng.normal(0.0, 1.0).unwrap();
         assert!(sample.is_finite());
 
         // Test mean and std_dev parameters
-        let sample_shifted = rng.normal(5.0, 2.0);
+        let sample_shifted = rng.normal(5.0, 2.0).unwrap();
         assert!(sample_shifted.is_finite());
     }
 
     #[test]
     fn test_pcg64_rng_normal_statistics() {
-        let mut rng = Pcg64Rng::new(12345);
+        let mut rng = Pcg64Rng::new(12345, 0);
         let n = 10_000;
 
-        let samples: Vec<f64> = (0..n).map(|_| rng.normal(0.0, 1.0)).collect();
+        let samples: Vec<f64> = (0..n).map(|_| rng.normal(0.0, 1.0).unwrap()).collect();
 
         let mean = samples.iter().sum::<f64>() / n as f64;
         let variance = samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64;
@@ -489,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_pcg64_rng_uniform_statistics() {
-        let mut rng = Pcg64Rng::new(98765);
+        let mut rng = Pcg64Rng::new(98765, 0);
         let n = 10_000;
 
         let samples: Vec<f64> = (0..n).map(|_| rng.uniform()).collect();
@@ -516,7 +365,7 @@ mod tests {
 
     #[test]
     fn test_pcg64_rng_clone() {
-        let mut rng1 = Pcg64Rng::new(42);
+        let mut rng1 = Pcg64Rng::new(42, 0);
 
         // Advance the RNG
         for _ in 0..50 {
@@ -535,7 +384,7 @@ mod tests {
     #[test]
     fn test_pcg64_chi_square_uniformity() {
         // Chi-square test for uniformity
-        let mut rng = Pcg64Rng::new(54321);
+        let mut rng = Pcg64Rng::new(54321, 0);
         let n_samples = 10_000;
         let n_bins = 10;
         let mut bins = vec![0usize; n_bins];

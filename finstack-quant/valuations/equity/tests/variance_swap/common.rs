@@ -85,10 +85,13 @@ pub fn base_context_without_vol() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc_curve).insert_price(
-        UNDERLYING_ID,
-        MarketScalar::unitless(5_000.0).expect("valid scalar"),
-    )
+    MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .insert_price(
+            UNDERLYING_ID,
+            MarketScalar::unitless(5_000.0).expect("valid scalar"),
+        )
 }
 
 /// Build a complete base market context with a replication-quality volatility surface.

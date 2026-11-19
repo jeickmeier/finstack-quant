@@ -81,8 +81,10 @@ fn build_market(equity_vol: f64, fx_vol: f64) -> MarketContext {
     let fx = FxMatrix::new(provider, None);
 
     MarketContext::new()
-        .insert(usd)
-        .insert(jpy)
+        .try_insert(usd)
+        .expect("insert market curve")
+        .try_insert(jpy)
+        .expect("insert market curve")
         .insert_surface(flat_surface("NKY-VOL", equity_vol))
         .insert_surface(flat_fx_surface("JPYUSD-VOL", fx_vol))
         .insert_fx(fx)

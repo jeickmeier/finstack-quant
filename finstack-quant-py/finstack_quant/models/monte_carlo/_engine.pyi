@@ -70,7 +70,10 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
             State ``[spot, variance]``; the starting variance must equal
             ``v0``. At most 8,000 steps.
           - ``"cheyette_rough"`` : ``kappa``, ``sigma_base`` (base volatility
-            curve, same shape as ``xi``), ``hurst``, ``eta``, ``rho``,
+            schedule in decimal rate units per square-root year, e.g.
+            ``{"interpolation": "linear", "amplitudes": [[0.0, 0.005]]}``
+            for a flat 50 bp amplitude; ``"constant_intervals"`` uses ending
+            times), ``hurst``, ``eta``, ``rho``,
             ``phi_times`` and ``phi_values`` (initial forward curve). State
             ``[x, y]``, normally started at ``[0, 0]``; the short rate is
             ``x`` plus the initial forward rate.

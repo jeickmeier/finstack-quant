@@ -431,7 +431,13 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        (as_of, option, MarketContext::new().insert(discount))
+        (
+            as_of,
+            option,
+            MarketContext::new()
+                .try_insert(discount)
+                .expect("insert market curve"),
+        )
     }
 
     #[test]

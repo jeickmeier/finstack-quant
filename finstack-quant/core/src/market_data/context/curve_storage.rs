@@ -147,7 +147,6 @@ impl_curve_storage_from!(
 impl CurveStorage {
     /// Condition this curve storage to `reference_date`.
     pub(crate) fn condition_storage(&self, reference_date: crate::dates::Date) -> Result<Self> {
-        let day_count_ctx = crate::dates::DayCountContext::default();
         match self {
             Self::Discount(curve) => Ok(Self::Discount(Arc::new(curve.condition(reference_date)?))),
             Self::Forward(curve) => Ok(Self::Forward(Arc::new(curve.condition(reference_date)?))),
@@ -164,11 +163,7 @@ impl CurveStorage {
                 Ok(Self::Inflation(Arc::clone(curve)))
             }
             Self::Price(curve) => {
-                let _ = curve.day_count().signed_year_fraction(
-                    curve.base_date(),
-                    reference_date,
-                    day_count_ctx,
-                )?;
+                curve.source_time(reference_date)?;
                 Ok(Self::Price(Arc::clone(curve)))
             }
             Self::BaseCorrelation(curve) => Ok(Self::BaseCorrelation(Arc::clone(curve))),
@@ -410,8 +405,10 @@ mod base_correlation_tests {
         assert_eq!(rebuilt.correlations(), curve.correlations());
         for detachment in [3.0, 5.0, 7.0, 8.5, 10.0] {
             assert_eq!(
-                rebuilt.correlation(detachment),
-                curve.correlation(detachment)
+                rebuilt
+                    .get_correlation(detachment)
+                    .expect("valid detachment"),
+                curve.get_correlation(detachment).expect("valid detachment")
             );
         }
     }

@@ -31,7 +31,9 @@
 //! - σ_asset is the asset volatility
 //! - σ_fx is the FX rate volatility
 
+use crate::gaussian::norm_cdf_or_nan;
 use crate::types::{OptionMarketParams, OptionType};
+#[cfg(test)]
 use finstack_quant_core::math::special_functions::norm_cdf;
 
 /// Compute the quanto drift adjustment.
@@ -147,8 +149,12 @@ pub fn quanto_price(
     let discount = (-rate_domestic * time).exp();
 
     let price = match option_type {
-        OptionType::Call => discount * (forward_adj * norm_cdf(d1) - strike * norm_cdf(d2)),
-        OptionType::Put => discount * (strike * norm_cdf(-d2) - forward_adj * norm_cdf(-d1)),
+        OptionType::Call => {
+            discount * (forward_adj * norm_cdf_or_nan(d1) - strike * norm_cdf_or_nan(d2))
+        }
+        OptionType::Put => {
+            discount * (strike * norm_cdf_or_nan(-d2) - forward_adj * norm_cdf_or_nan(-d1))
+        }
     };
     if price.is_finite() {
         price.max(0.0)
@@ -239,8 +245,9 @@ mod tests {
         let d1 =
             ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time) / (vol * sqrt_t);
         let d2 = d1 - vol * sqrt_t;
-        let vanilla = spot * (-div_yield * time).exp() * norm_cdf(d1)
-            - strike * (-rate * time).exp() * norm_cdf(d2);
+        let vanilla =
+            spot * (-div_yield * time).exp() * norm_cdf(d1).expect("valid Gaussian variate")
+                - strike * (-rate * time).exp() * norm_cdf(d2).expect("valid Gaussian variate");
 
         assert!(
             (quanto_call_price - vanilla).abs() < 0.01,

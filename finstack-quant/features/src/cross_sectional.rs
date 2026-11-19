@@ -260,7 +260,7 @@ impl ResolvedCrossSectionalOp {
             Self::Clip { lower, upper } => clip(values, indices, lower, upper, output),
             Self::ClipBySigma { sigma } => clip_by_sigma(values, indices, sigma, output)?,
             Self::Winsorize { lower, upper } => winsorize(values, indices, lower, upper, output),
-            Self::NormalScoreTransform => normal_score_transform(values, indices, output),
+            Self::NormalScoreTransform => normal_score_transform(values, indices, output)?,
             Self::LongShortWeights => long_short_weights(values, indices, output)?,
             Self::CapWeights { max_abs } => cap_weights(values, indices, max_abs, output)?,
             Self::FillMissing { value } => fill_missing(values, indices, value, output),
@@ -480,10 +480,15 @@ fn clip_by_sigma(
     Ok(())
 }
 
-fn normal_score_transform(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
+fn normal_score_transform(
+    values: &[Option<f64>],
+    indices: &[usize],
+    output: &mut [Option<f64>],
+) -> Result<()> {
     for (idx, rank) in partition_ranks(values, indices, RankMode::OpenPercentile) {
-        output[idx] = Some(standard_normal_inv_cdf(rank));
+        output[idx] = Some(standard_normal_inv_cdf(rank)?);
     }
+    Ok(())
 }
 
 fn long_short_weights(

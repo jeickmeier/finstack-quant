@@ -46,7 +46,9 @@ fn fixed_market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// Ten equal names so the systematic/idiosyncratic split has something to

@@ -946,7 +946,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should build");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         // Create an NDF that's past fixing date but without observed_fixing
         let ndf = Ndf::builder()
@@ -1135,7 +1137,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         let ndf = Ndf::builder()
             .id(InstrumentId::new("USDCNY-FIXED-CF"))
@@ -1196,7 +1200,10 @@ mod tests {
         };
         let fx_matrix = FxMatrix::new(fx_provider, None);
 
-        MarketContext::new().insert(usd_curve).insert_fx(fx_matrix)
+        MarketContext::new()
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .insert_fx(fx_matrix)
     }
 
     /// Audit F2: the `fixing_date > maturity` guard, previously stranded in the
@@ -1249,7 +1256,9 @@ mod tests {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve should build");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let schedule = Ndf::example()
             .expect("example")
             .cashflow_schedule(&market, as_of)

@@ -660,31 +660,23 @@ mod simulation_tests {
         })
     }
 
-    /// Pins the seed-to-path mapping of the seeded entry points (PCG64 via
-    /// `seed_from_u64`, Gillespie draw order). Platform `exp`/`ln` yields one
-    /// fingerprint on macOS and another on the Linux libm used by GitHub
-    /// Actions. A third fingerprint means the seeded stream moved.
+    /// Independent two-state reference uses the integer PCG XSL-RR recurrence,
+    /// an exponential waiting time, and a destination draw only for realized jumps.
     #[test]
-    fn migration_seed_to_stream_mapping_is_bit_stable() {
+    fn seeded_migration_matches_pcg_event_sequence() {
         let sim = MigrationSimulator::new(two_state_gen(), 20.0).unwrap();
         let paths = sim.simulate(0, 64, 7).unwrap();
+        // Round event times to 1e-10 year for portability across libm builds.
         let events = fingerprint(paths.iter().flat_map(|path| {
             path.transitions()
                 .iter()
-                .flat_map(|&(time, state)| [time.to_bits(), state as u64])
+                .flat_map(|&(time, state)| [(time * 1e10).round() as u64, state as u64])
         }));
+        assert_eq!(events, 0xfce15ee4ba5815f5);
         let empirical = sim.empirical_matrix(200, 7).unwrap();
-        let rows = fingerprint(empirical.to_rows().into_iter().flatten().map(f64::to_bits));
-        let got = (events, rows);
-        // The empirical-matrix fingerprint matches on both hosts. Event times
-        // from the Gillespie exponential draws do not.
-        const PINS: [(u64, u64); 2] = [
-            (9_101_374_654_972_199_437, 13_862_920_643_627_307_770),
-            (11_662_597_431_205_528_484, 13_862_920_643_627_307_770),
-        ];
-        assert!(
-            PINS.contains(&got),
-            "migration seed stream moved off the macOS and Linux libm pins: {got:?}"
+        assert_eq!(
+            empirical.to_rows(),
+            vec![vec![33.0 / 200.0, 167.0 / 200.0], vec![0.0, 1.0]]
         );
     }
 

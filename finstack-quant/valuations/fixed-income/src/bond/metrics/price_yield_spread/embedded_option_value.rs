@@ -158,7 +158,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Valid curve");
-        MarketContext::new().insert(discount_curve)
+        MarketContext::new()
+            .try_insert(discount_curve)
+            .expect("insert market curve")
     }
 
     fn create_callable_bond() -> Bond {
@@ -538,15 +540,17 @@ mod tests {
             .with_hw1f_sigma(0.0)
             .with_hazard_sigma(0.0)
             .with_tree_steps(16);
-        let market = create_test_market().insert(
-            HazardCurve::builder("USD-CREDIT")
-                .base_date(as_of)
-                .recovery_rate(0.4)
-                .knots([(5.0, 0.02)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .build()
-                .expect("valid hazard curve"),
-        );
+        let market = create_test_market()
+            .try_insert(
+                HazardCurve::builder("USD-CREDIT")
+                    .base_date(as_of)
+                    .recovery_rate(0.4)
+                    .knots([(5.0, 0.02)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .build()
+                    .expect("valid hazard curve"),
+            )
+            .expect("insert market curve");
         let pricer = TreePricer::rates_credit(bond_tree_settings(&bond));
         let optioned = pricer
             .price_at_oas(&bond, &market, as_of, 25.0)

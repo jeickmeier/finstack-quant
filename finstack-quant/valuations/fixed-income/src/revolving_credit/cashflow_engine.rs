@@ -1415,10 +1415,11 @@ mod tests {
             .build()
             .expect("facility");
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 ForwardCurve::flat("TERM", start, 0.04, DayCount::Act365F).expect("forward curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(start)
                     .day_count(DayCount::Act365F)
@@ -1427,7 +1428,8 @@ mod tests {
                     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
-            );
+            )
+            .expect("insert market curve");
         let fixings = ScalarTimeSeries::new(
             "FIXING:TERM",
             vec![(start, 0.07)],
@@ -1627,7 +1629,9 @@ mod tests {
                     .iter()
                     .map(|day| (*day - start).whole_days() as f64 / 365.0)
                     .collect();
-                let market = MarketContext::new().insert(term_fwd);
+                let market = MarketContext::new()
+                    .try_insert(term_fwd)
+                    .expect("insert market curve");
                 let engine =
                     CashflowEngine::new(&facility, Some(&market), start, None).expect("engine");
                 let deterministic = engine

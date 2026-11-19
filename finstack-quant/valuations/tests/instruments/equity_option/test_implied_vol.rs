@@ -30,8 +30,14 @@ fn bs_price(
     let disc_r = (-r * t).exp();
 
     match option_type {
-        OptionType::Call => spot * disc_q * norm_cdf(d1) - strike * disc_r * norm_cdf(d2),
-        OptionType::Put => strike * disc_r * norm_cdf(-d2) - spot * disc_q * norm_cdf(-d1),
+        OptionType::Call => {
+            spot * disc_q * norm_cdf(d1).expect("valid normal variate")
+                - strike * disc_r * norm_cdf(d2).expect("valid normal variate")
+        }
+        OptionType::Put => {
+            strike * disc_r * norm_cdf(-d2).expect("valid normal variate")
+                - spot * disc_q * norm_cdf(-d1).expect("valid normal variate")
+        }
     }
 }
 

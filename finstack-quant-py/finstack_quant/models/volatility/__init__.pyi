@@ -62,12 +62,14 @@ __all__ = [
 
 # SABR volatility smile
 
+_SabrQuoteType = Literal["normal", "black_lognormal", "shifted_black_lognormal"]
+
 class SabrParameters:
     """
     SABR parameters ``(alpha, beta, nu, rho)`` with optional ``shift``.
 
     Enforces ``alpha > 0``, ``beta in [0, 1]``, ``nu >= 0``, ``rho in
-    [-1, 1]``, and ``shift > 0`` when supplied.
+    (-1, 1)``, and finite signed displacement when supplied.
 
     Sources
     -------
@@ -96,16 +98,16 @@ class SabrParameters:
         Parameters
         ----------
         alpha : float
-            Positive initial volatility level as a decimal (Black vol for
-            ``beta > 0``, absolute normal vol in rate units for ``beta == 0``).
+            Positive initial CEV coefficient in forward units raised to
+            ``1 - beta`` per square root year.
         beta : float
             CEV elasticity constrained to the closed interval ``[0, 1]``.
         nu : float
             Non-negative volatility-of-volatility parameter per square-root year.
         rho : float
-            Instantaneous forward/volatility correlation in ``[-1, 1]``.
+            Instantaneous forward/volatility correlation in ``(-1, 1)``.
         shift : float or None, default None
-            Optional positive shifted-lognormal displacement in the forward's
+            Optional finite signed displacement in the forward's
             rate units (``0.03`` = 3% shift) for negative-rate strikes and
             forwards; ``None`` uses the unshifted formula.
 
@@ -114,7 +116,7 @@ class SabrParameters:
         ValueError
             If any parameter is non-finite; ``alpha`` is non-positive;
             ``beta`` is outside ``[0, 1]``; ``nu`` is negative; ``rho`` is
-            outside ``[-1, 1]``; or a supplied ``shift`` is non-positive.
+            outside ``(-1, 1)``; or a supplied ``shift`` is non-finite.
         """
         ...
     @staticmethod
@@ -175,7 +177,7 @@ class SabrParameters:
         nu : float
             Non-negative volatility of volatility per square-root year.
         rho : float
-            Forward/volatility correlation in ``[-1, 1]``.
+            Forward/volatility correlation in ``(-1, 1)``.
 
         Returns
         -------
@@ -186,7 +188,7 @@ class SabrParameters:
         ------
         ValueError
             If any parameter is non-finite; ``alpha`` is non-positive; ``nu``
-            is negative; ``rho`` is outside ``[-1, 1]``.
+            is negative; ``rho`` is outside ``(-1, 1)``.
 
         Examples
         --------
@@ -209,7 +211,7 @@ class SabrParameters:
         nu : float
             Non-negative volatility of volatility per square-root year.
         rho : float
-            Forward/volatility correlation in ``[-1, 1]``.
+            Forward/volatility correlation in ``(-1, 1)``.
 
         Returns
         -------
@@ -220,7 +222,7 @@ class SabrParameters:
         ------
         ValueError
             If any parameter is non-finite; ``alpha`` is non-positive; ``nu``
-            is negative; ``rho`` is outside ``[-1, 1]``.
+            is negative; ``rho`` is outside ``(-1, 1)``.
 
         Examples
         --------
@@ -243,7 +245,7 @@ class SabrParameters:
         nu : float
             Non-negative volatility of volatility per square-root year.
         rho : float
-            Forward/volatility correlation in ``[-1, 1]``.
+            Forward/volatility correlation in ``(-1, 1)``.
 
         Returns
         -------
@@ -254,7 +256,7 @@ class SabrParameters:
         ------
         ValueError
             If any parameter is non-finite; ``alpha`` is non-positive; ``nu``
-            is negative; ``rho`` is outside ``[-1, 1]``.
+            is negative; ``rho`` is outside ``(-1, 1)``.
 
         Examples
         --------
@@ -277,9 +279,9 @@ class SabrParameters:
         nu : float
             Non-negative volatility of volatility per square-root year.
         rho : float
-            Forward/volatility correlation in ``[-1, 1]``.
+            Forward/volatility correlation in ``(-1, 1)``.
         shift : float
-            Positive displacement added to forward and strike, in the
+            Finite signed displacement added to forward and strike, in the
             forward's rate units (``0.02`` = 2%).
 
         Returns
@@ -291,7 +293,7 @@ class SabrParameters:
         ------
         ValueError
             If any parameter is non-finite; ``alpha`` is non-positive; ``nu``
-            is negative; ``rho`` is outside ``[-1, 1]``; or ``shift`` is non-positive.
+            is negative; ``rho`` is outside ``(-1, 1)``; or ``shift`` is non-finite.
 
         Examples
         --------
@@ -314,9 +316,9 @@ class SabrParameters:
         nu : float
             Non-negative volatility of volatility per square-root year.
         rho : float
-            Forward/volatility correlation in ``[-1, 1]``.
+            Forward/volatility correlation in ``(-1, 1)``.
         shift : float
-            Positive displacement added to forward and strike, in the
+            Finite signed displacement added to forward and strike, in the
             forward's rate units (``0.02`` = 2%).
 
         Returns
@@ -328,7 +330,7 @@ class SabrParameters:
         ------
         ValueError
             If any parameter is non-finite; ``alpha`` is non-positive; ``nu``
-            is negative; ``rho`` is outside ``[-1, 1]``; or ``shift`` is non-positive.
+            is negative; ``rho`` is outside ``(-1, 1)``; or ``shift`` is non-finite.
 
         Examples
         --------
@@ -390,7 +392,7 @@ class SabrParameters:
     @property
     def rho(self) -> float:
         """
-        Forward/volatility correlation parameter in ``[-1, 1]``.
+        Forward/volatility correlation parameter in ``(-1, 1)``.
 
         Returns
         -------
@@ -406,7 +408,7 @@ class SabrParameters:
     @property
     def shift(self) -> float | None:
         """
-        Optional positive shift used for negative-rate smiles.
+        Optional finite signed additive model displacement.
 
         Returns
         -------
@@ -434,7 +436,7 @@ class SabrParameters:
         """
         ...
 
-    def implied_vol(self, forward: float, strike: float, t: float) -> float:
+    def implied_vol(self, forward: float, strike: float, t: float, quote_type: _SabrQuoteType) -> float:
         """
         Normal or Black implied volatility under the Hagan-2002 expansion.
 
@@ -446,12 +448,13 @@ class SabrParameters:
             Strike price.
         t : float
             Time to expiry in years.
+        quote_type : str
+            Explicit Normal, Black, or shifted Black annualized quote type.
 
         Returns
         -------
         float
-            Normal decimal rate per square-root year when beta is below 1e-4;
-            otherwise dimensionless annual Black volatility.
+            Annualized Normal volatility in rate units or relative Black volatility, as selected.
 
         Raises
         ------
@@ -459,25 +462,25 @@ class SabrParameters:
             If an input is non-finite, ``t`` is non-positive, unshifted
             non-normal SABR receives a non-positive forward or strike, shifted
             SABR has a non-positive effective forward or strike, or the
-            calculation produces an invalid volatility.
+            calculation produces an invalid volatility. Also raised for an unknown quote type
+            or a Black type inconsistent with model shift presence.
 
         Examples
         --------
         >>> from finstack_quant.models.volatility import SabrParameters
-        >>> round(SabrParameters.rates_default().implied_vol(0.02, 0.02, 1.0), 6)
+        >>> round(SabrParameters.rates_default().implied_vol(0.02, 0.02, 1.0, "black_lognormal"), 6)
         0.142511
         """
         ...
 
     def supports_negative_rates(self) -> bool:
         """
-        Return ``True`` for beta approximately zero or a positive shift.
+        Indicate whether the backbone or a stored displacement can support negative rates.
 
         Returns
         -------
         bool
-            ``True`` if beta is below 1e-4 (normal dynamics) or a positive
-            displacement enables negative-rate smiles.
+            ``True`` if beta equals zero or a positive displacement is specified.
 
         Notes
         -----
@@ -556,7 +559,7 @@ class SabrSmile:
     Examples
     --------
     >>> from finstack_quant.models.volatility import SabrParameters, SabrSmile
-    >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0)
+    >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0, "black_lognormal")
     >>> (round(smile.atm_vol(), 6), len(smile.generate_smile([90.0, 100.0, 110.0])))
     (0.20081, 3)
 
@@ -567,6 +570,7 @@ class SabrSmile:
         params: SabrParameters,
         forward: float,
         t: float,
+        quote_type: _SabrQuoteType,
     ) -> None:
         """
         Create a smile helper for one forward and expiry.
@@ -579,10 +583,13 @@ class SabrSmile:
             Forward price at expiry.
         t : float
             Time to expiry in years.
+        quote_type : str
+            Explicit Normal, Black, or shifted Black annualized quote type.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If the selected quote type is unknown.
         """
         ...
 
@@ -593,8 +600,7 @@ class SabrSmile:
         Returns
         -------
         float
-            Normal decimal rate per square-root year when beta is below 1e-4;
-            otherwise dimensionless annual Black volatility.
+            Annualized Normal volatility in rate units or relative Black volatility, as selected.
 
         Raises
         ------
@@ -615,8 +621,7 @@ class SabrSmile:
         Returns
         -------
         float
-            Normal (Bachelier) vol in absolute rate units when beta is below
-            1e-4; otherwise Black decimal volatility.
+            Annualized Normal vol in absolute rate units or relative Black vol, as selected.
 
         Raises
         ------
@@ -638,7 +643,7 @@ class SabrSmile:
         Returns
         -------
         list[float]
-            Implied vols aligned with ``strikes``.
+            Annualized vols aligned with ``strikes`` in the smile's selected quote units.
 
         Raises
         ------
@@ -666,7 +671,7 @@ class SabrSmile:
             Finite, strictly ascending strike grid with arbitrary spacing.
         r : float
             Continuously compounded risk-free rate (decimal) that discounts
-            the forward-based Black call prices compared against the 1e-6
+            the forward-based call prices in the selected model compared against the 1e-6
             tolerance; carry is already in the smile's forward.
 
         Returns
@@ -688,9 +693,9 @@ class SabrSmile:
         """
         Strike for an absolute forward delta, using the smile's ATM volatility.
 
-        Uses Bachelier delta when ``beta == 0`` and Black delta on the
-        (shifted) forward otherwise. This is an ATM-vol approximation, not a
-        smile-consistent solve.
+        Uses Bachelier delta for Normal quotes and Black delta for Black
+        quotes, applying the displacement for shifted Black. The inversion
+        uses ATM volatility at every strike.
 
         Parameters
         ----------
@@ -714,7 +719,7 @@ class SabrSmile:
         Examples
         --------
         >>> from finstack_quant.models.volatility import SabrParameters, SabrSmile
-        >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0)
+        >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0, "black_lognormal")
         >>> smile.strike_from_delta(0.25, True) > 100.0
         True
         """
@@ -734,7 +739,7 @@ class SabrSmile:
             Finite, strictly ascending strike grid with arbitrary spacing.
         r : float
             Continuously compounded risk-free rate (decimal) that discounts
-            the forward-based Black call prices.
+            the forward-based call prices in the selected model.
 
         Raises
         ------
@@ -746,7 +751,7 @@ class SabrSmile:
         Examples
         --------
         >>> from finstack_quant.models.volatility import SabrParameters, SabrSmile
-        >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0)
+        >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0, "black_lognormal")
         >>> smile.check_no_arbitrage([80.0, 90.0, 100.0, 110.0, 120.0], 0.0)
         """
         ...
@@ -755,7 +760,7 @@ class SabrSmile:
         """
         Smile vols on ``strikes`` after removing static arbitrage.
 
-        Generates the SABR smile, converts it to Black call prices, applies a
+        Generates the SABR smile, prices calls in its quote convention, applies a
         greedy monotonicity and convexity projection (not a full Fengler QP),
         and converts back. Strikes without violations keep their SABR vol.
 
@@ -765,7 +770,7 @@ class SabrSmile:
             Finite, strictly ascending strikes in the model domain.
         r : float
             Continuously compounded risk-free rate (decimal) that discounts
-            the forward-based Black call prices.
+            the forward-based call prices in the selected model.
         max_iterations : int
             Maximum number of repair passes.
 
@@ -783,7 +788,7 @@ class SabrSmile:
         Examples
         --------
         >>> from finstack_quant.models.volatility import SabrParameters, SabrSmile
-        >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0)
+        >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0, "black_lognormal")
         >>> strikes = [80.0, 90.0, 100.0, 110.0, 120.0]
         >>> smile.repair_arbitrage(strikes, 0.0, 10) == smile.generate_smile(strikes)
         True
@@ -817,7 +822,7 @@ class SabrSmile:
         Examples
         --------
         >>> from finstack_quant.models.volatility import SabrParameters, SabrSmile
-        >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0)
+        >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0, "black_lognormal")
         >>> list(smile.to_dataframe([90.0, 100.0, 110.0]).columns)
         ['strike', 'vol', 'log_moneyness']
         """
@@ -866,8 +871,8 @@ class SabrCalibrationOutcome:
     >>> from finstack_quant.models.volatility import SabrCalibrator, SabrParameters
     >>> params = SabrParameters(0.02, 0.5, 0.4, -0.3)
     >>> strikes = [0.02, 0.03, 0.04]
-    >>> quotes = [params.implied_vol(0.03, k, 2.0) for k in strikes]
-    >>> fit = SabrCalibrator().calibrate(0.03, strikes, quotes, 2.0, 0.5)
+    >>> quotes = [params.implied_vol(0.03, k, 2.0, "black_lognormal") for k in strikes]
+    >>> fit = SabrCalibrator().calibrate(0.03, strikes, quotes, 2.0, 0.5, "black_lognormal")
     >>> isinstance(fit, SabrCalibrationOutcome) and fit.max_relative_quote_error <= 1e-4
     True
     """
@@ -1098,6 +1103,7 @@ class SabrCalibrator:
         market_vols: list[float],
         t: float,
         beta: float,
+        quote_type: _SabrQuoteType,
     ) -> SabrCalibrationOutcome:
         """
         Fit ``(alpha, nu, rho)`` to market vols with ``beta`` fixed.
@@ -1109,12 +1115,13 @@ class SabrCalibrator:
         strikes : list[float]
             Strike grid aligned with ``market_vols``.
         market_vols : list[float]
-            Positive finite market vols: decimal rate per square-root year for beta=0,
-            dimensionless annual Black volatility otherwise.
+            Positive finite market volatilities in the selected quote type.
         t : float
             Expiry in years.
         beta : float
             Fixed SABR beta in ``[0, 1]``.
+        quote_type : str
+            Explicit Normal, Black, or shifted Black with a selected displacement.
 
         Returns
         -------
@@ -1506,13 +1513,12 @@ def get_cube_vol_clamped(
     Returns
     -------
     float
-        Annualized volatility in *convention*, or nan when the coordinates,
-        SABR domain, or a shifted-lognormal *convention* make it undefined.
+        Annualized volatility in the selected convention.
 
     Raises
     ------
     ValueError
-        If *convention* is not a recognized convention value.
+        If the coordinates or convention are invalid, or the SABR expansion is undefined.
 
     Examples
     --------
@@ -1525,7 +1531,11 @@ def get_cube_vol_clamped(
     ...
 
 def materialize_cube_tenor_slice(
-    cube: VolCube, tenor: float, strikes: list[float], convention: _VolatilityConvention
+    cube: VolCube,
+    tenor: float,
+    strikes: list[float],
+    convention: _VolatilityConvention,
+    interpolation_mode: Literal["vol", "total_variance"],
 ) -> VolSurface:
     """Materialize a cube tenor slice as an expiry-by-strike surface.
 
@@ -1534,7 +1544,7 @@ def materialize_cube_tenor_slice(
     cube : VolCube
         Source SABR cube.
     tenor : float
-        Finite tenor in years, clamped to the grid.
+        Finite tenor in years within the cube grid.
     strikes : list[float]
         Non-empty finite strike grid.
     convention : str or dict
@@ -1544,6 +1554,9 @@ def materialize_cube_tenor_slice(
         cube's rate units (``0.0075`` = 75 bp on decimal rates). A
         ``{"shifted_lognormal": {"shift": s}}`` output is rejected because the
         cube already carries its own shifts.
+
+    interpolation_mode : {"vol", "total_variance"}
+        Output expiry interpolation, independent of the source cube mode.
 
     Returns
     -------
@@ -1562,9 +1575,9 @@ def materialize_cube_tenor_slice(
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import materialize_cube_tenor_slice
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_tenor_slice(c, 5.0, [0.02, 0.03], "lognormal").grid_shape
+    >>> materialize_cube_tenor_slice(c, 5.0, [0.02, 0.03], "lognormal", "vol").grid_shape
     (1, 2)
-    >>> materialize_cube_tenor_slice(c, 5.0, [0.02, 0.03], "normal").quote_type
+    >>> materialize_cube_tenor_slice(c, 5.0, [0.02, 0.03], "normal", "vol").quote_type
     'normal'
     """
     ...
@@ -1579,7 +1592,7 @@ def materialize_cube_expiry_slice(
     cube : VolCube
         Source SABR cube.
     expiry : float
-        Finite expiry in years, clamped to the grid.
+        Finite expiry in years within the cube grid.
     strikes : list[float]
         Non-empty finite strike grid.
     convention : str or dict
@@ -1706,7 +1719,20 @@ def get_fx_delta_pillar_vols(surface: FxDeltaVolSurface, expiry_index: int) -> t
     >>> from finstack_quant.models.volatility import get_fx_delta_pillar_vols
     >>> tuple(
     ...     round(value, 6)
-    ...     for value in get_fx_delta_pillar_vols(FxDeltaVolSurface("FX", "EUR/USD", [1.0], [0.12], [0.01], [0.002]), 0)
+    ...     for value in get_fx_delta_pillar_vols(
+    ...         FxDeltaVolSurface(
+    ...             "FX",
+    ...             "EUR/USD",
+    ...             [1.0],
+    ...             [0.12],
+    ...             [0.01],
+    ...             [0.002],
+    ...             delta_convention="forward_unadjusted",
+    ...             atm_convention="delta_neutral_straddle",
+    ...             butterfly_convention="smile",
+    ...         ),
+    ...         0,
+    ...     )
     ... )
     (0.12, 0.117, 0.127)
     """
@@ -1740,7 +1766,17 @@ def get_fx_delta_vol(surface: FxDeltaVolSurface, expiry: float, strike: float, f
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface
     >>> from finstack_quant.models.volatility import get_fx_delta_vol
-    >>> s = FxDeltaVolSurface("FX", "EUR/USD", [1.0], [0.12], [0.01], [0.002])
+    >>> s = FxDeltaVolSurface(
+    ...     "FX",
+    ...     "EUR/USD",
+    ...     [1.0],
+    ...     [0.12],
+    ...     [0.01],
+    ...     [0.002],
+    ...     delta_convention="forward_unadjusted",
+    ...     atm_convention="delta_neutral_straddle",
+    ...     butterfly_convention="smile",
+    ... )
     >>> get_fx_delta_vol(s, 1.0, 1.1, 1.1) > 0
     True
     """
@@ -1749,6 +1785,7 @@ def get_fx_delta_vol(surface: FxDeltaVolSurface, expiry: float, strike: float, f
 def materialize_fx_delta_surface(
     surface: FxDeltaVolSurface,
     delivery_forwards: Sequence[float],
+    interpolation_mode: Literal["vol", "total_variance"],
 ) -> VolSurface:
     """Materialize FX delta quotes as a strike-axis surface.
 
@@ -1760,6 +1797,9 @@ def materialize_fx_delta_surface(
         Positive delivery FX forward rates matching ``surface.expiries`` in
         ``surface.pair`` quote-per-base units (one forward per expiry slice).
 
+    interpolation_mode : {"vol", "total_variance"}
+        Interpolate the output grid in decimal implied volatility or total variance.
+
     Returns
     -------
     VolSurface
@@ -1769,14 +1809,24 @@ def materialize_fx_delta_surface(
     ------
     ValueError
         If ``delivery_forwards`` length does not match ``surface.expiries``, any
-        forward is non-positive/non-finite, or smile nodes are invalid.
+        forward is non-positive/non-finite, smile nodes are invalid, or the interpolation mode is unknown.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface
     >>> from finstack_quant.models.volatility import materialize_fx_delta_surface
-    >>> s = FxDeltaVolSurface("FX", "EUR/USD", [1.0], [0.12], [0.01], [0.002])
-    >>> materialize_fx_delta_surface(s, [1.1]).grid_shape
+    >>> s = FxDeltaVolSurface(
+    ...     "FX",
+    ...     "EUR/USD",
+    ...     [1.0],
+    ...     [0.12],
+    ...     [0.01],
+    ...     [0.002],
+    ...     delta_convention="forward_unadjusted",
+    ...     atm_convention="delta_neutral_straddle",
+    ...     butterfly_convention="smile",
+    ... )
+    >>> materialize_fx_delta_surface(s, [1.1], "total_variance").grid_shape
     (1, 3)
     """
     ...

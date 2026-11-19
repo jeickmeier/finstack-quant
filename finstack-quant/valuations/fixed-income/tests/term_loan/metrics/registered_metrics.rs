@@ -67,7 +67,9 @@ fn term_loan(upfront_fee: Option<Money>, callable: bool) -> TermLoan {
 
 fn market() -> MarketContext {
     let as_of = date!(2025 - 01 - 01);
-    MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+    MarketContext::new()
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve")
 }
 
 fn metric(loan: &TermLoan, id: MetricId, key: &str) -> f64 {

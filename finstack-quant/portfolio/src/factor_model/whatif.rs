@@ -947,7 +947,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("other discount curve");
-        let market = base_market.insert(other_curve);
+        let market = base_market
+            .try_insert(other_curve)
+            .expect("insert market curve");
         let affected_calls = Arc::new(AtomicUsize::new(0));
         let unaffected_calls = Arc::new(AtomicUsize::new(0));
         let affected = Position::new(

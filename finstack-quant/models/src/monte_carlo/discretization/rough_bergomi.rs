@@ -86,9 +86,9 @@ impl Discretization<RoughBergomiProcess> for RoughBergomiEuler {
         x: &mut [f64],
         z: &[f64],
         work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let params = process.params();
-        let h = params.hurst.value();
+        let h = params.hurst.get_value();
         let eta = params.eta;
         let rho = params.rho;
 
@@ -108,15 +108,7 @@ impl Discretization<RoughBergomiProcess> for RoughBergomiEuler {
         // step's own shock and bias E[S_T] away from the forward.
         // Var(Ỹ_t) = t^{2H} for the √(2H)-normalised RL Volterra process, so
         // the convexity correction at time t is ½η²t^{2H}.
-        let two_h = 2.0 * h;
-        let y_t = work[0];
-        let exponent = eta * y_t - 0.5 * eta * eta * t.powf(two_h);
-        let raw_variance = params.xi.value(t) * exponent.exp();
-        let v_t = if raw_variance.is_finite() {
-            raw_variance.max(0.0)
-        } else {
-            raw_variance
-        };
+        let v_t = super::rough_level(params.xi.get_value(t)?, eta, work[0], t, h, 1.0)?;
 
         // Correlate spot noise with the Volterra driver. The Bayer-Friz-Gatheral
         // coupling is dW·dW̃ = ρ dt, so the correlated spot normal is built from
@@ -127,11 +119,19 @@ impl Discretization<RoughBergomiProcess> for RoughBergomiEuler {
         //   S_{t+dt} = S_t exp((r − q − ½V_t) dt + √V_t √dt Z_corr)
         let drift = (params.r - params.q - 0.5 * v_t) * dt;
         let diffusion = v_t.sqrt() * dt.sqrt() * z_correlated;
-        x[0] *= (drift + diffusion).exp();
+        let next_spot = x[0] * (drift + diffusion).exp();
 
         // Accumulate the Volterra process for the next step:
         //   Ỹ_{t+dt} = Ỹ_t + ΔỸ,  with Ỹ_t = √(2H)∫₀ᵗ(t−s)^{H−½}dW̃_s.
-        work[0] += d_y;
+        let next_history = work[0] + d_y;
+        if !next_spot.is_finite() || next_spot <= 0.0 || !next_history.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "rBergomi step produced invalid spot or history".into(),
+            ));
+        }
+        x[0] = next_spot;
+        work[0] = next_history;
+        Ok(())
     }
 
     fn work_size(&self, _process: &RoughBergomiProcess) -> usize {
@@ -162,6 +162,32 @@ mod tests {
     }
 
     #[test]
+    fn zero_variance_preserves_history_and_checked_time_domain() {
+        let xi = ForwardVarianceCurve::from_intervals(&[(1.0, 0.0), (2.0, 0.04)]).unwrap();
+        let params =
+            RoughBergomiParams::new(0.0, 0.0, HurstExponent::new(0.1).unwrap(), 1.0, 0.0, xi)
+                .unwrap();
+        let process = RoughBergomiProcess::new(params);
+        let mut state = [100.0];
+        let mut history = [1000.0];
+        let noise = [0.0, -1000.0, 0.0];
+        RoughBergomiEuler
+            .step(&process, 0.5, 0.5, &mut state, &noise, &mut history)
+            .unwrap();
+        assert_eq!(state, [100.0]);
+        assert_eq!(history, [0.0]);
+        assert!(
+            RoughBergomiEuler
+                .step(&process, -1.0, 1.0, &mut state, &noise, &mut history)
+                .is_err()
+        );
+        RoughBergomiEuler
+            .step(&process, 1.0, 1.0, &mut state, &[0.0; 3], &mut history)
+            .unwrap();
+        assert!(state[0] < 100.0);
+    }
+
+    #[test]
     fn test_single_step_zero_shocks() {
         let process = make_process();
         let disc = RoughBergomiEuler::new();
@@ -170,7 +196,8 @@ mod tests {
         let z = vec![0.0, 0.0, 0.0]; // No shocks: indep, ΔỸ, driving normal
         let mut work = vec![0.0];
 
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Spot should remain close to initial with small drift
         assert!(x[0] > 0.0, "Spot must remain positive");
@@ -192,7 +219,7 @@ mod tests {
         // Start mid-grid so the left-endpoint variance uses a non-zero time
         // and a non-zero accumulated Volterra level.
         let t = 0.5_f64;
-        let h = params.hurst.value();
+        let h = params.hurst.get_value();
         let eta = params.eta;
         let r = params.r;
         let q = params.q;
@@ -207,13 +234,14 @@ mod tests {
         let z = vec![z_indep, d_y, z_drive];
         let mut work = vec![y_t];
 
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Manually compute expected result: the spot step uses the LEFT-endpoint
         // variance V_t built from Ỹ_t (before ΔỸ) with convexity at time t.
         let two_h = 2.0 * h;
         let exponent = eta * y_t - 0.5 * eta * eta * t.powf(two_h);
-        let v = (params.xi.value(t) * exponent.exp()).max(0.0);
+        let v = (params.xi.get_value(t).unwrap() * exponent.exp()).max(0.0);
 
         // Spot–vol correlation uses the driving normal directly (no dt^H scale).
         let z_corr = rho * z_drive + (1.0 - rho * rho).max(0.0).sqrt() * z_indep;
@@ -246,14 +274,14 @@ mod tests {
         // V_t = ξ₀(t) exp(η Ỹ_t − ½ η² t^{2H})
         let two_h = 2.0 * h;
         let exponent = eta * w_h - 0.5 * eta * eta * t.powf(two_h);
-        let v = xi.value(t) * exponent.exp();
+        let v = xi.get_value(t).unwrap() * exponent.exp();
 
         // With flat ξ₀ = 0.04 and small w_h, variance should be positive
         assert!(v > 0.0, "Reconstructed variance should be positive: {v}");
 
         // With zero accumulation, variance should equal ξ₀(t) * exp(-½η²t^{2H})
         let exponent_zero = -0.5 * eta * eta * t.powf(two_h);
-        let v_zero = xi.value(t) * exponent_zero.exp();
+        let v_zero = xi.get_value(t).unwrap() * exponent_zero.exp();
         assert!(v_zero > 0.0);
         assert!(
             v_zero < 0.04,
@@ -271,8 +299,10 @@ mod tests {
         let mut work = vec![0.0];
 
         // Simulate a few steps of path 1
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
-        disc.step(&process, 0.01, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
+        disc.step(&process, 0.01, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         let w_h_after_path1 = work[0];
         assert!(
@@ -283,7 +313,8 @@ mod tests {
         // Start path 2 — engine zeros work buffer before each path
         x[0] = 100.0;
         work[0] = 0.0;
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // After a single step from t=0, work[0] should be exactly the single
         // RL Volterra increment (accumulator was zeroed by engine before path)
@@ -305,7 +336,8 @@ mod tests {
             let z = vec![z_val, z_val * 0.1, z_val];
             let mut work = vec![0.0];
 
-            disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+            disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+                .expect("valid simulation step");
 
             assert!(
                 x[0] > 0.0,
@@ -362,8 +394,10 @@ mod tests {
 
             let mut sum_st = 0.0;
             for _ in 0..num_paths {
-                rng.fill_std_normals(&mut vol_normals);
-                rng.fill_std_normals(&mut spot_normals);
+                rng.fill_std_normals(&mut vol_normals)
+                    .expect("normal draws");
+                rng.fill_std_normals(&mut spot_normals)
+                    .expect("normal draws");
                 r#gen.generate(&vol_normals, &mut increments);
                 r#gen.driving_normals_into(&vol_normals, &mut driving);
 
@@ -372,7 +406,8 @@ mod tests {
                 for k in 0..n {
                     let t = k as f64 * dt;
                     let z = [spot_normals[k], increments[k], driving[k]];
-                    disc.step(&process, t, dt, &mut x, &z, &mut work);
+                    disc.step(&process, t, dt, &mut x, &z, &mut work)
+                        .expect("valid simulation step");
                 }
                 sum_st += x[0];
             }
@@ -433,7 +468,7 @@ mod tests {
         let mut sum_mult_mid = 0.0;
 
         for _ in 0..num_paths {
-            rng.fill_std_normals(&mut normals);
+            rng.fill_std_normals(&mut normals).expect("normal draws");
             r#gen.generate(&normals, &mut increments);
 
             // Ỹ_{t_k} = Σ_{j<k} ΔỸ_j — the same accumulation RoughBergomiEuler does.
@@ -518,8 +553,10 @@ mod tests {
         let mut sum_payoff = 0.0;
         for _ in 0..num_paths {
             // Single advancing stream: Volterra normals then spot normals.
-            rng.fill_std_normals(&mut vol_normals);
-            rng.fill_std_normals(&mut spot_normals);
+            rng.fill_std_normals(&mut vol_normals)
+                .expect("normal draws");
+            rng.fill_std_normals(&mut spot_normals)
+                .expect("normal draws");
             r#gen.generate(&vol_normals, &mut increments);
             r#gen.driving_normals_into(&vol_normals, &mut driving);
 
@@ -529,7 +566,8 @@ mod tests {
                 let t = k as f64 * dt;
                 // z = [indep spot, ΔỸ Volterra increment, driving normal Z̃].
                 let z = [spot_normals[k], increments[k], driving[k]];
-                disc.step(&process, t, dt, &mut x, &z, &mut work);
+                disc.step(&process, t, dt, &mut x, &z, &mut work)
+                    .expect("valid simulation step");
             }
             sum_payoff += (x[0] - strike).max(0.0);
         }

@@ -610,8 +610,10 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, eurusd)])
             .expect("test FX quote should be valid");
         build_test_market_at(as_of)
-            .insert(flat_discount("EUR", as_of, 1.0))
-            .insert(flat_discount("USD", as_of, 1.0))
+            .try_insert(flat_discount("EUR", as_of, 1.0))
+            .expect("insert market curve")
+            .try_insert(flat_discount("USD", as_of, 1.0))
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(provider, None))
     }
 
@@ -857,16 +859,18 @@ mod tests {
             .position(position)
             .build()
             .expect("test should succeed");
-        let market = build_test_market_at(as_of).insert(
-            HazardCurve::builder("CDX.NA.IG.HAZARD")
-                .base_date(as_of)
-                .currency(Currency::USD)
-                .recovery_rate(0.40)
-                .knots([(5.0, 0.02)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .build()
-                .expect("hazard curve should build"),
-        );
+        let market = build_test_market_at(as_of)
+            .try_insert(
+                HazardCurve::builder("CDX.NA.IG.HAZARD")
+                    .base_date(as_of)
+                    .currency(Currency::USD)
+                    .recovery_rate(0.40)
+                    .knots([(5.0, 0.02)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .build()
+                    .expect("hazard curve should build"),
+            )
+            .expect("insert market curve");
 
         let full = aggregate_full_cashflows(&portfolio, &market, &fail_closed())
             .expect("cdx cashflow aggregation");
@@ -1045,8 +1049,10 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, eurusd)])
             .expect("test FX quote should be valid");
         MarketContext::new()
-            .insert(flat_discount("EUR", as_of, df_eur))
-            .insert(flat_discount("USD", as_of, df_usd))
+            .try_insert(flat_discount("EUR", as_of, df_eur))
+            .expect("insert market curve")
+            .try_insert(flat_discount("USD", as_of, df_usd))
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(provider, None))
     }
 
@@ -1095,7 +1101,8 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
-            .insert(flat_discount("USD", as_of, 0.95))
+            .try_insert(flat_discount("USD", as_of, 0.95))
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(provider, None));
 
         let err = full
@@ -1118,8 +1125,10 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
-            .insert(flat_discount("EUR-OIS", as_of, 0.99))
-            .insert(flat_discount("USD-OIS", as_of, 0.95))
+            .try_insert(flat_discount("EUR-OIS", as_of, 0.99))
+            .expect("insert market curve")
+            .try_insert(flat_discount("USD-OIS", as_of, 0.95))
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(provider, None));
         let mut curves = HashMap::new();
         curves.insert(Currency::EUR, CurveId::new("EUR-OIS"));

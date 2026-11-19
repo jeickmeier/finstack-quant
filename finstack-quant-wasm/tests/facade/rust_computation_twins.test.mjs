@@ -578,7 +578,8 @@ test('monteCarloBreachProbability reads the serialized path table', () => {
     ...config,
     include_path_data: true,
   });
-  assert.equal(statements.monteCarloBreachProbability(withPaths, 'revenue', 410), 0.27);
+  // Independent PCG64 paths breach in 58 of 200 three-quarter forecasts.
+  assert.equal(statements.monteCarloBreachProbability(withPaths, 'revenue', 410), 58 / 200);
   assert.equal(statements.monteCarloBreachProbability(withPaths, 'missing', 410), undefined);
   const withoutPaths = new statements.Evaluator().evaluateMonteCarlo(model, {
     ...config,

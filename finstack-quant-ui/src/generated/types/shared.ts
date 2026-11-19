@@ -4238,16 +4238,6 @@ export type Date67 = string;
  */
 export type Id69 = string;
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "PositiveF64Wire".
- */
-export type PositiveF64Wire = number;
-/**
  * Opaque string identifier.
  */
 export type Id70 = string;
@@ -14947,13 +14937,6 @@ export type Monitoring =
  */
 export type NdfQuoteConvention = "base_per_settlement" | "settlement_per_base";
 /**
- * Finite JSON number greater than or equal to zero.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "NonNegativeF64Wire".
- */
-export type NonNegativeF64Wire = number;
-/**
  * Notional exchange convention for XCCY swaps.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -15162,6 +15145,16 @@ export type PoolType = "generic" | "specified";
  * via the `definition` "Position".
  */
 export type Position = "long" | "short";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "PositiveF64Wire".
+ */
+export type PositiveF64Wire = number;
 /**
  * Accrual-start convention for the synthetic underlying CDS used by CDSO.
  *
@@ -16985,7 +16978,6 @@ export interface SharedDefs {
   Ndf?: Ndf;
   NdfFixingSource?: NdfFixingSource;
   NdfQuoteConvention?: NdfQuoteConvention;
-  NonNegativeF64Wire?: NonNegativeF64Wire;
   Notional?: Notional1;
   NotionalExchange?: NotionalExchange;
   OidEirSpec?: OidEirSpec;
@@ -17915,14 +17907,20 @@ export interface D_572Ad1Befb7D94914652 {
   vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_cdb8fddc0106047270c4".
  */
 export interface DCdb8Fddc0106047270C4 {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
@@ -35968,32 +35966,32 @@ export interface Money53 {
     | "ZWL";
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "SabrParameters".
  */
 export interface SabrParameters {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
   alpha: number;
   /**
-   * Finite JSON number in the closed interval `[0, 1]`.
+   * CEV exponent in the closed interval `[0, 1]`.
    */
   beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
   nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
   rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: PositiveF64Wire | null;
+  shift?: number | null;
 }
 /**
  * Scenario-only pricing adjustments.
@@ -45633,10 +45631,7 @@ export interface CommoditySpotOption {
   instrument_pricing_overrides?: InstrumentPricingOverrides49;
   metric_pricing_overrides?: MetricPricingOverrides49;
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Contract multiplier (typically 1.0 for OTC options).
    */
   multiplier: number;
   /**
@@ -45644,10 +45639,7 @@ export interface CommoditySpotOption {
    */
   option_type: "call" | "put";
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Contract quantity in units.
    */
   quantity: number;
   /**
@@ -45668,10 +45660,7 @@ export interface CommoditySpotOption {
    */
   spot_id?: Id9 | null;
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Strike price per unit.
    */
   strike: number;
   /**
@@ -45847,18 +45836,12 @@ export interface CommodityAsianOption {
    */
   past_fixings?: [Date, number][];
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Contract quantity in commodity units.
    */
   quantity: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides50;
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Strike price per unit.
    */
   strike: number;
   /**
@@ -46071,10 +46054,7 @@ export interface CommodityForward {
   maturity: Date112;
   metric_pricing_overrides?: MetricPricingOverrides51;
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Contract multiplier (typically 1.0 for OTC forwards, defaults to 1.0).
    */
   multiplier?: number;
   /**
@@ -46085,10 +46065,7 @@ export interface CommodityForward {
    */
   position?: "long" | "short";
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Contract quantity in units.
    */
   quantity: number;
   /**
@@ -46138,7 +46115,10 @@ export interface CommodityForward {
    */
   settlement_days?: number | null;
   /**
-   * Optional spot price ID (for delta calculations).
+   * Optional observed spot identifier. At maturity the scalar is the delivery
+   * observation. After maturity use the exact delivery observation in the
+   * corresponding `FIXING:{spot_id}` series. Before maturity an explicitly
+   * identified spot can supply the cost-of-carry input if the forward curve is absent.
    */
   spot_id?: Id9 | null;
   /**
@@ -46312,10 +46292,7 @@ export interface CommoditySwap {
    */
   past_fixings?: [Date, number][];
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Notional quantity per period.
    */
   quantity: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides52;
@@ -46494,10 +46471,7 @@ export interface CommoditySwaption {
   discount_curve_id: Id177;
   expiry: Date115;
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Fixed price (strike) of the underlying swap.
    */
   fixed_price: number;
   forward_curve_id: Id178;
@@ -46509,10 +46483,7 @@ export interface CommoditySwaption {
    */
   option_type: "call" | "put";
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Notional quantity per period.
    */
   quantity: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides53;
@@ -46698,10 +46669,7 @@ export interface CommoditySpreadOption {
    */
   option_type: "call" | "put";
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Notional quantity (number of units).
    */
   quantity: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides54;
@@ -52211,10 +52179,7 @@ export interface BondFutureSpecs {
 export interface DeliverableBond {
   bond_id: Id239;
   /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
+   * Positive conversion factor consumed by the model-price calculation.
    */
   conversion_factor: number;
 }

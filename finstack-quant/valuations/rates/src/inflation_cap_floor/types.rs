@@ -466,6 +466,7 @@ impl InflationCapFloor {
                         strike,
                         convention: Some(convention),
                         clamp: true,
+                        required_cube_clock: None,
                     },
                 )
             };

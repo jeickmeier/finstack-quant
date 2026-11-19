@@ -32,6 +32,7 @@ afterAll(async () => worker?.close());
 const request: FxStrikeSurfaceRequest = {
   surface: fxQuotes,
   deliveryForwards: [1.105, 1.11],
+  interpolationMode: "vol",
 };
 function direct(request: FxStrikeSurfaceRequest) {
   const surface = native.FxDeltaVolSurface.fromJson(
@@ -41,6 +42,7 @@ function direct(request: FxStrikeSurfaceRequest) {
     const grid = native.materializeFxDeltaSurface(
       surface,
       request.deliveryForwards,
+      request.interpolationMode,
     );
     try {
       return JSON.parse(grid.toJson());
@@ -52,7 +54,10 @@ function direct(request: FxStrikeSurfaceRequest) {
   }
 }
 it("returns the native strike-space surface JSON after every quote and delivery-forward change and frees both handles", async () => {
-  const variants: FxStrikeSurfaceRequest[] = [request];
+  const variants: FxStrikeSurfaceRequest[] = [
+    request,
+    { ...request, interpolationMode: "total_variance" },
+  ];
   for (const key of ["atm_vols", "rr_25d", "bf_25d"] as const) {
     const r = structuredClone(request);
     r.surface[key][1] += 0.001;
@@ -79,6 +84,7 @@ it("returns the native strike-space surface JSON after every quote and delivery-
     const grid = unwrap(await worker.proxy.materializeFxSurface(variant));
     expect(grid).toEqual(direct(variant));
     // The returned JSON is the canonical stored grid the surface views read.
+    expect(grid.interpolation_mode).toBe(variant.interpolationMode);
     expect(grid.secondary_axis).toBe("strike");
     expect(surfaceNodes(grid)).toHaveLength(
       grid.expiries.length * grid.secondary_values.length,

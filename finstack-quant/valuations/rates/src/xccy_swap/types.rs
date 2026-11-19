@@ -1105,7 +1105,7 @@ mod tests {
     fn xccy_swap_cashflow_provider_emits_multi_currency_flows() {
         let as_of = date(2025, Month::January, 1);
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots(vec![(0.0, 1.0), (1.0, 0.95)])
@@ -1115,7 +1115,8 @@ mod tests {
                     .build()
                     .expect("usd curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots(vec![(0.0, 1.0), (1.0, 0.97)])
@@ -1125,7 +1126,8 @@ mod tests {
                     .build()
                     .expect("eur curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat(
                     "USD-SOFR-3M",
                     as_of,
@@ -1134,7 +1136,8 @@ mod tests {
                 )
                 .expect("usd forward"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat(
                     "EUR-EURIBOR-3M",
                     as_of,
@@ -1142,7 +1145,8 @@ mod tests {
                     finstack_quant_core::dates::DayCount::Act365F,
                 )
                 .expect("eur forward"),
-            );
+            )
+            .expect("insert market curve");
 
         let start = date(2025, Month::January, 2);
         let end = date(2026, Month::January, 2);
@@ -1225,7 +1229,7 @@ mod tests {
         // surfaced from inside the per-cashflow loop.
         let as_of = date(2025, Month::January, 1);
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots(vec![(0.0, 1.0), (1.0, 0.95)])
@@ -1235,7 +1239,8 @@ mod tests {
                     .build()
                     .expect("usd curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots(vec![(0.0, 1.0), (1.0, 0.97)])
@@ -1245,7 +1250,8 @@ mod tests {
                     .build()
                     .expect("eur curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat(
                     "USD-SOFR-3M",
                     as_of,
@@ -1254,7 +1260,8 @@ mod tests {
                 )
                 .expect("usd forward"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat(
                     "EUR-EURIBOR-3M",
                     as_of,
@@ -1262,7 +1269,8 @@ mod tests {
                     finstack_quant_core::dates::DayCount::Act365F,
                 )
                 .expect("eur forward"),
-            );
+            )
+            .expect("insert market curve");
 
         let start = date(2025, Month::January, 2);
         let end = date(2026, Month::January, 2);
@@ -1568,10 +1576,14 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("set EUR/USD rate");
         let market = MarketContext::new()
-            .insert(curve("USD-OIS", 0.02))
-            .insert(curve("EUR-OIS", 0.01))
-            .insert(forward("USD-SOFR-3M", 0.02))
-            .insert(forward("EUR-EURIBOR-3M", 0.01))
+            .try_insert(curve("USD-OIS", 0.02))
+            .expect("insert market curve")
+            .try_insert(curve("EUR-OIS", 0.01))
+            .expect("insert market curve")
+            .try_insert(forward("USD-SOFR-3M", 0.02))
+            .expect("insert market curve")
+            .try_insert(forward("EUR-EURIBOR-3M", 0.01))
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(provider, None));
 
         let swap = XccySwap::example().expect("example");
@@ -1652,10 +1664,14 @@ mod tests {
         let fx = FxMatrix::new(provider, None);
 
         let ctx = MarketContext::new()
-            .insert(usd_disc)
-            .insert(eur_disc)
-            .insert(usd_fwd)
-            .insert(eur_fwd)
+            .try_insert(usd_disc)
+            .expect("insert market curve")
+            .try_insert(eur_disc)
+            .expect("insert market curve")
+            .try_insert(usd_fwd)
+            .expect("insert market curve")
+            .try_insert(eur_fwd)
+            .expect("insert market curve")
             .insert_fx(fx);
 
         let swap = XccySwap::example()
@@ -1831,7 +1847,11 @@ mod tests {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount");
-        let market = MarketContext::new().insert(disc).insert(fwd);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve");
         let swap = XccySwap::new(
             "EUR-OIS-BAD-CAL",
             leg.clone(),

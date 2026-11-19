@@ -239,8 +239,10 @@ fn test_mixed_currency_capital_structure_requires_reporting_fx() {
     };
 
     let market = MarketContext::new()
-        .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
-        .insert(flat_discount_curve(0.03, as_of, "EUR-OIS"));
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(flat_discount_curve(0.03, as_of, "EUR-OIS"))
+        .expect("insert market curve");
     let mut evaluator = Evaluator::new();
     let error = evaluator
         .evaluate_with_market(&model, &market, as_of)

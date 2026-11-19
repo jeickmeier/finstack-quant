@@ -63,7 +63,7 @@ pub fn create_market_context() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    context = context.insert(disc_curve);
+    context = context.try_insert(disc_curve).expect("insert market curve");
 
     // USD forward curve (SOFR 3M)
     let fwd_curve = ForwardCurve::builder("USD-SOFR-3M")
@@ -108,7 +108,7 @@ pub fn create_market_context() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    context = context.insert(fwd_curve);
+    context = context.try_insert(fwd_curve).expect("insert market curve");
     context = context.insert_series(
         ScalarTimeSeries::new(
             "FIXING:USD-SOFR-3M",
@@ -135,7 +135,7 @@ pub fn create_market_context() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    context = context.insert(eur_disc);
+    context = context.try_insert(eur_disc).expect("insert market curve");
 
     let eur_fwd = ForwardCurve::builder("EUR-EURIBOR-3M")
         .base_date(as_of_date())
@@ -155,7 +155,7 @@ pub fn create_market_context() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    context = context.insert(eur_fwd);
+    context = context.try_insert(eur_fwd).expect("insert market curve");
 
     // Equity market data
     context = context.insert_price(

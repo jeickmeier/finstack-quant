@@ -16,7 +16,7 @@
 //! them to [`simulate_path_fractional`], which injects them at `fbm_z_index`:
 //!
 //! ```text
-//! rng.fill_std_normals(&mut fbm_normals);
+//! rng.fill_std_normals(&mut fbm_normals)?;
 //! fbm_gen.generate(&fbm_normals, &mut fbm_increments);
 //!
 //! let path = FractionalPath {
@@ -203,11 +203,17 @@ mod tests {
             out[0] = 0.0;
         }
 
-        fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+        fn diffusion(
+            &self,
+            _t: f64,
+            _x: &[f64],
+            out: &mut [f64],
+        ) -> finstack_quant_core::Result<()> {
             out[0] = 1.0;
             if out.len() > 1 {
                 out[1] = 0.0;
             }
+            Ok(())
         }
 
         fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
@@ -227,9 +233,10 @@ mod tests {
             x: &mut [f64],
             z: &[f64],
             _work: &mut [f64],
-        ) {
+        ) -> finstack_quant_core::Result<()> {
             // Accumulate z[1] (the fBM slot) into x[0]
             x[0] += z[1];
+            Ok(())
         }
 
         fn work_size(&self, _process: &TwoFactorSpot) -> usize {
@@ -314,7 +321,8 @@ mod tests {
         let mut fbm_increments = vec![0.0; num_steps];
 
         // Generate fBM increments then simulate — the pattern callers use
-        rng.fill_std_normals(&mut fbm_normals);
+        rng.fill_std_normals(&mut fbm_normals)
+            .expect("normal draws");
         fbm_gen.generate(&fbm_normals, &mut fbm_increments);
 
         let path = FractionalPath {

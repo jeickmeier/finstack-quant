@@ -607,7 +607,7 @@ impl CommoditySwaption {
             inputs.time,
         )
         .0;
-        let nd1 = norm_cdf(d1);
+        let nd1 = norm_cdf(d1)?;
 
         let delta_unit = match self.option_type {
             OptionType::Call => inputs.annuity * nd1,
@@ -683,7 +683,7 @@ impl CommoditySwaption {
         )
         .0;
         // Vega = annuity * F * N'(d1) * sqrt(T) * 0.01 (per vol point)
-        let vega_abs = inputs.annuity * inputs.forward * norm_pdf(d1) * inputs.time.sqrt();
+        let vega_abs = inputs.annuity * inputs.forward * norm_pdf(d1)? * inputs.time.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity))
     }
 }
@@ -908,9 +908,10 @@ mod tests {
         // Steep linear contango: price rises ~1.0/yr. Midpoint vs payment-date
         // forwards then differ by ~half a period of carry.
         let price_curve = PriceCurve::builder("NG-FORWARD")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
             .day_count(DayCount::Act365F)
-            .spot_price(3.00)
             .knots([(0.0, 3.00), (0.5, 3.50), (1.0, 4.00), (2.0, 5.00)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
             .build()
@@ -925,7 +926,11 @@ mod tests {
             .build()
             .expect("discount curve");
 
-        let market = MarketContext::new().insert(disc).insert(price_curve);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve");
 
         let swaption = CommoditySwaption::builder()
             .id(InstrumentId::new("NG-SWAPTION-W02"))
@@ -1039,9 +1044,10 @@ mod tests {
 
         // Sloped contango curve so averaging conventions matter.
         let price_curve = PriceCurve::builder("NG-FORWARD")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
             .day_count(DayCount::Act365F)
-            .spot_price(3.00)
             .knots([(0.0, 3.00), (1.0, 4.00), (2.0, 5.00)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
             .build()
@@ -1054,7 +1060,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(disc).insert(price_curve);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve");
 
         let swap_start = Date::from_calendar_date(2025, Month::July, 1).expect("valid date");
         let swap_end = Date::from_calendar_date(2026, Month::July, 1).expect("valid date");
@@ -1161,15 +1171,20 @@ mod tests {
             .expect("discount curve");
 
         let price_curve = PriceCurve::builder("NG-FORWARD")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(flat_fwd)
             .knots([(0.0, flat_fwd), (2.0, flat_fwd)])
             .build()
             .expect("price curve");
 
         MarketContext::new()
-            .insert(disc)
-            .insert(price_curve)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface("NG-VOL", vol))
     }
 

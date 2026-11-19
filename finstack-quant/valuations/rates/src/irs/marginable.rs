@@ -238,15 +238,17 @@ mod tests {
 
         // Real market: USD-OIS discount + USD-SOFR-3M forward, both flat at 3%.
         let market = MarketContext::new()
-            .insert(discount_forward_curve_support::flat_discount_with_tenor(
+            .try_insert(discount_forward_curve_support::flat_discount_with_tenor(
                 "USD-OIS", start, 0.03, 30.0,
             ))
-            .insert(discount_forward_curve_support::flat_forward_with_tenor(
+            .expect("insert market curve")
+            .try_insert(discount_forward_curve_support::flat_forward_with_tenor(
                 "USD-SOFR-3M",
                 start,
                 0.03,
                 30.0,
-            ));
+            ))
+            .expect("insert market curve");
 
         let sens = swap
             .simm_sensitivities(&market, start)
@@ -320,9 +322,11 @@ mod tests {
             finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
                 lookback_days: 0,
             };
-        let market = MarketContext::new().insert(
-            discount_forward_curve_support::flat_discount_with_tenor("USD-OIS", start, 0.03, 30.0),
-        );
+        let market = MarketContext::new()
+            .try_insert(discount_forward_curve_support::flat_discount_with_tenor(
+                "USD-OIS", start, 0.03, 30.0,
+            ))
+            .expect("insert market curve");
         let result = swap
             .price_with_metrics(
                 &market,

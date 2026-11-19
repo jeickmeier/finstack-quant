@@ -284,8 +284,9 @@ impl DiscountCurve {
     /// Zero rate on `date` under the explicit `compounding` convention.
     ///
     /// Requires `date` to map strictly past `base_date` (`t > 0`) on the curve's
-    /// clock (`t <= 0`, including `date <= base_date`, returns an error because
-    /// `D(0) = 1` identifies no finite-horizon zero rate).
+    /// original source clock. The horizon is the difference between the source
+    /// coordinates of `date` and `base_date`. A nonpositive horizon has no
+    /// finite-horizon zero rate.
     ///
     /// # Arguments
     ///
@@ -300,14 +301,23 @@ impl DiscountCurve {
     #[inline]
     #[must_use = "computed zero rate should not be discarded"]
     pub fn zero_rate_on_date(&self, date: Date, compounding: Compounding) -> crate::Result<f64> {
-        let t = self.year_fraction_to(date)?;
+        let source_t = signed_curve_year_fraction(
+            self.source_base_date(),
+            date,
+            self.day_count,
+            self.calendar.as_ref(),
+        )?;
+        let t = source_t - self.transform.as_ref().map_or(0.0, |curve| curve.offset());
         if !t.is_finite() || t <= 0.0 {
             return Err(crate::Error::Validation(format!(
                 "zero_rate_on_date requires mapped time t > 0, got t={t} for date {date} (base {})",
                 self.base
             )));
         }
-        let df = self.df_on_date(date)?;
+        let df = match &self.transform {
+            Some(transform) => transform.df_at_source_time(&self.interp, source_t)?,
+            None => self.df(t)?,
+        };
         compounding.rate_from_df(df, t)
     }
 

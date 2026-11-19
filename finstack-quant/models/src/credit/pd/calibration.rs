@@ -92,12 +92,13 @@ pub fn ttc_to_pit(pd_ttc: f64, params: &PdCycleParams) -> Result<f64, PdCalibrat
     let rho = params.asset_correlation;
     let z = params.cycle_index;
 
-    let inv_ttc = standard_normal_inv_cdf(pd_ttc);
+    let inv_ttc = standard_normal_inv_cdf(pd_ttc)
+        .map_err(|_| PdCalibrationError::PdOutOfRange { value: pd_ttc })?;
     let sqrt_rho = rho.sqrt();
     let sqrt_one_minus_rho = (1.0 - rho).sqrt();
 
-    let pd_pit = norm_cdf((inv_ttc - sqrt_rho * z) / sqrt_one_minus_rho);
-    Ok(pd_pit)
+    let variate = (inv_ttc - sqrt_rho * z) / sqrt_one_minus_rho;
+    norm_cdf(variate).map_err(|_| PdCalibrationError::NonFiniteValue { value: variate })
 }
 
 /// Convert a Point-in-Time PD to a Through-the-Cycle PD.
@@ -123,12 +124,13 @@ pub fn pit_to_ttc(pd_pit: f64, params: &PdCycleParams) -> Result<f64, PdCalibrat
     let rho = params.asset_correlation;
     let z = params.cycle_index;
 
-    let inv_pit = standard_normal_inv_cdf(pd_pit);
+    let inv_pit = standard_normal_inv_cdf(pd_pit)
+        .map_err(|_| PdCalibrationError::PdOutOfRange { value: pd_pit })?;
     let sqrt_rho = rho.sqrt();
     let sqrt_one_minus_rho = (1.0 - rho).sqrt();
 
-    let pd_ttc = norm_cdf(inv_pit * sqrt_one_minus_rho + sqrt_rho * z);
-    Ok(pd_ttc)
+    let variate = inv_pit * sqrt_one_minus_rho + sqrt_rho * z;
+    norm_cdf(variate).map_err(|_| PdCalibrationError::NonFiniteValue { value: variate })
 }
 
 fn validate_cycle_index(cycle_index: f64) -> Result<(), PdCalibrationError> {

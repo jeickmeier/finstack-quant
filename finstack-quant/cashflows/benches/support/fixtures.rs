@@ -83,7 +83,11 @@ pub fn make_discount_market(base: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(disc).insert(hazard)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
 }
 
 pub fn make_forward_market(base: Date) -> MarketContext {
@@ -103,7 +107,9 @@ pub fn make_forward_market(base: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(fwd)
+    MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 pub fn make_fixed_schedule(base: Date, years: i32, frequency: Tenor) -> CashFlowSchedule {

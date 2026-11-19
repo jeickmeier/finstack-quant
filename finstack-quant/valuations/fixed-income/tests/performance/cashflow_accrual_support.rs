@@ -99,7 +99,9 @@ pub(super) fn bond_market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("windowed bond market");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 pub(super) fn windowed_bond() -> Bond {
@@ -130,7 +132,9 @@ pub(super) fn windowed_bond() -> Bond {
 }
 
 pub(super) fn loan_market(as_of: Date) -> MarketContext {
-    MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+    MarketContext::new()
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve")
 }
 
 pub(super) fn callable_loan() -> TermLoan {

@@ -69,9 +69,12 @@ fn create_market(base_date: Date, correlations: [f64; 2]) -> MarketContext {
         .build()
         .expect("credit index");
     MarketContext::new()
-        .insert(discount)
-        .insert(hazard.as_ref().clone())
-        .insert(correlation.as_ref().clone())
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard.as_ref().clone())
+        .expect("insert market curve")
+        .try_insert(correlation.as_ref().clone())
+        .expect("insert market curve")
         .insert_credit_index("CDX", index)
         .expect("credit index dependencies")
 }

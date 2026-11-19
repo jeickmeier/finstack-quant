@@ -279,13 +279,6 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZWG"
   | "ZWL";
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type D_73B92F56Cdc5Ce046018 = number;
-/**
  * Business day convention for payment dates
  */
 export type BusinessDayConvention =
@@ -811,11 +804,17 @@ export interface D_572Ad1Befb7D94914652 {
   vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface DCdb8Fddc0106047270C4 {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
@@ -1560,29 +1559,29 @@ export interface Money {
     | "ZWL";
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface DD09956C3320C77551Bb5 {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
   alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
   beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
   nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
   rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: D_73B92F56Cdc5Ce046018 | null;
+  shift?: number | null;
 }
 /**
  * Scenario-only pricing adjustments.

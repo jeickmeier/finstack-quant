@@ -46,7 +46,9 @@
 //!
 
 use super::{Copula, DEFAULT_QUADRATURE_ORDER, default_quadrature};
-use finstack_quant_core::math::{integration::GaussHermiteQuadrature, special_functions::norm_cdf};
+use finstack_quant_core::math::integration::GaussHermiteQuadrature;
+#[cfg(test)]
+use finstack_quant_core::math::special_functions::norm_cdf;
 use std::sync::Arc;
 
 /// Lower valid asset-correlation boundary.
@@ -117,7 +119,7 @@ impl GaussianCopula {
     /// use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
     ///
     /// let copula = GaussianCopula::new();
-    /// let threshold = standard_normal_inv_cdf(0.05);
+    /// let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
     /// let cond_pd = copula.conditional_default_prob(threshold, &[-1.0], 0.30);
     ///
     /// assert!(cond_pd > 0.0 && cond_pd < 1.0);
@@ -156,10 +158,10 @@ impl Copula for GaussianCopula {
                 actual = factor_realization.len(),
                 "GaussianCopula: factor length mismatch; returning unconditional PD"
             );
-            return norm_cdf(default_threshold);
+            return crate::gaussian::norm_cdf_or_nan(default_threshold);
         }
         let [z] = factor_realization else {
-            return norm_cdf(default_threshold);
+            return crate::gaussian::norm_cdf_or_nan(default_threshold);
         };
         let z = *z;
 
@@ -167,7 +169,7 @@ impl Copula for GaussianCopula {
             return f64::NAN;
         }
         if correlation == MIN_CORRELATION {
-            return norm_cdf(default_threshold);
+            return crate::gaussian::norm_cdf_or_nan(default_threshold);
         }
         if correlation == MAX_CORRELATION {
             return f64::from(z <= default_threshold);
@@ -176,7 +178,7 @@ impl Copula for GaussianCopula {
         let sqrt_rho = correlation.sqrt();
         let sqrt_1mr = (1.0 - correlation).sqrt();
         let conditional_threshold = (default_threshold - sqrt_rho * z) / sqrt_1mr;
-        norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
+        crate::gaussian::norm_cdf_or_nan(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
     }
 
     fn conditional_default_prob_given_systematic_and_mixing(
@@ -192,7 +194,10 @@ impl Copula for GaussianCopula {
         self.conditional_default_prob(default_threshold, &[systematic], correlation)
     }
 
-    fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
+    fn integrate_fn(
+        &self,
+        f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
+    ) -> finstack_quant_core::Result<f64> {
         // Gauss-Hermite quadrature over standard normal factor Z
         self.quadrature.integrate(|z| f(&[z]))
     }
@@ -227,7 +232,7 @@ mod tests {
     fn test_conditional_default_prob_at_zero_factor() {
         let copula = GaussianCopula::new();
         let pd = 0.05; // 5% default probability
-        let threshold = standard_normal_inv_cdf(pd);
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
         let correlation = 0.30;
 
         // At Z=0, the conditional probability is Φ(Φ⁻¹(PD) / √(1-ρ))
@@ -244,7 +249,7 @@ mod tests {
     #[test]
     fn test_conditional_default_prob_increases_with_negative_z() {
         let copula = GaussianCopula::new();
-        let threshold = standard_normal_inv_cdf(0.05);
+        let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
         let correlation = 0.30;
 
         let prob_z_neg = copula.conditional_default_prob(threshold, &[-2.0], correlation);
@@ -261,12 +266,13 @@ mod tests {
     fn test_integration_recovers_unconditional() {
         let copula = GaussianCopula::new();
         let pd = 0.05;
-        let threshold = standard_normal_inv_cdf(pd);
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
         let correlation = 0.30;
 
         // E[P(default|Z)] should equal P(default)
-        let integrated_prob =
-            copula.integrate_fn(&|z| copula.conditional_default_prob(threshold, z, correlation));
+        let integrated_prob = copula
+            .integrate_fn(&|z| Ok(copula.conditional_default_prob(threshold, z, correlation)))
+            .unwrap();
 
         assert!(
             (integrated_prob - pd).abs() < 0.001,
@@ -285,7 +291,7 @@ mod tests {
     #[test]
     fn test_extreme_correlation_handling() {
         let copula = GaussianCopula::new();
-        let threshold = standard_normal_inv_cdf(0.05);
+        let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
 
         // Very low correlation should give near-unconditional probability
         let prob_low = copula.conditional_default_prob(threshold, &[0.0], 0.001);
@@ -308,7 +314,7 @@ mod tests {
     #[test]
     fn perfect_correlation_uses_exact_indicator_limit() {
         let copula = GaussianCopula::new();
-        let threshold = standard_normal_inv_cdf(0.05);
+        let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
         assert_eq!(
             copula.conditional_default_prob(threshold, &[-2.0], 1.0),
             1.0
@@ -324,7 +330,7 @@ mod tests {
     fn test_factor_length_mismatch_contract() {
         let copula = GaussianCopula::new();
         let pd = 0.05;
-        let threshold = standard_normal_inv_cdf(pd);
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
         let correlation = 0.30;
 
         let assert_contract = |factors: &[f64]| {
@@ -360,15 +366,15 @@ mod tests {
 
         let copula = GaussianCopula::new();
         let pd = 0.05;
-        let threshold = standard_normal_inv_cdf(pd);
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
         let rho = 0.30;
 
         let mut rng = PhiloxRng::new(7);
         let trials = 400_000usize;
         let mut defaults = 0usize;
         for _ in 0..trials {
-            let z = rng.next_std_normal();
-            let eps = rng.next_std_normal();
+            let z = rng.next_std_normal().expect("normal draw");
+            let eps = rng.next_std_normal().expect("normal draw");
             let a = copula.latent_variable(z, eps, 1.0, rho);
             if a <= threshold {
                 defaults += 1;
@@ -386,8 +392,8 @@ mod tests {
     fn zero_correlation_preserves_independence_exactly() {
         let copula = GaussianCopula::new();
         let pd = 0.05;
-        let threshold = standard_normal_inv_cdf(pd);
-        let unconditional = norm_cdf(threshold);
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
+        let unconditional = norm_cdf(threshold).expect("valid Gaussian variate");
 
         for z in [-2.0, 0.0, 2.0] {
             let conditional = copula.conditional_default_prob(threshold, &[z], 0.0);
@@ -398,7 +404,7 @@ mod tests {
     #[test]
     fn checked_probability_rejects_invalid_correlation() {
         let copula = GaussianCopula::new();
-        let threshold = standard_normal_inv_cdf(0.05);
+        let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
         assert!(
             copula
                 .conditional_default_prob_checked(threshold, &[0.0], -0.01)

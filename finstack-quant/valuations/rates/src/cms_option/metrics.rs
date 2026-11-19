@@ -286,7 +286,7 @@ impl MetricCalculator for VannaCalculator {
 
             // Use combined d1_d2 for efficiency
             let (d1, d2) = d1_d2_black76(adjusted_rate, strike, vol, time_to_fixing);
-            let nd1_prime = norm_pdf(d1);
+            let nd1_prime = norm_pdf(d1)?;
 
             let sqrt_t = time_to_fixing.sqrt();
 

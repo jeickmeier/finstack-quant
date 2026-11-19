@@ -63,6 +63,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     let mut required_fields: Vec<(syn::Ident, syn::Type)> = Vec::new();
     let mut optional_fields: Vec<(syn::Ident, syn::Type)> = Vec::new();
     let mut defaults: HashMap<syn::Ident, Expr> = HashMap::new();
+    let mut skipped_fields = Vec::new();
     let mut field_docs: HashMap<syn::Ident, String> = HashMap::new();
 
     let mut custom_validator: Option<Expr> = None;
@@ -131,6 +132,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             field_docs.insert(ident.clone(), docs);
 
             let mut default_expr: Option<Expr> = None;
+            let mut skip = false;
             for attr in f.attrs {
                 if attr.path().is_ident("builder")
                     && let Err(error) = attr.parse_nested_meta(|meta| {
@@ -145,10 +147,11 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                                     syn::parse_quote! { ::core::default::Default::default() };
                                 default_expr = Some(ty_default);
                             }
+                        } else if meta.path.is_ident("skip") {
+                            skip = true;
                         } else {
-                            return Err(
-                                meta.error("unsupported builder attribute; expected default")
-                            );
+                            return Err(meta
+                                .error("unsupported builder attribute; expected default or skip"));
                         }
                         Ok(())
                     })
@@ -157,6 +160,13 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                 }
             }
 
+            if skip {
+                let expr = default_expr.unwrap_or_else(|| {
+                    syn::parse_quote! { ::core::default::Default::default() }
+                });
+                skipped_fields.push((ident, expr));
+                continue;
+            }
             if let Some(expr) = default_expr {
                 defaults.insert(ident.clone(), expr);
             }
@@ -245,6 +255,10 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         }
     });
 
+    let assign_skipped = skipped_fields
+        .iter()
+        .map(|(id, expr)| quote! { #id: #expr });
+
     let builder_doc = format!("Builder for `{}`.", struct_name);
     let build_doc = "Builds the final instance.";
     let builder_method_doc = "Creates a new builder.";
@@ -272,6 +286,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                 let __built = #struct_name {
                     #(#assign_req,)*
                     #(#assign_opt,)*
+                    #(#assign_skipped,)*
                 };
                 #validation
                 Ok(__built)

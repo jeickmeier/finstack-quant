@@ -583,16 +583,20 @@ mod tests {
             MarketScalar::unitless(1.20).expect("valid scalar"),
         );
         for id in ["USD-OIS", "EUR-OIS"] {
-            market = market.insert(
-                DiscountCurve::builder(id)
-                    .base_date(as_of)
-                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                    .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
-                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                    .build()
-                    .expect("flat curve"),
-            );
+            market = market
+                .try_insert(
+                    DiscountCurve::builder(id)
+                        .base_date(as_of)
+                        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                        .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+                        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                        .extrapolation(
+                            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                        )
+                        .build()
+                        .expect("flat curve"),
+                )
+                .expect("insert market curve");
         }
         let pricer = FxBarrierOptionMcPricer {
             config: PathDependentPricerConfig {
@@ -673,16 +677,20 @@ mod tests {
             MarketScalar::unitless(1.25).expect("valid scalar"),
         );
         for id in ["USD-OIS", "EUR-OIS"] {
-            market = market.insert(
-                DiscountCurve::builder(id)
-                    .base_date(before)
-                    .knots([(0.0, 1.0), (1.0, 1.0)])
-                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                    .build()
-                    .expect("curve"),
-            );
+            market = market
+                .try_insert(
+                    DiscountCurve::builder(id)
+                        .base_date(before)
+                        .knots([(0.0, 1.0), (1.0, 1.0)])
+                        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                        .extrapolation(
+                            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                        )
+                        .build()
+                        .expect("curve"),
+                )
+                .expect("insert market curve");
         }
         for timing in [PayoutTiming::AtHit, PayoutTiming::AtExpiry] {
             inst.rebate_timing = Some(timing);
@@ -842,7 +850,7 @@ mod tests {
             .expect("fx barrier option");
 
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
@@ -852,7 +860,8 @@ mod tests {
                     .build()
                     .expect("dom curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
@@ -862,6 +871,7 @@ mod tests {
                     .build()
                     .expect("for curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[0.25, 0.5, 1.0])
@@ -929,7 +939,7 @@ mod tests {
         let foreign_rate: f64 = 0.01;
         let volatility: f64 = 0.15;
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
@@ -939,7 +949,8 @@ mod tests {
                     .build()
                     .expect("domestic curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
@@ -949,6 +960,7 @@ mod tests {
                     .build()
                     .expect("foreign curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[0.5, 1.0, 2.0])
@@ -1170,7 +1182,7 @@ mod tests {
             .expect("analytical put option");
 
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
@@ -1180,7 +1192,8 @@ mod tests {
                     .build()
                     .expect("dom curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.98)])
@@ -1190,6 +1203,7 @@ mod tests {
                     .build()
                     .expect("for curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[0.25, 0.5, 1.0])
@@ -1302,7 +1316,7 @@ mod tests {
 
         let domestic_df_at_two_years = (-0.03_f64 * 2.0).exp();
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, domestic_df_at_two_years)])
@@ -1312,7 +1326,8 @@ mod tests {
                     .build()
                     .expect("dom curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, (-0.01_f64 * 2.0).exp())])
@@ -1322,6 +1337,7 @@ mod tests {
                     .build()
                     .expect("for curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[2.0])

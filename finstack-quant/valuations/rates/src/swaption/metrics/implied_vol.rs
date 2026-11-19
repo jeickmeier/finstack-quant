@@ -109,8 +109,10 @@ mod tests {
             .build()
             .expect("vol surface");
         MarketContext::new()
-            .insert(disc)
-            .insert(fwd)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve")
             .insert_surface(surface)
     }
 

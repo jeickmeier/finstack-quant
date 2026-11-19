@@ -389,8 +389,10 @@ mod tests {
         .expect("fixings series");
 
         let ctx = MarketContext::new()
-            .insert(disc.clone())
-            .insert(fwd)
+            .try_insert(disc.clone())
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve")
             .insert_series(fixings);
 
         let swap = InterestRateSwap::builder()
@@ -482,7 +484,9 @@ mod tests {
             .build()
             .expect("discount curve");
 
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let swap_no_lookback = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-NO-LOOKBACK"))
@@ -568,7 +572,9 @@ mod tests {
             .build()
             .expect("discount curve");
 
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         // Create swap with an explicitly specified but non-existent fixing calendar
         let swap = InterestRateSwap::builder()
@@ -650,7 +656,9 @@ mod tests {
             .build()
             .expect("discount curve");
 
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         // Create swap with NO fixing_calendar_id (defaults should be applied)
         let swap = InterestRateSwap::builder()
@@ -738,7 +746,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let ctx = MarketContext::new().insert(disc.clone());
+        let ctx = MarketContext::new()
+            .try_insert(disc.clone())
+            .expect("insert market curve");
 
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-VALUE-RAW-NO-FWD"))
@@ -810,7 +820,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SCHEDULE-NO-FWD"))
@@ -911,8 +923,10 @@ mod tests {
         .expect("fixings series");
 
         let ctx = MarketContext::new()
-            .insert(disc)
-            .insert(fwd)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve")
             .insert_series(fixings);
 
         let swap = InterestRateSwap::builder()
@@ -999,7 +1013,9 @@ mod tests {
             .build()
             .expect("discount curve");
 
-        let ctx = MarketContext::new().insert(disc.clone());
+        let ctx = MarketContext::new()
+            .try_insert(disc.clone())
+            .expect("insert market curve");
 
         // Create an OIS swap with NO lookback, NO observation shift, NO spread.
         // These are the conditions under which the identity is exact.

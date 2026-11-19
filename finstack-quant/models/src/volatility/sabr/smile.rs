@@ -1,13 +1,14 @@
 //! SABR model, smile, parameter, and calibration support.
 //!
 use super::parameters::SabrParameters;
-use finstack_quant_core::{Error, Result};
+use finstack_quant_core::{Error, Result, market_data::surfaces::VolQuoteType};
 
 /// SABR smile generator for creating volatility surfaces
 pub struct SabrSmile {
     params: SabrParameters,
     forward: f64,
     time_to_expiry: f64,
+    quote_type: VolQuoteType,
 }
 
 /// Result of arbitrage validation, containing any violations found.
@@ -101,11 +102,18 @@ impl SabrSmile {
     /// * `params` - Validated SABR parameters (`alpha`, `beta`, `nu`, `rho`, optional `shift`).
     /// * `forward` - Forward price or rate in the same units as strikes.
     /// * `time_to_expiry` - Time to expiry in years; must be strictly positive.
-    pub fn new(params: SabrParameters, forward: f64, time_to_expiry: f64) -> Self {
+    /// * `quote_type` - Annualized Normal, Black, or shifted Black output for the smile and price checks.
+    pub fn new(
+        params: SabrParameters,
+        forward: f64,
+        time_to_expiry: f64,
+        quote_type: VolQuoteType,
+    ) -> Self {
         Self {
             params,
             forward,
             time_to_expiry,
+            quote_type,
         }
     }
 
@@ -137,27 +145,30 @@ impl SabrSmile {
     /// # Example
     ///
     /// ```
+    /// use finstack_quant_core::market_data::surfaces::VolQuoteType;
     /// use finstack_quant_models::volatility::sabr::{
     ///     SabrParameters, SabrSmile,
     /// };
     ///
     /// let params = SabrParameters::new(0.2, 0.5, 0.3, -0.1).unwrap();
-    /// let smile = SabrSmile::new(params, 100.0, 1.0);
+    /// let smile = SabrSmile::new(params, 100.0, 1.0, VolQuoteType::BlackLognormal);
     ///
     /// let atm_vol = smile.atm_vol().unwrap();
     /// assert!(atm_vol > 0.0);
     /// ```
     #[must_use = "computed ATM volatility should be used"]
     pub fn atm_vol(&self) -> Result<f64> {
-        self.params
-            .implied_vol(self.forward, self.forward, self.time_to_expiry)
+        self.params.implied_vol(
+            self.forward,
+            self.forward,
+            self.time_to_expiry,
+            self.quote_type,
+        )
     }
 
     /// Implied volatility at one strike on this smile.
     ///
-    /// The quoting convention is β-dependent (normal vol in absolute rate
-    /// units when β ≈ 0, Black decimal vol otherwise); see
-    /// [`SabrParameters::quote_convention`](super::SabrParameters::quote_convention).
+    /// The selected Normal quote uses absolute rate units. Black quotes use relative volatility.
     ///
     /// # Arguments
     ///
@@ -169,7 +180,7 @@ impl SabrSmile {
     /// model domain or the Hagan expansion produces an invalid volatility.
     pub fn implied_vol(&self, strike: f64) -> Result<f64> {
         self.params
-            .implied_vol(self.forward, strike, self.time_to_expiry)
+            .implied_vol(self.forward, strike, self.time_to_expiry, self.quote_type)
     }
 
     /// Generate volatility smile for given strikes.
@@ -203,10 +214,11 @@ impl SabrSmile {
     /// # Examples
     ///
     /// ```
+    /// use finstack_quant_core::market_data::surfaces::VolQuoteType;
     /// use finstack_quant_models::volatility::sabr::{SabrParameters, SabrSmile};
     ///
     /// let params = SabrParameters::new_with_shift(0.01, 0.5, 0.3, -0.2, 0.02)?;
-    /// let smile = SabrSmile::new(params, -0.001, 1.0);
+    /// let smile = SabrSmile::new(params, -0.001, 1.0, VolQuoteType::ShiftedBlackLognormal);
     /// let m = smile.log_moneyness(-0.005);
     /// assert!((m - (0.015_f64 / 0.019).ln()).abs() < 1e-15);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -223,7 +235,7 @@ impl SabrSmile {
 
     /// Generate strike from absolute forward delta using the ATM volatility.
     ///
-    /// Uses Bachelier delta for beta=0 and Black delta on displaced coordinates
+    /// Uses Bachelier delta for Normal quotes and Black delta on effective coordinates
     /// otherwise. This is an ATM-vol approximation, not a smile-consistent solve.
     ///
     /// # Arguments
@@ -242,9 +254,9 @@ impl SabrSmile {
         }
         let atm_vol = self.atm_vol()?;
         let std_dev = atm_vol * self.time_to_expiry.sqrt();
-        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(delta);
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(delta)?;
         let signed_z = if is_call { z } else { -z };
-        if self.params.beta < super::expansion::BETA_SNAP_TOL {
+        if self.quote_type == VolQuoteType::Normal {
             return Ok(self.forward - std_dev * signed_z);
         }
         let shift = self.params.shift.unwrap_or(0.0);
@@ -274,7 +286,7 @@ impl SabrSmile {
     /// * `strikes` - Finite strikes in strictly ascending order; spacing may
     ///   vary. Strikes must also lie in the SABR model's quote domain.
     /// * `r` - Finite continuously compounded risk-free rate (annual decimal)
-    ///   used to discount the forward-based Black call prices compared against
+    ///   used to discount the forward-based call prices in the selected model compared against
     ///   the 1e-6 absolute tolerance. Carry is already in the smile's forward.
     ///
     /// # Returns
@@ -342,7 +354,7 @@ impl SabrSmile {
     /// * `strikes` - Finite strikes in strictly ascending order, with arbitrary
     ///   spacing, in the SABR model's quote domain.
     /// * `r` - Finite continuously compounded risk-free rate (decimal) used to
-    ///   discount the forward-based Black call prices.
+    ///   discount the forward-based call prices in the selected model.
     /// * `max_iterations` - Maximum repair iterations (default: 10)
     ///
     /// # Returns
@@ -506,7 +518,7 @@ impl SabrSmile {
     #[inline]
     fn call_price(&self, strike: f64, r: f64, vol: f64) -> f64 {
         let df = (-r * self.time_to_expiry).exp();
-        if self.params.beta < super::expansion::BETA_SNAP_TOL {
+        if self.quote_type == VolQuoteType::Normal {
             df * crate::closed_form::bachelier_call(self.forward, strike, vol, self.time_to_expiry)
         } else {
             let (f, k) = self.params.effective_rates(self.forward, strike);
@@ -522,7 +534,7 @@ impl SabrSmile {
             ));
         }
         let undiscounted = target_price / df;
-        let inverted = if self.params.beta < super::expansion::BETA_SNAP_TOL {
+        let inverted = if self.quote_type == VolQuoteType::Normal {
             crate::volatility::implied_vol_bachelier(
                 undiscounted,
                 self.forward,
@@ -580,7 +592,12 @@ mod smile_tests {
     #[test]
     fn log_moneyness_uses_the_displacement_shift() {
         let shifted = SabrParameters::new_with_shift(0.01, 0.5, 0.3, -0.2, 0.02).expect("params");
-        let negative = SabrSmile::new(shifted.clone(), -0.001, 1.0);
+        let negative = SabrSmile::new(
+            shifted.clone(),
+            -0.001,
+            1.0,
+            VolQuoteType::ShiftedBlackLognormal,
+        );
         let got: Vec<f64> = [-0.005, 0.0, 0.005]
             .iter()
             .map(|&k| negative.log_moneyness(k))
@@ -592,17 +609,18 @@ mod smile_tests {
         ]) {
             assert!((g - e).abs() < 1e-14, "{g} vs {e}");
         }
-        let positive = SabrSmile::new(shifted, 0.01, 1.0);
+        let positive = SabrSmile::new(shifted, 0.01, 1.0, VolQuoteType::ShiftedBlackLognormal);
         assert!((positive.log_moneyness(0.005) - (0.025_f64 / 0.03).ln()).abs() < 1e-15);
         assert!((positive.log_moneyness(0.02) - (0.04_f64 / 0.03).ln()).abs() < 1e-15);
 
         let unshifted = SabrParameters::new(0.2, 0.5, 0.3, -0.1).expect("params");
-        let smile = SabrSmile::new(unshifted, 100.0, 1.0);
+        let smile = SabrSmile::new(unshifted, 100.0, 1.0, VolQuoteType::BlackLognormal);
         assert!((smile.log_moneyness(110.0) - 1.1_f64.ln()).abs() < 1e-15);
         let normal = SabrSmile::new(
             SabrParameters::new(0.01, 0.0, 0.3, -0.1).expect("params"),
             -0.001,
             1.0,
+            VolQuoteType::Normal,
         );
         assert!(normal.log_moneyness(0.001).is_nan());
     }
@@ -610,7 +628,7 @@ mod smile_tests {
     #[test]
     fn uneven_strike_grid_preserves_flat_arbitrage_free_smile() {
         let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
-        let smile = SabrSmile::new(params, 100.0, 1.0);
+        let smile = SabrSmile::new(params, 100.0, 1.0, VolQuoteType::BlackLognormal);
         for strikes in [[99.0, 100.0, 120.0], [80.0, 100.0, 101.0]] {
             assert!(
                 smile
@@ -634,7 +652,7 @@ mod smile_tests {
     #[test]
     fn two_strike_repair_removes_monotonicity_arbitrage() {
         let params = SabrParameters::new(0.01, 1.0, 1.0, 0.0).expect("valid parameters");
-        let smile = SabrSmile::new(params, 100.0, 10.0);
+        let smile = SabrSmile::new(params, 100.0, 10.0, VolQuoteType::BlackLognormal);
         let strikes = [100.0, 120.0];
         let before = smile
             .validate_no_arbitrage(&strikes, 0.0)
@@ -652,7 +670,7 @@ mod smile_tests {
     #[test]
     fn arbitrage_repair_accepts_empty_and_single_strike_grids() {
         let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
-        let smile = SabrSmile::new(params, 100.0, 1.0);
+        let smile = SabrSmile::new(params, 100.0, 1.0, VolQuoteType::BlackLognormal);
         for strikes in [Vec::new(), vec![100.0]] {
             let repaired = smile
                 .repair_arbitrage(&strikes, 0.05, 10)
@@ -670,7 +688,7 @@ mod smile_tests {
     #[test]
     fn arbitrage_diagnostics_reject_invalid_strike_order_and_rates() {
         let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
-        let smile = SabrSmile::new(params, 100.0, 1.0);
+        let smile = SabrSmile::new(params, 100.0, 1.0, VolQuoteType::BlackLognormal);
         for strikes in [
             [100.0, 99.0, 120.0],
             [99.0, 100.0, 100.0],
@@ -706,10 +724,12 @@ mod smile_tests {
         let df = (-r * t).exp();
         let expected = df
             * (f * finstack_quant_core::math::special_functions::norm_cdf(d1)
-                - k * finstack_quant_core::math::special_functions::norm_cdf(d2));
+                .expect("valid Gaussian variate")
+                - k * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                    .expect("valid Gaussian variate"));
 
         let params = SabrParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
-        let smile = SabrSmile::new(params, f, t);
+        let smile = SabrSmile::new(params, f, t, VolQuoteType::BlackLognormal);
         let got = smile.call_price(k, r, vol);
         assert!(
             (got - expected).abs() < 1e-10,
@@ -720,7 +740,7 @@ mod smile_tests {
     #[test]
     fn normal_and_shifted_sabr_arbitrage_validation_and_repair() {
         let normal_params = SabrParameters::new(0.01, 0.0, 0.25, -0.15).expect("normal params");
-        let normal_smile = SabrSmile::new(normal_params, -0.002, 1.0);
+        let normal_smile = SabrSmile::new(normal_params, -0.002, 1.0, VolQuoteType::Normal);
         let strikes = [-0.010, -0.005, -0.002, 0.001, 0.005];
         assert!(
             normal_smile
@@ -735,7 +755,12 @@ mod smile_tests {
 
         let shifted_params =
             SabrParameters::new_with_shift(0.02, 0.5, 0.25, -0.15, 0.03).expect("shifted params");
-        let shifted_smile = SabrSmile::new(shifted_params, -0.002, 1.0);
+        let shifted_smile = SabrSmile::new(
+            shifted_params,
+            -0.002,
+            1.0,
+            VolQuoteType::ShiftedBlackLognormal,
+        );
         assert!(
             shifted_smile
                 .validate_no_arbitrage(&strikes, 0.0)
@@ -757,7 +782,7 @@ mod smile_tests {
         // Well-behaved SABR smile; we use a non-zero r to exercise the Black-76 path.
         let params = SabrParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
         let forward = 100.0_f64;
-        let smile = SabrSmile::new(params, forward, 1.0);
+        let smile = SabrSmile::new(params, forward, 1.0, VolQuoteType::BlackLognormal);
         let r = 0.05;
 
         // A normally-behaved smile: strikes well inside the smile range.
@@ -813,7 +838,7 @@ mod smile_tests {
     fn test_repair_arbitrage_output_is_revalidated_arbitrage_free() {
         let params = SabrParameters::new(0.22, 0.6, 0.45, -0.30).expect("valid SABR params");
         let forward = 100.0_f64;
-        let smile = SabrSmile::new(params, forward, 0.75);
+        let smile = SabrSmile::new(params, forward, 0.75, VolQuoteType::BlackLognormal);
         let r = 0.03;
 
         let strikes: Vec<f64> = (70..=130).step_by(5).map(f64::from).collect();
@@ -861,7 +886,7 @@ mod smile_tests {
         // non-convergence errors). This guards against the convergence check
         // being too strict and erroring on valid inputs.
         let params = SabrParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
-        let smile = SabrSmile::new(params, 100.0, 1.0);
+        let smile = SabrSmile::new(params, 100.0, 1.0, VolQuoteType::BlackLognormal);
         let strikes: Vec<f64> = (80..=120).step_by(5).map(f64::from).collect();
 
         let repaired = smile

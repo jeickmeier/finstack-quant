@@ -35,7 +35,7 @@ impl Discretization<GbmProcess> for ExactGbm {
         x: &mut [f64],
         z: &[f64],
         _work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let params = process.params();
 
         // Risk-neutral log-drift increment ∫(r−q) over [t, t+dt]: the
@@ -49,6 +49,7 @@ impl Discretization<GbmProcess> for ExactGbm {
         // Drift component: ∫(r−q) − ½σ²Δt
         let drift = drift_increment - 0.5 * params.sigma * params.sigma * dt;
         x[0] *= gbm_growth(drift, params.sigma, dt, z[0]);
+        Ok(())
     }
 
     fn work_size(&self, _process: &GbmProcess) -> usize {
@@ -96,9 +97,9 @@ fn recover_rate_coefficients<P: StochasticProcess>(
     drift: f64,
     diffusion: f64,
     index: usize,
-) -> (f64, f64) {
+) -> finstack_quant_core::Result<(f64, f64)> {
     if !x[index].is_subnormal() {
-        return (drift / x[index], diffusion / x[index]);
+        return Ok((drift / x[index], diffusion / x[index]));
     }
 
     ctx.probe_state.copy_from_slice(x);
@@ -109,9 +110,9 @@ fn recover_rate_coefficients<P: StochasticProcess>(
     };
     ctx.process.drift(ctx.t, ctx.probe_state, ctx.probe_drift);
     ctx.process
-        .diffusion(ctx.t, ctx.probe_state, ctx.probe_diffusion);
+        .diffusion(ctx.t, ctx.probe_state, ctx.probe_diffusion)?;
 
-    (ctx.probe_drift[index], ctx.probe_diffusion[index])
+    Ok((ctx.probe_drift[index], ctx.probe_diffusion[index]))
 }
 
 // The `ProportionalDiffusion` bound is load-bearing: this scheme recovers
@@ -123,7 +124,15 @@ impl<P> Discretization<P> for ExactMultiGbm
 where
     P: StochasticProcess + ProportionalDiffusion,
 {
-    fn step(&self, process: &P, _t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]) {
+    fn step(
+        &self,
+        process: &P,
+        _t: f64,
+        dt: f64,
+        x: &mut [f64],
+        z: &[f64],
+        work: &mut [f64],
+    ) -> finstack_quant_core::Result<()> {
         let dim = process.dim();
 
         // Work buffer layout: drift, diffusion, probe state, probe drift, probe diffusion.
@@ -133,7 +142,7 @@ where
         let (probe_drift, probe_diffusion) = rest.split_at_mut(dim);
 
         process.drift(_t, x, drift_vec);
-        process.diffusion(_t, x, diff_vec);
+        process.diffusion(_t, x, diff_vec)?;
         let mut recovery_ctx = RateRecoveryContext {
             process,
             t: _t,
@@ -152,13 +161,14 @@ where
             }
 
             let (mu, sigma) =
-                recover_rate_coefficients(&mut recovery_ctx, x, drift_vec[i], diff_vec[i], i);
+                recover_rate_coefficients(&mut recovery_ctx, x, drift_vec[i], diff_vec[i], i)?;
 
             let drift_term = (mu - 0.5 * sigma * sigma) * dt;
             let diffusion_term = sigma * sqrt_dt * z[i];
 
             x[i] *= (drift_term + diffusion_term).exp();
         }
+        Ok(())
     }
 
     fn work_size(&self, process: &P) -> usize {
@@ -181,7 +191,8 @@ mod tests {
         let z = vec![0.0]; // No shock
         let mut work = vec![];
 
-        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // With z=0, should get drift-only evolution
         // S(1) = 100 * exp((0.05 - 0.02 - 0.5*0.2²)*1.0 + 0) = 100 * exp(0.01)
@@ -199,7 +210,8 @@ mod tests {
         let z = vec![1.0]; // +1 std dev shock
         let mut work = vec![];
 
-        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // S(1) = 100 * exp((0.05 - 0.02 - 0.5*0.2²)*1.0 + 0.2*1.0*1.0)
         //      = 100 * exp(0.01 + 0.2) = 100 * exp(0.21)
@@ -223,7 +235,8 @@ mod tests {
             let mut state = vec![spot];
             let mut work = vec![];
 
-            disc.step(&process, 0.0, dt, &mut state, &[shock], &mut work);
+            disc.step(&process, 0.0, dt, &mut state, &[shock], &mut work)
+                .expect("valid simulation step");
 
             assert!(
                 state[0].is_finite() && state[0] > 0.0,
@@ -245,12 +258,14 @@ mod tests {
 
         // Take 10 steps of 0.1 each
         for _ in 0..10 {
-            disc.step(&process, 0.0, 0.1, &mut x, &z_zero, &mut work);
+            disc.step(&process, 0.0, 0.1, &mut x, &z_zero, &mut work)
+                .expect("valid simulation step");
         }
 
         // Should equal single step of 1.0
         let mut x_single = vec![100.0];
-        disc.step(&process, 0.0, 1.0, &mut x_single, &z_zero, &mut work);
+        disc.step(&process, 0.0, 1.0, &mut x_single, &z_zero, &mut work)
+            .expect("valid simulation step");
 
         assert!((x[0] - x_single[0]).abs() < 1e-10);
     }
@@ -277,8 +292,10 @@ mod tests {
         for &(t, dt) in &[(0.0, 0.5), (0.5, 0.5)] {
             let mut xc = vec![100.0];
             let mut xs = vec![100.0];
-            disc.step(&constant, t, dt, &mut xc, &z, &mut work);
-            disc.step(&scheduled, t, dt, &mut xs, &z, &mut work);
+            disc.step(&constant, t, dt, &mut xc, &z, &mut work)
+                .expect("valid simulation step");
+            disc.step(&scheduled, t, dt, &mut xs, &z, &mut work)
+                .expect("valid simulation step");
             assert!(
                 (xc[0] - xs[0]).abs() < 1e-12,
                 "flat M(t)=(r-q)t schedule must match constant drift at t={t}"
@@ -307,8 +324,10 @@ mod tests {
 
         let mut xc = vec![100.0];
         let mut xs = vec![100.0];
-        disc.step(&constant, 0.0, 0.5, &mut xc, &z, &mut work);
-        disc.step(&scheduled, 0.0, 0.5, &mut xs, &z, &mut work);
+        disc.step(&constant, 0.0, 0.5, &mut xc, &z, &mut work)
+            .expect("valid simulation step");
+        disc.step(&scheduled, 0.0, 0.5, &mut xs, &z, &mut work)
+            .expect("valid simulation step");
         assert!(
             xs[0] > xc[0],
             "front-loaded schedule must lift the first-step spot: {} vs {}",
@@ -316,8 +335,10 @@ mod tests {
             xc[0]
         );
 
-        disc.step(&constant, 0.5, 0.5, &mut xc, &z, &mut work);
-        disc.step(&scheduled, 0.5, 0.5, &mut xs, &z, &mut work);
+        disc.step(&constant, 0.5, 0.5, &mut xc, &z, &mut work)
+            .expect("valid simulation step");
+        disc.step(&scheduled, 0.5, 0.5, &mut xs, &z, &mut work)
+            .expect("valid simulation step");
         assert!(
             (xc[0] - xs[0]).abs() < 1e-12,
             "equal terminal M(1) must give equal S(1): {} vs {}",
@@ -340,7 +361,8 @@ mod tests {
         let z = vec![0.0, 0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         let expected = small_positive * (-0.025_f64).exp();
         assert_eq!(x[0], 0.0);
@@ -363,7 +385,8 @@ mod tests {
         let z = vec![0.0, -3.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert_eq!(x[0], 0.0);
         assert!(x[0].is_finite());
@@ -385,7 +408,8 @@ mod tests {
         let z = vec![0.0, 2.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 1.0, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         let expected = smallest_subnormal * 1.925_f64.exp();
         assert_eq!(x[0], 0.0);

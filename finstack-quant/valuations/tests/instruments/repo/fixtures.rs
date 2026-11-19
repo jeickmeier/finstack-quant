@@ -68,7 +68,8 @@ pub fn create_flat_discount_curve() -> DiscountCurve {
 /// Create a standard market context with curves and prices.
 pub fn create_standard_market_context() -> MarketContext {
     MarketContext::new()
-        .insert(create_usd_discount_curve())
+        .try_insert(create_usd_discount_curve())
+        .expect("insert market curve")
         .insert_price(
             "TREASURY_BOND_PRICE",
             MarketScalar::price(Money::new(1.02, Currency::USD).expect("valid money fixture")),

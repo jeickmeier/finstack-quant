@@ -1,6 +1,7 @@
 {
   "$defs": {
     "ForwardVarianceCurve": {
+      "additionalProperties": false,
       "description": "Forward variance curve ξ₀(t) for rough volatility models.\n\nRepresents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under\nthe consuming model's pricing measure. Values are supplied or calibrated by\nthe caller. The integral sets the model's expected accumulated variance.\n\nDifferencing ATM implied total variance is an optional proxy, not an exact\nvariance-swap bootstrap. This type interpolates the supplied curve; it does\nnot perform market calibration.",
       "properties": {
         "interpolation": {
@@ -16,7 +17,7 @@
           "type": "array"
         },
         "values": {
-          "description": "Point samples or constant interval variances (all > 0).",
+          "description": "Point samples or constant interval variances (all nonnegative).",
           "items": {
             "format": "double",
             "type": "number"
@@ -33,9 +34,11 @@
     },
     "HurstExponent": {
       "additionalProperties": false,
-      "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — smooth (persistent increments)",
+      "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — more regular paths with persistent increments",
       "properties": {
         "h": {
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": 0.0,
           "format": "double",
           "type": "number"
         }

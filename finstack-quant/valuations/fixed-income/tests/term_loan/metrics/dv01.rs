@@ -43,7 +43,9 @@ fn test_dv01_positive_for_asset() {
         .unwrap();
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let result = loan.price_with_metrics(
@@ -124,7 +126,9 @@ fn test_dv01_increases_with_maturity() {
         .unwrap();
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let result_short = loan_short
@@ -203,7 +207,9 @@ fn quoted_callable_dv01_freezes_solved_oas() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve");
     let pricer = TermLoanTreePricer;
     let oas_bp = pricer
         .calculate_oas(&loan, &market, as_of, 90.0)
@@ -307,7 +313,9 @@ fn quoted_callable_discounting_dv01_uses_quote_spread_not_tree_oas() {
         .attributes(Default::default())
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve");
     let options = PricingOptions::default().with_model(ModelKey::Discounting);
 
     loan.instrument_pricing_overrides

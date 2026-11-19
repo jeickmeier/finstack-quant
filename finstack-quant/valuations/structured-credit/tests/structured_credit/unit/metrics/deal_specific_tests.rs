@@ -293,7 +293,9 @@ fn test_cmbs_dscr_requires_loan_noi_and_matching_currency() {
 #[test]
 fn test_rmbs_wal_adjusts_with_psa_speed() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let market = MarketContext::new().insert(flat_discount_curve(as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(as_of))
+        .expect("insert market curve");
 
     let wal = |speed| {
         let mut rmbs = rmbs_instrument();

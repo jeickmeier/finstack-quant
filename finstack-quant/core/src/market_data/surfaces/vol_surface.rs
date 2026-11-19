@@ -811,7 +811,7 @@ impl VolSurface {
     ///
     /// # Arguments
     ///
-    /// * `id` - Market-data identifier stored on the surface and used for context lookup.
+    /// * `id` - Nonblank market-data identifier stored on the surface and used for context lookup.
     /// * `expiries` - Strictly positive, strictly increasing option expiries in years.
     /// * `secondary_values` - Strictly increasing secondary coordinates matching `opts.secondary_axis`.
     /// * `vols_row_major` - Annualized volatilities flattened in expiry-major row order.
@@ -825,6 +825,11 @@ impl VolSurface {
         opts: VolGridOpts,
         displacements: Option<&[f64]>,
     ) -> crate::Result<Self> {
+        if id.as_ref().trim().is_empty() {
+            return Err(crate::Error::Validation(
+                "vol surface id cannot be blank".to_owned(),
+            ));
+        }
         validate_displacements(opts.quote_type, displacements, expiries.len())?;
         validate_grid(expiries, secondary_values, vols_row_major)?;
         validate_secondary_domain(

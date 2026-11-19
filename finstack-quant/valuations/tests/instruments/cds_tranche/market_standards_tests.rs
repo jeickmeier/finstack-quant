@@ -173,9 +173,9 @@ fn test_base_correlation_approach() {
     let corr_curve = standard_correlation_curve();
 
     // Verify correlation increases with detachment point (typical pattern)
-    let corr_3 = corr_curve.correlation(3.0);
-    let corr_7 = corr_curve.correlation(7.0);
-    let corr_10 = corr_curve.correlation(10.0);
+    let corr_3 = corr_curve.get_correlation(3.0).expect("valid detachment");
+    let corr_7 = corr_curve.get_correlation(7.0).expect("valid detachment");
+    let corr_10 = corr_curve.get_correlation(10.0).expect("valid detachment");
 
     assert!(
         corr_3 <= corr_7,

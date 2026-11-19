@@ -7,7 +7,6 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::payoff::autocallable::AutocallableParams;
 use finstack_quant_models::monte_carlo::payoff::autocallable::AutocallablePayoff;
@@ -247,12 +246,7 @@ impl AutocallableMcPricer {
         // Identical grid to the previous constant-GBM path (uniform steps plus the
         // observation dates as required times), so a flat surface reproduces the
         // prior prices bit-for-bit.
-        let time_grid = TimeGrid::uniform_with_required_times(
-            t,
-            merged_cfg.steps_per_year,
-            merged_cfg.min_steps,
-            &observation_times,
-        )?;
+        let time_grid = merged_cfg.build_time_grid(t, &observation_times)?;
 
         // Mirror `PathDependentPricer::price` (non-Sobol path) but drive
         // the piecewise process with its exact discretization.

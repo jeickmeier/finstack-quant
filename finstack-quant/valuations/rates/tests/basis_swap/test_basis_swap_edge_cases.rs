@@ -102,7 +102,13 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc).insert(f3m).insert(f1m)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve")
 }
 
 /// Vanilla basis swaps must not exchange notionals.
@@ -417,7 +423,13 @@ fn flat_curves_zero_rates() {
     )
     .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "ZERO-RATES",
@@ -494,7 +506,13 @@ fn negative_rates() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "NEG-RATES",
@@ -679,7 +697,13 @@ fn steep_curve() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "STEEP-CURVE",
@@ -780,7 +804,13 @@ fn seasoned_swap_requires_fixings() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "SEASONED-NO-FIX",
@@ -884,9 +914,12 @@ fn seasoned_swap_with_fixings_succeeds() {
     .expect("fixings series");
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(f3m)
-        .insert(f1m)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve")
         .insert_series(fix_3m)
         .insert_series(fix_1m);
 

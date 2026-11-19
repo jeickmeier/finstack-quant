@@ -795,8 +795,8 @@ impl<'a> CreditBumpContexts<'a> {
             self.contexts.insert(
                 key.clone(),
                 (
-                    self.base.clone().insert(up_curve),
-                    self.base.clone().insert(down_curve),
+                    self.base.clone().try_insert(up_curve)?,
+                    self.base.clone().try_insert(down_curve)?,
                 ),
             );
         }
@@ -856,7 +856,7 @@ fn shift_credit_curves(
             continue;
         }
         let bumped = bump_credit_spreads(&out, curve_id, scaled)?;
-        out = out.insert(bumped);
+        out.try_insert_mut(bumped)?;
     }
     Ok(out)
 }
@@ -1733,8 +1733,12 @@ pub(super) mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
-        let error =
-            bump_credit_spreads(&market.insert(raw), &CurveId::new("RAW"), 1.0).unwrap_err();
+        let error = bump_credit_spreads(
+            &market.try_insert(raw).expect("insert market curve"),
+            &CurveId::new("RAW"),
+            1.0,
+        )
+        .unwrap_err();
         assert!(error.to_string().contains("calibration recipe"));
     }
 
@@ -2476,9 +2480,13 @@ pub(super) mod tests {
             ),
             (
                 2,
-                (|spec| MarketBump::BaseCorrelation {
+                (|spec: BumpSpec| MarketBump::BaseCorrelation {
                     id: "INDEX-BC".into(),
-                    spec,
+                    spec: BumpSpec {
+                        units: BumpUnits::Fraction,
+                        value: spec.value / 10_000.0,
+                        ..spec
+                    },
                 }) as fn(BumpSpec) -> MarketBump,
             ),
         ] {

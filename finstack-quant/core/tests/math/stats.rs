@@ -34,10 +34,12 @@ fn covariance_and_correlation() {
 #[test]
 fn log_returns_and_realized_variance_close_to_close() {
     let prices = [100.0, 102.0, 101.0, 105.0];
-    let returns = log_returns(&prices);
+    let returns = log_returns(&prices).unwrap();
     assert_eq!(returns.len(), prices.len() - 1);
 
-    let rv = realized_variance(&prices, Some(252.0)).expect("CloseToClose should succeed");
+    let rv = realized_variance(&prices, Some(252.0))
+        .expect("valid prices")
+        .expect("observed return");
     assert!(rv.is_finite() && rv >= 0.0);
     let expected = returns.iter().map(|r| r * r).sum::<f64>() / returns.len() as f64 * 252.0;
     assert!(
@@ -62,10 +64,9 @@ fn realized_variance_close_to_close_rejects_invalid_prices() {
 }
 
 #[test]
-fn realized_variance_close_to_close_single_price_is_zero() {
-    let result = realized_variance(&[100.0], Some(252.0))
-        .expect("single close price should use early zero return");
-    assert_eq!(result, 0.0);
+fn realized_variance_close_to_close_single_price_is_unavailable() {
+    let result = realized_variance(&[100.0], Some(252.0)).expect("valid singleton");
+    assert_eq!(result, None);
 }
 
 #[test]

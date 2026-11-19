@@ -104,9 +104,9 @@
 //!     ?;
 //!
 //! let curves = MarketContext::new()
-//!     .insert(disc)
-//!     .insert(fwd3m)
-//!     .insert(hazard);
+//!     .try_insert(disc)?
+//!     .try_insert(fwd3m)?
+//!     .try_insert(hazard)?;
 //! assert!(curves.get_discount("USD-OIS").is_ok());
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
@@ -147,6 +147,7 @@ pub use base_correlation::{
     BaseCorrelationCurve, BaseCorrelationCurveBuilder, CorrelationShapeReport,
     CorrelationShapeViolation,
 };
+pub(super) use credit_index::deserialize_issuer_map;
 pub use credit_index::{CreditIndexData, CreditIndexDataBuilder};
 pub use discount_curve::{DiscountCurve, DiscountCurveBuilder};
 pub use forward_curve::{ForwardCurve, ForwardCurveBuilder};

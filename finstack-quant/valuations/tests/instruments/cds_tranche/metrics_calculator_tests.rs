@@ -348,7 +348,8 @@ fn test_dv01_rebootstraps_calibrated_index_hazard_from_unchanged_spreads() {
             .build()
             .expect("rebuilt index");
         let rebuilt = bumped
-            .insert(Arc::clone(&hazard))
+            .try_insert(Arc::clone(&hazard))
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG.42", index)
             .expect("rebuilt index dependencies");
         tranche.value_raw(&rebuilt, as_of).expect("pv")
@@ -514,7 +515,8 @@ fn test_metrics_with_missing_credit_index() {
 
     // Create market without credit index
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(standard_discount_curve());
+        .try_insert(standard_discount_curve())
+        .expect("insert market curve");
 
     let as_of = base_date();
 
@@ -815,7 +817,9 @@ mod production_credit_audit {
                 )
                 .expect("issuer calibration"),
             );
-            market = market.insert(Arc::clone(&hazard));
+            market = market
+                .try_insert(Arc::clone(&hazard))
+                .expect("insert market curve");
             issuers.insert(id.to_owned(), hazard);
         }
         let correlation = BaseCorrelationCurve::builder("FLAT-BC")
@@ -831,7 +835,8 @@ mod production_credit_audit {
             .build()
             .expect("index");
         market
-            .insert(Arc::clone(index.base_correlation_curve()))
+            .try_insert(Arc::clone(index.base_correlation_curve()))
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG.42", index)
             .expect("dispersed credit index dependencies should exist")
     }

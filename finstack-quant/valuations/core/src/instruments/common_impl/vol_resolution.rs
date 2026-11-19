@@ -11,7 +11,7 @@
 
 use crate::instruments::pricing_overrides::MarketQuoteOverrides;
 use crate::market::resolve_vol_source;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, VolatilityClock};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::fx::CurrencyPair;
@@ -21,12 +21,20 @@ use finstack_quant_models::volatility::{VolSource, VolatilityConvention};
 
 /// Coordinates and pricing convention for one volatility resolution.
 pub struct VolatilityRequest {
+    /// Positive option time in years.
     pub expiry: f64,
+    /// Underlying contract tenor in years when required by the selected source.
     pub tenor: f64,
+    /// Strike in the source's quoted units.
     pub strike: f64,
-    /// None selects source metadata. Explicit models retain their quote units.
+    /// `None` selects source metadata. Explicit models retain their quote units.
     pub convention: Option<VolatilityConvention>,
+    /// Whether to use the source's clamped lookup.
     pub clamp: bool,
+    /// Required expiry clock for a dated, source-backed SABR cube lookup.
+    /// The cube must declare the same reference date, day count and context.
+    /// Numeric lookups omit this requirement.
+    pub required_cube_clock: Option<VolatilityClock>,
 }
 
 /// One validated quote together with the convention needed by prices and Greeks.
@@ -70,22 +78,69 @@ pub fn validate_sigma(sigma: f64) -> Result<f64> {
 }
 
 /// Resolve the active quote, retaining units and displacement throughout pricing.
+///
+/// # Arguments
+///
+/// * `overrides` - Optional explicit implied volatility in the selected quote convention.
+/// * `curves` - Market context containing computational volatility sources.
+/// * `vol_surface_id` - Identifier used to resolve the active volatility source.
+/// * `request` - Model coordinates, convention and lookup policy. Dated SABR
+///   consumers also specify their required source expiry clock.
+///
+/// # Errors
+///
+/// Returns an error when the source cannot be resolved, the quote conventions
+/// or required cube clock disagree, or the selected quote is invalid.
 pub fn resolve_volatility(
     overrides: &MarketQuoteOverrides,
     curves: &MarketContext,
     vol_surface_id: &str,
     request: VolatilityRequest,
 ) -> Result<ResolvedVolatility> {
+    let has_cube_tenor = request.tenor.is_finite() && request.tenor > 0.0;
     let source = if overrides.implied_volatility.is_some() && request.convention.is_some() {
-        // An explicit scalar/model pair needs no inactive surface. If a cube is
-        // present, its displacement remains part of the model definition.
-        resolve_vol_source(curves, vol_surface_id).ok()
+        // A cube can supply displacement only when the product has a tenor.
+        resolve_vol_source(curves, vol_surface_id)
+            .ok()
+            .filter(|source| has_cube_tenor || !matches!(source, VolSource::Cube(_)))
     } else {
         Some(resolve_vol_source(curves, vol_surface_id)?)
     };
+    if let (Some(VolSource::Cube(cube)), Some(required_clock)) =
+        (&source, &request.required_cube_clock)
+        && overrides.implied_volatility.is_none()
+    {
+        let clock = cube.expiry_clock().ok_or_else(|| {
+            Error::Validation(format!(
+                "SABR cube '{}' requires an explicit expiry_clock for dated valuation",
+                cube.id()
+            ))
+        })?;
+        if clock != required_clock {
+            return Err(Error::Validation(format!(
+                "SABR cube '{}' expiry_clock {clock:?} does not match the required model clock {required_clock:?}",
+                cube.id()
+            )));
+        }
+    }
     let source_convention = source
         .as_ref()
-        .map(|source| source.get_convention(request.expiry, request.tenor))
+        .map(|source| {
+            if matches!(source, VolSource::Cube(_)) {
+                if !has_cube_tenor {
+                    return Err(Error::Validation(format!(
+                        "SABR cube '{}' requires a finite positive underlying tenor",
+                        source.get_id()
+                    )));
+                }
+                let requested = request.convention.ok_or_else(|| {
+                    Error::Validation("SABR cube requires explicit output quote convention".into())
+                })?;
+                source.get_cube_convention(request.expiry, request.tenor, requested, request.clamp)
+            } else {
+                source.get_convention(request.expiry, request.tenor)
+            }
+        })
         .transpose()?;
     let mut convention = request.convention.or(source_convention).ok_or_else(|| {
         Error::Validation("Auto volatility requires source convention metadata".to_owned())
@@ -157,6 +212,7 @@ pub fn resolve_sigma_at(
             strike,
             convention: Some(VolatilityConvention::Lognormal),
             clamp: true,
+            required_cube_clock: None,
         },
     )?;
     if resolved.convention != VolatilityConvention::Lognormal {
@@ -379,6 +435,31 @@ mod tests {
         assert_eq!(
             resolve_sigma_at(&overrides, &market, "TENOR-VOL", 1.0, 100.0).unwrap(),
             0.31
+        );
+    }
+
+    #[test]
+    fn strike_only_resolver_does_not_clamp_a_missing_sabr_tenor() {
+        use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
+
+        let node = SabrParameterData::new(0.2, 1.0, 0.0, -0.25, Some(0.02)).expect("SABR node");
+        let cube = VolCube::from_grid("CUBE", &[1.0], &[5.0], &[node], &[0.03]).expect("cube");
+        let market = MarketContext::new().insert_vol_cube(cube);
+        let error = resolve_sigma_at(&MarketQuoteOverrides::default(), &market, "CUBE", 1.0, 0.03)
+            .expect_err("a strike-only option cannot query a swaption tenor");
+        assert!(
+            error.to_string().contains("positive underlying tenor"),
+            "{error}"
+        );
+
+        let scalar_override = MarketQuoteOverrides {
+            implied_volatility: Some(0.2),
+            ..Default::default()
+        };
+        assert_eq!(
+            resolve_sigma_at(&scalar_override, &market, "CUBE", 1.0, 0.03)
+                .expect("explicit strike-only quote"),
+            0.2
         );
     }
 

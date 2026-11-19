@@ -73,7 +73,8 @@ fn bumped_market(
         .expect("updated stencil index");
     market
         .clone()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_credit_index(&params.index_id, updated_index)
         .expect("stencil market")
 }

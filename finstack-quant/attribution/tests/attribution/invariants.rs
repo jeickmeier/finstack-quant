@@ -222,7 +222,9 @@ fn test_zero_market_change_identity() {
 
     // Same curve at T0 and T1 (no rate change)
     let curve = build_flat_curve("USD-OIS", as_of_t0, 0.04);
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -296,8 +298,12 @@ fn test_rates_pnl_sign_convention() {
     let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, 0.04);
     let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, 0.05);
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -350,8 +356,12 @@ fn test_rates_pnl_positive_when_rates_decrease() {
     let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, 0.04);
     let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, 0.03);
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -404,8 +414,12 @@ fn test_long_short_net_zero_invariant() {
     let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, 0.04);
     let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, 0.05);
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let long: Arc<dyn Instrument> = Arc::new(bond);
@@ -484,8 +498,12 @@ fn test_portfolio_additivity_invariant() {
     let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, 0.035);
     let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, 0.045);
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let inst_a: Arc<dyn Instrument> = Arc::new(bond_a);
@@ -581,7 +599,7 @@ proptest! {
         .unwrap();
 
         let curve = build_flat_curve("USD-OIS", as_of_t0, flat_rate);
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new().try_insert(curve).expect("insert market curve");
 
         let config = FinstackConfig::default();
         let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -628,8 +646,8 @@ proptest! {
         let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, base_rate);
         let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, base_rate + rate_shift);
 
-        let market_t0 = MarketContext::new().insert(curve_t0);
-        let market_t1 = MarketContext::new().insert(curve_t1);
+        let market_t0 = MarketContext::new().try_insert(curve_t0).expect("insert market curve");
+        let market_t1 = MarketContext::new().try_insert(curve_t1).expect("insert market curve");
 
         let config = FinstackConfig::default();
 
@@ -698,9 +716,9 @@ proptest! {
         let curve_small = build_flat_curve("USD-OIS", as_of_t1, base_rate + small_shift);
         let curve_large = build_flat_curve("USD-OIS", as_of_t1, base_rate + large_shift);
 
-        let market_t0 = MarketContext::new().insert(curve_t0);
-        let market_small = MarketContext::new().insert(curve_small);
-        let market_large = MarketContext::new().insert(curve_large);
+        let market_t0 = MarketContext::new().try_insert(curve_t0).expect("insert market curve");
+        let market_small = MarketContext::new().try_insert(curve_small).expect("insert market curve");
+        let market_large = MarketContext::new().try_insert(curve_large).expect("insert market curve");
 
         let config = FinstackConfig::default();
         let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -751,8 +769,12 @@ fn test_small_notional_edge_case() {
     let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, 0.04);
     let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, 0.05);
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -808,8 +830,12 @@ fn test_large_notional_edge_case() {
     let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, 0.04);
     let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, 0.041); // 10bp increase
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -876,8 +902,12 @@ fn test_extreme_rate_levels() {
     let curve_low = build_flat_curve("USD-OIS", as_of_t0, 0.001); // 10bp
     let curve_lower = build_flat_curve("USD-OIS", as_of_t1, 0.0005); // 5bp
 
-    let market_low = MarketContext::new().insert(curve_low);
-    let market_lower = MarketContext::new().insert(curve_lower);
+    let market_low = MarketContext::new()
+        .try_insert(curve_low)
+        .expect("insert market curve");
+    let market_lower = MarketContext::new()
+        .try_insert(curve_lower)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -907,8 +937,12 @@ fn test_extreme_rate_levels() {
     let curve_high = build_flat_curve("USD-OIS", as_of_t0, 0.15); // 15%
     let curve_higher = build_flat_curve("USD-OIS", as_of_t1, 0.16); // 16%
 
-    let market_high = MarketContext::new().insert(curve_high);
-    let market_higher = MarketContext::new().insert(curve_higher);
+    let market_high = MarketContext::new()
+        .try_insert(curve_high)
+        .expect("insert market curve");
+    let market_higher = MarketContext::new()
+        .try_insert(curve_higher)
+        .expect("insert market curve");
 
     let attribution_high = attribute_pnl(
         &AttributionMethod::Parallel,
@@ -961,8 +995,12 @@ fn test_near_maturity_edge_case() {
     let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, 0.04);
     let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, 0.05);
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);

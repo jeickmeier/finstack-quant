@@ -26,6 +26,7 @@ export function Example({
 }) {
   return (
     <FxSurfaceChart
+      interpolationMode="total_variance"
       {...presentation}
       surface={fx}
       coordinates={[

@@ -437,8 +437,8 @@ impl PyMertonModel {
     }
 
     #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.default_probability")]
-    fn default_probability(&self, horizon: f64) -> f64 {
-        self.inner.default_probability(horizon)
+    fn default_probability(&self, horizon: f64) -> PyResult<f64> {
+        self.inner.default_probability(horizon).map_err(core_to_py)
     }
 
     #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.default_probabilities")]
@@ -449,7 +449,10 @@ impl PyMertonModel {
         horizons: Vec<f64>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let labels: Vec<String> = horizons.iter().map(|h| h.to_string()).collect();
-        let values = self.inner.default_probabilities(&horizons);
+        let values = self
+            .inner
+            .default_probabilities(&horizons)
+            .map_err(core_to_py)?;
         values_to_series(py, values, &labels, "default_probability")
     }
 
@@ -1147,8 +1150,8 @@ impl PyToggleExerciseModel {
 
     #[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel.should_pik")]
     #[pyo3(text_signature = "($self, state, u)")]
-    fn should_pik(&self, state: &PyCreditState, u: f64) -> bool {
-        self.inner.should_pik(&state.inner, u)
+    fn should_pik(&self, state: &PyCreditState, u: f64) -> PyResult<bool> {
+        self.inner.should_pik(&state.inner, u).map_err(core_to_py)
     }
 
     #[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel.optimal")]

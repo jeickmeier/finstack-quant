@@ -121,7 +121,9 @@ fn repricing_market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("bench: discount curve should build");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 fn repricing_instruments(n_positions: usize) -> Vec<CurveZeroInstrument> {
@@ -161,7 +163,7 @@ fn sparse_repricing_market(as_of: Date, n_factors: usize) -> MarketContext {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("bench: sparse discount curve should build");
-        market.insert(curve)
+        market.try_insert(curve).expect("insert market curve")
     })
 }
 

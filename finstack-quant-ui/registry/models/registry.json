@@ -285,7 +285,7 @@
       "type": "registry:hook",
       "title": "useFxStrikeSurface",
       "description": "Materializes an FX delta surface as a strike-space volatility surface through the WASM worker.",
-      "docs": "Native models.volatility.materializeFxDeltaSurface with complete immutable quote and delivery-forward keys. Null means no request. Delivery forwards must match surface.expiries in order and units (quote per base), never defaulted. Requires FinstackQueryProvider; returns the canonical stored-surface JSON or native errors.",
+      "docs": "Native models.volatility.materializeFxDeltaSurface with complete immutable quotes, delivery forwards and an explicit interpolationMode (vol or total_variance). Null means no request. Delivery forwards must match surface.expiries in order and units (quote per base), never defaulted. Requires FinstackQueryProvider; returns the canonical stored-surface JSON or native errors.",
       "files": [
         {
           "path": "hooks/use-fx-strike-surface/use-fx-strike-surface.ts",
@@ -415,7 +415,7 @@
       "type": "registry:component",
       "title": "FX surface chart",
       "description": "FX volatility surface: raw quotes, natively evaluated Black volatilities and a Rust-materialized strike grid as heatmaps, tables and slices.",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. The strike grid materializes the quotes natively (models.volatility.materializeFxDeltaSurface) from editable qualified delivery forwards aligned with surface.expiries, seeded only from initialDeliveryForwards. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. The strike grid materializes the quotes natively (models.volatility.materializeFxDeltaSurface) from editable qualified delivery forwards aligned with surface.expiries, seeded from initialDeliveryForwards, using the supplied interpolationMode (vol or total_variance). Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
       "files": [
         {
           "path": "components/fx-surface-chart/fx-surface-chart.tsx",
@@ -447,7 +447,7 @@
       "type": "registry:component",
       "title": "Volatility cube slice",
       "description": "Rust-materialized fixed-tenor or fixed-expiry slice of a SABR volatility cube, plus one node's native SABR smile, arbitrage check and repair.",
-      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice in the selected convention (\"normal\" or \"lognormal\"), rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
+      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice in the selected convention (\"normal\" or \"lognormal\"), with an explicit interpolationMode for the fixed-tenor surface and a color extent per convention. The node smile uses the selected convention. Black smiles use the node's displacement when supplied. The arbitrage check takes a continuously compounded decimal rate (initialRate) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "components/vol-cube-slice/vol-cube-slice.tsx",
@@ -521,7 +521,7 @@
       "type": "registry:component",
       "title": "Volatility cube explorer",
       "description": "Explores a volatility cube by strike and convention using natively evaluated samples, with an optional Rust-materialized slice and node smile.",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Supplying slice (explicit initialStrikes, optional initialRate and repairIterations) adds vol-cube-slice. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Supplying slice (explicit initialStrikes and interpolationMode, optional initialRate and repairIterations) adds vol-cube-slice. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
       "files": [
         {
           "path": "components/vol-cube-explorer/vol-cube-explorer.tsx",

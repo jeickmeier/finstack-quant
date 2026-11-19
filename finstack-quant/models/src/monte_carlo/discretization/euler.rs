@@ -53,20 +53,29 @@ impl EulerMaruyama {
 }
 
 impl<P: StochasticProcess> Discretization<P> for EulerMaruyama {
-    fn step(&self, process: &P, t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]) {
+    fn step(
+        &self,
+        process: &P,
+        t: f64,
+        dt: f64,
+        x: &mut [f64],
+        z: &[f64],
+        work: &mut [f64],
+    ) -> finstack_quant_core::Result<()> {
         let dim = process.dim();
 
         // Compute drift: work[0..dim] = μ(t, x)
         process.drift(t, x, &mut work[0..dim]);
 
         // Compute diffusion: work[dim..2*dim] = σ(t, x)
-        process.diffusion(t, x, &mut work[dim..2 * dim]);
+        process.diffusion(t, x, &mut work[dim..2 * dim])?;
 
         // Euler step: x_{t+dt} = x_t + μ(t,x)dt + σ(t,x)√dt * Z
         let sqrt_dt = dt.sqrt();
         for i in 0..dim {
             x[i] += work[i] * dt + work[dim + i] * sqrt_dt * z[i];
         }
+        Ok(())
     }
 
     fn work_size(&self, process: &P) -> usize {
@@ -96,12 +105,20 @@ impl LogEuler {
 }
 
 impl<P: StochasticProcess> Discretization<P> for LogEuler {
-    fn step(&self, process: &P, t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]) {
+    fn step(
+        &self,
+        process: &P,
+        t: f64,
+        dt: f64,
+        x: &mut [f64],
+        z: &[f64],
+        work: &mut [f64],
+    ) -> finstack_quant_core::Result<()> {
         let dim = process.dim();
 
         // Compute drift and diffusion in original space
         process.drift(t, x, &mut work[0..dim]);
-        process.diffusion(t, x, &mut work[dim..2 * dim]);
+        process.diffusion(t, x, &mut work[dim..2 * dim])?;
 
         // Transform to log-space and apply Euler
         let sqrt_dt = dt.sqrt();
@@ -115,6 +132,7 @@ impl<P: StochasticProcess> Discretization<P> for LogEuler {
 
             x[i] *= (drift_term + diffusion_term).exp();
         }
+        Ok(())
     }
 
     fn work_size(&self, process: &P) -> usize {
@@ -141,7 +159,8 @@ mod tests {
         assert_eq!(work_size, 2 * process.dim());
         let mut work = vec![0.0; work_size];
 
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert!(x[0] > 0.0);
         // Should have moved up (positive drift + positive shock)
@@ -163,7 +182,8 @@ mod tests {
             let z = vec![-3.0]; // Very negative shock
             let mut work = vec![0.0; disc.work_size(&process)];
 
-            disc.step(&process, t, dt, &mut x, &z, &mut work);
+            disc.step(&process, t, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
 
             // Log-Euler should maintain positivity
             assert!(x[0] > 0.0, "State should remain positive");
@@ -185,7 +205,8 @@ mod tests {
             let z = vec![shock];
             let mut work = vec![0.0; disc.work_size(&process)];
 
-            disc.step(&process, t, dt, &mut x, &z, &mut work);
+            disc.step(&process, t, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
 
             // Log-Euler should maintain positivity
             assert!(
@@ -213,7 +234,8 @@ mod tests {
         let z = vec![0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert!((x[0] - (x0 + expected_drift)).abs() < 0.01);
     }

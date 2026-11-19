@@ -33,10 +33,35 @@ def _example_surface(*, with_10d: bool = False) -> FxDeltaVolSurface:
             atm,
             rr_25d,
             bf_25d,
+            delta_convention="forward_unadjusted",
+            atm_convention="delta_neutral_straddle",
+            butterfly_convention="smile",
             rr_10d=[0.018, 0.020, 0.024],
             bf_10d=[0.010, 0.011, 0.013],
         )
-    return FxDeltaVolSurface("EURUSD-DELTA-VOL", "EUR/USD", expiries, atm, rr_25d, bf_25d)
+    return FxDeltaVolSurface(
+        "EURUSD-DELTA-VOL",
+        "EUR/USD",
+        expiries,
+        atm,
+        rr_25d,
+        bf_25d,
+        delta_convention="forward_unadjusted",
+        atm_convention="delta_neutral_straddle",
+        butterfly_convention="smile",
+    )
+
+
+@pytest.mark.parametrize("missing", ["delta_convention", "atm_convention", "butterfly_convention"])
+def test_constructor_requires_each_fx_quote_convention(missing: str) -> None:
+    conventions = {
+        "delta_convention": "forward_unadjusted",
+        "atm_convention": "delta_neutral_straddle",
+        "butterfly_convention": "smile",
+    }
+    del conventions[missing]
+    with pytest.raises(TypeError, match=missing):
+        FxDeltaVolSurface("FX", "EUR/USD", [1.0], [0.10], [0.01], [0.002], **conventions)  # type: ignore[arg-type]
 
 
 def test_construction_and_accessors() -> None:
@@ -65,6 +90,9 @@ def test_construction_and_accessors() -> None:
         [0.09],
         [0.01],
         [0.002],
+        delta_convention="forward_unadjusted",
+        atm_convention="delta_neutral_straddle",
+        butterfly_convention="smile",
         expiry_clock=VolatilityClock(dt.date(2025, 1, 15), DayCount.ACT_365F, DayCountContext()),
     )
     assert pair_surface.pair == "EUR/USD"
@@ -88,6 +116,9 @@ def test_rr_bf_10d_consistency_required() -> None:
             [0.08, 0.085],
             [0.01, 0.012],
             [0.005, 0.006],
+            delta_convention="forward_unadjusted",
+            atm_convention="delta_neutral_straddle",
+            butterfly_convention="smile",
             rr_10d=[0.018, 0.020],
         )
 
@@ -101,6 +132,9 @@ def test_rejects_unknown_kwarg() -> None:
             [0.08],
             [0.01],
             [0.005],
+            delta_convention="forward_unadjusted",
+            atm_convention="delta_neutral_straddle",
+            butterfly_convention="smile",
             unknown_option=123,  # type: ignore[call-arg]
         )
 
@@ -120,8 +154,9 @@ def test_implied_vol_lookup_recovers_atm_at_atm_strike() -> None:
 def test_to_vol_surface_conversion_roundtrip() -> None:
     surface = _example_surface()
     delivery_forwards = [1.20 * math.exp((0.05 - 0.03) * t) for t in surface.expiries]
-    strike_surface = materialize_fx_delta_surface(surface, delivery_forwards)
+    strike_surface = materialize_fx_delta_surface(surface, delivery_forwards, "total_variance")
     assert isinstance(strike_surface, VolSurface)
+    assert strike_surface.interpolation_mode == "total_variance"
     # The strike-axis surface must expose at least the same expiry count.
     assert len(strike_surface.expiries) >= len(surface.expiries)
 

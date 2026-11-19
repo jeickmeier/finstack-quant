@@ -54,7 +54,9 @@ fn test_ytc_callable_loan() {
     });
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let result = loan.price_with_metrics(
@@ -108,7 +110,9 @@ fn test_ytc_uses_quoted_clean_price_pct_when_present() {
     });
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let base = loan
         .price_with_metrics(

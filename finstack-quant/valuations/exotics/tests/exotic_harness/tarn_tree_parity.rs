@@ -98,7 +98,11 @@ fn market(as_of: Date) -> MarketContext {
             &discount,
             Some(finstack_quant_core::dates::Tenor::semi_annual()),
         );
-    MarketContext::new().insert(discount).insert(forward)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
 }
 
 /// A non-knockout, effectively-linear TARN: a plain floating-coupon note plus

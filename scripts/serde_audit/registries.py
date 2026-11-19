@@ -156,7 +156,7 @@ def _runtime_exception(
 # Runtime Result names are individually reviewed because their suffix alone cannot
 # distinguish persisted DTOs from in-memory solver or algorithm state.
 RUNTIME_RESULT_EXCEPTIONS = (
-    *_runtime_exception("core", "src/math/linalg/mod.rs", ("LedoitWolfResult",)),
+    *_runtime_exception("core", "src/math/linalg/shrinkage.rs", ("LedoitWolfResult",)),
     *_runtime_exception(
         "valuations-fixed-income",
         "src/bond/pricing/ytm_solver.rs",

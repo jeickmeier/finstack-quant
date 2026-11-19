@@ -245,59 +245,57 @@ pub(super) fn error_message(spec: &PathSimulationSpec) -> String {
 // GBM bit pin
 // ---------------------------------------------------------------------------
 
-/// FNV-1a over the IEEE-754 bit patterns of every time, then every value.
-fn bit_hash(summary: &PathSummary) -> u64 {
-    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
-    for value in summary.times.iter().chain(&summary.values) {
-        for byte in value.to_bits().to_le_bytes() {
-            hash ^= u64::from(byte);
-            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-        }
-    }
-    hash
-}
-
-/// The hashes and terminal spots were recorded from the GBM-only path
-/// simulator that `simulate_paths` replaced. Stream A is pinned per libm
-/// (macOS, and Ubuntu 24.04 as used by GitHub Actions). Stream B is the same
-/// bits on both hosts.
+/// Reconstruct every path from the stream's uniform coordinates and the exact
+/// GBM transition. This checks the seed, substream, normal-pair order, grid and
+/// arithmetic on the active target, including differences in platform libm.
 #[test]
-fn gbm_default_scheme_is_pinned_bit_for_bit() {
-    let pinned = |r, q, sigma, spot, expiry, num_steps, num_paths, seed| {
-        simulate_paths(&PathSimulationSpec {
+fn gbm_default_paths_match_direct_reflected_box_muller_draws() {
+    use crate::monte_carlo::traits::RandomStream;
+    for (r, q, sigma, initial, expiry, steps, paths, seed) in [
+        (0.04, 0.01, 0.25, 100.0, 1.3, 17, 32, 19),
+        (-0.01, 0.03, 0.6, 42.5, 0.37, 1, 5, 7_919),
+    ] {
+        let summary = simulate_paths(&PathSimulationSpec {
             process: ProcessSpec::Gbm(GbmParams::new(r, q, sigma).unwrap()),
             scheme: SchemeSpec::Default,
-            initial_state: vec![spot],
-            time_grid: TimeGridSpec::Uniform { expiry, num_steps },
-            num_paths,
+            initial_state: vec![initial],
+            time_grid: TimeGridSpec::Uniform {
+                expiry,
+                num_steps: steps,
+            },
+            num_paths: paths,
             seed,
             antithetic: false,
             fbm: None,
         })
-        .unwrap()
-    };
-
-    let a = pinned(0.04, 0.01, 0.25, 100.0, 1.3, 17, 32, 19);
-    let b = pinned(-0.01, 0.03, 0.6, 42.5, 0.37, 1, 5, 7_919);
-    let stream_a = (bit_hash(&a), a.values[31 * 18 + 17].to_bits());
-    let stream_b = (bit_hash(&b), b.values[4 * 2 + 1].to_bits());
-    // (fingerprint of every time and value, one terminal spot).
-    const STREAM_A: [(u64, u64); 2] = [
-        (0x7e9a_6884_54fb_d37c, 0x4060_5556_4027_5291),
-        (0x0b78_49fa_54a0_493b, 0x4060_5556_4027_5290),
-    ];
-    const STREAM_B: (u64, u64) = (0x2b4a_52ec_fdb1_426b, 0x4040_f04d_39a6_c0fb);
-    assert!(
-        STREAM_A.contains(&stream_a),
-        "GBM stream A moved off the macOS and Linux libm pins: hash={:#x} spot={:#x}",
-        stream_a.0,
-        stream_a.1
-    );
-    assert_eq!(
-        stream_b, STREAM_B,
-        "GBM stream B moved: hash={:#x} spot={:#x}",
-        stream_b.0, stream_b.1
-    );
+        .unwrap();
+        let times: Vec<_> = (0..=steps)
+            .map(|i| expiry * (i as f64 / steps as f64))
+            .collect();
+        assert_eq!(summary.times, times);
+        assert_eq!(summary.values.len(), paths * (steps + 1));
+        for (id, captured) in summary.values.chunks_exact(steps + 1).enumerate() {
+            let mut uniform = PhiloxRng::with_stream(seed, id as u64);
+            let mut normals = Vec::with_capacity(steps + 1);
+            while normals.len() < steps {
+                let radius = (-2.0 * (-uniform.next_u01()).ln_1p()).sqrt();
+                let (sin, cos) = (std::f64::consts::TAU * uniform.next_u01()).sin_cos();
+                normals.extend([radius * cos, radius * sin]);
+            }
+            let mut spot = initial;
+            assert_eq!(captured[0].to_bits(), spot.to_bits());
+            for (i, interval) in times.windows(2).enumerate() {
+                let dt = interval[1] - interval[0];
+                let drift = (r - q) * dt - 0.5 * sigma * sigma * dt;
+                spot *= (drift + sigma * dt.sqrt() * normals[i]).exp();
+                assert_eq!(
+                    captured[i + 1].to_bits(),
+                    spot.to_bits(),
+                    "path {id}, step {i}"
+                );
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -412,14 +410,14 @@ fn stream_values_do_not_depend_on_the_number_of_streams() {
 fn explicit_times_grid_is_honoured() {
     let mut s = spec(hull_white(), &[0.02], 0);
     s.num_paths = 3;
+    // 0.03 + (0.29 - 0.03) rounds one ULP above the stored 0.29 knot.
+    let knots = vec![0.0, 0.03, 0.29, 2.0];
     s.time_grid = TimeGridSpec::Times {
-        times: vec![0.0, 0.1, 0.5, 2.0],
+        times: knots.clone(),
     };
     let out = simulate_paths(&s).unwrap();
     assert_eq!(out.values.len(), 3 * 4);
-    for (time, expected) in out.times.iter().zip([0.0, 0.1, 0.5, 2.0]) {
-        assert!((time - expected).abs() < 1e-15);
-    }
+    assert_eq!(out.times, knots);
 }
 
 // ---------------------------------------------------------------------------

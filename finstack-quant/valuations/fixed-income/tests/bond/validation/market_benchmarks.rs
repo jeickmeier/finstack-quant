@@ -75,7 +75,9 @@ fn test_bond_ytm_benchmark_1() {
 
     // Build market context with flat 5% curve
     let disc_curve = build_flat_curve(0.05, as_of, "USD_DISC");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -160,7 +162,9 @@ fn test_bond_ytm_benchmark_2_par_bond() {
         .unwrap();
 
     let disc_curve = build_flat_curve(0.06, as_of, "USD_DISC");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -217,7 +221,9 @@ fn test_bond_macaulay_duration_benchmark() {
         .unwrap();
 
     let disc_curve = build_flat_curve(0.08, as_of, "USD_DISC");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -274,7 +280,9 @@ fn test_bond_modified_duration_benchmark() {
         .unwrap();
 
     let disc_curve = build_flat_curve(0.08, as_of, "USD_DISC");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -335,7 +343,9 @@ fn test_bond_yield_dv01_market_standard() {
         .unwrap();
 
     let disc_curve = build_flat_curve(0.08, as_of, "USD_DISC");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -400,7 +410,9 @@ fn test_bond_price_yield_relationship() {
             .unwrap();
 
         let disc_curve = build_flat_curve(yield_rate, as_of, "USD_DISC");
-        let market = MarketContext::new().insert(disc_curve);
+        let market = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve");
 
         let price = bond.value(&market, as_of).unwrap();
         prices.push(price.amount());
@@ -457,7 +469,9 @@ fn test_bond_zero_coupon_duration() {
         .unwrap();
 
     let disc_curve = build_flat_curve(0.07, as_of, "USD_DISC");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -510,7 +524,9 @@ fn test_bond_convexity_positive() {
         .unwrap();
 
     let disc_curve = build_flat_curve(0.08, as_of, "USD_DISC");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(

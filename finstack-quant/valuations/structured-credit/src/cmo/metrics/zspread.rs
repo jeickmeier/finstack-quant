@@ -115,7 +115,9 @@ mod tests {
             .build()
             .expect("valid curve");
 
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// Findings 13/14 regression: a spread solve that cannot bracket the
@@ -179,16 +181,18 @@ mod production_mortgage_audit {
     fn cmo_clean_quote_has_zero_spread_at_clean_model_value() {
         let cmo = AgencyCmo::example().expect("cmo");
         let as_of = date!(2024 - 01 - 15);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (40.0, 1.0)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (40.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve");
         let tranche = cmo.reference_tranche().expect("tranche");
         let dirty = price_cmo(&cmo, &market, as_of).expect("price").amount();
         let accrued = tranche.current_face.amount() * tranche.coupon * 14.0 / 360.0;
@@ -213,16 +217,20 @@ mod production_mortgage_audit {
         let flat = 0.035_f64 * 365.0 / 360.0;
         let quote = 99.6;
         let spread_at = |as_of: Date| {
-            let market = MarketContext::new().insert(
-                DiscountCurve::builder("USD-OIS")
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
-                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
-                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                    .build()
-                    .expect("curve"),
-            );
+            let market = MarketContext::new()
+                .try_insert(
+                    DiscountCurve::builder("USD-OIS")
+                        .base_date(as_of)
+                        .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
+                        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                        .extrapolation(
+                            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                        )
+                        .build()
+                        .expect("curve"),
+                )
+                .expect("insert market curve");
             calculate_tranche_zspread(&cmo, quote, &market, as_of).expect("spread")
         };
         let before = spread_at(date!(2024 - 02 - 10));

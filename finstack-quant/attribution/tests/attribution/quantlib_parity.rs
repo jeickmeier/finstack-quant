@@ -148,10 +148,12 @@ fn quantlib_parity_metrics_based_bond_attribution() {
     .expect("Bond::fixed");
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
 
-    let market_t0 =
-        MarketContext::new().insert(flat_discount_curve("USD-OIS", t0, fixture.scenario.rate_t0));
-    let market_t1 =
-        MarketContext::new().insert(flat_discount_curve("USD-OIS", t1, fixture.scenario.rate_t1));
+    let market_t0 = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", t0, fixture.scenario.rate_t0))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", t1, fixture.scenario.rate_t1))
+        .expect("insert market curve");
 
     // Compute T0 and T1 valuations with the metrics `attribute_pnl_metrics_based`
     // consumes (Theta, DV01, BucketedDv01, Convexity). The bond's pricer
@@ -290,8 +292,10 @@ fn flat_forward_curve(
 
 fn irs_market(as_of: Date, rate: f64) -> MarketContext {
     MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, rate))
-        .insert(flat_forward_curve("USD-SOFR-3M", as_of, rate))
+        .try_insert(flat_discount_curve("USD-OIS", as_of, rate))
+        .expect("insert market curve")
+        .try_insert(flat_forward_curve("USD-SOFR-3M", as_of, rate))
+        .expect("insert market curve")
 }
 
 /// Build a vanilla USD payer IRS matching the QL fixture spec. Inlined here
@@ -517,8 +521,10 @@ fn fx_market(as_of: Date, usd_rate: f64, eur_rate: f64, spot_eur_usd: f64) -> Ma
         .expect("valid EUR/USD quote");
     let fx_matrix = FxMatrix::new(Arc::new(provider), None);
     MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, usd_rate))
-        .insert(flat_discount_curve("EUR-OIS", as_of, eur_rate))
+        .try_insert(flat_discount_curve("USD-OIS", as_of, usd_rate))
+        .expect("insert market curve")
+        .try_insert(flat_discount_curve("EUR-OIS", as_of, eur_rate))
+        .expect("insert market curve")
         .insert_fx(fx_matrix)
 }
 

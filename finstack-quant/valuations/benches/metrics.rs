@@ -42,7 +42,9 @@ fn create_benchmark_market() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(discount_curve)
+    MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert market curve")
 }
 
 /// Create a bond instrument for benchmarking

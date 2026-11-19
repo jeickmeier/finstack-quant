@@ -561,7 +561,11 @@ mod tests {
         .expect("hazard curve");
         (
             bond,
-            MarketContext::new().insert(discount).insert(hazard),
+            MarketContext::new()
+                .try_insert(discount)
+                .expect("insert market curve")
+                .try_insert(hazard)
+                .expect("insert market curve"),
             as_of,
         )
     }

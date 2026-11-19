@@ -28,7 +28,7 @@ fn column_evaluation() {
     let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
 
     let col_expr = CompiledExpr::new(Expr::column("x")).expect("elementwise expression compiles");
-    let result = col_expr.eval(&ctx, &cols).unwrap();
+    let result = col_expr.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
 }
 
@@ -38,7 +38,7 @@ fn literal_evaluation() {
     let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
 
     let lit_expr = CompiledExpr::new(Expr::literal(42.0)).expect("elementwise expression compiles");
-    let result = lit_expr.eval(&ctx, &cols).unwrap();
+    let result = lit_expr.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![42.0, 42.0, 42.0, 42.0, 42.0]);
 }
 
@@ -49,7 +49,7 @@ fn literal_zero_length() {
     let cols: Vec<&[f64]> = empty_data.iter().map(|v| v.as_slice()).collect();
 
     let lit_expr = CompiledExpr::new(Expr::literal(5.0)).expect("elementwise expression compiles");
-    let result = lit_expr.eval(&ctx, &cols).unwrap();
+    let result = lit_expr.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert!(result.is_empty());
 }
 
@@ -66,7 +66,7 @@ fn binop_add() {
         Expr::literal(10.0),
     ))
     .expect("elementwise expression compiles");
-    let result = add.eval(&ctx, &cols).unwrap();
+    let result = add.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![11.0, 12.0, 13.0, 14.0, 15.0]);
 }
 
@@ -81,7 +81,7 @@ fn binop_sub() {
         Expr::column("x"),
     ))
     .expect("elementwise expression compiles");
-    let result = sub.eval(&ctx, &cols).unwrap();
+    let result = sub.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![9.0, 18.0, 27.0, 36.0, 45.0]);
 }
 
@@ -96,7 +96,7 @@ fn binop_mul() {
         Expr::literal(2.0),
     ))
     .expect("elementwise expression compiles");
-    let result = mul.eval(&ctx, &cols).unwrap();
+    let result = mul.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![2.0, 4.0, 6.0, 8.0, 10.0]);
 }
 
@@ -111,7 +111,7 @@ fn binop_div() {
         Expr::column("x"),
     ))
     .expect("elementwise expression compiles");
-    let result = div.eval(&ctx, &cols).unwrap();
+    let result = div.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![10.0, 10.0, 10.0, 10.0, 10.0]);
 }
 
@@ -128,7 +128,7 @@ fn binop_division_by_zero_rejects_the_call() {
         Expr::column("den"),
     ))
     .expect("elementwise expression compiles");
-    let err = div.eval(&ctx, &cols).unwrap_err();
+    let err = div.eval(&ctx, &cols, cols[0].len()).unwrap_err();
     assert!(err.to_string().contains("row 0"), "{err}");
     assert!(err.to_string().contains("by zero"), "{err}");
 }
@@ -145,7 +145,7 @@ fn binop_comparisons() {
         Expr::literal(3.0),
     ))
     .expect("elementwise expression compiles");
-    let result = gt.eval(&ctx, &cols).unwrap();
+    let result = gt.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![0.0, 0.0, 0.0, 1.0, 1.0]); // 0 = false, 1 = true
 
     // Less than
@@ -155,7 +155,7 @@ fn binop_comparisons() {
         Expr::literal(3.0),
     ))
     .expect("elementwise expression compiles");
-    let result = lt.eval(&ctx, &cols).unwrap();
+    let result = lt.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![1.0, 1.0, 0.0, 0.0, 0.0]);
 }
 
@@ -179,7 +179,7 @@ fn binop_extended_comparisons_logic_and_modulo() {
     for (op, expected) in cases {
         let expr = CompiledExpr::new(Expr::bin_op(op, Expr::column("lhs"), Expr::column("rhs")))
             .expect("elementwise expression compiles");
-        let result = expr.eval(&ctx, &cols).unwrap();
+        let result = expr.eval(&ctx, &cols, cols[0].len()).unwrap();
         assert_eq!(result, expected, "{op:?}");
     }
 }
@@ -192,7 +192,7 @@ fn unary_not_maps_zero_to_true_and_non_zero_to_false() {
 
     let expr = CompiledExpr::new(Expr::unary_op(UnaryOp::Not, Expr::column("flag")))
         .expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap();
+    let result = expr.eval(&ctx, &cols, cols[0].len()).unwrap();
 
     assert_eq!(&result[..3], &[1.0, 0.0, 0.0]);
     assert!(result[3].is_nan());
@@ -245,7 +245,7 @@ fn if_then_else_evaluation() {
     let expr = Expr::if_then_else(cond, then_expr, else_expr);
 
     let compiled = CompiledExpr::new(expr).expect("elementwise expression compiles");
-    let out = compiled.eval(&ctx, &cols).unwrap();
+    let out = compiled.eval(&ctx, &cols, cols[0].len()).unwrap();
 
     // x: [1, 2, 3, 4, 5], y: [10, 20, 30, 40, 50]
     // x > y is always false, so we get y - x
@@ -266,7 +266,7 @@ fn if_then_else_mixed_condition() {
     let expr = Expr::if_then_else(cond, then_expr, else_expr);
 
     let compiled = CompiledExpr::new(expr).expect("elementwise expression compiles");
-    let out = compiled.eval(&ctx, &cols).unwrap();
+    let out = compiled.eval(&ctx, &cols, cols[0].len()).unwrap();
 
     // x > y: [false, true, true, true]
     // Results: [2-1=1, 2-1=1, 3-0=3, 4-(-1)=5]
@@ -284,7 +284,7 @@ fn empty_data_column() {
     let cols: Vec<&[f64]> = empty_data.iter().map(|v| v.as_slice()).collect();
 
     let expr = CompiledExpr::new(Expr::column("empty")).expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap();
+    let result = expr.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert!(result.is_empty());
 }
 
@@ -296,7 +296,7 @@ fn empty_data_function() {
 
     let expr = CompiledExpr::new(Expr::call(Function::Abs, vec![Expr::column("empty")]))
         .expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap();
+    let result = expr.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert!(result.is_empty());
 }
 
@@ -307,7 +307,7 @@ fn single_element_data() {
     let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
 
     let expr = CompiledExpr::new(Expr::column("single")).expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap();
+    let result = expr.eval(&ctx, &cols, cols[0].len()).unwrap();
     assert_eq!(result, vec![42.0]);
 }
 
@@ -325,7 +325,7 @@ fn nested_function_calls() {
     let sqrt = Expr::call(Function::Sqrt, vec![abs]);
 
     let compiled = CompiledExpr::new(sqrt).expect("elementwise expression compiles");
-    let result = compiled.eval(&ctx, &cols).unwrap();
+    let result = compiled.eval(&ctx, &cols, cols[0].len()).unwrap();
 
     // abs(x - 3) = [2, 1, 0, 1, 2]
     assert_eq!(result.len(), 5);
@@ -347,7 +347,7 @@ fn binop_with_function_result() {
     let add = Expr::bin_op(BinOp::Add, Expr::column("x"), abs);
 
     let compiled = CompiledExpr::new(add).expect("elementwise expression compiles");
-    let result = compiled.eval(&ctx, &cols).unwrap();
+    let result = compiled.eval(&ctx, &cols, cols[0].len()).unwrap();
 
     assert_eq!(result, vec![2.0, 4.0, 6.0, 8.0, 10.0]);
 }
@@ -361,7 +361,7 @@ fn missing_column_is_an_error() {
     let compiled =
         CompiledExpr::new(Expr::column("missing")).expect("elementwise expression compiles");
     let err = compiled
-        .eval(&ctx, &cols)
+        .eval(&ctx, &cols, cols[0].len())
         .expect_err("missing columns should fail closed");
 
     assert!(matches!(err, finstack_quant_core::Error::Input(_)));
@@ -377,4 +377,30 @@ fn unsupported_financial_function_is_an_error() {
         .expect_err("core expr compilation should reject statements-layer functions");
     assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
     let _ = (ctx, cols);
+}
+
+#[test]
+fn literal_broadcast_and_binding_preflight_include_unused_and_empty_columns() {
+    let no_names = SimpleContext::new(Vec::<String>::new()).unwrap();
+    let literal = CompiledExpr::new(Expr::literal(5.0)).unwrap();
+    assert_eq!(literal.eval(&no_names, &[], 3).unwrap(), vec![5.0; 3]);
+    let unknown = CompiledExpr::new(Expr::column("absent")).unwrap();
+    assert!(unknown.eval(&no_names, &[], 0).is_err());
+    let ctx = SimpleContext::new(["unused"]).unwrap();
+    assert!(literal.eval(&ctx, &[&[f64::INFINITY]], 1).is_err());
+    assert!(literal.eval(&ctx, &[&[]], 1).is_err());
+    assert!(literal.eval(&no_names, &[], usize::MAX).is_err());
+}
+
+#[test]
+fn unselected_invalid_branch_still_fails_on_nonempty_input() {
+    let ctx = SimpleContext::new(Vec::<String>::new()).unwrap();
+    let expr = CompiledExpr::new(Expr::if_then_else(
+        Expr::literal(0.0),
+        Expr::call(Function::Ln, vec![Expr::literal(-1.0)]),
+        Expr::literal(1.0),
+    ))
+    .unwrap();
+    assert!(expr.eval(&ctx, &[], 0).unwrap().is_empty());
+    assert!(expr.eval(&ctx, &[], 1).is_err());
 }

@@ -40,7 +40,9 @@ fn test_dv01_sensitivity() {
         .unwrap();
 
     let disc_curve = flat_discount_curve(0.04, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let result = facility.price_with_metrics(
@@ -119,8 +121,10 @@ fn floating_dv01_reflects_forward_reprojection() {
     let fixed = build("RC-DV01-FIXED", RateSpec::Fixed { rate });
 
     let market = MarketContext::new()
-        .insert(flat_discount_curve(rate, as_of, "USD-OIS"))
-        .insert(flat_forward_curve(rate, as_of, "USD-SOFR-3M"));
+        .try_insert(flat_discount_curve(rate, as_of, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(flat_forward_curve(rate, as_of, "USD-SOFR-3M"))
+        .expect("insert market curve");
 
     let dv01_of = |facility: &RevolvingCredit| -> f64 {
         let result = facility

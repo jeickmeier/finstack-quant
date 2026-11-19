@@ -71,7 +71,8 @@ fn build_market(vol: f64) -> MarketContext {
         .unwrap();
 
     MarketContext::new()
-        .insert(disc)
+        .try_insert(disc)
+        .expect("insert market curve")
         .insert_surface(surface)
         .insert_price(
             "EQ-SPOT",
@@ -116,7 +117,7 @@ fn build_option() -> EquityOption {
 ///
 /// # Unit analysis
 ///
-/// `measure_vol_surface_shift` returns the move in **percentage points** (×100 of absolute).
+/// `measure_vol_surface_shift` returns the native sigma change. Taylor converts to points.
 /// A 0.01 absolute shift → 1.0 vol point reported.
 ///
 /// `vega_per_point` must be in **$ per vol point** so that:

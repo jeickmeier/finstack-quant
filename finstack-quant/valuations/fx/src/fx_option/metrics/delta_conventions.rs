@@ -69,16 +69,20 @@ mod tests {
             .expect("FX quote");
         let mut market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider), None));
         for (id, rate) in [("USD-OIS", 0.03_f64), ("EUR-OIS", 0.01_f64)] {
-            market = market.insert(
-                DiscountCurve::builder(id)
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (1.0, (-rate).exp())])
-                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                    .build()
-                    .expect("discount curve"),
-            );
+            market = market
+                .try_insert(
+                    DiscountCurve::builder(id)
+                        .base_date(as_of)
+                        .knots([(0.0, 1.0), (1.0, (-rate).exp())])
+                        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                        .extrapolation(
+                            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                        )
+                        .build()
+                        .expect("discount curve"),
+                )
+                .expect("insert market curve");
         }
         market.insert_surface(
             VolSurface::builder("EURUSD-VOL")

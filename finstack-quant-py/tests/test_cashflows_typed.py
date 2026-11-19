@@ -460,14 +460,14 @@ class TestBuilderSpecs:
 
         # Log-linear factors give piecewise-flat instantaneous forwards: 0.1%
         # to t = 0.05, a 0.01y bridge at their 15.05% average, then 30%.
-        curve = ForwardCurve(
-            "USD-SOFR-3M",
-            dt.date(2025, 1, 1),
-            [(0.05, math.exp(-0.00005)), (0.06, math.exp(-0.001555)), (1.0, math.exp(-0.283555))],
-            interp="log_linear",
-            extrapolation="extend",
-            day_count="act_360",
-        )
+        curve = ForwardCurve({
+            "id": "USD-SOFR-3M",
+            "base_date": dt.date(2025, 1, 1),
+            "knots": [(0.05, math.exp(-0.00005)), (0.06, math.exp(-0.001555)), (1.0, math.exp(-0.283555))],
+            "interp": "log_linear",
+            "extrapolation": "extend",
+            "day_count": "act_360",
+        })
         market = MarketContext().insert(curve)
 
         def build_schedule(overnight_index_constraints: object | None) -> CashFlowSchedule:

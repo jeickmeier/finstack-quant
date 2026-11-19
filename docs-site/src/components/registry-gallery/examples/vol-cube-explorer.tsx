@@ -25,6 +25,7 @@ export function Example({
       initialConvention={variant === "shifted" ? "lognormal" : "normal"}
       colorDomains={{ normal: [0.003, 0.012], lognormal: [0.1, 0.7] }}
       slice={{
+        interpolationMode: "vol",
         initialStrikes:
           variant === "shifted"
             ? [-0.01, -0.005, 0, 0.005, 0.01, 0.02]

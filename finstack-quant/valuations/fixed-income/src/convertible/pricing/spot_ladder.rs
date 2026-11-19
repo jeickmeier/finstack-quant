@@ -372,7 +372,7 @@ mod tests {
             .map(|t| (t, (-RATE * t).exp()))
             .collect();
         MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(AS_OF)
                     .knots(knots)
@@ -382,6 +382,7 @@ mod tests {
                     .build()
                     .expect("curve"),
             )
+            .expect("insert market curve")
             .insert_price(
                 "STOCK",
                 MarketScalar::price(Money::new(100.0, Currency::USD).expect("spot")),

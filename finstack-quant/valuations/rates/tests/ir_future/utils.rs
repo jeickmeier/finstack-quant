@@ -37,7 +37,11 @@ pub fn build_standard_market(as_of: Date, rate: f64) -> MarketContext {
     let disc_curve = build_flat_discount_curve(rate, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(rate, as_of, "USD_LIBOR_3M");
 
-    MarketContext::new().insert(disc_curve).insert(fwd_curve)
+    MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
 }
 
 /// Listed terms for a term-rate SOFR-style future: `notional / 1,000,000`

@@ -317,10 +317,6 @@ fn volatility_shift(
     t1: &MarketContext,
     as_of_t0: Date,
 ) -> Result<Option<f64>> {
-    let expiry = instrument
-        .expiry()
-        .map(|date| (date - as_of_t0).whole_days() as f64 / 365.0)
-        .filter(|years| *years > 0.0);
     let mut result: Option<f64> = None;
     for id in deps.unique_vol_surface_ids() {
         let dependency = deps
@@ -331,12 +327,20 @@ fn volatility_shift(
                 finstack_quant_core::Error::Internal("missing volatility dependency".into())
             })?;
         let shift = if let Ok(surface) = t0.get_surface(id.as_str()) {
-            if expiry.is_some() && dependency.reference_strike.is_some() {
-                measure_vol_surface_shift(id.as_str(), t0, t1, expiry, dependency.reference_strike)?
+            let closing_surface = t1.get_surface(id.as_str())?;
+            if let Some((expiry, strike)) = instrument.expiry().zip(dependency.reference_strike)
+                && surface.secondary_axis()
+                    == finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike
+            {
+                let (opening, closing) = crate::helpers::volatility_expiry_times(
+                    &surface,
+                    &closing_surface,
+                    expiry,
+                    as_of_t0,
+                )?;
+                measure_vol_surface_shift(id.as_str(), t0, t1, opening, closing, strike)?
             } else {
-                // Aggregate Vega only determines a parallel move without a
-                // contractual sampling point. Verify uniformity, never average a twist away.
-                let closing_surface = t1.get_surface(id.as_str())?;
+                // Aggregate Vega without a contractual reference requires a parallel move.
                 let mut uniform: Option<f64> = None;
                 for &tenor in surface.expiries().iter().chain(closing_surface.expiries()) {
                     for &strike in surface
@@ -344,14 +348,9 @@ fn volatility_shift(
                         .iter()
                         .chain(closing_surface.secondary_values())
                     {
-                        let movement = measure_vol_surface_shift(
-                            id.as_str(),
-                            t0,
-                            t1,
-                            Some(tenor),
-                            Some(strike),
-                        )?;
-                        if uniform.is_some_and(|first| (first - movement).abs() > 1e-9) {
+                        let movement =
+                            measure_vol_surface_shift(id.as_str(), t0, t1, tenor, tenor, strike)?;
+                        if uniform.is_some_and(|first| (first - movement).abs() > 1e-11) {
                             return Err(finstack_quant_core::Error::Validation(format!(
                                 "Vega for '{id}' requires reference expiry/strike or bucketed risk for a non-parallel surface move"
                             )));
@@ -363,16 +362,17 @@ fn volatility_shift(
             }
         } else if t0.get_price(id.as_str()).is_ok() {
             // Scalar volatility has the same decimal convention as surface values.
-            let delta = measure_scalar_native_amount_diff(id.as_str(), t0, t1)? * 100.0;
-            if !delta.is_finite() {
-                return Err(Error::Validation(format!(
-                    "scalar volatility shift overflowed for '{id}'"
-                )));
-            }
-            delta
+            measure_scalar_native_amount_diff(id.as_str(), t0, t1)?
         } else {
             continue;
         };
+        // The reported Vega is cash per 0.01 native sigma for both scalars and surfaces.
+        let shift = 100.0 * shift;
+        if !shift.is_finite() {
+            return Err(Error::Validation(format!(
+                "volatility shift overflowed for '{id}'"
+            )));
+        }
         if result.is_some_and(|first| (first - shift).abs() > 1e-9) {
             return Err(finstack_quant_core::Error::Validation(
                 "Aggregate Vega cannot distinguish different moves on multiple volatility sources; supply per-source risk".into()

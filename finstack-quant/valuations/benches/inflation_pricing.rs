@@ -111,8 +111,10 @@ fn create_inflation_market() -> MarketContext {
     );
 
     MarketContext::new()
-        .insert(disc_ois)
-        .insert(infl_curve)
+        .try_insert(disc_ois)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve")
         .insert_inflation_index(index)
         .insert_surface(vol)
 }

@@ -164,7 +164,7 @@ impl Hw1fPaths<'_> {
         P: Payoff,
     {
         let process = HullWhite1FProcess::new(self.process_params.clone());
-        let prepared = ExactHullWhite1F::prepare_grid(&process, self.grid);
+        let prepared = ExactHullWhite1F::prepare_grid(&process, self.grid)?;
         let base_rng = PhiloxRng::new(self.config.seed);
 
         // Every leg consumes the same interval coefficients. Only its normal
@@ -187,7 +187,7 @@ impl Hw1fPaths<'_> {
                 let mut next_event = 0usize;
                 for (step, interval) in prepared.get_steps().iter().enumerate() {
                     let dt = self.grid.dt(step);
-                    rng.fill_std_normals(&mut z);
+                    rng.fill_std_normals(&mut z)?;
                     if anti == 1 {
                         z[0] = -z[0];
                     }
@@ -439,13 +439,14 @@ mod tests {
                 let mut observations = Vec::new();
                 let mut next_event = 0;
                 for step in 0..driver.grid.num_steps() {
-                    rng.fill_std_normals(&mut z);
+                    rng.fill_std_normals(&mut z).expect("normal draws");
                     if anti == 1 {
                         z[0] = -z[0];
                     }
                     let previous_rate = rate[0];
                     let dt = driver.grid.dt(step);
-                    disc.step(&process, driver.grid.time(step), dt, &mut rate, &z, &mut []);
+                    disc.step(&process, driver.grid.time(step), dt, &mut rate, &z, &mut [])
+                        .expect("valid simulation step");
                     bank *= bank_step_factor(previous_rate, rate[0], dt);
                     while next_event < driver.event_step_indices.len()
                         && driver.event_step_indices[next_event] == step + 1

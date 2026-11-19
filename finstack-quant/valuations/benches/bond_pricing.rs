@@ -152,8 +152,10 @@ fn create_market() -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(curve)
-        .insert(forward_curve)
+        .try_insert(curve)
+        .expect("insert market curve")
+        .try_insert(forward_curve)
+        .expect("insert market curve")
         .insert_series(fixings)
 }
 
@@ -166,7 +168,9 @@ fn create_hazard_market() -> MarketContext {
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
-    create_market().insert(hazard)
+    create_market()
+        .try_insert(hazard)
+        .expect("insert market curve")
 }
 
 fn bench_bond_pv(c: &mut Criterion) {

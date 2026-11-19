@@ -1125,6 +1125,7 @@ impl CashFlow {
     /// - Accrual factor must be finite (not NaN or Infinity)
     /// - Rate (if present) must be finite (not NaN or Infinity)
     /// - Reset date (if present) must not be after the payment date
+    /// - A net derivative settlement has a zero accrual factor and no coupon accrual metadata
     /// - Principal delta (if present) must share the amount's currency
     /// - Accrual metadata (if present) must have start before end, a coupon
     ///   period with start before end, and a finite projected index rate
@@ -1162,6 +1163,13 @@ impl CashFlow {
                 expected: self.amount.currency(),
                 actual: delta.currency(),
             });
+        }
+        if self.kind == CFKind::DerivativeSettlement
+            && (self.accrual.is_some() || self.accrual_factor != 0.0)
+        {
+            return Err(crate::Error::Validation(
+                "net derivative settlement cannot carry coupon accrual".into(),
+            ));
         }
         // Every principal-like row states its complete principal effect, an
         // explicit signed delta (zero included) and its balance date; other
@@ -1284,6 +1292,26 @@ mod tests {
     #[test]
     fn deserialization_validates_rows_and_accrual_slices() {
         // Record CORE-CONVENTIONS-015 #10: no wire route creates an invalid row.
+        let settlement_with_accrual = r#"{"date":"2025-07-01","amount":{"amount":"5","currency":"USD"},
+            "kind":"derivative_settlement","accrual_factor":0.25}"#;
+        assert!(serde_json::from_str::<CashFlow>(settlement_with_accrual).is_err());
+        let settlement = serde_json::json!({
+            "date": "2025-07-01", "amount": {"amount": "5", "currency": "USD"},
+            "kind": "derivative_settlement", "accrual_factor": 0.0
+        });
+        assert!(serde_json::from_value::<CashFlow>(settlement.clone()).is_ok());
+        let mut with_period = settlement;
+        with_period["accrual"] = serde_json::json!({
+            "start": "2025-01-01", "end": "2025-07-01", "day_count": "act_360",
+            "context": {"calendar_id":null,"frequency":null,"bus_basis":null,
+                "coupon_period":null,"end_is_termination_date":false}
+        });
+        assert!(
+            serde_json::from_value::<CashFlow>(with_period)
+                .unwrap_err()
+                .to_string()
+                .contains("settlement cannot carry coupon accrual")
+        );
         let pik_with_cash = r#"{"date":"2025-07-01","amount":{"amount":"5","currency":"USD"},
             "kind":"pik","accrual_factor":0.0,
             "principal_delta":{"amount":"5","currency":"USD"},"principal_date":"2025-07-01"}"#;

@@ -166,7 +166,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     fn bullet_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
@@ -524,10 +526,12 @@ mod tests {
             }],
             puts: Vec::new(),
         });
-        let market = test_market(as_of).insert(
-            HazardCurve::flat("ACME-HZD", as_of, 0.02, 0.4, DayCount::Act365F)
-                .expect("hazard curve"),
-        );
+        let market = test_market(as_of)
+            .try_insert(
+                HazardCurve::flat("ACME-HZD", as_of, 0.02, 0.4, DayCount::Act365F)
+                    .expect("hazard curve"),
+            )
+            .expect("insert market curve");
 
         let context = test_context(&bond, &market, as_of);
         let (risk_bond, base) = option_risk_bond_and_base_price(&bond, &context)
