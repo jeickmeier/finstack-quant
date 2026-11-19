@@ -42,8 +42,10 @@ fn market(forward: f64) -> MarketContext {
         .map(|days| (CLOSE - time::Duration::days(days), forward))
         .collect();
     MarketContext::new()
-        .insert(flat_discount_curve(0.03, CLOSE, "USD-OIS"))
-        .insert(flat_forward_curve(forward, CLOSE, INDEX))
+        .try_insert(flat_discount_curve(0.03, CLOSE, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(flat_forward_curve(forward, CLOSE, INDEX))
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 format!("FIXING:{INDEX}"),

@@ -23,7 +23,9 @@ fn flat_jpy_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("JPY discount curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// ACT/365F remaining life is exactly two years on this date pair (non-leap).
@@ -257,7 +259,11 @@ fn quote_engine_japanese_simple_yield_rejects_frn() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
     let bond = Bond::floating(
         finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
             id: "FRN-SIMPLE".into(),

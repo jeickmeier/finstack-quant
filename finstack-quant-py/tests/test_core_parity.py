@@ -294,6 +294,20 @@ class TestCoreTypesParity:
                 Rate(bad)
         assert str(Rate(0.05)) == "0.05"
 
+    def test_special_function_domains_and_extreme_cauchy_tail(self) -> None:
+        from finstack_quant.core.math import special_functions as sf
+
+        for evaluate in (sf.norm_cdf, sf.norm_pdf, sf.log_norm_cdf, sf.erf):
+            with pytest.raises(ValueError, match="NaN"):
+                evaluate(math.nan)
+        with pytest.raises(RuntimeError):
+            sf.log_norm_cdf(-1e308)
+        with pytest.raises(RuntimeError):
+            sf.norm_pdf_with_params(0.0, 0.0, 5e-324)
+        with pytest.raises(ValueError, match="finite positive"):
+            sf.ln_gamma(-1.0)
+        assert sf.student_t_cdf(-1e200, 1.0) * 1e200 * math.pi == pytest.approx(1.0, rel=1e-12)
+
     def test_student_t_invalid_degrees_of_freedom_raises(self) -> None:
         from finstack_quant.core.math import linalg, special_functions
 
@@ -306,8 +320,9 @@ class TestCoreTypesParity:
                 special_functions.student_t_inv_cdf(bad_p, 5.0)
         assert special_functions.student_t_inv_cdf(0.0, 5.0) == -math.inf
         assert special_functions.student_t_inv_cdf(1.0, 5.0) == math.inf
-        assert math.isnan(special_functions.standard_normal_inv_cdf(-0.1))
-        assert math.isnan(special_functions.standard_normal_inv_cdf(1.1))
+        for bad_p in (-0.1, 1.1, math.nan):
+            with pytest.raises(ValueError, match="probability"):
+                special_functions.standard_normal_inv_cdf(bad_p)
         with pytest.raises(linalg.CholeskyError, match="not symmetric"):
             linalg.cholesky_decomposition([[1.0, 0.5], [0.4, 1.0]])
         with pytest.raises(linalg.CholeskyError, match="not symmetric"):
@@ -613,19 +628,17 @@ class TestForwardCurveParity:
 
     @staticmethod
     def _curve(**overrides: object) -> ForwardCurve:
-        kwargs: dict[str, object] = {
+        options: dict[str, object] = {
+            "id": "USD-SOFR",
+            "base_date": date(2024, 1, 1),
+            "knots": [(1.0, math.exp(-0.045)), (5.0, math.exp(-0.25))],
             "interp": "log_linear",
             "extrapolation": "extend",
             "day_count": "act_360",
             "index_tenor": "3M",
         }
-        kwargs.update(overrides)
-        return ForwardCurve(
-            "USD-SOFR",
-            date(2024, 1, 1),
-            [(1.0, math.exp(-0.045)), (5.0, math.exp(-0.25))],
-            **kwargs,  # type: ignore[arg-type]
-        )
+        options.update(overrides)
+        return ForwardCurve(options)  # type: ignore[arg-type]
 
     def test_construction(self) -> None:
         """ID, base date, index tenor and the prepended unit factor survive construction."""
@@ -640,17 +653,11 @@ class TestForwardCurveParity:
         """The projection factor at an exact knot matches input."""
         assert self._curve().df(1.0) == pytest.approx(math.exp(-0.045), abs=1e-15)
 
-    def test_conventions_are_keyword_only(self) -> None:
-        """Conventions are keyword-only so a reordering can never be silent."""
-        with pytest.raises(TypeError):
-            ForwardCurve(  # type: ignore[misc]
-                "USD-SOFR",
-                date(2024, 1, 1),
-                [(1.0, 0.96)],
-                "log_linear",
-                "extend",
-                "act_360",
-            )
+    def test_constructor_rejects_incomplete_or_unknown_options(self) -> None:
+        with pytest.raises(TypeError, match="missing ForwardCurve option 'base_date'"):
+            ForwardCurve({"id": "USD-SOFR"})  # type: ignore[arg-type]
+        with pytest.raises(TypeError, match="unknown ForwardCurve option 'extrapoltion'"):
+            self._curve(extrapoltion="flat")
 
     def test_index_tenor_is_optional_and_readonly(self) -> None:
         assert self._curve(index_tenor=None).index_tenor is None
@@ -664,21 +671,31 @@ class TestForwardCurveParity:
         t_6m = 183.0 / 360.0
         p_3m = 1.0 / (1.0 + 0.04 * t_3m)
         p_6m = p_3m / (1.0 + 0.045 * (t_6m - t_3m))
-        curve = ForwardCurve(
-            "USD-SOFR",
-            date(2024, 1, 1),
-            [(t_3m, p_3m), (t_6m, p_6m)],
-            interp="log_linear",
-            extrapolation="extend",
-            day_count="act_360",
-        )
+        curve = ForwardCurve({
+            "id": "USD-SOFR",
+            "base_date": date(2024, 1, 1),
+            "knots": [(t_3m, p_3m), (t_6m, p_6m)],
+            "interp": "log_linear",
+            "extrapolation": "extend",
+            "day_count": "act_360",
+        })
         assert curve.rate_between(0.0, t_3m, t_3m) == pytest.approx(0.04, abs=1e-14)
         assert curve.rate_between(t_3m, t_6m, t_6m - t_3m) == pytest.approx(0.045, abs=1e-14)
 
     def test_constructor_runtime_signature_matches_stub(self) -> None:
-        assert str(signature(ForwardCurve)) == (
-            "(id, base_date, knots, *, interp, extrapolation, day_count, index_tenor=None)"
-        )
+        assert str(signature(ForwardCurve)) == "(options)"
+
+    def test_bus252_uses_the_constructor_calendar(self) -> None:
+        curve = self._curve(day_count="bus_252", calendar_id="usny")
+        assert curve.calendar_id == "usny"
+        # January 1 is a holiday, leaving Jan 2–5 as the four
+        # business days before Monday, January 8.
+        assert curve.df("2024-01-08") == pytest.approx(curve.df(4.0 / 252.0), rel=1e-14)
+        assert ForwardCurve.from_json(curve.to_json()).calendar_id == "usny"
+        with pytest.raises(ValueError, match="requires a holiday calendar"):
+            self._curve(day_count="bus_252")
+        with pytest.raises(KeyError):
+            self._curve(day_count="bus_252", calendar_id="unknown-calendar")
 
     def test_from_discount_curve_shares_factors(self) -> None:
         discount = DiscountCurve.flat("USD-OIS", date(2024, 1, 1), 0.04, "act_365f")
@@ -848,7 +865,19 @@ class TestMarketContextParity:
         )
         assert mc.get_discount("SHARED").id == "SHARED"
         assert mc.get_series("SHARED").id == "SHARED"
-        mc.insert(FxDeltaVolSurface("SHARED", "EUR/USD", [1.0], [0.12], [0.01], [0.002]))
+        mc.insert(
+            FxDeltaVolSurface(
+                "SHARED",
+                "EUR/USD",
+                [1.0],
+                [0.12],
+                [0.01],
+                [0.002],
+                delta_convention="forward_unadjusted",
+                atm_convention="delta_neutral_straddle",
+                butterfly_convention="smile",
+            )
+        )
         assert mc.get_fx_delta_vol_surface("SHARED").id == "SHARED"
         with pytest.raises(ValueError, match="Cannot replace curve"):
             mc.insert(ForwardCurve.flat("SHARED", date(2024, 1, 1), 0.04, "act_360"))
@@ -873,7 +902,7 @@ class TestMarketContextParity:
 
         retrieved = mc.get_base_correlation("CDX-IG-CORR")
         assert retrieved.id == "CDX-IG-CORR"
-        assert retrieved.correlation(3.0) == pytest.approx(0.20)
+        assert retrieved.get_correlation(3.0) == pytest.approx(0.20)
 
     def test_insert_and_get_credit_index(self) -> None:
         hazard = HazardCurve(
@@ -1389,3 +1418,13 @@ def test_slice2_cholesky_error_kind_split() -> None:
             linalg.cholesky_decomposition(non_spd)
         assert not isinstance(excinfo.value, linalg.CholeskyError)
         assert not isinstance(excinfo.value, ValueError)
+
+
+def test_market_preserves_inflation_series_basis() -> None:
+    series = {"series_id": "BLS:CUUR0000SA0", "reference_base": "1982-84=100", "seasonally_adjusted": False}
+    index = InflationIndex("US-CPI", [InflationObservation("2025-01-01", 105, "2025-02-12")], "USD", "2025-02-12")
+    payload = json.loads(index.to_json())
+    payload["series"] = series
+    market = MarketContext().insert_inflation_index(InflationIndex.from_json(json.dumps(payload)))
+    restored = MarketContext.from_json(market.to_json()).get_inflation_index("US-CPI")
+    assert json.loads(restored.to_json())["series"] == series

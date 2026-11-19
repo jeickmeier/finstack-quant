@@ -152,7 +152,7 @@ const displays = [
     api: "models.volatility.materializeCubeTenorSlice",
     route: "returned-surface",
     convention:
-      "Returned VolSurface JSON (expiry by strike) in the request's VolatilityConvention: normal, or Black/shifted-Black with displacements as Rust returns them; fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. Off-node tenors are Rust-interpolated.",
+      "Returned VolSurface JSON (expiry by strike) in the request's VolatilityConvention: normal, or Black/shifted-Black with displacements as Rust returns them; fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. The selected interpolation mode controls the returned surface between expiries. Rust interpolates off-node tenors.",
   },
   {
     id: "vol-cube-expiry-slice",
@@ -166,7 +166,7 @@ const displays = [
     api: "models.volatility.SabrSmile#generateSmile",
     route: "returned-smile",
     convention:
-      "SabrSmile of one stored cube node (paramsAt, forwardAt, the node expiry): normal volatility when beta < 1e-4, Black otherwise, as returned. validateNoArbitrage takes an explicit continuously compounded decimal rate; repairArbitrage runs only when the caller supplies its passes. Never routed through a surface check.",
+      "SabrSmile uses the selected quote type and stored node parameters, forward and expiry. Normal volatility is in annualized rate units. Black volatility is annualized relative volatility and uses the node displacement for shifted Black. validateNoArbitrage takes an explicit continuously compounded decimal rate. repairArbitrage uses the caller's iteration count.",
   },
   {
     id: "surface-arbitrage-badge",
@@ -189,7 +189,7 @@ const displays = [
     api: "models.volatility.materializeFxDeltaSurface",
     route: "returned-surface",
     convention:
-      "Returned VolSurface JSON (expiry by strike, Rust quote type and interpolation metadata); qualified delivery forwards aligned with surface.expiries (quote per base) are explicit caller input, never defaulted or looked up.",
+      "Returns VolSurface JSON on an expiry-by-strike grid. Callers provide the grid interpolation mode and the delivery forwards in quote per base units, one per surface expiry.",
   },
   {
     id: "fx-delta-pillars",

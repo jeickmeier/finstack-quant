@@ -680,7 +680,8 @@ mod tests {
             .expect("vol surface");
 
         MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "SPX",
@@ -743,6 +744,15 @@ mod tests {
         0x40275548b49fed20, 0x4025674b21ed1b07, 0x3fe51c02da16cfe8, 0x3fc5fabdb96b3b00,
     ];
 
+    // Ubuntu 24.04.5, runner image 20261111.127.1, Rust 1.97.1.
+    #[rustfmt::skip]
+    const UBUNTU_24_04_5_BARRIER_PDE_PIN: &[u64] = &[
+        0x40223cefad505ebe, 0x4026ccb20dcfa68c, 0x3fb5b3baf9065e4e, 0x3fd7c45b2139740e,
+        0x4009e4687b5f3e38, 0x3feea3021fe08220, 0x401d85c5917095fd, 0x401c610bed6e62ae,
+        0x3fe60bef814818ea, 0x3ffa7352f64660c5, 0x401b39112278152a, 0x401d2bd07148442f,
+        0x40275548b49fed20, 0x4025674b21ed1b07, 0x3fe51c02da16cfe8, 0x3fc5fabdb96b3b00,
+    ];
+
     fn barrier_pde_pin_values() -> Vec<u64> {
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
@@ -788,7 +798,12 @@ mod tests {
     fn barrier_pde_stepper_bit_pin() {
         let values = barrier_pde_pin_values();
         assert!(
-            values.as_slice() == BARRIER_PDE_PIN || values.as_slice() == LINUX_BARRIER_PDE_PIN,
+            [
+                BARRIER_PDE_PIN,
+                LINUX_BARRIER_PDE_PIN,
+                UBUNTU_24_04_5_BARRIER_PDE_PIN
+            ]
+            .contains(&values.as_slice()),
             "barrier PDE prices moved off the macOS and Linux libm pins:\n{values:#x?}"
         );
     }
@@ -909,8 +924,13 @@ mod tests {
             let df = (-rate * t).exp();
             let d1 = ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * t.sqrt());
             let d2 = d1 - vol * t.sqrt();
-            let vanilla = spot * finstack_quant_core::math::special_functions::norm_cdf(d1)
-                - strike * df * finstack_quant_core::math::special_functions::norm_cdf(d2);
+            let vanilla = spot
+                * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                    .expect("valid normal variate")
+                - strike
+                    * df
+                    * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                        .expect("valid normal variate");
             assert!(
                 pv >= -1e-6 && pv <= vanilla + 1e-6,
                 "up-and-out call price {pv:.6} at spot {spot} must lie in \
@@ -993,8 +1013,13 @@ mod tests {
         let df = (-rate * t).exp();
         let d1 = ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * t.sqrt());
         let d2 = d1 - vol * t.sqrt();
-        let vanilla = spot * finstack_quant_core::math::special_functions::norm_cdf(d1)
-            - strike * df * finstack_quant_core::math::special_functions::norm_cdf(d2);
+        let vanilla = spot
+            * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                .expect("valid normal variate")
+            - strike
+                * df
+                * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                    .expect("valid normal variate");
         let analytical_ko = barrier_price(
             &BarrierParams::new(spot, strike, barrier, t, rate, 0.0, vol),
             BarrierType::DownAndOut,
@@ -1089,7 +1114,7 @@ mod tests {
         let d2 = ((100.0_f64 / 120.0).ln() + (0.05 - 0.5 * 0.25 * 0.25) * t) / (0.25 * t.sqrt());
         let expected = bs_price_unchecked(100.0, 100.0, 0.05, 0.0, 0.25, t, OptionType::Call)
             - bs_price_unchecked(100.0, 120.0, 0.05, 0.0, 0.25, t, OptionType::Call)
-            - 20.0 * (-0.05 * t).exp() * norm_cdf(d2);
+            - 20.0 * (-0.05 * t).exp() * norm_cdf(d2).expect("valid normal variate");
         let pde = BarrierOptionPdePricer {
             space_points: 1_200,
             time_steps: 800,

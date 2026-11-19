@@ -60,11 +60,16 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve");
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 fn spec(application: OvernightIndexConstraintApplication) -> FloatingRateSpec {
     FloatingRateSpec {
+        index_id: "USD-SOFR-OIS".into(),
         forward_curve_id: "USD-SOFR-OIS".into(),
         spread_bp: Decimal::from(200),
         gearing: Decimal::ONE,

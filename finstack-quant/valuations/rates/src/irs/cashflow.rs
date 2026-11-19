@@ -43,6 +43,7 @@ pub(crate) fn float_leg_coupon_spec(
 ) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: leg.index_id.clone(),
             forward_curve_id: leg.forward_curve_id.clone(),
             spread_bp: leg.spread_bp,
             gearing: Decimal::ONE,
@@ -255,7 +256,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                 finstack_quant_valuations_core::instruments::pricing::overnight::OvernightCouponProjectionInput {
                     curve: projection_curve,
                     fixings,
-                    fixing_id: float.forward_curve_id.as_str(),
+                    fixing_id: float.index_id.as_str(),
                     as_of,
                     accrual_start,
                     accrual_end,
@@ -276,7 +277,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         if include_projected_fixings {
             projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
                 finstack_quant_cashflows::fixings::ProjectedFixing {
-                    series_id: fixing_series_id(float.forward_curve_id.as_str()),
+                    series_id: fixing_series_id(float.index_id.as_str()),
                     date: observation.observation_start,
                     value: Some(observation.projected_rate),
                 }
@@ -428,7 +429,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
         };
         let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
             market,
-            float.forward_curve_id.as_str(),
+            float.index_id.as_str(),
         )
         .ok();
         let valuation_date = as_of.unwrap_or_else(|| {
@@ -554,6 +555,7 @@ mod tests {
         irs.notional = Money::from((10_000_000_i64, irs.notional.currency()));
         irs.float_leg.start = date!(2025 - 01 - 02);
         irs.float_leg.end = date!(2025 - 04 - 02);
+        irs.float_leg.index_id = "TEST-TERM".into();
         irs.float_leg.forward_curve_id = "TEST-TERM".into();
         irs.float_leg.frequency = Tenor::quarterly();
         irs.float_leg.compounding = FloatingLegCompounding::Simple;
@@ -569,7 +571,9 @@ mod tests {
             finstack_quant_core::dates::DayCount::Act365F,
         )
         .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let as_of = date!(2025 - 02 - 01);
         assert!(
             float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true).is_err()
@@ -629,16 +633,18 @@ mod tests {
         irs.float_leg.stub = StubKind::ShortFront;
         irs.float_leg.reset_lag_days = 0;
         irs.float_leg.payment_lag_days = 2;
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .day_count(DayCount::Act365F)
-                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-                .interp(InterpStyle::Linear)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("discount curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                    .interp(InterpStyle::Linear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("discount curve"),
+            )
+            .expect("insert market curve");
 
         for (label, compounding, raw_dates, exported_dates) in [
             (
@@ -724,7 +730,8 @@ mod tests {
                 raw_dates
             );
             assert!(full.get_meta().projected_fixings.iter().all(|fixing| {
-                fixing.series_id == "FIXING:USD-OIS" && fixing.value.is_some_and(f64::is_finite)
+                fixing.series_id == fixing_series_id(irs.float_leg.index_id.as_str())
+                    && fixing.value.is_some_and(f64::is_finite)
             }));
             let _ = irs.value(&market, as_of).expect("economics-only value");
             let after = irs.cashflow_schedule(&market, as_of).expect("full export");
@@ -907,7 +914,7 @@ mod tests {
         irs.float_leg.compounding =
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
@@ -917,7 +924,11 @@ mod tests {
                     .build()
                     .expect("discount"),
             )
-            .insert(ForwardCurve::flat("USD-SOFR", as_of, 0.0, DayCount::Act360).expect("forward"));
+            .expect("insert market curve")
+            .try_insert(
+                ForwardCurve::flat("USD-SOFR", as_of, 0.0, DayCount::Act360).expect("forward"),
+            )
+            .expect("insert market curve");
 
         let schedule = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true)
             .expect("compounded schedule");
@@ -1026,6 +1037,7 @@ mod tests {
                 })
                 .float_leg(FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
+                    index_id: disc_id.as_str().into(),
                     forward_curve_id: disc_id.clone(), // single-curve OIS
                     spread_bp: Decimal::ZERO,
                     frequency: Tenor::quarterly(),
@@ -1053,7 +1065,9 @@ mod tests {
         let swap_cutoff = build_swap("OIS-CUTOFF-5D", FloatingLegCompounding::rate_cutoff(5));
 
         // Single-curve: only the discount curve is loaded (proj is None).
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let sched_no_cutoff =
             float_leg_schedule_with_curves_as_of(&swap_no_cutoff, Some(&ctx), Some(as_of), true)

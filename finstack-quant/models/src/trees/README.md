@@ -219,7 +219,7 @@ let price = tree.backward_induction(&terminal_values, |step, node, continuation|
 (`terminal_values.len()` must equal `tree.num_nodes(tree.num_steps())`) and a
 closure `(step, node_idx, continuation_value) -> f64`. `calibrate` is the
 single entry point: pass `&[]` as the mandatory times for a uniform grid.
-`HullWhiteTreeConfig::with_volatility` supplies a left-continuous
+`HullWhiteTreeConfig::with_volatility` supplies a right-continuous
 piecewise-constant `σ` schedule whose knots are merged into the grid so no
 transition straddles a change.
 

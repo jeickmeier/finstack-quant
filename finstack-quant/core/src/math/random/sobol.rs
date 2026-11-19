@@ -1,30 +1,8 @@
-//! Sobol quasi-Monte Carlo sequence with Owen scrambling.
+//! Finite 32-bit Sobol points in natural binary index order using Joe–Kuo directions.
 //!
-//! Sobol sequences are low-discrepancy quasi-random sequences that
-//! provide better convergence than pseudo-random for smooth payoffs.
-//!
-//! Owen scrambling adds randomization while preserving low-discrepancy
-//! properties, enabling error estimation.
-//!
-//! # Owen Scrambling Implementation
-//!
-//! This implementation uses an **approximate** Owen scramble in the style of
-//! Owen (1995, 1997): each bit's flip decision is a hash of all higher-order
-//! bits XOR a per-bit seed, not the canonical nested-uniform permutation
-//! tree. It decorrelates independent replications, which is what
-//! randomized-QMC error estimation needs, but it does not strictly guarantee
-//! the (t,m,s)-net-preserving randomization that scrambled-net variance
-//! theory assumes. Convergence-rate claims (e.g. the `O(n^{-3/2} log n)`
-//! scrambled-net RMSE) should therefore be read as heuristic for this
-//! scramble; see [`SobolRng`]'s `owen_scramble` docs for details and
-//! upgrade paths.
-//!
-//! # Dimension Support
-//!
-//! This implementation supports up to 40 dimensions using direction numbers
-//! from Joe & Kuo (2008). For higher dimensions (up to 21201), use the
-//! direction number tables available at:
-//! <https://web.maths.unsw.edu.au/~fkuo/sobol/>
+//! An optional seeded prefix hash permutes each coordinate's binary digits.
+//! This permutation preserves dyadic box structure. Its seed law and replicate
+//! uncertainty are considerations for the estimator using the sequence.
 //!
 //! # References
 //!
@@ -49,7 +27,7 @@ use crate::math::special_functions::standard_normal_inv_cdf;
 pub const MAX_SOBOL_DIMENSION: usize = 40;
 
 /// Distinct points in one Sobol period given 32-bit direction numbers.
-const SOBOL_PERIOD: u64 = 1 << 32;
+pub const SOBOL_PERIOD: u64 = 1 << 32;
 
 /// Combine two values into a deterministic hash.
 ///
@@ -66,127 +44,51 @@ fn hash_combine(seed: u64, value: u64) -> u32 {
     h as u32
 }
 
-/// Sobol sequence generator with Owen scrambling.
-///
-/// This implementation supports up to [`MAX_SOBOL_DIMENSION`] dimensions using
-/// direction numbers from Joe & Kuo (2008). For production use with higher
-/// dimensions (e.g., pricing baskets with many underlyings), consider loading
-/// direction numbers from the full Joe & Kuo tables.
-///
-/// # Owen Scrambling
-///
-/// Uses recursive bitwise Owen scrambling where each bit's permutation depends
-/// on all higher-order bits. This preserves the low-discrepancy structure while
-/// providing randomization for variance estimation.
-///
-/// # Dimension Requirements
-///
-/// - Single-asset paths: 1 dimension per timestep
-/// - Multi-asset (basket, correlation): `n_assets × n_timesteps` dimensions
-/// - Heston/stochastic vol: 2 dimensions per timestep
-///
-/// For a 10-asset basket with 252 daily steps: 2520 dimensions (requires extended tables).
-///
-/// # Example
-///
-/// ```rust
-/// use finstack_quant_core::math::random::SobolRng;
-///
-/// // Create 3D Sobol sequence with Owen scrambling
-/// let mut sobol = SobolRng::try_new(3, 12345).expect("valid dimension");
-///
-/// // Generate 100 quasi-random points
-/// let mut points = vec![0.0; 3 * 100];
-/// sobol.fill_u01(&mut points);
-/// assert!(points.iter().all(|&x| x > 0.0 && x < 1.0));
-/// ```
+/// Low-discrepancy vector sequence with up to 40 dimensions and 2^32 points per run.
+/// The cursor selects the next point. Cloning copies that position and all digit permutations.
 #[derive(Clone, Debug)]
 pub struct SobolRng {
-    /// Current index in the sequence
     index: u64,
-    /// Dimension
     dimension: usize,
-    /// Whether Owen scrambling is applied (a zero `scramble_seed` disables it).
-    scrambled: bool,
-    /// Scramble matrices for proper Owen scrambling (32 values per dimension)
-    /// Each row contains hash seeds for recursive bit permutation
-    scramble_matrices: Vec<[u32; 32]>,
-    /// Direction numbers for Sobol construction
-    direction_numbers: Vec<Vec<u32>>,
-    /// Cached raw Sobol integer per dimension at the current [`Self::index`].
-    ///
-    /// Advancing one point only changes the bits below (and including) the
-    /// lowest carry position of the index, so the next value follows from the
-    /// previous one with a handful of XORs instead of rescanning every bit of
-    /// the index. Sequence output is identical to recomputing from scratch.
-    state: Vec<u32>,
+    bit_seeds: Vec<[u32; 32]>,
+    direction_numbers: Vec<[u32; 32]>,
+    state: [u32; MAX_SOBOL_DIMENSION],
 }
 
 impl SobolRng {
-    /// Fallible constructor for a new Sobol sequence.
+    /// Construct a generator at point zero.
     ///
-    /// The returned generator starts before the first point. A zero
-    /// `scramble_seed` disables Owen scrambling; any nonzero seed selects a
-    /// deterministic, dimension-specific scramble, so equal `(dimension,
-    /// scramble_seed)` inputs reproduce the same sequence.
+    /// # Arguments
     ///
-    /// # Errors
-    ///
-    /// Returns an error if `dimension` is zero or exceeds
-    /// [`MAX_SOBOL_DIMENSION`].
-    pub fn try_new(dimension: usize, scramble_seed: u64) -> crate::Result<Self> {
-        if dimension == 0 || dimension > MAX_SOBOL_DIMENSION {
+    /// * `dimension` - Number of coordinates per point, from 1 through 40.
+    /// * `scramble_seed` - Optional seed for the prefix hash digit permutation.
+    ///   `None` preserves the raw Sobol directions. Every `Some` value selects a permutation.
+    pub fn new(dimension: usize, scramble_seed: Option<u64>) -> crate::Result<Self> {
+        if !(1..=MAX_SOBOL_DIMENSION).contains(&dimension) {
             return Err(crate::Error::Validation(format!(
                 "Sobol dimension must be 1-{MAX_SOBOL_DIMENSION}, got {dimension}"
             )));
         }
-
-        // Initialize direction numbers (simplified for first 8 dimensions)
-        let direction_numbers = initialize_direction_numbers(dimension);
-
-        // Generate scrambling seeds and matrices for proper Owen scrambling
-        let mut scramble_matrices = Vec::with_capacity(dimension);
-
-        for i in 0..dimension {
-            // Initialize scramble matrix for this dimension
-            // Each row provides hash seeds for the recursive bit scrambling
-            let mut matrix = [0u32; 32];
-            if scramble_seed != 0 {
-                // Create dimension-specific seed using a mixing function
-                let base_seed = hash_combine(scramble_seed, i as u64);
-                for (bit, entry) in matrix.iter_mut().enumerate() {
-                    // Generate deterministic but uncorrelated seeds for each bit level
-                    *entry = hash_combine(base_seed as u64, bit as u64);
-                }
+        let direction_numbers = initialize_direction_numbers(dimension)?;
+        let mut bit_seeds = Vec::new();
+        if let Some(seed) = scramble_seed {
+            bit_seeds
+                .try_reserve_exact(dimension)
+                .map_err(|e| crate::Error::Internal(format!("Sobol digit seed allocation: {e}")))?;
+            for d in 0..dimension {
+                let base = hash_combine(seed, d as u64);
+                bit_seeds.push(std::array::from_fn(|bit| {
+                    hash_combine(u64::from(base), bit as u64)
+                }));
             }
-            scramble_matrices.push(matrix);
         }
-
         Ok(Self {
             index: 0,
             dimension,
-            scrambled: scramble_seed != 0,
-            scramble_matrices,
+            bit_seeds,
             direction_numbers,
-            // At index 0 every dimension's value is 0.
-            state: vec![0; dimension],
+            state: [0; MAX_SOBOL_DIMENSION],
         })
-    }
-
-    /// Fill `buf` with the next Sobol point, avoiding per-call allocation.
-    ///
-    /// Writes `min(buf.len(), dimension)` values into `buf`. Advances the
-    /// sequence index by one regardless of buffer length.
-    ///
-    /// # Arguments
-    ///
-    /// * `buf` - Caller-owned output buffer, which must have the documented minimum length.
-    fn fill_point(&mut self, buf: &mut [f64]) {
-        for (d, slot) in buf.iter_mut().enumerate().take(self.dimension) {
-            let value = self.state[d];
-            *slot = self.owen_scramble(value, d);
-        }
-        self.advance();
     }
 
     /// Raw Sobol integer for dimension `d` at an arbitrary sequence index.
@@ -196,7 +98,7 @@ impl SobolRng {
     /// equivalence tests that pin the incremental cache to this definition.
     fn value_at(&self, index: u64, d: usize) -> u32 {
         let mut value = 0u32;
-        let mut index = index % SOBOL_PERIOD;
+        let mut index = index;
         let mut bit = 0;
 
         while index > 0 {
@@ -210,72 +112,11 @@ impl SobolRng {
         value
     }
 
-    /// Advance one point: increment the index and fold only the changed
-    /// low-order bits into the cached per-dimension state.
-    ///
-    /// Going from index `i` to `i + 1` flips bits `0..c` of the index (all
-    /// ones) down to zero and raises bit `c`, where `c = ctz(i + 1)`. The
-    /// state update is therefore `state ^= XOR(dir[0..c]) ^ dir[c]`,
-    /// amortized O(1). After the 2^32-point period the generator wraps to
-    /// index 0 and repeats the sequence.
-    fn advance(&mut self) {
-        if self.index + 1 == SOBOL_PERIOD {
-            self.reset();
-            return;
-        }
-        let c = (self.index + 1).trailing_zeros() as usize;
-        self.index += 1;
-        for (d, slot) in self.state.iter_mut().enumerate() {
-            let mut delta = 0u32;
-            for b in 0..c {
-                delta ^= self.direction_numbers[d][b];
-            }
-            delta ^= self.direction_numbers[d][c];
-            *slot ^= delta;
-        }
-    }
-
-    /// Apply an Owen-style scramble to a Sobol value.
-    ///
-    /// Owen scrambling (Owen 1995, 1997) applies a recursive bitwise permutation
-    /// where each bit's flip decision depends on all higher-order (more significant)
-    /// bits, achieving better variance reduction than simple XOR scrambling.
-    ///
-    /// # Approximation
-    ///
-    /// This is an **approximate** Owen scramble: the per-bit flip is a *hash* of
-    /// the higher-order bits XOR a fixed per-bit scramble seed, not the canonical
-    /// nested-uniform permutation tree. It decorrelates replications and is
-    /// adequate for randomized-QMC error bars at the dimensions used here, but it
-    /// does **not** strictly guarantee the (t,m,s)-net-preserving randomization
-    /// that scrambled-net variance theory assumes — quality can degrade in high
-    /// dimensions where the higher-bit space is sparse. Replace with a Matoušek
-    /// linear scramble or a full nested-uniform construction (validated against a
-    /// reference scrambled-Sobol sequence) if strict net preservation is needed.
-    ///
-    /// The algorithm processes bits from most significant to least significant,
-    /// where the decision to flip bit `i` depends on:
-    /// - The hash of all bits at positions > i
-    /// - A per-bit scrambling seed from the scramble matrix
-    ///
-    /// # References
-    ///
-    /// - Owen, A. B. (1995). "Randomly Permuted (t,m,s)-Nets and (t,s)-Sequences." `docs/REFERENCES.md#owen-1995-scrambling`
-    /// - Owen, A. B. (1997). "Scrambled Net Variance for Integrals of Smooth Functions." `docs/REFERENCES.md#owen-1995-scrambling`
-    fn owen_scramble(&self, value: u32, d: usize) -> f64 {
-        // Grid-centred (k + 0.5) / 2^32 mapping, matching
-        // `fill_std_normals`: never emits exactly 0.0 (or 1.0), so downstream
-        // inverse-CDF / log transforms stay finite.
-        (self.owen_scramble_int(value, d) as f64 + 0.5) / (u32::MAX as f64 + 1.0)
-    }
-
-    /// Apply Owen scrambling and return the scrambled integer in [0, 2^32).
-    fn owen_scramble_int(&self, value: u32, d: usize) -> u32 {
-        if !self.scrambled {
+    /// Apply the seeded prefix hash from the most significant digit down.
+    fn permute_digits(&self, value: u32, d: usize) -> u32 {
+        let Some(matrix) = self.bit_seeds.get(d) else {
             return value;
-        }
-
-        let matrix = &self.scramble_matrices[d];
+        };
         let mut scrambled = value;
 
         // Process from most significant bit to least significant
@@ -329,68 +170,96 @@ impl SobolRng {
         }
     }
 
-    /// Skip ahead in the sequence.
-    ///
-    /// The cached state is recomputed directly from the target index
-    /// (O(bits · dimensions)), independent of how far ahead `n` reaches.
-    /// The destination is taken modulo the 2^32-point period so large skips
-    /// wrap instead of overflowing the 32-bit direction-number table.
+    /// Skip whole points relative to the current cursor.
     ///
     /// # Arguments
     ///
-    /// * `n` - Number of sequence points to advance. Values larger than the
-    ///   period wrap; a multiple of the period is a no-op.
-    pub fn skip(&mut self, n: u64) {
-        if n > 0 && self.dimension > 0 {
-            let target = (self.index + (n % SOBOL_PERIOD)) % SOBOL_PERIOD;
+    /// * `n` - Number of points to consume, at most the remaining period.
+    ///   Landing exactly at exhaustion is allowed.
+    pub fn skip(&mut self, n: u64) -> crate::Result<()> {
+        let target = self.target_index(n)?;
+        if n == 0 {
+            return Ok(());
+        }
+        if target == SOBOL_PERIOD {
+            self.state.fill(0);
+        } else {
             for d in 0..self.dimension {
-                let value = self.value_at(target, d);
-                self.state[d] = value;
+                self.state[d] = self.value_at(target, d);
             }
-            self.index = target;
         }
+        self.index = target;
+        Ok(())
     }
 
-    /// Fill buffer with uniform random numbers in (0, 1).
-    ///
-    /// This fills with consecutive Sobol points (row-major by dimension),
-    /// using the grid-centred `(k + 0.5) / 2^32` mapping (never exactly 0.0).
-    pub fn fill_u01(&mut self, out: &mut [f64]) {
-        debug_assert!(
-            out.len().is_multiple_of(self.dimension),
-            "fill_u01: buffer length must be a multiple of dimension"
-        );
-        for chunk in out.chunks_mut(self.dimension) {
-            self.fill_point(chunk);
+    fn target_index(&self, count: u64) -> crate::Result<u64> {
+        if count > SOBOL_PERIOD - self.index {
+            return Err(crate::Error::Validation(format!(
+                "Sobol cursor {} cannot consume {count} points in a period of {SOBOL_PERIOD}",
+                self.index
+            )));
         }
+        Ok(self.index + count)
     }
 
-    /// Fill buffer with standard normal random numbers.
-    ///
-    /// Uses the inverse CDF on Sobol-generated uniforms.
-    ///
-    /// # Mapping
-    ///
-    /// Raw Sobol integers are in `[0, 2^32)`. We map integer k to
-    /// `(k + 0.5) / 2^32`, centring each grid cell so that k=0 becomes
-    /// ~1.16e-10 rather than exactly 0. This keeps the inverse normal CDF
-    /// finite without the ~37-sigma outlier that `f64::MIN_POSITIVE` would
-    /// produce as a clamp lower bound.
+    /// Emit complete consecutive points on the interior grid `(k + 0.5)/2^32`.
     ///
     /// # Arguments
     ///
-    /// * `out` - Caller-owned output buffer populated without allocating a replacement.
-    pub fn fill_std_normals(&mut self, out: &mut [f64]) {
-        debug_assert!(
-            out.len().is_multiple_of(self.dimension),
-            "fill_std_normals: buffer length must be a multiple of dimension"
-        );
-        for chunk in out.chunks_mut(self.dimension) {
-            self.fill_point(chunk);
-            for slot in chunk.iter_mut() {
-                *slot = standard_normal_inv_cdf(*slot);
+    /// * `out` - Row-major buffer, one coordinate per dimension per point.
+    ///   Its length must be a multiple of the dimension within the remaining period.
+    pub fn fill_u01(&mut self, out: &mut [f64]) -> crate::Result<()> {
+        self.fill(out, Ok)
+    }
+
+    /// Emit inverse-normal quantiles of complete consecutive interior-grid points.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Row-major buffer of standard normal coordinates. Its length
+    ///   must be a multiple of the dimension within the remaining period.
+    pub fn fill_std_normals(&mut self, out: &mut [f64]) -> crate::Result<()> {
+        self.fill(out, standard_normal_inv_cdf)
+    }
+
+    fn fill(
+        &mut self,
+        out: &mut [f64],
+        transform: impl Fn(f64) -> crate::Result<f64>,
+    ) -> crate::Result<()> {
+        if !out.len().is_multiple_of(self.dimension) {
+            return Err(crate::Error::Validation(format!(
+                "Sobol output length {} is not a multiple of dimension {}",
+                out.len(),
+                self.dimension
+            )));
+        }
+        let count = (out.len() / self.dimension) as u64;
+        let target = self.target_index(count)?;
+        let mut state = self.state;
+        for (index, row) in (self.index..target).zip(out.chunks_exact_mut(self.dimension)) {
+            for (d, slot) in row.iter_mut().enumerate() {
+                let k = self.permute_digits(state[d], d);
+                *slot = transform((f64::from(k) + 0.5) / SOBOL_PERIOD as f64)?;
+                if !slot.is_finite() {
+                    return Err(crate::Error::Internal("non-finite Sobol transform".into()));
+                }
+            }
+            let next = index + 1;
+            if next == SOBOL_PERIOD {
+                state.fill(0);
+            } else {
+                let carry = next.trailing_zeros() as usize;
+                for (slot, directions) in state.iter_mut().zip(&self.direction_numbers) {
+                    for direction in &directions[..=carry] {
+                        *slot ^= direction;
+                    }
+                }
             }
         }
+        self.index = target;
+        self.state = state;
+        Ok(())
     }
 }
 
@@ -401,15 +270,12 @@ impl SobolRng {
 ///
 /// For more dimensions, download the full table from:
 /// <https://web.maths.unsw.edu.au/~fkuo/sobol/>
-fn initialize_direction_numbers(max_dim: usize) -> Vec<Vec<u32>> {
-    let mut all_directions = Vec::with_capacity(max_dim);
-
-    // First dimension: powers of 2 (dimension 1 is always standard binary fractions)
-    let mut dim0 = Vec::with_capacity(32);
-    for i in 0..32 {
-        dim0.push(1u32 << (31 - i));
-    }
-    all_directions.push(dim0);
+fn initialize_direction_numbers(max_dim: usize) -> crate::Result<Vec<[u32; 32]>> {
+    let mut all_directions = Vec::new();
+    all_directions
+        .try_reserve_exact(max_dim)
+        .map_err(|e| crate::Error::Internal(format!("Sobol direction table allocation: {e}")))?;
+    all_directions.push(std::array::from_fn(|i| 1u32 << (31 - i)));
 
     // Direction numbers from Joe & Kuo (2008) for dimensions 2-40
     // Format: (degree s, polynomial a, [m_1, m_2, ..., m_s])
@@ -504,16 +370,12 @@ fn initialize_direction_numbers(max_dim: usize) -> Vec<Vec<u32>> {
         (8, 22, &[1, 3, 1, 11, 11, 11, 77, 249]),
     ];
 
-    for (dim_idx, &(s, a, initial_m)) in joe_kuo_data
-        .iter()
-        .enumerate()
-        .take(max_dim.saturating_sub(1))
-    {
-        let mut directions = Vec::with_capacity(32);
+    for &(s, a, initial_m) in joe_kuo_data.iter().take(max_dim - 1) {
+        let mut directions = [0; 32];
 
         // Set initial direction numbers (scaled to 32 bits)
         for (i, &m) in initial_m.iter().enumerate() {
-            directions.push(m << (31 - i));
+            directions[i] = m << (31 - i);
         }
 
         // Generate remaining direction numbers using recurrence relation:
@@ -527,18 +389,13 @@ fn initialize_direction_numbers(max_dim: usize) -> Vec<Vec<u32>> {
                 }
             }
             v ^= directions[i - s];
-            directions.push(v);
+            directions[i] = v;
         }
 
         all_directions.push(directions);
-
-        // Early exit if we've filled enough dimensions
-        if dim_idx + 2 >= max_dim {
-            break;
-        }
     }
 
-    all_directions
+    Ok(all_directions)
 }
 
 #[cfg(test)]
@@ -548,19 +405,19 @@ mod tests {
     /// Next Sobol point as an owned vector.
     fn point(sobol: &mut SobolRng) -> Vec<f64> {
         let mut out = vec![0.0; sobol.dimension];
-        sobol.fill_point(&mut out);
+        sobol.fill_u01(&mut out).unwrap();
         out
     }
 
     #[test]
-    fn test_try_new_rejects_invalid_dimension() {
-        assert!(SobolRng::try_new(0, 0).is_err());
-        assert!(SobolRng::try_new(MAX_SOBOL_DIMENSION + 1, 0).is_err());
+    fn constructor_rejects_invalid_dimension() {
+        assert!(SobolRng::new(0, None).is_err());
+        assert!(SobolRng::new(MAX_SOBOL_DIMENSION + 1, None).is_err());
     }
 
     #[test]
     fn test_sobol_basic() {
-        let mut sobol = SobolRng::try_new(2, 0).expect("valid dimension");
+        let mut sobol = SobolRng::new(2, None).expect("valid dimension");
 
         // First few points should be deterministic
         let p1 = point(&mut sobol);
@@ -575,7 +432,7 @@ mod tests {
 
     #[test]
     fn test_sobol_range() {
-        let mut sobol = SobolRng::try_new(3, 0).expect("valid dimension");
+        let mut sobol = SobolRng::new(3, None).expect("valid dimension");
 
         for _ in 0..100 {
             let point = point(&mut sobol);
@@ -587,11 +444,11 @@ mod tests {
 
     #[test]
     fn test_fill_u01_matches_consecutive_points() {
-        let mut sobol_fill = SobolRng::try_new(2, 123).expect("valid dimension");
+        let mut sobol_fill = SobolRng::new(2, Some(123)).expect("valid dimension");
         let mut out = vec![0.0; 4];
-        sobol_fill.fill_u01(&mut out);
+        sobol_fill.fill_u01(&mut out).unwrap();
 
-        let mut sobol_points = SobolRng::try_new(2, 123).expect("valid dimension");
+        let mut sobol_points = SobolRng::new(2, Some(123)).expect("valid dimension");
         let p1 = point(&mut sobol_points);
         let p2 = point(&mut sobol_points);
 
@@ -600,9 +457,27 @@ mod tests {
     }
 
     #[test]
-    fn test_owen_scrambling() {
-        let mut sobol_no_scramble = SobolRng::try_new(2, 0).expect("valid dimension");
-        let mut sobol_scrambled = SobolRng::try_new(2, 12345).expect("valid dimension");
+    fn zero_seed_matches_prefix_hash_reference_words() {
+        // Integer-only reference applies the two fixed hashes to the running
+        // output prefix, then forms the exact midpoint of each scrambled word.
+        let mut sobol = SobolRng::new(2, Some(0)).unwrap();
+        let mut values = [0.0; 4];
+        sobol.fill_u01(&mut values).unwrap();
+        let expected = [
+            0x992bca72_u32,
+            0x7652bbf5_u32,
+            0x32c6c857_u32,
+            0xa114a27a_u32,
+        ];
+        for (value, word) in values.into_iter().zip(expected) {
+            assert_eq!(value, (f64::from(word) + 0.5) / SOBOL_PERIOD as f64);
+        }
+    }
+
+    #[test]
+    fn prefix_hash_changes_points() {
+        let mut sobol_no_scramble = SobolRng::new(2, None).expect("valid dimension");
+        let mut sobol_scrambled = SobolRng::new(2, Some(12345)).expect("valid dimension");
 
         // Different scrambling should give different sequences
         let p1 = point(&mut sobol_no_scramble);
@@ -613,9 +488,9 @@ mod tests {
 
     #[test]
     fn test_scrambled_sobol_is_deterministic_for_same_seed() {
-        let mut sobol1 = SobolRng::try_new(3, 12345).expect("valid dimension");
-        let mut sobol2 = SobolRng::try_new(3, 12345).expect("valid dimension");
-        let mut different_seed = SobolRng::try_new(3, 54321).expect("valid dimension");
+        let mut sobol1 = SobolRng::new(3, Some(12345)).expect("valid dimension");
+        let mut sobol2 = SobolRng::new(3, Some(12345)).expect("valid dimension");
+        let mut different_seed = SobolRng::new(3, Some(54321)).expect("valid dimension");
 
         for _ in 0..32 {
             assert_eq!(point(&mut sobol1), point(&mut sobol2));
@@ -626,7 +501,7 @@ mod tests {
 
     #[test]
     fn test_sobol_reset_and_skip() {
-        let mut sobol = SobolRng::try_new(2, 0).expect("valid dimension");
+        let mut sobol = SobolRng::new(2, None).expect("valid dimension");
 
         let p1_first = point(&mut sobol);
         let _p2 = point(&mut sobol);
@@ -641,9 +516,9 @@ mod tests {
 
     #[test]
     fn test_fill_std_normals() {
-        let mut sobol = SobolRng::try_new(1, 0).expect("valid dimension");
+        let mut sobol = SobolRng::new(1, None).expect("valid dimension");
         let mut normals = vec![0.0; 100];
-        sobol.fill_std_normals(&mut normals);
+        sobol.fill_std_normals(&mut normals).unwrap();
 
         // All values should be finite, including the first Sobol point.
         for &n in &normals {
@@ -655,67 +530,37 @@ mod tests {
         assert!(mean.abs() < 2.0);
     }
 
-    // ── H5 regression: open-interval mapping keeps first point finite ──
-    //
-    // Without scrambling the first Sobol integer for dimension 0 is 0.
-    // The old MIN_POSITIVE clamp would map 0 → 2.2e-308 → N^{-1}(2.2e-308) ≈ -37σ.
-    // The (k+0.5)/2^32 mapping should produce a normal quantile ≈ 4.6σ which,
-    // while extreme, is not an artificial boundary artefact.
     #[test]
-    fn test_fill_std_normals_first_point_finite_and_bounded() {
-        // No scrambling — first point is k=0 in all dimensions.
-        let mut sobol = SobolRng::try_new(1, 0).expect("valid dimension");
-        let mut out = vec![0.0; 1];
-        sobol.fill_std_normals(&mut out);
-        assert!(out[0].is_finite(), "First unscrambled point must be finite");
-        // With (0+0.5)/2^32 ≈ 1.16e-10, Φ^{-1}(1.16e-10) ≈ -6.4σ.
-        // In practice the exact value depends on the inverse-normal implementation,
-        // but it must be finite and larger than -40.
-        assert!(
-            out[0] > -40.0,
-            "First point should not be a ~37σ outlier from MIN_POSITIVE, got {}",
-            out[0]
-        );
+    fn first_normal_is_the_quantile_of_the_first_midpoint() {
+        let mut sobol = SobolRng::new(1, None).unwrap();
+        let mut out = [0.0];
+        sobol.fill_std_normals(&mut out).unwrap();
+        assert!((out[0] + 6.337957754553789).abs() < 1e-7);
     }
 
-    // ── H5 regression: grid-centred mapping symmetry ──
-    //
-    // For a 1-D 2-point sequence (k=0, k=2^31) the open-interval values are
-    // (0.5/2^32, (2^31+0.5)/2^32) = (~1.16e-10, ~0.5). Their inverse-normal
-    // quantiles should be symmetric and finite.
     #[test]
-    fn test_fill_std_normals_symmetry_no_scramble() {
-        let mut sobol = SobolRng::try_new(1, 0).expect("valid dimension");
-        let mut out = vec![0.0; 2];
-        sobol.fill_std_normals(&mut out);
-        for &v in &out {
-            assert!(v.is_finite(), "All points must be finite: {v}");
-        }
-    }
-
-    // ── H5 regression: no artificial extreme tails with scrambling ──
-    //
-    // With a large batch and scrambling the 5-sigma quantile should not
-    // appear more than ~3× its theoretical frequency.
-    #[test]
-    fn test_fill_std_normals_no_extreme_tail_outliers() {
-        let mut sobol = SobolRng::try_new(1, 42).expect("valid dimension");
-        let mut out = vec![0.0; 1024];
-        sobol.fill_std_normals(&mut out);
-        // No value should exceed ±10σ in a 1024-point Sobol sequence
-        for &v in &out {
-            assert!(
-                v.abs() < 10.0,
-                "Unexpected extreme outlier {v} (grid-centred mapping should prevent >10σ in 1024 pts)"
-            );
-        }
+    fn transform_failure_leaves_cursor_and_cache_unmodified() {
+        let mut sobol = SobolRng::new(2, Some(9)).unwrap();
+        let previous = sobol.clone();
+        let mut out = [0.0; 4];
+        let calls = std::cell::Cell::new(0);
+        let result = sobol.fill(&mut out, |value| {
+            calls.set(calls.get() + 1);
+            if calls.get() == 3 {
+                return Err(crate::Error::Internal("test transform failure".into()));
+            }
+            Ok(value)
+        });
+        assert!(result.is_err());
+        assert_eq!(sobol.index, previous.index);
+        assert_eq!(sobol.state, previous.state);
     }
 
     #[test]
     fn incremental_state_matches_from_scratch_definition() {
         // The cached per-dimension state must equal the reference definition
         // value_at(index, d) at every step — including across skip and reset.
-        let mut rng = SobolRng::try_new(8, 0).expect("valid dimension");
+        let mut rng = SobolRng::new(8, None).expect("valid dimension");
 
         let check = |rng: &SobolRng| {
             for d in 0..8 {
@@ -726,59 +571,43 @@ mod tests {
         for _ in 0..300 {
             check(&rng);
             let mut buf = [0.0f64; 8];
-            rng.fill_point(&mut buf);
+            rng.fill_u01(&mut buf).unwrap();
         }
         // Cross a power-of-two boundary where many bits flip at once.
-        rng.skip(4812); // -> index 5112
+        rng.skip(4812).unwrap(); // -> index 5112
         check(&rng);
-        rng.skip(100_000);
+        rng.skip(100_000).unwrap();
         check(&rng);
         rng.reset();
         check(&rng);
         for _ in 0..257 {
             let mut buf = [0.0f64; 8];
-            rng.fill_u01(&mut buf);
+            rng.fill_u01(&mut buf).unwrap();
             check(&rng);
         }
     }
 
     #[test]
-    fn generation_wraps_after_the_last_period_point() {
-        let mut rng = SobolRng::try_new(2, 0).expect("valid dimension");
-        rng.skip(SOBOL_PERIOD - 1);
-        assert_eq!(rng.index, SOBOL_PERIOD - 1);
-
-        let mut last = [0.0f64; 2];
-        rng.fill_point(&mut last);
-        assert_eq!(rng.index, 0);
-        assert!(rng.state.iter().all(|&slot| slot == 0));
-        assert!(last.iter().all(|v| v.is_finite()));
-
-        let mut fresh = SobolRng::try_new(2, 0).expect("valid dimension");
-        let mut first = [0.0f64; 2];
-        fresh.fill_point(&mut first);
-        let mut wrapped = [0.0f64; 2];
-        rng.fill_point(&mut wrapped);
-        assert_eq!(wrapped, first);
-    }
-
-    #[test]
-    fn skip_wraps_modulo_period_without_overflow() {
-        let mut rng = SobolRng::try_new(3, 0).expect("valid dimension");
-        rng.skip(SOBOL_PERIOD - 1);
-        rng.skip(1);
-        assert_eq!(rng.index, 0);
-        assert!(rng.state.iter().all(|&slot| slot == 0));
-
-        rng.skip(u64::MAX);
-        assert_eq!(rng.index, u64::MAX % SOBOL_PERIOD);
-        for d in 0..3 {
-            assert_eq!(rng.state[d], rng.value_at(rng.index, d), "dim {d}");
-        }
-
+    fn partial_points_and_exhausted_requests_preserve_state_and_output() {
+        let mut rng = SobolRng::new(2, Some(0)).unwrap();
+        let mut raw = SobolRng::new(2, None).unwrap();
+        assert_ne!(point(&mut rng), point(&mut raw));
         rng.reset();
-        rng.skip(SOBOL_PERIOD);
-        assert_eq!(rng.index, 0);
-        assert!(rng.state.iter().all(|&slot| slot == 0));
+        rng.skip(SOBOL_PERIOD - 1).unwrap();
+        let mut too_many = [123.0; 4];
+        assert!(rng.fill_std_normals(&mut too_many).is_err());
+        assert!(rng.fill_u01(&mut too_many[..3]).is_err());
+        assert_eq!(too_many, [123.0; 4]);
+        assert!(rng.skip(u64::MAX).is_err());
+        assert_eq!(rng.index, SOBOL_PERIOD - 1);
+        rng.fill_u01(&mut too_many[..2]).unwrap();
+        assert_eq!(rng.index, SOBOL_PERIOD);
+        assert!(rng.state.iter().all(|&x| x == 0));
+        rng.fill_u01(&mut []).unwrap();
+        rng.skip(0).unwrap();
+        assert!(rng.fill_u01(&mut too_many[..2]).is_err());
+        rng.reset();
+        rng.skip(SOBOL_PERIOD).unwrap();
+        assert!(rng.skip(1).is_err());
     }
 }

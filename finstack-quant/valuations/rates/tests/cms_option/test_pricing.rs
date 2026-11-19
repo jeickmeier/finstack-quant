@@ -39,7 +39,9 @@ fn standard_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    market = market.insert(discount_curve);
+    market = market
+        .try_insert(discount_curve)
+        .expect("insert market curve");
 
     // Add LIBOR Forward Curve (Flat 3.5%)
     // Let's make it 3.5% to have spread
@@ -51,7 +53,9 @@ fn standard_market(as_of: Date) -> MarketContext {
     )
     .unwrap();
 
-    market = market.insert(forward_curve);
+    market = market
+        .try_insert(forward_curve)
+        .expect("insert market curve");
 
     // Add Vol Surface (Flat 20%)
     // Manually build a grid
@@ -245,7 +249,7 @@ fn test_vanna_computable() {
             );
             let adjusted = forward + convexity;
             let d1 = ((adjusted / strike).ln() + 0.5 * sigma * sigma * t) / (sigma * t.sqrt());
-            norm_cdf(d1)
+            norm_cdf(d1).expect("valid normal variate")
         };
         let df = disc.df_on_date(inst.payment_dates[i]).unwrap() / disc.df_on_date(as_of).unwrap();
         expected_vanna += df * inst.accrual_fractions[i] * (delta(vol + h) - delta(vol - h))
@@ -689,7 +693,7 @@ fn vanna_oracle(inst: &CmsOption, market: &MarketContext, as_of: Date) -> f64 {
             let adjusted = forward + convexity;
             let sigma = strike_vol + shift;
             let d1 = ((adjusted / strike).ln() + 0.5 * sigma * sigma * t) / (sigma * t.sqrt());
-            norm_cdf(d1)
+            norm_cdf(d1).expect("valid normal variate")
         };
         let df = disc.df_on_date(inst.payment_dates[i]).unwrap() / disc.df_on_date(as_of).unwrap();
         expected_vanna += df * inst.accrual_fractions[i] * (delta(h) - delta(-h)) / (2.0 * h)

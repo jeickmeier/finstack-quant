@@ -14,7 +14,7 @@ from the detailed algorithm records and source counts below.
 | ADR | Decision status | Scope |
 | --- | --- | --- |
 | [0030](0030-cds-survival-and-integration.md) | Accepted | Single-name CDS engine selection; detailed contract in CREDIT-12 |
-| [0031](0031-tranche-loss-model-selection.md) | Draft | Synthetic tranche loss and copula selection |
+| [0031](0031-tranche-loss-model-selection.md) | Accepted | Explicit finite-pool and copula selection, source identity, and shared loss state |
 
 ## Inventory
 

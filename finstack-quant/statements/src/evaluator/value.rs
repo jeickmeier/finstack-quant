@@ -509,8 +509,10 @@ pub(crate) fn round(value: Value, digits: Option<i32>, at: At<'_>) -> Result<Val
                 .map(Value::Money)
             }
             num => {
-                let rounded =
-                    finstack_quant_core::math::round_half_away(num.float(), digits.unwrap_or(0));
+                let rounded = at.core(
+                    finstack_quant_core::math::round_half_away(num.float(), digits.unwrap_or(0)),
+                    "round()",
+                )?;
                 Ok(like(other, at.finite(rounded, "round()")?))
             }
         },

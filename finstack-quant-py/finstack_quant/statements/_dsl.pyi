@@ -42,7 +42,7 @@ def parse_formula(formula: str) -> str:
 
 def parse_and_compile(formula: str) -> None:
     """
-    Validate that ``formula`` parses and compiles successfully.
+    Validate that ``formula`` compiles to the shared expression AST for the statements evaluator.
 
     Compilation checks every branch, including one evaluation would skip:
     function names and argument counts (``cumsum``, ``cumprod``, ``cummin``,

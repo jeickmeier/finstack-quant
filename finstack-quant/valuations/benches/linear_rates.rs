@@ -241,9 +241,12 @@ fn create_rates_market() -> MarketContext {
         .unwrap();
 
     MarketContext::new()
-        .insert(disc)
-        .insert(fwd_3m)
-        .insert(fwd_1m)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd_3m)
+        .expect("insert market curve")
+        .try_insert(fwd_1m)
+        .expect("insert market curve")
         .insert_surface(cap_vol)
         .insert_price(
             "TREASURY_BOND_PRICE",
@@ -317,6 +320,7 @@ fn basis_swap(id: &str, end: Date) -> BasisSwap {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -334,6 +338,7 @@ fn basis_swap(id: &str, end: Date) -> BasisSwap {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,

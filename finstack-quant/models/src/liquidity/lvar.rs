@@ -105,7 +105,7 @@ pub fn lvar_bangia(
     }
 
     let pv = position_value.abs();
-    let z_alpha = standard_normal_inv_cdf(confidence);
+    let z_alpha = standard_normal_inv_cdf(confidence)?;
     let spread_cost = (0.5 * spread_mean + 0.5 * z_alpha * spread_vol) * pv;
     let lvar = var - spread_cost;
     let lvar_ratio = if var.abs() > 1e-15 {

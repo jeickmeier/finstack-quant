@@ -187,7 +187,7 @@ impl Instrument for StructuredCredit {
         for tranche in &self.tranches.tranches {
             if let RateSpec::Floating(spec) = &tranche.coupon {
                 deps.add_forward_curve(spec.forward_curve_id.clone());
-                deps.add_series_id(fixing_series_id(spec.forward_curve_id.as_str()));
+                deps.add_series_id(fixing_series_id(spec.index_id.as_str()));
             }
         }
         Ok(deps)
@@ -581,10 +581,14 @@ mod tests {
         let dependencies = deal.market_dependencies().expect("dependencies");
         let mut market = MarketContext::new();
         for id in &dependencies.curves.discount_curves {
-            market = market.insert(flat_discount_with_tenor(id.as_str(), as_of, 0.04, 30.0));
+            market = market
+                .try_insert(flat_discount_with_tenor(id.as_str(), as_of, 0.04, 30.0))
+                .expect("insert market curve");
         }
         for id in &dependencies.curves.forward_curves {
-            market = market.insert(flat_forward_with_tenor(id.as_str(), as_of, 0.04, 0.25));
+            market = market
+                .try_insert(flat_forward_with_tenor(id.as_str(), as_of, 0.04, 0.25))
+                .expect("insert market curve");
         }
         let metrics = [MetricId::WAL];
 

@@ -19,10 +19,10 @@
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let base = date!(2025 - 01 - 01);
-//! let c0 = DiscountCurve::flat("USD-OIS", base, 0.04)?;
-//! let c1 = DiscountCurve::flat("USD-OIS", base, 0.0425)?;
-//! let m0 = MarketContext::new().insert(c0);
-//! let m1 = MarketContext::new().insert(c1);
+//! let c0 = DiscountCurve::flat("USD-OIS", base, 0.04, DayCount::Act365F)?;
+//! let c1 = DiscountCurve::flat("USD-OIS", base, 0.0425, DayCount::Act365F)?;
+//! let m0 = MarketContext::new().try_insert(c0)?;
+//! let m1 = MarketContext::new().try_insert(c1)?;
 //!
 //! let intervals = [DateInterval::new(date!(2025 - 07 - 01), date!(2026 - 07 - 01))?];
 //! let query = FactorRateDiffQuery::new(
@@ -54,6 +54,7 @@ use crate::{Error, Result};
 
 /// Output scale for continuous zero-rate, forward-rate, or growth-rate shifts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RateDiffScale {
     /// Rate difference in annual decimal units (`0.0001` = 1 bp).
     Decimal,
@@ -85,6 +86,7 @@ impl fmt::Display for RateDiffScale {
 /// Always measures raw hazard intensity `λ` per source year without converting to
 /// par CDS spreads or coupling to recovery assumptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HazardDiffScale {
     /// Intensity difference per source year (`λ₁ - λ₀`).
     Decimal,
@@ -113,6 +115,7 @@ impl fmt::Display for HazardDiffScale {
 
 /// Output scale for exact algebraic proportional changes `(x₁ - x₀) / x₀`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProportionalDiffScale {
     /// Unscaled decimal fraction (`(x₁ - x₀) / x₀`).
     Fraction,
@@ -141,6 +144,7 @@ impl fmt::Display for ProportionalDiffScale {
 
 /// Output scale for observed monthly CPI level differences.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ObservationDiffScale {
     /// Native CPI index-point difference `I₁ - I₀`.
     NativePoints,
@@ -150,6 +154,7 @@ pub enum ObservationDiffScale {
 
 /// Classification of a same-period monthly CPI comparison across snapshots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ObservationChangeKind {
     /// Both qualified snapshots observed the same index level for that month.
     Unchanged,
@@ -774,7 +779,8 @@ pub fn measure_hazard_intensity_diff(
     DiffMeasurement::from_validated_rows(rows)
 }
 
-/// Request parameters for comparing projected CPI levels across two [`InflationCurve`] snapshots.
+/// Request parameters for comparing projected CPI levels across two
+/// [`InflationCurve`](crate::market_data::term_structures::InflationCurve) snapshots.
 #[derive(Debug, Clone)]
 pub struct InflationCpiDiffQuery<'a> {
     /// Inflation curve identifier in `market_t0`.
@@ -837,9 +843,21 @@ impl MeasuredDiffValue for InflationCpiDiffRow {
     }
 }
 
-/// Measure projected CPI level differences `I₁(d) - I₀(d)` directly on [`InflationCurve`]s.
+fn require_matching_inflation_series(
+    earlier: Option<&crate::market_data::scalars::InflationSeries>,
+    later: Option<&crate::market_data::scalars::InflationSeries>,
+) -> Result<()> {
+    match (earlier, later) {
+        (Some(a), Some(b)) if a == b => Ok(()),
+        _ => Err(Error::Validation("CPI comparison requires matching published series, reference base and seasonal adjustment on both snapshots".into())),
+    }
+}
+
+/// Measure projected CPI level differences `I₁(d) - I₀(d)` directly on
+/// [`InflationCurve`](crate::market_data::term_structures::InflationCurve)s.
 ///
-/// Fails closed if either curve is missing or invalid, without falling back to [`InflationIndex`].
+/// Fails closed if either curve is missing or invalid, without falling back to
+/// [`InflationIndex`](crate::market_data::scalars::InflationIndex).
 ///
 /// # Arguments
 /// - `query` - Projected CPI query naming source curves and strictly increasing `dates`.
@@ -862,6 +880,7 @@ pub fn measure_inflation_cpi_level_diff(
     }
     let c0 = market_t0.get_inflation_curve(query.source_t0.as_str())?;
     let c1 = market_t1.get_inflation_curve(query.source_t1.as_str())?;
+    require_matching_inflation_series(c0.get_series(), c1.get_series())?;
     let mut rows = Vec::with_capacity(query.dates.len());
     let mut prev_date: Option<Date> = None;
 
@@ -1019,6 +1038,7 @@ pub fn measure_inflation_annual_growth_diff(
     }
     let c0 = market_t0.get_inflation_curve(query.source_t0.as_str())?;
     let c1 = market_t1.get_inflation_curve(query.source_t1.as_str())?;
+    require_matching_inflation_series(c0.get_series(), c1.get_series())?;
     if c0.day_count() != c1.day_count() {
         return Err(Error::Validation(format!(
             "inflation curves have incompatible day counts ({} vs {})",
@@ -1295,6 +1315,7 @@ pub fn measure_inflation_observation_diff(
         });
     }
 
+    require_matching_inflation_series(idx0.get_series(), idx1.get_series())?;
     let mut seen = BTreeSet::new();
     let mut rows = Vec::with_capacity(query.periods.len());
     for &pair in query.periods {
@@ -1624,6 +1645,9 @@ fn proportional_f64_change(x0: f64, x1: f64, scale: ProportionalDiffScale) -> Re
             "proportional change baseline cannot be zero".to_string(),
         ));
     }
+    if exact_f64_eq(x1, 0.0) {
+        return Ok(-scale.scale_factor());
+    }
     if exact_f64_eq(x1, x0) {
         return Ok(0.0);
     }
@@ -1662,6 +1686,43 @@ mod tests {
     use crate::money::fx::{FxMatrix, FxProvider};
     use std::sync::Arc;
     use time::macros::date;
+
+    #[test]
+    fn proportional_move_to_zero_is_a_complete_loss() {
+        for baseline in [1.0, -0.01, f64::from_bits(1)] {
+            assert_eq!(
+                proportional_f64_change(baseline, -0.0, ProportionalDiffScale::Percent).unwrap(),
+                -100.0
+            );
+        }
+    }
+
+    #[test]
+    fn diff_enum_serde_uses_canonical_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&RateDiffScale::BasisPoints).unwrap(),
+            r#""basis_points""#
+        );
+        assert_eq!(
+            serde_json::to_string(&HazardDiffScale::IntensityBp).unwrap(),
+            r#""intensity_bp""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ProportionalDiffScale::Percent).unwrap(),
+            r#""percent""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ObservationDiffScale::Proportional(
+                ProportionalDiffScale::Percent
+            ))
+            .unwrap(),
+            r#"{"proportional":"percent"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&ObservationChangeKind::CrossPeriod).unwrap(),
+            r#""cross_period""#
+        );
+    }
 
     #[derive(Debug)]
     struct StaticFx {
@@ -1778,8 +1839,12 @@ mod tests {
         let c1_raw = DiscountCurve::flat("USD-OIS", base0, 0.0425, DayCount::Act365F).expect("c1");
         let c1_cond = c1_raw.condition(cond_date).expect("conditioned c1");
 
-        let m0 = MarketContext::new().insert(c0);
-        let m1 = MarketContext::new().insert(c1_cond);
+        let m0 = MarketContext::new()
+            .try_insert(c0)
+            .expect("insert market curve");
+        let m1 = MarketContext::new()
+            .try_insert(c1_cond)
+            .expect("insert market curve");
 
         let intervals = [DateInterval::new(v, t).expect("valid interval")];
         let query = FactorRateDiffQuery::new(
@@ -1802,7 +1867,9 @@ mod tests {
             .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("fwd");
-        let mf = MarketContext::new().insert(fwd);
+        let mf = MarketContext::new()
+            .try_insert(fwd)
+            .expect("insert market curve");
         let fwd_query = FactorRateDiffQuery::new(
             "FWD-ONLY",
             &intervals,
@@ -1823,7 +1890,8 @@ mod tests {
     fn factor_diff_rejects_empty_duplicate_and_out_of_domain_intervals() {
         let base = date!(2025 - 01 - 01);
         let m0 = MarketContext::new()
-            .insert(DiscountCurve::flat("C0", base, 0.04, DayCount::Act365F).unwrap());
+            .try_insert(DiscountCurve::flat("C0", base, 0.04, DayCount::Act365F).unwrap())
+            .expect("insert market curve");
         let empty: [DateInterval; 0] = [];
         let q_empty =
             FactorRateDiffQuery::new("C0", &empty, DayCount::Act365F, RateDiffScale::Decimal);
@@ -1863,8 +1931,12 @@ mod tests {
             .condition(cond_date)
             .unwrap();
 
-        let m0 = MarketContext::new().insert(h0);
-        let m1 = MarketContext::new().insert(h1);
+        let m0 = MarketContext::new()
+            .try_insert(h0)
+            .expect("insert market curve");
+        let m1 = MarketContext::new()
+            .try_insert(h1)
+            .expect("insert market curve");
         let q = HazardDiffQuery::new("ACME", &[1.0, 5.0], HazardDiffScale::IntensityBp);
         let res = measure_hazard_intensity_diff(&q, &m0, &m1).expect("hazard diff");
         assert!((res.rows()[0].diff - 20.0).abs() < 1e-12);
@@ -1875,12 +1947,65 @@ mod tests {
         assert!(measure_hazard_intensity_diff(&bad_order, &m0, &m1).is_err());
     }
 
+    fn cpi_series() -> crate::market_data::scalars::InflationSeries {
+        crate::market_data::scalars::InflationSeries {
+            series_id: "BLS:CUUR0000SA0".into(),
+            reference_base: "1982-84=100".into(),
+            seasonally_adjusted: false,
+        }
+    }
+
+    #[test]
+    fn monthly_revision_requires_common_series_base_and_seasonal_status() {
+        use crate::market_data::scalars::InflationObservation;
+        let cutoff = date!(2025 - 02 - 12);
+        let market = |value, series| {
+            let obs = InflationObservation {
+                value,
+                reference_month: date!(2025 - 01 - 01),
+                available_on: cutoff,
+            };
+            let index = InflationIndex::new("USD-CPI", vec![obs], Currency::USD, cutoff)
+                .unwrap()
+                .with_series(series)
+                .unwrap();
+            MarketContext::new().insert_inflation_index(index)
+        };
+        let periods = [InflationPeriodPair::same(2025, Month::January)];
+        let query = InflationObservationDiffQuery::new(
+            "USD-CPI",
+            &periods,
+            cutoff,
+            cutoff,
+            ObservationDiffScale::NativePoints,
+        );
+        let opening = market(105.0, cpi_series());
+        let compare = |value, series| {
+            measure_inflation_observation_diff(&query, &opening, &market(value, series))
+        };
+        let mut rebased = cpi_series();
+        rebased.reference_base = "2015=100".into();
+        assert!(compare(210.0, rebased).is_err());
+        let mut adjusted = cpi_series();
+        adjusted.seasonally_adjusted = true;
+        assert!(compare(105.0, adjusted).is_err());
+        let mut other = cpi_series();
+        other.series_id = "BLS:OTHER".into();
+        assert!(compare(105.0, other).is_err());
+        assert_eq!(
+            compare(210.0 / 2.0, cpi_series()).unwrap().rows()[0].diff,
+            0.0
+        );
+        assert_eq!(compare(105.5, cpi_series()).unwrap().rows()[0].diff, 0.5);
+    }
+
     #[test]
     fn inflation_cpi_and_annual_growth_diffs() {
         use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 
         let base = date!(2025 - 01 - 01);
         let c0 = InflationCurve::builder("US-CPI")
+            .series(Some(cpi_series()))
             .base_date(base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 100.0), (1.0, 102.0), (5.0, 110.408_080_32)])
@@ -1889,6 +2014,7 @@ mod tests {
             .build()
             .unwrap();
         let c1 = InflationCurve::builder("US-CPI")
+            .series(Some(cpi_series()))
             .base_date(base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 100.0), (1.0, 103.0), (5.0, 115.927_407_43)])
@@ -1896,8 +2022,12 @@ mod tests {
             .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .unwrap();
-        let m0 = MarketContext::new().insert(c0);
-        let m1 = MarketContext::new().insert(c1);
+        let m0 = MarketContext::new()
+            .try_insert(c0)
+            .expect("insert market curve");
+        let m1 = MarketContext::new()
+            .try_insert(c1)
+            .expect("insert market curve");
 
         let d1 = date!(2026 - 01 - 01);
         let dates = [d1];
@@ -1948,8 +2078,10 @@ mod tests {
         )
         .unwrap();
 
-        let m0 = MarketContext::new().insert_inflation_index(idx0);
-        let m1 = MarketContext::new().insert_inflation_index(idx1);
+        let m0 =
+            MarketContext::new().insert_inflation_index(idx0.with_series(cpi_series()).unwrap());
+        let m1 =
+            MarketContext::new().insert_inflation_index(idx1.with_series(cpi_series()).unwrap());
         let periods = [InflationPeriodPair::same(2025, Month::January)];
 
         // Knowledge cutoff before publication date fails closed.
@@ -2004,7 +2136,7 @@ mod tests {
         let empty = MarketContext::new();
         let d0 = date!(2025 - 01 - 01);
         let d1 = date!(2025 - 02 - 01);
-        let same_ccy = FxQuoteDiffParams {
+        let same_currency_query = FxQuoteDiffParams {
             base: Currency::USD,
             quote: Currency::USD,
             date_t0: d0,
@@ -2013,7 +2145,7 @@ mod tests {
             policy_t1: FxConversionPolicy::PeriodEnd,
             scale: ProportionalDiffScale::Percent,
         };
-        let id_meas = measure_fx_quote_diff(&same_ccy, &empty, &empty).unwrap();
+        let id_meas = measure_fx_quote_diff(&same_currency_query, &empty, &empty).unwrap();
         assert_eq!(id_meas.diff, 0.0);
         assert_eq!(id_meas.rate_t0, 1.0);
         assert_eq!(id_meas.rate_t1, 1.0);
@@ -2023,7 +2155,7 @@ mod tests {
         let eur_usd = FxQuoteDiffParams {
             base: Currency::EUR,
             quote: Currency::USD,
-            ..same_ccy
+            ..same_currency_query
         };
         assert!(measure_fx_quote_diff(&eur_usd, &empty, &empty).is_err());
 

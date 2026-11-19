@@ -48,7 +48,7 @@ pub fn usd_ois_market(base: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc)
+    MarketContext::new().try_insert(disc).expect("insert market curve")
 }
 
 /// Inclusive quarter range starting at `2025Q1`.

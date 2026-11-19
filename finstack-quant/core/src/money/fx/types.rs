@@ -165,10 +165,7 @@ impl std::str::FromStr for CurrencyPair {
                 )));
             }
         };
-        Ok(Self {
-            base: base.parse()?,
-            quote: quote.parse()?,
-        })
+        Self::try_new(base.parse()?, quote.parse()?)
     }
 }
 
@@ -372,6 +369,9 @@ mod tests {
 
     #[test]
     fn currency_pair_try_new_display_and_serde_validate_distinct_currencies() {
+        for text in ["USD/USD", "USDUSD"] {
+            assert!(text.parse::<CurrencyPair>().is_err(), "{text}");
+        }
         let pair = CurrencyPair::try_new(Currency::EUR, Currency::USD).expect("distinct pair");
         assert_eq!(pair.to_string(), "EUR/USD");
         let json = serde_json::to_value(pair).expect("serialize pair");

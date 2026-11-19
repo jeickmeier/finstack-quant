@@ -166,7 +166,9 @@ fn svi_surface_grid_is_calendar_monotone_under_nonflat_curve() {
     );
 
     let discount = nonflat_discount_curve(base_date);
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
 
     let quotes = svi_option_quotes(base_date);
@@ -324,7 +326,9 @@ fn calibrated_surfaces_preserve_total_variance_between_published_expiries() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("zero-rate discount curve");
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let mut quotes = Vec::new();
     for (days, total_variance) in [(182, 0.04_f64), (365, 0.0401)] {
         let expiry = base_date + time::Duration::days(days);
@@ -419,12 +423,14 @@ fn surface_acceptance_policy_preserves_fit_and_execution_controls() {
     let quote_forward = SPOT / discount.df(1.0).expect("valid");
     let truth = finstack_quant_models::volatility::sabr::SabrParameters::new(0.2, 1.0, 1.0, -0.3)
         .expect("SABR truth");
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let quotes: Vec<_> = strikes
         .iter()
         .map(|&strike| {
             let vol = truth
-                .implied_vol(quote_forward, strike, 1.0)
+                .implied_vol_lognormal(quote_forward, strike, 1.0)
                 .expect("model quote");
             MarketQuote::Vol(VolQuote::OptionVol {
                 id: QuoteId::new(format!("matrix-{strike}")),
@@ -582,8 +588,11 @@ fn svi_density_scan_obeys_global_arbitrage_and_report_policy() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount");
-    let (prior_market, mut market_data) =
-        cal_utils::split_market_context(&MarketContext::new().insert(discount));
+    let (prior_market, mut market_data) = cal_utils::split_market_context(
+        &MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve"),
+    );
     cal_utils::extend_market_data(&mut market_data, &quotes);
     for check_arbitrage in [true, false] {
         for mode in [ValidationMode::Warn, ValidationMode::Error] {

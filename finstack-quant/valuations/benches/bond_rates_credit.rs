@@ -77,7 +77,11 @@ fn market() -> MarketContext {
         .expect("discount curve");
     let hazard =
         HazardCurve::flat("ACME-HAZARD", base, 0.02, 0.4, DayCount::Act365F).expect("hazard curve");
-    MarketContext::new().insert(discount).insert(hazard)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
 }
 
 fn options() -> PricingOptions {

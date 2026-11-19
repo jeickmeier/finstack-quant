@@ -112,7 +112,7 @@ def test_structured_helpers_are_fresh_and_use_the_base_stage(
     assert second["CDX-0-3"]["instrument"]["spec"]["detach_pct"] == 3.0
     assert stages == ["base"]
     assert market.get_credit_index("CDX-INDEX-DATA").num_constituents == 125
-    assert market.get_base_correlation("CDX-BASE-CORR").correlation(3.0) == pytest.approx(0.25)
+    assert market.get_base_correlation("CDX-BASE-CORR").get_correlation(3.0) == pytest.approx(0.25)
     assert math.isfinite(tranche.value.amount)
 
 
@@ -224,6 +224,7 @@ def test_variance_units_ohlc_and_kirk_independent_mc(tracks: ModuleType) -> None
         tracks.AS_OF,
         metrics=["variance_expected", "variance_realized"],
     )
+    assert variance.metrics["variance_realized"] == 0.0
     df = market.get_discount("USD-OIS").df(1.0)
     assert variance.value.amount == pytest.approx(1e6 * df * (variance.metrics["variance_expected"] - 0.04), abs=0.01)
     assert variance.metrics["variance_expected"] == pytest.approx(0.04, abs=0.0005)

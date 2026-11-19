@@ -242,6 +242,10 @@ pub enum ProcessSpec {
     RoughHeston(RoughHestonParams),
     /// Cheyette short-rate model with rough stochastic volatility.
     ///
+    /// `sigma_base` holds point or ending-interval amplitudes in decimal rate
+    /// units per square-root model year. For example, a flat 50 bp amplitude
+    /// is `{"interpolation":"linear","amplitudes":[[0.0,0.005]]}`.
+    ///
     /// State: `[x, y]`, the deviation of the short rate from the initial
     /// forward curve and the accumulated variance; both normally start at
     /// zero. The short rate at time `t` is `x + φ(t)`, with `φ` the initial
@@ -750,7 +754,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                     spec,
                     x0,
                     parallel,
-                    Some((spec.fbm.unwrap_or_default(), p.hurst.value())),
+                    Some((spec.fbm.unwrap_or_default(), p.hurst.get_value())),
                 ),
                 _ => unsupported(),
             }
@@ -772,15 +776,8 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                     "process 'rough_heston' supports at most 8000 steps, got {num_steps}"
                 )));
             }
-            // Kernel times as the pricer builds them: `expiry · i / n` on a
-            // uniform grid.
-            let times: Vec<f64> = match &spec.time_grid {
-                TimeGridSpec::Uniform { expiry, num_steps } => (0..=*num_steps)
-                    .map(|i| expiry * i as f64 / *num_steps as f64)
-                    .collect(),
-                TimeGridSpec::Times { times } => times.clone(),
-            };
-            let scheme = RoughHestonHybrid::new(&times, p.hurst.value())?;
+            let grid = spec.time_grid.build()?;
+            let scheme = RoughHestonHybrid::new(grid.times(), p.hurst.get_value())?;
             simulate_with_noise(&process, &scheme, spec, x0, parallel, None)
         }
         ProcessSpec::CheyetteRough(p) => {
@@ -793,7 +790,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                     spec,
                     x0,
                     parallel,
-                    Some((spec.fbm.unwrap_or_default(), p.hurst.value())),
+                    Some((spec.fbm.unwrap_or_default(), p.hurst.get_value())),
                 ),
                 _ => unsupported(),
             }?;
@@ -1019,24 +1016,24 @@ where
             mirrored[..dim].copy_from_slice(initial_state);
         }
         if let Some(noise) = noise {
-            path_rng.fill_std_normals(&mut s.fbm_normals);
+            path_rng.fill_std_normals(&mut s.fbm_normals)?;
             noise.generate(&s.fbm_normals, &mut s.fbm_increments);
         }
         let hook = NoiseHook::Correlation(correlation.as_ref());
         for step in 0..num_steps {
             let (t, dt) = (time_grid.time(step), time_grid.dt(step));
-            fill_shocks(&mut path_rng, &mut s.z, &mut s.z_raw, step, &hook);
+            fill_shocks(&mut path_rng, &mut s.z, &mut s.z_raw, step, &hook)?;
             if let Some(noise) = noise {
                 s.z[FBM_Z_INDEX] = s.fbm_increments[step];
                 s.z[DRIVE_Z_INDEX] = noise.driving_normal(&s.fbm_normals, step);
             }
-            scheme.step(process, t, dt, &mut s.state, &s.z, &mut s.work);
+            scheme.step(process, t, dt, &mut s.state, &s.z, &mut s.work)?;
             record(primary, step + 1, &s.state, stream)?;
             if spec.antithetic {
                 for z in &mut s.z {
                     *z = -*z;
                 }
-                scheme.step(process, t, dt, &mut s.state_anti, &s.z, &mut s.work_anti);
+                scheme.step(process, t, dt, &mut s.state_anti, &s.z, &mut s.work_anti)?;
                 record(mirrored, step + 1, &s.state_anti, stream)?;
             }
         }
@@ -1069,11 +1066,7 @@ where
             .try_for_each(|block| fill(&mut scratch, block))?;
     }
 
-    // `time + dt` rather than the stored knots: this is the time the engine
-    // stamps on each captured point.
-    let times = std::iter::once(0.0)
-        .chain((0..num_steps).map(|step| time_grid.time(step) + time_grid.dt(step)))
-        .collect();
+    let times = time_grid.times().to_vec();
     Ok(PathSummary {
         num_paths: spec.num_paths,
         num_simulated_paths,

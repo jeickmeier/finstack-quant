@@ -123,7 +123,19 @@ def test_fx_delta_vol_wing_pairing_is_the_rust_constructor_check(
     rr_10d: list[float] | None, bf_10d: list[float] | None
 ) -> None:
     with _raises_exactly("Validation error: rr_10d and bf_10d must both be provided or both omitted"):
-        FxDeltaVolSurface("X", "EUR/USD", [1.0], [0.1], [0.01], [0.005], rr_10d=rr_10d, bf_10d=bf_10d)
+        FxDeltaVolSurface(
+            "X",
+            "EUR/USD",
+            [1.0],
+            [0.1],
+            [0.01],
+            [0.005],
+            delta_convention="forward_unadjusted",
+            atm_convention="delta_neutral_straddle",
+            butterfly_convention="smile",
+            rr_10d=rr_10d,
+            bf_10d=bf_10d,
+        )
 
 
 def test_vol_cube_node_dicts_use_the_rust_serde_shape() -> None:
@@ -189,7 +201,9 @@ def test_realized_variance_defaults_are_rust_owned() -> None:
     h = [102.0, 103.0, 102.5, 103.5]
     lo = [99.0, 100.2, 99.9, 101.0]
     c = [101.0, 102.0, 101.5, 103.0]
-    assert stats.realized_variance_ohlc(o, h, lo, c) == stats.realized_variance_ohlc(o, h, lo, c, "yang_zhang", 252.0)
+    assert stats.realized_variance_ohlc(o, h, lo, c, previous_close=100.0) == stats.realized_variance_ohlc(
+        o, h, lo, c, "yang_zhang", 252.0, 100.0
+    )
 
 
 def test_fx_forward_trade_date_convention_defaults_in_rust() -> None:

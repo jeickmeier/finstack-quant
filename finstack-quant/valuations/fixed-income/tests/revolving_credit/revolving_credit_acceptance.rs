@@ -84,7 +84,9 @@ fn test_upfront_fee_sign() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Pre-commitment valuation: fee is still in the future, should be included
     let pv_pre = facility.value(&market, as_of).unwrap();
@@ -107,7 +109,9 @@ fn test_upfront_fee_sign() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market2 = MarketContext::new().insert(disc_curve2);
+    let market2 = MarketContext::new()
+        .try_insert(disc_curve2)
+        .expect("insert market curve");
     let pv_post = facility.value(&market2, start).unwrap();
     assert!(
         pv_post.amount().abs() < 1.0,
@@ -155,7 +159,9 @@ fn test_mid_period_draw_accrual() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let schedule =
         _generate_deterministic_cashflows_with_curves_replaced(&facility, &market, start).unwrap();
@@ -219,6 +225,7 @@ fn test_floating_vs_margin_only() {
         .maturity(end)
         .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(100.0).expect("valid"), // 100 bp margin
                 gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -258,8 +265,10 @@ fn test_floating_vs_margin_only() {
         .unwrap();
 
     let market_with_curve = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:USD-SOFR-3M",
@@ -321,6 +330,7 @@ fn test_reset_frequency_mismatch() {
         .maturity(end)
         .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-1M".into(),
                 forward_curve_id: "USD-SOFR-1M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"), // No margin to isolate reset effect
                 gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -360,8 +370,10 @@ fn test_reset_frequency_mismatch() {
         .unwrap();
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:USD-SOFR-1M",
@@ -477,7 +489,9 @@ fn test_utilization_tier() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let schedule_low =
         _generate_deterministic_cashflows_with_curves_replaced(&facility_low_util, &market, start)
@@ -555,7 +569,9 @@ fn test_as_of_filtering() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // As-of at Q1 end: no interest/fee cashflows should have date <= as_of
     let schedule =

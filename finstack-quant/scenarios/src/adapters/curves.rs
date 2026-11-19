@@ -400,16 +400,9 @@ fn projection_zero_rate(curve: &ForwardCurve, t: f64) -> Result<f64> {
     Ok(finstack_quant_core::math::Compounding::Continuous.rate_from_df(curve.df(t)?, t)?)
 }
 
-/// Rebuild a price curve from one level per knot. A front knot at `t = 0` is
-/// the spot, so its level also becomes the rebuilt curve's spot price.
+/// Rebuild every native level on the original grid.
 fn rebuild_price_levels(base: &PriceCurve, levels: Vec<f64>) -> Result<PriceCurve> {
-    let knots = base.knots();
-    let spot = match (knots.first(), levels.first()) {
-        (Some(front), Some(&level)) if front.abs() < 1e-12 => level,
-        _ => base.spot_price(),
-    };
-    let points: Vec<(f64, f64)> = knots.iter().copied().zip(levels).collect();
-    Ok(base.rebuild_with_knots(points, spot)?)
+    Ok(base.rebuild_with_knots(base.knots().iter().copied().zip(levels))?)
 }
 
 /// Price-curve value at `t` after combining each knot level with its dense delta.
@@ -425,7 +418,7 @@ fn preview_price_level(
         .zip(deltas)
         .map(|(&level, &delta)| bump(level, delta))
         .collect();
-    Ok(rebuild_price_levels(base, levels)?.price(t))
+    Ok(rebuild_price_levels(base, levels)?.price(t)?)
 }
 
 /// Typical percent-of-forward stress range for commodity price curves.
@@ -460,28 +453,6 @@ fn commodity_node_shock_warning(curve_id: &CurveId, nodes: &[(String, f64)]) -> 
             extreme.join(", ")
         ),
     })
-}
-
-/// Reject parallel VolIndex shocks that would drive any knot — or the spot
-/// level — to a non-positive value. Spot is checked with the same hard-error
-/// policy as the knots: silently clamping spot to zero would leave the curve
-/// internally inconsistent with its term structure.
-fn check_vol_index_post_shock_positivity(
-    curve_id: &CurveId,
-    levels: &[f64],
-    spot_level: f64,
-    pts: f64,
-) -> Result<()> {
-    let base_min = levels.iter().copied().fold(spot_level, f64::min);
-    if base_min.is_finite() && base_min + pts <= 0.0 {
-        return Err(Error::Validation(format!(
-            "VolIndex '{curve_id}' parallel shock would produce non-positive level \
-             (min of spot/knots {base_min:.4} + shift {pts:+.4} = {:.4}); volatility must stay \
-             positive",
-            base_min + pts
-        )));
-    }
-    Ok(())
 }
 
 /// Resolve the discount curve ID used by recalibration-based curve bumps.
@@ -718,7 +689,7 @@ pub(crate) fn curve_parallel_effects(
                 .map_err(|_| missing_market_err(curve_id.as_str()))?;
 
             let spec = BumpSpec {
-                mode: BumpMode::Additive,
+                mode: BumpMode::Multiplicative,
                 units: BumpUnits::Percent,
                 value: bp,
                 bump_type: BumpType::Parallel,
@@ -908,7 +879,7 @@ pub(crate) fn curve_node_effects(
                 &knots,
                 curve_id.as_str(),
                 |d, t| preview_price_level(&base_curve, d, t, |px, pct| px * (1.0 + pct / 100.0)),
-                |t, pct| Ok(base_curve.price(t) * (1.0 + pct / 100.0)),
+                |t, pct| Ok(base_curve.price(t)? * (1.0 + pct / 100.0)),
             )?;
 
             let mut prices: Vec<f64> = base_curve.prices().to_vec();
@@ -937,21 +908,12 @@ pub(crate) fn vol_index_parallel_effects(
         .get_vol_index_curve(curve_id.as_str())
         .map_err(|_| missing_market_err(curve_id.as_str()))?;
 
-    check_vol_index_post_shock_positivity(
-        curve_id,
-        base_curve.prices(),
-        base_curve.spot_price(),
-        points,
-    )?;
-
-    // Rebuild with the original ID so `MarketContext::insert` replaces the
-    // existing entry rather than adding a parallel "VIX+...bp" copy.
-    let knots: Vec<f64> = base_curve.knots().to_vec();
-    let bumped_levels: Vec<f64> = base_curve.prices().iter().map(|l| l + points).collect();
-    let bumped_points: Vec<(f64, f64)> = knots.into_iter().zip(bumped_levels).collect();
-    let new_curve =
-        base_curve.rebuild_with_knots(bumped_points, base_curve.spot_price() + points)?;
-
+    let new_curve = base_curve.apply_bump(BumpSpec {
+        mode: BumpMode::Additive,
+        units: BumpUnits::Fraction,
+        value: points,
+        bump_type: BumpType::Parallel,
+    })?;
     Ok(vec![ScenarioEffect::UpdateCurve(CurveStorage::from(
         new_curve,
     ))])
@@ -986,22 +948,13 @@ pub(crate) fn vol_index_node_effects(
         &knots,
         curve_id.as_str(),
         |deltas, t| preview_price_level(&base_curve, deltas, t, |level, pts| level + pts),
-        |t, points| Ok(base_curve.price(t) + points),
+        |t, points| Ok(base_curve.price(t)? + points),
     )?;
 
     let mut levels: Vec<f64> = base_curve.prices().to_vec();
 
     for &(idx, pts) in &result.indexed_targets {
-        let proposed = levels[idx] + pts;
-        if proposed <= 0.0 {
-            return Err(Error::Validation(format!(
-                "VolIndex '{curve_id}' node shock at knot[{idx}] would \
-                 produce non-positive level (base {:.4} + shift {:+.4} = \
-                 {:.4}); volatility must stay positive",
-                levels[idx], pts, proposed,
-            )));
-        }
-        levels[idx] = proposed;
+        levels[idx] += pts;
     }
 
     let new_curve = rebuild_price_levels(&base_curve, levels)?;
@@ -1035,13 +988,17 @@ mod tests {
     fn vol_index_parallel_uses_absolute_index_points() {
         let as_of = date!(2025 - 01 - 01);
         let vol_curve = PriceCurve::builder("VIX")
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .kind(PriceCurveKind::VolIndex)
             .base_date(as_of)
-            .spot_price(18.5)
             .knots([(0.0, 18.5), (0.25, 20.0), (0.5, 21.5)])
             .build()
             .expect("vol index curve should build");
-        let mut market = MarketContext::new().insert(vol_curve);
+        let mut market = MarketContext::new()
+            .try_insert(vol_curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "demo",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1077,21 +1034,25 @@ mod tests {
         let updated = market
             .get_vol_index_curve("VIX")
             .expect("vol index should exist");
-        assert!((updated.spot_price() - 19.5).abs() < 1.0e-12);
-        assert!((updated.price(0.25) - 21.0).abs() < 1.0e-12);
+        assert!((updated.price(0.0).unwrap() - 19.5).abs() < 1.0e-12);
+        assert!((updated.price(0.25).unwrap() - 21.0).abs() < 1.0e-12);
     }
 
     #[test]
-    fn vol_index_node_front_knot_syncs_spot_level() {
+    fn vol_index_node_updates_explicit_origin() {
         let as_of = date!(2025 - 01 - 01);
         let vol_curve = PriceCurve::builder("VIX")
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .kind(PriceCurveKind::VolIndex)
             .base_date(as_of)
-            .spot_price(18.5)
             .knots([(0.0, 18.5), (0.25, 20.0), (0.5, 21.5)])
             .build()
             .expect("vol index curve should build");
-        let mut market = MarketContext::new().insert(vol_curve);
+        let mut market = MarketContext::new()
+            .try_insert(vol_curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "demo",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1127,11 +1088,11 @@ mod tests {
             })
             .expect("vol-index update");
         assert!(
-            (bumped.spot_price() - 19.5).abs() < 1e-12,
+            (bumped.price(0.0).unwrap() - 19.5).abs() < 1e-12,
             "front-knot +1.0 should move spot 18.5 → 19.5, got {}",
-            bumped.spot_price()
+            bumped.price(0.0).unwrap()
         );
-        assert!((bumped.price(0.0) - 19.5).abs() < 1e-12);
+        assert!((bumped.price(0.0).unwrap() - 19.5).abs() < 1e-12);
     }
 
     #[test]
@@ -1157,13 +1118,16 @@ mod tests {
             .kind(PriceCurveKind::VolIndex)
             .base_date(as_of)
             .day_count(DayCount::Act360)
-            .spot_price(18.0)
             .interp(InterpStyle::LogLinear)
             .extrapolation(ExtrapolationPolicy::Extend)
             .knots([(0.0, 18.0), (0.25, 20.0), (0.5, 22.0)])
             .build()
             .expect("vol-index curve should build");
-        let mut market = MarketContext::new().insert(forward).insert(vol);
+        let mut market = MarketContext::new()
+            .try_insert(forward)
+            .expect("insert market curve")
+            .try_insert(vol)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "demo",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1218,16 +1182,20 @@ mod tests {
     }
 
     #[test]
-    fn vol_index_parallel_rejects_non_positive_floor() {
+    fn vol_index_parallel_allows_zero_and_rejects_negative_levels() {
         let as_of = date!(2025 - 01 - 01);
         let vol_curve = PriceCurve::builder("VIX")
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .kind(PriceCurveKind::VolIndex)
             .base_date(as_of)
-            .spot_price(15.0)
             .knots([(0.0, 15.0), (0.25, 16.0), (0.5, 18.0)])
             .build()
             .expect("vol index curve should build");
-        let mut market = MarketContext::new().insert(vol_curve);
+        let mut market = MarketContext::new()
+            .try_insert(vol_curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "demo",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1246,9 +1214,8 @@ mod tests {
         };
 
         let curve_id = CurveId::from("VIX");
-        let err = vol_index_parallel_effects(&curve_id, -15.0, &ctx)
-            .expect_err("shock to zero must be rejected");
-        assert!(err.to_string().contains("non-positive level"));
+        assert!(vol_index_parallel_effects(&curve_id, -15.0, &ctx).is_ok());
+        assert!(vol_index_parallel_effects(&curve_id, -15.1, &ctx).is_err());
     }
 
     /// Off-pillar interpolated node bump on a log-linear discount curve
@@ -1268,7 +1235,9 @@ mod tests {
         let base_zero = curve
             .zero_rate(3.0, finstack_quant_core::math::Compounding::Continuous)
             .expect("zero_rate");
-        let mut market = MarketContext::new().insert(curve);
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1355,7 +1324,11 @@ mod tests {
             .knots(vec![(1.0, 0.01), (5.0, 0.02)])
             .build()
             .expect("hazard curve should build");
-        let mut market = MarketContext::new().insert(discount).insert(hazard);
+        let mut market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1416,7 +1389,11 @@ mod tests {
             .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve should build");
-        let mut market = MarketContext::new().insert(discount).insert(forward);
+        let mut market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1476,8 +1453,11 @@ mod tests {
 
     fn wti_price_curve(as_of: finstack_quant_core::dates::Date) -> PriceCurve {
         PriceCurve::builder("WTI")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(70.0)
             .knots([(0.0, 70.0), (1.0, 72.0), (5.0, 75.0)])
             .build()
             .expect("WTI price curve should build")
@@ -1486,7 +1466,9 @@ mod tests {
     #[test]
     fn commodity_parallel_percent_moves_every_knot_and_spot() {
         let as_of = date!(2025 - 01 - 01);
-        let mut market = MarketContext::new().insert(wti_price_curve(as_of));
+        let mut market = MarketContext::new()
+            .try_insert(wti_price_curve(as_of))
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1524,12 +1506,12 @@ mod tests {
             .expect("parallel applies");
 
         let bumped = market.get_price_curve("WTI").expect("price curve");
-        assert!((bumped.spot_price() - 77.0).abs() < 1e-12);
+        assert!((bumped.price(0.0).unwrap() - 77.0).abs() < 1e-12);
         for (t, expected) in [(0.0, 77.0), (1.0, 79.2), (5.0, 82.5)] {
             assert!(
-                (bumped.price(t) - expected).abs() < 1e-12,
+                (bumped.price(t).unwrap() - expected).abs() < 1e-12,
                 "price({t}) should be {expected}, got {}",
-                bumped.price(t)
+                bumped.price(t).unwrap()
             );
         }
     }
@@ -1537,7 +1519,9 @@ mod tests {
     #[test]
     fn commodity_exact_node_percent_moves_only_that_pillar() {
         let as_of = date!(2025 - 01 - 01);
-        let mut market = MarketContext::new().insert(wti_price_curve(as_of));
+        let mut market = MarketContext::new()
+            .try_insert(wti_price_curve(as_of))
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1572,17 +1556,19 @@ mod tests {
                 _ => None,
             })
             .expect("price curve update");
-        assert!((bumped.price(1.0) - 79.2).abs() < 1e-12);
-        assert!((bumped.spot_price() - 70.0).abs() < 1e-12);
-        assert!((bumped.price(5.0) - 75.0).abs() < 1e-12);
+        assert!((bumped.price(1.0).unwrap() - 79.2).abs() < 1e-12);
+        assert!((bumped.price(0.0).unwrap() - 70.0).abs() < 1e-12);
+        assert!((bumped.price(5.0).unwrap() - 75.0).abs() < 1e-12);
     }
 
     #[test]
     fn commodity_interpolated_node_hits_native_price_percent() {
         let as_of = date!(2025 - 01 - 01);
         let curve = wti_price_curve(as_of);
-        let base_px = curve.price(3.0);
-        let mut market = MarketContext::new().insert(curve);
+        let base_px = curve.price(3.0).unwrap();
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1619,16 +1605,18 @@ mod tests {
             .expect("price curve update");
         let expected = base_px * 1.10;
         assert!(
-            (bumped.price(3.0) - expected).abs() < 1e-10,
+            (bumped.price(3.0).unwrap() - expected).abs() < 1e-10,
             "price(3Y) should move +10%: got {} expected {expected}",
-            bumped.price(3.0)
+            bumped.price(3.0).unwrap()
         );
     }
 
     #[test]
     fn commodity_parallel_large_shock_emits_warning() {
         let as_of = date!(2025 - 01 - 01);
-        let mut market = MarketContext::new().insert(wti_price_curve(as_of));
+        let mut market = MarketContext::new()
+            .try_insert(wti_price_curve(as_of))
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "demo",
             finstack_quant_core::dates::PeriodPlan::try_new(

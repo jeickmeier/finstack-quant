@@ -54,6 +54,8 @@
 //!
 //! See the Monte Carlo conventions doc in `finstack-quant-valuations` for detailed guidelines.
 
+use crate::math::interp::exact_f64_eq;
+
 use crate::Result;
 use crate::dates::{Date, DayCount, DayCountContext};
 
@@ -75,17 +77,9 @@ fn invalid(message: impl Into<String>) -> crate::Error {
     crate::Error::Validation(format!("Invalid time grid: {}", message.into()))
 }
 
-/// Push the knots `0, dt, …, (num_steps - 1)·dt, t_max` of a uniform grid.
-///
-/// The final knot is pinned to `t_max` exactly: `num_steps * (t_max/num_steps)`
-/// can differ from `t_max` by 1 ulp, which would make
-/// `grid.time(num_steps) != grid.t_max()` and disagree with
-/// [`TimeGrid::from_times`] (which derives `t_max` from the last knot).
-fn push_uniform_knots(times: &mut Vec<f64>, t_max: f64, num_steps: usize) {
-    let dt = t_max / num_steps as f64;
-    times.push(0.0);
-    times.extend((1..num_steps).map(|i| i as f64 * dt));
-    times.push(t_max);
+/// Interior coordinate of the canonical uniform grid. The fraction is in [0, 1].
+fn uniform_knot(i: usize, num_steps: usize, t_max: f64) -> f64 {
+    t_max * (i as f64 / num_steps as f64)
 }
 
 impl TimeGrid {
@@ -93,8 +87,8 @@ impl TimeGrid {
     ///
     /// # Arguments
     ///
-    /// * `t_max` - Final time in years (must be > 0)
-    /// * `num_steps` - Number of time steps (must be > 0)
+    /// * `t_max` - Finite nonnegative horizon in years.
+    /// * `num_steps` - Base interval count, zero exactly when the horizon is zero.
     ///
     /// # Example
     ///
@@ -108,10 +102,18 @@ impl TimeGrid {
     /// # }
     /// ```
     pub fn uniform(t_max: f64, num_steps: usize) -> Result<Self> {
+        if t_max == 0.0 && num_steps == 0 {
+            return Self::from_times(vec![0.0]);
+        }
         if !t_max.is_finite() || t_max <= 0.0 {
             return Err(invalid(format!(
                 "t_max must be finite and positive, got {t_max}"
             )));
+        }
+        if num_steps as u64 >= 1_u64 << 53 {
+            return Err(invalid(
+                "uniform interval count exceeds exact binary64 index range",
+            ));
         }
         if num_steps == 0 {
             return Err(invalid("num_steps must be greater than zero"));
@@ -129,118 +131,80 @@ impl TimeGrid {
 
         let mut times = Vec::new();
         times.try_reserve_exact(times_capacity).map_err(|error| {
-            invalid(format!(
+            crate::Error::Internal(format!(
                 "could not reserve {times_capacity} uniform time knots: {error}"
             ))
         })?;
-        let mut dts = Vec::new();
-        dts.try_reserve_exact(num_steps).map_err(|error| {
-            invalid(format!(
-                "could not reserve {num_steps} uniform time steps: {error}"
-            ))
-        })?;
-
-        push_uniform_knots(&mut times, t_max, num_steps);
-        let dt = t_max / num_steps as f64;
-        dts.extend(std::iter::repeat_n(dt, num_steps - 1));
-        dts.push(t_max - times[num_steps - 1]);
-
-        Ok(Self { t_max, times, dts })
+        times.push(0.0);
+        times.extend((1..num_steps).map(|i| uniform_knot(i, num_steps, t_max)));
+        times.push(t_max);
+        if times.windows(2).any(|w| w[0] >= w[1]) {
+            return Err(crate::Error::Internal(format!(
+                "cannot resolve {num_steps} distinct time steps on [0, {t_max}]"
+            )));
+        }
+        Self::from_times(times)
     }
 
     /// Create a uniform base grid on `[0, t_max]` and merge in `required_times` exactly.
     ///
-    /// Steps are chosen as `round(t_max * steps_per_year)`, floored to at least
-    /// `min_steps`, matching [`Self::uniform`] spacing. Any finite `required_time` in
-    /// `(0, t_max]` is inserted, the combined knot list is sorted and near-duplicates
-    /// removed, then [`Self::from_times`] validates the result (so the final grid may
-    /// be **non-uniform** if extra event times split intervals).
+    /// Distinct represented event times are retained, including adjacent floats.
     ///
     /// # Arguments
     ///
-    /// * `t_max` - Horizon in years (`> 0`).
-    /// * `steps_per_year` - Target density for the underlying uniform spacing (`> 0`).
-    /// * `min_steps` - Minimum number of uniform steps before merging events (`>= 1`).
-    /// * `required_times` - Extra knot times (e.g. barrier monitoring, cashflow dates).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error`] if inputs are invalid or the merged grid fails
-    /// [`Self::from_times`] validation.
+    /// * `t_max` - Finite nonnegative horizon in years.
+    /// * `num_steps` - Base interval count, zero exactly when the horizon is zero.
+    /// * `required_times` - Contractual event coordinates in years on the closed interval `[0, t_max]`.
     pub fn uniform_with_required_times(
         t_max: f64,
-        steps_per_year: f64,
-        min_steps: usize,
+        num_steps: usize,
         required_times: &[f64],
     ) -> Result<Self> {
-        if !t_max.is_finite() || t_max <= 0.0 {
-            return Err(invalid(format!(
-                "uniform_with_required_times requires finite t_max > 0, got {t_max}"
-            )));
-        }
-        if !steps_per_year.is_finite() || steps_per_year <= 0.0 {
-            return Err(invalid(format!(
-                "uniform_with_required_times requires finite steps_per_year > 0, got \
-                 {steps_per_year}"
-            )));
-        }
-        if min_steps == 0 {
+        if required_times
+            .iter()
+            .any(|time| !(0.0..=t_max).contains(time))
+        {
             return Err(invalid(
-                "uniform_with_required_times requires min_steps >= 1",
+                "required event times must be finite and within the horizon",
             ));
         }
-
-        let requested_steps = t_max * steps_per_year;
-        if !requested_steps.is_finite() {
-            return Err(invalid("uniform_with_required_times step count overflowed"));
+        let base = Self::uniform(t_max, num_steps)?;
+        if required_times.is_empty() {
+            return Ok(base);
         }
-        let rounded_steps = requested_steps.round();
-        let max_f64_capacity = isize::MAX as usize / std::mem::size_of::<f64>();
-        // `Vec` allocations are bounded by `isize::MAX` bytes; checking the
-        // f64-element capacity before the float-to-usize cast also avoids
-        // Rust's saturating float-cast behavior turning an oversized request
-        // into `usize::MAX`.
-        if rounded_steps >= max_f64_capacity as f64 {
+        let mut times = base.times;
+        times
+            .len()
+            .checked_add(required_times.len())
+            .filter(|&n| std::alloc::Layout::array::<f64>(n).is_ok())
+            .ok_or_else(|| invalid("merged event grid exceeds vector capacity"))?;
+        times
+            .try_reserve_exact(required_times.len())
+            .map_err(|error| {
+                crate::Error::Internal(format!("could not reserve merged event grid: {error}"))
+            })?;
+        times.extend_from_slice(required_times);
+        times.sort_unstable_by(f64::total_cmp);
+        times.dedup();
+        Self::from_times(times)
+    }
+
+    /// Find the exact index of an existing event coordinate.
+    ///
+    /// # Arguments
+    ///
+    /// * `time` - Model time in years, on the same clock as the grid knots.
+    pub fn get_index(&self, time: f64) -> Result<usize> {
+        if !(0.0..=self.t_max).contains(&time) {
             return Err(invalid(format!(
-                "uniform_with_required_times step count {rounded_steps} exceeds capacity"
+                "event time {time} outside [0, {}]",
+                self.t_max
             )));
         }
-        let num_steps = (rounded_steps as usize).max(min_steps);
-        let capacity = num_steps
-            .checked_add(required_times.len())
-            .and_then(|value| value.checked_add(1))
-            .filter(|&value| value <= max_f64_capacity)
-            .ok_or_else(|| {
-                invalid("uniform_with_required_times merged grid capacity overflowed")
-            })?;
-        let mut times = Vec::new();
-        times.try_reserve_exact(capacity).map_err(|error| {
-            invalid(format!(
-                "uniform_with_required_times could not reserve {capacity} knots: {error}"
-            ))
-        })?;
-        push_uniform_knots(&mut times, t_max, num_steps);
-
-        for &required_time in required_times {
-            // Accept times a float-noise tolerance past t_max (day-count year
-            // fractions routinely land 1 ulp beyond) by snapping them to the
-            // terminal knot instead of silently dropping the event.
-            if required_time.is_finite() && required_time > 1e-10 {
-                if required_time <= t_max {
-                    times.push(required_time);
-                } else if required_time - t_max < 1e-10 {
-                    times.push(t_max);
-                }
-            }
-        }
-
-        times.sort_by(|a, b| a.total_cmp(b));
-        times.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
-        if let Some(last) = times.last_mut() {
-            *last = t_max;
-        }
-
-        Self::from_times(times)
+        let time = if time == 0.0 { 0.0 } else { time };
+        self.times
+            .binary_search_by(|knot| knot.total_cmp(&time))
+            .map_err(|_| invalid(format!("event time {time} is absent from the grid")))
     }
 
     /// Create a custom time grid from explicit time points.
@@ -261,7 +225,7 @@ impl TimeGrid {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_times(times: Vec<f64>) -> Result<Self> {
+    pub fn from_times(mut times: Vec<f64>) -> Result<Self> {
         if times.is_empty() {
             return Err(invalid("times must not be empty"));
         }
@@ -275,6 +239,7 @@ impl TimeGrid {
             )));
         }
 
+        times[0] = 0.0;
         for i in 1..times.len() {
             if !times[i].is_finite() {
                 return Err(invalid(format!("times[{i}] must be finite")));
@@ -285,9 +250,12 @@ impl TimeGrid {
         }
 
         let dts_capacity = times.len() - 1;
+        if dts_capacity as u64 >= 1_u64 << 53 {
+            return Err(invalid("interval count exceeds exact binary64 index range"));
+        }
         let mut dts = Vec::new();
         dts.try_reserve_exact(dts_capacity).map_err(|error| {
-            invalid(format!(
+            crate::Error::Internal(format!(
                 "could not reserve {dts_capacity} custom time steps: {error}"
             ))
         })?;
@@ -297,15 +265,6 @@ impl TimeGrid {
                 return Err(invalid(format!("time step {i} is not finite")));
             }
             dts.push(dt);
-        }
-
-        const MIN_DT: f64 = 1e-10;
-        if let Some(&min_dt) = dts.iter().min_by(|a, b| a.total_cmp(b))
-            && min_dt < MIN_DT
-        {
-            return Err(invalid(format!(
-                "minimum time step {min_dt} is below the 1e-10 floor"
-            )));
         }
 
         let t_max = times.last().copied().unwrap_or(0.0);
@@ -342,14 +301,10 @@ impl TimeGrid {
         &self.dts
     }
 
-    /// Check if grid is uniform (all dts equal within tolerance).
+    /// Whether the stored knots exactly match the canonical uniform grid.
     pub fn is_uniform(&self) -> bool {
-        if self.dts.is_empty() {
-            return true;
-        }
-        let first_dt = self.dts[0];
-        let tol = 1e-10;
-        self.dts.iter().all(|&dt| (dt - first_dt).abs() < tol)
+        let count = self.num_steps();
+        (1..count).all(|i| exact_f64_eq(self.times[i], uniform_knot(i, count, self.t_max)))
     }
 }
 
@@ -475,15 +430,11 @@ mod tests {
 
     #[test]
     fn test_uniform_with_required_times_merges_and_dedups_events() {
-        let grid = TimeGrid::uniform_with_required_times(
-            1.0,
-            4.0,
-            2,
-            &[0.75, 0.5, 0.50000000001, 1.0, 0.0],
-        )
-        .expect("merged grid should succeed");
+        let grid =
+            TimeGrid::uniform_with_required_times(1.0, 4, &[0.75, 0.5, 0.50000000001, 1.0, 0.0])
+                .expect("merged grid should succeed");
 
-        assert_eq!(grid.times(), &[0.0, 0.25, 0.5, 0.75, 1.0]);
+        assert_eq!(grid.times(), &[0.0, 0.25, 0.5, 0.50000000001, 0.75, 1.0]);
     }
 
     #[test]
@@ -519,22 +470,18 @@ mod tests {
     }
 
     #[test]
-    fn test_uniform_with_required_times_snaps_float_noise_past_t_max() {
-        // A required time 1 ulp past maturity (typical day-count noise) must
-        // snap to the terminal knot, not be silently dropped.
-        let just_past = 1.0 + f64::EPSILON;
-        let grid = TimeGrid::uniform_with_required_times(1.0, 4.0, 2, &[just_past])
-            .expect("merged grid should succeed");
-        assert_eq!(grid.t_max(), 1.0);
-        assert_eq!(grid.times().last(), Some(&1.0));
+    fn required_times_must_be_in_the_closed_horizon() {
+        for bad in [-0.01, f64::NAN, f64::INFINITY, 1.0_f64.next_up()] {
+            assert!(TimeGrid::uniform_with_required_times(1.0, 4, &[bad]).is_err());
+        }
     }
 
     #[test]
     fn uniform_with_required_times_pins_terminal_knot_exactly() {
         // 11 * (0.1 / 11) is one ULP greater than 0.1 on IEEE-754 f64.
         let t_max = 0.1;
-        let grid = TimeGrid::uniform_with_required_times(t_max, 110.0, 1, &[])
-            .expect("grid should succeed");
+        let grid =
+            TimeGrid::uniform_with_required_times(t_max, 11, &[]).expect("grid should succeed");
 
         assert_eq!(grid.t_max().to_bits(), t_max.to_bits());
         assert_eq!(
@@ -545,40 +492,25 @@ mod tests {
     }
 
     #[test]
-    fn uniform_with_required_times_rejects_zero_min_steps() {
-        assert!(TimeGrid::uniform_with_required_times(1.0, 4.0, 0, &[]).is_err());
-    }
-
-    #[test]
-    fn uniform_with_required_times_rejects_invalid_horizon_and_density() {
-        for t_max in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            let result = std::panic::catch_unwind(|| {
-                TimeGrid::uniform_with_required_times(t_max, 4.0, 1, &[])
-            });
-            assert!(
-                matches!(result, Ok(Err(_))),
-                "invalid t_max={t_max} must return Err without panicking"
-            );
-        }
-        for steps_per_year in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            assert!(TimeGrid::uniform_with_required_times(1.0, steps_per_year, 1, &[]).is_err());
-        }
-    }
-
-    #[test]
-    fn uniform_with_required_times_rejects_step_overflow_without_allocating() {
-        for result in [
-            std::panic::catch_unwind(|| {
-                TimeGrid::uniform_with_required_times(f64::MAX, 2.0, 1, &[])
-            }),
-            std::panic::catch_unwind(|| {
-                TimeGrid::uniform_with_required_times(1.0, 1.0, usize::MAX, &[])
-            }),
+    fn uniform_and_event_grids_validate_the_base_before_merging() {
+        for (horizon, n) in [
+            (1.0, 0),
+            (0.0, 1),
+            (1.0, usize::MAX),
+            (f64::from_bits(1), 3),
         ] {
-            assert!(
-                matches!(result, Ok(Err(_))),
-                "overflowing step count must return Err without allocation panic"
-            );
+            assert!(TimeGrid::uniform_with_required_times(horizon, n, &[0.0]).is_err());
+        }
+        let origin = TimeGrid::uniform_with_required_times(-0.0, 0, &[-0.0]).unwrap();
+        assert_eq!(origin.times()[0].to_bits(), 0);
+        assert_eq!(origin.get_index(-0.0).unwrap(), 0);
+        assert!(origin.get_index(f64::NAN).is_err());
+        let tiny = f64::from_bits(1);
+        let grid = TimeGrid::uniform_with_required_times(1.0, 3, &[tiny, tiny.next_up()]).unwrap();
+        assert_eq!(grid.get_index(tiny).unwrap(), 1);
+        assert_eq!(grid.get_index(tiny.next_up()).unwrap(), 2);
+        for (pair, &dt) in grid.times().windows(2).zip(grid.dts()) {
+            assert_eq!(dt, pair[1] - pair[0]);
         }
     }
 

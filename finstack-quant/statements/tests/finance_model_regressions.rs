@@ -368,30 +368,29 @@ fn named_capital_structure_formulas_keep_native_instrument_currency() {
     assert!(error.to_string().contains("Dimensional mismatch"));
 }
 
+/// A plan's intervals cannot disagree with their identifiers: the plan
+/// constructor refuses them, so only a gap can reach model validation.
 #[test]
 fn model_period_intervals_must_match_their_identifiers_and_be_contiguous() {
-    let mut empty = forecast_model();
-    empty.periods.periods[0].end = empty.periods.periods[0].start;
-    assert!(
-        empty
-            .validate_semantics()
-            .unwrap_err()
-            .to_string()
-            .contains("not canonical")
-    );
+    use finstack_quant_core::dates::PeriodPlan;
+    let model = forecast_model();
+    let calendar = model.periods.get_calendar();
 
-    let mut overlapping = forecast_model();
-    overlapping.periods.periods[1].start = date!(2025 - 03 - 31);
-    assert!(
-        overlapping
-            .validate_semantics()
-            .unwrap_err()
-            .to_string()
-            .contains("not canonical")
-    );
+    let mut empty = model.periods.to_vec();
+    empty[0].end = empty[0].start;
+    let mut overlapping = model.periods.to_vec();
+    overlapping[1].start = date!(2025 - 03 - 31);
+    for rows in [empty, overlapping] {
+        let error = PeriodPlan::try_new(calendar, rows).unwrap_err();
+        assert!(error.to_string().contains("calendar bounds"), "{error}");
+    }
 
-    let mut sparse = forecast_model();
-    sparse.periods.periods[1].start = date!(2025 - 05 - 01);
+    let mut sparse = model;
+    let mut rows = finstack_quant_core::dates::build_periods("2025Q1..Q3", Some("2025Q1"))
+        .unwrap()
+        .into_periods();
+    rows.remove(1);
+    sparse.periods = PeriodPlan::try_new(calendar, rows).unwrap();
     assert!(
         sparse
             .validate_semantics()
@@ -435,7 +434,11 @@ fn runnable_model_keeps_missing_cells_and_rejects_plan_gaps_and_open_references(
         FinancialModelSpec::from_json(&gap.to_string()).expect_err("a plan gap is rejected");
     assert!(error.to_string().contains("contiguous"), "{error}");
     let mut direct = model;
-    direct.periods.periods.remove(1);
+    let mut rows = direct.periods.to_vec();
+    rows.remove(1);
+    direct.periods =
+        finstack_quant_core::dates::PeriodPlan::try_new(direct.periods.get_calendar(), rows)
+            .unwrap();
     Evaluator::new()
         .evaluate(&direct)
         .expect_err("evaluation revalidates a mutated model");

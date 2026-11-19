@@ -145,13 +145,17 @@ fn interest_rate_future_terms_reproduce_tick_formula() {
 fn vol_index_future_uses_settlement_price_on_settlement_date() {
     let settlement = date!(2025 - 04 - 01);
     let vix = PriceCurve::builder("VIX")
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .kind(PriceCurveKind::VolIndex)
         .base_date(date!(2025 - 01 - 01))
-        .spot_price(18.0)
         .knots([(0.0, 18.0), (1.0, 22.0)])
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(vix);
+    let market = MarketContext::new()
+        .try_insert(vix)
+        .expect("insert market curve");
     let notional = 100_000.0;
     let entry = 20.0;
     let mut future = VolatilityIndexFuture::builder()

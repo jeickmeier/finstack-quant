@@ -188,7 +188,7 @@ pub fn strike_to_delta(
         ));
     }
     let signed_d1 = if is_call { d1 } else { -d1 };
-    Ok(norm_cdf(signed_d1))
+    norm_cdf(signed_d1)
 }
 
 /// Evaluate an [`FxDeltaVolSurface`] at `(expiry, strike)` given an explicit FX `forward`.
@@ -288,17 +288,17 @@ pub fn get_fx_delta_pillar_vols(
 /// Converts each expiry slice's delta pillars into strikes using its explicit delivery forward
 /// `delivery_forwards[i]`, takes the exact IEEE-754 union (`f64::total_cmp` + exact dedup without
 /// tolerance coalescing) as the strike axis, and samples every expiry row linearly with flat wing
-/// clamping using [`VolInterpolationMode::Vol`].
+/// clamping. The selected interpolation mode governs subsequent queries of the stored grid.
 ///
 /// # Arguments
 ///
 /// * `surface` - Validated FX delta volatility surface to materialize.
 /// * `delivery_forwards` - Positive finite outright FX forward rates (`quote` per `base`), one per expiry in `surface.expiries()`.
+/// * `interpolation_mode` - Interpolate the output grid in implied volatility or total variance.
 ///
 /// # Returns
 ///
-/// Returns a strike-indexed [`VolSurface`] storing `VolQuoteType::BlackLognormal` and
-/// `VolInterpolationMode::Vol`.
+/// Returns a strike-indexed [`VolSurface`] storing `VolQuoteType::BlackLognormal` and the selected interpolation mode.
 ///
 /// # Errors
 ///
@@ -309,6 +309,7 @@ pub fn get_fx_delta_pillar_vols(
 pub fn materialize_fx_delta_surface(
     surface: &FxDeltaVolSurface,
     delivery_forwards: &[f64],
+    interpolation_mode: VolInterpolationMode,
 ) -> Result<VolSurface> {
     let expiries = surface.expiries();
     if delivery_forwards.len() != expiries.len() {
@@ -355,7 +356,7 @@ pub fn materialize_fx_delta_surface(
         VolGridOpts {
             secondary_axis: VolSurfaceAxis::Strike,
             quote_type: VolQuoteType::BlackLognormal,
-            interpolation_mode: VolInterpolationMode::Vol,
+            interpolation_mode,
         },
         None,
     )?;
@@ -415,7 +416,9 @@ mod tests {
         .bf_25d(&[0.002, 0.003])
         .build()
         .unwrap();
-        let materialized = materialize_fx_delta_surface(&surface, &[1.10, 1.12]).unwrap();
+        let materialized =
+            materialize_fx_delta_surface(&surface, &[1.10, 1.12], VolInterpolationMode::Vol)
+                .unwrap();
         assert_eq!(materialized.expiries(), &[0.5, 1.0]);
         assert_eq!(materialized.interpolation_mode(), VolInterpolationMode::Vol);
         assert!(materialized.secondary_values().len() >= 3);
@@ -425,7 +428,12 @@ mod tests {
     #[test]
     fn materialize_rejects_mismatched_or_non_positive_forwards() {
         let surface = sample_surface();
-        assert!(materialize_fx_delta_surface(&surface, &[1.10]).is_err());
-        assert!(materialize_fx_delta_surface(&surface, &[1.10, 0.0]).is_err());
+        assert!(
+            materialize_fx_delta_surface(&surface, &[1.10], VolInterpolationMode::Vol).is_err()
+        );
+        assert!(
+            materialize_fx_delta_surface(&surface, &[1.10, 0.0], VolInterpolationMode::Vol)
+                .is_err()
+        );
     }
 }

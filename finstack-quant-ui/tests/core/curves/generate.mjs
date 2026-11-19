@@ -55,7 +55,7 @@ market.curves.push(
     {
       type: "price",
       id: "PRICE",
-      spot_price: 100,
+      level_kind: "price",
       knot_points: [
         [0, 100],
         [1, 102],
@@ -65,7 +65,7 @@ market.curves.push(
     {
       type: "price",
       id: "VOL_INDEX",
-      spot_level: 18,
+      level_kind: "vol_index",
       knot_points: [
         [0, 18],
         [1, 19],

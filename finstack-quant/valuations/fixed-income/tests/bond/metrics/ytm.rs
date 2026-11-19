@@ -38,7 +38,9 @@ fn test_ytm_par_bond() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -113,7 +115,11 @@ fn test_ytm_floating_bond_is_finite_from_price() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let mut bond = Bond::floating(
         finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
@@ -185,7 +191,9 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Amortizing schedule: step down principal once before final maturity.
     let step_date = date!(2026 - 01 - 01);

@@ -294,38 +294,48 @@ mod tests {
         );
     }
 
-    /// Pins the per-path-paired estimates and standard errors. Captured from
-    /// the paired implementation before it took the short names. Platform
-    /// libm yields one pattern on macOS and another on the Linux libm used by
-    /// GitHub Actions. A third pattern means the seeded Greeks moved.
+    /// Reference values use the Philox integer specification and the closed-form
+    /// GBM terminal spot on each antithetic path. The central payoff difference
+    /// and its sample standard error are computed over the resulting path payoffs.
     #[test]
-    fn paired_finite_diff_greeks_are_bit_stable() {
-        let bits = |estimate: Estimate| [estimate.mean.to_bits(), estimate.stderr.to_bits()];
+    fn paired_finite_diff_greeks_match_seeded_terminal_payoffs() {
         let put = || crn_spec(100.0, 110.0, OptionType::Put);
-        let got = [
-            bits(finite_diff_delta(atm_spec()).expect("call delta")),
-            bits(finite_diff_gamma(atm_spec()).expect("call gamma")),
-            bits(finite_diff_delta(put()).expect("put delta")),
-            bits(finite_diff_gamma(put()).expect("put gamma")),
-        ];
-        const PINS: [[[u64; 2]; 4]; 2] = [
-            [
-                [0x3fe4_435d_3a2c_3108, 0x3f68_16b5_9602_d2dd],
-                [0x3f92_6177_6054_677d, 0x3f5a_48d2_3f3d_5558],
-                [0xbfe1_70bb_1a96_6f2a, 0x3f66_7b61_b338_9e42],
-                [0x3f94_ef48_0153_4ed3, 0x3f4d_ed31_31d4_5fe3],
-            ],
-            [
-                [0x3fe4_435d_3a2c_3108, 0x3f68_16b5_9602_d2de],
-                [0x3f92_6177_6054_678a, 0x3f5a_48d2_3f3d_5555],
-                [0xbfe1_70bb_1a96_6f22, 0x3f66_7b61_b338_9e45],
-                [0x3f94_ef48_0153_4ed0, 0x3f4d_ed31_31d4_5fe7],
-            ],
-        ];
-        assert!(
-            PINS.contains(&got),
-            "paired finite-difference Greeks moved off the macOS and Linux libm pins: {got:#x?}"
-        );
+        for (estimate, mean, stderr) in [
+            (
+                finite_diff_delta(atm_spec()),
+                0.6327256679939411,
+                0.002906188808079818,
+            ),
+            (
+                finite_diff_gamma(atm_spec()),
+                0.01957569417511879,
+                0.001682394092043128,
+            ),
+            (
+                finite_diff_delta(put()),
+                -0.5457244775663593,
+                0.002747080461811759,
+            ),
+            (
+                finite_diff_gamma(put()),
+                0.0190969375680929,
+                0.0008769435975753434,
+            ),
+        ] {
+            let estimate = estimate.expect("paired finite differences");
+            // The engine evolves and rounds each step, while the independent
+            // reference evaluates one terminal exponential per path.
+            assert!(
+                (estimate.mean - mean).abs() <= 2e-15,
+                "mean {} vs {mean}",
+                estimate.mean
+            );
+            assert!(
+                (estimate.stderr - stderr).abs() <= 2e-15,
+                "stderr {} vs {stderr}",
+                estimate.stderr
+            );
+        }
     }
 
     #[test]

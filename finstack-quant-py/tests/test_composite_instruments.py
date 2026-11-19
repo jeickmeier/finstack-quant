@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from functools import partial
 import json
+from pathlib import Path
 
 import pytest
 
@@ -284,3 +285,28 @@ def test_composite_entry_points_price_cs01_like_price_instrument() -> None:
     )
     weighted_composite = weighted.initialize(market, base).instrument
     assert weighted_composite.rebalance(market, base).instrument.to_json()
+
+
+def test_undefined_spread_rejects_initialization_and_rebalance() -> None:
+    payload = json.loads(fixed_spec().to_json())
+    fixture = (
+        Path(__file__).resolve().parents[2] / "finstack-quant/valuations/tests/fixtures/composite_spread_quantity.json"
+    )
+    payload["weighting_method"] = json.loads(fixture.read_text())
+    for leg in payload["legs"]:
+        leg["instrument"]["spec"].update(spot_id=leg["instrument_id"], quoted_spot=None)
+    spec = CompositeSpec.from_json(json.dumps(payload))
+
+    def prices(a: float) -> MarketContext:
+        return MarketContext().insert_price("A", a).insert_price("B", 100.0)
+
+    day = dt.date(2025, 1, 2)
+    with pytest.raises(RuntimeError, match="by zero"):
+        spec.initialize(prices(100.0), day)
+    for price, sign in [(101.0, 1.0), (99.0, -1.0)]:
+        resolved = spec.initialize(prices(price), day).instrument
+        before = resolved.to_json()
+        assert resolved.state.resolved_legs["A"] == sign
+        with pytest.raises(RuntimeError, match="by zero"):
+            resolved.rebalance(prices(100.0), day)
+        assert resolved.to_json() == before

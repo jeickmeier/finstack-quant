@@ -538,23 +538,12 @@ export type MarketDatum =
       scalar: MarketScalar;
     }
   | {
-      /**
-       * Quote currency for cash dividends (optional metadata).
-       */
-      currency?: valuations.Currency | null;
-      /**
-       * Sorted events by date (ascending).
-       */
+      currency: valuations.Currency;
       events: DividendEvent[];
-      /**
-       * Unique identifier of this schedule in the market context.
-       */
       id: valuations.Id;
       kind: "dividend_schedule";
-      /**
-       * Optional display symbol/ticker for convenience.
-       */
-      underlying?: string | null;
+      share_basis: string;
+      underlying: valuations.Id;
     }
   | {
       /**
@@ -601,6 +590,7 @@ export type MarketDatum =
        * Strictly ascending canonical monthly fixing observations.
        */
       observations: InflationObservation[];
+      series?: InflationSeries | null;
     }
   | {
       /**
@@ -699,6 +689,7 @@ export type MarketDatum =
        * Option expiries in years, strictly increasing. Indexes the first axis.
        */
       expiries: number[];
+      expiry_clock?: VolatilityClock | null;
       /**
        * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
        */
@@ -824,34 +815,6 @@ export type MarketScalar =
     }
   | {
       price: valuations.Money;
-    };
-/**
- * Type of dividend event.
- *
- * Distinguishes between cash payments, stock distributions, and continuous
- * yield approximations used in different pricing models.
- *
- * # Variants
- *
- * - **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)
- * - **Stock**: Share distribution (less common, complicates option pricing)
- * - **Yield**: Continuous approximation for analytical models
- */
-export type DividendKind =
-  | {
-      cash: valuations.Money;
-    }
-  | {
-      yield: number;
-    }
-  | {
-      stock: {
-        /**
-         * Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.
-         */
-        ratio: number;
-        [k: string]: unknown;
-      };
     };
 /**
  * Right-tail extrapolation policy for [`ScalarTimeSeries`].
@@ -1759,8 +1722,9 @@ export type SwaptionVolConvention =
   | {
       shifted_lognormal: {
         /**
-         * Finite positive additive shift in decimal rate units, applied to
+         * Finite signed additive shift in decimal rate units, applied to
          * both forwards and strikes and retained in calibrated artifacts.
+         * The effective forward and strikes must be positive.
          */
         shift: number;
         [k: string]: unknown;
@@ -1981,6 +1945,7 @@ export type PriorMarketObject =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
     }
   | {
       correlations: number[];
@@ -2025,6 +1990,10 @@ export type PriorMarketObject =
        */
       base: valuations.DateWire;
       /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
+      /**
        * Day count convention
        */
       day_count: valuations.DayCount;
@@ -2046,19 +2015,19 @@ export type PriorMarketObject =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
     }
   | {
       /**
        * Base date
        */
       base: valuations.DateWire;
+      /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
       /**
        * Day count convention
        */
@@ -2081,13 +2050,9 @@ export type PriorMarketObject =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
     }
   | {
       /**
@@ -2303,6 +2268,12 @@ export type RateCalibrationCurveRole =
       };
     };
 /**
+ * Level family a [`PriceCurve`] represents.
+ *
+ * The kind determines level validation and the typed market-context lookup.
+ */
+export type PriceCurveKind = "price" | "vol_index";
+/**
  * Semantic meaning of the secondary axis on a [`VolSurface`].
  *
  * Most option surfaces are defined on `expiry × strike`, but some calibration
@@ -2394,25 +2365,6 @@ export type FittedSliceParameters =
       svi: SviParams;
     };
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
-/**
- * Finite JSON number in the closed interval `[0, 1]`.
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
- * Finite JSON number greater than or equal to zero.
- */
-export type NonNegativeF64Wire = number;
-/**
- * Finite correlation coefficient in the closed interval `[-1, 1]`.
- */
-export type CorrelationWire = number;
-/**
  * Units of the residuals in [`CalibrationReport::residuals`],
  * [`CalibrationReport::max_residual`] and [`CalibrationReport::rmse`].
  *
@@ -2430,6 +2382,13 @@ export type ResidualUnits =
  * There is no default mode: every financial rounding names one explicitly.
  */
 export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ */
+export type PositiveF64Wire = number;
 /**
  * Numerical procedure that produced a [`CalibrationReport`].
  *
@@ -2619,6 +2578,7 @@ export type CurveState =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
       type: "inflation";
     }
   | {
@@ -2632,6 +2592,10 @@ export type CurveState =
        * Base date
        */
       base: valuations.DateWire;
+      /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
       /**
        * Day count convention
        */
@@ -2653,13 +2617,9 @@ export type CurveState =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
       type: "price";
     }
   | {
@@ -4924,18 +4884,13 @@ export interface CdsConventionKey {
   [k: string]: unknown;
 }
 /**
- * A dated dividend event.
+ * One gross cash distribution per entitled share on its schedule's share basis.
  */
 export interface DividendEvent {
-  /**
-   * Ex-dividend date.
-   */
-  date: valuations.DateWire;
-  /**
-   * Event kind.
-   */
-  kind: DividendKind;
-  [k: string]: unknown;
+  amount: valuations.Money;
+  event_id: string;
+  ex_date: valuations.DateWire;
+  pay_date: valuations.DateWire;
 }
 /**
  * One expected-release schedule assumption for a monthly CPI/RPI reference period.
@@ -4970,6 +4925,23 @@ export interface InflationObservation {
    * Published finite, strictly positive index level.
    */
   value: number;
+}
+/**
+ * Publication identity and units of an observed or projected inflation level.
+ */
+export interface InflationSeries {
+  /**
+   * Published reference period and index scale, for example `1982-84=100`.
+   */
+  reference_base: string;
+  /**
+   * True for seasonally adjusted levels and false for unadjusted levels.
+   */
+  seasonally_adjusted: boolean;
+  /**
+   * Publisher-qualified identifier of the statistical series.
+   */
+  series_id: string;
 }
 /**
  * Explicit day-count clock translating calendar expiry dates into year fractions
@@ -5140,7 +5112,7 @@ export interface RatesStepConventions {
   ois_compounding?: FloatingLegCompounding | null;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface RateCalibrationRecipe {
   /**
@@ -5151,6 +5123,10 @@ export interface RateCalibrationRecipe {
    * Day count used for the curve's time axis.
    */
   curve_day_count: valuations.DayCount;
+  /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: RateCalibrationExecution | null;
   /**
    * Numerical calibration method.
    */
@@ -5167,6 +5143,48 @@ export interface RateCalibrationRecipe {
    * Discount/projection role and linked curve identifier.
    */
   role: RateCalibrationCurveRole;
+}
+/**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface RateCalibrationExecution {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: RateQuoteBinding[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface RateQuoteBinding {
+  /**
+   * Contractual maturity resolved using the instrument conventions.
+   */
+  pillar_date: valuations.DateWire;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
 }
 /**
  * Source interpolation and a single accumulated transformation, never a chain
@@ -5504,29 +5522,29 @@ export interface FittedSlice {
   parameters: FittedSliceParameters;
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface SabrParameters {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
-  alpha: PositiveF64Wire;
+  alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
-  beta: ClosedUnitIntervalF64Wire;
+  beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
-  nu: NonNegativeF64Wire;
+  nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
-  rho: CorrelationWire;
+  rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: PositiveF64Wire | null;
+  shift?: number | null;
 }
 /**
  * SVI (Stochastic Volatility Inspired) raw parameterization.
@@ -5776,36 +5794,14 @@ export interface CreditIndexState {
   recovery_rate: number;
 }
 /**
- * Dividend schedule for an equity or ETF underlying.
- *
- * Contains a time-ordered sequence of dividend events used for pricing equity
- * derivatives and calculating total return. The schedule can be referenced by
- * multiple instruments via its [`CurveId`] in the market context.
- *
- * # Usage in Pricing
- *
- * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
- * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
- * - **Dividend futures**: Sum dividends in contract period
- * - **Total return**: Include dividend reinvestment in performance
+ * Validated distributions for one security, share basis and currency.
  */
 export interface DividendSchedule {
-  /**
-   * Quote currency for cash dividends (optional metadata).
-   */
-  currency?: valuations.Currency | null;
-  /**
-   * Sorted events by date (ascending).
-   */
+  currency: valuations.Currency;
   events: DividendEvent[];
-  /**
-   * Unique identifier of this schedule in the market context.
-   */
   id: valuations.Id;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
+  share_basis: string;
+  underlying: valuations.Id;
 }
 /**
  * Serializable state of an FxMatrix.
@@ -5936,6 +5932,7 @@ export interface InflationIndex {
    * Strictly ascending canonical monthly fixing observations.
    */
   observations: InflationObservation[];
+  series?: InflationSeries | null;
 }
 /**
  * Date-indexed time series with flexible interpolation.
@@ -6040,6 +6037,7 @@ export interface VolCube {
    * Option expiries in years, strictly increasing. Indexes the first axis.
    */
   expiries: number[];
+  expiry_clock?: VolatilityClock | null;
   /**
    * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
    */

@@ -44,21 +44,29 @@ export default [
   {
     "path": "#/$defs/d_07856c27d945226b86ed",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent",
-    "description": "A dated dividend event."
+    "description": "One gross cash distribution per entitled share on its schedule's share basis."
   },
   {
-    "path": "#/$defs/d_07856c27d945226b86ed/properties/date",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/date",
-    "description": "Ex-dividend date.",
+    "path": "#/$defs/d_07856c27d945226b86ed/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/amount",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_07856c27d945226b86ed/properties/event_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/event_id"
+  },
+  {
+    "path": "#/$defs/d_07856c27d945226b86ed/properties/ex_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/ex_date",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
-    "path": "#/$defs/d_07856c27d945226b86ed/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/kind",
-    "description": "Event kind.",
-    "ref": "#/$defs/DividendKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind"
+    "path": "#/$defs/d_07856c27d945226b86ed/properties/pay_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/pay_date",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_14c856f170a7fa5ec480",
@@ -96,9 +104,32 @@ export default [
     "description": "Piecewise quadratic forwards (C¹ forwards and C² log discount factors)."
   },
   {
+    "path": "#/$defs/d_15e86d33b70e6065d029",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding",
+    "description": "Identity and resolved maturity of a quote in its original evaluator."
+  },
+  {
+    "path": "#/$defs/d_15e86d33b70e6065d029/properties/pillar_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding/properties/pillar_date",
+    "description": "Contractual maturity resolved using the instrument conventions.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_15e86d33b70e6065d029/properties/pillar_time",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding/properties/pillar_time",
+    "description": "Curve-clock year fraction at the resolved maturity.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_15e86d33b70e6065d029/properties/quote_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding/properties/quote_id",
+    "description": "Original stable market quote identifier."
+  },
+  {
     "path": "#/$defs/d_17ffcd7842a3f40268b1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationRecipe",
-    "description": "Typed conventions required to replay a rate-curve calibration."
+    "description": "Benchmark conventions and quotes associated with a rate curve."
   },
   {
     "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/currency",
@@ -113,6 +144,21 @@ export default [
     "description": "Day count used for the curve's time axis.",
     "ref": "#/$defs/DayCount",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
+  },
+  {
+    "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/execution",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationRecipe/properties/execution",
+    "description": "Original execution evidence. A transcribed benchmark list has no qualified replay."
+  },
+  {
+    "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/execution/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationRecipe/properties/execution/anyOf/0",
+    "ref": "#/$defs/RateCalibrationExecution",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution"
+  },
+  {
+    "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/execution/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationRecipe/properties/execution/anyOf/1"
   },
   {
     "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/method",
@@ -155,47 +201,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationCurveRole"
   },
   {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind",
-    "description": "Type of dividend event.\n\nDistinguishes between cash payments, stock distributions, and continuous\nyield approximations used in different pricing models.\n\n# Variants\n\n- **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)\n- **Stock**: Share distribution (less common, complicates option pricing)\n- **Yield**: Continuous approximation for analytical models"
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/0",
-    "description": "Cash dividend payment.\n\nMost common type. Ex-dividend date reduces stock price by dividend amount."
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/0/properties/cash",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/0/properties/cash",
-    "ref": "#/$defs/Money",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Money"
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/1",
-    "description": "Continuous dividend yield (annualized fraction).\n\nUsed in analytical models (Black-Scholes with dividends) that assume\ncontinuous payout rather than discrete payments."
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/1/properties/yield",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/1/properties/yield",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/2",
-    "description": "Stock dividend (share distribution).\n\nIncreases share count proportionally. For example, 5% stock dividend\nmeans each shareholder receives 0.05 additional shares per share held."
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/2/properties/stock",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/2/properties/stock"
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/2/properties/stock/properties/ratio",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/2/properties/stock/properties/ratio",
-    "description": "Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_1a06a0fdbb3b25f44f0d",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationPillar",
     "description": "Typed maturity specification retained from an original market quote."
@@ -225,27 +230,17 @@ export default [
   {
     "path": "#/$defs/d_1c77a48708b4a54d6160",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule",
-    "description": "Dividend schedule for an equity or ETF underlying.\n\nContains a time-ordered sequence of dividend events used for pricing equity\nderivatives and calculating total return. The schedule can be referenced by\nmultiple instruments via its [`CurveId`] in the market context.\n\n# Usage in Pricing\n\n- **Discrete dividends**: Subtract PV of future dividends from spot for option pricing\n- **Ex-dividend adjustments**: Reduce forward price by dividend amount\n- **Dividend futures**: Sum dividends in contract period\n- **Total return**: Include dividend reinvestment in performance\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::dividends::DividendSchedule;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet schedule = DividendSchedule::builder(\"AAPL-DIVS\")\n    .underlying(\"AAPL\")\n    .currency(Currency::USD)\n    .cash(\n        Date::from_calendar_date(2025, Month::March, 15).expect(\"Valid date\"),\n        Money::new(0.24, Currency::USD).expect(\"valid money fixture\")\n    ).build().expect(\"Valid dividends\");\n\nassert_eq!(schedule.get_events().len(), 1);\n```"
+    "description": "Validated distributions for one security, share basis and currency."
   },
   {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/currency",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/currency",
-    "description": "Quote currency for cash dividends (optional metadata)."
-  },
-  {
-    "path": "#/$defs/d_1c77a48708b4a54d6160/properties/currency/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/currency/anyOf/0",
     "ref": "#/$defs/Currency",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
   },
   {
-    "path": "#/$defs/d_1c77a48708b4a54d6160/properties/currency/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/currency/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/events",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/events",
-    "description": "Sorted events by date (ascending)."
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/events"
   },
   {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/events/items",
@@ -256,14 +251,18 @@ export default [
   {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/id",
-    "description": "Unique identifier of this schedule in the market context.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
   },
   {
+    "path": "#/$defs/d_1c77a48708b4a54d6160/properties/share_basis",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/share_basis"
+  },
+  {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/underlying",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/underlying",
-    "description": "Optional display symbol/ticker for convenience."
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_1ec33fbdab11dd6751bf",
@@ -517,6 +516,7 @@ export default [
   {
     "path": "#/$defs/d_4ad1b3e6968748946cee/properties/issuer_credit_curve_ids",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CreditIndexState/properties/issuer_credit_curve_ids",
+    "default": null,
     "description": "Optional map of issuer ID → hazard curve ID"
   },
   {
@@ -526,6 +526,7 @@ export default [
   {
     "path": "#/$defs/d_4ad1b3e6968748946cee/properties/issuer_recovery_rates",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CreditIndexState/properties/issuer_recovery_rates",
+    "default": null,
     "description": "Optional map of issuer ID → recovery rate"
   },
   {
@@ -536,6 +537,7 @@ export default [
   {
     "path": "#/$defs/d_4ad1b3e6968748946cee/properties/issuer_weights",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CreditIndexState/properties/issuer_weights",
+    "default": null,
     "description": "Optional map of issuer ID → weight"
   },
   {
@@ -581,6 +583,37 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation/properties/value",
     "description": "Published finite, strictly positive index level.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution",
+    "description": "Executed evaluator, resolved instruments and original outcome of a rate calibration."
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/accepted",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/accepted",
+    "description": "Whether the original fit passed its recorded acceptance policy."
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/bindings",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/bindings",
+    "description": "Resolved quote identities and maturities, in input order."
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/bindings/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/bindings/items",
+    "ref": "#/$defs/RateQuoteBinding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding"
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/calibration_config",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/calibration_config",
+    "description": "Solver controls and residual acceptance thresholds used by the evaluator."
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/step_params",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/step_params",
+    "description": "Discount or projection evaluator parameters, including pricing dependencies."
   },
   {
     "path": "#/$defs/d_683ec38b8d36db5534bc",
@@ -1168,6 +1201,20 @@ export default [
     "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/expiries/items",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolCube/properties/expiries/items",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/expiry_clock",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolCube/properties/expiry_clock"
+  },
+  {
+    "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/expiry_clock/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolCube/properties/expiry_clock/anyOf/0",
+    "ref": "#/$defs/VolatilityClock",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock"
+  },
+  {
+    "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/expiry_clock/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolCube/properties/expiry_clock/anyOf/1"
   },
   {
     "path": "#/$defs/d_8292ddf9415f5b0b91bb/properties/forwards",
@@ -2009,6 +2056,20 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/series",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/series"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/series/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/series/anyOf/0",
+    "ref": "#/$defs/InflationSeries",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/series/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/series/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/type",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/type",
     "const": "inflation"
@@ -2060,6 +2121,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/calendar_id",
+    "description": "Registered holiday calendar for the source clock."
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/day_count",
     "description": "Day count convention",
@@ -2105,16 +2171,11 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/spot_level",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/spot_level",
-    "description": "Spot index level (volatility index curves)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/spot_price",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/spot_price",
-    "description": "Spot price (signed price curves)",
-    "format": "double"
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/level_kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/level_kind",
+    "description": "Native level family.",
+    "ref": "#/$defs/PriceCurveKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PriceCurveKind"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/type",
@@ -2201,24 +2262,30 @@ export default [
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/alpha",
     "description": "Initial volatility level, strictly positive.",
+    "exclusiveMinimum": 0,
     "format": "double"
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/beta",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/beta",
     "description": "CEV exponent in the closed interval `[0, 1]`.",
-    "format": "double"
+    "format": "double",
+    "maximum": 1,
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/nu",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/nu",
     "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/rho",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/rho",
     "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+    "exclusiveMaximum": 1,
+    "exclusiveMinimum": -1,
     "format": "double"
   },
   {
@@ -3436,6 +3503,23 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Money"
   },
   {
+    "path": "#/$defs/d_d42cbc543d2261f1cd11",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PriceCurveKind",
+    "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup."
+  },
+  {
+    "path": "#/$defs/d_d42cbc543d2261f1cd11/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PriceCurveKind/oneOf/0",
+    "const": "price",
+    "description": "Signed, finite forward prices, for example in USD per barrel."
+  },
+  {
+    "path": "#/$defs/d_d42cbc543d2261f1cd11/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PriceCurveKind/oneOf/1",
+    "const": "vol_index",
+    "description": "Nonnegative volatility-index levels in index points."
+  },
+  {
     "path": "#/$defs/d_d7c93a9d6d6ba5ccd0ac",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock",
     "description": "Explicit day-count clock translating calendar expiry dates into year fractions\nrelative to a surface or cube reference date.\n\nMarket data objects such as [`FxDeltaVolSurface`](crate::market_data::surfaces::FxDeltaVolSurface)\nattach an optional `VolatilityClock` so downstream pricers can validate that\nthe surface anchor matches `as_of` and bridge between instrument day-counts\nand surface variance time without silently assuming a day-count convention.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};\nuse time::macros::date;\n\nlet clock = VolatilityClock::try_new(\n    date!(2025 - 01 - 15),\n    DayCount::Act365F,\n    DayCountContextState::default(),\n)?;\nlet t = clock.expiry_time(date!(2026 - 01 - 15))?;\nassert!((t - 1.0).abs() < 1e-12);\n# Ok::<(), finstack_quant_core::Error>(())\n```"
@@ -3540,6 +3624,20 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation"
   },
   {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/series",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/series"
+  },
+  {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/series/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/series/anyOf/0",
+    "ref": "#/$defs/InflationSeries",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries"
+  },
+  {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/series/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/series/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_e94fd584c7a9c31df19d",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationMethod",
     "description": "Numerical method used to calibrate a rate curve."
@@ -3601,6 +3699,26 @@ export default [
     "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_points/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items/prefixItems/1",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f411b3891ba92dd52290",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries",
+    "description": "Publication identity and units of an observed or projected inflation level."
+  },
+  {
+    "path": "#/$defs/d_f411b3891ba92dd52290/properties/reference_base",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries/properties/reference_base",
+    "description": "Published reference period and index scale, for example `1982-84=100`."
+  },
+  {
+    "path": "#/$defs/d_f411b3891ba92dd52290/properties/seasonally_adjusted",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries/properties/seasonally_adjusted",
+    "description": "True for seasonally adjusted levels and false for unadjusted levels."
+  },
+  {
+    "path": "#/$defs/d_f411b3891ba92dd52290/properties/series_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries/properties/series_id",
+    "description": "Publisher-qualified identifier of the statistical series."
   },
   {
     "path": "#/$defs/d_f9d22f9148b706cb0598",

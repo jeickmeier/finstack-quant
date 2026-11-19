@@ -629,8 +629,9 @@ impl JsMertonModel {
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if `assetDrift` is not finite or the model
-    /// uses driftless CreditGrades dynamics.
+    /// Throws a `validation` error if drift or horizon is non-finite, a Gaussian
+    /// variate is undefined, or the model uses driftless CreditGrades dynamics.
+    /// Numerically unresolved structural probabilities raise a computation error.
     #[wasm_bindgen(js_name = distanceToDefaultWithDrift)]
     pub fn distance_to_default_with_drift(
         &self,
@@ -652,13 +653,16 @@ impl JsMertonModel {
     ///
     /// # Errors
     ///
-    /// Throws a `TypeError` if `horizon` is not a number.
+    /// Throws a `TypeError` if `horizon` is not a number. A non-finite horizon or undefined variate raises
+    /// a validation error. Numerically unresolved structural probabilities raise a computation error.
     #[wasm_bindgen(js_name = defaultProbability)]
     pub fn default_probability(
         &self,
         #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
     ) -> Result<f64, JsValue> {
-        Ok(self.inner.default_probability(js_f64(&horizon, "horizon")?))
+        self.inner
+            .default_probability(js_f64(&horizon, "horizon")?)
+            .map_err(to_js_err)
     }
 
     /// Risk-neutral default probabilities over a grid of horizons.
@@ -669,7 +673,8 @@ impl JsMertonModel {
     ///
     /// # Errors
     ///
-    /// Throws a `TypeError` if `horizons` is not an array of numbers.
+    /// Throws a `TypeError` if `horizons` is not an array of numbers. A non-finite horizon or undefined variate raises
+    /// a validation error. Numerically unresolved structural probabilities raise a computation error.
     #[wasm_bindgen(js_name = defaultProbabilities)]
     pub fn default_probabilities(
         &self,
@@ -679,6 +684,7 @@ impl JsMertonModel {
         Ok(self
             .inner
             .default_probabilities(&horizons)
+            .map_err(to_js_err)?
             .into_boxed_slice())
     }
 
@@ -1421,7 +1427,8 @@ impl JsToggleExerciseModel {
     /// # Errors
     ///
     /// Throws a `TypeError` if `state` is neither a string nor a plain object
-    /// or `u` is not a number, and a `validation` error if `state` is malformed.
+    /// or `u` is not a number, a `validation` error if `state` is malformed,
+    /// or a computation error if the nested model cannot produce a finite draw.
     #[wasm_bindgen(js_name = shouldPik)]
     pub fn should_pik(
         &self,
@@ -1430,7 +1437,9 @@ impl JsToggleExerciseModel {
         #[wasm_bindgen(unchecked_param_type = "number")] u: JsValue,
     ) -> Result<bool, JsValue> {
         let state: CreditState = from_js_json(&state, "state")?;
-        Ok(self.inner.should_pik(&state, js_f64(&u, "u")?))
+        self.inner
+            .should_pik(&state, js_f64(&u, "u")?)
+            .map_err(to_js_err)
     }
 
     /// Which rule this model carries: `"threshold"`, `"stochastic"` or

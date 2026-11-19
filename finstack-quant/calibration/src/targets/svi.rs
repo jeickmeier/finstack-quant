@@ -60,7 +60,7 @@ pub(crate) fn solve(
     }
     let option_quotes = extract_equity_option_quotes(quotes, &params.underlying_ticker)?;
     let spot = resolve_equity_spot(params.spot_override, &params.underlying_ticker, context)?;
-    finstack_quant_core::validation::validate_f64_positive(spot, "SVI spot")?;
+    finstack_quant_core::validation::validate_f64_positive(spot.amount, "SVI spot")?;
 
     let discount = params
         .discount_curve_id
@@ -109,7 +109,7 @@ pub(crate) fn solve(
                     "SVI equity carry resolution is incomplete".to_string(),
                 )
             })?;
-            let forward = spot * (-dividend_yield * t).exp();
+            let forward = spot.amount * (-dividend_yield * t).exp();
             finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
             Ok(forward)
         }

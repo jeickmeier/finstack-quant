@@ -521,7 +521,8 @@ export interface D_674830A94Dacf97E7Ac8 {
     | "variation_margin_pay"
     | "margin_interest"
     | "collateral_substitution_in"
-    | "collateral_substitution_out";
+    | "collateral_substitution_out"
+    | "derivative_settlement";
   /**
    * Present value in row currency, before FX conversion and before any
    * scenario price shock.

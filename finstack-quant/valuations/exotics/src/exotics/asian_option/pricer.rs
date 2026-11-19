@@ -59,23 +59,12 @@ pub(super) fn map_fixings_to_steps(
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     let time_grid = finstack_quant_core::math::time_grid::TimeGrid::uniform_with_required_times(
         t,
-        base_num_steps.max(1) as f64 / t,
         base_num_steps.max(1),
         &fixing_times,
     )?;
     let fixing_steps = fixing_times
         .iter()
-        .map(|&time| {
-            time_grid
-                .times()
-                .iter()
-                .position(|&node| (node - time).abs() < 1e-10)
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "Asian fixing time {time} is outside the simulation grid"
-                    ))
-                })
-        })
+        .map(|&time| time_grid.get_index(time))
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     Ok(FixingGrid {
         time_grid,
@@ -241,9 +230,9 @@ fn seasoned_geometric_asian_control(
     let d2 = d1 - std;
     let norm_cdf = finstack_quant_core::math::special_functions::norm_cdf;
     let price = if is_call {
-        expected_g * norm_cdf(d1) - strike * norm_cdf(d2)
+        expected_g * norm_cdf(d1)? - strike * norm_cdf(d2)?
     } else {
-        strike * norm_cdf(-d2) - expected_g * norm_cdf(-d1)
+        strike * norm_cdf(-d2)? - expected_g * norm_cdf(-d1)?
     };
     Ok(df * price.max(0.0))
 }
@@ -870,7 +859,8 @@ mod tests {
             .expect("vol surface");
 
         MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_surface(vol_surface)
             .insert_price(
                 "SPX-SPOT",
@@ -893,7 +883,8 @@ mod tests {
             .expect("discount curve");
 
         MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_price(
                 "SPX-SPOT",
                 MarketScalar::unitless(spot).expect("valid scalar"),
@@ -1926,7 +1917,9 @@ mod tests {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve");
-            let curves = market(as_of, 100.0, 0.0, 0.0, 0.0).insert(curve);
+            let curves = market(as_of, 100.0, 0.0, 0.0, 0.0)
+                .try_insert(curve)
+                .expect("insert market curve");
             let expected = 5.0 * terminal_df;
             let actual = AsianOptionAnalyticalGeometricPricer
                 .price_dyn(&option, &curves, as_of)
@@ -2098,7 +2091,10 @@ mod tests {
         let expected = df
             * (expected_g
                 * finstack_quant_core::math::special_functions::norm_cdf(d2 + variance.sqrt())
-                - option.strike * finstack_quant_core::math::special_functions::norm_cdf(d2));
+                    .expect("valid normal variate")
+                - option.strike
+                    * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                        .expect("valid normal variate"));
         let grid = map_fixings_to_steps(&option.fixing_dates, option.day_count, as_of, t, 2)
             .expect("grid");
         let times = grid.future_times();
@@ -2177,7 +2173,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let curves = market(as_of, 100.0, sigma, 0.0, q).insert(curve);
+        let curves = market(as_of, 100.0, sigma, 0.0, q)
+            .try_insert(curve)
+            .expect("insert market curve");
         // For two distinct observations, Cov(log S1, log S2)=sigma^2*t1.
         let f1 = 100.0 * (-q * t1).exp() / 0.99;
         let f2 = 100.0 * (-q * t2).exp() / 0.90;
@@ -2197,13 +2195,20 @@ mod tests {
             let expected = 0.85
                 * match option_type {
                     OptionType::Call => {
-                        expected_g * finstack_quant_core::math::special_functions::norm_cdf(d1)
-                            - 100.0 * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                        expected_g
+                            * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                                .expect("valid normal variate")
+                            - 100.0
+                                * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                                    .expect("valid normal variate")
                     }
                     OptionType::Put => {
-                        100.0 * finstack_quant_core::math::special_functions::norm_cdf(-d2)
+                        100.0
+                            * finstack_quant_core::math::special_functions::norm_cdf(-d2)
+                                .expect("valid normal variate")
                             - expected_g
                                 * finstack_quant_core::math::special_functions::norm_cdf(-d1)
+                                    .expect("valid normal variate")
                     }
                 };
             let actual = AsianOptionAnalyticalGeometricPricer

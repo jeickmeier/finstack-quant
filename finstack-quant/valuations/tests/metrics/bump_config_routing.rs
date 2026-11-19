@@ -176,7 +176,8 @@ fn equity_market(as_of: Date) -> MarketContext {
     let expiries = [0.25, 0.5, 1.0, 2.0];
     let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
     MarketContext::new()
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, EQ_RATE, 5.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, EQ_RATE, 5.0))
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface("EQUITY-VOL", &expiries, &strikes, EQ_VOL))
         .insert_price(
             "EQUITY-SPOT",
@@ -293,10 +294,15 @@ fn equity_option_vanna_volga_honour_bump_config() {
     let (s, k, q, sig) = (EQ_SPOT, opt.strike, EQ_DIV, EQ_VOL);
     let d1 = ((s / k).ln() + (r - q + 0.5 * sig * sig) * t) / (sig * t.sqrt());
     let d2 = d1 - sig * t.sqrt();
-    let call = s * (-q * t).exp() * norm_cdf(d1) - k * df * norm_cdf(d2);
+    let call = s * (-q * t).exp() * norm_cdf(d1).expect("valid normal variate")
+        - k * df * norm_cdf(d2).expect("valid normal variate");
     let scale = pv(&opt, &market, as_of) / call;
-    let bs_vanna = -(-q * t).exp() * norm_pdf(d1) * d2 / sig * 0.01 * scale;
-    let bs_volga = s * (-q * t).exp() * norm_pdf(d1) * t.sqrt() * d1 * d2 / sig * 1e-4 * scale;
+    let bs_vanna =
+        -(-q * t).exp() * norm_pdf(d1).expect("valid normal variate") * d2 / sig * 0.01 * scale;
+    let bs_volga =
+        s * (-q * t).exp() * norm_pdf(d1).expect("valid normal variate") * t.sqrt() * d1 * d2 / sig
+            * 1e-4
+            * scale;
     assert_rel("vanna vs Black-Scholes", vanna, bs_vanna, 5e-3);
     assert_rel("volga vs Black-Scholes", volga, bs_volga, 5e-3);
 }
@@ -404,8 +410,10 @@ fn fx_fixture_with_strike(
     let strikes = [0.9, 1.0, 1.1, 1.2, 1.3];
     let market = MarketContext::new()
         .insert_fx(FxMatrix::new(Arc::new(FlatFx(FX_SPOT)), None))
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.04, 5.0))
-        .insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.02, 5.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.04, 5.0))
+        .expect("insert market curve")
+        .try_insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.02, 5.0))
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface("EURUSD-VOL", &expiries, &strikes, FX_VOL));
     let opt = fx_option_european_call(
         "FX-ROUTING",
@@ -499,7 +507,7 @@ fn fx_option_vanna_volga_honour_bump_config() {
     let fwd = FX_SPOT * df_f / df_d;
     let d1 = ((fwd / opt.strike).ln() + 0.5 * FX_VOL * FX_VOL * t) / (FX_VOL * t.sqrt());
     let d2 = d1 - FX_VOL * t.sqrt();
-    let vega_unit = FX_SPOT * df_f * norm_pdf(d1) * t.sqrt();
+    let vega_unit = FX_SPOT * df_f * norm_pdf(d1).expect("valid normal variate") * t.sqrt();
     let gk_volga = vega_unit * d1 * d2 / FX_VOL * 1e-4 * 1_000_000.0;
     // The central difference carries an O(h²) truncation error (≈0.9% at
     // h = 2 vol points for this strike), so compare the Richardson
@@ -556,8 +564,10 @@ fn quanto_market() -> MarketContext {
         .set_quotes(&[(Currency::JPY, Currency::USD, 1.0 / 150.0)])
         .expect("rate");
     MarketContext::new()
-        .insert(usd)
-        .insert(jpy)
+        .try_insert(usd)
+        .expect("insert market curve")
+        .try_insert(jpy)
+        .expect("insert market curve")
         .insert_surface(flat_surface(
             "NKY-VOL",
             &[10_000.0, 25_000.0, 35_000.0, 50_000.0, 75_000.0],
@@ -668,8 +678,10 @@ fn barrier_fixture() -> (FxBarrierOption, MarketContext, Date) {
     let expiries = [0.25, 0.5, 1.0, 2.0, 5.0];
     let strikes = [0.9, 1.0, 1.1, 1.2, 1.3];
     let market = MarketContext::new()
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
-        .insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 5.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
+        .expect("insert market curve")
+        .try_insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 5.0))
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface("EURUSD-VOL", &expiries, &strikes, 0.15))
         .insert_price(
             "EURUSD-SPOT",
@@ -772,7 +784,8 @@ fn lookback_fixture() -> (LookbackOption, MarketContext, Date) {
     )
     .expect("surface");
     let market = MarketContext::new()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_surface(surface)
         .insert_price(
             "SPX-SPOT",

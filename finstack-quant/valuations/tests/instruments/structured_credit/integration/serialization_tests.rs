@@ -302,6 +302,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         .with_meta("desk", "alts");
 
     let floating_coupon = finstack_quant_cashflows::builder::FloatingRateSpec {
+        index_id: "SOFR-3M".into(),
         forward_curve_id: CurveId::new("SOFR-3M"),
         spread_bp: rust_decimal::Decimal::try_from(150.0).expect("valid"),
         gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -647,16 +648,18 @@ fn waterfall_rules_round_trip_and_price_through_json() {
     assert_eq!(json, json2, "waterfall_rules wire format must be stable");
 
     // Price through the entry point the Python/WASM bindings wrap.
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(closing)
-            .knots(vec![(0.0, 1.0), (5.0, 0.90)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(closing)
+                .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
     let instrument = parse_boxed_instrument_from_json(&json, None).expect("parse envelope");
     price_instrument(
         &instrument,

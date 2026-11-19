@@ -245,13 +245,13 @@ impl CmsSpreadOptionPricer {
             // Conditional on the long-rate normal, the short rate is
             // lognormal. Integrating it with Black removes the payoff kink
             // from the inner dimension and leaves one Gaussian expectation.
-            conditional_spread_payoff(
+            Ok(conditional_spread_payoff(
                 short_conditional_mean,
                 long_rate - strike,
                 conditional_stddev,
                 inst.option_type,
-            )
-        });
+            ))
+        })?;
 
         if !expected.is_finite() || expected < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -530,7 +530,8 @@ mod tests {
         inst.option_type = OptionType::Call;
 
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-10Y", 0.25))
             .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-2Y", 0.25));
 
@@ -589,10 +590,12 @@ mod tests {
     fn future_market(as_of: Date) -> MarketContext {
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
         MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.02, 30.0))
-            .insert(
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.02, 30.0))
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat("USD-SOFR-3M", as_of, 0.04, DayCount::Act360).expect("forward"),
             )
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-10Y", 0.30))
             .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-2Y", 0.20))
     }
@@ -722,8 +725,10 @@ mod tests {
             time_to_expiry: 2.0,
         };
         let quadrature = GaussHermiteQuadrature::new(20).expect("quadrature");
-        assert!((quadrature.integrate(|_| 1.0) - 1.0).abs() < 1.0e-14);
-        let mean = quadrature.integrate(|z| quantile_from_gaussian(&leg, z));
+        assert!((quadrature.integrate(|_| Ok(1.0)).unwrap() - 1.0).abs() < 1.0e-14);
+        let mean = quadrature
+            .integrate(|z| Ok(quantile_from_gaussian(&leg, z)))
+            .unwrap();
         assert!((mean - leg.adjusted_forward_rate).abs() < 1.0e-12);
         let mut previous = 0.0;
         for z in [-8.0, -4.0, -1.0, 0.0, 1.0, 4.0, 8.0] {

@@ -58,6 +58,7 @@ fn authored_swap(id: &str) -> InterestRateSwap {
     };
     let float = FloatLegSpec {
         discount_curve_id: CurveId::new("USD-OIS"),
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: CurveId::new("USD-SOFR-3M"),
         spread_bp: Decimal::ZERO,
         frequency: Tenor::quarterly(),

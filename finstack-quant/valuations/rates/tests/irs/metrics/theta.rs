@@ -42,8 +42,10 @@ fn build_curves(rate: f64, base_date: Date) -> MarketContext {
     .expect("fixings series");
 
     MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(fixings)
 }
 
@@ -70,6 +72,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> Int
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),

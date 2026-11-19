@@ -1,14 +1,20 @@
 # FACTOR-011: Credit calibration panel, clock, and DTS preparation
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for complete credit panels, explicit observation clocks and DTS preparation.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Complete-panel admission, basis-point conversion and time-local DTS weights are implemented. Exact calendar admission, explicit method choices, minimum history and anchor consistency remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 82 tests selected by the calibration filter passed on 2026-11-17 against current behavior. Independent exact arithmetic checked a lagged DTS move. The accepted calendar, anchor and minimum-history rules remain to be qualified.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Require complete issuer and generic series on one qualified observation grid and cut. Daily uses an explicit business calendar. Monthly and quarterly preserve the declared origin and end-of-month convention. Annualize per-observation variance by `252`, `12` and `4`, respectively. Require at least two usable spread changes for variance calibration and apply any stricter elected estimator requirements.
+2. Accept finite decimal spread levels in the supported range `(-0.5, 2)` and convert once to basis points. Explicitly elect levels or first differences in bp, weighting, issuer-fit policy, volatility estimator and covariance strategy. Set the calibration anchor from the final qualified panel observation over the same issuer universe.
+3. Use a sourced fixed positive duration per issuer for DTS. For spread changes use duration times opening spread; for levels use duration times same-date spread. Require finite strictly positive weights. With opening spreads `100` and `200 bp`, durations `1` and `2` years and changes `+10` and `−20 bp`, DTS weights `100` and `400` give a weighted change of `−14 bp`.
+
+## Observed choice and rationale
 
 Calibrate a deterministic credit hierarchy on a fully aligned issuer spread panel, using either spread levels or first differences and an explicitly chosen observation frequency. Public validation rejects missing observations even though internal statistical kernels retain sparse representations.
 
@@ -31,7 +37,7 @@ Defaults are Monthly, Returns, DTS weighting, Sample volatility, FullSampleRepai
 
 ## Limitations, failures, and fallbacks
 
-Daily validation allows holiday-like gaps up to seven days, so unequal elapsed intervals still count as equal observations. A single observation can enter some strategies and produce zero estimated variance; LedoitWolf subsequently requires two complete working observations. As-of spreads need not numerically equal the last historical values. The spread range is a domain heuristic, not definitive detection of bp mistakes. The crate README opening still advertises sparse history, whereas its later calibration section and the implementation require complete observations. Duration history is a single static value, not a dated series.
+Daily validation allows gaps up to seven days, so an omitted trading observation can pass as a closure. A single observation can enter some strategies and produce zero estimated variance; LedoitWolf subsequently requires two complete working observations. Supplied as-of spreads can differ from the last historical values. The spread range defines supported inputs. The crate README now describes the current complete-panel requirement. Duration history is one fixed value per issuer.
 
 ## Alternatives and tradeoffs
 
@@ -46,12 +52,11 @@ Calendar-aware daily grids, elapsed-time volatility scaling, ragged panels, perc
 - [src/credit/calibration/calibrator.rs](../../../../finstack-quant/factor/src/credit/calibration/calibrator.rs) — inspected implementation.
 - [src/credit/units.rs](../../../../finstack-quant/factor/src/credit/units.rs) — inspected implementation.
 
-[src/credit/calibration/tests.rs](../../../../finstack-quant/factor/src/credit/calibration/tests.rs) contains inspected or located date/None rejection, bp conversion, levels-to-changes volatility, DTS hand arithmetic and duration requirements. The contemporaneous DTS fixture computes (100+2*200)/3 bp at the first date and 250 bp later. [tests/credit_calibration.rs](../../../../finstack-quant/factor/tests/credit_calibration.rs) locates as-of/universe and config validation cases.
+[Calibration tests](../../../../finstack-quant/factor/src/credit/calibration/tests.rs) and [integration tests](../../../../finstack-quant/factor/tests/credit_calibration.rs) passed against current behavior, including complete observations, basis-point conversions, DTS and duration requirements. Qualify business-calendar gaps, exact anchor equality and the selected minimum working sample.
 
 [Ben Dor DTS](../../../REFERENCES.md#ben-dor-2007-dts) is the catalogued duration-times-spread convention reference; it does not independently validate this weighted sequential factor-construction algorithm.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

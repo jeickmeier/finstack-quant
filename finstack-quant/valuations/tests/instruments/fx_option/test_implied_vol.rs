@@ -31,10 +31,12 @@ fn bs_price(
 
     match option_type {
         finstack_quant_models::types::OptionType::Call => {
-            spot * disc_q * norm_cdf(d1) - strike * disc_r * norm_cdf(d2)
+            spot * disc_q * norm_cdf(d1).expect("valid normal variate")
+                - strike * disc_r * norm_cdf(d2).expect("valid normal variate")
         }
         finstack_quant_models::types::OptionType::Put => {
-            strike * disc_r * norm_cdf(-d2) - spot * disc_q * norm_cdf(-d1)
+            strike * disc_r * norm_cdf(-d2).expect("valid normal variate")
+                - spot * disc_q * norm_cdf(-d1).expect("valid normal variate")
         }
     }
 }

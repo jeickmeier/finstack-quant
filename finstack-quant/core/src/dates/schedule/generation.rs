@@ -115,12 +115,20 @@ pub(super) struct BuilderInternal {
     pub roll: GridMode,
 }
 
+impl From<&ScheduleSpec> for BuilderInternal {
+    fn from(spec: &ScheduleSpec) -> Self {
+        Self {
+            start: spec.start,
+            end: spec.end,
+            frequency: spec.frequency,
+            stub: spec.stub,
+            roll: spec.grid,
+        }
+    }
+}
+
 impl BuilderInternal {
     pub(super) fn generate(self) -> crate::Result<Vec<Date>> {
-        if self.start >= self.end {
-            return Err(crate::InputError::InvalidDateRange.into());
-        }
-        self.check_grid_anchor()?;
         let dates = match self.stub {
             StubKind::ShortFront => self.gen_short_front(),
             StubKind::LongFront => self.gen_long_front(),
@@ -141,7 +149,7 @@ impl BuilderInternal {
     /// (record CORE-CONVENTIONS-008 #5-#6): `start` for no-stub and back-stub
     /// policies, `end` for front-stub policies, and both for `None`. Only the
     /// declared stub side may be off-grid; no replacement anchor is searched.
-    fn check_grid_anchor(self) -> crate::Result<()> {
+    pub(super) fn check_grid_anchor(self) -> crate::Result<()> {
         self.roll.check_frequency(self.frequency)?;
         let (name, on_grid): (&str, fn(Date) -> bool) = match self.roll {
             GridMode::Natural => return Ok(()),
@@ -153,15 +161,13 @@ impl BuilderInternal {
                 is_imm_date,
             ),
         };
-        let mut anchors = Vec::with_capacity(2);
-        if self.stub == StubKind::None || !self.is_front_stub() {
-            anchors.push(("start", self.start));
-        }
-        if self.stub == StubKind::None || self.is_front_stub() {
-            anchors.push(("end", self.end));
-        }
-        for (side, date) in anchors {
-            if !on_grid(date) {
+        let front = self.is_front_stub();
+        let anchors = [
+            ("start", self.start, !front),
+            ("end", self.end, front || self.stub == StubKind::None),
+        ];
+        for (side, date, required) in anchors {
+            if required && !on_grid(date) {
                 return Err(crate::Error::Validation(format!(
                     "schedule {side} {date} is not a {name} date; with stub {} the {side} \
                      anchors the regular grid",

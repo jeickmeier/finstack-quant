@@ -15,7 +15,8 @@
    policy. Remove the negative-MTM fallback. Repo margin uses its
    agreement-qualified route.
    [Margin valuation](../valuations-framework/margin-bridge.md#accepted-decision-for-checked-margin-repricing-and-identity)
-   and [repo agreement rules](../valuations-rates/15-repo.md).
+   and [repo agreement rules](../valuations-rates/15-repo.md) ·
+   [Repo cash margin](../margin-collateral-im/20-repo-margin-cashflows.md#accepted-decision-for-checked-repo-cash-margin-and-interest).
 
 2. **Require explicit dated collateral balances.** Current VM is signed in
    agreement currency, positive when held and negative when posted. A
@@ -24,7 +25,8 @@
    within its authorized scope. Apply collateral eligibility and haircuts
    once under the owner's rules. The elected VM calculator owns threshold,
    independent amount, minimum transfer, rounding and settlement rules.
-   [Variation margin](../margin-collateral-im/18-variation-margin.md).
+   [Variation margin](../margin-collateral-im/18-variation-margin.md#accepted-decision-for-checked-signed-variation-margin-and-transfers) ·
+   [Call and settlement replay](../margin-collateral-im/19-margin-dates-and-replay.md#accepted-decision-for-checked-vm-schedules-and-settlement-replay).
 
 3. **Report VM calls from the desk's cash perspective.** Signed VM outflow
    equals `post − collect`. A return of excess held collateral is an
@@ -40,7 +42,7 @@
    allocated threshold and MTA once. Preserve gross IM, required and
    current collateral, transfer and custody status. Record whether this
    is a posting or collecting account so transfer direction is explicit.
-   [CSA IM terms](../margin-collateral-im/17-csa-selection-and-im-terms.md).
+   [CSA IM terms](../margin-collateral-im/17-csa-selection-and-im-terms.md#accepted-decision-for-checked-csa-elections-and-one-way-im-account-terms).
 
 5. **Publish totals on their stated basis.** Report gross model IM,
    signed net VM outflow and gross positive VM outflow separately.

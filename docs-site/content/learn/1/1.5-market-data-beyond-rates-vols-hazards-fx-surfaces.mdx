@@ -92,7 +92,7 @@ surface = VolSurface('LESSON-VOL', [0.5, 1.0], [90.0, 100.0, 110.0],
 interpolated = get_surface_vol(surface, 0.75, 100.0)
 broken = check_surface_grid([90.0, 100.0, 110.0], [0.5, 1.0],
     [[0.40] * 3, [0.10] * 3], forward_prices=[100.0, 100.0])
-fx_surface = FxDeltaVolSurface('EURUSD-VOL', 'EUR/USD', [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.003, 0.004])
+fx_surface = FxDeltaVolSurface('EURUSD-VOL', 'EUR/USD', [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.003, 0.004], delta_convention='forward_unadjusted', atm_convention='delta_neutral_straddle', butterfly_convention='smile')
 call_vol = 0.11 + 0.004 + 0.012 / 2
 strike = delta_to_strike(True, 0.25, 1.08, call_vol, 1.0)
 resolved = get_fx_delta_vol(fx_surface, 1.0, strike, 1.08)

@@ -67,7 +67,7 @@ impl Discretization<GbmWithDividends> for ExactGbmWithDividends {
         x: &mut [f64],
         z: &[f64],
         _work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let params = process.params();
         let r = params.r;
         let q = params.q;
@@ -121,6 +121,7 @@ impl Discretization<GbmWithDividends> for ExactGbmWithDividends {
         }
 
         x[0] = spot;
+        Ok(())
     }
 
     fn work_size(&self, _process: &GbmWithDividends) -> usize {
@@ -154,7 +155,8 @@ mod tests {
         let z = vec![0.5];
         let mut work = vec![];
 
-        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Should have evolved
         assert!(x[0] > 0.0);
@@ -176,7 +178,8 @@ mod tests {
         let mut work = vec![];
 
         // Step that crosses dividend
-        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Spot should be less than 100 due to dividend
         // (exact value depends on GBM evolution + dividend jump)
@@ -200,7 +203,8 @@ mod tests {
         let z = vec![0.0, 0.0, 0.0];
         let mut work = vec![];
 
-        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Should have applied both dividends
         assert!(x[0] < 100.0);
@@ -222,7 +226,8 @@ mod tests {
         let z = vec![0.0, 0.0];
         let mut work = vec![];
 
-        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // With zero vol and small dt, should be close to 100 * (1 - 0.02) = 98
         // (plus small drift effect)
@@ -243,7 +248,8 @@ mod tests {
         let z = vec![0.0, 0.0];
         let mut work = vec![];
 
-        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&gbm_div, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Dividend application should prevent negative spot
         assert!(x[0] >= 0.0);

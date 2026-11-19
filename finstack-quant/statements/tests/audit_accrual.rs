@@ -73,7 +73,7 @@ fn test_accrued_interest_semi_annual_bond() -> Result<(), Box<dyn std::error::Er
     let market_ctx = MarketContext::new();
 
     // Monthly periods for 2025 to observe accrual accumulation
-    let periods = build_periods("2025M1..M12", None)?.periods;
+    let periods = build_periods("2025M1..M12", None)?.into_periods();
 
     // Semi-annual bond: 5% coupon, $1M face value
     // First coupon: July 1, 2025 (6 months after issue)

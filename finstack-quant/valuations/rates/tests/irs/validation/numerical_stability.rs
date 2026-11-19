@@ -164,7 +164,11 @@ fn test_30y_swap_numerical_stability() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("SWAP_30Y"),
@@ -221,7 +225,11 @@ fn test_annuity_deterministic_across_runs() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("DETERMINISM_TEST"),
@@ -273,7 +281,11 @@ fn test_expired_swap_handling() {
     // before the curve base now error under the default FloatingRateFallback.
     let fwd_curve = build_flat_forward_curve(0.05, start, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = InterestRateSwap {
         adjust_fixed_accrual_dates: false,
@@ -297,6 +309,7 @@ fn test_expired_swap_handling() {
         },
         float_leg: FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -354,7 +367,11 @@ fn test_very_short_swap_1_month() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     // Use manual construction for very short swap since quarterly frequency won't work
     let swap = InterestRateSwap {
@@ -379,6 +396,7 @@ fn test_very_short_swap_1_month() {
         },
         float_leg: FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::monthly(),
@@ -416,7 +434,11 @@ fn test_extreme_rate_environment_stress() {
     let disc_high = build_flat_discount_curve(0.15, as_of, "USD-OIS");
     let fwd_high = build_flat_forward_curve(0.15, as_of, "USD-SOFR-3M");
 
-    let market_high = MarketContext::new().insert(disc_high).insert(fwd_high);
+    let market_high = MarketContext::new()
+        .try_insert(disc_high)
+        .expect("insert market curve")
+        .try_insert(fwd_high)
+        .expect("insert market curve");
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("STRESS_HIGH"),
@@ -439,7 +461,11 @@ fn test_extreme_rate_environment_stress() {
     let disc_low = build_flat_discount_curve(0.001, as_of, "USD-OIS");
     let fwd_low = build_flat_forward_curve(0.001, as_of, "USD-SOFR-3M");
 
-    let market_low = MarketContext::new().insert(disc_low).insert(fwd_low);
+    let market_low = MarketContext::new()
+        .try_insert(disc_low)
+        .expect("insert market curve")
+        .try_insert(fwd_low)
+        .expect("insert market curve");
 
     let npv_low = swap.value(&market_low, as_of);
     assert!(
@@ -471,7 +497,11 @@ fn test_golden_5y_usd_swap_par_npv() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     // First compute actual par rate for this swap
     let temp_swap = test_utils::usd_irs_swap(
@@ -529,7 +559,11 @@ fn test_golden_annuity_5y_at_5pct() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("GOLDEN_ANNUITY"),
@@ -571,7 +605,11 @@ fn test_golden_dv01_approximation() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("GOLDEN_DV01"),
@@ -615,7 +653,9 @@ fn test_missing_curve_produces_clear_error() {
 
     // Create market with only discount curve (no forward curve)
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
     // Note: No forward curve added
 
     let swap = test_utils::usd_irs_swap(

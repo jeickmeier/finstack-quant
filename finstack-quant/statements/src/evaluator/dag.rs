@@ -450,7 +450,7 @@ mod tests {
         use crate::types::{FinancialModelSpec, NodeSpec, NodeType};
         let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
             .expect("periods")
-            .periods;
+            .into_periods();
         let mut model = FinancialModelSpec::new(
             "deep",
             finstack_quant_core::dates::PeriodPlan::try_new(

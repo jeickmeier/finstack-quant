@@ -51,6 +51,7 @@ fn test_irs_at_par_npv_zero() {
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -113,6 +114,7 @@ fn test_irs_receive_fixed_below_market() {
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -174,6 +176,7 @@ fn test_irs_receive_fixed_above_market() {
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -231,6 +234,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
 
     let float_leg = finstack_quant_valuations_core::instruments::FloatLegSpec {
         discount_curve_id: "USD-OIS".into(),
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
         frequency: Tenor::quarterly(),
@@ -544,7 +548,7 @@ fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
         swap.fixed_leg.payment_lag_days = lag;
         swap.float_leg.payment_lag_days = lag;
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([
@@ -558,7 +562,8 @@ fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
                     .build()
                     .unwrap(),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat(
                     "USD-SOFR-3M",
                     as_of,
@@ -567,6 +572,7 @@ fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
                 )
                 .unwrap(),
             )
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:USD-SOFR-3M",

@@ -80,7 +80,11 @@ fn test_protection_leg_positive_pv() {
     )
     .expect("CDS construction should succeed");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let protection_pv = metric_value(&cds, &market, as_of, MetricId::ProtectionLegPv);
 
@@ -106,7 +110,11 @@ fn test_premium_leg_positive_pv() {
     )
     .expect("CDS construction should succeed");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let premium_pv = metric_value(&cds, &market, as_of, MetricId::PremiumLegPv);
 
@@ -124,7 +132,11 @@ fn test_npv_calculation_buyer() {
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.02, 0.40, as_of, "CORP");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = test_utils::cds_buy_protection(
         "NPV_BUYER",
@@ -163,8 +175,16 @@ fn test_par_spread_increases_with_hazard() {
     )
     .expect("CDS construction should succeed");
 
-    let market_low = MarketContext::new().insert(disc.clone()).insert(hazard_low);
-    let market_high = MarketContext::new().insert(disc).insert(hazard_high);
+    let market_low = MarketContext::new()
+        .try_insert(disc.clone())
+        .expect("insert market curve")
+        .try_insert(hazard_low)
+        .expect("insert market curve");
+    let market_high = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard_high)
+        .expect("insert market curve");
 
     let par_low = metric_value(&cds, &market_low, as_of, MetricId::ParSpread);
     let par_high = metric_value(&cds, &market_high, as_of, MetricId::ParSpread);
@@ -182,7 +202,11 @@ fn test_par_spread_distinguishes_pending_coupon_from_fully_settled_cds() {
     let end = as_of; // Protection expires on the New Year holiday.
     let disc = build_discount_curve(0.03, start, "USD_OIS");
     let hazard = build_hazard_curve(0.02, 0.40, start, "CORP");
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = test_utils::cds_buy_protection(
         "EXPIRED_PAR",
@@ -244,7 +268,11 @@ fn test_premium_leg_metric_positive() {
     let end = date!(2026 - 01 - 01);
     let disc = build_discount_curve(0.02, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.05, 0.40, as_of, "CORP");
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = test_utils::cds_buy_protection(
         "PREM_METRIC",
@@ -272,7 +300,11 @@ fn test_npv_buyer_seller_opposite() {
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.015, 0.40, as_of, "CORP");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let buyer = test_utils::cds_buy_protection(
         "BUYER",
@@ -319,7 +351,11 @@ fn test_par_spread_positive() {
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.015, 0.40, as_of, "CORP");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = test_utils::cds_buy_protection(
         "PAR_SPREAD_TEST",
@@ -349,7 +385,11 @@ fn test_par_spread_gives_zero_npv() {
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.01, 0.40, as_of, "CORP");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let mut cds = test_utils::cds_buy_protection(
         "PAR_NPV_TEST",
@@ -385,7 +425,11 @@ fn test_risky_annuity_positive() {
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.01, 0.40, as_of, "CORP");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = test_utils::cds_buy_protection(
         "RISKY_ANN_TEST",
@@ -412,7 +456,11 @@ fn test_risky_pv01_scales_with_notional() {
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.01, 0.40, as_of, "CORP");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds1 = test_utils::cds_buy_protection(
         "PV01_1MM",
@@ -509,7 +557,11 @@ fn test_cdsw_final_coupon_cashflow_accrual_matches_pricer_premium_pv() {
 
     let disc = build_discount_curve(0.0, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.0, 0.40, as_of, "CORP");
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds = test_utils::cds_buy_protection(
         "CDSW_FINAL_COUPON_CASHFLOW",
@@ -560,7 +612,11 @@ fn test_higher_hazard_increases_protection_value() {
     for hazard_rate in [0.005, 0.010, 0.020, 0.030] {
         let disc_local = build_discount_curve(0.05, as_of, "USD_OIS");
         let hazard = build_hazard_curve(hazard_rate, 0.40, as_of, "CORP");
-        let market = MarketContext::new().insert(disc_local).insert(hazard);
+        let market = MarketContext::new()
+            .try_insert(disc_local)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve");
 
         let cds = test_utils::cds_buy_protection(
             "HAZARD_SENS",
@@ -596,7 +652,11 @@ fn test_higher_recovery_decreases_protection_value() {
     for recovery in [0.20, 0.40, 0.60] {
         let disc_local = build_discount_curve(0.05, as_of, "USD_OIS");
         let hazard = build_hazard_curve(0.015, recovery, as_of, "CORP");
-        let market = MarketContext::new().insert(disc_local).insert(hazard);
+        let market = MarketContext::new()
+            .try_insert(disc_local)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve");
 
         let mut cds = test_utils::cds_buy_protection(
             "RECOVERY_SENS",
@@ -631,7 +691,11 @@ fn test_premium_leg_increases_with_spread() {
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.02, 0.40, as_of, "CORP");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let cds_low = test_utils::cds_buy_protection(
         "PREM_LOW",
@@ -671,7 +735,11 @@ fn test_settlement_delay_reduces_protection_pv() {
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.02, 0.40, as_of, "CORP");
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let mut cds_no_delay = test_utils::cds_buy_protection(
         "NO_DELAY",
@@ -704,7 +772,11 @@ fn test_aod_uses_default_settlement_timing() {
 
     let disc = build_discount_curve(0.05, as_of, "USD_OIS");
     let hazard = build_hazard_curve(0.30, 0.40, as_of, "CORP");
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let mut cds_no_delay = test_utils::cds_buy_protection(
         "AOD_NO_DELAY",

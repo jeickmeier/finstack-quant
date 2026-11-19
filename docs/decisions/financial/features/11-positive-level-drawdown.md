@@ -1,14 +1,20 @@
 # FEATURES-011: Running-peak drawdown on positive levels
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** The running peak and gap semantics are implemented. Stable relative-difference evaluation requires reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Independent examples checked an interrupted path and a decline near the peak. The Rust fixture was inspected. Boundary and entity isolation checks remain pending.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Maintain a running peak per entity with no supplied initial level. The first finite positive level and each subsequent high yield zero. For a level below the peak, return the dimensionless relative difference (level − peak) / peak.
+2. Missing, nonfinite, zero, and negative levels yield missing and leave the peak unchanged. For [100, 120, 0, missing, 90, 132], the output is [0, 0, missing, missing, −25%, 0]. [Entity ordering](01-ordering-keys-and-partitions.md).
+3. Evaluate the relative difference directly to preserve small declines near the peak. An extreme decline from a positive level may round to −1.
+
+## Observed scope and selection
 
 `Drawdown` accepts no parameters and runs independently per lexically ordered entity. The documented input is a positive level series, such as cumulative value, not a return series. No initial wealth, externally supplied high-water mark, rolling horizon or cash-flow adjustment is available.
 
@@ -29,5 +35,5 @@ The source explicitly calls this a level-series transform. Proposed rationale is
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

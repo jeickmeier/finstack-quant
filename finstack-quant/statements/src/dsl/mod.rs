@@ -109,7 +109,7 @@ pub use parser::parse_formula;
 /// * `formula` - DSL expression to parse then compile
 ///
 /// # Returns
-/// Core [`Expr`](finstack_quant_core::expr::Expr) ready for evaluation by the engine.
+/// Shared [`Expr`](finstack_quant_core::expr::Expr) for the period-aware statements evaluator.
 ///
 /// # Example
 ///

@@ -1,14 +1,20 @@
 # FEATURES-008: Finite-sample rolling skewness and excess kurtosis
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Fisher estimators and inclusive window selection are implemented. Constant-window availability and checked central moments require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked both moments for a symmetric four-point sample. Rust fixtures were inspected. Constant-window and near-constant accuracy still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and actual selection
+## Accepted decision
+
+1. Use finite observations from the inclusive trailing window. Adjusted Fisher G1 skewness requires at least max(min_periods, 3) observations, and adjusted Fisher G2 excess kurtosis requires at least max(min_periods, 4). A missing current row can receive an estimate when the window qualifies. Both results are dimensionless.
+2. Return missing for insufficient or genuinely constant samples. Preserve a zero estimate from a varying sample. For [1, 2, 3, 4], skewness is 0 and excess kurtosis is −6/5.
+3. Use checked, scaled central moments and preserve small representable spreads. When numerical loss prevents estimating a varying sample, fail the whole call under [FEATURES-002](02-parameters-missing-and-failure.md).
+
+## Observed scope and actual selection
 
 `RollingSkew` and `RollingKurtosis` use finite values inside the inclusive trailing row window. Defaults are window=1/min_periods=window, but skewness needs at least max(min_periods,3) and kurtosis max(min_periods,4). They may emit at a missing current row. There is no annualization or weighting, and outputs are dimensionless.
 
@@ -31,9 +37,7 @@ The enums identify Fisher G1/G2; the implementation explicitly includes their fi
 - Inspected `transform_timeseries_supports_advanced_rolling_signal_ops` in [transform tests](../../../../finstack-quant/features/tests/transforms.rs): symmetric skew=0, a window of three cannot produce kurtosis, and [1,2,3,4] has expected excess kurtosis -1.2, tolerance 1e-12.
 - Inspected `dimensionless_features_do_not_depend_on_measurement_units` in [audit regressions](../../../../finstack-quant/features/tests/audit_regressions.rs): scales 1e-150 through 1e150 and a three-point expected skew sqrt(3). Same-kernel scale comparisons are not independent estimator validation.
 
-No external estimator reference or high-precision oracle was authenticated in this audit.
-
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

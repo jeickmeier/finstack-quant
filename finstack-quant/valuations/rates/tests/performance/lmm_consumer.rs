@@ -87,7 +87,9 @@ fn fixture(two_exercises: bool, seed: u64) -> Fixture {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("single-curve market");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let curve = market.get_discount("D").expect("discount curve");
     let params = BermudanSwaptionLmmPricer::build_lmm_params(&option, curve.as_ref(), as_of, 0.15)
         .expect("canonical LMM params");
@@ -184,7 +186,7 @@ fn simulate_paired(f: &Fixture) -> PairedStates {
             let mut current_exercises = vec![Vec::new(); f.exercises.len()];
             let mut original_exercises = current_exercises.clone();
             for step in 0..f.grid.num_steps() {
-                rng.fill_std_normals(&mut z);
+                rng.fill_std_normals(&mut z).expect("normal draws");
                 if leg == 1 {
                     for shock in &mut z {
                         *shock = -*shock;
@@ -196,7 +198,9 @@ fn simulate_paired(f: &Fixture) -> PairedStates {
                 let frozen = original::first_alive(&f.params, time);
                 let before = current[..frozen].to_vec();
                 let old_before = old[..frozen].to_vec();
-                scheme.step(&process, time, dt, &mut current, &z, &mut work);
+                scheme
+                    .step(&process, time, dt, &mut current, &z, &mut work)
+                    .expect("valid simulation step");
                 original::step(&f.params, time, dt, &mut old, &z, &mut old_work);
                 for i in 0..f.params.num_forwards {
                     assert!(current[i].is_finite() && old[i].is_finite());

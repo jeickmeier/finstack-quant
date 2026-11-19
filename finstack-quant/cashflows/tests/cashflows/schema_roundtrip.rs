@@ -174,7 +174,7 @@ fn canonical_floating_coupon(spread_bp: &str) -> serde_json::Value {
     let mut spec = canonical_schedule_params();
     spec["coupon_type"] = json!("cash");
     spec["rate_spec"] = json!({
-        "forward_curve_id": "TEST-INDEX",
+        "index_id": "TEST-INDEX", "forward_curve_id": "TEST-INDEX",
         "spread_bp": spread_bp,
         "reset_frequency": {"count": 3, "unit": "months"},
         "reset_lag_days": 0,
@@ -657,7 +657,10 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
         finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixing series builds");
-    let market = MarketContext::new().insert(fwd).insert_series(series);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve")
+        .insert_series(series);
     let market_json = serde_json::to_string(&market).expect("market context serializes");
     assert!(
         market_json.contains("FIXING:USD-SOFR-3M"),
@@ -676,7 +679,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
             "spec": {
               "coupon_type": "cash",
               "rate_spec": {
-                "forward_curve_id": "USD-SOFR-3M",
+                "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
                 "spread_bp": "100",
                 "reset_frequency": {"count": 3, "unit": "months"},
                 "reset_lag_days": 0

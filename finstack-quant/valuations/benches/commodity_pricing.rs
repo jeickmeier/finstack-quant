@@ -103,11 +103,16 @@ fn create_commodity_market() -> MarketContext {
     );
 
     MarketContext::new()
-        .insert(discount_curve)
-        .insert(wti_curve)
-        .insert(cl_curve)
-        .insert(ng_curve)
-        .insert(rbob_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(wti_curve)
+        .expect("insert market curve")
+        .try_insert(cl_curve)
+        .expect("insert market curve")
+        .try_insert(ng_curve)
+        .expect("insert market curve")
+        .try_insert(rbob_curve)
+        .expect("insert market curve")
         .insert_surface(wti_vol)
         .insert_surface(cl_vol)
         .insert_surface(ng_vol)
@@ -717,12 +722,14 @@ fn matrix_market(volatility: f64, flat_forward: bool) -> MarketContext {
     );
     let market = create_commodity_market().insert_surface(surface);
     if flat_forward {
-        market.insert(commodity_curve_support::flat_price_curve(
-            "CL-FORWARD",
-            base_date(),
-            75.0,
-            5.0,
-        ))
+        market
+            .try_insert(commodity_curve_support::flat_price_curve(
+                "CL-FORWARD",
+                base_date(),
+                75.0,
+                5.0,
+            ))
+            .expect("insert market curve")
     } else {
         market
     }

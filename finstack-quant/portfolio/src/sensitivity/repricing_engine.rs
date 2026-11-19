@@ -493,7 +493,9 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
-        Ok(MarketContext::new().insert(curve))
+        Ok(MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve"))
     }
 
     fn test_market_with_other_curve(as_of: Date) -> Result<MarketContext> {
@@ -504,7 +506,7 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
-        Ok(test_market(as_of)?.insert(other_curve))
+        test_market(as_of)?.try_insert(other_curve)
     }
 
     fn test_fx_market() -> Result<MarketContext> {

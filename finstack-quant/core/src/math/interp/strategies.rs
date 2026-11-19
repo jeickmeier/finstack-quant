@@ -104,6 +104,74 @@ fn eval_scaled_exp(anchor: f64, exponent: f64, context: &str) -> crate::Result<f
 #[derive(Debug, Clone)]
 pub struct LinearStrategy;
 
+impl LinearStrategy {
+    /// Interpolate between two finite samples on a closed interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `left` - Coordinate and level at the lower endpoint.
+    /// * `right` - Coordinate and level at the strictly higher endpoint.
+    /// * `x` - Finite query coordinate in the same units, within the two endpoints.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for invalid endpoints or an out-of-range coordinate.
+    pub fn interpolate_segment(left: (f64, f64), right: (f64, f64), x: f64) -> crate::Result<f64> {
+        let (x0, y0) = left;
+        let (x1, y1) = right;
+        if !x0.is_finite()
+            || !x1.is_finite()
+            || !y0.is_finite()
+            || !y1.is_finite()
+            || x0 >= x1
+            || !(x0..=x1).contains(&x)
+        {
+            return Err(crate::Error::Validation(
+                "linear interpolation requires finite ordered endpoints and an in-range query"
+                    .into(),
+            ));
+        }
+        if exact_f64_eq(x, x1) {
+            return Ok(y1);
+        }
+        if exact_f64_eq(x, x0) || exact_f64_eq(y0, y1) {
+            return Ok(y0);
+        }
+        // Anchor at the smaller magnitude to preserve small contributions.
+        // FMA rounds a subnormal blend only once.
+        let (base, delta, dx) = if y0.abs() <= y1.abs() {
+            (y0, y1 - y0, x - x0)
+        } else {
+            (y1, y0 - y1, x1 - x)
+        };
+        let width = x1 - x0;
+        let weight = dx / width;
+        if width.is_finite()
+            && delta.is_finite()
+            && weight.is_normal()
+            && y0.is_sign_negative() == y1.is_sign_negative()
+        {
+            let value = weight.mul_add(delta, base);
+            if value.is_finite() {
+                return Ok(value);
+            }
+        }
+        // Extreme coordinate ratios can round to zero before multiplication by
+        // a large level. Complete the affine combination before converting back.
+        use num_rational::BigRational;
+        use num_traits::ToPrimitive;
+        let exact = |v| {
+            BigRational::from_float(v)
+                .ok_or_else(|| crate::Error::Validation("invalid interpolation endpoint".into()))
+        };
+        let (x0, x1, x) = (exact(x0)?, exact(x1)?, exact(x)?);
+        let value = ((&x1 - &x) * exact(y0)? + (x - &x0) * exact(y1)?) / (x1 - x0);
+        value.to_f64().ok_or_else(|| {
+            crate::Error::Validation("linear interpolation exceeds binary64 range".into())
+        })
+    }
+}
+
 impl InterpolationStrategy for LinearStrategy {
     fn from_raw(
         _knots: &[f64],

@@ -106,7 +106,8 @@ mod tests {
                 index.index_factor = factor;
                 index.protection_leg.recovery_rate = 0.4;
                 let market = MarketContext::new()
-                    .insert(hazard(index.protection_leg.credit_curve_id.as_str(), rate));
+                    .try_insert(hazard(index.protection_leg.credit_curve_id.as_str(), rate))
+                    .expect("insert market curve");
                 let expected = index.notional.amount() * factor * 0.6 * -(-rate).exp_m1();
                 let mut ctx = context(index.clone(), market.clone(), date!(2025 - 01 - 01));
                 let actual = ExpectedLossCalculator.calculate(&mut ctx).expect("EL");
@@ -142,8 +143,10 @@ mod tests {
             },
         ];
         let market = MarketContext::new()
-            .insert(hazard("FIRST-HZ", 0.02))
-            .insert(hazard("SECOND-HZ", 0.04));
+            .try_insert(hazard("FIRST-HZ", 0.02))
+            .expect("insert market curve")
+            .try_insert(hazard("SECOND-HZ", 0.04))
+            .expect("insert market curve");
         let expected = index.notional.amount()
             * 0.75
             * (0.25 * 0.8 * -(-0.02_f64).exp_m1() + 0.75 * 0.5 * -(-0.04_f64).exp_m1());

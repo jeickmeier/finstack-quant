@@ -447,6 +447,10 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
                     json!("USD-SOFR-3M"),
                 ),
                 (
+                    json!(["instrument", "spec", "pool", "assets", 0, "reset_lag_days"]),
+                    json!(2),
+                ),
+                (
                     json!(["instrument", "spec", "pool", "assets", 0, "spread_bp"]),
                     json!(450.0),
                 ),

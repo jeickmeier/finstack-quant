@@ -457,6 +457,7 @@ pub fn build_stress_attribution(
 
 use super::{VARIANCE_TOLERANCE, tail_multipliers};
 
+#[cfg(test)]
 use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
 // Validation helpers
@@ -540,11 +541,9 @@ fn compute_incremental_var(
     covariance: &[f64],
     portfolio_variance: f64,
     portfolio_var: f64,
-    confidence: f64,
+    z_alpha: f64,
     n: usize,
 ) -> Vec<f64> {
-    let z_alpha = standard_normal_inv_cdf(confidence);
-
     (0..n)
         .map(|k| {
             let w_k = weights[k];
@@ -629,7 +628,7 @@ pub fn parametric_var_decomposition(
         });
     }
 
-    let (z_alpha, es_multiplier) = tail_multipliers(confidence);
+    let (z_alpha, es_multiplier) = tail_multipliers(confidence)?;
 
     // Sigma * w (matrix-vector product).
     let mut sigma_w = vec![0.0; n];
@@ -739,7 +738,7 @@ pub fn parametric_var_decomposition(
             covariance,
             variance,
             portfolio_var,
-            confidence,
+            z_alpha,
             n,
         );
         for (contribution, ivar) in var_contributions.iter_mut().zip(incremental) {
@@ -1665,7 +1664,7 @@ mod tests {
         // Diversification: the portfolio loses less than the sum of
         // standalone losses, so the signed portfolio VaR sits above the
         // (negative) sum of standalone VaRs.
-        let z = standard_normal_inv_cdf(0.95);
+        let z = standard_normal_inv_cdf(0.95).expect("valid probability");
         let standalone_var_a = -(0.5 * 0.2 * z);
         let standalone_var_b = -(0.5 * 0.2 * z);
         let sum_standalone = standalone_var_a + standalone_var_b;

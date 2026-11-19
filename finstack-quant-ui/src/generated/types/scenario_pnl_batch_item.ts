@@ -665,14 +665,6 @@ export type D_9F32C296492D66417E76 =
       [k: string]: unknown;
     }
   | {
-      kind: "base_corr_bucket_no_match";
-      /**
-       * Surface identifier.
-       */
-      surface_id: string;
-      [k: string]: unknown;
-    }
-  | {
       /**
        * Free-text from `ArbitrageViolation` Display.
        */

@@ -1,14 +1,21 @@
 # FEATURES-009: Rolling linear trend against row positions
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Row-position OLS is implemented. Checked centered arithmetic and failure on numerically unusable positions require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked a gapped fit at a missing current row. Rust fixtures were inspected. Long-window and extreme-scale qualification remain pending.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Fit unweighted OLS with an intercept to finite responses at their original positions in the inclusive trailing window. Preserve gaps left by missing rows. Require at least max(min_periods, 2) finite responses. A missing current row can receive a slope when enough earlier observations qualify. Order keys determine sequence. Report the slope in response units per entity-row step, with no elapsed-time scaling. [Row membership](01-ordering-keys-and-partitions.md).
+2. Return zero for a valid fit to constant responses and missing for insufficient history. Use checked scaled arithmetic. Fail the call if numerical loss makes distinct row positions unusable. [Numerical failure policy](02-parameters-missing-and-failure.md).
+
+For [1, missing, 4, 8, missing] with window 5 and minimum count 3, the last row uses positions 0, 2, and 3 and has slope 31/14 per row.
+
+## Observed scope and selection
 
 `RollingSlope` applies ordinary unweighted linear slope with an implicit intercept to finite values in an inclusive trailing row window. Defaults window=1/min_periods=window; effective finite count is at least two. The time regressor is the integer position in that window, not the order-key text or elapsed time.
 
@@ -31,5 +38,5 @@ The source has no date-distance regression option.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

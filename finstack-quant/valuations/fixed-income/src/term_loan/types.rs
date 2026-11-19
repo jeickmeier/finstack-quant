@@ -666,6 +666,7 @@ impl TermLoan {
         use time::macros::date;
 
         let floating_rate = FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::new(400, 0),
             gearing: Decimal::ONE,
@@ -887,7 +888,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for TermLoan {
         if let RateSpec::Floating(spec) = &self.rate {
             deps.add_forward_curve(spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                spec.forward_curve_id.as_str(),
+                spec.index_id.as_str(),
             ));
         }
         Ok(deps)
@@ -1170,9 +1171,8 @@ mod tests {
         let RateSpec::Floating(spec) = &loan.rate else {
             unreachable!("floating example must use a floating rate");
         };
-        let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
-            spec.forward_curve_id.as_str(),
-        );
+        let expected =
+            finstack_quant_core::market_data::fixings::fixing_series_id(spec.index_id.as_str());
 
         let deps =
             finstack_quant_valuations_core::instruments::Instrument::market_dependencies(&loan)

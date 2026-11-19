@@ -25,20 +25,6 @@
         }
       ]
     },
-    "ClosedUnitIntervalF64Wire": {
-      "description": "Finite JSON number in the closed interval `[0, 1]`.",
-      "format": "double",
-      "maximum": 1.0,
-      "minimum": 0.0,
-      "type": "number"
-    },
-    "CorrelationWire": {
-      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
-      "format": "double",
-      "maximum": 1.0,
-      "minimum": -1.0,
-      "type": "number"
-    },
     "FixedLegSpec": {
       "additionalProperties": false,
       "description": "Specification for fixed rate legs in interest rate swaps",
@@ -172,6 +158,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Payment frequency"
         },
+        "index_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Contractual observed index identifying historical rate publications."
+        },
         "payment_lag_days": {
           "default": 0,
           "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
@@ -199,6 +189,7 @@
         }
       },
       "required": [
+        "index_id",
         "discount_curve_id",
         "forward_curve_id",
         "spread_bp",
@@ -307,12 +298,6 @@
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
     },
-    "NonNegativeF64Wire": {
-      "description": "Finite JSON number greater than or equal to zero.",
-      "format": "double",
-      "minimum": 0.0,
-      "type": "number"
-    },
     "OptionType": {
       "description": "Option payoff direction used by analytical and numerical model engines.",
       "oneOf": [
@@ -328,49 +313,50 @@
         }
       ]
     },
-    "PositiveF64Wire": {
-      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
-      "exclusiveMinimum": 0.0,
-      "format": "double",
-      "type": "number"
-    },
     "SabrParameters": {
       "additionalProperties": false,
-      "description": "SABR model parameters",
+      "description": "Parameters of a SABR backbone, with an optional signed rate displacement.",
       "properties": {
         "alpha": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Initial volatility (alpha)"
+          "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0.0,
+          "format": "double",
+          "type": "number"
         },
         "beta": {
-          "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
-          "description": "CEV exponent (beta) - typically 0 to 1"
+          "description": "CEV exponent in the closed interval `[0, 1]`.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
         },
         "nu": {
-          "$ref": "#/$defs/NonNegativeF64Wire",
-          "description": "Volatility of volatility (nu/volvol)"
+          "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+          "format": "double",
+          "minimum": 0.0,
+          "type": "number"
         },
         "rho": {
-          "$ref": "#/$defs/CorrelationWire",
-          "description": "Correlation between asset and volatility (rho)"
+          "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": -1.0,
+          "format": "double",
+          "type": "number"
         },
         "shift": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/PositiveF64Wire"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Shift parameter for handling negative rates (optional)"
+          "description": "Optional finite displacement applied to forward and strike.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "alpha",
         "beta",
-        "nu",
-        "rho"
+        "rho",
+        "nu"
       ],
       "type": "object"
     },
@@ -488,7 +474,7 @@
         },
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Volatility surface ID for option pricing"
+          "description": "Volatility source ID for option pricing. A dated SABR cube needs an\nACT/365F expiry clock anchored at the valuation date."
         }
       },
       "required": [
@@ -592,6 +578,7 @@
               "count": 3,
               "unit": "months"
             },
+            "index_id": "USD-OIS",
             "payment_lag_days": 0,
             "reset_lag_days": 0,
             "spread_bp": "0",

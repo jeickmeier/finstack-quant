@@ -238,6 +238,17 @@ pub enum Error {
         path: Vec<String>,
     },
 
+    /// A scalar expression operation is undefined for the supplied row.
+    #[error("expression node {node}, row {row}: {message}")]
+    ExpressionEvaluation {
+        /// Zero-based node in the compiled expression plan.
+        node: u64,
+        /// Zero-based row of the input columns.
+        row: usize,
+        /// Arithmetic operation and the reason it is undefined.
+        message: String,
+    },
+
     /// Catch-all for unexpected internal failures.
     #[error("Internal system error: {0}")]
     Internal(String),
@@ -327,6 +338,7 @@ impl Error {
                 | InputError::FxTriangulationFailed { .. },
             ) => ErrorKind::NotFound,
             Error::Calibration { .. }
+            | Error::ExpressionEvaluation { .. }
             | Error::Internal(_)
             | Error::CircularDependency { .. }
             | Error::Input(

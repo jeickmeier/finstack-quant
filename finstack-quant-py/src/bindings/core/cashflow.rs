@@ -1,7 +1,7 @@
 //! Python bindings for `finstack_quant_core::cashflow`.
 
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
@@ -66,6 +66,8 @@ cf_kind_classattrs! {
     FRONTING_FEE => FrontingFee,
     /// Principal exchange or notional flow.
     NOTIONAL => Notional,
+    /// Net contractual derivative payoff without a principal exchange.
+    DERIVATIVE_SETTLEMENT => DerivativeSettlement,
     /// Payment-in-kind interest capitalization.
     PIK => Pik,
     /// Scheduled amortization (principal repayment).
@@ -202,6 +204,9 @@ impl PyCashFlowAccrual {
     ///     with: calendar, frequency, business-day basis, regular ICMA or
     ///     full ACT/365L coupon period, and termination status.
     ///
+    /// nominal_dates : list of dates, optional
+    ///     Consecutive nominal boundaries covering a multi-period ACT/ACT ICMA coupon.
+    ///
     /// Raises
     /// ------
     /// KeyError
@@ -214,23 +219,50 @@ impl PyCashFlowAccrual {
     ///     missing or non-overlapping ``ACT/ACT ICMA`` coupon period, or
     ///     out-of-bounds ``ACT/365L`` period).
     #[new]
-    #[pyo3(signature = (start, end, day_count, context, projected_index_rate=None))]
+    #[pyo3(signature = (start, end, day_count, context, projected_index_rate=None, nominal_dates=None))]
     fn new(
         start: &Bound<'_, PyAny>,
         end: &Bound<'_, PyAny>,
         day_count: PyRef<'_, PyDayCount>,
         context: PyRef<'_, PyDayCountContext>,
         projected_index_rate: Option<f64>,
+        nominal_dates: Option<Vec<Bound<'_, PyAny>>>,
     ) -> PyResult<Self> {
-        let inner = CashFlowAccrual::new(
-            py_to_date(start)?,
-            py_to_date(end)?,
-            day_count.inner,
-            projected_index_rate,
-            context.inner.clone(),
-        )
+        let start = py_to_date(start)?;
+        let end = py_to_date(end)?;
+        let inner = if let Some(dates) = nominal_dates {
+            if day_count.inner != finstack_quant_core::dates::DayCount::ActActIsma {
+                return Err(PyValueError::new_err("nominal_dates requires ACT/ACT ICMA"));
+            }
+            let dates = dates.iter().map(py_to_date).collect::<PyResult<_>>()?;
+            CashFlowAccrual::from_nominal_dates(
+                start,
+                end,
+                projected_index_rate,
+                context.inner.clone(),
+                dates,
+            )
+        } else {
+            CashFlowAccrual::new(
+                start,
+                end,
+                day_count.inner,
+                projected_index_rate,
+                context.inner.clone(),
+            )
+        }
         .map_err(core_to_py)?;
         Ok(Self { inner })
+    }
+
+    /// Unadjusted reference dates for a multi-period ICMA coupon.
+    #[getter]
+    fn nominal_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
+        self.inner
+            .get_nominal_dates()
+            .iter()
+            .map(|date| date_to_py(py, *date))
+            .collect()
     }
 
     /// Inclusive accrual start as a Python date.

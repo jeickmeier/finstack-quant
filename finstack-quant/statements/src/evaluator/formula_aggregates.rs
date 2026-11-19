@@ -101,7 +101,7 @@ pub(super) fn prefix_slots(context: &EvaluationContext) -> Result<Vec<PeriodId>>
         .history
         .model_plan()
         .ok()
-        .and_then(|plan| Some((plan.periods.first()?.id, plan.calendar)));
+        .and_then(|plan| Some((plan.first()?.id, plan.get_calendar())));
     let Some((first, calendar)) = first else {
         return Ok(super::formula::expression_periods(context)
             .into_iter()

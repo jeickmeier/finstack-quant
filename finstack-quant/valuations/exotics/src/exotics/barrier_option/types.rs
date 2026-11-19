@@ -381,7 +381,7 @@ mod tests {
         option.monitoring = super::Monitoring::Continuous;
         option.observed_barrier_breached = None;
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(option.expiry)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
@@ -391,6 +391,7 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::from_grid(
                     "SPX-VOL",

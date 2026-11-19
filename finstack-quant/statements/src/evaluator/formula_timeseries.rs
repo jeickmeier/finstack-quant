@@ -31,7 +31,7 @@ const UNDEFINED: Value = Value::Unavailable(UnavailableReason::UndefinedBase);
 /// calendar is an error, not a missing value.
 pub(crate) fn offset_period(context: &EvaluationContext, offset: i32) -> Result<Option<PeriodId>> {
     let period = context.period_id;
-    let calendar = context.history.model_plan()?.calendar;
+    let calendar = context.history.model_plan()?.get_calendar();
     period.shift(0, calendar)?;
     Ok(period.shift(offset, calendar).ok())
 }
@@ -316,7 +316,7 @@ fn window_sum(
 
 /// The `count` consecutive plan slots that end at the current period.
 pub(super) fn trailing_slots(context: &EvaluationContext, count: u16) -> Result<Vec<PeriodId>> {
-    let calendar = context.history.model_plan()?.calendar;
+    let calendar = context.history.model_plan()?.get_calendar();
     (0..i32::from(count))
         .rev()
         .map(|back| Ok(context.period_id.shift(-back, calendar)?))

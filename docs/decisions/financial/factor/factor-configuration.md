@@ -1,14 +1,20 @@
 # FACTOR-001: Factor definitions, units, and configuration validation
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for ordered factor bases, typed shock coordinates and checked configuration.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Ordered factor IDs, matcher-universe checks and risk-confidence validation are implemented. Explicit bump coordinates, full configuration admission and checked risk-basis alignment remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 343 Factor Rust tests passed on 2026-11-17 against current behavior. The accepted configuration rules and host and downstream consumers still need qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Bind factor definitions, sensitivities and covariance to the same ordered factor basis. Require unique, exact, nonblank factor IDs, matching axes and coordinates, a declared covariance horizon and one reporting currency for monetary sensitivities. Reject mismatches before computing risk. [Matrix invariants](matrix-invariants.md) · [Factor risk](factor-risk.md).
+2. Require an explicit positive finite magnitude in the declared unit for every active finite-difference bump. Retire implicit one-unit defaults and the custom-factor rate fallback. Distinguish relative spot and FX moves from additive volatility moves. For example, one absolute volatility point moves sigma from 20% to 21%; a 1% relative shift moves it to 20.2%. Keep assignment-driven credit distinct from market-mapped shocks. [Portfolio shock and routing contract](../portfolio-execution/12-factor-shocks-and-routing.md#accepted-decision-for-checked-portfolio-factor-shocks-and-routing).
+3. Share Rust admission checks at construction and restoration. Reject incompatible factor and mapping combinations, duplicate targets, unknown bump IDs, and invalid tenor grids or weights. Validate matcher references against the declared universe. Require an explicit risk measure and finite VaR or ES confidence strictly in `(0.5, 1)`. Keep Strict as the default. Warn can return an incomplete assignment report under the [accepted coverage rules](../portfolio-attribution/12-factor-assignment-and-credit-exposures.md#accepted-decision-for-checked-factor-assignment-and-credit-exposures).
+
+## Observed choice and rationale
 
 Represent the factor universe as ordered typed definitions, an aligned covariance matrix, declarative matching, and a selected risk measure. The observed rationale is a single configuration consumed by portfolio sensitivity engines; the numerical bump execution belongs to that downstream scope.
 
@@ -34,7 +40,7 @@ Configuration validation does not validate bump magnitudes, unknown override IDs
 
 ## Alternatives and tradeoffs
 
-Typed validated mapping constructors could reject invalid combinations earlier; a declarative configuration with consumer checks is more flexible but requires a precise boundary. A universal normalized bump unit would reduce ambiguity but would change all sensitivity/covariance contracts. No new representation is adopted here.
+Typed mappings carry the unit of each financial operation. Shared admission lets pricing and risk consumers use the same configuration contract while retaining operation-specific checks on actual market targets and delivered moves.
 
 ## Implementation and evidence
 
@@ -44,10 +50,9 @@ Typed validated mapping constructors could reject invalid combinations earlier; 
 - [src/primitives/dependency.rs](../../../../finstack-quant/factor/src/primitives/dependency.rs) — inspected implementation.
 - [src/envelope.rs](../../../../finstack-quant/factor/src/envelope.rs) — inspected implementation.
 
-[tests/multi_asset_config.rs](../../../../finstack-quant/factor/tests/multi_asset_config.rs) locates multi-asset, exact-axis and strict-envelope checks; [src/config.rs](../../../../finstack-quant/factor/src/config.rs) contains matcher-universe and confidence tests. These establish intended contracts, not economic correctness of a bumped price. Source mappings are the evidence for units.
+[tests/multi_asset_config.rs](../../../../finstack-quant/factor/tests/multi_asset_config.rs) covers multi-asset, exact-axis and strict-envelope behavior. [src/config.rs](../../../../finstack-quant/factor/src/config.rs) contains matcher-universe, confidence and volatility unit tests. These tests passed against the current implementation. Qualify the accepted admission rules, host parity and downstream unit consistency.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

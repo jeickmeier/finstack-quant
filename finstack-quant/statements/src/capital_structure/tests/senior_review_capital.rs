@@ -47,7 +47,11 @@ fn swap_market(forward_rate: f64) -> MarketContext {
         .expect("valid discount curve");
     let forward = ForwardCurve::flat("USD-SOFR-3M", as_of, forward_rate, DayCount::Act360)
         .expect("valid signed forward curve");
-    MarketContext::new().insert(discount).insert(forward)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
 }
 
 #[test]
@@ -55,7 +59,7 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
     let as_of = date!(2025 - 01 - 01);
     let period = build_periods("2025..2025", None)
         .expect("annual period")
-        .periods
+        .into_periods()
         .remove(0);
     for (side, fixed_rate, forward_rate) in [
         (PayReceive::Receive, 0.01, -0.01),
@@ -215,7 +219,7 @@ fn canonical_negative_debt_coupons_are_income() {
     let as_of = date!(2025 - 01 - 01);
     let period = build_periods("2025..2025", None)
         .expect("annual period")
-        .periods
+        .into_periods()
         .remove(0);
     let mut negative_loan = loan(as_of);
     let mut floating =
@@ -280,7 +284,7 @@ fn placeholder_rate_option_schedule_is_rejected_explicitly() {
     let as_of = date!(2025 - 01 - 01);
     let period = build_periods("2025..2025", None)
         .expect("annual period")
-        .periods
+        .into_periods()
         .remove(0);
     let error = calculate_period_flows(
         &option,
@@ -630,7 +634,11 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
 
     // No as-of cutoff: an actual is used as given, where evaluating with a
     // market as of the first period's start would hide it until period end.
-    model.periods.periods[0].is_actual = true;
+    let mut rows = model.periods.to_vec();
+    rows[0].is_actual = true;
+    model.periods =
+        finstack_quant_core::dates::PeriodPlan::try_new(model.periods.get_calendar(), rows)
+            .unwrap();
     let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
     assert_eq!(
         plain.get_source("cash", &q1),
@@ -758,7 +766,7 @@ fn bond_issuance_is_funded_once_before_on_and_after_first_period_start() {
 fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
     let periods = build_periods("2025Q1..2025Q2", None)
         .expect("valid periods")
-        .periods;
+        .into_periods();
     let market = MarketContext::new();
     let zero = Money::from((0_i64, Currency::USD));
     for issue in [
@@ -860,7 +868,7 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
     let market = MarketContext::new();
     let periods = build_periods("2025Q1..2025Q2", None)
         .expect("valid periods")
-        .periods;
+        .into_periods();
     for issue in [
         date!(2024 - 12 - 31),
         date!(2025 - 01 - 01),
@@ -982,7 +990,7 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
 fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt() {
     let periods = build_periods("2025Q1..2025Q2", None)
         .expect("valid periods")
-        .periods;
+        .into_periods();
     let market = MarketContext::new();
     let zero = Money::from((0_i64, Currency::USD));
     for issue in [
@@ -1055,7 +1063,7 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
 fn implicit_issuance_rejects_negative_principal_and_keeps_zero_at_zero() {
     let period = build_periods("2025Q1..2025Q1", None)
         .expect("valid period")
-        .periods
+        .into_periods()
         .remove(0);
     let market = MarketContext::new();
     let zero = Money::from((0_i64, Currency::USD));
@@ -1427,7 +1435,7 @@ fn ecf_sweep_priority_pays_the_sized_sweep_and_preserves_cash() {
 fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
     let periods = build_periods("2025Q1..2025Q2", None)
         .expect("valid periods")
-        .periods;
+        .into_periods();
     let issue = date!(2025 - 01 - 15);
     let flows = vec![
         CashFlowParams::new(

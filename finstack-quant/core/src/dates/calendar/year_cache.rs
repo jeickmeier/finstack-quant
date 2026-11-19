@@ -11,7 +11,6 @@ use time::{Date, Duration};
 use super::algo::{BASE_YEAR, END_YEAR};
 use super::business_days::count_business_days_by_scan;
 use super::types::Calendar;
-use crate::dates::DateExt;
 use crate::{FxHashMap, recover_lock};
 
 /// 366-day holiday mask plus inclusive business-day prefix sums for one year.
@@ -35,6 +34,7 @@ struct YearKey {
     /// Static rule slice identity (`as_ptr` / `len`), not a raw pointer (Send+Sync).
     rules_addr: usize,
     rules_len: usize,
+    open_dates: &'static [Date],
 }
 
 fn cache() -> &'static RwLock<FxHashMap<YearKey, YearBits>> {
@@ -94,7 +94,7 @@ fn materialize(cal: &Calendar, year: i32) -> crate::Result<YearBits> {
         };
         last_ordinal = ordinal;
         let is_hol = holiday_bit_set(&holiday, ordinal);
-        if !date.is_weekend() && !is_hol {
+        if !cal.is_closed_weekend(date) && !is_hol {
             bd = bd.saturating_add(1);
         }
         bd_prefix[usize::from(ordinal)] = bd;
@@ -115,6 +115,7 @@ fn year_bits(cal: &Calendar, year: i32) -> crate::Result<YearBits> {
         ignore_weekends: cal.ignore_weekends,
         rules_addr: cal.rules.as_ptr() as usize,
         rules_len: cal.rules.len(),
+        open_dates: cal.open_dates,
     };
     if let Some(bits) = recover_lock(cache().read()).get(&key).copied() {
         return Ok(bits);
@@ -187,10 +188,10 @@ pub(super) fn count_business_days_cached(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::HolidayCalendar;
     use crate::dates::calendar::rule::Rule;
     use crate::dates::calendar::types::Calendar;
     use crate::dates::calendar::{BSE, NYSE, SSE, TARGET2};
+    use crate::dates::{DateExt, HolidayCalendar};
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {
@@ -267,7 +268,7 @@ mod tests {
                     );
                     assert_eq!(
                         cal.is_business_day(d).expect("calendar lookup"),
-                        !d.is_weekend() && !rule_holiday,
+                        !cal.is_closed_weekend(d) && !rule_holiday,
                         "{} {} business-day bit must match weekend + rule scan",
                         cal.id,
                         d
@@ -320,8 +321,8 @@ mod tests {
         static RULES_JAN1: [Rule; 1] = [Rule::fixed(Month::January, 1)];
         static RULES_JULY4: [Rule; 1] = [Rule::fixed(Month::July, 4)];
 
-        let cal_jan1 = Calendar::new("dup_id", "Jan 1 only", false, &RULES_JAN1, None);
-        let cal_july4 = Calendar::new("dup_id", "July 4 only", false, &RULES_JULY4, None);
+        let cal_jan1 = Calendar::new("dup_id", "Jan 1 only", false, &RULES_JAN1, None, &[]);
+        let cal_july4 = Calendar::new("dup_id", "July 4 only", false, &RULES_JULY4, None, &[]);
 
         let jan1 = date(2025, Month::January, 1);
         let july4 = date(2025, Month::July, 4);

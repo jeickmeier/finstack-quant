@@ -1,14 +1,20 @@
 # COVENANTS-07: Dated observations, period calendars and series evaluation
 
-**Decision status:** Draft — observed implementation; adoption pending for choices not already settled. Existing accepted decisions retain their scope.
+**Decision status:** Accepted 2026-11-17 for dated observations, exact period identity and read-only series coverage.
 
-**Implementation status:** Observed in the exact source paths identified below, including stated discrepancies and limitations.
+**Implementation status:** Dated sorting, duplicate-date rejection in the series constructor and explicit stochastic reference dates for dated wrappers are implemented. Shared period admission, empty-assessment validation, forecast eligibility and observation coverage remain pending.
 
-**Validation status:** Source and identified test assertions inspected; tests, builds, numerical experiments and external benchmarks not executed. Test existence is not adoption or independent qualification.
+**Validation status:** The 115-test Covenants Rust baseline and all five focused series tests passed on 2026-11-17 against current behavior. Unknown-period rejection and the accepted coverage and admission rules need qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope inventory and coverage ledger](README.md).
 
-## Construction and selection
+## Accepted decision
+
+1. Resolve exact period membership and validate dates before reading metrics, including when the selected scope has no active tests. Plain dated rows use their observation date as both inclusive start and end. Reject unknown periods and frequency mismatches. For model periods, use the source's stored calendar and assess on the last included day.
+2. Sort plain dated rows and reject duplicate dates. Require selected model periods to have valid start and end bounds and strictly increasing test dates. An empty assessment validates the engine and scope, then returns zero coverage. A forecast requires at least one selected period.
+3. Keep series operations read-only. Read required metrics on demand for applicable tests. A missing required observation yields an incomplete assessment, and an invalid required value yields a validation error. Carry the source classification of actual and projected observations, forecast only selected projected periods, and require an explicit reference date for stochastic forecasts over plain dated rows. [Accepted statement assessment contract](../statements-analytics-credit/11-covenant-statement-adapter.md#accepted-decision-for-verified-statement-covenant-assessments).
+
+## Observed construction and selection
 
 `DatedMetricSeries::new` requires at least one row, sorts by calendar date, maps each date to `PeriodId::day(year,ordinal)`, rejects duplicate dates, and stores the metric map without validating its values. Stored periods are ascending and private. A missing metric read returns `None`; a stored nonfinite value is rejected only if a test actually reads it. There is no interpolation, forward filling, resampling, revision history or actual-versus-forecast classification.
 
@@ -22,15 +28,15 @@ Forecast wrappers differ: they use every sorted stored date, require nonempty st
 
 The inspected [statements adapter](../../../../finstack-quant/statements-analytics/src/analysis/credit/covenants.rs) resolves stored fiscal/calendar periods and subtracts one day from the exclusive statement end. It passes all result periods, including actuals, to the engine. That adapter owns the half-open-to-inclusive conversion; the covenant crate neither reconstructs fiscal calendars nor selects forecast-only periods. Its methodology is separately recorded in [STATEMENTS-ANALYTICS-CREDIT-11](../statements-analytics-credit/11-covenant-statement-adapter.md).
 
-Source documentation explains the explicit dated-row horizon requirement and on-demand reads. Rejecting all unused invalid data, sorting evaluation rows, or requiring a forecast flag are alternative boundaries; none is implied by the current API.
+Exact membership prevents an unrelated period from selecting an effective covenant window. Classification and calendar dates come from the source. A plain observation date identifies the test date and carries no reporting-interval start for stochastic horizon inference.
 
 ## Evidence
 
 Owning [series module](../../../../finstack-quant/covenants/src/series.rs) and [period trait/forecast validation](../../../../finstack-quant/covenants/src/forward.rs). Inspected inline tests `series_sorts_rows_and_maps_each_date_to_a_daily_period`, `series_rejects_empty_and_duplicate_dates`, `stochastic_series_forecast_requires_a_reference_date`, and `forecast_and_series_evaluation_agree_on_the_breach_date` cover convenience paths.
 
-These generic edge paths were not executed.
+All five focused series tests passed. Generic unknown-period paths with inactive or empty sets and the accepted empty-selection behavior remain unqualified.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [covenant follow-ups](../FOLLOW_UPS.md#covenants).

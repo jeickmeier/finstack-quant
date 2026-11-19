@@ -38,6 +38,11 @@ export interface VolCubeSliceProps extends Pick<
   /** Absolute strikes in the stored forwards' rate units, in the order given; Rust requires them strictly increasing and inside the SABR domain. */
   initialStrikes: readonly number[];
   initialConvention: OutputConvention;
+  /** Expiry interpolation of the materialized fixed-tenor surface. */
+  interpolationMode: Extract<
+    CubeSliceRequest,
+    { axis: "tenor" }
+  >["interpolationMode"];
   /** Fixed axis shown first; omitted fixes the underlying tenor. */
   initialAxis?: CubeSliceRequest["axis"];
   /** Continuously compounded decimal rate for the smile's arbitrage check. Omitted leaves the field empty. */
@@ -106,33 +111,57 @@ export function VolCubeSlice(props: VolCubeSliceProps) {
       ? (parsed as number[])
       : null;
   }, [strikes]);
-  const sliceRequest = useMemo<CubeSliceRequest | null>(
-    () =>
-      values && {
-        cube,
-        axis,
-        at:
-          axis === "tenor"
-            ? cube.tenors[tenorIndex]!
-            : cube.expiries[expiryIndex]!,
-        strikes: values,
-        convention,
-      },
-    [cube, axis, tenorIndex, expiryIndex, values, convention],
-  );
+  const sliceRequest = useMemo<CubeSliceRequest | null>(() => {
+    if (!values) return null;
+    const grid = { cube, strikes: values, convention };
+    return axis === "tenor"
+      ? {
+          ...grid,
+          axis,
+          at: cube.tenors[tenorIndex]!,
+          interpolationMode: props.interpolationMode,
+        }
+      : { ...grid, axis, at: cube.expiries[expiryIndex]! };
+  }, [
+    cube,
+    axis,
+    tenorIndex,
+    expiryIndex,
+    values,
+    convention,
+    props.interpolationMode,
+  ]);
   const smileRequest = useMemo<CubeSmileRequest | null>(() => {
     const r = decimalValue(rate);
+    // finstack-arith: row-major index into the stored SABR parameters
+    const nodeIndex = expiryIndex * cube.tenors.length + tenorIndex;
+    const shift = cube.params[nodeIndex]?.shift;
+    const quoteType =
+      convention === "normal"
+        ? "normal"
+        : shift == null
+          ? "black_lognormal"
+          : "shifted_black_lognormal";
     return values && r !== null
       ? {
           cube,
           expiryIndex,
           tenorIndex,
           strikes: values,
+          quoteType,
           rate: r,
           repairIterations: props.repairIterations,
         }
       : null;
-  }, [cube, expiryIndex, tenorIndex, values, rate, props.repairIterations]);
+  }, [
+    cube,
+    expiryIndex,
+    tenorIndex,
+    values,
+    rate,
+    convention,
+    props.repairIterations,
+  ]);
   const slice = useCubeSlice(sliceRequest);
   const smile = useCubeSmile(smileRequest);
   const view = useMemo(
@@ -155,7 +184,12 @@ export function VolCubeSlice(props: VolCubeSliceProps) {
       })),
     ];
   }, [smileRequest, smile.data]);
-  const smileValue = "SABR implied volatility (raw)";
+  const smileValue =
+    convention === "normal"
+      ? "Normal volatility (annualized rate units)"
+      : smileRequest?.quoteType === "shifted_black_lognormal"
+        ? "Shifted Black-76 volatility (annualized decimal)"
+        : "Black-76 volatility (annualized decimal)";
   const definition = useMemo(
     () =>
       defineChart({
@@ -183,7 +217,7 @@ export function VolCubeSlice(props: VolCubeSliceProps) {
           }),
         },
       }),
-    [smilePoints],
+    [smilePoints, smileValue],
   );
   const fixed = axis === "tenor" ? "tenor" : "expiry";
   const node = {
@@ -299,10 +333,8 @@ export function VolCubeSlice(props: VolCubeSliceProps) {
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              Native SabrSmile values for the node&apos;s parameters and forward{" "}
-              {smile.data.forward} (rate units) at expiry {smile.data.expiry}{" "}
-              years: normal volatility when beta &lt; 1e-4, Black volatility of
-              the (shifted) forward otherwise.{" "}
+              {smileValue} for the node&apos;s forward {smile.data.forward} at
+              expiry {smile.data.expiry} years.{" "}
               {smile.data.repaired
                 ? `Repaired values come from repairArbitrage with ${props.repairIterations} passes.`
                 : "No repair was requested."}

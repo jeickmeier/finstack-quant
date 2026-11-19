@@ -74,7 +74,7 @@ proptest! {
         // Build market curves
         let disc = build_test_discount_curve(0.03, base_date, "USD-OIS");
         let fwd = build_test_forward_curve(0.03, base_date, "USD-SOFR-3M");
-        let context = MarketContext::new().insert(disc).insert(fwd);
+        let context = MarketContext::new().try_insert(disc).expect("insert market curve").try_insert(fwd).expect("insert market curve");
 
         // Create two receiver swaps with different fixed rates
         let irs_low = InterestRateSwap::builder()
@@ -96,6 +96,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -131,6 +132,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -175,7 +177,7 @@ proptest! {
         // Build market curves
         let disc = build_test_discount_curve(0.04, base_date, "USD-OIS");
         let fwd = build_test_forward_curve(0.04, base_date, "USD-SOFR-3M");
-        let context = MarketContext::new().insert(disc).insert(fwd);
+        let context = MarketContext::new().try_insert(disc).expect("insert market curve").try_insert(fwd).expect("insert market curve");
 
         let payer = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-PAYER"))
@@ -196,6 +198,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -231,6 +234,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -298,7 +302,7 @@ proptest! {
         let disc = disc_res.unwrap();
         let fwd = fwd_res.unwrap();
 
-        let context = MarketContext::new().insert(disc).insert(fwd);
+        let context = MarketContext::new().try_insert(disc).expect("insert market curve").try_insert(fwd).expect("insert market curve");
 
         let irs = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-EXTREME"))
@@ -319,6 +323,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),

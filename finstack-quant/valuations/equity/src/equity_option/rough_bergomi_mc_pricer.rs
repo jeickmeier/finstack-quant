@@ -130,7 +130,13 @@ fn build_xi0_from_surface(
         .market_quotes
         .implied_volatility
     {
-        return ForwardVarianceCurve::flat(iv * iv);
+        let variance = iv * iv;
+        if iv < 0.0 || (iv > 0.0 && variance == 0.0) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "rough Bergomi volatility override {iv} cannot be represented as a nonnegative variance rate"
+            )));
+        }
+        return ForwardVarianceCurve::flat(variance);
     }
 
     let surface = market.get_surface(equity_option.vol_surface_id.as_str())?;
@@ -142,7 +148,7 @@ fn build_xi0_from_surface(
         .expiries()
         .iter()
         .copied()
-        .filter(|&u| u > 1e-12 && u < t - 1e-12)
+        .filter(|&u| u > 0.0 && u < t)
         .collect();
     strip.push(t);
 
@@ -155,13 +161,23 @@ fn build_xi0_from_surface(
         let atm_forward = spot * ((r - q) * u).exp();
         let sigma_u =
             finstack_quant_models::volatility::get_surface_vol_clamped(&surface, u, atm_forward);
-        let w = sigma_u * sigma_u * u;
-        let xi = (w - prev_w) / (u - prev_u);
-        if !xi.is_finite() || xi <= 0.0 {
+        // Weight first when u rescales the square toward the representable range.
+        let w = if (u > 1.0) == (sigma_u < 1.0) {
+            (sigma_u * u) * sigma_u
+        } else {
+            (sigma_u * sigma_u) * u
+        };
+        if sigma_u > 0.0 && w == 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "rough Bergomi xi0 strip: non-positive forward variance {xi} over \
+                "positive ATM total variance underflows at expiry {u}"
+            )));
+        }
+        let xi = (w - prev_w) / (u - prev_u);
+        if !xi.is_finite() || xi < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "rough Bergomi xi0 strip: invalid forward variance {xi} over \
                  ({prev_u}, {u}) from surface '{}' — ATM total variance must be \
-                 increasing in maturity (no calendar arbitrage)",
+                 nondecreasing in maturity",
                 equity_option.vol_surface_id
             )));
         }
@@ -229,7 +245,8 @@ fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
     for _ in 0..num_paths {
         // Generate Riemann-Liouville Volterra increments for this path, plus
         // the driving Brownian normals that the spot leg correlates against.
-        rng.fill_std_normals(&mut fbm_normals);
+        rng.fill_std_normals(&mut fbm_normals)
+            .map_err(|e| PricingError::from_core(e, err_ctx.clone()))?;
         fbm_gen.generate(&fbm_normals, &mut fbm_increments);
         fbm_gen.driving_normals_into(&fbm_normals, &mut driving_normals);
 
@@ -483,7 +500,7 @@ mod variance_strip_tests {
         let mut start = 0.0;
         let mut total = 0.0;
         for end in breaks.iter().copied().filter(|&b| b < t).chain([t]) {
-            total += curve.value(0.5 * (start + end)) * (end - start);
+            total += curve.get_value(0.5 * (start + end)).unwrap() * (end - start);
             start = end;
         }
         total
@@ -497,6 +514,25 @@ mod variance_strip_tests {
         for (time, total) in [(0.25, 0.01), (1.0, 0.1), (1.5, 0.11)] {
             assert!((total_variance(&curve, &[0.25, 1.0, 1.5], time) - total).abs() < 1e-14);
         }
+    }
+
+    #[test]
+    fn equal_atm_total_variances_give_zero_forward_variance() {
+        let (_, option) = market_and_option();
+        let surface = VolSurface::builder(option.vol_surface_id.as_str())
+            .expiries(&[0.25, 1.0])
+            .secondary_values(&[80.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .row(&[0.5; 2])
+            .row(&[0.25; 2])
+            .build()
+            .unwrap();
+        let market = MarketContext::new().insert_surface(surface);
+        let xi = build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.0).unwrap();
+        assert_eq!(xi.get_value(0.0).unwrap(), 0.25);
+        assert_eq!(xi.get_value(0.25).unwrap(), 0.0);
     }
 
     #[test]
@@ -568,7 +604,7 @@ mod variance_strip_tests {
         let curve =
             build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.5).expect("override");
         for time in [0.0, 0.25, 1.0, 1.5, 2.0] {
-            assert!((curve.value(time) - 0.09).abs() < 1e-14);
+            assert!((curve.get_value(time).unwrap() - 0.09).abs() < 1e-14);
         }
     }
 
@@ -603,7 +639,8 @@ mod variance_strip_tests {
             .build()
             .expect("discount");
         let market = market
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_price(
                 "EQUITY-SPOT",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
@@ -630,6 +667,7 @@ mod variance_strip_tests {
             100.0
                 * (2.0
                     * finstack_quant_core::math::special_functions::norm_cdf(0.5 * variance.sqrt())
+                        .expect("valid normal variate")
                     - 1.0)
         };
         let exact = call_price(0.1);
@@ -638,8 +676,9 @@ mod variance_strip_tests {
             // The left-point Euler grid need not contain the .25y curve break.
             // Measure its quadrature bias separately from MC sampling error.
             let dt = 1.0 / steps as f64;
-            let discretized_variance: f64 =
-                (0..steps).map(|i| curve.value(i as f64 * dt) * dt).sum();
+            let discretized_variance: f64 = (0..steps)
+                .map(|i| curve.get_value(i as f64 * dt).unwrap() * dt)
+                .sum();
             let discrete_price = call_price(discretized_variance);
             let bias = (discrete_price - exact).abs();
             assert!(bias < previous_bias, "Euler bias must fall on refinement");

@@ -257,7 +257,7 @@ fn default_reset_lag() -> i32 {
 ///
 /// The cashflow builder consults it whenever projecting a floating coupon
 /// fails: a missing forward curve, a pre-cutoff observation with no
-/// `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+/// `FIXING:{index_id}` series supplied, a reset before the curve base
 /// date, or an overnight or day-count projection error. It never fills a gap
 /// in recorded history: when a curve and a fixing series are both supplied, a
 /// missing pre-cutoff observation is an error under every policy.
@@ -393,7 +393,7 @@ impl OvernightIndexConstraintApplication {
 /// # Seasoned Instruments (Historical Fixings)
 ///
 /// Historical fixings **are supported** via the `MarketContext`: store a
-/// `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+/// `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
 /// `finstack_quant_core::market_data::fixings`) containing realized index
 /// observations. Observation dates strictly before the valuation cutoff then
 /// resolve from that series instead of the curve. The cutoff is the forward
@@ -428,6 +428,7 @@ impl OvernightIndexConstraintApplication {
 ///
 /// // 3M SOFR + 200bps with 0% floor
 /// let spec = FloatingRateSpec {
+///     index_id: "USD-SOFR-3M".into(),
 ///     forward_curve_id: "USD-SOFR-3M".into(),
 ///     spread_bp: dec!(200.0),
 ///     gearing: dec!(1.0),
@@ -450,6 +451,8 @@ impl OvernightIndexConstraintApplication {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FloatingRateSpec {
+    /// Contractual rate index used for historical observations in FIXING series.
+    pub index_id: finstack_quant_core::types::IndexId,
     /// Forward curve identifier (e.g., "USD-SOFR-3M", "EUR-EURIBOR-6M").
     pub forward_curve_id: CurveId,
 
@@ -632,6 +635,9 @@ impl FloatingRateSpec {
     /// its index cap, or an all-in floor exceeds its all-in cap. Rates and
     /// spreads are quoted in basis points where the field name ends in `_bp`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        finstack_quant_core::market_data::fixings::validate_fixing_index_id(
+            self.index_id.as_str(),
+        )?;
         if self.reset_lag_days < 0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "reset_lag_days must be non-negative; got {}",
@@ -677,7 +683,7 @@ impl FloatingRateSpec {
 
     /// Shared preset skeleton: unit gearing, no floors/caps, `Error` fallback.
     fn preset(
-        forward_curve_id: &str,
+        benchmark: &str,
         spread_bp: Decimal,
         reset_frequency: Tenor,
         index_tenor: Option<Tenor>,
@@ -685,7 +691,8 @@ impl FloatingRateSpec {
         fixing_calendar_id: &str,
     ) -> Self {
         Self {
-            forward_curve_id: CurveId::from(forward_curve_id),
+            index_id: benchmark.into(),
+            forward_curve_id: CurveId::from(benchmark),
             spread_bp,
             gearing: default_gearing(),
             gearing_includes_spread: true,

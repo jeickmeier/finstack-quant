@@ -38,7 +38,9 @@ fn create_bond_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(disc_curve)
+    MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
 }
 
 /// Helper to create a test bond instrument

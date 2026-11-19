@@ -145,6 +145,18 @@ fn fx_matrix_policy_can_be_reused() {
     assert_eq!(first.rate(), second.rate());
 }
 
+fn fx_quote_options() -> js_sys::Object {
+    let opts = js_sys::Object::new();
+    for (field, value) in [
+        ("deltaConvention", "forward_unadjusted"),
+        ("atmConvention", "delta_neutral_straddle"),
+        ("butterflyConvention", "smile"),
+    ] {
+        js_sys::Reflect::set(&opts, &field.into(), &value.into()).unwrap();
+    }
+    opts
+}
+
 #[wasm_bindgen_test]
 fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
     let ref_date = create_date(JsValue::from(2025), JsValue::from(1), JsValue::from(15)).unwrap();
@@ -154,7 +166,7 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
         None,
     )
     .unwrap();
-    let opts = js_sys::Object::new();
+    let opts = fx_quote_options();
     js_sys::Reflect::set(&opts, &"expiryClock".into(), &JsValue::from(clock)).unwrap();
     let surface = JsFxDeltaVolSurface::new(
         JsValue::from("EURUSD-DELTA-VOL"),
@@ -163,7 +175,7 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
         JsValue::from([0.08, 0.085, 0.09].to_vec()),
         JsValue::from([0.01, 0.012, 0.015].to_vec()),
         JsValue::from([0.005, 0.006, 0.007].to_vec()),
-        Some(opts.into()),
+        opts.into(),
     )
     .unwrap();
 
@@ -196,7 +208,7 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
 
 #[wasm_bindgen_test]
 fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
-    let opts = js_sys::Object::new();
+    let opts = fx_quote_options();
     js_sys::Reflect::set(&opts, &"rr10d".into(), &JsValue::from(vec![0.018, 0.020])).unwrap();
     match JsFxDeltaVolSurface::new(
         JsValue::from("BAD"),
@@ -205,7 +217,7 @@ fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
         JsValue::from([0.08, 0.085].to_vec()),
         JsValue::from([0.01, 0.012].to_vec()),
         JsValue::from([0.005, 0.006].to_vec()),
-        Some(opts.into()),
+        opts.into(),
     ) {
         Ok(_) => panic!("mixed rr10d/bf10d must error"),
         Err(err) => {
@@ -257,8 +269,7 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
             JsValue::from(-0.01),
             JsValue::from("normal"),
         )
-        .unwrap()
-        .is_nan()
+        .is_err()
     );
 
     let normal = JsVolCube::new(

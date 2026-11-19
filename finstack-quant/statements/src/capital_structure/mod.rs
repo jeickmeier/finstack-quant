@@ -82,7 +82,7 @@
 //!     model_builder.build()?
 //! };
 //!
-//! let market_ctx = MarketContext::new().insert(
+//! let market_ctx = MarketContext::new().try_insert(
 //!     DiscountCurve::builder("USD-OIS")
 //!         .base_date(issue_date)
 //!         .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -90,7 +90,7 @@
 //!         .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
 //!         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
 //!         .build()?,
-//! );
+//! ).expect("insert market curve");
 //!
 //! let mut evaluator = Evaluator::new();
 //! let results = evaluator.evaluate_with_market(

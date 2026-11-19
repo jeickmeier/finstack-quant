@@ -101,7 +101,9 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    let source_market = MarketContext::new().insert(discount_curve);
+    let source_market = MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert market curve");
     let index_curve = credit_support::calibrated_hazard_curve_with_pillars(
         &source_market,
         base,
@@ -140,8 +142,10 @@ fn create_market() -> MarketContext {
         .unwrap();
 
     source_market
-        .insert(index_curve)
-        .insert(Arc::clone(index_data.base_correlation_curve()))
+        .try_insert(index_curve)
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered")
 }
@@ -165,7 +169,9 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
         .build()
         .unwrap();
 
-    let source_market = MarketContext::new().insert(discount_curve);
+    let source_market = MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert market curve");
     let index_curve = credit_support::calibrated_hazard_curve_with_pillars(
         &source_market,
         base,
@@ -224,14 +230,18 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
         .unwrap();
 
     let mut market = source_market
-        .insert(index_curve)
-        .insert(Arc::clone(index_data.base_correlation_curve()));
+        .try_insert(index_curve)
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.base_correlation_curve()))
+        .expect("insert market curve");
     for curve in index_data
         .issuer_credit_curves()
         .expect("Issuer curves should exist")
         .values()
     {
-        market.insert_mut(Arc::clone(curve));
+        market
+            .try_insert_mut(Arc::clone(curve))
+            .expect("insert market curve");
     }
     market
         .insert_credit_index("CDX.NA.IG.42", index_data)
@@ -264,8 +274,8 @@ fn capture_case(
             .into_iter()
             .flat_map(|curves| curves.iter())
             .map(|(id, curve)| {
-                let weight = index.get_issuer_weight(id);
-                let recovery = index.get_issuer_recovery(id);
+                let weight = index.get_issuer_weight(id).expect("known pool member");
+                let recovery = index.get_issuer_recovery(id).expect("known pool member");
                 let pd = (1.0 - curve.sp_on_date(tranche.maturity).expect("issuer survival"))
                     .clamp(0.0, 1.0);
                 if weight > 0.0 {
@@ -385,10 +395,11 @@ fn replace_issuer_pool(
         .build()
         .expect("control issuer pool");
     for (_, curve) in curves {
-        market.insert_mut(curve);
+        market.try_insert_mut(curve).expect("insert market curve");
     }
     market
-        .insert(correlation)
+        .try_insert(correlation)
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", replacement)
         .expect("registered control pool")
 }
@@ -532,8 +543,10 @@ fn create_high_hazard_homogeneous_market() -> MarketContext {
         .build()
         .expect("high-hazard homogeneous index");
     market
-        .insert(hazard)
-        .insert(correlation)
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(correlation)
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", replacement)
         .expect("registered high-hazard homogeneous index")
 }
@@ -1025,8 +1038,11 @@ fn bench_cds_tranche_p5_controls(c: &mut Criterion) {
                 let positive: Vec<_> = curves
                     .keys()
                     .filter_map(|id| {
-                        let weight = index.get_issuer_weight(id);
-                        (weight > 0.0).then_some((weight, index.get_issuer_recovery(id)))
+                        let weight = index.get_issuer_weight(id).expect("known pool member");
+                        (weight > 0.0).then_some((
+                            weight,
+                            index.get_issuer_recovery(id).expect("known pool member"),
+                        ))
                     })
                     .collect();
                 assert_eq!(positive.len(), control.names);

@@ -143,8 +143,10 @@ pub(crate) fn market_with_curves(base: Date) -> MarketContext {
         .map(|days| (base - time::Duration::days(days), 0.04))
         .collect();
     MarketContext::new()
-        .insert(flat_discount_curve(0.03, base, "USD-OIS"))
-        .insert(flat_forward_curve(0.04, base, "USD-SOFR-3M"))
+        .try_insert(flat_discount_curve(0.03, base, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(flat_forward_curve(0.04, base, "USD-SOFR-3M"))
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:USD-SOFR-3M",
@@ -205,8 +207,9 @@ fn single_revolver_pool_reproduces_the_standalone_schedule() {
     });
     let run = deal.run_simulation(&market, closing).expect("pool run");
     // The registry valuation path routes through the same engine.
-    let market_with_discount =
-        MarketContext::new().insert(flat_discount_curve(0.03, closing, "USD-OIS"));
+    let market_with_discount = MarketContext::new()
+        .try_insert(flat_discount_curve(0.03, closing, "USD-OIS"))
+        .expect("insert market curve");
     let pv = finstack_quant_valuations_core::instruments::Instrument::value(
         &deal,
         &market_with_discount,
@@ -403,7 +406,9 @@ fn exercise_policies_redeem_when_they_should() {
     let maturity = date!(2034 - 01 - 15);
     let call_date = date!(2026 - 01 - 15);
     let put_date = date!(2027 - 01 - 15);
-    let market = MarketContext::new().insert(flat_discount_curve(0.03, closing, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.03, closing, "USD-OIS"))
+        .expect("insert market curve");
 
     let run_with = |policy: CallExercisePolicy, put: PutExercisePolicy, price: Option<f64>| {
         let mut bond = callable_eight_percent_bond(

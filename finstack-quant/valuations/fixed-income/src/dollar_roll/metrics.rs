@@ -97,7 +97,7 @@ mod production_mortgage_audit {
         roll.repo_curve_id = Some("REPO".into());
         let carry = crate::dollar_roll::carry::implied_financing_rate(&roll).expect("carry");
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (5.0, 1.0)])
@@ -107,7 +107,8 @@ mod production_mortgage_audit {
                     .build()
                     .expect("curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("REPO")
                     .base_date(as_of)
                     .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -116,7 +117,8 @@ mod production_mortgage_audit {
                     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("repo curve"),
-            );
+            )
+            .expect("insert market curve");
         let mut context = MetricContext::new(
             Arc::new(roll),
             Arc::new(market),
@@ -167,16 +169,18 @@ mod rate_risk_rebuild_tests {
     const AS_OF: Date = date!(2026 - 01 - 15);
 
     fn market() -> MarketContext {
-        MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(AS_OF)
-                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
-                .interp(InterpStyle::LogLinear)
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        )
+        MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(AS_OF)
+                    .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                    .interp(InterpStyle::LogLinear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve")
     }
 
     fn bumped(bp: f64) -> MarketContext {

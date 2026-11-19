@@ -26,7 +26,9 @@ fn build_market_context() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
 }
 
 #[test]
@@ -721,6 +723,7 @@ mod margin_stepup_period_semantics {
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2026 - 01 - 01))
             .rate(RateSpec::Floating(FloatingRateSpec {
+                index_id: "USD-SOFR".into(),
                 forward_curve_id: CurveId::from("USD-SOFR"),
                 spread_bp: Decimal::from(200),
                 gearing: Decimal::from(1),
@@ -785,7 +788,9 @@ mod margin_stepup_period_semantics {
     fn market_with_forward() -> MarketContext {
         let fwd =
             ForwardCurve::flat("USD-SOFR", date!(2025 - 01 - 01), 0.045, DayCount::Act360).unwrap();
-        build_market_context().insert(fwd)
+        build_market_context()
+            .try_insert(fwd)
+            .expect("insert market curve")
     }
 
     /// `(accrual_start, accrual_end)` for every interest-like flow, in date order.

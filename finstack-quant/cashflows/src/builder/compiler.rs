@@ -26,7 +26,7 @@
 //! produced schedule must contain at least two dates.
 
 use finstack_quant_core::InputError;
-use finstack_quant_core::dates::{Date, HolidayCalendar};
+use finstack_quant_core::dates::{Date, HolidayCalendar, StubKind};
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
@@ -154,6 +154,8 @@ fn terminal_accrual_end(periods: &[CompiledPeriod], maturity: Date) -> Option<Da
 /// Compiled fixed-coupon schedule produced by [`compute_coupon_schedules`].
 #[derive(Clone)]
 pub(crate) struct FixedSchedule {
+    /// Original nominal roll anchor, shared by all fixed rate groups in the window.
+    pub(crate) grid_anchor: Date,
     pub(crate) spec: FixedCouponSpec,
     pub(crate) calendar: &'static dyn HolidayCalendar,
     pub(crate) periods: Vec<CompiledPeriod>,
@@ -296,6 +298,7 @@ pub(super) struct CompiledSchedules {
 }
 
 struct StepUpCompileInput<'a> {
+    grid_anchor: Date,
     maturity: Date,
     split: CouponType,
     initial_rate: Decimal,
@@ -343,6 +346,7 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
         .map(|group| {
             let terminal = terminal_accrual_end(&group.periods, input.maturity);
             FixedSchedule {
+                grid_anchor: input.grid_anchor,
                 spec: FixedCouponSpec {
                     coupon_type: input.split,
                     rate: group.rate,
@@ -504,6 +508,10 @@ pub(super) fn compute_coupon_schedules(
             select_payment_split(&payment_pieces, s, e, chosen_coupon.coupon.coupon_type())?;
         let schedule = chosen_coupon.coupon.schedule().clone();
 
+        let grid_anchor = match schedule.stub {
+            StubKind::ShortFront | StubKind::LongFront => e,
+            _ => s,
+        };
         let periods = build_compiled_periods(DateWindow::new(s, e), &schedule)?;
         if periods.is_empty() {
             return Err(InputError::TooFewPoints.into());
@@ -519,6 +527,7 @@ pub(super) fn compute_coupon_schedules(
                 };
                 let terminal = terminal_accrual_end(&periods, maturity);
                 fixed_schedules.push(FixedSchedule {
+                    grid_anchor,
                     spec,
                     calendar,
                     periods,
@@ -536,6 +545,7 @@ pub(super) fn compute_coupon_schedules(
                     ));
                 }
                 fixed_schedules.extend(compile_step_up_schedules(StepUpCompileInput {
+                    grid_anchor,
                     maturity,
                     split,
                     initial_rate: *initial_rate,

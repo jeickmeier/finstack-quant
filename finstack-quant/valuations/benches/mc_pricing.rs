@@ -88,7 +88,9 @@ fn build_market(as_of: Date) -> MarketContext {
         .build()
         .expect("Valid curve");
 
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 fn capture_result(
@@ -156,13 +158,10 @@ fn capture_result(
         .expect("capture Hull-White parameters");
         let times = if model == ModelKey::MonteCarloHullWhite1F {
             let grid = match config.mc_base_steps {
-                Some(base_steps) => TimeGrid::uniform_with_required_times(
-                    horizon,
-                    base_steps as f64 / horizon,
-                    base_steps,
-                    &exercise_times,
-                )
-                .expect("capture base grid"),
+                Some(base_steps) => {
+                    TimeGrid::uniform_with_required_times(horizon, base_steps, &exercise_times)
+                        .expect("capture base grid")
+                }
                 None => {
                     build_event_aligned_grid(
                         &exercise_times,
@@ -448,7 +447,7 @@ fn bench_lmm_consumer(c: &mut Criterion) {
                 .interp(InterpStyle::LogLinear)
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build().expect("single-curve LMM market");
-            let market = MarketContext::new().insert(curve);
+            let market = MarketContext::new().try_insert(curve).expect("insert market curve");
             let discount = market.get_discount("D").expect("discount curve");
             let params = BermudanSwaptionLmmPricer::build_lmm_params(
                 &swaption, discount.as_ref(), as_of, 0.15,

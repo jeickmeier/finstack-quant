@@ -95,6 +95,17 @@
             "null"
           ]
         },
+        "previous_close_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual closing fixing immediately before the first Yang–Zhang target bar.\nResolved exactly in the same close series as the target bars."
+        },
         "quote_calendar_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Quote-currency calendar used in the joint observation calendar."

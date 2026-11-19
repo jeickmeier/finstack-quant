@@ -433,3 +433,17 @@ def test_market_condition_rejects_invalid_anchor_or_unextrapolated_range(anchor:
     context = MarketContext().insert(curve)
     with pytest.raises(ValueError, match=match):
         context.condition(anchor)
+
+
+@pytest.mark.parametrize(
+    ("calendar", "start", "expected"),
+    [
+        ("nse", "2026-01-15", "2026-01-16"),
+        ("nyse", "2012-10-29", "2012-10-31"),
+        ("sifma", "2021-12-31", "2021-12-31"),
+    ],
+)
+def test_amended_session_rolls(calendar: str, start: str, expected: str) -> None:
+    from finstack_quant.core.dates import adjust
+
+    assert adjust(start, "following", calendar) == date.fromisoformat(expected)

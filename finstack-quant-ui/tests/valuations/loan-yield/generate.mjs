@@ -39,6 +39,7 @@ const callable = withSpec(termLoan, {
   amortization: { percent_of_original_per_period: { pct: 0.0025 } },
   rate: {
     floating: {
+      index_id: "USD-SOFR-3M",
       forward_curve_id: "USD-SOFR-3M",
       spread_bp: "375",
       gearing: "1",

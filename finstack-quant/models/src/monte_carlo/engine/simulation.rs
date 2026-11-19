@@ -77,26 +77,23 @@ pub(crate) fn fill_shocks<R: RandomStream>(
     z_raw: &mut [f64],
     step: usize,
     hook: &NoiseHook<'_>,
-) {
+) -> Result<()> {
     match hook {
         NoiseHook::Correlation(Some(cf)) => {
-            rng.fill_std_normals(z_raw);
-            // Dimensions are validated at engine setup; a mismatch here would
-            // silently leave `z` holding the PREVIOUS step's shocks, so fail
-            // fast in debug builds rather than discarding the error.
-            let applied = cf.apply(z_raw, z);
-            debug_assert!(
-                applied.is_ok(),
-                "correlation factor dimension mismatch in shock hot path: {applied:?}"
-            );
+            rng.fill_std_normals(z_raw)?;
+            cf.apply(z_raw, z).map_err(|err| {
+                finstack_quant_core::Error::Validation(format!(
+                    "correlating Monte Carlo shocks: {err}"
+                ))
+            })?;
         }
-        NoiseHook::Correlation(None) => rng.fill_std_normals(z),
+        NoiseHook::Correlation(None) => rng.fill_std_normals(z)?,
         NoiseHook::InjectFbm {
             z_index,
             increments,
             aux,
         } => {
-            rng.fill_std_normals(z);
+            rng.fill_std_normals(z)?;
             debug_assert!(
                 step < increments.len(),
                 "fBM increments shorter than time grid: step {step} >= len {}",
@@ -123,6 +120,7 @@ pub(crate) fn fill_shocks<R: RandomStream>(
             }
         }
     }
+    Ok(())
 }
 
 /// Shared per-path simulation loop used by [`McEngine::simulate_path`] and the
@@ -195,10 +193,10 @@ where
         let t = time_grid.time(step);
         let dt = time_grid.dt(step);
 
-        fill_shocks(rng, z, z_raw, step, hook);
-        disc.step(*process, t, dt, state, z, work);
+        fill_shocks(rng, z, z_raw, step, hook)?;
+        disc.step(*process, t, dt, state, z, work)?;
 
-        path_state.set_step_time(step + 1, t + dt);
+        path_state.set_step_time(step + 1, time_grid.time(step + 1));
         process.populate_path_state(state, &mut path_state);
         draw_uniform_if_needed(rng, payoff, &mut path_state);
         payoff.on_event(&mut path_state)?;
@@ -273,17 +271,18 @@ impl McEngine {
             let t = self.config.time_grid.time(step);
             let dt = self.config.time_grid.dt(step);
 
-            fill_shocks(rng, z, z_raw, step, &hook);
-            disc.step(process, t, dt, state, z, work);
+            fill_shocks(rng, z, z_raw, step, &hook)?;
+            disc.step(process, t, dt, state, z, work)?;
 
-            path_state.set_step_time(step + 1, t + dt);
+            path_state.set_step_time(step + 1, self.config.time_grid.time(step + 1));
             process.populate_path_state(state, &mut path_state);
             draw_uniform_if_needed(rng, payoff, &mut path_state);
 
             payoff.on_event(&mut path_state)?;
 
             let state_vec = SmallVec::from_slice(state);
-            let mut point = PathPoint::with_state(step + 1, t + dt, state_vec);
+            let mut point =
+                PathPoint::with_state(step + 1, self.config.time_grid.time(step + 1), state_vec);
 
             path_state.drain_cashflows(|time, amount, cf_type| {
                 point.add_typed_cashflow(time, amount, cf_type);
@@ -389,13 +388,13 @@ impl McEngine {
             let t = self.config.time_grid.time(step);
             let dt = self.config.time_grid.dt(step);
 
-            fill_shocks(rng, z, z_raw, step, &hook);
+            fill_shocks(rng, z, z_raw, step, &hook)?;
             for i in 0..z.len() {
                 z_anti[i] = -z[i];
             }
 
-            disc.step(process, t, dt, state_p, z, work);
-            disc.step(process, t, dt, state_a, z_anti, work_anti);
+            disc.step(process, t, dt, state_p, z, work)?;
+            disc.step(process, t, dt, state_a, z_anti, work_anti)?;
 
             let u_step = if payoff_p.needs_uniform_random() {
                 Some(rng.next_u01())
@@ -403,14 +402,14 @@ impl McEngine {
                 None
             };
 
-            path_state_p.set_step_time(step + 1, t + dt);
+            path_state_p.set_step_time(step + 1, self.config.time_grid.time(step + 1));
             process.populate_path_state(state_p, &mut path_state_p);
             if let Some(u) = u_step {
                 path_state_p.set_uniform_random(u);
             }
             payoff_p.on_event(&mut path_state_p)?;
 
-            path_state_a.set_step_time(step + 1, t + dt);
+            path_state_a.set_step_time(step + 1, self.config.time_grid.time(step + 1));
             process.populate_path_state(state_a, &mut path_state_a);
             if let Some(u) = u_step {
                 path_state_a.set_uniform_random(1.0 - u);

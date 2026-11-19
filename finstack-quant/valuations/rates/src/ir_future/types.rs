@@ -998,7 +998,7 @@ mod tests {
             .hw1f_mean_reversion = Some(0.1);
         future.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.02);
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder(future.discount_curve_id.clone())
                     .base_date(base)
                     .knots([(0.0, 1.0), (1.0, 0.96)])
@@ -1008,7 +1008,8 @@ mod tests {
                     .build()
                     .expect("discount"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat(
                     future.forward_curve_id.clone(),
                     base,
@@ -1017,6 +1018,7 @@ mod tests {
                 )
                 .expect("forward"),
             )
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:TEST",
@@ -1316,7 +1318,7 @@ mod tests {
             .build()
             .expect("future");
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
@@ -1326,10 +1328,12 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat("USD-SOFR", as_of, 0.05, DayCount::Act360)
                     .expect("forward curve"),
             )
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:USD-SOFR",
@@ -1389,7 +1393,7 @@ mod tests {
 
         let normal_vol = 0.01;
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(curve_base)
                     .knots(vec![(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
@@ -1399,10 +1403,12 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat("USD-SOFR-3M", curve_base, 0.04, DayCount::Act360)
                     .expect("forward curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("USD-SR3-NORMAL-VOL")
                     .secondary_axis(VolSurfaceAxis::Strike)
@@ -1467,15 +1473,17 @@ mod tests {
             .attributes(Attributes::new())
             .build()
             .expect("future");
-        let market = MarketContext::new().insert(
-            ForwardCurve::flat(
-                "USD-SOFR-3M",
-                date!(2025 - 02 - 01),
-                0.04,
-                finstack_quant_core::dates::DayCount::Act365F,
+        let market = MarketContext::new()
+            .try_insert(
+                ForwardCurve::flat(
+                    "USD-SOFR-3M",
+                    date!(2025 - 02 - 01),
+                    0.04,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("forward curve"),
             )
-            .expect("forward curve"),
-        );
+            .expect("insert market curve");
 
         let error = future
             .model_settlement_rate(&market, date!(2025 - 02 - 01))

@@ -84,8 +84,8 @@ impl MertonModel {
         let d1 = ((v / b).ln() + (r - q + 0.5 * sigma * sigma) * horizon) / (sigma * sqrt_t);
         let d2 = d1 - sigma * sqrt_t;
 
-        let nd1 = norm_cdf(d1);
-        let nd2 = norm_cdf(d2);
+        let nd1 = norm_cdf(d1)?;
+        let nd2 = norm_cdf(d2)?;
 
         let exp_neg_qt = (-q * horizon).exp();
         let equity = v * exp_neg_qt * nd1 - b * (-r * horizon).exp() * nd2;
@@ -193,8 +193,8 @@ impl MertonModel {
             let d1 = ((v / b).ln() + (r - q + 0.5 * sigma_v * sigma_v) * t) / (sigma_v * sqrt_t);
             let d2 = d1 - sigma_v * sqrt_t;
 
-            let nd1 = norm_cdf(d1);
-            let nd2 = norm_cdf(d2);
+            let nd1 = norm_cdf(d1)?;
+            let nd2 = norm_cdf(d2)?;
 
             // Deep-OTM: N(d1) -> 0 makes the V / sigma_V updates blow up to
             // inf/NaN, which makes the relative-change test silently never
@@ -232,8 +232,8 @@ impl MertonModel {
             residual: {
                 let d1 =
                     ((v / b).ln() + (r - q + 0.5 * sigma_v * sigma_v) * t) / (sigma_v * sqrt_t);
-                let nd1 = norm_cdf(d1);
-                let nd2 = norm_cdf(d1 - sigma_v * sqrt_t);
+                let nd1 = norm_cdf(d1)?;
+                let nd2 = norm_cdf(d1 - sigma_v * sqrt_t)?;
                 (v * exp_neg_qt * nd1 - b * (-r * t).exp() * nd2 - e).abs()
             },
             last_x: v,
@@ -514,7 +514,7 @@ impl MertonModel {
             )));
         }
 
-        let d2 = -standard_normal_inv_cdf(target_pd);
+        let d2 = -standard_normal_inv_cdf(target_pd)?;
         let mu = risk_free_rate - payout_rate - 0.5 * asset_vol * asset_vol;
         let barrier = asset_value * (mu * maturity - d2 * asset_vol * maturity.sqrt()).exp();
         if !barrier.is_finite() || barrier <= 0.0 {
@@ -904,7 +904,7 @@ mod tests {
     fn from_target_pd_roundtrips() {
         let target_pd = 0.05; // 5% cumulative PD over 5 years
         let m = MertonModel::from_target_pd(200.0, 0.25, 0.04, 0.0, target_pd, 5.0).expect("cal");
-        let actual_pd = m.default_probability(5.0);
+        let actual_pd = m.default_probability(5.0).expect("valid model horizon");
         assert!(
             (actual_pd - target_pd).abs() < 1e-6,
             "PD should match target: got {actual_pd}, want {target_pd}"
@@ -929,7 +929,7 @@ mod tests {
         let bb_pd = 1.0 - (-0.0020_f64 * 5.0).exp();
         let m_bb = MertonModel::from_target_pd(200.0, 0.20, 0.045, 0.0, bb_pd, 5.0).expect("BB");
         assert!(
-            (m_bb.default_probability(5.0) - bb_pd).abs() < 1e-6,
+            (m_bb.default_probability(5.0).expect("valid model horizon") - bb_pd).abs() < 1e-6,
             "BB PD mismatch"
         );
 
@@ -937,7 +937,7 @@ mod tests {
         let b_pd = 1.0 - (-0.0200_f64 * 5.0).exp();
         let m_b = MertonModel::from_target_pd(140.0, 0.30, 0.045, 0.0, b_pd, 5.0).expect("B");
         assert!(
-            (m_b.default_probability(5.0) - b_pd).abs() < 1e-6,
+            (m_b.default_probability(5.0).expect("valid model horizon") - b_pd).abs() < 1e-6,
             "B PD mismatch"
         );
 
@@ -945,7 +945,7 @@ mod tests {
         let ccc_pd = 1.0 - (-0.0400_f64 * 5.0).exp();
         let m_ccc = MertonModel::from_target_pd(115.0, 0.40, 0.045, 0.0, ccc_pd, 5.0).expect("CCC");
         assert!(
-            (m_ccc.default_probability(5.0) - ccc_pd).abs() < 1e-6,
+            (m_ccc.default_probability(5.0).expect("valid model horizon") - ccc_pd).abs() < 1e-6,
             "CCC PD mismatch"
         );
 
@@ -1018,7 +1018,10 @@ mod tests {
         let m_low = MertonModel::credit_grades(25.0, 0.30, 80.0, 0.04, 0.30, 0.40).expect("cg");
         let m_high = MertonModel::credit_grades(25.0, 0.70, 80.0, 0.04, 0.30, 0.40).expect("cg");
         assert!(
-            m_high.default_probability(5.0) > m_low.default_probability(5.0),
+            m_high
+                .default_probability(5.0)
+                .expect("valid model horizon")
+                > m_low.default_probability(5.0).expect("valid model horizon"),
             "Higher equity vol should increase CG PD"
         );
     }
@@ -1068,8 +1071,12 @@ mod tests {
         let high_lambda =
             MertonModel::credit_grades(25.0, 0.50, 80.0, 0.04, 0.60, 0.40).expect("cg");
         assert_ne!(
-            low_lambda.default_probability(5.0),
-            high_lambda.default_probability(5.0),
+            low_lambda
+                .default_probability(5.0)
+                .expect("valid model horizon"),
+            high_lambda
+                .default_probability(5.0)
+                .expect("valid model horizon"),
             "CreditGrades barrier uncertainty must feed the survival function"
         );
     }
@@ -1108,8 +1115,8 @@ mod tests {
     #[test]
     fn credit_grades_pd_matches_independent_finger_reference() {
         let m = MertonModel::credit_grades(25.0, 0.50, 80.0, 0.04, 0.30, 0.40).expect("cg");
-        let pd_1y = m.default_probability(1.0);
-        let pd_5y = m.default_probability(5.0);
+        let pd_1y = m.default_probability(1.0).expect("valid model horizon");
+        let pd_5y = m.default_probability(5.0).expect("valid model horizon");
         // Tolerance 1e-9: the reference uses Python's erf-based normal CDF,
         // which differs from this crate's norm_cdf by O(1e-11) in the tails.
         // A structural regression (e.g. losing exp(λ²)) moves PD by O(1e-2).

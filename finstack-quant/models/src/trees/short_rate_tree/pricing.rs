@@ -150,7 +150,7 @@ impl ShortRateTree {
         let dt_pricing = self.time_steps[1] - self.time_steps[0];
         let oas = oas_bp / 10_000.0;
         let mut discount_rates = Vec::with_capacity(rates.len());
-        let mut node_oas_bps = Vec::with_capacity(rates.len());
+        let mut node_oas_bp_by_step = Vec::with_capacity(rates.len());
         for row in rates {
             let mut row_rates = Vec::with_capacity(row.len());
             let mut row_oas = Vec::with_capacity(row.len());
@@ -165,7 +165,7 @@ impl ShortRateTree {
                 });
             }
             discount_rates.push(row_rates);
-            node_oas_bps.push(row_oas);
+            node_oas_bp_by_step.push(row_oas);
         }
         let state_gen = |step: usize, node: usize| -> f64 {
             rates
@@ -182,7 +182,7 @@ impl ShortRateTree {
                 .unwrap_or(0.0)
         };
         let node_oas_bp = |step: usize, node: usize| -> f64 {
-            node_oas_bps
+            node_oas_bp_by_step
                 .get(step)
                 .and_then(|row| row.get(node))
                 .copied()

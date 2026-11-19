@@ -1,14 +1,20 @@
 # FEATURES-003: Sequential panel pipelines and typed/JSON result contracts
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Sequential execution and ordered output are implemented. Shared input admission, restored-result validation, and result-shape documentation require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** An independent branching example checked default and explicit input selection. Existing fixtures were inspected. Restored-result validation still requires qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope, selection and algorithm
+## Accepted decision
+
+1. Execute in request order. An omitted input reads the preceding output, or raw values for the first operation. An explicit input selects values or an earlier named output. Names are exact and case-sensitive. Reject blank, reserved, and duplicate names, and self, forward, and unknown references.
+2. Validate every supplied key column against the input row count before execution, including for an empty pipeline. Require the keys each operation uses and apply the same parameter and failure rules at typed and JSON boundaries. Fail the entire pipeline when an operation fails. [Feature admission](02-parameters-missing-and-failure.md).
+3. Keep the ordered columns array with input-aligned values and JSON null for missing values. Validate results before exposing them, including after restoration. Require valid unique names, uniform column lengths, and finite numeric values. Callers retain the source keys and operation provenance.
+
+## Observed scope, selection and algorithm
 
 `transform_panel_json` deserializes `PanelTransformSpec`, calls `transform_panel`, then serializes `PanelTransformResult`. Only scalar time-series and cross-sectional families are pipeline variants; grouped, pairwise and regression helpers remain separate APIs.
 
@@ -36,5 +42,5 @@ The documented purpose is explicit sequential composition with branching to prev
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

@@ -26,6 +26,7 @@ type Date = finstack_quant_core::dates::Date;
 fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp,
             gearing: Decimal::ONE,
@@ -79,7 +80,9 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .expect("ForwardCurve should succeed");
-    let market = MarketContext::new().insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
@@ -144,7 +147,9 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .expect("ForwardCurve should succeed");
-    let market = MarketContext::new().insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
@@ -355,7 +360,9 @@ fn test_floating_rate_default_fallback_with_curve() {
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .expect("ForwardCurve should succeed");
-    let market = MarketContext::new().insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
@@ -467,7 +474,9 @@ fn make_flat_forward_market(
     let cont_rate = 4.0 * (flat_rate * 0.25).ln_1p();
     let fwd = ForwardCurve::flat("USD-SOFR-3M", base, cont_rate, DayCount::Act360)
         .expect("Flat ForwardCurve should succeed");
-    MarketContext::new().insert(fwd)
+    MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 fn make_exact_quarterly_market(
@@ -504,7 +513,9 @@ fn make_exact_quarterly_market(
         ExtrapolationPolicy::Extend,
     )
     .expect("Exact quarterly ForwardCurve should succeed");
-    MarketContext::new().insert(fwd)
+    MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 fn attach_fixings(
@@ -1027,6 +1038,7 @@ fn make_overnight_float_spec(
 ) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp,
             gearing: Decimal::ONE,
@@ -1270,7 +1282,9 @@ fn test_overnight_observation_shift_samples_pre_accrual_window() {
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .expect("rising forward curve builds");
-    let market = MarketContext::new().insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     // Zero spread so the emitted rate is exactly the compounded index rate.
     let arrears_spec = make_overnight_float_spec(
@@ -1378,7 +1392,9 @@ fn test_overnight_lookback_samples_pre_accrual_rates() {
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .expect("rising forward curve builds");
-    let market = MarketContext::new().insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let arrears_spec = make_overnight_float_spec(
         FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
@@ -1592,10 +1608,13 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
 
     let friday = Date::from_calendar_date(2025, Month::January, 3).unwrap();
     let fwd = ForwardCurve::flat("USD-SOFR-ON", friday, 0.05, DayCount::Act360).unwrap();
-    let market = MarketContext::new().insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let make_spec = |business_day_convention| FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-ON".into(),
             forward_curve_id: "USD-SOFR-ON".into(),
             spread_bp: dec!(0),
             gearing: Decimal::ONE,
@@ -1700,10 +1719,13 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
 
     let cont_rate = 360.0 * (0.05_f64 / 360.0).ln_1p();
     let fwd = ForwardCurve::flat("USD-SOFR-ON", issue, cont_rate, DayCount::Act360).unwrap();
-    let market = MarketContext::new().insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let spec = FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-ON".into(),
             forward_curve_id: "USD-SOFR-ON".into(),
             spread_bp: dec!(100),
             gearing: Decimal::ONE,
@@ -1748,7 +1770,11 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
     let friday = Date::from_calendar_date(2025, Month::January, 3).unwrap();
     let fwd = ForwardCurve::flat("USD-SOFR-ON", friday, cont_rate, DayCount::Act360).unwrap();
     let projected = b
-        .build(Some(&MarketContext::new().insert(fwd)))
+        .build(Some(
+            &MarketContext::new()
+                .try_insert(fwd)
+                .expect("insert market curve"),
+        ))
         .expect("Friday fixing can be projected from its base date");
     let coupon = projected
         .get_flows()
@@ -1869,7 +1895,9 @@ fn test_overnight_sampling_uses_fixing_calendar() {
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .expect("rising forward curve builds");
-    let market = MarketContext::new().insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let build_with_fixing_cal = |fixing_calendar_id: Option<String>| {
         let mut spec = make_overnight_float_spec(
@@ -1931,7 +1959,12 @@ fn make_exact_overnight_market_with_fixings(
     let cont_rate = 360.0 * (flat_rate / 360.0).ln_1p();
     let fwd = ForwardCurve::flat("USD-SOFR-3M", curve_base, cont_rate, DayCount::Act360)
         .expect("Exact overnight ForwardCurve should succeed");
-    attach_fixings(MarketContext::new().insert(fwd), fixings)
+    attach_fixings(
+        MarketContext::new()
+            .try_insert(fwd)
+            .expect("insert market curve"),
+        fixings,
+    )
 }
 
 /// Helper: ISDA 2021 compounded-in-arrears expectation over `(rate, days)`
@@ -2597,7 +2630,9 @@ fn overnight_projection_is_invariant_to_the_curve_day_count_clock() {
             finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         )
         .expect("same dated curve in either clock");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut spec = make_overnight_float_spec(
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             FloatingRateFallback::Error,

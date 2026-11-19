@@ -58,73 +58,57 @@
 //! - QuantLib SABR implementation: `ql/termstructures/volatility/sabr.cpp` `docs/REFERENCES.md#hagan-2002-sabr`
 use super::parameters::SabrParameters;
 use crate::volatility::VolatilityConvention;
-use finstack_quant_core::{Error, Result};
-
-/// Snap β to the exact endpoints 0 or 1 when it is within this tolerance.
-///
-/// Used by every code path that branches on "β = 0" (normal-SABR) or "β = 1"
-/// (lognormal-SABR) so that a raw parameter like `0.00005` lands on the same
-/// branch for smile pricing, the ATM limit, and the quoting convention.
-pub(crate) const BETA_SNAP_TOL: f64 = 1e-4;
+use finstack_quant_core::{Error, Result, market_data::surfaces::VolQuoteType};
 
 impl SabrParameters {
-    /// Quoting convention of the vols [`Self::implied_vol`] produces.
-    ///
-    /// The β≈0 (normal-SABR) branch outputs a **normal (Bachelier)** vol in
-    /// absolute rate units, displaced or not; every other β outputs a
-    /// **lognormal (Black)** vol, displaced by `shift` when one is set.
-    /// Storing a Bachelier vol in a Black surface (or vice versa) is a silent
-    /// unit error, so callers must branch on this tag. Determined by the same
-    /// β-snap tolerance the pricing branches use.
-    #[must_use]
-    pub fn quote_convention(&self) -> VolatilityConvention {
-        if self.beta < BETA_SNAP_TOL {
-            VolatilityConvention::Normal
-        } else if let Some(shift) = self.shift {
-            VolatilityConvention::ShiftedLognormal { shift }
-        } else {
-            VolatilityConvention::Lognormal
-        }
-    }
-
-    /// Hagan et al. (2002) implied-vol expansion with Obloj (2008) z/χ
-    /// correction and optional shifted SABR for negative rates.
-    ///
-    /// Selects the branch from β: a normal (Bachelier) vol for β≈0 and a
-    /// lognormal (Black) vol otherwise, as reported by
-    /// [`Self::quote_convention`]. [`Self::implied_vol_lognormal`] and
-    /// [`Self::implied_vol_normal`] are the separate fixed-convention
-    /// expansions used by SABR cubes.
+    /// Resolve the selected quote type against the stored SABR displacement.
     ///
     /// # Arguments
     ///
-    /// * `forward` - Forward price or rate used by the volatility or pricing model
-    /// * `strike` - Option strike in the surface's quote units (absolute or relative)
-    /// * `time_to_expiry` - Time to expiry in years; must be strictly positive.
-    #[must_use = "computed volatility should be used"]
-    #[inline]
-    pub fn implied_vol(&self, forward: f64, strike: f64, time_to_expiry: f64) -> Result<f64> {
-        self.validate_inputs(forward, strike, time_to_expiry)?;
-
-        if self.beta < BETA_SNAP_TOL {
-            let vol = normal_beta_zero(
-                self.alpha,
-                self.nu,
-                self.rho,
-                forward,
-                strike,
-                time_to_expiry,
-            );
-            return if vol.is_finite() && vol > 0.0 {
-                Ok(vol)
-            } else {
-                Err(Error::Validation(
-                    "normal SABR produced invalid volatility".to_owned(),
-                ))
-            };
+    /// * `quote_type` - Normal, unshifted Black, or shifted Black output in annualized units.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the requested Black type disagrees with shift presence.
+    pub fn quote_convention(&self, quote_type: VolQuoteType) -> Result<VolatilityConvention> {
+        match (quote_type, self.shift) {
+            (VolQuoteType::Normal, _) => Ok(VolatilityConvention::Normal),
+            (VolQuoteType::BlackLognormal, None) => Ok(VolatilityConvention::Lognormal),
+            (VolQuoteType::ShiftedBlackLognormal, Some(shift)) if shift.is_finite() => {
+                Ok(VolatilityConvention::ShiftedLognormal { shift })
+            }
+            _ => Err(Error::Validation(
+                "SABR Black quote type disagrees with the model displacement".into(),
+            )),
         }
+    }
 
-        self.implied_vol_lognormal(forward, strike, time_to_expiry)
+    /// Evaluate the Hagan SABR expansion in an explicitly selected quote type.
+    ///
+    /// # Arguments
+    ///
+    /// * `forward` - Finite forward, in the same price or decimal-rate units as the strike.
+    /// * `strike` - Finite option strike before application of the model displacement.
+    /// * `time_to_expiry` - Finite positive option expiry, in years.
+    /// * `quote_type` - Requested annualized Normal or Black output, with matching Black displacement presence.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the quote type, model, or effective coordinates are invalid.
+    pub fn implied_vol(
+        &self,
+        forward: f64,
+        strike: f64,
+        time_to_expiry: f64,
+        quote_type: VolQuoteType,
+    ) -> Result<f64> {
+        self.validate_inputs(forward, strike, time_to_expiry)?;
+        match self.quote_convention(quote_type)? {
+            VolatilityConvention::Normal => {
+                self.implied_vol_normal(forward, strike, time_to_expiry)
+            }
+            _ => self.implied_vol_lognormal(forward, strike, time_to_expiry),
+        }
     }
 
     /// Lognormal ATM implied volatility (Hagan et al. (2002) eq. 2.18).
@@ -139,10 +123,6 @@ impl SabrParameters {
         let alpha = self.alpha;
         let nu = self.nu;
         let rho = self.rho;
-
-        if alpha.abs() < 1e-14 {
-            return Ok(0.0);
-        }
 
         let alpha_term = (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / (f_beta * f_beta);
         let rho_term = 0.25 * rho * beta * nu * alpha / f_beta;
@@ -200,7 +180,7 @@ impl SabrParameters {
 
     /// Whether normal beta=0 dynamics or a displacement permit negative rates.
     pub fn supports_negative_rates(&self) -> bool {
-        self.beta < BETA_SNAP_TOL || self.shift.is_some()
+        self.beta == 0.0 || self.shift.is_some_and(|shift| shift > 0.0)
     }
 
     /// Forward and strike after applying the optional displacement shift.
@@ -239,8 +219,8 @@ impl SabrParameters {
         }
 
         if self.shift.is_none() {
-            // Normal SABR (β≈0) permits non-positive forwards and strikes.
-            let beta_is_zero = self.beta < BETA_SNAP_TOL;
+            // Normal SABR (β=0) permits non-positive forwards and strikes.
+            let beta_is_zero = self.beta == 0.0;
             if !beta_is_zero && (forward <= 0.0 || strike <= 0.0) {
                 return Err(Error::Validation(format!(
                     "Standard SABR with beta={:.4} requires positive rates. \
@@ -250,7 +230,7 @@ impl SabrParameters {
                 )));
             }
         } else if let Some(shift) = self.shift
-            && self.beta >= BETA_SNAP_TOL
+            && self.beta > 0.0
             && (forward + shift <= 0.0 || strike + shift <= 0.0)
         {
             return Err(Error::Validation(format!(
@@ -383,13 +363,13 @@ impl SabrParameters {
     /// on pricing paths.
     fn implied_vol_normal_unchecked(&self, f: f64, k: f64, t: f64) -> f64 {
         let alpha = self.alpha;
-        let beta = if self.beta < BETA_SNAP_TOL {
-            0.0
-        } else {
-            self.beta
-        };
+        let beta = self.beta;
         let rho = self.rho;
         let nu = self.nu;
+
+        if beta == 0.0 {
+            return normal_beta_zero(alpha, nu, rho, f, k, t);
+        }
 
         let (f, k) = if let Some(s) = self.shift {
             (f + s, k + s)
@@ -402,10 +382,6 @@ impl SabrParameters {
         }
         if beta > 0.0 && (f <= 0.0 || k <= 0.0) {
             return f64::NAN;
-        }
-
-        if beta == 0.0 {
-            return normal_beta_zero(alpha, nu, rho, f, k, t);
         }
 
         // No special-case for ν → 0: as in the lognormal expansion, the general
@@ -477,6 +453,7 @@ impl SabrParameters {
         k: f64,
         t: f64,
     ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         let (effective_f, effective_k) = match self.shift {
             Some(shift) => (f + shift, k + shift),
             None => (f, k),
@@ -515,12 +492,15 @@ impl SabrParameters {
     /// * `k` - Unshifted strike in the same units as `f`, with the same positivity condition.
     /// * `t` - Finite, strictly positive option expiry in years.
     pub fn implied_vol_normal(&self, f: f64, k: f64, t: f64) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         let shift = self.shift.unwrap_or(0.0);
         let (sf, sk) = (f + shift, k + shift);
-        if (sf <= 0.0 || sk <= 0.0)
-            && self.beta >= BETA_SNAP_TOL
-            && (sf - sk).abs() > 1e-12 * sf.abs().max(1e-10)
-        {
+        if !sf.is_finite() || !sk.is_finite() || !t.is_finite() || t <= 0.0 {
+            return Err(Error::Validation(
+                "SABR requires finite effective rates and positive expiry".into(),
+            ));
+        }
+        if (sf <= 0.0 || sk <= 0.0) && self.beta > 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "SABR implied_vol_normal: forward or strike <= 0 (F={sf}, K={sk} after shift) with \
                  beta = {} > 0. The CEV backbone is not shift-invariant; configure an explicit \
@@ -529,11 +509,11 @@ impl SabrParameters {
             )));
         }
         let v = self.implied_vol_normal_unchecked(f, k, t);
-        if v.is_finite() && v >= 0.0 {
+        if v.is_finite() && v > 0.0 {
             Ok(v)
         } else {
             Err(finstack_quant_core::Error::Validation(
-                "normal SABR expansion produced a non-finite or negative volatility".to_string(),
+                "normal SABR expansion produced a non-finite or nonpositive volatility".to_string(),
             ))
         }
     }
@@ -545,10 +525,9 @@ impl SabrParameters {
         let rho = self.rho;
         let nu = self.nu;
 
-        let f_abs = f.abs().max(1e-10);
         let omb = 1.0 - beta;
-        let f_beta = f_abs.powf(beta);
-        let f_omb = f_abs.powf(omb);
+        let f_beta = f.powf(beta);
+        let f_omb = f.powf(omb);
 
         let base = alpha * f_beta;
 
@@ -599,10 +578,22 @@ mod performance_tests {
     fn check_gradient_references(cases: &[GradientReference]) {
         for &(alpha, beta, nu, rho, forward, strike, expected) in cases {
             let parameters = SabrParameters::new(alpha, beta, nu, rho).expect("parameters");
-            let actual = PreparedSabrStrike::new(&parameters, forward, strike, 2.0)
-                .expect("prepare")
-                .gradient(&parameters)
-                .expect("gradient");
+            let actual = PreparedSabrStrike::new(
+                &parameters,
+                forward,
+                strike,
+                2.0,
+                if beta == 0.0 {
+                    VolQuoteType::Normal
+                } else if parameters.shift.is_some() {
+                    VolQuoteType::ShiftedBlackLognormal
+                } else {
+                    VolQuoteType::BlackLognormal
+                },
+            )
+            .expect("prepare")
+            .gradient(&parameters)
+            .expect("gradient");
             for (a, e) in actual.into_iter().zip(expected) {
                 assert!(
                     (a - e).abs() < 2e-8 + 2e-6 * e.abs(),
@@ -629,8 +620,20 @@ mod performance_tests {
                             SabrParameters::new(alpha, beta, nu, rho).expect("parameters");
                         for relative in [-0.5, -1e-4, -1e-7, 0.0, 1e-7, 1e-4, 0.5] {
                             let strike = 0.02 * (1.0 + relative);
-                            let prepared = PreparedSabrStrike::new(&parameters, 0.02, strike, 2.0)
-                                .expect("prepare");
+                            let prepared = PreparedSabrStrike::new(
+                                &parameters,
+                                0.02,
+                                strike,
+                                2.0,
+                                if beta == 0.0 {
+                                    VolQuoteType::Normal
+                                } else if parameters.shift.is_some() {
+                                    VolQuoteType::ShiftedBlackLognormal
+                                } else {
+                                    VolQuoteType::BlackLognormal
+                                },
+                            )
+                            .expect("prepare");
                             if prepared.evaluate(&parameters).is_err() {
                                 continue;
                             }
@@ -793,10 +796,22 @@ mod performance_tests {
             ),
         ] {
             let parameters = SabrParameters::new(alpha, beta, nu, rho).expect("parameters");
-            let actual = PreparedSabrStrike::new(&parameters, forward, strike, 2.0)
-                .expect("prepare")
-                .gradient(&parameters)
-                .expect("gradient");
+            let actual = PreparedSabrStrike::new(
+                &parameters,
+                forward,
+                strike,
+                2.0,
+                if beta == 0.0 {
+                    VolQuoteType::Normal
+                } else if parameters.shift.is_some() {
+                    VolQuoteType::ShiftedBlackLognormal
+                } else {
+                    VolQuoteType::BlackLognormal
+                },
+            )
+            .expect("prepare")
+            .gradient(&parameters)
+            .expect("gradient");
             for (a, e) in actual.into_iter().zip(expected) {
                 assert!(
                     (a - e).abs() < 2e-8 + 2e-6 * e.abs(),
@@ -825,10 +840,32 @@ mod performance_tests {
                             {
                                 let strike = forward + 0.02 * relative;
                                 for t in [0.01, 1.0, 10.0] {
-                                    let result = parameters.implied_vol(forward, strike, t);
-                                    let prepared =
-                                        PreparedSabrStrike::new(&parameters, forward, strike, t)
-                                            .and_then(|prepared| prepared.evaluate(&parameters));
+                                    let result = parameters.implied_vol(
+                                        forward,
+                                        strike,
+                                        t,
+                                        if beta == 0.0 {
+                                            VolQuoteType::Normal
+                                        } else if parameters.shift.is_some() {
+                                            VolQuoteType::ShiftedBlackLognormal
+                                        } else {
+                                            VolQuoteType::BlackLognormal
+                                        },
+                                    );
+                                    let prepared = PreparedSabrStrike::new(
+                                        &parameters,
+                                        forward,
+                                        strike,
+                                        t,
+                                        if beta == 0.0 {
+                                            VolQuoteType::Normal
+                                        } else if parameters.shift.is_some() {
+                                            VolQuoteType::ShiftedBlackLognormal
+                                        } else {
+                                            VolQuoteType::BlackLognormal
+                                        },
+                                    )
+                                    .and_then(|prepared| prepared.evaluate(&parameters));
                                     assert_eq!(
                                         result
                                             .as_ref()
@@ -883,24 +920,12 @@ pub(super) struct PreparedLognormal {
 impl PreparedLognormal {
     fn new(parameters: &SabrParameters, f: f64, k: f64, t: f64) -> Self {
         let (effective_f, effective_k) = parameters.effective_rates(f, k);
-        let raw_beta = parameters.beta;
-        let beta_is_zero = raw_beta < BETA_SNAP_TOL;
-        let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
-        let beta = if beta_is_zero {
-            0.0
-        } else if beta_is_one {
-            1.0
-        } else {
-            raw_beta
-        };
+        let beta = parameters.beta;
+        let beta_is_one = beta.to_bits() == 1.0_f64.to_bits();
         let relative_diff =
             (effective_f - effective_k).abs() / effective_f.abs().max(effective_k.abs());
         if relative_diff < 1e-8 {
-            let atm_f_beta = if effective_f.abs() < 1e-14 {
-                1e-14_f64.powf(1.0 - beta)
-            } else {
-                effective_f.powf(1.0 - beta)
-            };
+            let atm_f_beta = effective_f.powf(1.0 - beta);
             return Self {
                 f,
                 k,
@@ -973,11 +998,7 @@ impl PreparedLognormal {
 
         let x = chi(z_corrected, parameters.rho)?;
 
-        let factor1 = if f_mid_beta.abs() < 1e-14 {
-            alpha
-        } else {
-            alpha / (f_mid_beta * correction_term)
-        };
+        let factor1 = alpha / (f_mid_beta * correction_term);
 
         let factor2 = parameters.z_over_chi(z_corrected, x)?;
 
@@ -1017,9 +1038,10 @@ impl PreparedSabrStrike {
         forward: f64,
         strike: f64,
         time: f64,
+        quote_type: VolQuoteType,
     ) -> Result<Self> {
         parameters.validate_inputs(forward, strike, time)?;
-        Ok(if parameters.beta < BETA_SNAP_TOL {
+        Ok(if quote_type == VolQuoteType::Normal {
             Self::Normal {
                 forward,
                 strike,
@@ -1037,23 +1059,7 @@ impl PreparedSabrStrike {
                 forward,
                 strike,
                 time,
-            } => {
-                let vol = normal_beta_zero(
-                    parameters.alpha,
-                    parameters.nu,
-                    parameters.rho,
-                    *forward,
-                    *strike,
-                    *time,
-                );
-                if vol.is_finite() && vol > 0.0 {
-                    Ok(vol)
-                } else {
-                    Err(Error::Validation(
-                        "normal SABR produced invalid volatility".to_owned(),
-                    ))
-                }
-            }
+            } => parameters.implied_vol_normal(*forward, *strike, *time),
         }
     }
 }
@@ -1150,9 +1156,6 @@ impl PreparedSabrStrike {
                 ]
             }
             Self::Lognormal(p) => {
-                if p.atm && alpha.abs() < 1e-14 {
-                    return Ok([0.0; 3]);
-                }
                 let (denominator, a, b, ratio, rz, rr, z, z_nu) = if p.atm {
                     let f_beta = p.atm_f_beta;
                     (
@@ -1173,11 +1176,7 @@ impl PreparedSabrStrike {
                     };
                     let (ratio, rz, rr) = ratio_partials(z, rho, false)?;
                     (
-                        if p.f_mid_beta.abs() < 1e-14 {
-                            1.0
-                        } else {
-                            p.f_mid_beta * p.correction_term
-                        },
+                        p.f_mid_beta * p.correction_term,
                         (1.0 - p.beta).powi(2) / 24.0 / p.f_mid_power,
                         0.25 * p.beta / p.f_mid_beta,
                         ratio,

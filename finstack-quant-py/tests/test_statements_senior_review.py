@@ -53,6 +53,17 @@ def test_forecast_spec_uses_canonical_log_normal_name() -> None:
     assert not hasattr(s.ForecastSpec, "lognormal")
 
 
+def test_formula_round_preserves_large_integers_and_extreme_places() -> None:
+    value = float(7 * 2**50 + 1)
+    builder = s.ModelBuilder("decimal-round").periods("2025Q1..Q1", None)
+    builder.value_scalar("balance", {"2025Q1": value})
+    builder.compute("tenths", "round(balance, 1)")
+    builder.compute("coarse", "round(balance, -324)")
+    result = s.Evaluator().evaluate(builder.build())
+    assert result.get("tenths", "2025Q1") == value
+    assert result.get("coarse", "2025Q1") == 0.0
+
+
 def test_precomputed_checks_cannot_relabel_explicit_money_as_scalar() -> None:
     builder = s.ModelBuilder("mixed-currency")
     builder.periods("2025Q1..Q1", None)

@@ -629,6 +629,9 @@ pub struct ModelConfig {
     /// this forward curve instead of using a discount-curve par-rate proxy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asw_forward_curve_id: Option<CurveId>,
+    /// Contractual floating index used for asset-swap accruals and historical resets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asw_index_id: Option<finstack_quant_core::types::IndexId>,
     /// Optional government discount curve identifier for the bond `g_spread` metric.
     ///
     /// The metric subtracts this curve's par yield from the bond's yield. It
@@ -707,6 +710,7 @@ impl Default for ModelConfig {
             rate_credit_correlation: None,
             tree_discount_curve_id: None,
             asw_forward_curve_id: None,
+            asw_index_id: None,
             government_curve_id: None,
             oas_quote_compounding: default_oas_quote_compounding(),
             mc_paths: None,
@@ -968,8 +972,18 @@ impl InstrumentPricingOverrides {
         self
     }
 
-    /// Set the forward curve used by asset-swap metrics.
-    pub fn with_asw_forward_curve_id(mut self, curve_id: impl Into<CurveId>) -> Self {
+    /// Select the projection curve and contractual floating index for asset-swap quotes.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve_id` - Market curve supplying dated projection factors.
+    /// * `index_id` - Registered rate index supplying coupon conventions and historical resets.
+    pub fn with_asw_forward(
+        mut self,
+        curve_id: impl Into<CurveId>,
+        index_id: impl Into<finstack_quant_core::types::IndexId>,
+    ) -> Self {
+        self.model_config.asw_index_id = Some(index_id.into());
         self.model_config.asw_forward_curve_id = Some(curve_id.into());
         self
     }

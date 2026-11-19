@@ -192,8 +192,8 @@ fn price_touch(
     let s_over_h = spot / barrier;
     let power1 = s_over_h.powf(-(mu + lambda));
     let power2 = s_over_h.powf(-(mu - lambda));
-    let n_eta_z = finstack_quant_core::math::special_functions::norm_cdf(eta * z);
-    let n_eta_z_prime = finstack_quant_core::math::special_functions::norm_cdf(eta * z_prime);
+    let n_eta_z = finstack_quant_core::math::special_functions::norm_cdf(eta * z)?;
+    let n_eta_z_prime = finstack_quant_core::math::special_functions::norm_cdf(eta * z_prime)?;
     let one_touch_prob = power1 * n_eta_z + power2 * n_eta_z_prime;
 
     let df = (-r_d * t).exp();
@@ -265,8 +265,10 @@ mod tests {
         let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
         MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_surface(vol_surface)
             .insert_fx(fx_matrix)
     }
@@ -359,16 +361,18 @@ mod tests {
     fn zero_vol_no_touch_preserves_certain_payment() {
         let as_of = date!(2024 - 01 - 01);
         let expiry = date!(2025 - 01 - 01);
-        let market = build_market(as_of).insert(
-            DiscountCurve::builder("EUR-OIS")
-                .base_date(as_of)
-                .day_count(DayCount::Act365F)
-                .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("flat curve"),
-        );
+        let market = build_market(as_of)
+            .try_insert(
+                DiscountCurve::builder("EUR-OIS")
+                    .base_date(as_of)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("flat curve"),
+            )
+            .expect("insert market curve");
         let df = market
             .get_discount("USD-OIS")
             .expect("discount curve")
@@ -403,18 +407,20 @@ mod tests {
         ] {
             let mut market = build_market(as_of);
             for (id, rate) in [("USD-OIS", domestic), ("EUR-OIS", foreign)] {
-                market = market.insert(
-                    DiscountCurve::builder(id)
-                        .base_date(as_of)
-                        .day_count(DayCount::Act365F)
-                        .knots([(0.0, 1.0), (1.0, (-rate).exp())])
-                        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                        .extrapolation(
-                            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
-                        )
-                        .build()
-                        .expect("flat curve"),
-                );
+                market = market
+                    .try_insert(
+                        DiscountCurve::builder(id)
+                            .base_date(as_of)
+                            .day_count(DayCount::Act365F)
+                            .knots([(0.0, 1.0), (1.0, (-rate).exp())])
+                            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                            .extrapolation(
+                                finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                            )
+                            .build()
+                            .expect("flat curve"),
+                    )
+                    .expect("insert market curve");
             }
             let mut option = build_option(expiry);
             option.barrier_direction = direction;

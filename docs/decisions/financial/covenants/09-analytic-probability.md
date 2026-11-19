@@ -1,14 +1,20 @@
 # COVENANTS-09: Lognormal overlay and analytic marginal breach probability
 
-**Decision status:** Draft — observed implementation; adoption pending for choices not already settled. Existing accepted decisions retain their scope.
+**Decision status:** Accepted 2026-11-17 for the positive-projection lognormal overlay, explicit clock and stable analytic tails.
 
-**Implementation status:** Observed in the exact source paths identified below, including stated discrepancies and limitations.
+**Implementation status:** The mean-preserving lognormal model is implemented. Explicit clock and volatility provenance, deterministic-only handling outside the positive domain and stable tail evaluation remain pending.
 
-**Validation status:** Source and identified test assertions inspected; tests, builds, numerical experiments and external benchmarks not executed. Test existence is not adoption or independent qualification.
+**Validation status:** Both focused analytic tests passed on 2026-11-17. Independent normal-tail arithmetic reproduced cancellation at nine standard deviations. Extreme scales, tail accuracy in production and the accepted boundary behavior remain to be qualified.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope inventory and coverage ledger](README.md).
 
-## Model and formula
+## Accepted decision
+
+1. Use the mean-preserving lognormal overlay on a valid positive base projection with positive time and volatility. Use the explicit reference date and divide elapsed calendar days by 365.25. The supplied annual log-volatility uses that basis. Hold trigger and denominator observations fixed. Report a marginal probability conditional on the projection and volatility. [Forecast composition](08-forecast-composition.md).
+2. Use the exact base-case comparison when time or volatility is zero. A valid nonpositive projection retains its deterministic assessment and carries no modeled probability. Indeterminate, incomplete and unassessed tests carry no modeled probability. In the positive stochastic domain, a nonpositive threshold gives probability one for a maximum and zero for a minimum.
+3. For positive thresholds, compute the standardized boundary from a stable log ratio and use the normal lower tail for a minimum and upper tail for a maximum. Validate the result before publishing a finite probability in `[0,1]`. Check extreme arithmetic and use stable equivalent expressions wherever the exact result remains representable. [Normal distribution reference](https://www.itl.nist.gov/div898/handbook/eda/section3/eda3661.htm).
+
+## Observed model and formula
 
 Stochastic forecasting is explicitly selected by `stochastic=true` and requires finite annualized log-volatility `sigma >= 0`; no volatility is calibrated or inferred. `num_paths=0` selects the analytic method. Defaults otherwise select deterministic maintenance forecasting, no volatility, no seed, no reference date, antithetic false and a 0.05 batch-reporting cutoff. Cutoff must be finite in `[0,1]` even in deterministic mode. Stochastic-only settings are not validated when stochastic mode is false.
 
@@ -20,17 +26,17 @@ For positive threshold `h`, compute `z=(ln(h/b)+0.5 sigma²T)/(sigma sqrt(T))`. 
 
 ## Rationale, alternatives and limitations
 
-The source describes the GBM overlay and shared deterministic fallbacks; it gives no empirical calibration or contract-specific adoption evidence for lognormal covenant metrics or the 365.25 clock. Additive/shifted ratio models, joint numerator/denominator simulation and fitted distributions offer different negative-value and tail behavior. They are alternatives, not defaults approved by this record.
+The overlay represents uncertainty around a caller-supplied positive projection. Calibration and empirical fitness remain the producer's responsibility. Additive or shifted distributions and joint numerator and denominator processes require their own model contracts.
 
 Finite inputs are not sufficient to guarantee finite intermediates: `h/b`, `sigma²T` and the denominator may overflow/underflow. The upper tail is evaluated by subtraction from one, without a survival/log-tail branch, and final analytic probabilities receive no finite/range post-check. Extreme-scale and tail behavior is not qualified by the inspected evidence.
 
 ## Evidence
 
-Owning [configuration, horizon and analytic method](../../../../finstack-quant/covenants/src/forward.rs), [core CDF](../../../../finstack-quant/core/src/math/special_functions.rs), and [dated horizon requirement](../../../../finstack-quant/covenants/src/series.rs). Inline forward test `num_paths_zero_selects_analytic_mode` uses an approximate hand calculation near 0.47526 with absolute tolerance 0.001; it is inspected fixture evidence, not an independently run benchmark. Degenerate/nonfinite and date rejection assertions are in forward/audit tests.
+Owning [configuration, horizon and analytic method](../../../../finstack-quant/covenants/src/forward.rs), [core CDF](../../../../finstack-quant/core/src/math/special_functions.rs), and [dated horizon requirement](../../../../finstack-quant/covenants/src/series.rs). The focused analytic tests passed. `num_paths_zero_selects_analytic_mode` uses the moderate fixture near 0.47526 with absolute tolerance 0.001. The Monte Carlo agreement test compares against the crate's analytic result.
 
-The repository [Glasserman reference](../../../REFERENCES.md#glasserman-2004-monte-carlo) provides mathematical background, not calibration evidence for borrower metrics. No external numerical source was checked or computation run.
+An independent calculation using `0.5 * erfc(9 / sqrt(2))` gives approximately `1.12858840595384e-19` for the upper tail. Subtraction of the rounded CDF from one gives zero in binary64. This demonstrates cancellation in the formula. Production accuracy over the accepted domain remains to be qualified.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [covenant follow-ups](../FOLLOW_UPS.md#covenants).

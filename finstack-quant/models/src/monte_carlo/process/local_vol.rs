@@ -109,7 +109,7 @@ impl LocalVolParams {
 ///
 /// let (mut drift, mut diffusion) = ([0.0], [0.0]);
 /// process.drift(0.5, &[90.0], &mut drift);
-/// process.diffusion(0.5, &[90.0], &mut diffusion);
+/// process.diffusion(0.5, &[90.0], &mut diffusion).expect("valid diffusion");
 /// assert!((drift[0] - 0.02 * 90.0).abs() < 1e-12);
 /// assert!((diffusion[0] - 0.30 * 90.0).abs() < 1e-12);
 /// # Ok::<(), finstack_quant_core::Error>(())
@@ -161,9 +161,10 @@ impl StochasticProcess for LocalVolProcess {
         out[0] = self.drift_rate() * x[0];
     }
 
-    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         // σ(t, S) = σ_loc(t, S) S
         out[0] = self.surface.value(t, x[0]) * x[0];
+        Ok(())
     }
 }
 

@@ -87,6 +87,9 @@ const fxVolFromArrays = new core.FxDeltaVolSurface(
   [0.01, 0.012],
   [0.005, 0.006],
   {
+    deltaConvention: 'forward_unadjusted',
+    atmConvention: 'delta_neutral_straddle',
+    butterflyConvention: 'smile',
     rr10d: [0.02, 0.022],
     bf10d: [0.008, 0.009],
     expiryClock: clock,
@@ -100,6 +103,9 @@ const fxVolFromTyped = new core.FxDeltaVolSurface(
   new Float64Array([0.01, 0.012]),
   new Float64Array([0.005, 0.006]),
   {
+    deltaConvention: 'forward_unadjusted',
+    atmConvention: 'delta_neutral_straddle',
+    butterflyConvention: 'smile',
     rr10d: new Float64Array([0.02, 0.022]),
     bf10d: new Float64Array([0.008, 0.009]),
   }
@@ -111,7 +117,7 @@ const pillarVols: Float64Array = models.volatility.getFxDeltaPillarVols(fxVolFro
 const fxStrike: number = models.volatility.deltaToStrike(true, 0.25, 1.1, 0.12, 1);
 const fxDelta: number = models.volatility.strikeToDelta(true, 1.12, 1.1, 0.12, 1);
 const fxStrikeSurface: InstanceType<typeof core.VolSurface> =
-  models.volatility.materializeFxDeltaSurface(fxVolFromArrays, [1.105, 1.11]);
+  models.volatility.materializeFxDeltaSurface(fxVolFromArrays, [1.105, 1.11], 'vol');
 const factorReturns = analytics.constrainedLeastSquares([1], 1, [0.01], [1]);
 const factorAttribution: FactorBrinsonResult = portfolio.factorBrinsonAttribution(
   '{}',

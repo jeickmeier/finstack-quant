@@ -121,7 +121,9 @@ pub fn heston_satisfies_feller(
 ///
 /// Twin of the Rust and Python `simulate_paths`: the spec selects the process,
 /// the discretization scheme, the time grid and the random streams, and Rust
-/// validates every field.
+/// validates every field. For rough Bergomi, `xi.values` contains annual variance
+/// rates (0.04 for 20% volatility). Cheyette `sigma_base.amplitudes` contains
+/// ordered `[time, rate_volatility]` pairs (0.005 for a 50 basis point amplitude).
 /// @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
 /// @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
 ///

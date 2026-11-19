@@ -183,27 +183,27 @@ fn bond_retired_funding_curve_key_is_rejected() {
 }
 
 #[test]
-// schema-rejection-test: FloatingRateSpec `index_id`
-fn floating_rate_spec_retired_index_key_is_rejected() {
-    let bond = Bond::example_floating().expect("example");
-    let json = serde_json::to_value(&bond).expect("serialize");
-    let pointer = pointer_of_object_with(&json, "forward_curve_id", String::new())
-        .expect("floating rate spec present");
-    assert_rejects_at(
-        &bond,
-        &pointer,
-        "index_id",
-        serde_json::json!("USD-SOFR-3M"),
-    );
-
-    let loan = TermLoan::example_floating_with_ddtl().expect("example");
-    let json = serde_json::to_value(&loan).expect("serialize");
-    let pointer = pointer_of_object_with(&json, "forward_curve_id", String::new())
-        .expect("floating rate spec present");
-    assert_rejects_at(
-        &loan,
-        &pointer,
-        "index_id",
-        serde_json::json!("USD-SOFR-3M"),
-    );
+fn floating_rate_specs_require_an_independent_index_on_the_wire() {
+    for mut json in [
+        serde_json::to_value(Bond::example_floating().expect("bond")).expect("serialize bond"),
+        serde_json::to_value(TermLoan::example_floating_with_ddtl().expect("loan"))
+            .expect("serialize loan"),
+    ] {
+        let pointer =
+            pointer_of_object_with(&json, "index_id", String::new()).expect("floating rate spec");
+        let spec = json.pointer_mut(&pointer).expect("rate spec");
+        spec["forward_curve_id"] = serde_json::json!("PROXY");
+        let decoded: finstack_quant_cashflows::builder::FloatingRateSpec =
+            serde_json::from_value(spec.clone()).expect("distinct projection curve");
+        assert_ne!(decoded.index_id.as_str(), decoded.forward_curve_id.as_str());
+        spec.as_object_mut().expect("object").remove("index_id");
+        assert!(
+            serde_json::from_value::<finstack_quant_cashflows::builder::FloatingRateSpec>(
+                spec.clone()
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("index_id")
+        );
+    }
 }

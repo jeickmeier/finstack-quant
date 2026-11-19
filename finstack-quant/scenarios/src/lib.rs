@@ -49,12 +49,12 @@
 //! let as_of = date!(2025-01-01);
 //!
 //! // The scenario bumps USD_SOFR, so that curve has to be in the context.
-//! let mut market = MarketContext::new().insert(
+//! let mut market = MarketContext::new().try_insert(
 //!     DiscountCurve::builder("USD_SOFR")
 //!         .base_date(as_of)
 //!         .knots([(0.0, 1.0), (5.0, 0.80)])
 //!         .build()?,
-//! );
+//! ).expect("insert market curve");
 //! let mut model = FinancialModelSpec::new("test", finstack_quant_core::dates::build_periods("2025Q1..Q1", None)?);
 //!
 //! let scenario = ScenarioSpec {

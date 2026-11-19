@@ -1265,7 +1265,7 @@ mod period_timeline_tests {
     fn period(id: PeriodId, is_actual: bool) -> Period {
         let range = finstack_quant_core::dates::build_periods(&format!("{id}..{id}"), None)
             .expect("single-period range");
-        let mut p = range.periods.into_iter().next().expect("one period");
+        let mut p = range.into_periods().into_iter().next().expect("one period");
         p.is_actual = is_actual;
         p
     }
@@ -1350,23 +1350,16 @@ mod period_timeline_tests {
     /// Out-of-order periods are rejected regardless of actual/forecast flags.
     #[test]
     fn out_of_order_periods_are_rejected() {
-        let mut model = model_with_periods(vec![
-            period(
-                PeriodId::quarter(2024, 2).expect("valid period fixture"),
-                true,
-            ),
-            period(
-                PeriodId::quarter(2024, 1).expect("valid period fixture"),
-                true,
-            ),
-        ]);
-        let err = model
-            .validate_semantics()
-            .expect_err("descending periods must be rejected");
-        assert!(
-            err.to_string().contains("not canonical"),
-            "expected the ordering diagnostic: {err}"
-        );
+        let rows = vec![
+            period(PeriodId::quarter(2024, 2).unwrap(), true),
+            period(PeriodId::quarter(2024, 1).unwrap(), true),
+        ];
+        let err = finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            rows,
+        )
+        .expect_err("descending periods must be rejected at construction");
+        assert!(err.to_string().contains("ascending"), "{err}");
     }
 
     /// Both swap sides are supported; signed cashflows and the declared IRS

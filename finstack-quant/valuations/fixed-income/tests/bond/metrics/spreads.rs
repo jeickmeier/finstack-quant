@@ -42,7 +42,9 @@ fn test_z_spread_discount_bond() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -98,7 +100,9 @@ fn test_z_spread_reports_bond_compounding_spread() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let target_dirty = bond
         .cashflow_schedule(&market, as_of)
         .unwrap()
@@ -164,7 +168,9 @@ fn test_i_spread_uses_quote_date_for_settlement_based_curve() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -202,7 +208,9 @@ fn test_asw_market_price_adjustment_has_correct_economic_sign() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     bond.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
@@ -257,7 +265,7 @@ fn test_asw_market_uses_configured_forward_curve() {
     .unwrap();
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price_pct(98.0)
-        .with_asw_forward_curve_id("USD-SOFR-6M");
+        .with_asw_forward("USD-SOFR-6M", "USD-SOFR-OIS");
 
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -270,10 +278,13 @@ fn test_asw_market_uses_configured_forward_curve() {
     let low_forward_curve =
         ForwardCurve::flat("USD-SOFR-6M", as_of, 0.01, DayCount::Act360).unwrap();
     let market_with_forward = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(discount_curve.clone())
-        .insert(low_forward_curve);
-    let market_without_forward =
-        finstack_quant_core::market_data::context::MarketContext::new().insert(discount_curve);
+        .try_insert(discount_curve.clone())
+        .expect("insert market curve")
+        .try_insert(low_forward_curve)
+        .expect("insert market curve");
+    let market_without_forward = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert market curve");
 
     let with_forward = bond
         .price_with_metrics(
@@ -368,7 +379,9 @@ fn test_oas_metric_uses_bond_tree_pricing_overrides() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let mut low_vol_bond = base_bond.clone();
     low_vol_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
@@ -460,8 +473,10 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
         .build()
         .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(pricing_curve)
-        .insert(tree_curve);
+        .try_insert(pricing_curve)
+        .expect("insert market curve")
+        .try_insert(tree_curve)
+        .expect("insert market curve");
 
     let with_override = bond
         .price_with_metrics(
@@ -534,7 +549,9 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -619,7 +636,9 @@ fn test_embedded_option_value_uses_as_of_oas_pricing_basis() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -685,7 +704,9 @@ fn test_callable_bond_vega_is_registered_and_bumps_hw1f_sigma() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -755,7 +776,9 @@ fn test_callable_bond_oas_and_vega_use_explicit_bdt_tree_path() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -842,7 +865,9 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let vega_half_point = vega_with_bump(&bond, &market, as_of, 0.005);
     let vega_one_point = vega_with_bump(&bond, &market, as_of, 0.01);
@@ -907,7 +932,9 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let dirty_at_quote = price_from_oas(&bond, &market, quote_date, ModelKey::Tree, target_oas)
         .expect("quote-date OAS price");
     let schedule = bond
@@ -986,7 +1013,9 @@ fn test_callable_bond_value_uses_same_bdt_tree_dispatch_as_oas_pricer() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let direct_value = bond
         .value(&market, as_of)
@@ -1113,7 +1142,9 @@ fn test_z_spread_roundtrip_coupon_exactly_on_settlement_date() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Quote the bond at a clean price that is off-par so the Z-spread is non-zero.
     let clean_pct = 98.5_f64;
@@ -1216,7 +1247,9 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Choose an explicit YTM and derive the implied clean price.
     let target_ytm = 0.055_f64;
@@ -1279,7 +1312,9 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let bond_ig = Bond::fixed(
         "ZSPR-CONV-IG",
@@ -1441,7 +1476,9 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Quote the bond off-par so the Z-spread is non-zero.
     let clean_pct = 97.25_f64;
@@ -1525,7 +1562,9 @@ fn test_z_spread_negative_denom_returns_err_not_infinity() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // z = -5.0 drives the compounding denominator well below zero for m=2
     // (semi-annual, the default for Bond::fixed):
@@ -1578,7 +1617,9 @@ fn test_z_spread_solver_non_positive_base_df_returns_err() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Quote an astronomically high price (10× par): no physically valid spread
     // can match this — the solver must fail rather than return a meaningless z.
@@ -1639,7 +1680,9 @@ fn test_z_spread_on_curve_model_pv_is_zero_with_settlement_lag() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -1686,7 +1729,9 @@ fn callable_i_spread_uses_par_rate_to_workout_and_round_trips() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let mut bond = Bond::fixed(
         "ISPR-CALLABLE",

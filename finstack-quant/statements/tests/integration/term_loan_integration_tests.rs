@@ -90,7 +90,9 @@ fn term_loan_capital_structure_evaluates_with_market() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid discount curve");
-    let market = MarketContext::new().insert(discount_curve);
+    let market = MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert market curve");
 
     let mut evaluator = Evaluator::new();
     let result = evaluator

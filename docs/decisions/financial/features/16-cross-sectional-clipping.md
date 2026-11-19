@@ -1,14 +1,20 @@
 # FEATURES-016: Absolute, sigma and Type-7 cross-sectional clipping
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** The three clipping variants are implemented. Checked scaled sigma-bound comparison requires reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked repeated winsorization and a sigma cutoff beyond the supported numeric range. Rust fixtures were inspected. Extreme-scale behavior and host boundaries remain open.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and actual selection
+## Accepted decision
+
+1. Apply clipping independently in each partition, preserve missing rows, and retain input units. Fixed Clip bounds are optional, finite when supplied, and ordered. Equal bounds collapse finite values to one level. Reapplying the same fixed bounds leaves the result unchanged.
+2. ClipBySigma uses arithmetic mean and population standard deviation. Sigma defaults to 3, must be finite and nonnegative, and zero clips to the mean. Use checked scaled comparisons so a cutoff beyond the finite input range leaves that side unchanged, even if the cutoff itself cannot be represented.
+3. Winsorize uses checked Type-7 quantiles with probabilities ordered in [0, 1] and defaults of 0.01 and 0.99. Both statistical clipping variants recompute bounds on each application. On [0, 4, 8], 25th/75th-percentile winsorization gives [2, 4, 6], then [3, 4, 5] on reapplication. [Shared quantiles](04-scaled-statistics-and-quantiles.md).
+
+## Observed scope and actual selection
 
 `Clip`, `ClipBySigma` and `Winsorize` operate independently per finite cross-section or grouped sub-partition. Missing/nonfinite inputs remain None. Explicit parameters must be finite JSON numbers; omitted absolute clip bounds alone default to negative/positive infinity.
 
@@ -34,5 +40,5 @@ No independent robust-statistics benchmark was inspected.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

@@ -191,8 +191,9 @@ pub(crate) fn calibrate_hull_white_to_swaptions_with_fn(
             price / annuity * (2.0 * std::f64::consts::PI / quote.expiry).sqrt()
         } else {
             let probability = 0.5 * (1.0 + price / (annuity * forward));
-            2.0 * finstack_quant_core::math::special_functions::standard_normal_inv_cdf(probability)
-                / quote.expiry.sqrt()
+            2.0 * finstack_quant_core::math::special_functions::standard_normal_inv_cdf(
+                probability,
+            )? / quote.expiry.sqrt()
         };
         if !implied.is_finite() || implied < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -672,7 +673,7 @@ pub(super) fn hw1f_swaption_price_prepared(
         let d1 = ((p0_ti / (strike * p0_start)).ln() + 0.5 * sigma_p * sigma_p) / sigma_p;
         let d2 = d1 - sigma_p;
 
-        let put_price = strike * p0_start * norm_cdf(-d2) - p0_ti * norm_cdf(-d1);
+        let put_price = strike * p0_start * norm_cdf(-d2)? - p0_ti * norm_cdf(-d1)?;
         // Preserve NaN: `put_price < 0.0` is false for NaN, so NaN flows
         // through; only genuinely-negative numerical noise gets clamped.
         let put_price_clamped = if put_price < 0.0 { 0.0 } else { put_price };

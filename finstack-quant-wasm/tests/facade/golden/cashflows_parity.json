@@ -3832,6 +3832,7 @@
       }
     },
     {
+      "index_id": "USD-SOFR",
       "forward_curve_id": "USD-SOFR",
       "spread_bp": "150",
       "gearing": "1",
@@ -3854,6 +3855,7 @@
       "overnight_basis": "act_360"
     },
     {
+      "index_id": "GBP-SONIA",
       "forward_curve_id": "GBP-SONIA",
       "spread_bp": "25.5",
       "gearing": "1",
@@ -3876,6 +3878,7 @@
       "overnight_basis": "act_365f"
     },
     {
+      "index_id": "EUR-EURIBOR-3M",
       "forward_curve_id": "EUR-EURIBOR-3M",
       "spread_bp": "-10",
       "gearing": "1",

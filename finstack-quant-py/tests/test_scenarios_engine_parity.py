@@ -608,3 +608,21 @@ def test_annual_compounding_requires_periodic_one() -> None:
         RateBindingSpec.from_json('{"node_id":"rate","curve_id":"USD-OIS","tenor":"1Y","compounding":"annual"}')
     binding = RateBindingSpec("rate", "USD-OIS", "1Y", compounding=Compounding("periodic(1)"))
     assert json.loads(binding.to_json())["compounding"] == {"periodic": 1}
+
+
+def test_base_correlation_bucket_uses_percent_coordinates_and_preserves_failed_market() -> None:
+    from finstack_quant.core.market_data import BaseCorrelationCurve
+
+    market = MarketContext()
+    market.insert(BaseCorrelationCurve("CDX", [(0.07, 0.20), (3, 0.25), (7, 0.45), (10, 0.98)]))
+
+    def shock(buckets: list[int], points: float) -> ApplicationResult:
+        return apply_scenario(
+            ScenarioSpec("shock", [OperationSpec.base_corr_bucket_pts("CDX", points, buckets)]), market, AS_OF
+        )
+
+    assert shock([700], 0.05).market.get_base_correlation("CDX").correlations == [0.20, 0.25, 0.50, 0.98]
+    for buckets, change in [([700, 800], 0.01), ([1000], 0.10)]:
+        with pytest.raises(ValueError, match=r"detachment|correlation"):
+            shock(buckets, change)
+    assert market.get_base_correlation("CDX").correlations == [0.20, 0.25, 0.45, 0.98]

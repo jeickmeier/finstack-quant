@@ -71,7 +71,11 @@ fn test_bond_dated_cashflows_include_floating_cfkind() {
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     // Build simplified schedule
     let flows = frn
@@ -403,16 +407,18 @@ fn build_step_up_bond_schedule(
         .build()
         .expect("Bond builder should succeed for step-up test");
 
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(issue)
-            .knots([(0.0, 1.0), (5.0, 0.90)])
-            .interp(InterpStyle::Linear)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("DiscountCurve builder should succeed in test"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(issue)
+                .knots([(0.0, 1.0), (5.0, 0.90)])
+                .interp(InterpStyle::Linear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("DiscountCurve builder should succeed in test"),
+        )
+        .expect("insert market curve");
 
     let schedule = bond
         .full_cashflow_schedule(&market)
@@ -450,16 +456,18 @@ fn step_up_no_steps_equals_fixed_rate() {
         .build()
         .expect("Bond builder should succeed for fixed test");
 
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(issue)
-            .knots([(0.0, 1.0), (5.0, 0.90)])
-            .interp(InterpStyle::Linear)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("DiscountCurve builder should succeed in test"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(issue)
+                .knots([(0.0, 1.0), (5.0, 0.90)])
+                .interp(InterpStyle::Linear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("DiscountCurve builder should succeed in test"),
+        )
+        .expect("insert market curve");
 
     let fixed_sched = fixed_bond
         .full_cashflow_schedule(&market)

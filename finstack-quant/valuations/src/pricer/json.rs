@@ -844,7 +844,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     struct FixedJsonBondPricer {

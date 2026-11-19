@@ -581,6 +581,7 @@ class InterestRateSwapBuilder:
     ...     end="2030-01-15",
     ... )
     >>> floating = FloatLegSpec(
+    ...     index_id="USD-SOFR-3M",
     ...     discount_curve_id="USD-OIS",
     ...     forward_curve_id="USD-SOFR-3M",
     ...     spread_bp="0",
@@ -1491,6 +1492,7 @@ class SwaptionBuilder:
     ...     end="2030-01-15",
     ... )
     >>> floating = FloatLegSpec(
+    ...     index_id="USD-SOFR-3M",
     ...     discount_curve_id="USD-OIS",
     ...     forward_curve_id="USD-SOFR-3M",
     ...     spread_bp="0",

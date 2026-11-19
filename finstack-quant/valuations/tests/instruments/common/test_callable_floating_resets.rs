@@ -77,9 +77,12 @@ fn hazard_curve() -> HazardCurve {
 
 fn market() -> MarketContext {
     MarketContext::new()
-        .insert(discount_curve())
-        .insert(index_curve())
-        .insert(hazard_curve())
+        .try_insert(discount_curve())
+        .expect("insert market curve")
+        .try_insert(index_curve())
+        .expect("insert market curve")
+        .try_insert(hazard_curve())
+        .expect("insert market curve")
 }
 
 /// Quarterly USD-SOFR-3M + 200 bp floater on the rates-credit path.
@@ -306,6 +309,7 @@ fn floating_credit_loan(coupon_type: CouponType) -> TermLoan {
         .issue_date(as_of())
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::new(400, 0),
             gearing: Decimal::ONE,

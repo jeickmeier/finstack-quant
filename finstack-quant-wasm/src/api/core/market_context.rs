@@ -196,11 +196,9 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `VolSurface` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertVolSurface)]
-    pub fn insert_vol_surface(&mut self, curve: &JsVolSurface) -> Result<(), JsValue> {
+    pub fn insert_vol_surface(&mut self, curve: &JsVolSurface) {
         self.context_mut()
-            .try_insert_surface_mut(Arc::clone(&curve.inner))
-            .map(|_| ())
-            .map_err(to_js_err)
+            .insert_surface_mut(Arc::clone(&curve.inner));
     }
 
     /// Store a FX delta-quoted volatility surface under its own id; `insert` dispatches here.
@@ -209,14 +207,9 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `FxDeltaVolSurface` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertFxDeltaVolSurface)]
-    pub fn insert_fx_delta_vol_surface(
-        &mut self,
-        curve: &JsFxDeltaVolSurface,
-    ) -> Result<(), JsValue> {
+    pub fn insert_fx_delta_vol_surface(&mut self, curve: &JsFxDeltaVolSurface) {
         self.context_mut()
-            .try_insert_fx_delta_vol_surface_mut(Arc::clone(&curve.inner))
-            .map(|_| ())
-            .map_err(to_js_err)
+            .insert_fx_delta_vol_surface_mut(Arc::clone(&curve.inner));
     }
 
     /// Store a SABR volatility cube under its own id; `insert` dispatches here.
@@ -225,11 +218,9 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `VolCube` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertVolCube)]
-    pub fn insert_vol_cube(&mut self, curve: &JsVolCube) -> Result<(), JsValue> {
+    pub fn insert_vol_cube(&mut self, curve: &JsVolCube) {
         self.context_mut()
-            .try_insert_vol_cube_mut(Arc::clone(&curve.inner))
-            .map(|_| ())
-            .map_err(to_js_err)
+            .insert_vol_cube_mut(Arc::clone(&curve.inner));
     }
 
     /// Attach the FX matrix used for currency conversion (Rust `MarketContext::insert_fx_mut`).

@@ -40,13 +40,20 @@ fn market() -> MarketContext {
         finstack_quant_core::dates::DayCount::Act365F,
     )
     .unwrap();
-    MarketContext::new().insert(disc).insert(ois).insert(term)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(ois)
+        .expect("insert market curve")
+        .try_insert(term)
+        .expect("insert market curve")
 }
 
 fn term_leg(curve: &str, compounding: FloatingLegCompounding) -> FloatLegSpec {
     FloatLegSpec {
         end_of_month: false,
         fixing_calendar_id: None,
+        index_id: curve.into(),
         forward_curve_id: CurveId::new(curve),
         discount_curve_id: CurveId::new("USD-OIS"),
         start: d(2025, 1, 2),

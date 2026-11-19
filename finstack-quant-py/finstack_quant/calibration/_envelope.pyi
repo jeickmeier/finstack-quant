@@ -1154,9 +1154,9 @@ class CalibrationEnvelope:
         market_data : list[RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsTrancheQuote | FxSpotDatum | PriceDatum | dict[str, Any]] | None, default None
             Flat market data: typed quotes and datums or ``{"kind": ...}`` dicts.
             Dividend schedules use ``{"kind": "dividend_schedule", "id": ...,
-            "underlying": ..., "events": [...], "currency": ...}`` directly,
-            with ISO dates and cash amounts in the stated currency. Optional
-            underlying/currency metadata may be omitted. The former nested
+            "underlying": ..., "share_basis": ..., "events": [...], "currency": ...}``
+            with a security and share basis. Each event supplies a unique event ID,
+            ISO ex-date and pay date, and gross cash per share in that currency. The former nested
             ``schedule`` field is rejected. Duplicate kind-and-ID inputs are
             rejected during validation.
         prior_market : list[dict] | None, default None

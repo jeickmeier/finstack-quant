@@ -1,14 +1,62 @@
 # MARGIN-REGULATORY-XVA-002: FRTB correlation scenarios, quadratic aggregation and binding-total selection
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed** in the stated source scope.
-- Validation status: **Evidence inspected/located, not executed.** Selected test bodies were read; no runtime test, build or numerical experiment was run.
+- Decision status: **Accepted 2026-11-17 for checked FRTB scenarios, aggregation and result scope.**
+- Implementation status: Existing behavior is described below. Full-capital and diagnostic result separation, checked reductions and caller reconciliation remain pending.
+- Validation status: Source and primary references inspected. Independent examples checked scenario scaling and order, the capped retry and its failure case, non-CTP addition, exact ties and scaled norms. Runtime, schema, host and regulatory qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope and hashes: [inventory](README.md), [coverage ledger](coverage.json).
 
+## Accepted decision for checked FRTB scenarios and aggregation
+
+1. **Give full capital and SBA diagnostics distinct results.** A full run
+   evaluates Low, Medium and High across all seven risk classes on the elected
+   perimeter and requires complete applicable coverage. A diagnostic takes
+   explicit, nonempty, duplicate-free scenario and class selections and reports
+   only the selected SBA charges. Validate every supplied input under record
+   001. Publish full capital only when the required SBA, DRC and RRAO inputs
+   are qualified. [FRTB input contract](01-frtb-inputs-and-wire.md#accepted-decision-for-checked-frtb-inputs-and-provenance).
+2. **Apply each scenario to the prescribed correlation.** For base correlation
+   `r`, use `max(2r − 1, 0.75r)` for Low, `r` for Medium and `min(1.25r, 1)`
+   for High. Keep the unit diagonal. For curvature, square the applicable
+   delta correlation before the scenario transformation. Validate base and
+   transformed coefficients.
+   [Basel MAR21.6, MAR21.100 and MAR21.101](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+3. **Cap ordinary delta and vega bucket sums only on retry.** Within each
+   bucket, calculate `K_b` from the prescribed weighted-sensitivity quadratic
+   with its zero floor and retain the raw signed sum `S_b`. Across buckets,
+   start with `Q = Σ K_b² + Σ_{b≠c} γ_bc S_b S_c`. Use `√Q` when `Q ≥ 0`.
+   For `Q < 0`, cap each `S_b` to `[−K_b, K_b]` and retry once. A negative retry
+   is a calculation error. With `K = (5, 5)`, `S = (7, −7)` and `γ = 1`,
+   the raw quadratic is `−48` and the retry gives zero.
+   [Basel MAR21.4](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+4. **Use the specialised non-CTP and curvature rules.** For non-CTP
+   securitisation credit spread risk, combine ordinary buckets as `√Σ K_b²`
+   and add the designated other-sector charge outside the root. Curvature
+   uses its own signed aggregation and prescribed zero floors. The ordinary
+   capped-`S` retry applies to delta and vega.
+   [Basel MAR21.5 and MAR21.69–71](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23) ·
+   [Curvature record](11-frtb-curvature.md).
+5. **Choose one binding scenario from the complete scenario totals.** Sum
+   delta, vega and curvature across the included classes within each scenario.
+   Select the largest unrounded total. Break exact ties in Low, Medium, High
+   order. A fully evaluated zero book binds at Low. Add DRC and RRAO once to
+   the binding SBA charge for full capital.
+   [Basel MAR21.7](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23) ·
+   [Basel MAR20](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/20/inforce/2023-01-01/published/2020-03-27).
+6. **Make the arithmetic and result evidence reproducible.** Use canonical
+   factor and bucket order, scaled quadratics and checked compensated sums.
+   Report arithmetic failures before applying financial floors. Preserve
+   every evaluated scenario total, its component charges, explicit zeros,
+   inapplicability and any capped retry with both quadratics. Derive the
+   binding breakdown from that scenario. Convert completed monetary outputs
+   through the accepted Money boundary and carry the same scope and provenance
+   through Rust, Python, WASM and wire restoration.
+   [Money precision](../core-conventions/012-money-decimal-precision.md) ·
+   [Margin wire contract](../margin-collateral-im/22-wire-tables-and-provenance.md#accepted-decision-for-checked-margin-tables-wire-state-and-provenance).
+
 ## Choice and domain
 
-This describes the observed design. No historical adoption rationale is inferred; the alternatives and tradeoffs below are the audit's assessment.
+The observations below describe the audited design. The accepted contract binds one scenario for complete capital and gives a selected SBA diagnostic its own result scope.
 
 The engine adds delta, vega and curvature charges across the selected risk classes within each selected correlation scenario, selects one largest scenario total, then adds DRC and RRAO. It does not maximize each component independently and does not diversify across risk classes.
 
@@ -31,10 +79,10 @@ Parameter and aggregation floors can suppress negative quadratic forms; finite i
 
 ## Alternatives and tradeoffs
 
-Always capping S would change valid nonnegative standard forms. Taking componentwise scenario maxima would be more conservative in some books but is a different algorithm. Canonical sorted reduction or compensated sums would improve reproducibility at a cost; no such change is adopted here.
+Raw signed bucket sums preserve the standard form whenever its quadratic is nonnegative. The accepted cap is a conditional retry. Canonical checked reductions retain the evidence required to reconstruct scenario totals and select the binding result.
 
 ## Evidence and role
 
 Owning formulas: [src/regulatory/frtb/aggregation.rs](../../../../finstack-quant/margin/src/regulatory/frtb/aggregation.rs), [src/regulatory/frtb/engine.rs](../../../../finstack-quant/margin/src/regulatory/frtb/engine.rs), [src/regulatory/frtb/types.rs](../../../../finstack-quant/margin/src/regulatory/frtb/types.rs). [tests/frtb_sba_charges.rs](../../../../finstack-quant/margin/tests/frtb_sba_charges.rs) includes hand-written commodity scenario totals and cross-class addition; [src/regulatory/frtb/engine.rs](../../../../finstack-quant/margin/src/regulatory/frtb/engine.rs) locates configuration/default and scenario-breakdown reconciliation tests. The latter replays reported components and is not an independent regulatory benchmark. [FRTB reference index](../../../REFERENCES.md#bcbs-frtb-minimum-capital-requirements) is provenance background.
 
-The implementation establishes observed behavior, not financial adoption or regulatory compliance. Actionable work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
+Implementation reconciliation and independent qualification are tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).

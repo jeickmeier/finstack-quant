@@ -314,6 +314,10 @@ export type Date = string;
  */
 export type Id3 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
  * Spread in basis points added to the forward rate
  */
 export type Decimal = string;
@@ -363,6 +367,7 @@ export interface D_4F077E8Bfdae2A5Fc362 {
  * let end = Date::from_calendar_date(2025, Month::January, 3).expect("valid date");
  *
  * let primary_leg = FloatLegSpec {
+ *     index_id: "3M-SOFR".into(),
  *     forward_curve_id: CurveId::new("3M-SOFR"),
  *     discount_curve_id: CurveId::new("OIS"),
  *     start,
@@ -381,6 +386,7 @@ export interface D_4F077E8Bfdae2A5Fc362 {
  * };
  *
  * let reference_leg = FloatLegSpec {
+ *     index_id: "6M-SOFR".into(),
  *     forward_curve_id: CurveId::new("6M-SOFR"),
  *     discount_curve_id: CurveId::new("OIS"),
  *     start,
@@ -540,6 +546,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -797,11 +807,17 @@ export interface D_572Ad1Befb7D94914652 {
   vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface DCdb8Fddc0106047270C4 {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
@@ -1622,6 +1638,7 @@ export interface DBcb4883B54741A29B14F {
   fixing_calendar_id?: Id1 | null;
   forward_curve_id: Id3;
   frequency: Tenor;
+  index_id: Id4;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -1744,6 +1761,7 @@ export interface DBcb4883B54741A29B14F1 {
   fixing_calendar_id?: Id1 | null;
   forward_curve_id: Id3;
   frequency: Tenor;
+  index_id: Id4;
   /**
    * Payment lag in business days after period end (default: 0).
    *

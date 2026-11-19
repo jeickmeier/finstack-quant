@@ -1232,11 +1232,12 @@ export interface CoreNamespace {
    * * `n` - Number of variables (columns); at least `1`.
    *
    * @returns A two-element array `[covariance, shrinkage]`: the shrunk
-   * covariance as a flat row-major `n * n` `Float64Array`, and the optimal
+   * covariance as a flat row-major `n * n` `Float64Array`, and the estimated
    * shrinkage intensity in `[0, 1]`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
    * `validation`) if `t < 2`, `n == 0`, an entry is non-finite, or
-   * `observations` does not hold exactly `t * n` entries.
+   * `observations` does not hold exactly `t * n` entries, or kind `computation`
+   * if the intensity or covariance cannot be resolved.
    * @param observations - Flat row-major `t * n` observation matrix; each row is one date and each column one variable.
    * @param t - Number of observations (rows); at least `2`.
    * @param n - Number of variables (columns); at least `1`.
@@ -1359,9 +1360,8 @@ export interface CoreNamespace {
    *
    * * `prices` - Chronologically ordered price levels.
    *
-   * @returns `prices.length - 1` values `ln(p[t] / p[t-1])`; a window with a
-   * non-positive or non-finite price gives `NaN`. Empty for fewer than two prices.
-   * @throws `TypeError` if `prices` is not an array of numbers.
+   * @returns Adjacent log returns, or an empty array for fewer than two valid prices.
+   * @throws `TypeError` for a mistyped series or `FinstackError` for nonpositive or nonfinite prices.
    * @param prices - Chronologically ordered price levels.
    */
   readonly logReturns: typeof wasm.logReturns;
@@ -1400,10 +1400,10 @@ export interface CoreNamespace {
    * * `annualization_factor` - Observations per year (for example `252` for
    *   daily closes); omitted selects the Rust daily default (252).
    *
-   * @returns Annualized realized variance (decimal, not volatility).
+   * @returns Annualized decimal variance, or `undefined` for fewer than two valid prices.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
    * `validation`) for a non-positive or non-finite price or a non-positive
-   * annualization factor.
+   * annualization factor; kind `computation` if the annualized result is unrepresentable.
    * @param prices - Close prices in time order; each must be finite and positive.
    * @param annualizationFactor - Observations per year (for example `252` for daily closes); omitted selects the Rust daily default (252).
    *
@@ -1428,10 +1428,14 @@ export interface CoreNamespace {
    * * `annualization_factor` - Bars per year (for example `252` for daily
    *   bars); omitted selects the Rust daily default (252).
    *
-   * @returns Annualized realized variance (decimal, not volatility).
+   * * `previous_close` - Positive finite close immediately preceding the first bar for Yang-Zhang and close-to-close. Range estimators require omission.
+   *
+   * @param previousClose - Closing price immediately before the first target bar, required for close-to-close and Yang-Zhang and omitted otherwise.
+   * @returns Annualized variance in decimal units, or `undefined` for a valid empty window or fewer than two Yang-Zhang bars.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
    * `validation`) for an unknown method, series of different lengths, an
-   * invalid bar, or a non-positive annualization factor.
+   * missing or inappropriate preceding close, invalid bar, or a non-positive annualization factor;
+   * kind `computation` if the annualized result is unrepresentable.
    * @param open - Opening prices, one per bar.
    * @param high - High prices, one per bar.
    * @param low - Low prices, one per bar.
@@ -1443,21 +1447,23 @@ export interface CoreNamespace {
   /**
    * Standard normal CDF Φ(x).
    * @param x - Real-valued point at which to evaluate Φ; any finite or infinite `x` is accepted.
-   * @returns Probability in `(0, 1)` for finite `x`, with the usual ±∞ limits.
+   * @returns Cumulative probability in `[0, 1]`; the two infinities map to zero and one.
+   * @throws `TypeError` for a non-number, or a validation error if `x` is NaN.
    */
   readonly normCdf: typeof wasm.normCdf;
   /**
    * Natural logarithm of the standard normal CDF, stable in the negative tail.
    *
-   * @param x - Standard-normal threshold in standard-deviation units; infinities are accepted and NaN propagates.
-   * @returns Natural log probability; negative infinity at negative infinity, zero at positive infinity, and NaN for NaN.
-   * @throws `TypeError` if `x` is not a number; special floating-point inputs follow the documented limits.
+   * @param x - Standard-normal threshold in standard-deviation units; both infinities are accepted.
+   * @returns Natural log probability; negative infinity at negative infinity, zero at positive infinity.
+   * @throws `TypeError` for a non-number, a validation error for NaN, or a computation error for an unrepresentable finite-input log probability.
    */
   readonly logNormCdf: typeof wasm.logNormCdf;
   /**
    * Standard normal PDF φ(x).
    * @param x - Real-valued point at which to evaluate φ.
    * @returns Density at `x`; φ(0) is `1/sqrt(2π)`.
+   * @throws `TypeError` for a non-number, or a validation error if `x` is NaN.
    */
   readonly normPdf: typeof wasm.normPdf;
   /**
@@ -1494,7 +1500,7 @@ export interface CoreNamespace {
    * @returns The density of `N(mean, stdDev²)` at `x`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
    * `validation`) if `stdDev` is non-finite or not strictly positive, `mean` is
-   * non-finite, `x` is `NaN`, or the density overflows `f64`.
+   * non-finite, or `x` is `NaN`; kind `computation` if the density overflows.
    * @param x - Point at which to evaluate the density (`±Infinity` accepted, `NaN` rejected).
    * @param mean - Finite mean of the distribution, in the units of `x`.
    * @param stdDev - Strictly positive standard deviation (not the variance), in the units of `x`.
@@ -1502,8 +1508,9 @@ export interface CoreNamespace {
   readonly normPdfWithParams: typeof wasm.normPdfWithParams;
   /**
    * Inverse standard normal CDF Φ⁻¹(p).
-   * @param p - Probability in `[0, 1]` (`0` yields `-Infinity`, `1` yields `Infinity`, values outside `[0, 1]` yield `NaN`).
+   * @param p - Probability in `[0, 1]` (`0` yields `-Infinity`, `1` yields `Infinity`, values outside `[0, 1]` are invalid).
    * @returns Standard-normal quantile for probability `p`.
+   * @throws `TypeError` for a non-number, a validation error for NaN or an out-of-domain probability, or a computation error for an unresolved interior quantile.
    */
   readonly standardNormalInvCdf: typeof wasm.standardNormalInvCdf;
   /**
@@ -1511,14 +1518,15 @@ export interface CoreNamespace {
    *
    * # Arguments
    *
-   * * `x` - Point at which to evaluate the CDF; `NaN` returns `NaN`.
+   * * `x` - Point at which to evaluate the CDF; infinities are accepted.
    * * `df` - Degrees of freedom, strictly positive.
    *
    * @returns The probability that a Student-t variable with `df` degrees of
    * freedom is at most `x`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) if `df` is non-finite or not strictly positive.
-   * @param x - Point at which to evaluate the CDF; `NaN` returns `NaN`.
+   * `validation`) if `x` is NaN or `df` is non-finite or nonpositive, or kind
+   * `computation` if the tail cannot be evaluated.
+   * @param x - Point at which to evaluate the CDF; infinities are accepted.
    * @param df - Degrees of freedom, strictly positive.
    */
   readonly studentTCdf: typeof wasm.studentTCdf;
@@ -1530,10 +1538,11 @@ export interface CoreNamespace {
    * * `p` - Probability in `[0, 1]` (`0` returns `-Infinity`, `1` returns `Infinity`).
    * * `df` - Degrees of freedom, finite and strictly positive.
    *
-   * @returns The quantile `x` with `studentTCdf(x, df) === p`.
+   * @returns Student-t quantile at probability `p`, including infinite endpoint limits.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
    * `validation`) if `df` is non-finite or not strictly positive, or `p` is
-   * non-finite or outside `[0, 1]`.
+   * non-finite or outside `[0, 1]`, or kind `computation` if an interior
+   * quantile cannot be resolved or represented.
    * @param p - Probability in `[0, 1]` (`0` returns `-Infinity`, `1` returns `Infinity`).
    * @param df - Degrees of freedom, finite and strictly positive.
    */
@@ -1541,13 +1550,15 @@ export interface CoreNamespace {
   /**
    * Error function erf(x).
    * @param x - Real-valued argument to erf; the function is odd, so erf(-x) = -erf(x).
-   * @returns erf(x) in `(-1, 1)` for finite `x`.
+   * @returns erf(x) in `[-1, 1]`.
+   * @throws `TypeError` for a non-number, or a validation error if `x` is NaN.
    */
   readonly erf: typeof wasm.erf;
   /**
    * Natural logarithm of the Gamma function ln(Γ(x)).
-   * @param x - Real argument; must be positive and away from the non-positive integers.
+   * @param x - Finite positive argument.
    * @returns ln(Γ(x)); ln(Γ(1)) is 0 and ln(Γ(n+1)) is ln(n!).
+   * @throws `TypeError` for a non-number, a validation error for non-finite or nonpositive arguments, or a computation error if the logarithm overflows.
    */
   readonly lnGamma: typeof wasm.lnGamma;
   /**
@@ -5807,7 +5818,9 @@ export interface ModelsMonteCarloNamespace {
    *
    * Twin of the Rust and Python `simulate_paths`: the spec selects the process,
    * the discretization scheme, the time grid and the random streams, and Rust
-   * validates every field.
+   * validates every field. For rough Bergomi, `xi.values` contains annual variance
+   * rates (0.04 for 20% volatility). Cheyette `sigma_base.amplitudes` contains
+   * ordered `[time, rate_volatility]` pairs (0.005 for a 50 basis point amplitude).
    * @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
    * @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
    *
@@ -6176,7 +6189,7 @@ export interface ModelsVolatilityNamespace {
   readonly getCubeVol: typeof wasm.getCubeVol;
   /**
    * Evaluate a core SABR cube in the requested convention with flat coordinate
-   * clamping; returns `NaN` where the volatility is undefined.
+   * clamping; throws on undefined volatility.
    *
    * # Arguments
    *
@@ -6189,18 +6202,17 @@ export interface ModelsVolatilityNamespace {
    *   (absolute Bachelier vol in the forward's rate units). The serde form
    *   `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already
    *   carries its own shifts.
-   *   A shifted-lognormal convention yields `NaN`.
    *
    * # Errors
    *
    * Throws a JavaScript exception for a non-numeric coordinate or an
-   * undecodable `convention`.
+   * unsupported `convention` or failed SABR expansion.
    * @param cube - Structurally validated data-only volatility cube.
    * @param expiry - Finite option expiry in years; clamped to the stored grid.
    * @param tenor - Finite underlying tenor in years; clamped to the stored grid.
    * @param strike - Finite strike in the same rate units as the stored forwards.
-   * @param convention - Output quote convention: `"lognormal"` (decimal Black, shifted by the cube's own SABR shifts where it stores them) or `"normal"` (absolute Bachelier vol in the forward's rate units). The serde form `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already carries its own shifts. A shifted-lognormal convention yields `NaN`.
-   * @returns Annualized volatility in `convention`, or `NaN` when undefined (including a shifted-lognormal `convention`).
+   * @param convention - Output quote convention: `"lognormal"` (decimal Black, shifted by the cube's own SABR shifts where it stores them) or `"normal"` (absolute Bachelier vol in the forward's rate units). The serde form `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already carries its own shifts.
+   * @returns Annualized volatility in the selected convention.
    */
   readonly getCubeVolClamped: typeof wasm.getCubeVolClamped;
   /**
@@ -6602,6 +6614,7 @@ export interface ModelsVolatilityNamespace {
    * @param strikes - Strictly increasing strikes of the output surface.
    * @param convention - `"lognormal"` for Black volatilities or `"normal"` for
    * absolute Bachelier volatilities; shifted-lognormal is rejected.
+   * @param interpolationMode - Output expiry interpolation on the sampled sigma grid.
    * @returns The expiry by strike `core.VolSurface` handle in `convention`.
    *
    * # Errors
@@ -6632,6 +6645,7 @@ export interface ModelsVolatilityNamespace {
    *
    * * `surface` - Structurally validated `core.FxDeltaVolSurface` handle.
    * * `delivery_forwards` - Outright FX delivery forwards in quote units per base unit, one positive finite value per surface expiry.
+   * * `interpolation_mode` - Select direct implied volatility or total-variance interpolation on the output grid.
    *
    * # Errors
    *
@@ -6640,8 +6654,9 @@ export interface ModelsVolatilityNamespace {
    * non-finite or non-positive, or delta-to-strike conversion fails.
    * @param surface - `core.FxDeltaVolSurface` handle.
    * @param deliveryForwards - Outright FX delivery forwards (quote per unit of base), one positive value per expiry.
+   * @param interpolationMode - Output grid interpolation in implied volatility ("vol") or total variance ("total_variance").
    * @returns The strike-space `core.VolSurface` handle.
-   * @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when forwards mismatch length, are non-positive, or wing conversion fails.
+   * @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when forwards mismatch length, are non-positive, wing conversion fails, or the interpolation mode is invalid.
    */
   readonly materializeFxDeltaSurface: typeof wasm.materializeFxDeltaSurface;
 }

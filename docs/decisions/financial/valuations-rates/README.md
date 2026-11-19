@@ -18,7 +18,7 @@ from the detailed algorithm records and source counts below.
 
 | ADR | Decision status | Scope |
 | --- | --- | --- |
-| [0029](0029-rate-option-exercise-and-volatility.md) | Draft | Rate-option selection by quotation and exercise |
+| [0029](0029-rate-option-exercise-and-volatility.md) | Accepted | Explicit cap/floor and swaption model selection by quotation, settlement, and exercise |
 
 ## Methodology inventory
 
@@ -87,6 +87,6 @@ from the detailed algorithm records and source counts below.
 
 ## Related methodology and evidence boundaries
 
-Shared [listed-product settlement/marks](../valuations-framework/listed-products.md), [Hull–White analytic kernels](../models-analytic/hull-white-analytic-kernels.md), [Hull–White tree construction](../models-numerical/hull-white-event-grid-and-affine-bonds.md), [LMM process](../models-monte-carlo/10-lmm.md) and [regression solver policies](../models-monte-carlo/24-regression-policies.md) own their numerical kernels. The rates records describe how instruments configure, compose and restrict them. Existing [rate-option selection ADR0029](0029-rate-option-exercise-and-volatility.md) remains a draft selection document, not approval of these observed implementations.
+Shared [listed-product settlement/marks](../valuations-framework/listed-products.md), [Hull–White analytic kernels](../models-analytic/hull-white-analytic-kernels.md), [Hull–White tree construction](../models-numerical/hull-white-event-grid-and-affine-bonds.md), [LMM process](../models-monte-carlo/10-lmm.md) and [regression solver policies](../models-monte-carlo/24-regression-policies.md) own their numerical kernels. The rates records describe how instruments configure, compose and restrict them. [ADR 0029](0029-rate-option-exercise-and-volatility.md) summarizes the accepted rate-option selection contract.
 
 The [rates-valuation follow-ups](../FOLLOW_UPS.md#rates-valuations) track scoped discrepancies; [central follow-ups](../../FOLLOW_UPS.md#financial-methodology-audit) coordinate cross-slice work. Financial adoption and accuracy qualification remain separate from this inventory.

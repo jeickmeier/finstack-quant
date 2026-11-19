@@ -158,7 +158,7 @@ impl HullWhiteParams {
     ///
     /// * `kappa` - Mean-reversion speed κ in inverse years; must be positive
     ///   and finite.
-    /// * `volatility` - Left-continuous piecewise-constant σ(t) schedule.
+    /// * `volatility` - Right-continuous piecewise-constant σ(t) schedule.
     ///
     /// # Errors
     ///
@@ -215,23 +215,22 @@ impl HullWhiteParams {
     /// # Arguments
     ///
     /// * `t` - Model time in years; the segment starting at or before `t`
-    ///   supplies the value, clamped to the first or last segment outside the knots.
-    #[must_use]
-    pub fn get_sigma(&self, t: f64) -> f64 {
-        self.volatility.value_at(t)
+    ///   supplies the value. Negative or non-finite times raise a validation error.
+    pub fn get_sigma(&self, t: f64) -> Result<f64> {
+        self.volatility.get_value(t)
     }
 
     /// Segment start times of the volatility schedule, in years.
     #[must_use]
     pub fn get_times(&self) -> &[f64] {
-        self.volatility.times()
+        self.volatility.get_times()
     }
 
     /// Volatility on each schedule segment, in absolute rate units per
     /// square-root year.
     #[must_use]
     pub fn get_values(&self) -> &[f64] {
-        self.volatility.values()
+        self.volatility.get_values()
     }
 
     /// Compute zero-coupon bond-option volatility under scheduled σ(t).
@@ -259,10 +258,8 @@ impl HullWhiteParams {
             )));
         }
         let b = hw_b(self.kappa, expiry, maturity);
-        let variance = self
-            .volatility
-            .integrate_squared_exp_weight(self.kappa, expiry, t, expiry)?;
-        Ok(b * variance.max(0.0).sqrt())
+        let variance = self.volatility.integrate(self.kappa, expiry, t, expiry)?;
+        Ok(b * variance.sqrt())
     }
 
     /// Compute centered short-rate state variance `Var[x(t)]`.
@@ -281,8 +278,7 @@ impl HullWhiteParams {
 
     /// Exact centered-state variance contributed over an interval in years.
     pub(crate) fn state_variance_between(&self, start: f64, end: f64) -> Result<f64> {
-        self.volatility
-            .integrate_squared_exp_weight(self.kappa, end, start, end)
+        self.volatility.integrate(self.kappa, end, start, end)
     }
 
     /// Compute covariance of the centered short-rate state at two times.
@@ -296,10 +292,15 @@ impl HullWhiteParams {
     ///
     /// Returns an error when evaluation of the earlier-time variance fails.
     pub fn state_covariance(&self, left_time: f64, right_time: f64) -> Result<f64> {
-        let earlier = left_time.min(right_time);
-        if earlier <= 0.0 {
-            return Ok(0.0);
+        if ![left_time, right_time]
+            .iter()
+            .all(|&t| t.is_finite() && t >= 0.0)
+        {
+            return Err(Error::Validation(
+                "state covariance requires two finite nonnegative model times".into(),
+            ));
         }
+        let earlier = left_time.min(right_time);
         let variance = self.state_variance(earlier)?;
         Ok(variance * (-self.kappa * (left_time - right_time).abs()).exp())
     }
@@ -1010,7 +1011,9 @@ mod tests {
             let vol = variance.sqrt();
             let gearing = 1.0 + strike * accrual;
             let d1 = (ratio / gearing).ln() / vol + 0.5 * vol;
-            let expected = df(payment) * (ratio * norm_cdf(d1) - gearing * norm_cdf(d1 - vol));
+            let expected = df(payment)
+                * (ratio * norm_cdf(d1).expect("valid Gaussian variate")
+                    - gearing * norm_cdf(d1 - vol).expect("valid Gaussian variate"));
             let actual = hw1f_term_caplet_price_from_dfs_with_model(
                 &model,
                 &TermCapletPeriod {

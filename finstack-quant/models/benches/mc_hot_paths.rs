@@ -236,14 +236,18 @@ fn bench_rough_heston_step(c: &mut Criterion) {
             let mut work = vec![0.0; scheme.work_size(&process)];
             let z = [0.5_f64, -0.3, 0.2];
             let mut first = [100.0_f64, 0.04];
-            scheme.step(&process, 0.0, dt, &mut first, &z, &mut work);
+            scheme
+                .step(&process, 0.0, dt, &mut first, &z, &mut work)
+                .expect("valid simulation step");
             check_rough_first_step(&first, dt, &z);
             let path = |work: &mut [f64]| {
                 let mut x = [100.0_f64, 0.04];
                 work.fill(0.0);
                 let mut t = 0.0;
                 for _ in 0..n {
-                    scheme.step(&process, t, dt, &mut x, &z, work);
+                    scheme
+                        .step(&process, t, dt, &mut x, &z, work)
+                        .expect("valid simulation step");
                     t += dt;
                 }
                 x

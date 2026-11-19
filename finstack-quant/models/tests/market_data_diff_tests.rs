@@ -56,11 +56,15 @@ fn sample_fx_matrix() -> FxMatrix {
 }
 
 fn market_with_discount(curve: DiscountCurve) -> MarketContext {
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 fn market_with_inflation(curve: InflationCurve) -> MarketContext {
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 fn market_with_surface(surface: VolSurface) -> MarketContext {
@@ -293,6 +297,13 @@ fn test_discount_curve_ordered_intervals_match_custom_schedule() {
 fn test_inflation_curve_shift() {
     let base = sample_date();
     let curve_t0 = InflationCurve::builder("CPI-USD")
+        .series(Some(
+            finstack_quant_core::market_data::scalars::InflationSeries {
+                series_id: "BLS:CUUR0000SA0".into(),
+                reference_base: "1982-84=100".into(),
+                seasonally_adjusted: false,
+            },
+        ))
         .base_date(base)
         .day_count(DayCount::Act365F)
         .interp(InterpStyle::LogLinear)
@@ -303,6 +314,13 @@ fn test_inflation_curve_shift() {
 
     // 2% higher CPI at all tenors
     let curve_t1 = InflationCurve::builder("CPI-USD")
+        .series(Some(
+            finstack_quant_core::market_data::scalars::InflationSeries {
+                series_id: "BLS:CUUR0000SA0".into(),
+                reference_base: "1982-84=100".into(),
+                seasonally_adjusted: false,
+            },
+        ))
         .base_date(base)
         .day_count(DayCount::Act365F)
         .interp(InterpStyle::LogLinear)
@@ -406,7 +424,7 @@ fn test_vol_surface_point_shift() {
     let market_t0 = market_with_surface(surface_t0);
     let market_t1 = market_with_surface(surface_t1);
 
-    let shift = measure_vol_surface_shift("EQ-VOL", &market_t0, &market_t1, Some(1.0), Some(1.0))
+    let shift = measure_vol_surface_shift("EQ-VOL", &market_t0, &market_t1, 1.0, 1.0, 1.0)
         .expect("Should measure shift");
 
     // At expiry=1.0 and strike=1.0 (ATM), the constructed surfaces have:
@@ -414,11 +432,111 @@ fn test_vol_surface_point_shift() {
     // - surface_t1: 0.25
     // so the expected shift is +0.02 = +2 vol points (percentage points).
 
-    assert!((shift - 2.0).abs() < 0.5, "Expected ~2pct pts vol shift");
+    assert!(
+        (shift - 0.02).abs() < 1e-14,
+        "Expected 0.02 native volatility shift"
+    );
 }
 
 #[test]
-fn test_vol_surface_average_shift() {
+fn surface_shifts_preserve_native_normal_units_and_reject_incompatible_inputs() {
+    use finstack_quant_core::dates::{DayCountContextState, VolatilityClock};
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
+    let grid = |quote_type, secondary_axis, sigma, shift: Option<&[f64]>| {
+        VolSurface::from_grid(
+            "VOL",
+            &[1.0],
+            &[1.0],
+            &[sigma],
+            VolGridOpts {
+                secondary_axis,
+                quote_type,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
+            shift,
+        )
+        .unwrap()
+    };
+    let normal = grid(VolQuoteType::Normal, VolSurfaceAxis::Strike, 0.008, None);
+    let t0 = market_with_surface(normal.clone());
+    let t1 = market_with_surface(grid(
+        VolQuoteType::Normal,
+        VolSurfaceAxis::Strike,
+        0.009,
+        None,
+    ));
+    let measured = measure_vol_surface_shift("VOL", &t0, &t1, 1.0, 1.0, 1.0).unwrap();
+    assert!((measured - 0.001).abs() < 1e-14);
+    let clock = VolatilityClock::try_new(
+        sample_date(),
+        DayCount::Act365F,
+        DayCountContextState::default(),
+    )
+    .unwrap();
+    for changed in [
+        grid(
+            VolQuoteType::BlackLognormal,
+            VolSurfaceAxis::Strike,
+            0.20,
+            None,
+        ),
+        grid(VolQuoteType::Normal, VolSurfaceAxis::Tenor, 0.008, None),
+        normal.with_expiry_clock(clock),
+    ] {
+        assert!(
+            measure_vol_surface_shift("VOL", &t0, &market_with_surface(changed), 1.0, 1.0, 1.0)
+                .is_err()
+        );
+    }
+    let shifted = |shift| {
+        market_with_surface(grid(
+            VolQuoteType::ShiftedBlackLognormal,
+            VolSurfaceAxis::Strike,
+            0.2,
+            Some(&[shift]),
+        ))
+    };
+    assert!(
+        measure_vol_surface_shift("VOL", &shifted(0.02), &shifted(0.03), 1.0, 1.0, 1.0).is_err()
+    );
+}
+
+#[test]
+fn surface_shifts_compare_only_active_displacements_and_use_each_expiry_clock() {
+    use finstack_quant_core::dates::{DayCountContextState, VolatilityClock};
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
+    let build = |anchor, shifts: &[f64]| {
+        let surface = VolSurface::from_grid(
+            "VOL",
+            &[0.5, 1.0],
+            &[1.0],
+            &[0.12, 0.13],
+            VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::ShiftedBlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
+            Some(shifts),
+        )
+        .unwrap();
+        let clock =
+            VolatilityClock::try_new(anchor, DayCount::Act365F, DayCountContextState::default())
+                .unwrap();
+        market_with_surface(surface.with_expiry_clock(clock))
+    };
+    let opening = build(sample_date(), &[0.01, 0.02]);
+    let closing = build(sample_date().next_day().unwrap(), &[0.02, 0.03]);
+    let matched = measure_vol_surface_shift("VOL", &opening, &closing, 1.0, 0.5, 1.0).unwrap();
+    assert!((matched + 0.01).abs() < 1e-14);
+    assert!(measure_vol_surface_shift("VOL", &opening, &closing, 0.75, 0.5, 1.0).is_err());
+}
+
+#[test]
+fn test_vol_surface_shift_across_expiry_coordinates() {
     use finstack_quant_core::market_data::surfaces::{
         VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
     };
@@ -447,10 +565,10 @@ fn test_vol_surface_average_shift() {
     let market_t0 = market_with_surface(surface_t0);
     let market_t1 = market_with_surface(surface_t1);
 
-    let shift = measure_vol_surface_shift("EQ-VOL", &market_t0, &market_t1, None, None)
-        .expect("Should measure average shift");
+    let shift = measure_vol_surface_shift("EQ-VOL", &market_t0, &market_t1, 0.25, 1.0, 1.0)
+        .expect("Should measure the two requested expiries");
 
-    assert!(shift > 0.0, "Should detect positive vol shift");
+    assert!((shift + 0.01).abs() < 1e-14);
 }
 
 #[test]
@@ -458,7 +576,7 @@ fn test_vol_surface_missing_error() {
     let market_t0 = MarketContext::new();
     let market_t1 = MarketContext::new();
 
-    let result = measure_vol_surface_shift("MISSING", &market_t0, &market_t1, None, None);
+    let result = measure_vol_surface_shift("MISSING", &market_t0, &market_t1, 1.0, 1.0, 1.0);
 
     assert!(result.is_err(), "Should error on missing surface");
 }
@@ -481,7 +599,7 @@ fn test_vol_surface_zero_shift() {
 
     let market = market_with_surface(surface);
 
-    let shift = measure_vol_surface_shift("EQ-VOL", &market, &market, None, None)
+    let shift = measure_vol_surface_shift("EQ-VOL", &market, &market, 1.0, 1.0, 1.0)
         .expect("Should measure shift");
 
     assert_eq!(shift, 0.0, "Same surface should produce zero shift");
@@ -844,7 +962,7 @@ fn test_vol_surface_single_expiry() {
     let market_t0 = market_with_surface(surface_t0);
     let market_t1 = market_with_surface(surface_t1);
 
-    let shift = measure_vol_surface_shift("TEST-VOL", &market_t0, &market_t1, None, None)
+    let shift = measure_vol_surface_shift("TEST-VOL", &market_t0, &market_t1, 1.0, 1.0, 1.0)
         .expect("Should measure shift");
 
     assert!(shift > 0.0, "Should detect positive shift");

@@ -53,7 +53,9 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let market = MarketContext::new().insert(discount);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let schedule = loan
         .raw_cashflow_schedule(&market, issue)
         .expect("loan cashflows");
@@ -191,7 +193,7 @@ fn newly_funded_balance_closes_on_economic_principal_dates() {
     use finstack_quant_statements::capital_structure::calculate_period_flows;
     let periods = finstack_quant_core::dates::build_periods("2025Q1..2025Q2", None)
         .expect("valid periods")
-        .periods;
+        .into_periods();
     let market = MarketContext::new();
     for (economic, payment, expected_close) in [
         // Amortized in the quarter, settled after it: the balance is already lower.
@@ -245,7 +247,9 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let market = MarketContext::new().insert(discount);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     for issue in [date!(2024 - 01 - 01), date!(2024 - 01 - 15)] {
         let mut loan = TermLoan::example().expect("canonical term loan");
         loan.id = INSTRUMENT.into();
@@ -359,7 +363,9 @@ fn evaluator_prepays_a_term_loan_and_a_revolver_and_records_the_outcome() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let market = MarketContext::new().insert(discount);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
 
     let quarters: Vec<_> = (1..=4)
         .map(|quarter| PeriodId::quarter(2024, quarter).expect("valid quarter"))
@@ -893,15 +899,17 @@ fn a_floating_coupon_keeps_its_rate_when_rebuilt_after_a_sweep() {
     loan.rate = TermLoan::example_floating_with_ddtl()
         .expect("floating loan")
         .rate;
-    let market = MarketContext::new().insert(
-        finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
-            "USD-SOFR-3M",
-            date!(2025 - 01 - 01),
-            0.03,
-            DayCount::Act360,
+    let market = MarketContext::new()
+        .try_insert(
+            finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
+                "USD-SOFR-3M",
+                date!(2025 - 01 - 01),
+                0.03,
+                DayCount::Act360,
+            )
+            .expect("forward curve"),
         )
-        .expect("forward curve"),
-    );
+        .expect("insert market curve");
     use finstack_quant_core::market_data::scalars::{
         ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
     };

@@ -806,14 +806,27 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
 
 def _volatility_cases() -> dict[str, Callable[[], Any]]:
     svi = lambda: volatility.SviParams(*SVI)  # noqa: E731
-    tenor_slice = lambda: volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04], "lognormal")  # noqa: E731
+    tenor_slice = lambda: volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04], "lognormal", "vol")  # noqa: E731
     expiry_slice = lambda: volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04], "lognormal")  # noqa: E731
     grid_slice = lambda: VolCubeExpirySlice(  # noqa: E731
         "GRID", 1.0, [2.0, 5.0], [0.02, 0.03, 0.04], [0.3, 0.25, 0.27, 0.28, 0.24, 0.26], quote_type="black_lognormal"
     )
-    fx = lambda: FxDeltaVolSurface("EURUSD", "EUR/USD", [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.002, 0.003])  # noqa: E731
+
+    def fx() -> FxDeltaVolSurface:
+        return FxDeltaVolSurface(
+            "EURUSD",
+            "EUR/USD",
+            [0.5, 1.0],
+            [0.10, 0.11],
+            [0.01, 0.012],
+            [0.002, 0.003],
+            delta_convention="forward_unadjusted",
+            atm_convention="delta_neutral_straddle",
+            butterfly_convention="smile",
+        )
+
     greeks = lambda: models.bs_greeks(_gbm("call"))  # noqa: E731
-    smile = lambda: volatility.SabrSmile(volatility.SabrParameters(0.2, 1.0, 0.3, -0.2), 100.0, 1.5)  # noqa: E731
+    smile = lambda: volatility.SabrSmile(volatility.SabrParameters(0.2, 1.0, 0.3, -0.2), 100.0, 1.5, "black_lognormal")  # noqa: E731
     implied = lambda: VolSurface(  # noqa: E731
         "SKEW",
         LV_EXPIRIES,
@@ -844,7 +857,7 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
         ],
         "volatility.cube_slices": lambda: [
             _surface_vols(tenor_slice()),
-            _surface_vols(volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04], "normal")),
+            _surface_vols(volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04], "normal", "vol")),
             _surface_vols(volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04], "lognormal")),
             _surface_vols(volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04], "normal")),
             volatility.get_surface_vol(tenor_slice(), 1.5, 0.025),
@@ -862,6 +875,7 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
             volatility.materialize_fx_delta_surface(
                 fx(),
                 [1.10 * math.exp(0.01 * 0.5), 1.10 * math.exp(0.01 * 1.0)],
+                "vol",
             )
         ),
         "volatility.sabr_smile": lambda: [smile().forward, smile().time_to_expiry],

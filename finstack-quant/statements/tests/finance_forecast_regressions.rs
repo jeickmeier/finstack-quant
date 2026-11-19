@@ -825,10 +825,10 @@ fn a_single_run_replays_from_its_recorded_stream() {
         ),
         ("x", seed, 1)
     );
-    let mut rng = Pcg64Rng::new_with_stream(recorded.state, recorded.stream);
+    let mut rng = Pcg64Rng::new(recorded.state, recorded.stream);
     let mut level = 100.0;
     for index in [2, 3, 4] {
-        level += 1.5 + 3.0 * rng.normal(0.0, 1.0);
+        level += 1.5 + 3.0 * rng.normal(0.0, 1.0).unwrap();
         assert_eq!(
             result.get("x", &quarter(index)).unwrap().to_bits(),
             level.to_bits()

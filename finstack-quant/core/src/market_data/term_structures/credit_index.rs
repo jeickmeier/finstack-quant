@@ -21,7 +21,7 @@
 
 use super::{BaseCorrelationCurve, hazard_curve::HazardCurve};
 use crate::Result;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, btree_map::Entry};
 use std::sync::Arc;
 
 /// Aggregated market data for a specific credit index.
@@ -68,9 +68,9 @@ impl CreditIndexData {
             recovery_rate: Some(self.recovery_rate),
             index_credit_curve: Some(Arc::clone(&self.index_credit_curve)),
             base_correlation_curve: Some(Arc::clone(&self.base_correlation_curve)),
-            issuer_credit_curves: self.issuer_credit_curves.clone(),
-            issuer_recovery_rates: self.issuer_recovery_rates.clone(),
-            issuer_weights: self.issuer_weights.clone(),
+            issuer_credit_curves: self.issuer_credit_curves.clone().map(Ok),
+            issuer_recovery_rates: self.issuer_recovery_rates.clone().map(Ok),
+            issuer_weights: self.issuer_weights.clone().map(Ok),
         }
     }
 
@@ -129,16 +129,25 @@ impl CreditIndexData {
         validate_issuer_weights(&self.issuer_credit_curves, &self.issuer_weights)
     }
 
-    /// Get the credit curve for a specific issuer.
+    /// Resolve the hazard curve of an identified pool member.
     ///
-    /// Returns the issuer-specific curve if available, otherwise falls back
-    /// to the index curve (homogeneous portfolio assumption).
-    pub fn get_issuer_curve(&self, issuer_id: &str) -> &HazardCurve {
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Exact, case-sensitive issuer key in the named pool roster.
+    ///
+    /// # Errors
+    ///
+    /// Returns a lookup error for an unknown issuer or a pool without a named roster.
+    pub fn get_issuer_curve(&self, issuer_id: &str) -> crate::Result<&HazardCurve> {
         self.issuer_credit_curves
             .as_ref()
             .and_then(|curves| curves.get(issuer_id))
-            .map(|arc| arc.as_ref())
-            .unwrap_or(self.index_credit_curve.as_ref())
+            .map(AsRef::as_ref)
+            .ok_or_else(|| {
+                crate::Error::Input(crate::InputError::NotFound {
+                    id: format!("credit index member '{issuer_id}'"),
+                })
+            })
     }
 
     /// Check if heterogeneous pricing mode is available.
@@ -164,22 +173,42 @@ impl CreditIndexData {
     ///
     /// Returns the issuer-specific recovery rate if available, otherwise falls back
     /// to the index recovery rate (homogeneous portfolio assumption).
-    pub fn get_issuer_recovery(&self, issuer_id: &str) -> f64 {
-        self.issuer_recovery_rates
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Exact, case-sensitive issuer key in the named pool roster.
+    ///
+    /// # Errors
+    ///
+    /// Returns a lookup error for an unknown issuer or a pool without a named roster.
+    pub fn get_issuer_recovery(&self, issuer_id: &str) -> crate::Result<f64> {
+        self.get_issuer_curve(issuer_id)?;
+        Ok(self
+            .issuer_recovery_rates
             .as_ref()
             .and_then(|m| m.get(issuer_id).copied())
-            .unwrap_or(self.recovery_rate)
+            .unwrap_or(self.recovery_rate))
     }
 
     /// Get the weight for a specific issuer.
     ///
     /// Returns the issuer-specific weight if available, otherwise falls back
     /// to equal weighting (1/N).
-    pub fn get_issuer_weight(&self, issuer_id: &str) -> f64 {
-        self.issuer_weights
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Exact, case-sensitive issuer key in the named pool roster.
+    ///
+    /// # Errors
+    ///
+    /// Returns a lookup error for an unknown issuer or a pool without a named roster.
+    pub fn get_issuer_weight(&self, issuer_id: &str) -> crate::Result<f64> {
+        self.get_issuer_curve(issuer_id)?;
+        Ok(self
+            .issuer_weights
             .as_ref()
             .and_then(|m| m.get(issuer_id).copied())
-            .unwrap_or(1.0 / self.num_constituents as f64)
+            .unwrap_or(1.0 / self.num_constituents as f64))
     }
 }
 
@@ -228,9 +257,9 @@ pub struct CreditIndexDataBuilder {
     recovery_rate: Option<f64>,
     index_credit_curve: Option<Arc<HazardCurve>>,
     base_correlation_curve: Option<Arc<BaseCorrelationCurve>>,
-    issuer_credit_curves: Option<BTreeMap<String, Arc<HazardCurve>>>,
-    issuer_recovery_rates: Option<BTreeMap<String, f64>>,
-    issuer_weights: Option<BTreeMap<String, f64>>,
+    issuer_credit_curves: Option<Result<BTreeMap<String, Arc<HazardCurve>>>>,
+    issuer_recovery_rates: Option<Result<BTreeMap<String, f64>>>,
+    issuer_weights: Option<Result<BTreeMap<String, f64>>>,
 }
 
 impl CreditIndexDataBuilder {
@@ -261,9 +290,8 @@ impl CreditIndexDataBuilder {
     /// Set issuer-specific credit curves for heterogeneous portfolio modeling.
     ///
     /// Entries are stored by issuer identifier in lexicographic order so
-    /// snapshots are deterministic. If `curves` repeats an identifier, the
-    /// last curve yielded by the iterator replaces earlier values. Validation
-    /// is deferred until [`build`](Self::build), which requires exactly
+    /// snapshots are deterministic. Blank or repeated identifiers fail
+    /// validation in [`build`](Self::build), which requires exactly
     /// `num_constituents` distinct issuer curves so no pool weight is omitted.
     ///
     /// # Arguments
@@ -278,13 +306,13 @@ impl CreditIndexDataBuilder {
     where
         I: IntoIterator<Item = (String, Arc<HazardCurve>)>,
     {
-        self.issuer_credit_curves = Some(curves.into_iter().collect());
+        self.issuer_credit_curves = Some(collect_issuers(curves));
         self
     }
     /// Set issuer-specific recovery rates for heterogeneous portfolio modeling.
     ///
-    /// Entries are stored in lexicographic issuer order. Repeated identifiers
-    /// use the last value yielded by the iterator. Validation is deferred until
+    /// Entries are stored in lexicographic issuer order. Duplicate or blank
+    /// identifiers fail validation in
     /// [`build`](Self::build), which requires issuer curves, rejects unknown
     /// identifiers, and checks each recovery lies in the inclusive `[0, 1]`
     /// range.
@@ -299,17 +327,17 @@ impl CreditIndexDataBuilder {
     where
         I: IntoIterator<Item = (String, f64)>,
     {
-        self.issuer_recovery_rates = Some(rates.into_iter().collect());
+        self.issuer_recovery_rates = Some(collect_issuers(rates));
         self
     }
 
     /// Set issuer-specific weights for heterogeneous portfolio modeling.
     ///
-    /// Entries are stored in lexicographic issuer order. Repeated identifiers
-    /// use the last value yielded by the iterator. Validation is deferred until
+    /// Entries are stored in lexicographic issuer order. Duplicate or blank
+    /// identifiers fail validation in
     /// [`build`](Self::build), which requires exact coverage of the issuer
-    /// curves, rejects unknown identifiers and negative or non-finite values,
-    /// and requires the weights to sum to `1.0` within `1e-9`.
+    /// curves, rejects weights outside `[0, 1]`, and requires the compensated
+    /// sum to differ from `1.0` by at most `f64::EPSILON`.
     ///
     /// # Arguments
     ///
@@ -321,7 +349,7 @@ impl CreditIndexDataBuilder {
     where
         I: IntoIterator<Item = (String, f64)>,
     {
-        self.issuer_weights = Some(weights.into_iter().collect());
+        self.issuer_weights = Some(collect_issuers(weights));
         self
     }
 
@@ -350,13 +378,83 @@ impl CreditIndexDataBuilder {
             recovery_rate,
             index_credit_curve,
             base_correlation_curve,
-            issuer_credit_curves: self.issuer_credit_curves,
-            issuer_recovery_rates: self.issuer_recovery_rates,
-            issuer_weights: self.issuer_weights,
+            issuer_credit_curves: self.issuer_credit_curves.transpose()?,
+            issuer_recovery_rates: self.issuer_recovery_rates.transpose()?,
+            issuer_weights: self.issuer_weights.transpose()?,
         };
         data.validate()?;
         Ok(data)
     }
+}
+
+fn insert_issuer<T>(map: &mut BTreeMap<String, T>, issuer: String, value: T) -> Result<()> {
+    crate::validation::validate_non_blank(&issuer, "issuer ID")?;
+    match map.entry(issuer) {
+        Entry::Vacant(entry) => {
+            entry.insert(value);
+            Ok(())
+        }
+        Entry::Occupied(entry) => Err(crate::Error::Validation(format!(
+            "duplicate issuer ID '{}'",
+            entry.key()
+        ))),
+    }
+}
+
+fn collect_issuers<T>(
+    entries: impl IntoIterator<Item = (String, T)>,
+) -> Result<BTreeMap<String, T>> {
+    let mut map = BTreeMap::new();
+    for (issuer, value) in entries {
+        insert_issuer(&mut map, issuer, value)?;
+    }
+    Ok(map)
+}
+
+/// Read issuer maps directly from the input stream to reject repeated keys.
+pub(in crate::market_data) fn deserialize_issuer_map<'de, D, T>(
+    deserializer: D,
+) -> std::result::Result<Option<BTreeMap<String, T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    struct IssuerMapVisitor<T>(std::marker::PhantomData<T>);
+    impl<'de, T: serde::Deserialize<'de>> serde::de::Visitor<'de> for IssuerMapVisitor<T> {
+        type Value = Option<BTreeMap<String, T>>;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("null or a map keyed by unique nonblank issuer IDs")
+        }
+
+        fn visit_none<E: serde::de::Error>(self) -> std::result::Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        // Internally tagged containers replay a buffered JSON null as unit.
+        fn visit_unit<E: serde::de::Error>(self) -> std::result::Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_some<D: serde::Deserializer<'de>>(
+            self,
+            de: D,
+        ) -> std::result::Result<Self::Value, D::Error> {
+            de.deserialize_map(self)
+        }
+
+        fn visit_map<A: serde::de::MapAccess<'de>>(
+            self,
+            mut access: A,
+        ) -> std::result::Result<Self::Value, A::Error> {
+            let mut map = BTreeMap::new();
+            while let Some((issuer, value)) = access.next_entry()? {
+                insert_issuer(&mut map, issuer, value).map_err(serde::de::Error::custom)?;
+            }
+            Ok(Some(map))
+        }
+    }
+    deserializer.deserialize_option(IssuerMapVisitor(std::marker::PhantomData))
 }
 
 fn validate_issuer_curves(
@@ -434,27 +532,20 @@ fn validate_issuer_weights(
             curves.len()
         )));
     }
-    let mut weight_sum = 0.0;
-    for (issuer, weight) in weights {
+    for (issuer, &weight) in weights {
         if !curves.contains_key(issuer) {
             return Err(crate::Error::Validation(format!(
                 "issuer_weights contains unknown issuer '{issuer}'"
             )));
         }
-        if !weight.is_finite() {
+        if !(0.0..=1.0).contains(&weight) {
             return Err(crate::Error::Validation(format!(
-                "issuer_weights[{issuer}] must be finite, got {weight}"
+                "issuer_weights[{issuer}] must be finite and in [0, 1], got {weight}"
             )));
         }
-        if *weight < 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "issuer_weights[{issuer}] must be non-negative, got {weight}"
-            )));
-        }
-        weight_sum += *weight;
     }
-
-    if (weight_sum - 1.0).abs() > 1e-9 {
+    let weight_sum = crate::math::summation::neumaier_sum(weights.values().copied())?;
+    if (weight_sum - 1.0).abs() > f64::EPSILON {
         return Err(crate::Error::Validation(format!(
             "issuer_weights must sum to 1.0, got {weight_sum}"
         )));

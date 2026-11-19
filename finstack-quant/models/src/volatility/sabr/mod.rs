@@ -29,7 +29,7 @@
 //! | Strike (K) | Same units as forward | Decimal for rates, price units for equity |
 //! | Alpha (α) | Initial stochastic vol | Same scale as F^β |
 //! | Time (T) | Time to expiry | Years |
-//! | Output | Implied volatility — lognormal (Black) for β>0, **normal (Bachelier)** for β≈0; see `SabrParameters::quote_convention` | Decimal (0.20 = 20%) / absolute rate units |
+//! | Output | Implied volatility — explicit Black, shifted Black, or Normal (Bachelier) output | Decimal (0.20 = 20%) / absolute rate units |
 
 mod calibration;
 mod expansion;

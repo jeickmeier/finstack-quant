@@ -75,8 +75,7 @@ pub(crate) fn build_initial_context(
                 ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::PriceCurve(c) | PriorMarketObject::VolatilityIndexCurve(c) => {
-                // The tag states the curve family; a vol-index curve is the one
-                // carrying `spot_level`, a price curve the one carrying `spot_price`.
+                // The outer calibration tag must match the declared level family.
                 let expected = match obj {
                     PriorMarketObject::VolatilityIndexCurve(_) => PriceCurveKind::VolIndex,
                     _ => PriceCurveKind::Price,
@@ -92,7 +91,7 @@ pub(crate) fn build_initial_context(
                 ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::VolSurface(s) => {
-                ctx.try_insert_surface_mut(s.clone())?;
+                ctx.insert_surface_mut(s.clone());
             }
         }
     }
@@ -129,10 +128,10 @@ pub(crate) fn build_initial_context(
                 credit_states.push(c);
             }
             MarketDatum::FxVolSurface(s) => {
-                ctx.try_insert_fx_delta_vol_surface_mut(s.clone())?;
+                ctx.insert_fx_delta_vol_surface_mut(s.clone());
             }
             MarketDatum::VolCube(c) => {
-                ctx.try_insert_vol_cube_mut(c.clone())?;
+                ctx.insert_vol_cube_mut(c.clone());
             }
             // Quote variants are consumed per-step by the engine, not stored
             // on the market context.
@@ -223,6 +222,9 @@ mod tests {
 
         let curve = |kind| {
             PriceCurve::builder("VIX")
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                 .kind(kind)
                 .base_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
                 .knots([(0.0, 15.0), (1.0, 18.0)])

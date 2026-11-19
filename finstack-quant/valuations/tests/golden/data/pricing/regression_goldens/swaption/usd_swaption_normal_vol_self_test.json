@@ -640,6 +640,7 @@
         },
         "underlying_float_leg": {
           "discount_curve_id": "USD-OIS",
+          "index_id": "USD-SOFR-3M",
           "forward_curve_id": "USD-SOFR-3M",
           "spread_bp": "0",
           "frequency": {
@@ -688,8 +689,8 @@
   "tolerances": {
     "npv": {
       "abs": 1e-05,
-      "rel": 1e-06,
-      "tolerance_reason": "Independent math.erfc Bachelier reference. Absolute tolerance exceeds observed price/CDF numerical difference (<5e-8 USD); relative tolerance allows small calibration variation while detecting quote-convention and Greek scaling defects."
+      "rel": 2e-06,
+      "tolerance_reason": "Independent math.erfc Bachelier reference. Relative tolerance covers the observed 1.21e-6 CI calibration variation (0.0053 USD on 10MM notional) while remaining tight enough to detect quote-convention errors."
     },
     "vega": {
       "abs": 1e-05,

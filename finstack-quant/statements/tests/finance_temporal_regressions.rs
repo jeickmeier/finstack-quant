@@ -65,7 +65,7 @@ fn fiscal_weekly_offsets_include_the_short_final_week() {
         None,
     )
     .unwrap()
-    .periods;
+    .into_periods();
     assert_eq!(periods[1].id.index(), 53);
     assert_eq!((periods[1].end - periods[1].start).whole_days(), 2);
     let model = offset_model(periods.clone(), &[100.0, 110.0, 121.0, 133.1]);
@@ -95,7 +95,7 @@ fn fiscal_daily_offsets_cross_leap_and_nonleap_fiscal_years() {
             None,
         )
         .unwrap()
-        .periods;
+        .into_periods();
         assert_eq!(periods[1].id.index(), expected_final_ordinal);
         assert_eq!(periods[2].id.index(), 1);
         let model = offset_model(periods.clone(), &[100.0, 110.0, 121.0, 133.1]);
@@ -115,7 +115,7 @@ fn fiscal_daily_offsets_cross_leap_and_nonleap_fiscal_years() {
 #[test]
 fn growth_rate_annualizes_quarterly_and_monthly_observations() {
     for (range, frequency) in [("2024Q1..2025Q1", 4), ("2024M1..2025M1", 12)] {
-        let periods = build_periods(range, None).unwrap().periods;
+        let periods = build_periods(range, None).unwrap().into_periods();
         let values: Vec<_> = periods
             .iter()
             .enumerate()
@@ -161,15 +161,17 @@ fn daily_and_weekly_growth_use_actual_365_fixed_between_period_end_dates() {
         None,
     )
     .unwrap()
-    .periods;
+    .into_periods();
     let fiscal_daily = build_fiscal_periods(
         "FY2024D366..FY2025D1",
         FiscalConfig::new(10, 1).expect("valid fiscal start"),
         None,
     )
     .unwrap()
-    .periods;
-    let calendar_daily = build_periods("2023D365..2024D2", None).unwrap().periods;
+    .into_periods();
+    let calendar_daily = build_periods("2023D365..2024D2", None)
+        .unwrap()
+        .into_periods();
     for periods in [fiscal_weekly, fiscal_daily, calendar_daily] {
         let origin = periods[0].end.previous_day().unwrap();
         let values: Vec<_> = periods
@@ -219,7 +221,7 @@ fn snapshot(period: PeriodId, value: f64) -> CapitalStructureCashflows {
 
 #[test]
 fn parser_produced_cs_references_work_in_historical_functions() {
-    let periods = build_periods("2025M1..M6", None).unwrap().periods;
+    let periods = build_periods("2025M1..M6", None).unwrap().into_periods();
     let current = periods.last().unwrap().id;
     // A standalone capital-structure context need not also manufacture empty
     // statement rows for every cashflow snapshot.
@@ -327,7 +329,7 @@ fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
         None,
     )
     .unwrap()
-    .periods;
+    .into_periods();
     let values: Vec<_> = periods
         .iter()
         .zip([1.0, 2.0, 4.0, 8.0])
@@ -355,7 +357,9 @@ fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
 
 #[test]
 fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
-    let all_days = build_periods("2024D1..2025D365", None).unwrap().periods;
+    let all_days = build_periods("2024D1..2025D365", None)
+        .unwrap()
+        .into_periods();
     for business_only in [false, true] {
         // The plan is every calendar day; a business-day model leaves the
         // weekend observations out.
@@ -404,19 +408,14 @@ fn model_rejects_periods_of_mixed_kinds() {
         ("2025M01..2025M06", "2025H2..2025H2"),
         ("2025Q1..2025Q2", "2025M07..2025M12"),
     ] {
-        let mut periods = build_periods(fine, None).unwrap().periods;
-        periods.extend(build_periods(coarse, None).unwrap().periods);
-        let mut model_builder = ModelBuilder::new("mixed-frequency");
-        let err = match model_builder
-            .periods_explicit(fixture_plan(periods))
-            .map(|_| ())
-        {
-            Err(err) => err,
-            Ok(()) => model_builder
-                .build()
-                .expect_err("mixed period kinds must be rejected"),
-        };
-        assert!(err.to_string().contains("one period kind"), "{err}");
+        let mut periods = build_periods(fine, None).unwrap().into_periods();
+        periods.extend(build_periods(coarse, None).unwrap().into_periods());
+        let err = finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect_err("a mixed-frequency plan cannot be supplied to the model");
+        assert!(err.to_string().contains("one frequency"), "{err}");
     }
 }
 
@@ -435,7 +434,6 @@ fn weekly_ttm_is_an_evaluation_error() {
         .unwrap(),
     ] {
         let values: Vec<_> = plan
-            .periods
             .iter()
             .map(|period| (period.id, AmountOrScalar::scalar(1.0)))
             .collect();
@@ -658,7 +656,7 @@ fn month_to_quarter_windows_follow_the_fiscal_quarter() {
         None,
     )
     .unwrap()
-    .periods;
+    .into_periods();
     let values: Vec<_> = periods
         .iter()
         .zip(1..)

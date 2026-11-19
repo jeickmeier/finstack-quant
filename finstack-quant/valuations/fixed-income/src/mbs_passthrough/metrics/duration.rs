@@ -227,7 +227,10 @@ mod tests {
         )
         .expect("fixing series");
 
-        MarketContext::new().insert(disc).insert_series(fixings)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .insert_series(fixings)
     }
 
     #[test]
@@ -397,16 +400,18 @@ mod production_mortgage_audit {
         let as_of = date!(2024 - 01 - 15);
         let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
         mbs.metric_pricing_overrides.bump_config.rate_bump_bp = Some(1.0);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve");
         let dynamic = duration_convexity(&mbs, &market, as_of, Some(1.0)).expect("duration");
         let result = mbs
             .price_with_metrics(&market, as_of, &[MetricId::Dv01], PricingOptions::default())
@@ -426,16 +431,18 @@ mod production_mortgage_audit {
     fn mbs_bucketed_rate_risk_reconciles_with_parallel_projection_risk() {
         let as_of = date!(2024 - 01 - 15);
         let mbs = AgencyMbsPassthrough::example().expect("mbs");
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve");
         let result = mbs
             .price_with_metrics(
                 &market,
@@ -457,16 +464,18 @@ mod production_mortgage_audit {
         let as_of = date!(2024 - 01 - 15);
         let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
         mbs.prepayment_spec = PrepaymentModelSpec::psa(0.0);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve");
         assert!(
             duration_convexity(&mbs, &market, as_of, None)
                 .expect("duration")

@@ -167,7 +167,18 @@ impl Cs01Request {
     }
 }
 
-/// Swap `bumped` into `scratch`, revalue, and restore `original`.
+/// Price with a replacement hazard curve and restore the original curve after repricing.
+///
+/// # Arguments
+///
+/// * `scratch` - Mutable pricing context holding the original hazard curve and any dependent credit indices.
+/// * `bumped` - Replacement under the original hazard curve's market identifier.
+/// * `original` - Shared hazard curve to restore after the pricing callback returns.
+/// * `revalue_raw` - Pricing callback run once after a successful replacement. Its result is the bumped PV.
+///
+/// # Errors
+///
+/// Propagates insertion, repricing, and restoration errors. A rejected replacement prevents repricing.
 pub fn reprice_with_hazard<B, F>(
     scratch: &mut MarketContext,
     bumped: B,
@@ -178,9 +189,9 @@ where
     B: Into<finstack_quant_core::market_data::context::CurveStorage>,
     F: FnMut(&MarketContext) -> finstack_quant_core::Result<f64>,
 {
-    scratch.insert_mut(bumped);
+    scratch.try_insert_mut(bumped)?;
     let pv = revalue_raw(scratch);
-    scratch.insert_mut(Arc::clone(original));
+    scratch.try_insert_mut(Arc::clone(original))?;
     pv
 }
 
@@ -535,6 +546,33 @@ pub fn cs01_reval(
 mod tests {
     use super::validate_buckets_strictly_increasing;
     use finstack_quant_core::math::summation::NeumaierAccumulator;
+
+    #[test]
+    fn rejected_hazard_swap_returns_before_repricing() -> finstack_quant_core::Result<()> {
+        use finstack_quant_core::dates::DayCount;
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+        use std::sync::Arc;
+        let date = time::macros::date!(2025 - 01 - 01);
+        let hazard = Arc::new(HazardCurve::flat(
+            "CREDIT",
+            date,
+            0.02,
+            0.4,
+            DayCount::Act365F,
+        )?);
+        let discount = DiscountCurve::flat("CREDIT", date, 0.03, DayCount::Act365F)?;
+        let mut scratch = MarketContext::new().try_insert(discount)?;
+        let mut repriced = false;
+        let result = super::reprice_with_hazard(&mut scratch, Arc::clone(&hazard), &hazard, |_| {
+            repriced = true;
+            Ok(0.0)
+        });
+        assert!(result.is_err());
+        assert!(!repriced);
+        assert!(scratch.get_discount("CREDIT").is_ok());
+        Ok(())
+    }
 
     #[test]
     fn test_central_vs_forward_difference() {

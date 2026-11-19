@@ -162,7 +162,8 @@ fn total_variance_materialized_slice_matches_canonical_cube_query() {
         2.0,
         strike,
         finstack_quant_models::volatility::VolatilityConvention::Lognormal,
-    );
+    )
+    .unwrap();
     let actual =
         finstack_quant_models::volatility::get_cube_expiry_slice_vol(&surface, 2.0, strike)
             .unwrap();
@@ -182,7 +183,8 @@ fn total_variance_materialized_slice_matches_canonical_cube_query() {
             &cube,
             f64::NAN,
             &[strike],
-            finstack_quant_models::volatility::VolatilityConvention::Lognormal
+            finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+            finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
         )
         .is_err()
     );
@@ -224,7 +226,7 @@ fn vol_cube_clamped_queries_propagate_non_finite_coordinates() {
             0.03,
             finstack_quant_models::volatility::VolatilityConvention::Lognormal
         )
-        .is_nan()
+        .is_err()
     );
     assert!(
         finstack_quant_models::volatility::get_cube_vol_clamped(
@@ -234,7 +236,7 @@ fn vol_cube_clamped_queries_propagate_non_finite_coordinates() {
             0.03,
             finstack_quant_models::volatility::VolatilityConvention::Lognormal
         )
-        .is_nan()
+        .is_err()
     );
     assert!(
         finstack_quant_models::volatility::get_cube_vol_clamped(
@@ -244,7 +246,7 @@ fn vol_cube_clamped_queries_propagate_non_finite_coordinates() {
             f64::NAN,
             finstack_quant_models::volatility::VolatilityConvention::Lognormal
         )
-        .is_nan()
+        .is_err()
     );
 }
 
@@ -342,7 +344,8 @@ fn test_vol_cube_vol_clamped_extrapolation() {
         2.0,
         0.03,
         finstack_quant_models::volatility::VolatilityConvention::Lognormal,
-    );
+    )
+    .unwrap();
     assert!(vol.is_finite() && vol > 0.0);
 }
 
@@ -389,6 +392,7 @@ fn test_vol_cube_materialize_tenor_slice() {
         5.0,
         &strikes,
         finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
     )
     .unwrap();
     assert_eq!(surface.expiries(), &[1.0, 5.0]);
@@ -471,6 +475,7 @@ fn shifted_materialization_preserves_convention_and_displacement_rows() {
         5.0,
         &[0.02, 0.03, 0.04],
         finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
     )
     .unwrap();
     assert_eq!(surface.quote_type(), VolQuoteType::ShiftedBlackLognormal);
@@ -592,7 +597,7 @@ fn normal_sabr_clamped_path_rejects_nonpositive_shifted_levels() {
             -0.01,
             finstack_quant_models::volatility::VolatilityConvention::Normal
         )
-        .is_nan()
+        .is_err()
     );
 
     let normal = SabrParameterData::new(0.01, 0.0, 0.4, -0.2, None).unwrap();
@@ -605,7 +610,7 @@ fn normal_sabr_clamped_path_rejects_nonpositive_shifted_levels() {
             -0.02,
             finstack_quant_models::volatility::VolatilityConvention::Normal
         )
-        .is_finite()
+        .is_ok()
     );
 }
 
@@ -853,7 +858,7 @@ fn test_vol_cube_vol_normal_rejects_degenerate_point() {
             0.02,
             finstack_quant_models::volatility::VolatilityConvention::Normal
         )
-        .is_nan()
+        .is_err()
     );
 }
 
@@ -874,6 +879,7 @@ fn test_vol_cube_materialize_tenor_slice_normal() {
         5.0,
         &strikes,
         finstack_quant_models::volatility::VolatilityConvention::Normal,
+        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
     )
     .unwrap();
     assert_eq!(surface.quote_type(), VolQuoteType::Normal);
@@ -951,24 +957,13 @@ fn zero_vol_of_vol_cube_preserves_the_exact_black_limit() {
     }
 }
 
-/// Bit-level pin of the SABR-cube lookups that branch on the node's quote
-/// convention: `VolSource::get_convention`, the Black and normal lookups and
-/// their clamped forms, for lognormal, displaced and β = 0 cubes in both
-/// interpolation modes. `u64::MAX` marks a rejected lookup.
 #[test]
-fn cube_convention_and_vol_lookups_are_bit_stable() {
+fn cube_lookups_agree_on_explicit_quote_conventions() {
     use finstack_quant_models::volatility::{
         VolSource, VolatilityConvention, get_cube_vol, get_cube_vol_clamped,
     };
     use std::sync::Arc;
 
-    // (number of pinned values, FNV-1a style fold of their bit patterns).
-    // SABR evaluation calls platform libm, so macOS and the Linux libm on
-    // GitHub Actions each have one fold. A third fold means a lookup moved.
-    const PINS: [(usize, u64); 2] = [
-        (1044, 10_630_799_891_945_969_391),
-        (1044, 10_806_975_138_623_105_775),
-    ];
     let nodes = |beta: f64, shift: Option<f64>| -> Vec<SabrParameterData> {
         [
             (0.030, -0.2, 0.4),
@@ -983,7 +978,6 @@ fn cube_convention_and_vol_lookups_are_bit_stable() {
         })
         .collect()
     };
-    let mut actual = Vec::new();
     for (beta, shift, forwards) in [
         (0.5, None, [0.030, 0.035, 0.040, 0.045]),
         (1.0, None, [0.030, 0.035, 0.040, 0.045]),
@@ -996,96 +990,141 @@ fn cube_convention_and_vol_lookups_are_bit_stable() {
             VolInterpolationMode::Vol,
             VolInterpolationMode::TotalVariance,
         ] {
-            let Ok(cube) = VolCube::from_grid(
-                "PIN",
+            let cube = VolCube::from_grid(
+                "EXPLICIT",
                 &[1.0, 5.0],
                 &[2.0, 10.0],
                 &nodes(beta, shift),
                 &forwards,
-            ) else {
-                actual.push(u64::MAX - 1);
-                continue;
-            };
-            let cube = cube.with_interpolation_mode(mode);
+            )
+            .unwrap()
+            .with_interpolation_mode(mode);
             let source = VolSource::Cube(Arc::new(cube.clone()));
             for (expiry, tenor) in [(1.0, 2.0), (2.5, 6.0), (5.0, 10.0)] {
-                actual.push(match source.get_convention(expiry, tenor) {
-                    Ok(VolatilityConvention::Normal) => 1,
-                    Ok(VolatilityConvention::Lognormal) => 2,
-                    Ok(VolatilityConvention::ShiftedLognormal { shift }) => shift.to_bits(),
-                    Err(_) => u64::MAX,
+                assert!(source.get_convention(expiry, tenor).is_err());
+                let black = shift.map_or(VolatilityConvention::Lognormal, |shift| {
+                    VolatilityConvention::ShiftedLognormal { shift }
                 });
+                assert_eq!(
+                    source
+                        .get_cube_convention(expiry, tenor, black, false)
+                        .unwrap(),
+                    black
+                );
                 for strike in [-0.01, 0.005, 0.03, 0.08] {
-                    actual.push(
-                        source
-                            .get_vol(expiry, tenor, strike)
-                            .map_or(u64::MAX, f64::to_bits),
-                    );
-                    actual.push(
-                        source
-                            .get_normal_vol(expiry, tenor, strike)
-                            .map_or(u64::MAX, f64::to_bits),
-                    );
-                    actual.push(
-                        get_cube_vol(
-                            &cube,
-                            expiry,
-                            tenor,
-                            strike,
-                            finstack_quant_models::volatility::VolatilityConvention::Lognormal,
-                        )
-                        .map_or(u64::MAX, f64::to_bits),
-                    );
-                    actual.push(
-                        get_cube_vol(
-                            &cube,
-                            expiry,
-                            tenor,
-                            strike,
-                            finstack_quant_models::volatility::VolatilityConvention::Normal,
-                        )
-                        .map_or(u64::MAX, f64::to_bits),
-                    );
-                    // NaN payloads are not part of the contract; fold every NaN to one marker.
-                    for clamped in [
-                        get_cube_vol_clamped(
-                            &cube,
-                            expiry,
-                            tenor,
-                            strike,
-                            finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+                    for (convention, actual) in [
+                        (
+                            VolatilityConvention::Lognormal,
+                            source.get_vol(expiry, tenor, strike),
                         ),
-                        get_cube_vol_clamped(
-                            &cube,
-                            expiry,
-                            tenor,
-                            strike,
-                            finstack_quant_models::volatility::VolatilityConvention::Normal,
-                        ),
-                        get_cube_vol_clamped(
-                            &cube,
-                            0.25,
-                            30.0,
-                            strike,
-                            finstack_quant_models::volatility::VolatilityConvention::Normal,
+                        (
+                            VolatilityConvention::Normal,
+                            source.get_normal_vol(expiry, tenor, strike),
                         ),
                     ] {
-                        actual.push(if clamped.is_nan() {
-                            u64::MAX
-                        } else {
-                            clamped.to_bits()
-                        });
+                        let checked = get_cube_vol(&cube, expiry, tenor, strike, convention);
+                        let clamped =
+                            get_cube_vol_clamped(&cube, expiry, tenor, strike, convention);
+                        assert_eq!(
+                            actual.ok().map(f64::to_bits),
+                            checked.as_ref().ok().map(|v| v.to_bits())
+                        );
+                        assert_eq!(
+                            clamped.ok().map(f64::to_bits),
+                            checked.ok().map(f64::to_bits)
+                        );
                     }
                 }
             }
         }
     }
-    let fold = actual.iter().fold(0xcbf2_9ce4_8422_2325_u64, |hash, bits| {
-        (hash ^ bits).wrapping_mul(0x0000_0100_0000_01b3)
-    });
-    let got = (actual.len(), fold);
+}
+
+#[test]
+fn vol_cube_materialization_retains_clock_and_rejects_incompatible_shifts() {
+    use finstack_quant_core::dates::{DayCount, VolatilityClock};
+    use finstack_quant_models::volatility::{
+        VolatilityConvention, get_cube_vol, materialize_cube_expiry_slice,
+        materialize_cube_tenor_slice,
+    };
+
+    let clock = VolatilityClock::try_new(
+        time::macros::date!(2025 - 01 - 01),
+        DayCount::Act365F,
+        Default::default(),
+    )
+    .unwrap();
+    let unshifted = SabrParameterData::new(0.2, 1.0, 0.0, 0.0, None).unwrap();
+    let shifted = SabrParameterData::new(0.2, 1.0, 0.0, 0.0, Some(0.0)).unwrap();
+    let cube = VolCube::from_grid("C", &[1.0, 2.0], &[5.0], &[unshifted, shifted], &[0.03; 2])
+        .unwrap()
+        .with_expiry_clock(clock.clone());
+    let cube: VolCube = serde_json::from_str(&serde_json::to_string(&cube).unwrap()).unwrap();
+    assert_eq!(cube.expiry_clock(), Some(&clock));
+    let black = VolatilityConvention::Lognormal;
+    let normal = VolatilityConvention::Normal;
+    assert!(get_cube_vol(&cube, 1.0, 5.0, 0.03, black).is_ok());
+    assert!(get_cube_vol(&cube, 1.5, 5.0, 0.03, black).is_err());
     assert!(
-        PINS.contains(&got),
-        "vol-cube lookups moved off the macOS and Linux libm pins: {got:?}"
+        get_cube_vol(
+            &cube
+                .clone()
+                .with_interpolation_mode(VolInterpolationMode::TotalVariance),
+            1.5,
+            5.0,
+            0.03,
+            black
+        )
+        .is_err()
     );
+    assert!(
+        materialize_cube_tenor_slice(&cube, 5.0, &[0.03], black, VolInterpolationMode::Vol)
+            .is_err()
+    );
+    assert!(
+        materialize_cube_tenor_slice(&cube, 4.0, &[0.03], normal, VolInterpolationMode::Vol)
+            .is_err()
+    );
+    assert!(materialize_cube_expiry_slice(&cube, 0.5, &[0.03], normal).is_err());
+    let surface = materialize_cube_tenor_slice(
+        &cube,
+        5.0,
+        &[0.03],
+        normal,
+        VolInterpolationMode::TotalVariance,
+    )
+    .unwrap();
+    assert_eq!(surface.expiry_clock(), Some(&clock));
+    assert_eq!(
+        surface.interpolation_mode(),
+        VolInterpolationMode::TotalVariance
+    );
+    let slice = materialize_cube_expiry_slice(&cube, 2.0, &[0.03], normal).unwrap();
+    assert_eq!(slice.expiry_clock(), Some(&clock));
+}
+
+#[test]
+fn mixed_beta_nodes_preserve_endpoints_and_reject_midpoint_queries() {
+    use finstack_quant_models::volatility::{VolatilityConvention, get_cube_vol};
+    let left = SabrParameterData::new(0.04, 0.5, 0.0, 0.0, None).unwrap();
+    let right = SabrParameterData::new(0.2, 1.0, 0.0, 0.0, None).unwrap();
+    let cube =
+        VolCube::from_grid("MIXED", &[1.0], &[5.0, 10.0], &[left, right], &[0.04; 2]).unwrap();
+    let vol = |tenor| get_cube_vol(&cube, 1.0, tenor, 0.04, VolatilityConvention::Lognormal);
+    assert!((vol(5.0).unwrap() - 0.20008333333333).abs() < 1e-12);
+    assert!((vol(10.0).unwrap() - 0.20).abs() < 1e-12);
+    for tenor in [7.5, 7.50000001] {
+        assert!(
+            vol(tenor)
+                .unwrap_err()
+                .to_string()
+                .contains("different beta")
+        );
+    }
+    let right = SabrParameterData::new(0.08, 0.5, 0.0, 0.0, None).unwrap();
+    let cube =
+        VolCube::from_grid("COMMON", &[1.0], &[5.0, 10.0], &[left, right], &[0.04; 2]).unwrap();
+    let vol =
+        |tenor| get_cube_vol(&cube, 1.0, tenor, 0.04, VolatilityConvention::Lognormal).unwrap();
+    assert!((vol(7.5) - vol(7.50000001)).abs() < 1e-8);
 }

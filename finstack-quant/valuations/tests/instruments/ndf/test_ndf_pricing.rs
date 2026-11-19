@@ -37,7 +37,10 @@ fn create_test_market(as_of: Date) -> MarketContext {
     };
     let fx_matrix = FxMatrix::new(fx_provider, None);
 
-    MarketContext::new().insert(usd_curve).insert_fx(fx_matrix)
+    MarketContext::new()
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .insert_fx(fx_matrix)
 }
 
 #[test]
@@ -305,8 +308,10 @@ fn test_ndf_pricing_with_foreign_curve() {
     let fx_matrix = FxMatrix::new(fx_provider, None);
 
     let market = MarketContext::new()
-        .insert(usd_curve)
-        .insert(cny_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(cny_curve)
+        .expect("insert market curve")
         .insert_fx(fx_matrix);
 
     // NDF with foreign curve for proper CIRP calculation

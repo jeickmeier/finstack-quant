@@ -376,7 +376,7 @@ impl StochasticProcess for CreditLineProcess {
             * (self.params.credit_spread.cir.theta - x[2].max(0.0));
     }
 
-    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         // x[0] = utilization, x[1] = short_rate, x[2] = credit_spread
 
         // Utilization: σ_U (constant volatility)
@@ -385,7 +385,7 @@ impl StochasticProcess for CreditLineProcess {
         // Short rate: σ_r (constant) for floating, or 0 for fixed
         out[1] = match &self.params.interest_rate {
             InterestRateSpec::Floating { params, .. } => {
-                params.sigma_at_time(self.params.time_offset + t)
+                params.sigma_at_time(self.params.time_offset + t)?
             }
             InterestRateSpec::Fixed { .. } | InterestRateSpec::DeterministicForward { .. } => 0.0,
         };
@@ -393,6 +393,7 @@ impl StochasticProcess for CreditLineProcess {
         // Credit spread: σ_λ √λ_t (square-root diffusion)
         let lambda = x[2].max(0.0);
         out[2] = self.params.credit_spread.cir.sigma * lambda.sqrt();
+        Ok(())
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
@@ -444,7 +445,7 @@ impl ProcessMetadata for CreditLineProcess {
             } => {
                 params.add_param("rate_type", 1.0); // 1.0 = floating
                 params.add_param("rate_kappa", hw_params.model.kappa);
-                params.add_param("rate_sigma", hw_params.sigma_at_time(0.0));
+                params.add_param("rate_sigma", hw_params.model.get_values()[0]);
                 params.add_param("rate_initial", *initial);
             }
             InterestRateSpec::DeterministicForward { times, .. } => {
@@ -736,7 +737,9 @@ mod tests {
         let x = [0.5, 0.05, 0.015];
         let mut diffusion = [0.0; 3];
 
-        process.diffusion(0.0, &x, &mut diffusion);
+        process
+            .diffusion(0.0, &x, &mut diffusion)
+            .expect("valid diffusion");
 
         // Utilization: σ_U = 0.1
         assert_eq!(diffusion[0], 0.1);

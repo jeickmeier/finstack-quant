@@ -2404,7 +2404,7 @@ export default [
   {
     "path": "#/$defs/BasisSwap",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwap",
-    "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations_rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations_core::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```"
+    "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations_rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations_core::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    index_id: \"3M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    index_id: \"6M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```"
   },
   {
     "path": "#/$defs/BasisSwap/properties/allow_calendar_fallback",
@@ -3941,6 +3941,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
+    "path": "#/$defs/CashFlowAccrual/properties/nominal_dates",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CashFlowAccrual/properties/nominal_dates",
+    "description": "Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods."
+  },
+  {
+    "path": "#/$defs/CashFlowAccrual/properties/nominal_dates/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CashFlowAccrual/properties/nominal_dates/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
     "path": "#/$defs/CashFlowAccrual/properties/projected_index_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CashFlowAccrual/properties/projected_index_rate",
     "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
@@ -5117,6 +5128,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CFKind/oneOf/26",
     "const": "collateral_substitution_out",
     "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced."
+  },
+  {
+    "path": "#/$defs/CFKind/oneOf/27",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CFKind/oneOf/27",
+    "const": "derivative_settlement",
+    "description": "Net contractual derivative payoff settled in cash without exchanging principal."
   },
   {
     "path": "#/$defs/CFKind/oneOf/3",
@@ -6822,7 +6839,7 @@ export default [
   {
     "path": "#/$defs/CommodityForward/properties/spot_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommodityForward/properties/spot_id",
-    "description": "Optional spot price ID (for delta calculations)."
+    "description": "Optional observed spot identifier. At maturity the scalar is the delivery\nobservation. After maturity use the exact delivery observation in the\ncorresponding `FIXING:{spot_id}` series. Before maturity an explicitly\nidentified spot can supply the cost-of-carry input if the forward curve is absent."
   },
   {
     "path": "#/$defs/CommodityForward/properties/spot_id/anyOf/0",
@@ -10187,6 +10204,21 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_forward_curve_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id",
+    "description": "Contractual floating index used for asset-swap accruals and historical resets."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
@@ -14402,7 +14434,7 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve",
-    "description": "A finite, left-continuous piecewise-constant curve."
+    "description": "A finite, right-continuous piecewise-constant curve."
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times",
@@ -14411,7 +14443,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/times/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values",
@@ -14420,7 +14453,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_d30540ea90ce7eca3dee",
@@ -17427,7 +17461,7 @@ export default [
   {
     "path": "#/$defs/FloatingRateFallback",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateFallback",
-    "description": "Policy for handling floating rate projection failures.\n\nThe cashflow builder consults it whenever projecting a floating coupon\nfails: a missing forward curve, a pre-cutoff observation with no\n`FIXING:{forward_curve_id}` series supplied, a reset before the curve base\ndate, or an overnight or day-count projection error. It never fills a gap\nin recorded history: when a curve and a fixing series are both supplied, a\nmissing pre-cutoff observation is an error under every policy.\n\nA non-`Error` policy replaces the index for the whole coupon (every\novernight observation of the period, not only a failing one), logs\n`warn!`, and the coupon still records the substituted index as its\n`projected_index_rate`. The default (`Error`) surfaces failures\nexplicitly; the other variants are explicit opt-in degradation modes. The\nbond LSMC pricer applies the policy per overnight observation instead.\n\n# References\n\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#hull-options-futures`"
+    "description": "Policy for handling floating rate projection failures.\n\nThe cashflow builder consults it whenever projecting a floating coupon\nfails: a missing forward curve, a pre-cutoff observation with no\n`FIXING:{index_id}` series supplied, a reset before the curve base\ndate, or an overnight or day-count projection error. It never fills a gap\nin recorded history: when a curve and a fixing series are both supplied, a\nmissing pre-cutoff observation is an error under every policy.\n\nA non-`Error` policy replaces the index for the whole coupon (every\novernight observation of the period, not only a failing one), logs\n`warn!`, and the coupon still records the substituted index as its\n`projected_index_rate`. The default (`Error`) surfaces failures\nexplicitly; the other variants are explicit opt-in degradation modes. The\nbond LSMC pricer applies the policy per overnight observation instead.\n\n# References\n\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#hull-options-futures`"
   },
   {
     "path": "#/$defs/FloatingRateFallback/oneOf/0",
@@ -17455,7 +17489,7 @@ export default [
   {
     "path": "#/$defs/FloatingRateSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec",
-    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),\n   BEFORE adding spread\n3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by\n   default, `index * gearing + spread` when `gearing_includes_spread` is false\n4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),\n   AFTER spread and gearing\n\nDefault formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the valuation cutoff then\nresolve from that series instead of the curve. The cutoff is the forward\ncurve base date under `build` and the valuation date under `build_as_of`:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the cutoff prefers a published same-day fixing\nwhen the series has one, otherwise projects on the curve clock.\n\nThe [`FloatingRateFallback`] policy applies when projection fails and never\nfills a gap in a supplied fixing series (see its doc): `Error` (the\ndefault) fails the build with a descriptive message naming the date,\nindex, and expected series id; `FixedRate(r)` uses `r` as the index rate\nfor the whole coupon; `SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
+    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),\n   BEFORE adding spread\n3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by\n   default, `index * gearing + spread` when `gearing_includes_spread` is false\n4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),\n   AFTER spread and gearing\n\nDefault formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the valuation cutoff then\nresolve from that series instead of the curve. The cutoff is the forward\ncurve base date under `build` and the valuation date under `build_as_of`:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the cutoff prefers a published same-day fixing\nwhen the series has one, otherwise projects on the curve clock.\n\nThe [`FloatingRateFallback`] policy applies when projection fails and never\nfills a gap in a supplied fixing series (see its doc): `Error` (the\ndefault) fails the build with a descriptive message naming the date,\nindex, and expected series id; `FixedRate(r)` uses `r` as the index rate\nfor the whole coupon; `SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
   },
   {
     "path": "#/$defs/FloatingRateSpec/properties/all_in_cap_bp",
@@ -17579,6 +17613,13 @@ export default [
   {
     "path": "#/$defs/FloatingRateSpec/properties/index_floor_bp/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/index_floor_bp/anyOf/1"
+  },
+  {
+    "path": "#/$defs/FloatingRateSpec/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/index_id",
+    "description": "Contractual rate index used for historical observations in FIXING series.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/FloatingRateSpec/properties/index_tenor",
@@ -17730,6 +17771,13 @@ export default [
     "description": "Payment frequency",
     "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+  },
+  {
+    "path": "#/$defs/FloatLegSpec/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatLegSpec/properties/index_id",
+    "description": "Contractual observed index identifying historical rate publications.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/FloatLegSpec/properties/payment_lag_days",
@@ -18140,13 +18188,13 @@ export default [
     "path": "#/$defs/Function/oneOf/40",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/40",
     "const": "pow",
-    "description": "Exponentiation (`pow(base, exp)`), computed as `base^exp` with IEEE 754\nsemantics: `pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf, and overflow\nsaturates to ±inf."
+    "description": "Exponentiation (`pow(base, exponent)`). Core rejects domain and overflow errors."
   },
   {
     "path": "#/$defs/Function/oneOf/41",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/41",
     "const": "round",
-    "description": "Round to a number of decimal digits (`round(expr[, digits])`).\n\nTies round half away from zero (Excel convention): `round(2.5)` is 3,\n`round(-2.5)` is -3. `digits` defaults to 0 and may be negative to\nround to tens/hundreds (`round(1234, -2)` is 1200). Non-finite inputs\npass through unchanged."
+    "description": "Quantize the represented value to a decimal place, with ties away from zero.\nDigits default to zero. Core requires a direct, integral i32 literal."
   },
   {
     "path": "#/$defs/Function/oneOf/42",
@@ -18164,37 +18212,37 @@ export default [
     "path": "#/$defs/Function/oneOf/44",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/44",
     "const": "ln",
-    "description": "Natural logarithm (`ln(expr)`), IEEE semantics: `ln(0)` is -inf and\n`ln(x)` for `x < 0` is NaN."
+    "description": "Natural logarithm of a positive operand (`ln(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/45",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/45",
     "const": "exp",
-    "description": "Natural exponential (`exp(expr)`); overflow saturates to +inf."
+    "description": "Natural exponential (`exp(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/46",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/46",
     "const": "log10",
-    "description": "Base-10 logarithm (`log10(expr)`), IEEE semantics: `log10(0)` is -inf\nand `log10(x)` for `x < 0` is NaN."
+    "description": "Base-10 logarithm of a positive operand (`log10(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/47",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/47",
     "const": "sqrt",
-    "description": "Square root (`sqrt(expr)`), IEEE semantics: `sqrt(x)` for `x < 0` is\nNaN."
+    "description": "Square root of a nonnegative operand (`sqrt(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/48",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/48",
     "const": "clamp",
-    "description": "Clamp a value to an inclusive range (`clamp(expr, lo, hi)`),\nequivalent to `min(max(expr, lo), hi)`. Returns NaN when any argument\nis NaN or when `lo > hi`; it never panics on an inverted range."
+    "description": "Restrict a value to ordered, inclusive finite bounds (`clamp(expr, lo, hi)`).\nMissing operands propagate and infinite operands fail."
   },
   {
     "path": "#/$defs/Function/oneOf/49",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/49",
     "const": "is_missing",
-    "description": "Missing-value predicate (`is_missing(expr)`), returning 1 when the\nvalue is non-finite (NaN or ±inf) and 0 otherwise — the same\n\"finite\" convention used by `coalesce`."
+    "description": "Missing-value predicate (`is_missing(expr)`); core admits NaN as its missing sentinel."
   },
   {
     "path": "#/$defs/Function/oneOf/5",
@@ -19984,6 +20032,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxVarianceSwap/properties/open_series_id",
     "default": null,
     "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `spot_id` (or currency-pair string) when absent."
+  },
+  {
+    "path": "#/$defs/FxVarianceSwap/properties/previous_close_date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxVarianceSwap/properties/previous_close_date",
+    "description": "Contractual closing fixing immediately before the first Yang–Zhang target bar.\nResolved exactly in the same close series as the target bars."
+  },
+  {
+    "path": "#/$defs/FxVarianceSwap/properties/previous_close_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxVarianceSwap/properties/previous_close_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxVarianceSwap/properties/previous_close_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxVarianceSwap/properties/previous_close_date/anyOf/1"
   },
   {
     "path": "#/$defs/FxVarianceSwap/properties/quote_calendar_id",
@@ -23734,13 +23797,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfQuoteConvention/oneOf/1",
     "const": "settlement_per_base",
     "description": "Rate quoted as settlement currency per base currency (e.g., 0.138 USD per CNY).\nSettlement = Notional_base × (F_fixing - F_contract)"
-  },
-  {
-    "path": "#/$defs/NonNegativeF64Wire",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NonNegativeF64Wire",
-    "description": "Finite JSON number greater than or equal to zero.",
-    "format": "double",
-    "minimum": 0
   },
   {
     "path": "#/$defs/Notional",
@@ -27891,50 +27947,43 @@ export default [
   {
     "path": "#/$defs/SabrParameters",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters",
-    "description": "SABR model parameters"
+    "description": "Parameters of a SABR backbone, with an optional signed rate displacement."
   },
   {
     "path": "#/$defs/SabrParameters/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/alpha",
-    "description": "Initial volatility (alpha)",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PositiveF64Wire"
+    "description": "Initial volatility level, strictly positive.",
+    "exclusiveMinimum": 0,
+    "format": "double"
   },
   {
     "path": "#/$defs/SabrParameters/properties/beta",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/beta",
-    "description": "CEV exponent (beta) - typically 0 to 1",
-    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClosedUnitIntervalF64Wire"
+    "description": "CEV exponent in the closed interval `[0, 1]`.",
+    "format": "double",
+    "maximum": 1,
+    "minimum": 0
   },
   {
     "path": "#/$defs/SabrParameters/properties/nu",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/nu",
-    "description": "Volatility of volatility (nu/volvol)",
-    "ref": "#/$defs/NonNegativeF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NonNegativeF64Wire"
+    "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/SabrParameters/properties/rho",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/rho",
-    "description": "Correlation between asset and volatility (rho)",
-    "ref": "#/$defs/CorrelationWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CorrelationWire"
+    "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+    "exclusiveMaximum": 1,
+    "exclusiveMinimum": -1,
+    "format": "double"
   },
   {
     "path": "#/$defs/SabrParameters/properties/shift",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/shift",
-    "description": "Shift parameter for handling negative rates (optional)"
-  },
-  {
-    "path": "#/$defs/SabrParameters/properties/shift/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/shift/anyOf/0",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/SabrParameters/properties/shift/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SabrParameters/properties/shift/anyOf/1"
+    "description": "Optional finite displacement applied to forward and strike.",
+    "format": "double"
   },
   {
     "path": "#/$defs/ScheduledFee",
@@ -29691,7 +29740,7 @@ export default [
   {
     "path": "#/$defs/Swaption/properties/vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Swaption/properties/vol_surface_id",
-    "description": "Volatility surface ID for option pricing",
+    "description": "Volatility source ID for option pricing. A dated SABR cube needs an\nACT/365F expiry clock anchored at the valuation date.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -30795,6 +30844,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VarianceSwap/properties/open_series_id",
     "default": null,
     "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang)."
+  },
+  {
+    "path": "#/$defs/VarianceSwap/properties/previous_close_date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VarianceSwap/properties/previous_close_date",
+    "description": "Contractual closing fixing immediately before the first Yang–Zhang target bar.\nResolved exactly in the same close series as the target bars."
+  },
+  {
+    "path": "#/$defs/VarianceSwap/properties/previous_close_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VarianceSwap/properties/previous_close_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/VarianceSwap/properties/previous_close_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VarianceSwap/properties/previous_close_date/anyOf/1"
   },
   {
     "path": "#/$defs/VarianceSwap/properties/price_series_policy",
@@ -33198,12 +33262,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/NdfQuoteConvention",
     "ref": "#/$defs/NdfQuoteConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfQuoteConvention"
-  },
-  {
-    "path": "#/properties/NonNegativeF64Wire",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/NonNegativeF64Wire",
-    "ref": "#/$defs/NonNegativeF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NonNegativeF64Wire"
   },
   {
     "path": "#/properties/Notional",

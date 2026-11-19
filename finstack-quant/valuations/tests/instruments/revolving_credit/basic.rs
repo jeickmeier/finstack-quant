@@ -63,7 +63,9 @@ fn test_revolving_credit_basic_pricing() {
         .unwrap();
 
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let pv = facility.value(&market, val_date).unwrap();
 
@@ -121,7 +123,9 @@ fn test_revolving_credit_with_draws_and_repayments() {
         .unwrap();
 
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let pv = facility.value(&market, val_date).unwrap();
 
@@ -160,7 +164,9 @@ fn test_revolving_credit_utilization_metrics() {
         .unwrap();
 
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Test utilization rate metric
     let result = facility
@@ -222,7 +228,9 @@ fn test_revolving_credit_standard_metrics() {
 
     let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
 
-    let source = MarketContext::new().insert(disc_curve);
+    let source = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
     let hazard_curve = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         val_date,
@@ -231,7 +239,9 @@ fn test_revolving_credit_standard_metrics() {
         "USD-OIS",
     )
     .expect("hazard calibration should succeed");
-    let market = source.insert(hazard_curve);
+    let market = source
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     // Test rate, canonical par-spread, and time-decay metrics.
     let result = facility
@@ -317,7 +327,9 @@ fn test_revolving_credit_cs01_z_spread_fallback_without_credit_curve() {
         .unwrap();
 
     let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = facility
         .price_with_metrics(
@@ -388,7 +400,9 @@ fn test_revolving_credit_cs01_stochastic_without_credit_curve_errors() {
         .unwrap();
 
     let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let err = facility
         .price_with_metrics(
@@ -429,7 +443,9 @@ fn test_revolving_credit_bucketed_dv01() {
         .unwrap();
 
     let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Test bucketed DV01
     let result = facility
@@ -511,8 +527,10 @@ fn test_term_forward_with_floor() {
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:USD-SOFR-3M",
@@ -533,6 +551,7 @@ fn test_term_forward_with_floor() {
         .maturity(maturity_date)
         .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(500.0).expect("valid"), // +500 bp margin = +5%
                 gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -571,6 +590,7 @@ fn test_term_forward_with_floor() {
         .maturity(maturity_date)
         .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(500.0).expect("valid"), // +500 bp margin = +5%
                 gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -714,8 +734,10 @@ fn test_deterministic_with_credit_risk() {
         .unwrap();
 
     let mut market = MarketContext::new();
-    market = market.insert(disc_curve);
-    market = market.insert(hazard_curve);
+    market = market.try_insert(disc_curve).expect("insert market curve");
+    market = market
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     // Price both facilities
     let npv_risky = facility_risky.value(&market, val_date).unwrap();
@@ -840,8 +862,10 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         .unwrap();
 
     let mut market = MarketContext::new();
-    market = market.insert(disc_curve);
-    market = market.insert(hazard_curve);
+    market = market.try_insert(disc_curve).expect("insert market curve");
+    market = market
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     // Price both facilities
     let npv_det = facility_det.value(&market, val_date).unwrap();

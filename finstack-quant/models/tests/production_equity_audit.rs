@@ -73,14 +73,16 @@ fn m12_grid_knot_dividend_is_applied_exactly_once() {
     let mut spot = [100.0];
     let grid = [0.0, 2.0 / 365.0, knot, 15.0 / 365.0];
     for interval in grid.windows(2) {
-        scheme.step(
-            &process,
-            interval[0],
-            interval[1] - interval[0],
-            &mut spot,
-            &[0.0, 0.0],
-            &mut [],
-        );
+        scheme
+            .step(
+                &process,
+                interval[0],
+                interval[1] - interval[0],
+                &mut spot,
+                &[0.0, 0.0],
+                &mut [],
+            )
+            .expect("valid simulation step");
     }
     assert!(
         (spot[0] - 98.0).abs() < 1e-12,

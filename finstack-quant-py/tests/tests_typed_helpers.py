@@ -70,15 +70,15 @@ def projection_curve(
     A ``t = 0`` pillar is dropped (the curve prepends ``(0, 1)``); one pillar
     gives a flat curve.
     """
-    return ForwardCurve(
-        curve_id,
-        base_date,
-        [(t, math.exp(-r * t)) for t, r in zero_rates if t > 0.0],
-        interp="log_linear",
-        extrapolation="extend",
-        day_count=day_count,
-        index_tenor=index_tenor,
-    )
+    return ForwardCurve({
+        "id": curve_id,
+        "base_date": base_date,
+        "knots": [(t, math.exp(-r * t)) for t, r in zero_rates if t > 0.0],
+        "interp": "log_linear",
+        "extrapolation": "extend",
+        "day_count": day_count,
+        "index_tenor": index_tenor,
+    })
 
 
 def canonical_structured_credit_json(*, calendar_id: str = "nyse") -> str:
@@ -101,6 +101,7 @@ def irs_legs() -> tuple[FixedLegSpec, FloatLegSpec]:
     )
     float_leg = FloatLegSpec(
         discount_curve_id="USD-OIS",
+        index_id="USD-SOFR-3M",
         forward_curve_id="USD-SOFR-3M",
         spread_bp="0",
         frequency=Tenor.quarterly(),
@@ -139,6 +140,7 @@ def swaption_legs() -> tuple[FixedLegSpec, FloatLegSpec]:
         ),
         FloatLegSpec(
             discount_curve_id="USD-OIS",
+            index_id="USD-SOFR-3M",
             forward_curve_id="USD-SOFR-3M",
             spread_bp="0",
             frequency=Tenor.quarterly(),

@@ -232,8 +232,8 @@ mod quadrature_tests {
         for order in [5, 7, 10, 15, 20] {
             let quad = GaussHermiteQuadrature::new(order).expect("valid order");
 
-            let result_x2 = quad.integrate(|x| x * x);
-            let result_x4 = quad.integrate(|x| x.powi(4));
+            let result_x2 = quad.integrate(|x| Ok(x * x)).expect("finite integral");
+            let result_x4 = quad.integrate(|x| Ok(x.powi(4))).expect("finite integral");
 
             // All supported orders are exact for x² (degree 2) and x⁴ (degree 4)
             // because n-point GH is exact for polynomials of degree ≤ 2n-1, and our

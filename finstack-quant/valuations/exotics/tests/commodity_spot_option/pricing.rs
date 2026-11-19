@@ -42,8 +42,14 @@ fn bs_price(
     let disc_r = (-r * t).exp();
 
     match option_type {
-        OptionType::Call => spot * disc_q * norm_cdf(d1) - strike * disc_r * norm_cdf(d2),
-        OptionType::Put => strike * disc_r * norm_cdf(-d2) - spot * disc_q * norm_cdf(-d1),
+        OptionType::Call => {
+            spot * disc_q * norm_cdf(d1).expect("valid normal variate")
+                - strike * disc_r * norm_cdf(d2).expect("valid normal variate")
+        }
+        OptionType::Put => {
+            strike * disc_r * norm_cdf(-d2).expect("valid normal variate")
+                - spot * disc_q * norm_cdf(-d1).expect("valid normal variate")
+        }
     }
 }
 
@@ -63,8 +69,10 @@ fn test_black76_futures_based_pricing() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let option = CommoditySpotOption::builder()
@@ -125,8 +133,10 @@ fn test_flat_forward_spot_american_close_to_european() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let build = |style| {
@@ -187,8 +197,10 @@ fn test_spot_bermudan_prices_between_european_and_american() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let build = |style| {
@@ -262,8 +274,10 @@ fn test_spot_based_american_put_above_european() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "CL-SPOT",
@@ -322,8 +336,10 @@ fn test_post_expiry_returns_zero() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     // ITM call option (forward 100 > strike 90)
@@ -431,8 +447,10 @@ fn test_at_expiry_returns_intrinsic() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     // ITM call: forward 100 > strike 90, intrinsic = 10
@@ -531,8 +549,10 @@ fn test_put_call_parity_european() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     // Test put-call parity at multiple strikes (ITM, ATM, OTM)
@@ -641,8 +661,10 @@ fn test_non_flat_vol_surface_skew() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
-        .insert(flat_price_curve("CL-FWD", as_of, 80.0, 1.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+        .expect("insert market curve")
+        .try_insert(flat_price_curve("CL-FWD", as_of, 80.0, 1.0))
+        .expect("insert market curve")
         .insert_surface(skewed_surface);
 
     let flat_market = MarketContext::new()
@@ -651,8 +673,10 @@ fn test_non_flat_vol_surface_skew() {
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
                 .expect("valid scalar"),
         )
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
-        .insert(flat_price_curve("CL-FWD", as_of, 80.0, 1.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+        .expect("insert market curve")
+        .try_insert(flat_price_curve("CL-FWD", as_of, 80.0, 1.0))
+        .expect("insert market curve")
         .insert_surface(flat_surface);
 
     // Build ATM call (strike = 80, same vol in both surfaces)

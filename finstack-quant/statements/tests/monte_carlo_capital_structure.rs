@@ -255,7 +255,10 @@ fn monte_carlo_evaluates_floating_debt_on_the_supplied_market() {
         builder.build().expect("model")
     };
     let market = MarketContext::new()
-        .insert(ForwardCurve::flat("USD-SOFR-3M", as_of, 0.03, DayCount::Act360).expect("curve"))
+        .try_insert(
+            ForwardCurve::flat("USD-SOFR-3M", as_of, 0.03, DayCount::Act360).expect("curve"),
+        )
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:USD-SOFR-3M",

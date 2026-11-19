@@ -285,7 +285,7 @@ impl StatementResult {
         let eval_order = &prepared.eval_order;
         let node_to_column = Arc::clone(&prepared.node_to_column);
         let target_periods: Vec<Period> = buckets.iter().map(|b| b.period.clone()).collect();
-        let target_plan = PeriodPlan::try_new(model.periods.calendar, target_periods)?;
+        let target_plan = PeriodPlan::try_new(model.periods.get_calendar(), target_periods)?;
         let mut history = Arc::new(PeriodHistory::with_periods(
             Arc::clone(&node_to_column),
             &target_plan,

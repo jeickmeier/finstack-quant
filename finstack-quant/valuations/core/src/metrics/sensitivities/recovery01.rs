@@ -159,7 +159,7 @@ pub fn market_with_recovery(
         // the (trade, curve) pair; the λ knots are untouched so the priced PV
         // is exactly the documented LGD-only sensitivity.
         let frozen = hazard.with_recovery_rate(recovery)?;
-        return Ok(market.as_ref().clone().insert(frozen));
+        return market.as_ref().clone().try_insert(frozen);
     }
     let recalibrated = context
         .rebuild_hazard_curve(
@@ -183,10 +183,10 @@ pub fn market_with_recovery(
             ),
             category: "recovery01_rebootstrap".to_string(),
         })?;
-    Ok(market
+    market
         .as_ref()
         .clone()
-        .insert(recalibrated.as_ref().clone()))
+        .try_insert(recalibrated.as_ref().clone())
 }
 
 /// Recovery01 of a non-CDS instrument priced on hazard curve `hazard_id`, by

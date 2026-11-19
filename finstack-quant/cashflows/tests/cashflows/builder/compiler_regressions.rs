@@ -464,7 +464,7 @@ fn overnight_spec() -> Value {
         .expect("coupon")
         .remove("rate");
     value["coupon_program"][0]["spec"]["rate_spec"] = json!({
-        "forward_curve_id": "RFR", "spread_bp": "0",
+        "index_id": "RFR", "forward_curve_id": "RFR", "spread_bp": "0",
         "reset_frequency": {"count": 3, "unit": "months"}, "reset_lag_days": 0,
         "compounding": {"compounded_in_arrears": {"lookback_days": 0}},
         "overnight_index_constraints": "period"
@@ -486,7 +486,9 @@ fn overnight_market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 #[test]
@@ -604,7 +606,14 @@ fn overnight_zero_daycount_segment_keeps_replay_clock_and_emits_zero() {
     let cont_rate = 360.0 * (0.1_f64 / 360.0).ln_1p();
     let curve = ForwardCurve::flat("RFR", date("2025-01-30"), cont_rate, DayCount::Act360)
         .expect("flat curve");
-    let schedule = build(value, Some(&MarketContext::new().insert(curve)));
+    let schedule = build(
+        value,
+        Some(
+            &MarketContext::new()
+                .try_insert(curve)
+                .expect("insert market curve"),
+        ),
+    );
     let zero = schedule
         .coupons()
         .find(|flow| {
@@ -640,7 +649,9 @@ fn weekend_balance_splits_record_one_raw_fixing_and_materialize_without_conflict
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .expect("sloped curve");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let schedule = build(value.clone(), Some(&market));
     let known: Vec<_> = schedule
         .get_meta()
@@ -662,10 +673,11 @@ fn weekend_balance_splits_record_one_raw_fixing_and_materialize_without_conflict
         date("2025-01-07"),
     )
     .expect("raw published observations have no conflicting slice-tenor values")
-    .insert(
+    .try_insert(
         ForwardCurve::flat("RFR", date("2025-01-07"), 0.3, DayCount::Act360)
             .expect("post-roll curve"),
-    );
+    )
+    .expect("insert market curve");
     let replayed = build(value, Some(&realized));
     close(
         replayed

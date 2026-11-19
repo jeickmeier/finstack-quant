@@ -1,14 +1,20 @@
 # FACTOR-008: Historical tail mass and ES-proportional VaR allocation
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for empirical boundary VaR, fractional ES and ES-proportional position allocations.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Boundary VaR, fractional ES, tie sharing and ES-proportional VaR allocation are implemented in part. Explicit inputs, unsnapped tail mass, raw statistics and checked reconciliation remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 18 tests selected by the historical filter passed on 2026-11-17 against current behavior. An independent exact example verified fractional tail VaR and ES. The accepted boundary and gain-tail rules still need qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Admit a checked equal-weight scenario panel with unique ordered position IDs, finite P&L in one currency and horizon, and explicit confidence. A nonempty portfolio requires at least two observation-equivalents of tail mass. Report actual tail mass and retain the distinction between calculation eligibility and statistical adequacy.
+2. Set `m = (1 − confidence) × N` using the admitted numeric inputs, preserving consequential fractional mass without near-integer snapping. Use the empirical boundary at rank `ceil(m)` for VaR. For ES, give full weight to scenarios below the boundary and share the remaining mass equally across exact boundary ties. Use the same weights for portfolio and position ES. With mass `2.5` and the three worst observations `−100`, `−50` and `−10`, raw VaR is `−10` and raw ES is `−62`.
+3. Retain the raw signed tail statistics and report loss measures as `min(raw, 0)`. When VaR represents a loss, scale signed position ES allocations by `VaR / ES` and label the result ES-proportional VaR allocation. Use checked arithmetic without a small-ES cutoff. A zero reported measure has zero risk allocations and undefined shares. Historical marginals and removal risk are unavailable. Check finite results and allocation closure before publication.
+
+## Observed choice and rationale
 
 Use empirical portfolio P&L order statistics for VaR, fractional probability mass for ES, and allocate VaR proportionally to ES components. Historical component VaR is therefore a selected allocation rule, not a direct derivative or conditional-at-VaR estimate.
 
@@ -41,10 +47,9 @@ Conditional VaR-band attribution, smoothed quantile derivatives, or bump-and-rec
 - [src/risk/position.rs](../../../../finstack-quant/factor/src/risk/position.rs) — inspected implementation.
 - [src/risk/mod.rs](../../../../finstack-quant/factor/src/risk/mod.rs) — inspected implementation.
 
-[src/risk/position.rs](../../../../finstack-quant/factor/src/risk/position.rs) contains inspected fractional-tail examples: 250 observations at 99% use mass 2.5 and yield ES -62 for losses -100,-50,-10; boundary ties distribute component ES independently of input order. Replication invariance is an invariant test, not independent market validation. [Hallerbach](../../../REFERENCES.md#hallerbach-2003-decomposing-var) is a conceptual comparison, not proof of the ES-proportional rule.
+[Historical position-risk tests](../../../../finstack-quant/factor/src/risk/position.rs) passed against the current tail boundary, ties, replication and gain-floor behavior. Eight scenarios and confidence `11/16` give mass `5/2` exactly in the independent example above. Qualify the accepted tail boundary, small nonzero losses, gain-tail outputs, reconciliation and sample disclosure.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

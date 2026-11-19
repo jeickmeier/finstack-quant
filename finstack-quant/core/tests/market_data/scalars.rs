@@ -6,7 +6,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::dividends::DividendSchedule;
+use finstack_quant_core::market_data::dividends::{DividendEvent, DividendSchedule};
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationLag, InflationObservation, ScalarTimeSeries, SeriesInterpolation,
 };
@@ -43,40 +43,53 @@ fn jan(day: u8) -> Date {
 
 #[test]
 fn dividend_schedule_builds_and_filters() {
-    let schedule = DividendSchedule::builder("AAPL-DIVS")
-        .underlying("AAPL")
-        .currency(Currency::USD)
-        .cash(
-            jan(20),
-            Money::new(1.30, Currency::USD).expect("valid money fixture"),
-        )
-        .cash(
-            jan(5),
-            Money::new(1.25, Currency::USD).expect("valid money fixture"),
-        )
-        .cash(
-            jan(12),
-            Money::new(1.28, Currency::USD).expect("valid money fixture"),
-        )
-        .build()
-        .expect("valid dividend schedule");
+    let schedule = DividendSchedule::new(
+        "AAPL-DIVS",
+        "AAPL",
+        "AAPL",
+        Currency::USD,
+        vec![
+            DividendEvent::new(
+                "distribution-2",
+                jan(5),
+                jan(5),
+                Money::new(1.25, Currency::USD).expect("valid money fixture"),
+            )
+            .unwrap(),
+            DividendEvent::new(
+                "distribution-3",
+                jan(12),
+                jan(12),
+                Money::new(1.28, Currency::USD).expect("valid money fixture"),
+            )
+            .unwrap(),
+            DividendEvent::new(
+                "distribution-1",
+                jan(20),
+                jan(20),
+                Money::new(1.30, Currency::USD).expect("valid money fixture"),
+            )
+            .unwrap(),
+        ],
+    )
+    .expect("valid dividend schedule");
 
     assert!(
         schedule
             .get_events()
             .windows(2)
-            .all(|pair| pair[0].date <= pair[1].date)
+            .all(|pair| pair[0].get_ex_date() <= pair[1].get_ex_date())
     );
 }
 
 #[test]
 fn dividend_schedule_validate_rejects_negative_cash() {
-    let schedule = DividendSchedule::builder("NEG")
-        .cash(
-            jan(5),
-            Money::new(-1.0, Currency::USD).expect("valid money fixture"),
-        )
-        .build();
+    let schedule = DividendEvent::new(
+        "negative",
+        jan(5),
+        jan(5),
+        Money::new(-1.0, Currency::USD).unwrap(),
+    );
     assert!(schedule.is_err());
 }
 

@@ -190,8 +190,8 @@ pub(crate) fn compute_greeks(
         inst.metric_pricing_overrides.theta_days_per_year(),
     );
     let (d1, d2) = finstack_quant_models::closed_form::d1_d2(spot, inst.strike, r_d, sigma, t, r_f);
-    let cdf_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1);
-    let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
+    let cdf_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1)?;
+    let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2)?;
     let exp_rd_t = (-r_d * t).exp();
     let delta_forward_unit = match inst.option_type {
         OptionType::Call => cdf_d1,
@@ -301,8 +301,10 @@ mod delegation_tests {
         let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
         MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_surface(vol_surface)
             .insert_fx(fx_matrix)
     }

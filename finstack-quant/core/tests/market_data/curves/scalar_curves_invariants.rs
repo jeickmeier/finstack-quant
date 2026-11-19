@@ -52,8 +52,10 @@ mod scalar_curve_invariants {
 
     fn price_curve() -> PriceCurve {
         PriceCurve::builder("WTI")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(base_date())
-            .spot_price(80.0)
             .knots([
                 (0.0, 80.0),
                 (0.25, 81.0),
@@ -68,9 +70,10 @@ mod scalar_curve_invariants {
 
     fn vol_curve() -> PriceCurve {
         PriceCurve::builder("VIX")
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .kind(PriceCurveKind::VolIndex)
             .base_date(base_date())
-            .spot_price(20.0)
             .knots([
                 (0.0, 20.0),
                 (0.25, 21.0),
@@ -92,8 +95,8 @@ mod scalar_curve_invariants {
         let bumped_pc = pc.apply_bump(par(bump)).unwrap();
         let bumped_vc = vc.apply_bump(par(bump)).unwrap();
 
-        assert!((bumped_pc.spot_price() - (pc.spot_price() + bump)).abs() < TOL);
-        assert!((bumped_vc.spot_price() - (vc.spot_price() + bump)).abs() < TOL);
+        assert!((bumped_pc.price(0.0).unwrap() - (pc.price(0.0).unwrap() + bump)).abs() < TOL);
+        assert!((bumped_vc.price(0.0).unwrap() - (vc.price(0.0).unwrap() + bump)).abs() < TOL);
 
         for (orig, bumped) in pc.prices().iter().zip(bumped_pc.prices().iter()) {
             assert!((bumped - orig - bump).abs() < TOL);
@@ -112,8 +115,8 @@ mod scalar_curve_invariants {
         let bumped_vc = vc.apply_bump(par(0.0)).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0] {
-            assert!((bumped_pc.price(t) - pc.price(t)).abs() < TOL);
-            assert!((bumped_vc.price(t) - vc.price(t)).abs() < TOL);
+            assert!((bumped_pc.price(t).unwrap() - pc.price(t).unwrap()).abs() < TOL);
+            assert!((bumped_vc.price(t).unwrap() - vc.price(t).unwrap()).abs() < TOL);
         }
     }
 
@@ -136,8 +139,12 @@ mod scalar_curve_invariants {
         let single_bump_vc = vc.apply_bump(par(3.0)).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0] {
-            assert!((double_bump_pc.price(t) - single_bump_pc.price(t)).abs() < TOL);
-            assert!((double_bump_vc.price(t) - single_bump_vc.price(t)).abs() < TOL);
+            assert!(
+                (double_bump_pc.price(t).unwrap() - single_bump_pc.price(t).unwrap()).abs() < TOL
+            );
+            assert!(
+                (double_bump_vc.price(t).unwrap() - single_bump_vc.price(t).unwrap()).abs() < TOL
+            );
         }
     }
 
@@ -153,8 +160,8 @@ mod scalar_curve_invariants {
             .apply_bump(key_rate(Some(0.25), 0.5, Some(1.0), 3.0))
             .unwrap();
 
-        assert!((bumped_pc.spot_price() - pc.spot_price()).abs() < TOL);
-        assert!((bumped_vc.spot_price() - vc.spot_price()).abs() < TOL);
+        assert!((bumped_pc.price(0.0).unwrap() - pc.price(0.0).unwrap()).abs() < TOL);
+        assert!((bumped_vc.price(0.0).unwrap() - vc.price(0.0).unwrap()).abs() < TOL);
     }
 
     #[test]
@@ -193,8 +200,10 @@ mod scalar_curve_invariants {
         let horizon = base_date() + Duration::days(90);
 
         let conditioned = MarketContext::new()
-            .insert(pc.clone())
-            .insert(vc.clone())
+            .try_insert(pc.clone())
+            .expect("insert market curve")
+            .try_insert(vc.clone())
+            .expect("insert market curve")
             .condition(horizon)
             .unwrap();
 
@@ -203,8 +212,8 @@ mod scalar_curve_invariants {
 
         assert_eq!(kept_pc.base_date(), pc.base_date());
         assert_eq!(kept_vc.base_date(), vc.base_date());
-        assert!((kept_pc.spot_price() - pc.spot_price()).abs() < TOL);
-        assert!((kept_vc.spot_price() - vc.spot_price()).abs() < TOL);
+        assert!((kept_pc.price(0.0).unwrap() - pc.price(0.0).unwrap()).abs() < TOL);
+        assert!((kept_vc.price(0.0).unwrap() - vc.price(0.0).unwrap()).abs() < TOL);
     }
 
     #[test]
@@ -214,7 +223,7 @@ mod scalar_curve_invariants {
             serde_json::from_str(&serde_json::to_string(&pc).unwrap()).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0, 2.0] {
-            assert!((pc.price(t) - restored.price(t)).abs() < TOL);
+            assert!((pc.price(t).unwrap() - restored.price(t).unwrap()).abs() < TOL);
         }
     }
 
@@ -225,27 +234,7 @@ mod scalar_curve_invariants {
             serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0, 2.0] {
-            assert!((vc.price(t) - restored.price(t)).abs() < TOL);
+            assert!((vc.price(t).unwrap() - restored.price(t).unwrap()).abs() < TOL);
         }
-    }
-
-    #[test]
-    fn spot_inference_consistency_across_curve_types() {
-        let pc_inferred = PriceCurve::builder("WTI-INF")
-            .base_date(base_date())
-            .knots([(0.0, 75.0), (0.25, 76.0), (0.5, 77.0), (1.0, 78.0)])
-            .build()
-            .unwrap();
-        let vc_inferred = PriceCurve::builder("VIX-INF")
-            .kind(PriceCurveKind::VolIndex)
-            .base_date(base_date())
-            .knots([(0.0, 18.0), (0.25, 19.0), (0.5, 20.0), (1.0, 21.0)])
-            .build()
-            .unwrap();
-
-        assert!((pc_inferred.spot_price() - 75.0).abs() < TOL);
-        assert!((vc_inferred.spot_price() - 18.0).abs() < TOL);
-        assert!((pc_inferred.price(0.0) - pc_inferred.spot_price()).abs() < TOL);
-        assert!((vc_inferred.price(0.0) - vc_inferred.spot_price()).abs() < TOL);
     }
 }

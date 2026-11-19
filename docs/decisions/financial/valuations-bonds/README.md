@@ -7,7 +7,7 @@
 
 The scope is all **71 assigned Rust source files** under `finstack-quant/valuations/fixed-income/src/bond/`: 59 carry algorithms, economically material defaults, validation or dispatch; six contain only support/reexports; six are test-only files. [The exact file ledger](coverage.json) maps every file once to the 20 records below. Runtime code following test-only wrappers/declarations in hazard, tree-pricer and LSMC files is included. Inline tests are evidence within their owning production files, not separate file-count entries.
 
-The owning records identify accepted decisions, current source behavior and qualification work. Core day counts and root solvers, cashflow projection and accrual kernels, generic factor trees and shared risk bump mechanics are owned by their corresponding scopes. This slice records their bond-specific selection, adapters, clocks, supported domains and interactions. [ADR 0028](0028-callable-bond-model-selection.md) remains the broader model-selection discussion.
+The owning records identify accepted decisions, current source behavior and qualification work. Core day counts and root solvers, cashflow projection and accrual kernels, generic factor trees and shared risk bump mechanics are owned by their corresponding scopes. This slice records their bond-specific selection, adapters, clocks, supported domains and interactions. [ADR 0028](0028-callable-bond-model-selection.md) summarizes the accepted model-selection contract.
 
 ## Governing and overview ADRs
 
@@ -17,7 +17,7 @@ from the detailed algorithm records and source counts below.
 | ADR | Decision status | Scope |
 | --- | --- | --- |
 | [0011](0011-bond-cs01-without-hazard-curve.md) | Accepted | Bond CS01 without a hazard curve |
-| [0028](0028-callable-bond-model-selection.md) | Draft | Callable-bond model selection |
+| [0028](0028-callable-bond-model-selection.md) | Accepted | Callable-bond routing, explicit rates-only subtype, and price and risk basis |
 
 ## Algorithm inventory
 

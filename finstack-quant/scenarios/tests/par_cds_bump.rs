@@ -126,7 +126,11 @@ fn test_par_cds_bump_integration() {
     );
     let original_lambda = hazard.hazard_rate(5.0).unwrap();
 
-    let mut market = MarketContext::new().insert(discount).insert(hazard);
+    let mut market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -204,7 +208,11 @@ fn test_par_cds_bump_reprices_credit_bond() {
         &[("1Y", 60.0), ("5Y", 120.0)],
     );
 
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let mut bond = Bond::fixed(
         "CREDIT-BOND",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -322,7 +330,11 @@ fn roll_with_discount_and_par_cds_bump_survives_knot_on_roll_tenor() {
             ],
         );
 
-        let mut market = MarketContext::new().insert(discount).insert(hazard);
+        let mut market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -408,7 +420,11 @@ fn par_cds_market() -> (finstack_quant_core::dates::Date, MarketContext) {
     );
     (
         base_date,
-        MarketContext::new().insert(discount).insert(hazard),
+        MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve"),
     )
 }
 
@@ -455,7 +471,11 @@ fn par_cds_bump_rejects_uncalibrated_hazard_curve() {
         .knots(vec![(1.0, 0.01), (5.0, 0.02)])
         .build()
         .unwrap();
-    let mut market = MarketContext::new().insert(discount).insert(hazard);
+    let mut market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let scenario = regression_scenario(
         "reject-uncalibrated",
         vec![OperationSpec::CurveParallelBp {
@@ -644,7 +664,13 @@ fn two_independent_par_cds_curves_match_separate_applies() {
         0.3,
         &[("1Y", 350.0), ("5Y", 490.0)],
     );
-    let market = MarketContext::new().insert(discount).insert(ig).insert(hy);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(ig)
+        .expect("insert market curve")
+        .try_insert(hy)
+        .expect("insert market curve");
 
     let together = ScenarioSpec {
         id: "both".into(),
@@ -862,7 +888,10 @@ fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("second discount curve");
-        let mut market = source.clone().insert(unrelated_discount);
+        let mut market = source
+            .clone()
+            .try_insert(unrelated_discount)
+            .expect("insert market curve");
         let mut ctx = ExecutionContext {
             market: &mut market,
             model: None,

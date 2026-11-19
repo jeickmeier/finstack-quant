@@ -1,323 +1,206 @@
-//! Dividend schedules for equity and ETF pricing.
-//!
-//! Provides types for storing and querying dividend events (cash, stock, yield)
-//! used in equity option pricing, dividend swap valuation, and ETF analytics.
-//! Schedules are stored in `MarketContext` and keyed by `CurveId` for consistency
-//! with other market data.
-//!
-//! # Dividend Types
-//!
-//! - **Cash dividends**: Fixed amount in a currency (most common)
-//! - **Stock dividends**: Proportional share distribution (e.g., 5% stock dividend)
-//! - **Yield**: Continuous dividend yield approximation for modeling
-//!
-//! # Use Cases
-//!
-//! - **Equity option pricing**: Discrete dividend adjustments in Black-Scholes
-//! - **Dividend futures**: Contract on future dividend payments
-//! - **Total return swaps**: Dividend reinvestment calculations
-//! - **Ex-dividend adjustments**: Forward price and strike adjustments
-//!
-//! # Examples
-//!
-//! ```rust
-//! use finstack_quant_core::market_data::dividends::DividendSchedule;
-//! use finstack_quant_core::money::Money;
-//! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::dates::Date;
-//! use time::Month;
-//!
-//! let d1 = Date::from_calendar_date(2025, Month::March, 15).expect("Valid date");
-//! let d2 = Date::from_calendar_date(2025, Month::June, 15).expect("Valid date");
-//!
-//! let schedule = DividendSchedule::builder("AAPL-DIVS")
-//!     .underlying("AAPL")
-//!     .currency(Currency::USD)
-//!     .cash(d1, Money::new(0.24, Currency::USD).expect("valid money fixture"))
-//!     .cash(d2, Money::new(0.25, Currency::USD).expect("valid money fixture"))
-//!     .build()
-//!     .expect("DividendScheduleBuilder should succeed");
-//!
-//! assert_eq!(schedule.get_events().len(), 2);
-//! ```
+//! Identified gross cash dividends per entitled share, with distinct entitlement
+//! and payment dates. Continuous yields are model inputs held separately.
 
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::money::Money;
-use crate::types::CurveId;
+use crate::types::{CurveId, UnderlyingId};
 use crate::{Error, Result};
-
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
-/// Type of dividend event.
-///
-/// Distinguishes between cash payments, stock distributions, and continuous
-/// yield approximations used in different pricing models.
-///
-/// # Variants
-///
-/// - **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)
-/// - **Stock**: Share distribution (less common, complicates option pricing)
-/// - **Yield**: Continuous approximation for analytical models
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum DividendKind {
-    /// Cash dividend payment.
-    ///
-    /// Most common type. Ex-dividend date reduces stock price by dividend amount.
-    Cash(Money),
-
-    /// Continuous dividend yield (annualized fraction).
-    ///
-    /// Used in analytical models (Black-Scholes with dividends) that assume
-    /// continuous payout rather than discrete payments.
-    Yield(f64),
-
-    /// Stock dividend (share distribution).
-    ///
-    /// Increases share count proportionally. For example, 5% stock dividend
-    /// means each shareholder receives 0.05 additional shares per share held.
-    Stock {
-        /// Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.
-        ratio: f64,
-    },
-}
-
-/// A dated dividend event.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct DividendEvent {
-    /// Ex-dividend date.
+#[serde(deny_unknown_fields)]
+struct EventWire {
+    event_id: String,
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
-    pub date: Date,
-    /// Event kind.
-    pub kind: DividendKind,
+    ex_date: Date,
+    #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
+    pay_date: Date,
+    amount: Money,
 }
 
-/// Dividend schedule for an equity or ETF underlying.
-///
-/// Contains a time-ordered sequence of dividend events used for pricing equity
-/// derivatives and calculating total return. The schedule can be referenced by
-/// multiple instruments via its [`CurveId`] in the market context.
-///
-/// # Usage in Pricing
-///
-/// - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
-/// - **Ex-dividend adjustments**: Reduce forward price by dividend amount
-/// - **Dividend futures**: Sum dividends in contract period
-/// - **Total return**: Include dividend reinvestment in performance
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::market_data::dividends::DividendSchedule;
-/// use finstack_quant_core::money::Money;
-/// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::dates::Date;
-/// use time::Month;
-///
-/// let schedule = DividendSchedule::builder("AAPL-DIVS")
-///     .underlying("AAPL")
-///     .currency(Currency::USD)
-///     .cash(
-///         Date::from_calendar_date(2025, Month::March, 15).expect("Valid date"),
-///         Money::new(0.24, Currency::USD).expect("valid money fixture")
-///     ).build().expect("Valid dividends");
-///
-/// assert_eq!(schedule.get_events().len(), 1);
-/// ```
-#[derive(Clone, Debug, Serialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct DividendSchedule {
-    /// Unique identifier of this schedule in the market context.
-    id: CurveId,
-    /// Optional display symbol/ticker for convenience.
-    underlying: Option<String>,
-    /// Sorted events by date (ascending).
-    events: Vec<DividendEvent>,
-    /// Quote currency for cash dividends (optional metadata).
-    currency: Option<Currency>,
-}
+/// One gross cash distribution per entitled share on its schedule's share basis.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "EventWire")]
+#[cfg_attr(
+    feature = "json-schema",
+    derive(schemars::JsonSchema),
+    schemars(with = "EventWire")
+)]
+pub struct DividendEvent(EventWire);
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct DividendScheduleWire {
-    id: CurveId,
-    underlying: Option<String>,
-    events: Vec<DividendEvent>,
-    currency: Option<Currency>,
-}
+impl TryFrom<EventWire> for DividendEvent {
+    type Error = Error;
 
-impl<'de> Deserialize<'de> for DividendSchedule {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> std::result::Result<Self, D::Error> {
-        Self::try_from(DividendScheduleWire::deserialize(deserializer)?)
-            .map_err(serde::de::Error::custom)
+    fn try_from(wire: EventWire) -> Result<Self> {
+        Self::new(wire.event_id, wire.ex_date, wire.pay_date, wire.amount)
     }
 }
 
-impl TryFrom<DividendScheduleWire> for DividendSchedule {
-    type Error = Error;
-    fn try_from(wire: DividendScheduleWire) -> Result<Self> {
-        DividendScheduleBuilder {
-            id: wire.id,
-            underlying: wire.underlying,
-            events: wire.events,
-            currency: wire.currency,
+impl DividendEvent {
+    /// Admit a distribution with its supplied ex-date and payment date.
+    ///
+    /// # Arguments
+    ///
+    /// * `event_id` - Stable, nonempty issuer or data-source event identifier.
+    /// * `ex_date` - Supplied entitlement-transfer date.
+    /// * `pay_date` - Supplied cash payment date, including payments before the ex-date.
+    /// * `amount` - Nonnegative gross cash per one entitled share in the distribution currency.
+    pub fn new(
+        event_id: impl Into<String>,
+        ex_date: Date,
+        pay_date: Date,
+        amount: Money,
+    ) -> Result<Self> {
+        let event_id = event_id.into();
+        if event_id.trim().is_empty() || amount.amount_decimal() < rust_decimal::Decimal::ZERO {
+            return Err(Error::Validation(
+                "dividend requires a nonempty event ID and nonnegative cash per share".into(),
+            ));
         }
-        .build()
+        Ok(Self(EventWire {
+            event_id,
+            ex_date,
+            pay_date,
+            amount,
+        }))
+    }
+
+    /// Source identity used to distinguish distributions on the same ex-date.
+    pub fn get_event_id(&self) -> &str {
+        &self.0.event_id
+    }
+
+    /// Supplied date of the entitlement transfer.
+    pub fn get_ex_date(&self) -> Date {
+        self.0.ex_date
+    }
+
+    /// Supplied date of cash payment.
+    pub fn get_pay_date(&self) -> Date {
+        self.0.pay_date
+    }
+
+    /// Gross cash per unit of the schedule's declared share basis.
+    pub fn get_amount(&self) -> Money {
+        self.0.amount
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct ScheduleWire {
+    id: CurveId,
+    underlying: UnderlyingId,
+    share_basis: String,
+    currency: Currency,
+    events: Vec<DividendEvent>,
+}
+
+/// Validated distributions for one security, share basis and currency.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(try_from = "ScheduleWire")]
+#[cfg_attr(
+    feature = "json-schema",
+    derive(schemars::JsonSchema),
+    schemars(with = "ScheduleWire")
+)]
+pub struct DividendSchedule(ScheduleWire);
+
+impl TryFrom<ScheduleWire> for DividendSchedule {
+    type Error = Error;
+
+    fn try_from(wire: ScheduleWire) -> Result<Self> {
+        Self::new(
+            wire.id,
+            wire.underlying,
+            wire.share_basis,
+            wire.currency,
+            wire.events,
+        )
     }
 }
 
 impl DividendSchedule {
-    /// Create a [`DividendScheduleBuilder`] for constructing a new schedule.
+    /// Construct a schedule from identified cash distributions in source order.
     ///
-    /// This is the preferred entry point, consistent with other curve builders.
-    #[must_use]
-    pub fn builder(id: impl Into<CurveId>) -> DividendScheduleBuilder {
-        DividendScheduleBuilder::new(id)
-    }
-
-    /// Identifier used to retrieve this schedule from market data.
-    pub fn get_id(&self) -> &CurveId {
-        &self.id
-    }
-
-    /// Optional human-readable underlying ticker.
-    pub fn get_underlying(&self) -> Option<&str> {
-        self.underlying.as_deref()
-    }
-
-    /// Validated dividend events in ascending date order.
-    pub fn get_events(&self) -> &[DividendEvent] {
-        &self.events
-    }
-
-    /// Optional default cash-dividend currency metadata.
-    pub fn get_currency(&self) -> Option<Currency> {
-        self.currency
-    }
-
-    /// Validate schedule content (non-negative finite cash amounts, yields, and stock ratios).
-    fn validate(&self) -> Result<()> {
-        for ev in &self.events {
-            match &ev.kind {
-                DividendKind::Cash(m) => {
-                    if m.amount() < 0.0 {
-                        return Err(Error::Input(crate::InputError::NegativeValue));
-                    }
-                }
-                DividendKind::Yield(y) => {
-                    if !y.is_finite() {
-                        return Err(Error::Validation(
-                            "dividend yield must be finite".to_string(),
-                        ));
-                    }
-                    if *y < 0.0 {
-                        return Err(Error::Input(crate::InputError::NegativeValue));
-                    }
-                }
-                DividendKind::Stock { ratio } => {
-                    if !ratio.is_finite() {
-                        return Err(Error::Validation(
-                            "stock dividend ratio must be finite".to_string(),
-                        ));
-                    }
-                    if *ratio < 0.0 {
-                        return Err(Error::Input(crate::InputError::NegativeValue));
-                    }
-                }
+    /// # Arguments
+    ///
+    /// * `id` - Nonempty market lookup key for this schedule.
+    /// * `underlying` - Exact nonempty identifier of the security paying the distribution.
+    /// * `share_basis` - Exact nonempty identifier of the quoted share or unit entitled to one payment.
+    /// * `currency` - Distribution currency required on every event.
+    /// * `events` - Gross cash distributions in ascending (ex-date, event ID) order, with unique IDs.
+    pub fn new(
+        id: impl Into<CurveId>,
+        underlying: impl Into<UnderlyingId>,
+        share_basis: impl Into<String>,
+        currency: Currency,
+        events: Vec<DividendEvent>,
+    ) -> Result<Self> {
+        let id = id.into();
+        let underlying = underlying.into();
+        let share_basis = share_basis.into();
+        if [id.as_str(), underlying.as_str(), &share_basis]
+            .iter()
+            .any(|v| v.trim().is_empty())
+        {
+            return Err(Error::Validation(
+                "dividend schedule requires an ID, underlying and share basis".into(),
+            ));
+        }
+        let mut ids = HashSet::new();
+        let mut previous = None;
+        for event in &events {
+            let key = (event.get_ex_date(), event.get_event_id());
+            if !ids.insert(event.get_event_id()) || previous.is_some_and(|prior| prior >= key) {
+                return Err(Error::Validation(
+                    "dividend events require unique IDs and ascending (ex_date, event_id) order"
+                        .into(),
+                ));
             }
+            if event.get_amount().currency() != currency {
+                return Err(Error::Validation(format!(
+                    "dividend {} currency differs from schedule currency {currency}",
+                    event.get_event_id()
+                )));
+            }
+            previous = Some(key);
         }
-        Ok(())
-    }
-}
-
-/// Builder for [`DividendSchedule`].
-pub struct DividendScheduleBuilder {
-    id: CurveId,
-    underlying: Option<String>,
-    currency: Option<Currency>,
-    events: Vec<DividendEvent>,
-}
-
-impl DividendScheduleBuilder {
-    /// Start a new builder with identifier `id`.
-    fn new(id: impl Into<CurveId>) -> Self {
-        Self {
-            id: id.into(),
-            underlying: None,
-            currency: None,
-            events: Vec::new(),
-        }
+        Ok(Self(ScheduleWire {
+            id,
+            underlying,
+            share_basis,
+            currency,
+            events,
+        }))
     }
 
-    /// Optional underlying/ticker.
-    pub fn underlying(mut self, name: impl Into<String>) -> Self {
-        self.underlying = Some(name.into());
-        self
+    /// Key used to retrieve the schedule.
+    pub fn get_id(&self) -> &CurveId {
+        &self.0.id
     }
 
-    /// Optional default currency for cash dividends.
-    pub fn currency(mut self, ccy: Currency) -> Self {
-        self.currency = Some(ccy);
-        self
+    /// Exact identity of the underlying security.
+    pub fn get_underlying(&self) -> &UnderlyingId {
+        &self.0.underlying
     }
 
-    /// Add a cash dividend.
-    pub fn cash(mut self, date: Date, amount: Money) -> Self {
-        self.events.push(DividendEvent {
-            date,
-            kind: DividendKind::Cash(amount),
-        });
-        self
+    /// Exact share or unit basis of each per-share amount.
+    pub fn get_share_basis(&self) -> &str {
+        &self.0.share_basis
     }
 
-    /// Build the schedule (events are sorted by date).
-    pub fn build(mut self) -> Result<DividendSchedule> {
-        self.events.sort_by_key(|e| e.date);
-        let schedule = DividendSchedule {
-            id: self.id,
-            underlying: self.underlying,
-            events: self.events,
-            currency: self.currency,
-        };
-        schedule.validate()?;
-        Ok(schedule)
+    /// Distribution currency shared by every event.
+    pub fn get_currency(&self) -> Currency {
+        self.0.currency
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use time::Month;
-
-    #[test]
-    fn build_and_filter_schedule() {
-        let d1 = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
-        let d2 = Date::from_calendar_date(2025, Month::March, 15).expect("Valid test date");
-        let d3 = Date::from_calendar_date(2025, Month::June, 15).expect("Valid test date");
-
-        let sched = DividendSchedule::builder("AAPL-DIVS")
-            .underlying("AAPL")
-            .cash(
-                d1,
-                Money::new(0.24, Currency::USD).expect("valid money fixture"),
-            )
-            .cash(
-                d2,
-                Money::new(0.24, Currency::USD).expect("valid money fixture"),
-            )
-            .cash(
-                d3,
-                Money::new(0.24, Currency::USD).expect("valid money fixture"),
-            )
-            .build()
-            .expect("DividendScheduleBuilder should succeed in test");
-
-        assert_eq!(sched.events.len(), 3);
+    /// Distributions in canonical entitlement-date and event-ID order.
+    pub fn get_events(&self) -> &[DividendEvent] {
+        &self.0.events
     }
 }

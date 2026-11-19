@@ -28,8 +28,10 @@ fn ng_swaption() -> (CommoditySwaption, MarketContext, Date) {
     let vol_surface = flat_vol_surface("NG-VOL", &[0.25, 0.5, 1.0, 2.0], &[2.0, 3.5, 5.0], 0.30);
 
     let market = MarketContext::new()
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let swaption = CommoditySwaption::builder()
@@ -102,7 +104,8 @@ fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift()
                     .implied_volatility = quote_vol.then_some(0.0);
                 let market = base_market
                     .clone()
-                    .insert(flat_price_curve("NG-FORWARD", as_of, f, 2.0))
+                    .try_insert(flat_price_curve("NG-FORWARD", as_of, f, 2.0))
+                    .expect("insert market curve")
                     .insert_surface(flat_vol_surface(
                         "NG-VOL",
                         &[0.5, 1.0],
@@ -129,18 +132,14 @@ fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift()
                 if f == 3.5 {
                     assert_eq!(delta, 0.0);
                 } else {
-                    let up_market = market.clone().insert(flat_price_curve(
-                        "NG-FORWARD",
-                        as_of,
-                        f + 0.0001,
-                        2.0,
-                    ));
-                    let down_market = market.clone().insert(flat_price_curve(
-                        "NG-FORWARD",
-                        as_of,
-                        f - 0.0001,
-                        2.0,
-                    ));
+                    let up_market = market
+                        .clone()
+                        .try_insert(flat_price_curve("NG-FORWARD", as_of, f + 0.0001, 2.0))
+                        .expect("insert market curve");
+                    let down_market = market
+                        .clone()
+                        .try_insert(flat_price_curve("NG-FORWARD", as_of, f - 0.0001, 2.0))
+                        .expect("insert market curve");
                     let fd = (option.value(&up_market, as_of)?.amount()
                         - option.value(&down_market, as_of)?.amount())
                         / 0.0002;

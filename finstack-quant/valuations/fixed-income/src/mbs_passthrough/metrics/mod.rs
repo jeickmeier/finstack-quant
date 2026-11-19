@@ -160,7 +160,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         // Discounted quote so both spreads are clearly non-zero.
         let quote = 92.0_f64;
@@ -246,16 +248,18 @@ mod tests {
     #[test]
     fn oas_metric_reads_hull_white_parameters_from_model_config() {
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (30.0, 0.30)])
-                .interp(InterpStyle::LogLinear)
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("valid curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (30.0, 0.30)])
+                    .interp(InterpStyle::LogLinear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("valid curve"),
+            )
+            .expect("insert market curve");
         let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
         mbs.instrument_pricing_overrides
             .market_quotes

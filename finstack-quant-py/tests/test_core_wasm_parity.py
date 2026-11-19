@@ -81,7 +81,15 @@ def _inflation() -> InflationCurve:
 
 
 def _price() -> PriceCurve:
-    return PriceCurve("WTI", "2025-01-02", [(0.0, 72.0), (1.0, 70.5)], spot_price=72.0)
+    return PriceCurve({
+        "id": "WTI",
+        "base_date": "2025-01-02",
+        "knots": [(0.0, 72.0), (1.0, 70.5)],
+        "kind": "price",
+        "day_count": "act_365f",
+        "interp": "linear",
+        "extrapolation": "flat",
+    })
 
 
 def _base_correlation() -> BaseCorrelationCurve:
@@ -419,7 +427,7 @@ CASES: dict[str, Callable[[], Any]] = {
     "price_curve": lambda: json.loads(_price().to_json()),
     "price_curve_queries": lambda: [_price().price(0.5), _price().price("2025-07-02"), _price().kind],
     "base_correlation_curve": lambda: json.loads(_base_correlation().to_json()),
-    "base_correlation": lambda: _base_correlation().correlation(5.0),
+    "base_correlation": lambda: _base_correlation().get_correlation(5.0),
     "vol_surface": lambda: json.loads(_surface().to_json()),
     "vol_surface_queries": lambda: [
         volatility.get_surface_vol(_surface(), 0.75, 100.0),
@@ -552,7 +560,15 @@ def test_unknown_names_raise_the_rust_error_kind() -> None:
     with pytest.raises(KeyError):
         _market().get_discount("missing")
     with pytest.raises(ValueError, match="Invalid price curve kind"):
-        PriceCurve("X", "2025-01-02", [(0.0, 1.0), (1.0, 2.0)], kind="Price")
+        PriceCurve({
+            "id": "X",
+            "base_date": "2025-01-02",
+            "knots": [(0.0, 1.0), (1.0, 2.0)],
+            "kind": "Price",
+            "day_count": "act_365f",
+            "interp": "linear",
+            "extrapolation": "flat",
+        })
     with pytest.raises(ValueError, match="monthly index must be in 1"):
         dates.PeriodId.month(2025, 13)
     with pytest.raises(ValueError, match="std_dev must be finite and positive"):

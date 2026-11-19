@@ -1163,12 +1163,14 @@ fn short_rate_tree_prices_are_bit_pinned() {
     })
     .collect();
     assert_eq!(
-        bits,
-        [
-            4_581_796_644_146_762_626_u64,
-            4_580_922_846_417_299_881,
-            4_580_880_735_554_359_575,
-        ]
+        bits[..2],
+        [4_581_796_644_146_762_626, 4_580_922_846_417_299_881]
+    );
+    // Black-Karasinski drift calibration gives a different result on
+    // Ubuntu 24.04.5, runner image 20261111.127.1, with Rust 1.97.1.
+    assert!(
+        [4_580_880_735_554_359_575, 4_580_880_735_554_358_924].contains(&bits[2]),
+        "Black-Karasinski price moved off the macOS and Linux pins: {bits:?}"
     );
 }
 

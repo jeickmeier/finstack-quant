@@ -289,7 +289,9 @@ mod tests {
             .build()
             .expect("valid curve");
 
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     #[test]
@@ -938,16 +940,18 @@ mod rate_risk_rebuild_tests {
     const AS_OF: Date = date!(2026 - 01 - 15);
 
     fn market() -> MarketContext {
-        MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(AS_OF)
-                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
-                .interp(InterpStyle::LogLinear)
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        )
+        MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(AS_OF)
+                    .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                    .interp(InterpStyle::LogLinear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve")
     }
 
     fn bumped(bp: f64) -> MarketContext {

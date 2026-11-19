@@ -318,6 +318,11 @@
           "const": "collateral_substitution_out",
           "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced.",
           "type": "string"
+        },
+        {
+          "const": "derivative_settlement",
+          "description": "Net contractual derivative payoff settled in cash without exchanging principal.",
+          "type": "string"
         }
       ]
     },
@@ -419,6 +424,13 @@
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Contractual accrual-period end date."
+        },
+        "nominal_dates": {
+          "description": "Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
         },
         "projected_index_rate": {
           "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",

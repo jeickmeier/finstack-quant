@@ -90,7 +90,9 @@ fn test_ytm_uses_bond_daycount() {
     let bond_30360 = create_bond_with_daycount(DayCount::Thirty360, 0.05, as_of, maturity);
 
     let disc = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Price both bonds at par (same price)
     let mut bond_act365_quoted = bond_act365;
@@ -157,7 +159,9 @@ fn test_ytm_par_equals_coupon_for_matching_daycount() {
         let bond = create_bond_with_daycount(day_count, coupon, as_of, maturity);
 
         let disc = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let mut bond_at_par = bond.clone();
         bond_at_par.instrument_pricing_overrides =
@@ -196,7 +200,9 @@ fn test_duration_consistent_with_ytm() {
     let bond = create_bond_with_daycount(DayCount::Thirty360, 0.05, as_of, maturity);
 
     let disc = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let mut bond_quoted = bond;
     bond_quoted.instrument_pricing_overrides =
@@ -244,7 +250,9 @@ fn test_accrued_interest_uses_bond_daycount() {
     let bond_30360 = create_bond_with_daycount(DayCount::Thirty360, 0.05, issue, maturity);
 
     let disc = build_flat_discount_curve(0.05, issue, "USD-OIS");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let result_act365 = bond_act365
         .price_with_metrics(
@@ -302,7 +310,9 @@ fn test_dirty_clean_price_consistency() {
         let bond = create_bond_with_daycount(day_count, 0.05, issue, maturity);
 
         let disc = build_flat_discount_curve(0.05, issue, "USD-OIS");
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let result = bond
             .price_with_metrics(

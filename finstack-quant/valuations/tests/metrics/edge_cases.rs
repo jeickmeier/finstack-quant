@@ -100,7 +100,11 @@ fn test_zero_recovery_cds() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let registry = STANDARD.metrics();
     let pv = cds.value(&market, as_of).unwrap();
@@ -742,7 +746,8 @@ fn test_very_low_interest_rate_greeks() {
         .unwrap();
 
     let market = MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"));
 
@@ -833,7 +838,8 @@ fn test_vol_smile_greeks() {
         .unwrap();
 
     let market = MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"));
 

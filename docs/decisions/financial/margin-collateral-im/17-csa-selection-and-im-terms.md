@@ -1,14 +1,25 @@
 # MARGIN-COLLATERAL-IM-017 — CSA selection and separate IM collateral terms
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for checked CSA elections and one-way IM account terms.
 
-**Implementation status:** Observed for the source scope below, including the stated limitations and discrepancies.
+**Implementation status:** Existing behavior is described below. Agreement and account identity, qualified balances, exact transfer arithmetic, MTA policy, custody evidence and caller reconciliation with the accepted contract are pending.
 
-**Validation status:** Evidence inspected or specifically located; no tests/builds executed. Audit date **2026-11-05**; source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+**Validation status:** Primary margin references and live caller paths inspected. Independent Decimal examples checked target and signed transfer arithmetic, exact MTA equality and cancellation at large amounts. Runtime, portfolio and host qualification remain pending. Audit date **2026-11-05** and source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+
+## Accepted decision for checked CSA elections and one-way IM account terms
+
+1. Bind the legal parties, dated agreement, authorized netting scope, exact account, posting or collecting side, currency and information cut. Elect explicit no IM with a reason, qualified bilateral SIMM or Schedule, or the exact cleared route from record 014. Require credit classification where the SIMM contract uses it. Retire the internal-model placeholder and generic haircut IM elections. Keep posting IM, collecting IM and VM in separate accounts. [Basel margin requirements](https://www.bis.org/committees/bcbs/basel-framework/standard/mgn/20/inforce/2019-12-15/published/2019-12-15) · [Cleared IM](14-ccp-external-and-proxy.md#accepted-decision-for-elected-cleared-initial-margin-routes) · [Collateral valuation](15-collateral-eligibility-and-haircuts.md#accepted-decision-for-checked-collateral-eligibility-and-credited-value).
+2. Require actual dated agreement terms for the allocated group threshold, applicable minimum transfer amount (MTA), horizon, eligibility, custody, settlement and applicable curve and calendar. Apply each allocation once at its authorized scope. Group allocation belongs to the owner with complete group coverage. Retire defaults inferred from currency or methodology. Preserve other elected terms when amending a CSA. [Agreement election](01-registry-and-defaults.md#accepted-decision-for-explicit-margin-parameter-snapshots-and-contractual-terms) · [Basel MGN20.5–20.6](https://www.bis.org/committees/bcbs/basel-framework/standard/mgn/20/inforce/2019-12-15/published/2019-12-15).
+3. Use qualified IM at the elected horizon. Convert directly into the account currency and sum only scopes authorized for that account. Require a dated current collateral balance credited under record 015 and explicit treatment of eligible pending transfers. An empty account requires an explicit zero. Missing balances, incompatible horizons and incomplete scope make the result unavailable. [Portfolio account scope](../portfolio-execution/17-margin-collateral-and-wire.md#accepted-decision-for-checked-portfolio-vm-and-collateral-reports).
+4. In checked Money compute `target = max(pre-threshold IM − allocated threshold, 0)` and `difference = target − current collateral`. Positive differences add to the elected account and negative differences release excess. Use a qualified CCP report that already gives the account's target once. Preserve the indicative status of calculations based on a proxy. [Money arithmetic](../core-conventions/012-money-decimal-precision.md) · [Reported CCP amount](14-ccp-external-and-proxy.md#accepted-decision-for-elected-cleared-initial-margin-routes).
+5. For a separately authorized IM MTA, compare the absolute unrounded difference with the elected threshold. Support both at least and strictly greater than, according to governing terms. Transfer the full difference when triggered. A shared IM and VM MTA requires a qualified joint decision. The supported standalone route requires an explicit no-rounding election. Required rounding needs its own supported treatment. [EU Article 25](https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX%3A02016R2251-20230214) · [CFTC combined MTA rule](https://www.ecfr.gov/current/title-17/chapter-I/part-23/subpart-E/section-23.152).
+6. Report source IM, target, current balance, raw difference, transfer outcome, side, coverage and required versus observed custody. Distinguish exact balance, MTA suppression, explicit no IM and unavailable. Use one checked Rust calculation and restoration path through portfolio, Python and WASM. Record 019 owns call and settlement timing. Record 022 owns the wire format. [Call and settlement timing](19-margin-dates-and-replay.md) · [Result transport](22-wire-tables-and-provenance.md).
+
+USD 100 of pre-threshold IM with USD 20 of allocated threshold and USD 70 already credited gives a USD 80 target and a USD 10 increase. An MTA of USD 10 admits that difference under the at-least rule and suppresses it under the strictly-greater rule.
 
 ## Choice and rationale
 
-Observed: model IM and contractual collateral transfer are separate stages. CSA IM terms specify the allocated threshold and custody requirement; they do not select or execute a calculator automatically. Proposed rationale: apply a group allocation once at the intended CSA level and avoid offsetting segregated IM against VM.
+The observed CSA operation applies a threshold and transfer filter to supplied model IM. The accepted calculation binds effective terms and credited collateral to an exact one-way account and keeps model amounts, custody requirements and transfers distinct.
 
 ## Input domain and conventions
 
@@ -29,7 +40,7 @@ Default regulatory constructors use SIMM, same numeric50m threshold in any curre
 
 ## Alternatives and tradeoffs
 
-Bilateral per-party thresholds/independent amounts or combined IM+VM MTA elections would need a richer contractual model. Automatic group allocation would require group-wide exposure/state. The current method intentionally relies on caller allocation and one-way accounts.
+The accepted account operation uses the qualified allocation supplied by the group owner. A shared IM and VM transfer gate requires a qualified joint decision under the elected agreement.
 
 ## Source and validation evidence
 
@@ -41,5 +52,5 @@ Existing evidence: [src/types/csa.rs](../../../../finstack-quant/margin/src/type
 
 ## Follow-up tracking
 
-Adoption, implementation reconciliation and qualification work is tracked in the
+Implementation reconciliation and qualification work is tracked in the
 [collateral and initial-margin register](../FOLLOW_UPS.md#margin-collateral-and-initial-margin).

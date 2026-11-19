@@ -2413,24 +2413,6 @@
           "type": "object"
         },
         {
-          "description": "Bucket-correlation shock matched no detachment buckets.",
-          "properties": {
-            "kind": {
-              "const": "base_corr_bucket_no_match",
-              "type": "string"
-            },
-            "surface_id": {
-              "description": "Surface identifier.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "surface_id"
-          ],
-          "type": "object"
-        },
-        {
           "description": "Vol-surface arbitrage warning detected post-shock.",
           "properties": {
             "detail": {

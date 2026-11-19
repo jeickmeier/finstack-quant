@@ -53,17 +53,13 @@ pub(crate) fn compute_pv(
 
     let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
     let total_fixings = inst.fixing_dates.len();
-    // Intrinsic of the average of `count` realized fixings. The forward
-    // curve's spot stands in only for `count == 0`, which the expired branch
-    // can reach when the day count gives `t <= 0` before the last fixing.
     let realized_intrinsic = |count: usize| -> finstack_quant_core::Result<f64> {
-        let average = match realized_average(inst.averaging_method, hist_sum, hist_prod_log, count)
-        {
-            Some(average) => average,
-            None => market
-                .get_price_curve(inst.forward_curve_id.as_str())?
-                .spot_price(),
-        };
+        let average = realized_average(inst.averaging_method, hist_sum, hist_prod_log, count)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "realized Asian option payoff requires at least one observed fixing".into(),
+                )
+            })?;
         Ok(average_intrinsic(inst.option_type, average, inst.strike))
     };
 
@@ -300,12 +296,12 @@ fn price_geometric_commodity(
     let d2 = d1 - total_vol;
     let price = match option_type {
         OptionType::Call => {
-            fwd_x * finstack_quant_core::math::special_functions::norm_cdf(d1)
-                - strike * finstack_quant_core::math::special_functions::norm_cdf(d2)
+            fwd_x * finstack_quant_core::math::special_functions::norm_cdf(d1)?
+                - strike * finstack_quant_core::math::special_functions::norm_cdf(d2)?
         }
         OptionType::Put => {
-            strike * finstack_quant_core::math::special_functions::norm_cdf(-d2)
-                - fwd_x * finstack_quant_core::math::special_functions::norm_cdf(-d1)
+            strike * finstack_quant_core::math::special_functions::norm_cdf(-d2)?
+                - fwd_x * finstack_quant_core::math::special_functions::norm_cdf(-d1)?
         }
     };
 
@@ -375,12 +371,12 @@ fn price_arithmetic_tw_commodity(
 
     let price = match option_type {
         OptionType::Call => {
-            m1 * finstack_quant_core::math::special_functions::norm_cdf(d1)
-                - k_eff * finstack_quant_core::math::special_functions::norm_cdf(d2)
+            m1 * finstack_quant_core::math::special_functions::norm_cdf(d1)?
+                - k_eff * finstack_quant_core::math::special_functions::norm_cdf(d2)?
         }
         OptionType::Put => {
-            k_eff * finstack_quant_core::math::special_functions::norm_cdf(-d2)
-                - m1 * finstack_quant_core::math::special_functions::norm_cdf(-d1)
+            k_eff * finstack_quant_core::math::special_functions::norm_cdf(-d2)?
+                - m1 * finstack_quant_core::math::special_functions::norm_cdf(-d1)?
         }
     };
 
@@ -467,15 +463,20 @@ mod tests {
             .expect("discount curve");
 
         let price_curve = PriceCurve::builder("CL-FORWARD")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(flat_forward_price)
             .knots([(0.0, flat_forward_price), (2.0, flat_forward_price)])
             .build()
             .expect("price curve");
 
         MarketContext::new()
-            .insert(disc)
-            .insert(price_curve)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface("CL-VOL", &expiries, &strikes, vol))
     }
 
@@ -499,15 +500,20 @@ mod tests {
             .expect("discount curve");
 
         let price_curve = PriceCurve::builder("CL-FORWARD")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(spot)
             .knots([(0.0, spot), (1.0, far_price)])
             .build()
             .expect("price curve");
 
         MarketContext::new()
-            .insert(disc)
-            .insert(price_curve)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface("CL-VOL", &expiries, &strikes, vol))
     }
 
@@ -533,6 +539,17 @@ mod tests {
             .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("should build")
+    }
+
+    #[test]
+    fn colliding_model_dates_cannot_turn_a_forward_quote_into_a_realized_fixing() {
+        let as_of = date(2025, 1, 30);
+        let fixing = date(2025, 1, 31);
+        let mut option = base_option(vec![fixing], fixing);
+        option.day_count = DayCount::ThirtyE360;
+        let market = build_commodity_market(as_of, 80.0, 0.25, 0.05);
+        let error = option.value(&market, as_of).unwrap_err();
+        assert!(error.to_string().contains("observed fixing"), "{error}");
     }
 
     #[test]

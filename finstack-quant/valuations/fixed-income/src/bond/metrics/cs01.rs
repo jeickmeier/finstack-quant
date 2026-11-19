@@ -589,7 +589,9 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
-        let market = MarketContext::new().insert(hazard);
+        let market = MarketContext::new()
+            .try_insert(hazard)
+            .expect("insert market curve");
 
         for (metric, calculator, operation) in [
             (

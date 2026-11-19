@@ -40,9 +40,11 @@ fn fixture(index: usize) -> Fixture {
         return Fixture {
             case: "agency_mbs_metrics/oas",
             pool,
-            market: MarketContext::new().insert(discount_forward_curves::flat_discount(
-                "USD-OIS", as_of, 0.05,
-            )),
+            market: MarketContext::new()
+                .try_insert(discount_forward_curves::flat_discount(
+                    "USD-OIS", as_of, 0.05,
+                ))
+                .expect("insert market curve"),
             as_of,
         };
     }
@@ -191,7 +193,9 @@ fn fixture(index: usize) -> Fixture {
     Fixture {
         case,
         pool,
-        market: MarketContext::new().insert(curve),
+        market: MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve"),
         as_of,
     }
 }
@@ -439,7 +443,8 @@ fn run_case(index: usize, scenario: &str) {
         months as f64 / 12.0,
     )
     .expect("curve-consistent HW model");
-    let paths = simulate_rate_paths(rate, &hw, config.num_paths, months, config.seed);
+    let paths =
+        simulate_rate_paths(rate, &hw, config.num_paths, months, config.seed).expect("rate paths");
     assert_eq!(paths.len(), config.num_paths);
     let taus: Vec<f64> = steps
         .payment_extras

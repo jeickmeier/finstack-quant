@@ -59,7 +59,7 @@
 //!     .build()?;
 //!
 //! // Add to market context
-//! let market = MarketContext::new().insert(curve);
+//! let market = MarketContext::new().try_insert(curve).expect("insert market curve");
 //! assert!(market.get_discount("USD-OIS").is_ok());
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
@@ -75,7 +75,6 @@
 
 /// Bump functionality for scenario analysis and stress testing.
 pub mod bumps;
-pub use bumps::MarketDataTarget;
 /// Market data context with enum-based storage.
 pub mod context;
 /// Market data comparison and shift measurement.

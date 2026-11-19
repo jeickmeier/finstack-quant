@@ -131,7 +131,9 @@ fn b4_normal_sabr_smile_is_translation_invariant_across_zero() {
     let expected = alpha * z / x * (1.0 + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu * t);
     let params = SabrParameters::new(alpha, 0.0, nu, rho).expect("params");
     for (f, k) in [(-0.02, -0.015), (-0.002, 0.003), (0.01, 0.015)] {
-        let model = params.implied_vol(f, k, t).expect("model");
+        let model = params
+            .implied_vol(f, k, t, VolQuoteType::Normal)
+            .expect("model");
         let expansion = params.implied_vol_normal(f, k, t).expect("expansion");
         assert!(
             (model - expected).abs() < 1e-12,
@@ -154,10 +156,14 @@ fn b5_default_sabr_calibration_controls_relative_quote_error() {
         let params = SabrParameters::new(0.004 * scale, 0.0, 0.7, -0.4).expect("params");
         let quotes: Vec<_> = strikes
             .iter()
-            .map(|&k| params.implied_vol(forward, k, 2.0).expect("quote"))
+            .map(|&k| {
+                params
+                    .implied_vol(forward, k, 2.0, VolQuoteType::Normal)
+                    .expect("quote")
+            })
             .collect();
         let fitted = SabrCalibrator::new()
-            .calibrate(forward, &strikes, &quotes, 2.0, 0.0)
+            .calibrate(forward, &strikes, &quotes, 2.0, 0.0, VolQuoteType::Normal)
             .expect("fit");
         let max_relative = strikes
             .iter()
@@ -165,7 +171,7 @@ fn b5_default_sabr_calibration_controls_relative_quote_error() {
             .map(|(&k, &v)| {
                 (fitted
                     .parameters
-                    .implied_vol(forward, k, 2.0)
+                    .implied_vol(forward, k, 2.0, VolQuoteType::Normal)
                     .expect("fit quote")
                     - v)
                     .abs()
@@ -180,12 +186,15 @@ fn b5_default_sabr_calibration_controls_relative_quote_error() {
 }
 
 #[test]
-fn b2_black_lookup_rejects_normal_cube() {
+fn b2_black_and_normal_outputs_are_distinct_for_beta_zero_cube() {
     use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
     let p = SabrParameterData::new(0.008, 0.0, 0.3, 0.0, None).expect("params");
     let cube = VolCube::from_grid("NORMAL", &[1.0], &[5.0], &[p], &[0.02]).expect("cube");
     let source = VolSource::Cube(Arc::new(cube));
-    assert!(source.get_vol(1.0, 5.0, 0.02).is_err());
+    assert!(source.get_convention(1.0, 5.0).is_err());
+    let black = source.get_vol(1.0, 5.0, 0.02).expect("Black quote");
+    let normal = source.get_normal_vol(1.0, 5.0, 0.02).expect("normal quote");
+    assert!(black > normal);
 }
 
 #[test]
@@ -208,7 +217,8 @@ fn b2_clamped_cube_preserves_small_valid_quote() {
         5.0,
         0.02,
         finstack_quant_models::volatility::VolatilityConvention::Lognormal,
-    );
+    )
+    .unwrap();
     assert!(
         (checked - clamped).abs() < 1e-14,
         "checked {checked}, clamped {clamped}"
@@ -229,31 +239,18 @@ fn b2_clamped_cube_never_fabricates_volatility_for_invalid_black_rates() {
             -0.01,
             finstack_quant_models::volatility::VolatilityConvention::Lognormal
         )
-        .is_nan()
+        .is_err()
     );
 }
 
 #[test]
-fn b4_normal_cube_uses_canonical_beta_snap() {
+fn b4_normal_cube_rejects_signed_rates_with_fractional_beta() {
     use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
-    use finstack_quant_models::volatility::VolatilityConvention;
     let p = SabrParameterData::new(0.008, 0.00005, 0.3, -0.2, None).expect("params");
-    let cube = VolCube::from_grid("NORMAL-SNAP", &[1.0], &[5.0], &[p], &[-0.01]).expect("cube");
+    let cube = VolCube::from_grid("SMALL-BETA", &[1.0], &[5.0], &[p], &[-0.01]).expect("cube");
     let source = VolSource::Cube(Arc::new(cube));
-    assert_eq!(
-        source.get_convention(1.0, 5.0).expect("convention"),
-        VolatilityConvention::Normal
-    );
-    let params = SabrParameters::new(0.008, 0.00005, 0.3, -0.2).expect("parameters");
-    let expected = params.implied_vol(-0.01, 0.001, 1.0).expect("normal quote");
-    assert!(
-        (source
-            .get_normal_vol_clamped(1.0, 5.0, 0.001)
-            .expect("cube quote")
-            - expected)
-            .abs()
-            < 1e-14
-    );
+    assert!(source.get_convention(1.0, 5.0).is_err());
+    assert!(source.get_normal_vol_clamped(1.0, 5.0, 0.001).is_err());
 }
 
 #[test]
@@ -283,7 +280,8 @@ fn m1_hw_bond_option_converges_to_independent_affine_price() {
     let p_expiry = (-rate * expiry).exp();
     let p_maturity = (-rate * maturity).exp();
     let d1 = (p_maturity / (strike * p_expiry)).ln() / bond_vol + 0.5 * bond_vol;
-    let expected = p_maturity * norm_cdf(d1) - strike * p_expiry * norm_cdf(d1 - bond_vol);
+    let expected = p_maturity * norm_cdf(d1).expect("valid Gaussian variate")
+        - strike * p_expiry * norm_cdf(d1 - bond_vol).expect("valid Gaussian variate");
     let mut errors = Vec::new();
     for steps in [25, 100, 400] {
         let tree = HullWhiteTree::calibrate(

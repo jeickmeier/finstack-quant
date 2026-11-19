@@ -1,14 +1,18 @@
 # MARGIN-REGULATORY-XVA-020: Unilateral and bilateral CVA/DVA bucket quadrature
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed** in the stated source scope.
-- Validation status: **Evidence inspected/located, not executed.** Selected test bodies were read; no runtime test, build or numerical experiment was run.
+- Decision status: **Accepted 2026-11-17 for unilateral and bilateral CVA/DVA, replayable bucket quadrature, and collateral-aware exposure.**
+- Implementation status: The bucket approximation is implemented. Checked curve admission, explicit bilateral assumptions, removal of inferred posted-IM deductions, and replay coverage require reconciliation.
+- Validation status: Exact arithmetic checked the two-path collateral example. Rust fixtures were inspected. Grid convergence and collateral-aware exposure integration require qualification.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope and hashes: [inventory](README.md), [coverage ledger](coverage.json).
 
-## Choice and domain
+## Accepted decision
 
-This describes the observed design. No historical adoption rationale is inferred; the alternatives and tradeoffs below are the audit's assessment.
+1. Integrate on the admitted XVA 019 grid. Multiply each checked survival decrement by loss given default, average exposure, and average discount factor. CVA uses counterparty default and EPE and is a positive loss. DVA uses own default and ENE and is a positive benefit. Reject increasing survival. [Exposure admission](19-xva-profile-and-epe.md).
+2. For bilateral valuation, multiply each leg by the other name's average survival over the interval. Disclose the first-to-default approximation, with independent defaults and exposure independent of default. Retain interval inputs and contributions for replay and qualify the approximation against analytic cases and grid refinement. [First-to-default research](https://arxiv.org/abs/1106.3496).
+3. Require a qualified exposure profile reflecting the selected collateral and close-out terms. Remove the automatic deduction of expected posted IM from ENE. For two equally weighted paths with negative exposure [100, 0] and posted IM [0, 100], deducting their averages gives zero. Applying the deduction path by path leaves expected exposure of 50.
+
+## Observed choice and domain
 
 CVA and DVA are discounted loss integrals over the supplied expected positive/negative exposure profiles. The bilateral branch weights a default leg by the other name's average survival, an independence-style first-to-default approximation; it does not model joint default or wrong-way exposure dependence.
 
@@ -37,4 +41,4 @@ Exact integration under piecewise-constant hazards/exposure or adaptive quadratu
 
 Runtime: [src/xva/cva.rs](../../../../finstack-quant/margin/src/xva/cva.rs); row/result contracts: [src/xva/types.rs](../../../../finstack-quant/margin/src/xva/types.rs). Inspected flat-hazard CVA/DVA tests compare against `LGD×E×lambda/(lambda+r)×(1−exp(−(lambda+r)T))` with quarterly grids and 2% tolerance: independent closed-form shape evidence, not an executed result. Bilateral tests inspected only establish lower/equal survival-weighted adjustments; row replay and posted-IM examples were located. [Gregory XVA](../../../REFERENCES.md#gregory-xva-challenge), [Green XVA](../../../REFERENCES.md#green-xva).
 
-The implementation establishes observed behavior, not financial adoption or regulatory compliance. Actionable work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
+Implementation reconciliation and independent qualification are tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).

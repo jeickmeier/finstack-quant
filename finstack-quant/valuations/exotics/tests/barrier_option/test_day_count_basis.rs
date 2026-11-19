@@ -179,7 +179,8 @@ fn test_vol_lookup_uses_correct_time_basis() {
     let disc_curve = build_discount_curve_with_day_count(rate, as_of, DISC_ID, DayCount::Act360);
 
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
@@ -205,7 +206,8 @@ fn test_vol_lookup_uses_correct_time_basis() {
     let disc_curve_365 =
         build_discount_curve_with_day_count(rate, as_of, DISC_ID, DayCount::Act365F);
     let market_365 = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(disc_curve_365)
+        .try_insert(disc_curve_365)
+        .expect("insert market curve")
         .insert_surface(
             VolSurface::builder(VOL_ID)
                 .secondary_axis(VolSurfaceAxis::Strike)

@@ -40,7 +40,9 @@ fn market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// Five-class CLO: ten 10M bullet loans at `pool_rate`, A 60 / B 15 / C 10 /

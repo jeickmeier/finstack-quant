@@ -15,7 +15,9 @@ fn credit_loan_and_market() -> (TermLoan, MarketContext) {
     let mut loan = TermLoan::example().expect("term loan");
     loan.credit_curve_id = Some(CurveId::new("USD-CREDIT"));
     let discount = flat_discount_curve(0.04, as_of, "USD-OIS");
-    let source = MarketContext::new().insert(discount);
+    let source = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
@@ -24,7 +26,10 @@ fn credit_loan_and_market() -> (TermLoan, MarketContext) {
         "USD-OIS",
     )
     .expect("hazard calibration");
-    (loan, source.insert(hazard))
+    (
+        loan,
+        source.try_insert(hazard).expect("insert market curve"),
+    )
 }
 
 #[test]
@@ -75,7 +80,9 @@ fn cs01_follows_the_selected_pricing_model() {
 fn quoted_z_spread_cs01_matches_settlement_price_bumps() {
     let as_of = date!(2024 - 01 - 15);
     let mut loan = TermLoan::example().expect("term loan");
-    let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.04, as_of, "USD-OIS"))
+        .expect("insert market curve");
     let spread = 0.05;
     loan.instrument_pricing_overrides
         .market_quotes
@@ -136,7 +143,9 @@ fn quoted_z_spread_cs01_matches_settlement_price_bumps() {
 #[test]
 fn quoted_clean_price_changes_term_loan_cs01() {
     let as_of = date!(2024 - 01 - 15);
-    let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.04, as_of, "USD-OIS"))
+        .expect("insert market curve");
     let registry = STANDARD.pricers();
     let mut sensitivities = Vec::with_capacity(3);
     for clean_price in [80.0, 99.0, 110.0] {
@@ -163,7 +172,9 @@ fn quoted_clean_price_changes_term_loan_cs01() {
 #[test]
 fn impossible_clean_price_does_not_return_model_anchored_risk() {
     let as_of = date!(2024 - 01 - 15);
-    let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.04, as_of, "USD-OIS"))
+        .expect("insert market curve");
     let mut loan = TermLoan::example().expect("term loan");
     loan.instrument_pricing_overrides
         .market_quotes

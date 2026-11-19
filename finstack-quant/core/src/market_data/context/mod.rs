@@ -43,7 +43,7 @@
 //!     .build()
 //!     .expect("DiscountCurve builder should succeed");
 //!
-//! let ctx = MarketContext::new().insert(curve);
+//! let ctx = MarketContext::new().try_insert(curve).expect("insert market curve");
 //! let retrieved = ctx.get_discount("USD-OIS").expect("Discount curve should exist");
 //! assert_eq!(retrieved.id(), &CurveId::from("USD-OIS"));
 //! ```
@@ -311,7 +311,8 @@ impl MarketContext {
     /// * `amount` - Monetary amount to convert.
     /// * `target_currency` - Destination currency.
     /// * `as_of` - Date used for the FX rate lookup.
-    /// * `policy` - FX conversion policy (e.g. [`FxConversionPolicy::CashflowDate`] or [`FxConversionPolicy::PeriodAverage`]).
+    /// * `policy` - Point-date FX provider-selection policy, either
+    ///   [`FxConversionPolicy::CashflowDate`] or [`FxConversionPolicy::PeriodEnd`].
     ///
     /// # Errors
     ///

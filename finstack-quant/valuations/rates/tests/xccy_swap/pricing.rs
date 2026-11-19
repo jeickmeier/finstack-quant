@@ -484,7 +484,9 @@ fn estr_overnight_versus_euribor_float_leg_prices() {
         finstack_quant_core::dates::DayCount::Act365F,
     )
     .unwrap();
-    let market = market_with_fx().insert(estr);
+    let market = market_with_fx()
+        .try_insert(estr)
+        .expect("insert market curve");
     let pv = swap.value(&market, base).expect("estr xccy pv");
     assert_eq!(pv.currency(), Currency::USD);
     assert!(pv.amount().is_finite());
@@ -519,7 +521,9 @@ fn mtm_reset_still_emits_notional_rebals_with_overnight_leg() {
         finstack_quant_core::dates::DayCount::Act365F,
     )
     .unwrap();
-    let market = market_with_fx().insert(estr);
+    let market = market_with_fx()
+        .try_insert(estr)
+        .expect("insert market curve");
     let pv = swap.value(&market, base).expect("mtm overnight pv");
     assert!(pv.amount().is_finite());
     let schedule = swap

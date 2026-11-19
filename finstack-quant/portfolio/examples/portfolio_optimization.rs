@@ -43,7 +43,9 @@ fn build_market(as_of: Date) -> MarketContext {
         .build()
         .expect("example discount curve should build");
 
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 fn build_bond_portfolio(as_of: Date) -> finstack_quant_portfolio::Portfolio {

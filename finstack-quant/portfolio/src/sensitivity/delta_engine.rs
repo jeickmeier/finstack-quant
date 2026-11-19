@@ -4,7 +4,7 @@ use super::traits::{FactorRepricingPlan, FactorSensitivityEngine, factor_bump, m
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{
-    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump, MarketDataTarget,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
@@ -154,7 +154,7 @@ pub(crate) fn mapping_to_market_bumps(
         .map(|(fraction, _)| fraction)
         .ok_or_else(|| {
             Error::Validation(format!(
-                "factor bump units {bump_units:?} cannot express an additive spot/FX shift"
+                "factor bump units {bump_units:?} cannot express an additive fractional shift"
             ))
         })
     };
@@ -170,7 +170,27 @@ pub(crate) fn mapping_to_market_bumps(
             };
             curve_ids
                 .iter()
-                .map(|id| Ok(market.curve_target(id)?.into_bump(spec)))
+                .map(|id| {
+                    let target = market.curve_target(id)?;
+                    // The factor magnitude has declared reporting units. Correlation
+                    // sources accept changes only in their native decimal fraction.
+                    let native = if matches!(target, MarketDataTarget::BaseCorrelation(_)) {
+                        let fraction = additive_fraction()?;
+                        if bump_size != 0.0 && fraction == 0.0 {
+                            return Err(Error::Validation(
+                                "correlation factor bump underflow".into(),
+                            ));
+                        }
+                        BumpSpec {
+                            units: BumpUnits::Fraction,
+                            value: fraction,
+                            ..spec
+                        }
+                    } else {
+                        spec
+                    };
+                    Ok(target.into_bump(native))
+                })
                 .collect()
         }
         MarketMapping::CurveBucketed {
@@ -576,7 +596,8 @@ mod tests {
             .build()?;
 
         Ok(MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar")))
     }
 
@@ -588,7 +609,7 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
-        Ok(test_market(as_of)?.insert(other_curve))
+        test_market(as_of)?.try_insert(other_curve)
     }
 
     fn test_fx_market() -> Result<MarketContext> {

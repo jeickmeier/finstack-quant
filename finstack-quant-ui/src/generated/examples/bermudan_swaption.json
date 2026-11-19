@@ -65,6 +65,7 @@
           "count": 3,
           "unit": "months"
         },
+        "index_id": "USD-OIS",
         "payment_lag_days": 0,
         "reset_lag_days": 0,
         "spread_bp": "0",

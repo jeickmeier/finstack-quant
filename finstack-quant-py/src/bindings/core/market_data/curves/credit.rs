@@ -21,7 +21,7 @@ use crate::errors::core_to_py;
 /// -------
 /// >>> from finstack_quant.core.market_data import BaseCorrelationCurve
 /// >>> curve = BaseCorrelationCurve("CDX-IG", [(3.0, 0.25), (7.0, 0.40), (10.0, 0.55)])
-/// >>> round(curve.correlation(5.0), 4)
+/// >>> round(curve.get_correlation(5.0), 4)
 /// 0.325
 #[pyclass(
     name = "BaseCorrelationCurve",
@@ -88,9 +88,16 @@ impl PyBaseCorrelationCurve {
     /// -------
     /// float
     ///     Base correlation as a decimal in ``[0, 1]``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the detachment is non-finite or outside ``[0, 100]``.
     #[pyo3(text_signature = "(self, detachment_pct)")]
-    fn correlation(&self, detachment_pct: f64) -> f64 {
-        self.inner.correlation(detachment_pct)
+    fn get_correlation(&self, detachment_pct: f64) -> PyResult<f64> {
+        self.inner
+            .get_correlation(detachment_pct)
+            .map_err(core_to_py)
     }
 
     /// Export knots as a pandas ``DataFrame`` with columns ``detachment_pct`` and ``correlation``.
@@ -211,14 +218,14 @@ impl PyCreditIndexData {
     ///     Base correlations by detachment point.
     /// issuer_curves : dict[str, HazardCurve], optional
     ///     Hazard curve per issuer identifier (ticker, CUSIP, ...). When given
-    ///     it must cover exactly ``num_constituents`` distinct issuers.
+    ///     it must cover exactly ``num_constituents`` distinct, nonblank issuer identifiers.
     /// issuer_recovery_rates : dict[str, float], optional
     ///     Recovery per issuer as a decimal in ``[0, 1]``; requires
     ///     ``issuer_curves`` and only its identifiers. Issuers left out use
     ///     ``recovery_rate``.
     /// issuer_weights : dict[str, float], optional
-    ///     Non-negative notional weight per issuer (decimal fractions summing
-    ///     to ``1.0`` within ``1e-9``); requires ``issuer_curves`` and must
+    ///     Notional weight per issuer (decimal fractions in ``[0, 1]`` summing
+    ///     to ``1.0`` within ``2**-52``); requires ``issuer_curves`` and must
     ///     cover exactly its identifiers.
     ///
     /// Raises
@@ -227,7 +234,7 @@ impl PyCreditIndexData {
     ///     If ``num_constituents`` is zero, a recovery is outside ``[0, 1]``,
     ///     the issuer curves do not cover ``num_constituents`` issuers, the
     ///     issuer recoveries or weights name an unknown issuer (or are given
-    ///     without ``issuer_curves``), or the weights are negative, do not
+    ///     without ``issuer_curves``), or the weights lie outside ``[0, 1]``, do not
     ///     cover every issuer or do not sum to ``1.0``.
     ///
     /// Example
@@ -280,7 +287,7 @@ impl PyCreditIndexData {
         })
     }
 
-    /// Hazard curve of one issuer, falling back to the index curve.
+    /// Hazard curve of a named pool member.
     ///
     /// Parameters
     /// ----------
@@ -290,11 +297,20 @@ impl PyCreditIndexData {
     /// Returns
     /// -------
     /// HazardCurve
-    ///     The issuer's curve, or ``index_credit_curve`` when the bundle has
-    ///     no curve for ``issuer_id`` (homogeneous assumption).
+    ///     The hazard curve of the named member.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If the pool has no named roster or the issuer is absent.
     #[pyo3(text_signature = "(self, issuer_id)")]
-    fn get_issuer_curve(&self, issuer_id: &str) -> PyHazardCurve {
-        PyHazardCurve::from_inner(Arc::new(self.inner.get_issuer_curve(issuer_id).clone()))
+    fn get_issuer_curve(&self, issuer_id: &str) -> PyResult<PyHazardCurve> {
+        Ok(PyHazardCurve::from_inner(Arc::new(
+            self.inner
+                .get_issuer_curve(issuer_id)
+                .map_err(core_to_py)?
+                .clone(),
+        )))
     }
 
     /// Whether issuer-level curves are present (heterogeneous pricing mode).
@@ -330,9 +346,16 @@ impl PyCreditIndexData {
     /// float
     ///     The issuer's recovery as a decimal, or ``recovery_rate`` when none
     ///     was supplied for ``issuer_id``.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If the pool has no named roster or the issuer is absent.
     #[pyo3(text_signature = "(self, issuer_id)")]
-    fn get_issuer_recovery(&self, issuer_id: &str) -> f64 {
-        self.inner.get_issuer_recovery(issuer_id)
+    fn get_issuer_recovery(&self, issuer_id: &str) -> PyResult<f64> {
+        self.inner
+            .get_issuer_recovery(issuer_id)
+            .map_err(core_to_py)
     }
 
     /// Notional weight of one issuer, falling back to equal weighting.
@@ -347,9 +370,14 @@ impl PyCreditIndexData {
     /// float
     ///     The issuer's weight as a decimal fraction, or
     ///     ``1 / num_constituents`` when none was supplied for ``issuer_id``.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If the pool has no named roster or the issuer is absent.
     #[pyo3(text_signature = "(self, issuer_id)")]
-    fn get_issuer_weight(&self, issuer_id: &str) -> f64 {
-        self.inner.get_issuer_weight(issuer_id)
+    fn get_issuer_weight(&self, issuer_id: &str) -> PyResult<f64> {
+        self.inner.get_issuer_weight(issuer_id).map_err(core_to_py)
     }
 
     /// Number of constituents in the credit index.

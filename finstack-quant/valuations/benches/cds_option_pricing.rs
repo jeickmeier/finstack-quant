@@ -139,8 +139,10 @@ fn create_market() -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(disc)
-        .insert(hazard)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
 }
 

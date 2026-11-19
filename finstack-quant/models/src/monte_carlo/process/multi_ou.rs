@@ -141,8 +141,9 @@ impl StochasticProcess for MultiOuProcess {
         }
     }
 
-    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         out.copy_from_slice(&self.params.sigmas);
+        Ok(())
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
@@ -181,7 +182,7 @@ mod tests {
         let mut mu = [0.0, 0.0];
         let mut sig = [0.0, 0.0];
         proc.drift(0.0, &x, &mut mu);
-        proc.diffusion(0.0, &x, &mut sig);
+        proc.diffusion(0.0, &x, &mut sig).expect("valid diffusion");
         assert!((mu[0] - 2.0 * (1.0 - 0.0)).abs() < 1e-12);
         assert!((mu[1] - 1.0 * (-1.0 - 0.0)).abs() < 1e-12);
         assert!((sig[0] - 0.3).abs() < 1e-12);

@@ -2,7 +2,7 @@
 //!
 //! `fill_std_normals` / `fill_u01` are the innermost loop of every QMC
 //! simulation. Scrambled and unscrambled fills are measured separately: the
-//! recursive Owen scramble is a fixed per-value hash whose cost can dominate
+//! prefix hash scramble is a fixed per-value hash whose cost can dominate
 //! the raw sequence generation, and only a split measurement shows which of
 //! the two is worth optimizing.
 //!
@@ -19,35 +19,43 @@ use std::hint::black_box;
 const POINTS: usize = 1024;
 
 /// Check batching against direct index reconstruction, independently of advance.
-fn check_fill(dims: usize, seed: u64, normals: bool) {
+fn check_fill(dims: usize, seed: Option<u64>, normals: bool) {
     let mut actual = vec![f64::NAN; POINTS * dims];
-    let mut batch_rng = SobolRng::try_new(dims, seed).expect("valid preflight dimension");
+    let mut batch_rng = SobolRng::new(dims, seed).expect("valid preflight dimension");
     if normals {
-        batch_rng.fill_std_normals(&mut actual);
+        batch_rng
+            .fill_std_normals(&mut actual)
+            .expect("valid Sobol request");
     } else {
-        batch_rng.fill_u01(&mut actual);
+        batch_rng
+            .fill_u01(&mut actual)
+            .expect("valid Sobol request");
     }
 
-    let mut reference_rng = SobolRng::try_new(dims, seed).expect("valid reference dimension");
+    let mut reference_rng = SobolRng::new(dims, seed).expect("valid reference dimension");
     let mut point = vec![0.0; dims];
     assert_eq!(actual.len(), POINTS * dims);
     for (index, actual_point) in actual.chunks_exact(dims).enumerate() {
         // `skip` reconstructs raw state from index bits; it does not reuse the
         // incremental state exercised by the batch fill under measurement.
         reference_rng.reset();
-        reference_rng.skip(index as u64);
-        reference_rng.fill_u01(&mut point);
+        reference_rng
+            .skip(index as u64)
+            .expect("valid Sobol request");
+        reference_rng
+            .fill_u01(&mut point)
+            .expect("valid Sobol request");
         for (&value, &uniform) in actual_point.iter().zip(&point) {
             assert!(uniform.is_finite() && uniform > 0.0 && uniform < 1.0);
             let expected = if normals {
-                standard_normal_inv_cdf(uniform)
+                standard_normal_inv_cdf(uniform).expect("interior probability")
             } else {
                 uniform
             };
             assert!(value.is_finite());
             assert_eq!(
                 value, expected,
-                "point {index}, dimension {dims}, seed {seed}"
+                "point {index}, dimension {dims}, seed {seed:?}"
             );
         }
     }
@@ -56,8 +64,8 @@ fn check_fill(dims: usize, seed: u64, normals: bool) {
 fn bench_fill_std_normals(c: &mut Criterion) {
     let mut group = c.benchmark_group("sobol_fill_std_normals");
     for &dims in &[1usize, 8, 32] {
-        for seed in [0u64, 42] {
-            let label = if seed == 0 {
+        for seed in [None, Some(42)] {
+            let label = if seed.is_none() {
                 "unscrambled"
             } else {
                 "scrambled"
@@ -67,10 +75,10 @@ fn bench_fill_std_normals(c: &mut Criterion) {
                 &POINTS,
                 |b, _| {
                     check_fill(dims, seed, true);
-                    let mut rng = SobolRng::try_new(dims, seed).expect("valid dimension");
+                    let mut rng = SobolRng::new(dims, seed).expect("valid dimension");
                     let mut out = vec![0.0; POINTS * dims];
                     b.iter(|| {
-                        rng.fill_std_normals(&mut out);
+                        rng.fill_std_normals(&mut out).expect("valid Sobol request");
                         black_box(out.as_slice());
                     });
                 },
@@ -83,8 +91,8 @@ fn bench_fill_std_normals(c: &mut Criterion) {
 fn bench_fill_u01(c: &mut Criterion) {
     let mut group = c.benchmark_group("sobol_fill_u01");
     for &dims in &[1usize, 8, 32] {
-        for seed in [0u64, 42] {
-            let label = if seed == 0 {
+        for seed in [None, Some(42)] {
+            let label = if seed.is_none() {
                 "unscrambled"
             } else {
                 "scrambled"
@@ -94,10 +102,10 @@ fn bench_fill_u01(c: &mut Criterion) {
                 &POINTS,
                 |b, _| {
                     check_fill(dims, seed, false);
-                    let mut rng = SobolRng::try_new(dims, seed).expect("valid dimension");
+                    let mut rng = SobolRng::new(dims, seed).expect("valid dimension");
                     let mut out = vec![0.0; POINTS * dims];
                     b.iter(|| {
-                        rng.fill_u01(&mut out);
+                        rng.fill_u01(&mut out).expect("valid Sobol request");
                         black_box(out.as_slice());
                     });
                 },

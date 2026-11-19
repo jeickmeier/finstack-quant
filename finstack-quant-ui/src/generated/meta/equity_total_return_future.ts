@@ -826,6 +826,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_forward_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id",
+    "description": "Contractual floating index used for asset-swap accruals and historical resets."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
     "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
@@ -3713,7 +3728,7 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve",
-    "description": "A finite, left-continuous piecewise-constant curve."
+    "description": "A finite, right-continuous piecewise-constant curve."
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times",
@@ -3722,7 +3737,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/times/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values",
@@ -3731,7 +3747,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_d30540ea90ce7eca3dee",

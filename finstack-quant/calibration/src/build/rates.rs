@@ -542,6 +542,7 @@ fn build_swap(
 
     let float = FloatLegSpec {
         discount_curve_id: CurveId::new(discount_id),
+        index_id: index.clone(),
         forward_curve_id: CurveId::new(forward_id),
         spread_bp: Decimal::ZERO,
         frequency: leg_conv.float_frequency,

@@ -56,28 +56,34 @@ impl StochasticDefault for FactorCorrelatedDefault {
         self.factor_loading.abs().clamp(0.0, 0.99)
     }
 
-    fn expected_mdr(&self, seasoning: u32) -> f64 {
-        let base_mdr = self.base_mdr_at_seasoning(seasoning);
+    fn expected_mdr(&self, seasoning: u32) -> finstack_quant_core::Result<f64> {
+        let base_mdr = self.base_spec.mdr(seasoning)?;
         if base_mdr <= f64::EPSILON {
-            return 0.0;
+            return Ok(0.0);
         }
         let sigma = (self.factor_loading * self.cdr_volatility).abs();
         if sigma == 0.0 {
-            return base_mdr.min(0.50);
+            return Ok(base_mdr.min(0.50));
         }
         // E[min(cap, b exp(sigma Z))] has an exact truncated-lognormal
         // expression. The shock sign does not affect its unconditional mean.
         let cutoff = (0.50 / base_mdr).ln() / sigma;
-        base_mdr
+        Ok(base_mdr
             * (0.5 * sigma * sigma).exp()
-            * finstack_quant_core::math::special_functions::norm_cdf(cutoff - sigma)
-            + 0.50 * finstack_quant_core::math::special_functions::norm_cdf(-cutoff)
+            * finstack_quant_core::math::special_functions::norm_cdf(cutoff - sigma)?
+            + 0.50 * finstack_quant_core::math::special_functions::norm_cdf(-cutoff)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expected_mdr_rejects_invalid_base_rate() {
+        let model = FactorCorrelatedDefault::new(DefaultModelSpec::constant_cdr(-1.0), 1.0, 1.0);
+        assert!(model.expected_mdr(12).is_err());
+    }
 
     #[test]
     fn expected_mdr_matches_conditional_log_normal_mean_including_cap() {
@@ -92,13 +98,16 @@ mod tests {
                     model.conditional_mdr(30, &[z]) * density * step
                 })
                 .sum();
-            assert!((model.expected_mdr(30) - integrated).abs() < 1e-8);
+            assert!((model.expected_mdr(30).unwrap() - integrated).abs() < 1e-8);
         }
     }
 
     #[test]
     fn deterministic_expected_mdr_matches_the_conditional_cap() {
         let model = FactorCorrelatedDefault::new(DefaultModelSpec::constant_cdr(1.0), 1.0, 0.0);
-        assert_eq!(model.expected_mdr(30), model.conditional_mdr(30, &[0.0]));
+        assert_eq!(
+            model.expected_mdr(30).unwrap(),
+            model.conditional_mdr(30, &[0.0])
+        );
     }
 }

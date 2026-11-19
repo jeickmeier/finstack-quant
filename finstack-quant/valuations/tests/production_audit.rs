@@ -56,7 +56,9 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
             },
         ))
         .expect("registry");
-    let market = MarketContext::new().insert(curve.clone());
+    let market = MarketContext::new()
+        .try_insert(curve.clone())
+        .expect("insert market curve");
     let result = registry
         .price_with_metrics(
             &swaption,
@@ -140,16 +142,18 @@ fn m2_lsmc_partial_coupon_and_spread_match_cashflows() {
         .instrument_pricing_overrides
         .model_config
         .hw1f_sigma = Some(1e-7);
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder(swaption.get_discount_curve_id().clone())
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (10.0, (-0.4_f64).exp())])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder(swaption.get_discount_curve_id().clone())
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (10.0, (-0.4_f64).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve");
     let mut expected = 0.0;
     let mut start = exercise;
     for end in [date!(2027 - 01 - 01), date!(2028 - 01 - 01)] {
@@ -270,7 +274,9 @@ fn b11_icma_bond_duration_and_convexity_use_yield_clock() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     for (as_of, first_time, dirty) in [(start, 0.5, 100.0), (date!(2024 - 05 - 31), 0.25, 101.0)] {
         let result = bond
             .price_with_metrics(
@@ -342,7 +348,11 @@ fn b12_dm_inversion_applies_settlement_once() {
         .build()
         .expect("curve");
     let fwd = ForwardCurve::flat("USD-SOFR-3M", as_of, 0.03, DayCount::Act360).expect("forward");
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
     let target = 0.015;
     let dirty = price_from_dm(&bond, &market, as_of, target).expect("DM price");
     let quotes = finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes(
@@ -474,7 +484,9 @@ fn m28_model_yield_does_not_repeat_settlement_carry() {
         .expect("flat continuous curve");
     let result = loan
         .price_with_metrics(
-            &MarketContext::new().insert(curve),
+            &MarketContext::new()
+                .try_insert(curve)
+                .expect("insert market curve"),
             as_of,
             &[MetricId::Ytm],
             PricingOptions::default(),
@@ -514,7 +526,9 @@ fn m28_coupon_date_purchase_uses_balance_after_settled_amortization() {
         .expect("curve");
     let result = loan
         .price_with_metrics(
-            &MarketContext::new().insert(curve),
+            &MarketContext::new()
+                .try_insert(curve)
+                .expect("insert market curve"),
             as_of,
             &[MetricId::Ytm],
             PricingOptions::default(),
@@ -578,7 +592,7 @@ fn b2_cap_auto_uses_normal_quote_metadata_and_rejects_black_mismatch() {
     };
     let as_of = date!(2024 - 01 - 02);
     let market = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("DISC")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 1.0)])
@@ -588,7 +602,9 @@ fn b2_cap_auto_uses_normal_quote_metadata_and_rejects_black_mismatch() {
                 .build()
                 .expect("discount"),
         )
-        .insert(ForwardCurve::flat("FWD", as_of, 0.02, DayCount::Act360).expect("forward"))
+        .expect("insert market curve")
+        .try_insert(ForwardCurve::flat("FWD", as_of, 0.02, DayCount::Act360).expect("forward"))
+        .expect("insert market curve")
         .insert_surface(
             VolSurface::builder("NORMAL")
                 .secondary_axis(VolSurfaceAxis::Strike)
@@ -635,7 +651,8 @@ fn b2_cap_auto_uses_normal_quote_metadata_and_rejects_black_mismatch() {
     let std_dev = 0.008 * t.sqrt();
     let d = (forward - 0.02) / std_dev;
     let phi = (-0.5 * d * d).exp() / std::f64::consts::TAU.sqrt();
-    let cdf = finstack_quant_core::math::special_functions::norm_cdf(d);
+    let cdf =
+        finstack_quant_core::math::special_functions::norm_cdf(d).expect("valid normal variate");
     let scale = 1_000_000.0 * 0.25;
     let expected = scale * ((forward - 0.02) * cdf + std_dev * phi);
     assert!((normal.value.amount() - expected).abs() < 1e-7);
@@ -684,8 +701,10 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
         .build()
         .expect("discount");
     let market = MarketContext::new()
-        .insert(curve)
-        .insert(ForwardCurve::flat("FWD", as_of, 0.02, DayCount::Act360).expect("forward"));
+        .try_insert(curve)
+        .expect("insert market curve")
+        .try_insert(ForwardCurve::flat("FWD", as_of, 0.02, DayCount::Act360).expect("forward"))
+        .expect("insert market curve");
     let swap_start = date!(2025 - 01 - 02);
     let swap_end = date!(2030 - 01 - 02);
     let fixed = FixedLegSpec {
@@ -704,6 +723,7 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
     };
     let float = FloatLegSpec {
         discount_curve_id: CurveId::new("DISC"),
+        index_id: "FWD".into(),
         forward_curve_id: CurveId::new("FWD"),
         spread_bp: Decimal::ZERO,
         frequency: Tenor::quarterly(),
@@ -760,9 +780,10 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
     let d1 = (forward / strike).ln() / std_dev + 0.5 * std_dev;
     let d2 = d1 - std_dev;
     let phi = (-0.5 * d1 * d1).exp() / std::f64::consts::TAU.sqrt();
-    let cdf = finstack_quant_core::math::special_functions::norm_cdf;
+    let n_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1).expect("valid d1");
+    let n_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2).expect("valid d2");
     let scale = 1_000_000.0 * inputs.annuity;
-    let expected = scale * (forward * cdf(d1) - strike * cdf(d2));
+    let expected = scale * (forward * n_d1 - strike * n_d2);
     assert!((shifted - expected).abs() < 1e-7);
     option
         .instrument_pricing_overrides
@@ -781,7 +802,7 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
             PricingOptions::default(),
         )
         .expect("shifted Greeks and inversion");
-    assert!((risk.measures["delta"] - scale * cdf(d1)).abs() < 1e-7);
+    assert!((risk.measures["delta"] - scale * n_d1).abs() < 1e-7);
     assert!((risk.measures["gamma"] - scale * phi / (forward * std_dev)).abs() < 1e-5);
     assert!(
         (risk.measures["vega"] - scale * forward * inputs.time_to_expiry.sqrt() * phi * 0.01).abs()
@@ -821,7 +842,7 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
             .is_err()
     );
     let market = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 1.0)])
@@ -831,7 +852,8 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
                 .build()
                 .expect("discount"),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             InflationCurve::builder("US-CPI")
                 .base_date(as_of)
                 .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -841,6 +863,7 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
                 .build()
                 .expect("inflation"),
         )
+        .expect("insert market curve")
         .insert_inflation_index(
             finstack_quant_valuations_test_support::inflation::simple_index(
                 "US-CPI",
@@ -977,16 +1000,18 @@ fn m11_hw_greeks_use_the_active_parameters_and_tree_grid() {
         .model_config
         .tree_steps = Some(70);
     let curve_id = swaption.get_discount_curve_id().clone();
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder(curve_id.clone())
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (20.0, (-0.6_f64).exp())])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder(curve_id.clone())
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (20.0, (-0.6_f64).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve");
     let base = swaption
         .price_with_metrics(
             &market,
@@ -1061,16 +1086,18 @@ fn bermudan_hw_sigma_vega_uses_absolute_bump() {
     config.hw1f_mean_reversion = Some(0.05);
     config.hw1f_sigma = Some(sigma);
     config.tree_steps = Some(60);
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder(swaption.get_discount_curve_id().clone())
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (20.0, (-0.6_f64).exp())])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder(swaption.get_discount_curve_id().clone())
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (20.0, (-0.6_f64).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve");
     let reported = swaption
         .price_with_metrics(
             &market,
@@ -1124,7 +1151,7 @@ fn b13_unpaid_principal_remains_exposed_to_credit_recovery() {
     bond.quote_compounding =
         finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     let market = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("D")
                 .base_date(maturity)
                 .knots([(0.0, 1.0), (1.0, 1.0)])
@@ -1134,7 +1161,8 @@ fn b13_unpaid_principal_remains_exposed_to_credit_recovery() {
                 .build()
                 .expect("discount"),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             HazardCurve::builder("H")
                 .base_date(maturity)
                 .recovery_rate(0.4)
@@ -1142,7 +1170,8 @@ fn b13_unpaid_principal_remains_exposed_to_credit_recovery() {
                 .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard"),
-        );
+        )
+        .expect("insert market curve");
     let survival = (-0.2_f64 * 2.0 / 365.0).exp();
     let expected = 105.0 * survival + 40.0 * (1.0 - survival);
     let actual = bond.value(&market, maturity).expect("price").amount();

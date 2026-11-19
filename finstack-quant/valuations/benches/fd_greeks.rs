@@ -76,8 +76,10 @@ fn flat_vol_surface(id: &str) -> VolSurface {
 /// Single market covering every fixture's curve/surface/price IDs.
 fn create_market() -> MarketContext {
     MarketContext::new()
-        .insert(discount_curve("USD-OIS"))
-        .insert(discount_curve("USD_DISC"))
+        .try_insert(discount_curve("USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(discount_curve("USD_DISC"))
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface("EQUITY-VOL"))
         .insert_surface(flat_vol_surface("SPX_VOL"))
         .insert_price(

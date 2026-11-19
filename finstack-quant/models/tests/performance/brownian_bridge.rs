@@ -172,7 +172,7 @@ fn replicate_record(points: usize, seed: u64) -> Value {
             "index": index,
             "points": points / replicates + usize::from(index < points % replicates),
             "scramble_seed_hex": format!("{:016x}", (seed ^ SCRAMBLE_SALT)
-                .wrapping_add((index as u64).wrapping_mul(WEYL_INCREMENT)).max(1)),
+                .wrapping_add((index as u64).wrapping_mul(WEYL_INCREMENT))),
         })).collect::<Vec<_>>(),
     })
 }
@@ -278,18 +278,19 @@ fn result_record(
 }
 
 // Recompute bridge topology recursively, without using BrownianBridge or a
-// candidate prepared coefficient table. Retain C0 arithmetic ordering.
+// candidate prepared coefficient table. Use the checked bridge arithmetic profile.
 fn direct_bridge(z: &[f64], times: &[f64]) -> Vec<f64> {
     fn fill(left: usize, right: usize, z: &[f64], times: &[f64], w: &mut [f64], next: &mut usize) {
         if right - left <= 1 {
             return;
         }
         let mid = (left + right) / 2;
-        let alpha = (times[mid] - times[left]) / (times[right] - times[left]);
-        let mean = w[left] + alpha * (w[right] - w[left]);
-        let variance = ((times[mid] - times[left]) * (times[right] - times[mid]))
-            / (times[right] - times[left]);
-        w[mid] = mean + variance.sqrt() * z[*next];
+        let a = times[mid] - times[left];
+        let b = times[right] - times[mid];
+        let span = times[right] - times[left];
+        let mean = (b / span) * w[left] + (a / span) * w[right];
+        let sd = a.min(b).sqrt() * (a.max(b) / span).sqrt();
+        w[mid] = sd.mul_add(z[*next], mean);
         *next += 1;
         fill(left, mid, z, times, w, next);
         fill(mid, right, z, times, w, next);
@@ -300,6 +301,43 @@ fn direct_bridge(z: &[f64], times: &[f64]) -> Vec<f64> {
     fill(0, z.len(), z, times, &mut w, &mut next);
     assert_eq!(next, z.len());
     w
+}
+
+// Recursively split a standardized endpoint by conditioning on the next Sobol
+// coordinate. Match the target's compensated two-term rounding for the bit
+// comparison, independently of the pricer's prepared schedule and storage.
+fn direct_increments(
+    times: &[f64],
+    parent: f64,
+    innovations: &mut impl Iterator<Item = f64>,
+    increments: &mut Vec<f64>,
+) {
+    if times.len() == 2 {
+        increments.push(parent);
+        return;
+    }
+    let mid = (times.len() - 1) / 2;
+    let end = times[times.len() - 1];
+    let span = (end - times[0]).sqrt();
+    let left = (times[mid] - times[0]).sqrt() / span;
+    let right = (end - times[mid]).sqrt() / span;
+    let z = innovations.next().expect("one innovation per split");
+    let combine = |a: f64, b: f64| {
+        let product = a * parent;
+        b.mul_add(z, product) + a.mul_add(parent, -product)
+    };
+    direct_increments(
+        &times[..=mid],
+        combine(left, right),
+        innovations,
+        increments,
+    );
+    direct_increments(
+        &times[mid..],
+        combine(right, -left),
+        innovations,
+        increments,
+    );
 }
 
 fn check_captured_reference(result: &MonteCarloResult, case: Case, seed: u64) -> Value {
@@ -314,19 +352,31 @@ fn check_captured_reference(result: &MonteCarloResult, case: Case, seed: u64) ->
     let mut path_id = 0;
     let mut records = Vec::with_capacity(case.points);
     for replicate in 0..replicates {
-        let scramble_seed = (seed ^ SCRAMBLE_SALT)
-            .wrapping_add((replicate as u64).wrapping_mul(WEYL_INCREMENT))
-            .max(1);
+        let scramble_seed =
+            (seed ^ SCRAMBLE_SALT).wrapping_add((replicate as u64).wrapping_mul(WEYL_INCREMENT));
         let mut rng =
-            SobolRng::try_new(case.steps, scramble_seed).expect("supported reference dimension");
+            SobolRng::new(case.steps, Some(scramble_seed)).expect("supported reference dimension");
         let points = case.points / replicates + usize::from(replicate < case.points % replicates);
         for point_index in 0..points {
             let mut z = vec![0.0; case.steps];
-            rng.fill_std_normals(&mut z);
+            rng.fill_std_normals(&mut z).expect("valid Sobol request");
             let w = direct_bridge(&z, time_grid.times());
-            let increments: Vec<f64> = (0..case.steps)
-                .map(|step| (w[step + 1] - w[step]) / time_grid.dt(step).sqrt())
-                .collect();
+            let mut innovations = z[1..].iter().copied();
+            let mut increments = Vec::with_capacity(case.steps);
+            direct_increments(time_grid.times(), z[0], &mut innovations, &mut increments);
+            assert!(innovations.next().is_none());
+            assert_eq!(increments.len(), case.steps);
+            // W(t+dt) = W(t) + sqrt(dt) * Z. Independent level-space
+            // conditioning rounds each endpoint before the increment is formed.
+            for (step, &increment) in increments.iter().enumerate() {
+                let delta = time_grid.dt(step).sqrt() * increment;
+                let scale = w[step].abs() + w[step + 1].abs() + delta.abs();
+                let residual = w[step + 1] - w[step] - delta;
+                assert!(
+                    residual.abs() <= 8.0 * f64::EPSILON * scale.max(1.0),
+                    "path {path_id}, interval {step}, level residual {residual}"
+                );
+            }
             let path = &paths.paths[path_id];
             assert_eq!(path.path_id, path_id);
             assert_eq!(path.points.len(), case.steps + 1);
@@ -334,11 +384,7 @@ fn check_captured_reference(result: &MonteCarloResult, case: Case, seed: u64) ->
             let mut sum = 0.0;
             let mut compensation = 0.0;
             for (step, captured) in path.points.iter().enumerate() {
-                let expected_time = if step == 0 {
-                    0.0
-                } else {
-                    time_grid.time(step - 1) + time_grid.dt(step - 1)
-                };
+                let expected_time = time_grid.time(step);
                 if step > 0 {
                     let dt = time_grid.dt(step - 1);
                     let drift = (RATE - DIVIDEND) * dt - 0.5 * VOLATILITY * VOLATILITY * dt;
@@ -379,7 +425,7 @@ fn check_captured_reference(result: &MonteCarloResult, case: Case, seed: u64) ->
         }
     }
     assert_eq!(path_id, case.points);
-    json!({ "kind": "direct_recursive_bridge_original_division_and_scalar_exact_gbm",
+    json!({ "kind": "recursive_standardized_bridge_with_independent_level_witness_and_scalar_exact_gbm",
         "complete_path_state_payoff_cashflow_bits_equal": true, "paths": records })
 }
 

@@ -200,10 +200,10 @@ pub fn covariance(
 /// * `annualization_factor` - Observations per year (for example `252` for
 ///   daily closes); omitted selects the Rust daily default (252).
 ///
-/// @returns Annualized realized variance (decimal, not volatility).
+/// @returns Annualized decimal variance, or `undefined` for fewer than two valid prices.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) for a non-positive or non-finite price or a non-positive
-/// annualization factor.
+/// annualization factor; kind `computation` if the annualized result is unrepresentable.
 /// @param prices - Close prices in time order; each must be finite and positive.
 /// @param annualizationFactor - Observations per year (for example `252` for daily closes); omitted selects the Rust daily default (252).
 ///
@@ -219,7 +219,7 @@ pub fn realized_variance(
         unchecked_optional_param_type = "number | null"
     )]
     annualization_factor: Option<JsValue>,
-) -> Result<f64, JsValue> {
+) -> Result<Option<f64>, JsValue> {
     let prices: &[f64] = &js_f64_seq(&prices, "prices")?;
     let annualization_factor = js_opt_f64(annualization_factor.as_ref(), "annualizationFactor")?;
     stats::realized_variance(prices, annualization_factor).map_err(to_js_err)
@@ -239,10 +239,14 @@ pub fn realized_variance(
 /// * `annualization_factor` - Bars per year (for example `252` for daily
 ///   bars); omitted selects the Rust daily default (252).
 ///
-/// @returns Annualized realized variance (decimal, not volatility).
+/// * `previous_close` - Positive finite close immediately preceding the first bar for Yang-Zhang and close-to-close. Range estimators require omission.
+///
+/// @param previousClose - Closing price immediately before the first target bar, required for close-to-close and Yang-Zhang and omitted otherwise.
+/// @returns Annualized variance in decimal units, or `undefined` for a valid empty window or fewer than two Yang-Zhang bars.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) for an unknown method, series of different lengths, an
-/// invalid bar, or a non-positive annualization factor.
+/// missing or inappropriate preceding close, invalid bar, or a non-positive annualization factor;
+/// kind `computation` if the annualized result is unrepresentable.
 /// @param open - Opening prices, one per bar.
 /// @param high - High prices, one per bar.
 /// @param low - Low prices, one per bar.
@@ -261,15 +265,29 @@ pub fn realized_variance_ohlc(
         unchecked_optional_param_type = "number | null"
     )]
     annualization_factor: Option<JsValue>,
-) -> Result<f64, JsValue> {
+    #[wasm_bindgen(
+        js_name = "previousClose",
+        unchecked_optional_param_type = "number | null"
+    )]
+    previous_close: Option<JsValue>,
+) -> Result<Option<f64>, JsValue> {
     let open: &[f64] = &js_f64_seq(&open, "open")?;
     let high: &[f64] = &js_f64_seq(&high, "high")?;
     let low: &[f64] = &js_f64_seq(&low, "low")?;
     let close: &[f64] = &js_f64_seq(&close, "close")?;
     let method = realized_var_method(method)?;
     let annualization_factor = js_opt_f64(annualization_factor.as_ref(), "annualizationFactor")?;
-    stats::realized_variance_ohlc(open, high, low, close, method, annualization_factor)
-        .map_err(to_js_err)
+    let previous_close = js_opt_f64(previous_close.as_ref(), "previousClose")?;
+    stats::realized_variance_ohlc(
+        open,
+        high,
+        low,
+        close,
+        method,
+        annualization_factor,
+        previous_close,
+    )
+    .map_err(to_js_err)
 }
 
 /// Parse an optional `RealizedVarMethod` from its serde name.
@@ -299,68 +317,73 @@ pub fn quantile(
 
 /// Standard normal CDF Φ(x).
 /// @param x - Real-valued point at which to evaluate Φ; any finite or infinite `x` is accepted.
-/// @returns Probability in `(0, 1)` for finite `x`, with the usual ±∞ limits.
+/// @returns Cumulative probability in `[0, 1]`; the two infinities map to zero and one.
+/// @throws `TypeError` for a non-number, or a validation error if `x` is NaN.
 #[wasm_bindgen(js_name = normCdf)]
 pub fn norm_cdf(
     #[wasm_bindgen(unchecked_param_type = "number")] x: JsValue,
 ) -> Result<f64, JsValue> {
     let x = js_f64(&x, "x")?;
-    Ok(special_functions::norm_cdf(x))
+    special_functions::norm_cdf(x).map_err(to_js_err)
 }
 
 /// Natural logarithm of the standard normal CDF, stable in the negative tail.
 ///
-/// @param x - Standard-normal threshold in standard-deviation units; infinities are accepted and NaN propagates.
-/// @returns Natural log probability; negative infinity at negative infinity, zero at positive infinity, and NaN for NaN.
-/// @throws `TypeError` if `x` is not a number; special floating-point inputs follow the documented limits.
+/// @param x - Standard-normal threshold in standard-deviation units; both infinities are accepted.
+/// @returns Natural log probability; negative infinity at negative infinity, zero at positive infinity.
+/// @throws `TypeError` for a non-number, a validation error for NaN, or a computation error for an unrepresentable finite-input log probability.
 #[wasm_bindgen(js_name = logNormCdf)]
 pub fn log_norm_cdf(
     #[wasm_bindgen(unchecked_param_type = "number")] x: JsValue,
 ) -> Result<f64, JsValue> {
     let x = js_f64(&x, "x")?;
-    Ok(special_functions::log_norm_cdf(x))
+    special_functions::log_norm_cdf(x).map_err(to_js_err)
 }
 
 /// Standard normal PDF φ(x).
 /// @param x - Real-valued point at which to evaluate φ.
 /// @returns Density at `x`; φ(0) is `1/sqrt(2π)`.
+/// @throws `TypeError` for a non-number, or a validation error if `x` is NaN.
 #[wasm_bindgen(js_name = normPdf)]
 pub fn norm_pdf(
     #[wasm_bindgen(unchecked_param_type = "number")] x: JsValue,
 ) -> Result<f64, JsValue> {
     let x = js_f64(&x, "x")?;
-    Ok(special_functions::norm_pdf(x))
+    special_functions::norm_pdf(x).map_err(to_js_err)
 }
 
 /// Inverse standard normal CDF Φ⁻¹(p).
-/// @param p - Probability in `[0, 1]` (`0` yields `-Infinity`, `1` yields `Infinity`, values outside `[0, 1]` yield `NaN`).
+/// @param p - Probability in `[0, 1]` (`0` yields `-Infinity`, `1` yields `Infinity`, values outside `[0, 1]` are invalid).
 /// @returns Standard-normal quantile for probability `p`.
+/// @throws `TypeError` for a non-number, a validation error for NaN or an out-of-domain probability, or a computation error for an unresolved interior quantile.
 #[wasm_bindgen(js_name = standardNormalInvCdf)]
 pub fn standard_normal_inv_cdf(
     #[wasm_bindgen(unchecked_param_type = "number")] p: JsValue,
 ) -> Result<f64, JsValue> {
     let p = js_f64(&p, "p")?;
-    Ok(special_functions::standard_normal_inv_cdf(p))
+    special_functions::standard_normal_inv_cdf(p).map_err(to_js_err)
 }
 
 /// Error function erf(x).
 /// @param x - Real-valued argument to erf; the function is odd, so erf(-x) = -erf(x).
-/// @returns erf(x) in `(-1, 1)` for finite `x`.
+/// @returns erf(x) in `[-1, 1]`.
+/// @throws `TypeError` for a non-number, or a validation error if `x` is NaN.
 #[wasm_bindgen(js_name = erf)]
 pub fn erf(#[wasm_bindgen(unchecked_param_type = "number")] x: JsValue) -> Result<f64, JsValue> {
     let x = js_f64(&x, "x")?;
-    Ok(special_functions::erf(x))
+    special_functions::erf(x).map_err(to_js_err)
 }
 
 /// Natural logarithm of the Gamma function ln(Γ(x)).
-/// @param x - Real argument; must be positive and away from the non-positive integers.
+/// @param x - Finite positive argument.
 /// @returns ln(Γ(x)); ln(Γ(1)) is 0 and ln(Γ(n+1)) is ln(n!).
+/// @throws `TypeError` for a non-number, a validation error for non-finite or nonpositive arguments, or a computation error if the logarithm overflows.
 #[wasm_bindgen(js_name = lnGamma)]
 pub fn ln_gamma(
     #[wasm_bindgen(unchecked_param_type = "number")] x: JsValue,
 ) -> Result<f64, JsValue> {
     let x = js_f64(&x, "x")?;
-    Ok(special_functions::ln_gamma(x))
+    special_functions::ln_gamma(x).map_err(to_js_err)
 }
 
 /// Kahan compensated summation over a typed numeric array.
@@ -429,11 +452,12 @@ pub fn symmetric_eigen(
 /// * `n` - Number of variables (columns); at least `1`.
 ///
 /// @returns A two-element array `[covariance, shrinkage]`: the shrunk
-/// covariance as a flat row-major `n * n` `Float64Array`, and the optimal
+/// covariance as a flat row-major `n * n` `Float64Array`, and the estimated
 /// shrinkage intensity in `[0, 1]`.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `t < 2`, `n == 0`, an entry is non-finite, or
-/// `observations` does not hold exactly `t * n` entries.
+/// `observations` does not hold exactly `t * n` entries, or kind `computation`
+/// if the intensity or covariance cannot be resolved.
 /// @param observations - Flat row-major `t * n` observation matrix; each row is one date and each column one variable.
 /// @param t - Number of observations (rows); at least `2`.
 /// @param n - Number of variables (columns); at least `1`.
@@ -579,15 +603,16 @@ pub fn finite_count(
 ///
 /// * `prices` - Chronologically ordered price levels.
 ///
-/// @returns `prices.length - 1` values `ln(p[t] / p[t-1])`; a window with a
-/// non-positive or non-finite price gives `NaN`. Empty for fewer than two prices.
-/// @throws `TypeError` if `prices` is not an array of numbers.
+/// @returns Adjacent log returns, or an empty array for fewer than two valid prices.
+/// @throws `TypeError` for a mistyped series or `FinstackError` for nonpositive or nonfinite prices.
 /// @param prices - Chronologically ordered price levels.
 #[wasm_bindgen(js_name = logReturns)]
 pub fn log_returns(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] prices: JsValue,
 ) -> Result<Box<[f64]>, JsValue> {
-    Ok(stats::log_returns(&js_f64_seq(&prices, "prices")?).into_boxed_slice())
+    Ok(stats::log_returns(&js_f64_seq(&prices, "prices")?)
+        .map_err(to_js_err)?
+        .into_boxed_slice())
 }
 
 /// Normal cumulative distribution function `Φ((x - mean) / stdDev)` (Rust
@@ -634,7 +659,7 @@ pub fn norm_cdf_with_params(
 /// @returns The density of `N(mean, stdDev²)` at `x`.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `stdDev` is non-finite or not strictly positive, `mean` is
-/// non-finite, `x` is `NaN`, or the density overflows `f64`.
+/// non-finite, or `x` is `NaN`; kind `computation` if the density overflows.
 /// @param x - Point at which to evaluate the density (`±Infinity` accepted, `NaN` rejected).
 /// @param mean - Finite mean of the distribution, in the units of `x`.
 /// @param stdDev - Strictly positive standard deviation (not the variance), in the units of `x`.
@@ -656,14 +681,15 @@ pub fn norm_pdf_with_params(
 ///
 /// # Arguments
 ///
-/// * `x` - Point at which to evaluate the CDF; `NaN` returns `NaN`.
+/// * `x` - Point at which to evaluate the CDF; infinities are accepted.
 /// * `df` - Degrees of freedom, strictly positive.
 ///
 /// @returns The probability that a Student-t variable with `df` degrees of
 /// freedom is at most `x`.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `df` is non-finite or not strictly positive.
-/// @param x - Point at which to evaluate the CDF; `NaN` returns `NaN`.
+/// `validation`) if `x` is NaN or `df` is non-finite or nonpositive, or kind
+/// `computation` if the tail cannot be evaluated.
+/// @param x - Point at which to evaluate the CDF; infinities are accepted.
 /// @param df - Degrees of freedom, strictly positive.
 #[wasm_bindgen(js_name = studentTCdf)]
 pub fn student_t_cdf(
@@ -680,10 +706,11 @@ pub fn student_t_cdf(
 /// * `p` - Probability in `[0, 1]` (`0` returns `-Infinity`, `1` returns `Infinity`).
 /// * `df` - Degrees of freedom, finite and strictly positive.
 ///
-/// @returns The quantile `x` with `studentTCdf(x, df) === p`.
+/// @returns Student-t quantile at probability `p`, including infinite endpoint limits.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `df` is non-finite or not strictly positive, or `p` is
-/// non-finite or outside `[0, 1]`.
+/// non-finite or outside `[0, 1]`, or kind `computation` if an interior
+/// quantile cannot be resolved or represented.
 /// @param p - Probability in `[0, 1]` (`0` returns `-Infinity`, `1` returns `Infinity`).
 /// @param df - Degrees of freedom, finite and strictly positive.
 #[wasm_bindgen(js_name = studentTInvCdf)]

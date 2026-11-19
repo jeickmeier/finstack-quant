@@ -136,8 +136,8 @@ pub fn price_bermudan_lmm(
         for step in 0..num_steps {
             let t = time_grid.time(step);
             let dt = time_grid.dt(step);
-            rng.fill_std_normals(&mut z);
-            disc.step(&process, t, dt, &mut x, &z, &mut work);
+            rng.fill_std_normals(&mut z)?;
+            disc.step(&process, t, dt, &mut x, &z, &mut work)?;
             path_states.push(x.clone());
         }
         all_paths.push(path_states);
@@ -155,11 +155,11 @@ pub fn price_bermudan_lmm(
             for step in 0..num_steps {
                 let t = time_grid.time(step);
                 let dt = time_grid.dt(step);
-                rng2.fill_std_normals(&mut z2);
+                rng2.fill_std_normals(&mut z2)?;
                 for zz in z2.iter_mut() {
                     *zz = -*zz; // negate
                 }
-                disc.step(&process, t, dt, &mut x2, &z2, &mut work2);
+                disc.step(&process, t, dt, &mut x2, &z2, &mut work2)?;
                 path_states2.push(x2.clone());
             }
             all_paths.push(path_states2);
@@ -833,11 +833,11 @@ mod tests {
         );
     }
 
-    /// `num_paths` counts independent estimators; the halved `lmm_bermudan`
-    /// registry default must replay the same streams, so the default PV is
-    /// pinned bit-for-bit to the value captured before the change.
+    /// The registry prices 25,000 independent antithetic pairs. The reference
+    /// uses integer Philox, reflected Box–Muller, terminal-measure displaced
+    /// forwards and a NumPy SVD fit of the co-terminal exercise policy.
     #[test]
-    fn lmm_default_pv_unchanged() {
+    fn lmm_default_estimate_matches_independent_bermudan_reference() {
         let params = test_lmm_params();
         let df_terminal = (-0.03 * 4.0_f64).exp();
         let estimate = price_bermudan_lmm(
@@ -853,12 +853,10 @@ mod tests {
             &crate::swaption::lmm_pricer::lmm_bermudan_mc_config(),
         )
         .expect("default price");
-        assert_eq!(
-            estimate.mean.amount().to_bits(),
-            0x40c98c29d93c5d6e_u64,
-            "pv={}",
-            estimate.mean.amount()
-        );
+        assert_eq!(estimate.num_paths, 25_000);
+        assert_eq!(estimate.num_simulated_paths, 50_000);
+        assert!((estimate.mean.amount() - 13_094.093_557_288_317).abs() < 3e-9);
+        assert!((estimate.stderr - 25.752_437_242_585_245).abs() < 2e-11);
     }
 
     #[test]

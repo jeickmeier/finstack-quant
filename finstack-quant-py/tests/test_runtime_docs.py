@@ -102,6 +102,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
     ),
     "finstack_quant.core.dates": ("PeriodKind", "VolatilityClock"),
     "finstack_quant.core.market_data": (
+        "PriceCurve",
         "InflationCurve",
         "InflationIndex",
         "InflationObservation",

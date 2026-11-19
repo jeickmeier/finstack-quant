@@ -173,16 +173,18 @@ mod tests {
     #[test]
     fn mapped_rate_dv01_is_available_for_custom_rate_future_options() {
         let as_of = date!(2026 - 01 - 01);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (2.0, 0.90)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("discount curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (2.0, 0.90)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("discount curve"),
+            )
+            .expect("insert market curve");
         let option = InterestRateFutureOption::example().expect("rate future option");
         let dv01 = option.rate_dv01(&market, as_of).expect("rate DV01");
         assert!(dv01.is_finite());

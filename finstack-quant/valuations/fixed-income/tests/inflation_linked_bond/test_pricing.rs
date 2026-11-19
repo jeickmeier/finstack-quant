@@ -32,8 +32,9 @@ fn adjusted_final_payment_remains_live_after_raw_maturity() {
         .unwrap();
     let market = MarketContext::new()
         .insert_surface(zero_floor_vol())
-        .insert(discount.clone())
-        .insert(
+        .try_insert(discount.clone())
+        .expect("insert market curve")
+        .try_insert(
             InflationCurve::builder("US-CPI")
                 .base_date(base)
                 .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -42,7 +43,8 @@ fn adjusted_final_payment_remains_live_after_raw_maturity() {
                 .knots([(0.0, 300.0), (2.0, 300.0)])
                 .build()
                 .unwrap(),
-        );
+        )
+        .expect("insert market curve");
     let market = market.insert_inflation_index(
         fixing_snapshot(
             "US-CPI",
@@ -186,8 +188,10 @@ fn test_npv_increases_with_inflation() {
 
         finstack_quant_core::market_data::context::MarketContext::new()
             .insert_surface(zero_floor_vol())
-            .insert(disc)
-            .insert(curve)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
     };
 
@@ -218,8 +222,10 @@ fn test_npv_increases_with_inflation() {
 
         finstack_quant_core::market_data::context::MarketContext::new()
             .insert_surface(zero_floor_vol())
-            .insert(disc)
-            .insert(curve)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
     };
 
@@ -274,8 +280,10 @@ fn test_npv_decreases_with_higher_discount_rate() {
     let ctx_low = finstack_quant_core::market_data::context::MarketContext::new()
         .insert_surface(zero_floor_vol())
         .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
-        .insert(disc_low)
-        .insert(inflation_curve);
+        .try_insert(disc_low)
+        .expect("insert market curve")
+        .try_insert(inflation_curve)
+        .expect("insert market curve");
 
     // Rebuild inflation curve for second context
     let inflation_curve2 =
@@ -291,8 +299,10 @@ fn test_npv_decreases_with_higher_discount_rate() {
     let ctx_high = finstack_quant_core::market_data::context::MarketContext::new()
         .insert_surface(zero_floor_vol())
         .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
-        .insert(disc_high)
-        .insert(inflation_curve2);
+        .try_insert(disc_high)
+        .expect("insert market curve")
+        .try_insert(inflation_curve2)
+        .expect("insert market curve");
 
     // Act
     let pv_low_rate = ilb.value(&ctx_low, as_of).unwrap();
@@ -364,8 +374,9 @@ fn test_npv_with_deflation_protection() {
 
     let ctx = finstack_quant_core::market_data::context::MarketContext::new()
         .insert_surface(zero_floor_vol())
-        .insert(disc)
-        .insert(
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(
             finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
                 .base_date(as_of)
                 .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -375,6 +386,7 @@ fn test_npv_with_deflation_protection() {
                 .build()
                 .unwrap(),
         )
+        .expect("insert market curve")
         .insert_inflation_index(index);
 
     // Act
@@ -588,8 +600,10 @@ fn test_pv_matches_projected_index_ratio_times_nominal_df() {
         .unwrap();
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())
-        .insert(discount)
-        .insert(inflation)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(inflation)
+        .expect("insert market curve")
         .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD));
 
     let pv = bond.value(&ctx, as_of).unwrap().amount();

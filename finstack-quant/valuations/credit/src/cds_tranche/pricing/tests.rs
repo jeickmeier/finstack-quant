@@ -72,9 +72,12 @@ fn sample_market_context() -> MarketContext {
         .expect("Curve builder should succeed with valid test data");
 
     MarketContext::new()
-        .insert(discount_curve)
-        .insert(Arc::clone(index_data.index_credit_curve()))
-        .insert(Arc::clone(index_data.base_correlation_curve()))
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.index_credit_curve()))
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered")
 }
@@ -251,7 +254,7 @@ fn price_matches_discounted_projected_rows() {
 fn test_conditional_default_probability() {
     let model = CdsTranchePricer::new();
     let correlation = 0.30;
-    let default_threshold = standard_normal_inv_cdf(0.05); // 5% default probability
+    let default_threshold = standard_normal_inv_cdf(0.05).expect("valid probability"); // 5% default probability
 
     let conditional = |factor: f64| {
         model.conditional_default_prob_copula(
@@ -585,15 +588,20 @@ fn homogeneity_detection_uses_consistent_tolerance() {
             .build()
             .expect("index data");
         let mut market = MarketContext::new()
-            .insert(discount_curve.clone())
-            .insert(Arc::clone(index.index_credit_curve()))
-            .insert(Arc::clone(index.base_correlation_curve()));
+            .try_insert(discount_curve.clone())
+            .expect("insert market curve")
+            .try_insert(Arc::clone(index.index_credit_curve()))
+            .expect("insert market curve")
+            .try_insert(Arc::clone(index.base_correlation_curve()))
+            .expect("insert market curve");
         for curve in index
             .issuer_credit_curves()
             .expect("Issuer curves should exist")
             .values()
         {
-            market.insert_mut(Arc::clone(curve));
+            market
+                .try_insert_mut(Arc::clone(curve))
+                .expect("insert market curve");
         }
         market
             .insert_credit_index("CDX.NA.IG.42", index)
@@ -1139,7 +1147,7 @@ fn test_smooth_correlation_boundary_c1_at_seams() {
 #[test]
 fn test_conditional_default_probability_is_bounded_at_smoothed_correlations() {
     let model = CdsTranchePricer::new();
-    let default_threshold = standard_normal_inv_cdf(0.05); // 5% unconditional default prob
+    let default_threshold = standard_normal_inv_cdf(0.05).expect("valid probability"); // 5% unconditional default prob
 
     // Pricing passes every base correlation through the smooth boundary
     // before the copula conditional, including degenerate inputs.
@@ -1325,10 +1333,25 @@ fn test_nearly_wiped_tranche() {
 }
 
 #[test]
+fn correlation01_rejects_an_unrepresentable_two_sided_shock() {
+    let curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+        .knots([(3.0, 0.995), (7.0, 0.995)])
+        .build()
+        .expect("valid source");
+    let market = sample_market_context()
+        .try_insert(curve)
+        .expect("replace correlation");
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let error = CdsTranchePricer::new()
+        .calculate_correlation_delta(&sample_tranche(), &market, as_of)
+        .expect_err("up-shock would exceed one");
+    assert!(error.to_string().contains("in [0, 1]"));
+}
+
+#[test]
 fn test_correlation_bump_is_a_pure_parallel_shift() {
     // A parallel shift of a monotone base-correlation curve is itself
     // monotone — the bump preserves the ordering without any repair loop.
-    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let index_data = market_ctx
         .get_credit_index("CDX.NA.IG.42")
@@ -1338,19 +1361,18 @@ fn test_correlation_bump_is_a_pure_parallel_shift() {
     // A large negative bump still parallel-shifts every knot by the same
     // amount; monotonicity is preserved by construction.
     let bump = -0.2;
-    let bumped = model
-        .bump_base_correlation(original, bump)
+    let bumped = original
+        .apply_bucket_bump(None, bump)
         .expect("Bumping should succeed");
 
-    // Every knot must be shifted by exactly `bump` (no clamp fires for this
-    // curve since all shifted values stay inside [0, 1]).
+    // Every admissible knot receives the same absolute change.
     for (i, (&orig, &shifted)) in original
         .correlations()
         .iter()
         .zip(bumped.correlations().iter())
         .enumerate()
     {
-        let expected = (orig + bump).clamp(0.0, 1.0);
+        let expected = orig + bump;
         assert!(
             (shifted - expected).abs() < 1e-12,
             "knot {i}: bumped correlation {shifted} must equal pure shift {expected}"
@@ -1371,7 +1393,6 @@ fn test_correlation_bump_is_a_pure_parallel_shift() {
 /// sides differently near curve kinks, biasing the derivative.
 #[test]
 fn correlation_bump_up_and_down_are_symmetric() {
-    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let index_data = market_ctx
         .get_credit_index("CDX.NA.IG.42")
@@ -1379,10 +1400,8 @@ fn correlation_bump_up_and_down_are_symmetric() {
     let original = index_data.base_correlation_curve();
 
     let h = 0.01;
-    let up = model.bump_base_correlation(original, h).expect("up bump");
-    let down = model
-        .bump_base_correlation(original, -h)
-        .expect("down bump");
+    let up = original.apply_bucket_bump(None, h).expect("up bump");
+    let down = original.apply_bucket_bump(None, -h).expect("down bump");
 
     // For every knot, (up - orig) must equal -(down - orig): the two bumps
     // are exact mirror images. A surviving monotonicity-repair loop would
@@ -1410,7 +1429,7 @@ fn correlation_bump_up_and_down_are_symmetric() {
 
     // The resulting Correlation01 must be finite and well-defined.
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-    let corr01 = model
+    let corr01 = CdsTranchePricer::new()
         .calculate_correlation_delta(&sample_tranche(), &market_ctx, as_of)
         .expect("correlation delta");
     assert!(corr01.is_finite(), "Correlation01 must be finite");
@@ -1611,13 +1630,15 @@ fn test_par_spread_missing_credit_index_errors() {
     let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let market_ctx = MarketContext::new().insert(
-        sample_market_context()
-            .get_discount("USD-OIS")
-            .expect("sample discount curve")
-            .as_ref()
-            .clone(),
-    );
+    let market_ctx = MarketContext::new()
+        .try_insert(
+            sample_market_context()
+                .get_discount("USD-OIS")
+                .expect("sample discount curve")
+                .as_ref()
+                .clone(),
+        )
+        .expect("insert market curve");
 
     let err = model
         .calculate_par_spread(&tranche, &market_ctx, as_of)
@@ -1679,9 +1700,12 @@ fn arbitrage_market_context() -> MarketContext {
         .expect("Index builder should succeed");
 
     MarketContext::new()
-        .insert(discount_curve)
-        .insert(Arc::clone(index_data.index_credit_curve()))
-        .insert(Arc::clone(index_data.base_correlation_curve()))
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.index_credit_curve()))
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered")
 }
@@ -1814,9 +1838,12 @@ fn realistic_base_correlation_skew_prices_every_tranche() {
         .build()
         .expect("index data");
     let market_ctx = MarketContext::new()
-        .insert(discount_curve)
-        .insert(Arc::clone(index_data.index_credit_curve()))
-        .insert(Arc::clone(index_data.base_correlation_curve()))
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.index_credit_curve()))
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered");
     let pricer = CdsTranchePricer::new();
@@ -1877,70 +1904,14 @@ fn realistic_base_correlation_skew_prices_every_tranche() {
     }
 }
 
-/// C2: homogeneous Gaussian path must not panic when `default_prob` is outside
-/// the open interval `(0, 1)`.
-///
-/// ## Root cause
-///
-/// `get_default_probability` returns `1.0 - sp(t)` with **no clamp**. If the
-/// credit curve's `sp` implementation returns a value marginally above `1.0`
-/// (floating-point rounding near the base date is the most common cause), the
-/// resulting `default_prob` is marginally **negative**. That negative value
-/// flows directly into `standard_normal_inv_cdf(default_prob)`, which calls
-/// `statrs::Normal::inverse_cdf`, which **panics** with `"x must be in [0, 1]"`
-/// for any argument strictly outside `[0, 1]`.
-///
-/// The heterogeneous path is safe because it routes probabilities through
-/// `default_threshold_for_copula`, which clamps with `PROBABILITY_CLIP`.
-/// The homogeneous Gaussian branch lacked that guard.
-///
-/// ## Fix
-///
-/// 1. `get_default_probability` clamps its result to `[0.0, 1.0]`.
-/// 2. The homogeneous-Gaussian branch clamps `default_prob` to
-///    `[PROBABILITY_CLIP, 1 − PROBABILITY_CLIP]` before passing it to
-///    `standard_normal_inv_cdf`, matching the heterogeneous branch exactly.
-///
-/// ## What this test asserts (regression gate)
-///
-/// The underlying panic source is `statrs::Normal::inverse_cdf` — it panics for
-/// any `p ∉ [0, 1]`.  We verify that:
-///
-/// 1. `standard_normal_inv_cdf` still panics for a negative input (confirming
-///    the `statrs` contract has not changed and the guard is load-bearing).
-/// 2. The homogeneous pricer path does **not** panic when it internally
-///    computes `default_prob = 0.0` (from `sp(0) = 1.0` at the base date).
-///    Before the fix the integration returned a non-finite EL (because
-///    `standard_normal_inv_cdf(0.0) = −∞` propagated through the quadrature);
-///    after the fix the EL is finite.
+/// The checked probit rejects invalid probabilities. The homogeneous Gaussian
+/// pricer must still handle an exact boundary probability at the curve base date.
 #[test]
-fn homogeneous_path_boundary_default_prob_does_not_panic() {
-    // ── Part 1: confirm the probit saturates (no panic) on a negative input ──
-    //
-    // This is the precise condition that would be triggered in the unfixed pricer
-    // when `sp > 1.0` (floating-point rounding near t = 0).
-    //
-    // `standard_normal_inv_cdf` now guards the
-    // raw `statrs` panic itself and saturates out-of-domain inputs
-    // (p <= 0 → −∞). The pricer-side clamp remains
-    // load-bearing for *numerics* (−∞ would still poison the quadrature), but
-    // the panic itself is gone by design.
-    assert!(
-        standard_normal_inv_cdf(-1e-15_f64).is_nan(),
-        "standard_normal_inv_cdf must return NaN (not panic or saturate) for p < 0"
-    );
-
-    // ── Part 2: homogeneous pricer must not panic and must return finite EL ──
-    //
-    // When maturity == curve base_date, `years_from_base` = 0, `sp(0)` = 1.0,
-    // `default_prob` = 0.0.  Before the fix `standard_normal_inv_cdf(0.0) = −∞`
-    // and the Gauss-Hermite integrand evaluates `norm_cdf((−∞ − ρ·z)/√(1−ρ²))`
-    // → 0 for all z, collapsing the EL to a finite (but trivial) zero.
-    //
-    // A more dangerous case — not exercisable with a real HazardCurve in this
-    // unit test — is `sp` returning `> 1.0` due to fp-rounding, giving a
-    // negative `default_prob`.  Part 1 proves that would panic.  The clamp in
-    // `get_default_probability` (`(1.0 - sp).clamp(0.0, 1.0)`) cuts both tails.
+fn homogeneous_path_returns_finite_loss_at_zero_default_probability() {
+    let pricer = CdsTranchePricer::new();
+    for invalid in [-1e-15, f64::NAN, 1.01] {
+        assert!(pricer.default_threshold_for_copula(invalid).is_err());
+    }
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("date");
 
     let index_curve =
@@ -1966,43 +1937,10 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
         .build()
         .expect("index data");
 
-    // maturity == base_date  ⇒  maturity_years = 0.0  ⇒  sp(0) = 1.0
-    // ⇒  default_prob = 0.0  ⇒  without clamp: standard_normal_inv_cdf(0.0) = −∞.
-    let maturity = base_date;
-
-    // Drive the homogeneous Gaussian branch directly (no issuer curves).
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        CdsTranchePricer::new().calculate_equity_tranche_capped(
-            7.0,
-            0.30,
-            &index_data,
-            maturity,
-            PoolExposure::Loss,
-        )
-    }));
-
-    // `Err` here is a `catch_unwind` panic payload, not a domain error.
-    #[allow(clippy::match_wild_err_arm)]
-    match result {
-        Err(_) => panic!(
-            "homogeneous Gaussian path panicked for default_prob=0.0 (sp at t=0); \
-             the PROBABILITY_CLIP clamp before `standard_normal_inv_cdf` is missing"
-        ),
-        Ok(Err(e)) => panic!(
-            "homogeneous path returned an unexpected error for boundary default_prob=0.0: {e}"
-        ),
-        Ok(Ok(el)) => {
-            assert!(
-                el.is_finite(),
-                "expected loss must be finite after clamping default_prob to PROBABILITY_CLIP; \
-                 if non-finite, the clamp before standard_normal_inv_cdf is absent, got {el}"
-            );
-            assert!(
-                (0.0..=1.0).contains(&el),
-                "expected loss must be in [0,1] for boundary default_prob=0.0, got {el}"
-            );
-        }
-    }
+    let expected_loss = pricer
+        .calculate_equity_tranche_capped(7.0, 0.30, &index_data, base_date, PoolExposure::Loss)
+        .expect("zero default probability at the curve base date");
+    assert!((0.0..=1.0).contains(&expected_loss));
 }
 
 /// Items 5 & 6: the within-period default fraction must be survival-weighted,
@@ -2128,9 +2066,12 @@ fn discounting_is_invariant_under_curve_rebasing() {
 
     let make_ctx = |base: Date| {
         MarketContext::new()
-            .insert(make_disc(base))
-            .insert(Arc::clone(index_data.index_credit_curve()))
-            .insert(Arc::clone(index_data.base_correlation_curve()))
+            .try_insert(make_disc(base))
+            .expect("insert market curve")
+            .try_insert(Arc::clone(index_data.index_credit_curve()))
+            .expect("insert market curve")
+            .try_insert(Arc::clone(index_data.base_correlation_curve()))
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG.42", index_data.clone())
             .expect("Credit index dependencies should be registered")
     };
@@ -2225,9 +2166,12 @@ fn rising_hazard_lowers_premium_leg_pv() {
             .build()
             .expect("index data");
         MarketContext::new()
-            .insert(discount_curve)
-            .insert(Arc::clone(index_data.index_credit_curve()))
-            .insert(Arc::clone(index_data.base_correlation_curve()))
+            .try_insert(discount_curve)
+            .expect("insert market curve")
+            .try_insert(Arc::clone(index_data.index_credit_curve()))
+            .expect("insert market curve")
+            .try_insert(Arc::clone(index_data.base_correlation_curve()))
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG.42", index_data)
             .expect("Credit index dependencies should be registered")
     };
@@ -2283,9 +2227,12 @@ fn recovery_market_context(recovery: f64, hazard_scale: f64) -> MarketContext {
         .build()
         .expect("index data");
     MarketContext::new()
-        .insert(discount_curve)
-        .insert(Arc::clone(index_data.index_credit_curve()))
-        .insert(Arc::clone(index_data.base_correlation_curve()))
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.index_credit_curve()))
+        .expect("insert market curve")
+        .try_insert(Arc::clone(index_data.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered")
 }
@@ -2628,7 +2575,8 @@ fn seasoned_aod_reduces_only_the_remaining_day_of_accrual() {
         .build()
         .expect("rebuilt index");
     let market = market
-        .insert(Arc::clone(index.index_credit_curve()))
+        .try_insert(Arc::clone(index.index_credit_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", index)
         .expect("index");
     let mut tranche = sample_tranche();
@@ -2713,7 +2661,10 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
         )
         .build()
         .unwrap();
-    let thresholds: Vec<_> = pds.iter().map(|pd| standard_normal_inv_cdf(*pd)).collect();
+    let thresholds: Vec<_> = pds
+        .iter()
+        .map(|pd| standard_normal_inv_cdf(*pd).expect("valid probability"))
+        .collect();
     let pricer = CdsTranchePricer::new();
     for rho in [0.05_f64, 0.3, 0.8] {
         for cap in [
@@ -2741,7 +2692,10 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
                     let z = -10.0 + j as f64 * h;
                     let conditional: Vec<_> = thresholds
                         .iter()
-                        .map(|x| norm_cdf((x - rho.sqrt() * z) / (1.0 - rho).sqrt()))
+                        .map(|x| {
+                            norm_cdf((x - rho.sqrt() * z) / (1.0 - rho).sqrt())
+                                .expect("valid normal variate")
+                        })
                         .collect();
                     let conditional_loss: f64 = (0..16)
                         .map(|state| {
@@ -2820,8 +2774,10 @@ fn credit_performance_numerical_baseline() {
             .build()
             .expect("index");
         let market = sample_market_context()
-            .insert(index_curve)
-            .insert(correlation)
+            .try_insert(index_curve)
+            .expect("insert market curve")
+            .try_insert(correlation)
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG.42", index.clone())
             .expect("market");
         let mut tranche = sample_tranche();
@@ -2875,9 +2831,16 @@ fn credit_performance_numerical_baseline() {
             .amount();
         let pmf_evaluations = super::sensitivities::take_pmf_evaluations();
         eprintln!("{name}: {pmf_evaluations} PMF evaluations per PV");
-        let delta = pricer
-            .calculate_correlation_delta(&tranche, &market, as_of)
-            .expect("correlation sensitivity");
+        let delta = pricer.calculate_correlation_delta(&tranche, &market, as_of);
+        let delta = if name == "boundary" {
+            // rho=0.999 plus the prescribed 0.01 shock exceeds one.
+            assert!(
+                matches!(delta, Err(finstack_quant_core::Error::Validation(ref msg)) if msg.contains("in [0, 1]"))
+            );
+            None
+        } else {
+            Some(delta.expect("admissible symmetric correlation shock"))
+        };
         let width = (detach - attach) / 100.0;
         records.push(serde_json::json!({"name": name, "raw": raw, "curve": curve.iter().map(|p| [p.el_fraction, p.wd_fraction]).collect::<Vec<_>>(), "pv": pv, "delta": delta, "fraction_bound": 4e-10 / width, "pv_bound": tranche.notional.amount() * 4e-10 / width * (2.0 * periods.len() as f64 + 0.05 * (years as f64 + 1.0))}));
     }
@@ -2968,13 +2931,18 @@ fn credit_performance_numerical_baseline() {
         );
         // Correlation delta is a central difference per one percentage point;
         // each of its two PVs carries the same bound.
-        assert!(
-            (actual["delta"].as_f64().expect("delta") - expected["delta"].as_f64().expect("delta"))
-                .abs()
-                <= 2.0 * pv_bound,
-            "{} correlation delta",
-            actual["name"]
-        );
+        match (actual["delta"].as_f64(), expected["delta"].as_f64()) {
+            (Some(a), Some(b)) => assert!(
+                (a - b).abs() <= 2.0 * pv_bound,
+                "{} correlation delta",
+                actual["name"]
+            ),
+            (None, None) => assert_eq!(actual["name"], "boundary"),
+            _ => panic!(
+                "correlation sensitivity admission changed for {}",
+                actual["name"]
+            ),
+        }
     }
 }
 
@@ -3017,7 +2985,8 @@ fn prepared_tranche_snapshots_market_and_reuses_only_correlation_inputs() {
                 .expect("trial index");
             let trial_market = market
                 .clone()
-                .insert(Arc::clone(&curve))
+                .try_insert(Arc::clone(&curve))
+                .expect("insert market curve")
                 .insert_credit_index("CDX.NA.IG.42", trial_index)
                 .expect("trial market");
             assert_eq!(
@@ -3049,7 +3018,8 @@ fn prepared_tranche_snapshots_market_and_reuses_only_correlation_inputs() {
             .expect("changed index");
         let changed_market = market
             .clone()
-            .insert(hazard)
+            .try_insert(hazard)
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG.42", changed_index)
             .expect("changed market");
         assert_eq!(
@@ -3083,7 +3053,9 @@ fn prepared_wiped_tranche_preserves_upfront_without_requiring_credit_index() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount");
-    let market = MarketContext::new().insert(discount);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let mut tranche = sample_tranche();
     tranche.realized_loss = 0.08;
     tranche.upfront = Some((as_of, Money::from((1000_i64, Currency::USD))));

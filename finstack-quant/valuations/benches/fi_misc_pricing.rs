@@ -218,6 +218,7 @@ fn revolving_credit_floating(maturity: Date) -> RevolvingCredit {
         .maturity(maturity)
         .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: Decimal::try_from(100.0).unwrap(),
                 gearing: Decimal::try_from(1.0).unwrap(),
@@ -329,8 +330,10 @@ fn revolving_credit_market(as_of: Date) -> MarketContext {
     )
     .expect("revolver reset fixing");
     MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_series(fixings)
 }
 
@@ -342,9 +345,11 @@ fn bench_term_loan_pv(c: &mut Criterion) {
             &years,
             |b, years| {
                 let as_of = as_of();
-                let market = MarketContext::new().insert(
-                    discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05),
-                );
+                let market = MarketContext::new()
+                    .try_insert(discount_forward_curve_support::flat_discount(
+                        "USD-OIS", as_of, 0.05,
+                    ))
+                    .expect("insert market curve");
                 let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
                 let instrument = term_loan(maturity);
                 support::bench(
@@ -408,6 +413,7 @@ fn bench_term_loan_discount_margin(c: &mut Criterion) {
         let market = revolving_credit_market(as_of);
         let mut loan = term_loan(Date::from_calendar_date(2030, Month::January, 1).unwrap());
         loan.rate = RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: Decimal::from(350),
             gearing: Decimal::ONE,
@@ -458,7 +464,9 @@ fn bench_term_loan_tree(c: &mut Criterion) {
 
         let as_of = as_of();
         let disc = discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05);
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
         let mut loan = term_loan(Date::from_calendar_date(2030, Month::January, 1).unwrap());
         loan.call_schedule = Some(LoanCallSchedule {
             calls: vec![LoanCall {
@@ -529,9 +537,11 @@ fn bench_agency_mbs_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("agency_mbs_pv");
     group.bench_function("passthrough_example", |b| {
         let as_of = as_of();
-        let market = MarketContext::new().insert(discount_forward_curve_support::flat_discount(
-            "USD-OIS", as_of, 0.05,
-        ));
+        let market = MarketContext::new()
+            .try_insert(discount_forward_curve_support::flat_discount(
+                "USD-OIS", as_of, 0.05,
+            ))
+            .expect("insert market curve");
         let mbs = AgencyMbsPassthrough::example().unwrap();
         support::bench(
             b,
@@ -552,9 +562,11 @@ fn bench_agency_mbs_pv(c: &mut Criterion) {
     });
     group.bench_function("tba_example", |b| {
         let as_of = as_of();
-        let market = MarketContext::new().insert(discount_forward_curve_support::flat_discount(
-            "USD-OIS", as_of, 0.05,
-        ));
+        let market = MarketContext::new()
+            .try_insert(discount_forward_curve_support::flat_discount(
+                "USD-OIS", as_of, 0.05,
+            ))
+            .expect("insert market curve");
         let tba = AgencyTba::example().unwrap();
         support::bench(
             b,
@@ -581,9 +593,11 @@ fn bench_agency_mbs_metrics(c: &mut Criterion) {
     ] {
         group.bench_function(label, |b| {
             let as_of = as_of();
-            let market = MarketContext::new().insert(
-                discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05),
-            );
+            let market = MarketContext::new()
+                .try_insert(discount_forward_curve_support::flat_discount(
+                    "USD-OIS", as_of, 0.05,
+                ))
+                .expect("insert market curve");
             let mut mbs = AgencyMbsPassthrough::example().unwrap();
             mbs.instrument_pricing_overrides
                 .market_quotes
@@ -768,7 +782,9 @@ fn bench_agency_mbs_oas_scaling(c: &mut Criterion) {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("B4 flat discount curve");
-            let market = MarketContext::new().insert(discount);
+            let market = MarketContext::new()
+                .try_insert(discount)
+                .expect("insert market curve");
             let metrics = [MetricId::Oas];
             support::bench(
                 b,
@@ -879,8 +895,10 @@ fn fi_trs_market(as_of: Date) -> MarketContext {
     )
     .unwrap();
     MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_series(fixings)
         .insert_price(
             "US-CORP-INDEX",
@@ -954,9 +972,11 @@ fn bench_cmo_waterfall_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("cmo_waterfall_pv");
     group.bench_function("5t", |b| {
         let as_of = as_of();
-        let market = MarketContext::new().insert(discount_forward_curve_support::flat_discount(
-            "USD-OIS", as_of, 0.05,
-        ));
+        let market = MarketContext::new()
+            .try_insert(discount_forward_curve_support::flat_discount(
+                "USD-OIS", as_of, 0.05,
+            ))
+            .expect("insert market curve");
         let n_tranches = 5;
         let tranches: Vec<CmoTranche> = (0..n_tranches)
             .map(|i| {
@@ -1013,9 +1033,11 @@ fn bench_cmo_structure_type(c: &mut Criterion) {
     ] {
         group.bench_function(label, |b| {
             let as_of = as_of();
-            let market = MarketContext::new().insert(
-                discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05),
-            );
+            let market = MarketContext::new()
+                .try_insert(discount_forward_curve_support::flat_discount(
+                    "USD-OIS", as_of, 0.05,
+                ))
+                .expect("insert market curve");
             let cmo = fixture().expect("CMO fixture");
             assert!(!cmo.waterfall.tranches.is_empty());
             support::bench(
@@ -1049,9 +1071,11 @@ fn bench_dollar_roll_pv(c: &mut Criterion) {
             &drop_bp,
             |b, drop_bp| {
                 let as_of = as_of();
-                let market = MarketContext::new().insert(
-                    discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05),
-                );
+                let market = MarketContext::new()
+                    .try_insert(discount_forward_curve_support::flat_discount(
+                        "USD-OIS", as_of, 0.05,
+                    ))
+                    .expect("insert market curve");
                 let front_price = 98.50_f64;
                 let back_price = front_price - drop_bp;
                 let roll = DollarRoll::builder()

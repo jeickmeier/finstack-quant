@@ -138,15 +138,36 @@ pub fn par_rate_and_annuity_from_discount(
     Ok((num / ann, ann))
 }
 
+pub(crate) fn asw_index_conventions(
+    bond: &Bond,
+) -> finstack_quant_core::Result<(&finstack_quant_core::types::IndexId, DayCount, Tenor)> {
+    if let Some(id) = &bond.instrument_pricing_overrides.model_config.asw_index_id {
+        let conventions = ConventionRegistry::try_global()?.require_rate_index(id)?;
+        return Ok((
+            id,
+            conventions.day_count,
+            conventions.default_payment_frequency,
+        ));
+    }
+    let coupon = bond.cashflow_spec.floating_coupon_spec().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "asset-swap projection requires a contractual asw_index_id".into(),
+        )
+    })?;
+    Ok((
+        &coupon.rate_spec.index_id,
+        coupon.schedule.day_count,
+        coupon.schedule.frequency,
+    ))
+}
+
 /// Asset-swap forward leg PV and fixed/floating annuities per unit notional.
 ///
 /// # Arguments
 ///
 /// * `disc` - Discount curve supplying present-value factors for both legs.
 /// * `fwd` - Forward curve supplying date-based floating reference rates.
-///   This curve-convention helper also uses its day count for floating coupon
-///   accrual; callers with an explicit floating convention must use that basis
-///   when calculating the floating leg.
+/// * `float_day_count` - Contractual floating coupon and spread-annuity accrual basis.
 /// * `fixed_day_count` - Fixed-leg accrual day-count convention.
 /// * `fixed_frequency` - Optional fixed coupon frequency required by
 ///   ACT/ACT-style and ACT/365L accrual calculations.
@@ -157,6 +178,7 @@ pub fn par_rate_and_annuity_from_discount(
 pub fn asset_swap_forward_components(
     disc: &DiscountCurve,
     fwd: &ForwardCurve,
+    float_day_count: DayCount,
     fixed_day_count: finstack_quant_core::dates::DayCount,
     fixed_frequency: Option<finstack_quant_core::dates::Tenor>,
     schedule: &[Date],
@@ -165,7 +187,7 @@ pub fn asset_swap_forward_components(
     let fixed_ann = fixed_leg_annuity(disc, fixed_day_count, fixed_frequency, schedule)?;
 
     let (float_pv, float_ann) =
-        floating_leg_pv_and_annuity(disc, fwd, fwd.day_count(), schedule, float_spread_bp, None)?;
+        floating_leg_pv_and_annuity(disc, fwd, float_day_count, schedule, float_spread_bp, None)?;
     Ok((float_pv, fixed_ann, float_ann))
 }
 
@@ -184,8 +206,8 @@ pub fn asset_swap_forward_components(
 /// * `schedule` - Ordered period boundary dates; fewer than two dates give
 ///   `(0, 0)`.
 /// * `float_spread_bp` - Spread over the index in basis points.
-/// * `seasoned` - `Some((market, as_of))` fixes periods that started before
-///   `as_of` from the forward curve's historical fixing series in `market`;
+/// * `seasoned` - `Some((market, as_of, index))` fixes periods that started before
+///   `as_of` from the contractual index fixing series in `market`;
 ///   `None` projects every period.
 ///
 /// # Errors
@@ -198,7 +220,7 @@ pub(crate) fn floating_leg_pv_and_annuity(
     day_count: finstack_quant_core::dates::DayCount,
     schedule: &[Date],
     float_spread_bp: f64,
-    seasoned: Option<(&MarketContext, Date)>,
+    seasoned: Option<(&MarketContext, Date, &finstack_quant_core::types::IndexId)>,
 ) -> finstack_quant_core::Result<(f64, f64)> {
     if schedule.len() < 2 {
         return Ok((0.0, 0.0));
@@ -211,9 +233,9 @@ pub(crate) fn floating_leg_pv_and_annuity(
         let yf = day_count.year_fraction(prev, d, DayCountContext::default())?;
         let df = disc.df_on_date(d)?;
         let forward = match seasoned {
-            Some((market, as_of)) if prev < as_of => {
+            Some((market, as_of, index)) if prev < as_of => {
                 let fixing_id =
-                    finstack_quant_core::market_data::fixings::fixing_series_id(fwd.id().as_str());
+                    finstack_quant_core::market_data::fixings::fixing_series_id(index.as_str());
                 let fixings = market.get_series(&fixing_id).map_err(|_| {
                     finstack_quant_core::Error::Validation(format!(
                         "Seasoned asset swap requires historical fixing series '{}' for reset date {}; \
@@ -459,10 +481,17 @@ pub(crate) fn settlement_asw_components(
         .clone()
         .map(|id| market.get_forward(&id))
         .transpose()?;
-    let frequency = forward
-        .as_ref()
-        .and_then(|curve| curve.index_tenor())
-        .unwrap_or(params.frequency);
+    let index = bond
+        .instrument_pricing_overrides
+        .model_config
+        .asw_index_id
+        .as_ref();
+    let (float_day_count, frequency) = if forward.is_some() || index.is_some() {
+        let (_, basis, frequency) = asw_index_conventions(bond)?;
+        (basis, frequency)
+    } else {
+        (bond.cashflow_spec.day_count(), params.frequency)
+    };
     let calendar = finstack_quant_core::dates::calendar_by_id_strict(&params.calendar_id)?;
     let float_schedule = asw_leg_schedule(
         settlement,
@@ -475,7 +504,7 @@ pub(crate) fn settlement_asw_components(
         floating_leg_pv_and_annuity(
             disc.as_ref(),
             forward.as_ref(),
-            forward.day_count(),
+            float_day_count,
             &float_schedule,
             0.0,
             None,
@@ -483,7 +512,7 @@ pub(crate) fn settlement_asw_components(
     } else {
         let annuity = fixed_leg_annuity(
             disc.as_ref(),
-            disc.day_count(),
+            float_day_count,
             Some(frequency),
             &float_schedule,
         )?;
@@ -706,6 +735,7 @@ mod tests {
         let base = date!(2025 - 01 - 02);
         let maturity = date!(2030 - 01 - 02);
         let recipe = RateCalibrationRecipe {
+            execution: None,
             currency: Currency::USD,
             method: RateCalibrationMethod::Bootstrap,
             curve_day_count: DayCount::Act365F,

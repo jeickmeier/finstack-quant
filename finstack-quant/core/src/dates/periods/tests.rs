@@ -912,39 +912,59 @@ fn canonical_plans_are_nonempty_exact_and_contiguous() {
     fiscal.validate_canonical().expect("fiscal plan");
 
     let plan = build_periods("2025Q1..Q4", None).expect("range");
-    let rebuilt = |periods: Vec<Period>| PeriodPlan::try_new(plan.calendar, periods).expect("plan");
+    let rebuilt = |periods: Vec<Period>| PeriodPlan::try_new(plan.get_calendar(), periods);
 
-    let empty = rebuilt(Vec::new()).validate_canonical().expect_err("empty");
+    let empty = rebuilt(Vec::new())
+        .expect("an empty plan constructs")
+        .validate_canonical()
+        .expect_err("empty");
     assert!(empty.to_string().contains("at least one period"), "{empty}");
 
-    let mut gap = plan.periods.clone();
+    let mut gap = plan.to_vec();
     gap.remove(1);
-    let error = rebuilt(gap).validate_canonical().expect_err("gap");
+    let error = rebuilt(gap)
+        .expect("a gapped plan constructs")
+        .validate_canonical()
+        .expect_err("gap");
     assert!(error.to_string().contains("contiguous"), "{error}");
 
-    let mut reversed = plan.periods.clone();
+    // Order, calendar bounds and one period kind are refused at construction.
+    let mut reversed = plan.to_vec();
     reversed.swap(0, 1);
-    rebuilt(reversed)
-        .validate_canonical()
-        .expect_err("out of order");
+    rebuilt(reversed).expect_err("out of order");
 
-    let mut shifted = plan.periods.clone();
+    let mut shifted = plan.to_vec();
     shifted[2].end = d(2025, Month::September, 30);
-    let error = rebuilt(shifted).validate_canonical().expect_err("bounds");
-    assert!(
-        error.to_string().contains("differ from the calendar"),
-        "{error}"
-    );
+    let error = rebuilt(shifted).expect_err("bounds");
+    assert!(error.to_string().contains("calendar bounds"), "{error}");
 
-    let mut mixed = plan.periods.clone();
+    let mut mixed = plan.to_vec();
     mixed.push(
         build_periods("2026M01..2026M01", None)
             .expect("month")
-            .periods[0]
-            .clone(),
+            .to_vec()
+            .remove(0),
     );
-    let error = rebuilt(mixed)
-        .validate_canonical()
-        .expect_err("mixed kinds");
-    assert!(error.to_string().contains("one period kind"), "{error}");
+    let error = rebuilt(mixed).expect_err("mixed kinds");
+    assert!(error.to_string().contains("one frequency"), "{error}");
+}
+
+#[test]
+fn daily_plan_rejects_a_duplicate_substituted_for_january_second() {
+    let plan = build_periods("2025D001..D365", None).unwrap();
+    let mut wire = serde_json::to_value(&plan).unwrap();
+    wire["periods"][1] = wire["periods"][0].clone();
+    assert!(serde_json::from_value::<PeriodPlan>(wire).is_err());
+    let mut rows = plan.to_vec();
+    rows.remove(1);
+    let sparse = PeriodPlan::try_new(plan.get_calendar(), rows).unwrap();
+    let target = plan.last().unwrap().id;
+    let window = super::ltm_window(target, &sparse).unwrap();
+    assert_eq!((window.missing, window.slots.len()), (1, 364));
+    let mut rows = plan.to_vec();
+    rows.swap(0, 1);
+    assert!(PeriodPlan::try_new(plan.get_calendar(), rows).is_err());
+    let mut rows = plan.to_vec();
+    rows[1].end = rows[1].start;
+    assert!(PeriodPlan::try_new(plan.get_calendar(), rows).is_err());
 }

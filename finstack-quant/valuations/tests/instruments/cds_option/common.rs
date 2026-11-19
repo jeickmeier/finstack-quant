@@ -6,15 +6,11 @@
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used)]
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::DateExt;
-use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, HazardCurve, RateCalibrationCurveRole, RateCalibrationMethod,
-    RateCalibrationPillar, RateCalibrationQuote, RateCalibrationRecipe,
-};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_models::types::OptionType;
 pub use finstack_quant_test_utils::assert::relative_eq;
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
@@ -26,46 +22,7 @@ use rust_decimal::Decimal;
 
 /// Standard flat discount curve for testing
 pub fn flat_discount(id: &str, base: Date, rate: f64) -> DiscountCurve {
-    let df1 = (-rate).exp();
-    let df5 = (-rate * 5.0).exp();
-    let df10 = (-rate * 10.0).exp();
-
-    DiscountCurve::builder(id)
-        .base_date(base)
-        .knots([(0.0, 1.0), (1.0, df1), (5.0, df5), (10.0, df10)])
-        .rate_calibration(RateCalibrationRecipe {
-            currency: Currency::USD,
-            method: RateCalibrationMethod::Bootstrap,
-            curve_day_count: DayCount::Act365F,
-            ois_compounding: None,
-            role: RateCalibrationCurveRole::Discount {
-                projection_curve_id: CurveId::new(id),
-            },
-            quotes: vec![
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-OIS"),
-                    pillar: RateCalibrationPillar::Tenor("1Y".parse().unwrap()),
-                    rate,
-                },
-                RateCalibrationQuote::Swap {
-                    index_id: IndexId::new("USD-SOFR-OIS"),
-                    pillar: RateCalibrationPillar::Tenor("5Y".parse().unwrap()),
-                    rate,
-                    spread_decimal: None,
-                },
-                RateCalibrationQuote::Swap {
-                    index_id: IndexId::new("USD-SOFR-OIS"),
-                    pillar: RateCalibrationPillar::Tenor("10Y".parse().unwrap()),
-                    rate,
-                    spread_decimal: None,
-                },
-            ],
-        })
-        .day_count(finstack_quant_core::dates::DayCount::Act365F)
-        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-        .build()
-        .unwrap()
+    super::super::common::calibrated_discount(id, base, rate)
 }
 
 /// Standard flat hazard curve for testing
@@ -84,12 +41,18 @@ pub fn standard_market(as_of: Date) -> MarketContext {
     let disc = flat_discount("USD-OIS", as_of, 0.03);
     let credit = flat_hazard("HZ-SN", as_of, STANDARD_RECOVERY_SENIOR, 0.02);
 
-    MarketContext::new().insert(disc).insert(credit)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(credit)
+        .expect("insert market curve")
 }
 
 /// Standard market whose hazard curve retains lossless quote replay inputs.
 pub fn replayable_standard_market(as_of: Date) -> MarketContext {
-    let source = MarketContext::new().insert(flat_discount("USD-OIS", as_of, 0.03));
+    let source = MarketContext::new()
+        .try_insert(flat_discount("USD-OIS", as_of, 0.03))
+        .expect("insert market curve");
     let pillars = [
         (as_of.add_months(12).expect("valid date shift"), 500.0),
         (as_of.add_months(36).expect("valid date shift"), 500.0),
@@ -110,7 +73,7 @@ pub fn replayable_standard_market(as_of: Date) -> MarketContext {
         },
     )
     .expect("hazard calibration should succeed");
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 /// Clone `market` with the named hazard curve's `recovery_rate` metadata
@@ -127,7 +90,10 @@ pub fn frozen_market_with_recovery(
 ) -> MarketContext {
     let hazard = market.get_hazard(hazard_id).unwrap();
     let realigned = hazard.with_recovery_rate(recovery).unwrap();
-    market.clone().insert(realigned)
+    market
+        .clone()
+        .try_insert(realigned)
+        .expect("insert market curve")
 }
 
 /// Convert basis points (f64) to a Decimal rate.

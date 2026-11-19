@@ -6,8 +6,8 @@ positions × factors `SensitivityMatrix`, and a deterministic hierarchical
 credit calibrator with its decomposition counterpart.
 
 Credit has the deepest implementation today: a sequential peel that calibrates
-a `CreditFactorModel` from sparse issuer-spread history, plus decomposition of
-observed spreads back into level factor values. Rates, equity, FX, volatility,
+a `CreditFactorModel` from complete, aligned issuer-spread history and decomposes
+observed spreads into level factor values. Rates, equity, FX, volatility,
 commodity, and inflation factors are first-class through the generic
 `FactorType`, `FactorDefinition`, `MarketMapping`, `MatchingConfig`, and
 `FactorModelConfig` types, but have no calibrator of their own yet.

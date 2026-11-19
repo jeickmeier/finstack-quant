@@ -23,15 +23,17 @@ use time::macros::date;
 #[test]
 fn production_history_requires_quote_recalibration_for_credit_spreads() {
     let origin = date!(2025 - 01 - 02);
-    let market = MarketContext::new().insert(
-        HazardCurve::builder("ACME-HZD")
-            .base_date(origin)
-            .recovery_rate(0.4)
-            .knots([(1.0, 0.02), (5.0, 0.02)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .build()
-            .expect("hazard"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            HazardCurve::builder("ACME-HZD")
+                .base_date(origin)
+                .recovery_rate(0.4)
+                .knots([(1.0, 0.02), (5.0, 0.02)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .build()
+                .expect("hazard"),
+        )
+        .expect("insert market curve");
     let scenario = MarketScenario::new(
         origin,
         vec![RiskFactorShift {
@@ -108,7 +110,10 @@ fn production_history_reuses_the_pricing_boundary_recalibration_provider() {
         .as_f64()
         .expect("shifted spread");
     assert!((shifted_spread - initial_spread - 10.0).abs() < 1e-10);
-    let shocked = market.clone().insert(rebuilt.as_ref().clone());
+    let shocked = market
+        .clone()
+        .try_insert(rebuilt.as_ref().clone())
+        .expect("insert market curve");
     let mut bond = Bond::fixed(
         "HVAR-CREDIT",
         Money::from((1_000_000_i64, Currency::USD)),
@@ -179,7 +184,9 @@ fn production_par_cds_spread_shock_rejects_uncalibrated_hazard_curve() {
             "R={recovery}: direct intensity bump should add 0.001, got {direct_rate}"
         );
 
-        let mut market = MarketContext::new().insert(curve);
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let spec = ScenarioSpec {
             id: "spread-units".into(),
             operations: vec![OperationSpec::CurveParallelBp {
@@ -246,7 +253,7 @@ fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
         spec.rate_spec.reset_lag_days = 0;
     }
     let mut market = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(origin)
                 .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)])
@@ -256,9 +263,11 @@ fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
                 .build()
                 .expect("discount"),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             ForwardCurve::flat("USD-SOFR-3M", origin, 0.03, DayCount::Act360).expect("forward"),
-        );
+        )
+        .expect("insert market curve");
     let expected_index = market
         .get_forward("USD-SOFR-3M")
         .expect("forward")

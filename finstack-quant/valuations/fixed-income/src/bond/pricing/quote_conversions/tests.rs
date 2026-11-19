@@ -27,16 +27,18 @@ fn b11_quote_set_propagates_applicable_metric_failure() {
     }
     let bond = Bond::example().expect("bond");
     let as_of = bond.issue_date;
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder(bond.discount_curve_id.as_str())
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (20.0, 0.5)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder(bond.discount_curve_id.as_str())
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (20.0, 0.5)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve");
     let mut metrics = crate::FIXED_INCOME.metrics().clone();
     metrics.replace_metric(
         MetricId::Ytm,
@@ -70,16 +72,18 @@ fn quote_set_reports_a_non_finite_metric_as_none() {
     }
     let bond = Bond::example().expect("bond");
     let as_of = bond.issue_date;
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder(bond.discount_curve_id.as_str())
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (20.0, 0.5)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder(bond.discount_curve_id.as_str())
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (20.0, 0.5)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve");
     let mut metrics = crate::FIXED_INCOME.metrics().clone();
     for (id, value) in [
         (MetricId::Ytw, f64::NEG_INFINITY),
@@ -179,7 +183,7 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
         .expect("discount curve should build");
     let fwd = ForwardCurve::builder("USD-3M")
         .base_date(base)
-        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (0.125, 0.997191451372845),
@@ -214,15 +218,25 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
         expected_float_pv += fwd.rate_between(t1, t2, yf).expect("valid term forward") * yf * df;
     }
 
-    let (float_pv, _, _) = asset_swap_forward_components(
+    let (float_pv, _, float_annuity) = asset_swap_forward_components(
         &disc,
         &fwd,
+        finstack_quant_core::dates::DayCount::Act360,
         finstack_quant_core::dates::DayCount::Act360,
         None,
         &schedule,
         0.0,
     )
     .expect("asset-swap components should succeed");
+    let contractual_annuity: f64 = schedule
+        .windows(2)
+        .map(|period| {
+            f64::from(i32::try_from((period[1] - period[0]).whole_days()).unwrap()) / 360.0
+                * disc.df_on_date(period[1]).unwrap()
+        })
+        .sum();
+    let numerator = 0.05 * contractual_annuity;
+    assert!((10_000.0 * numerator / float_annuity - 500.0).abs() < 1e-10);
 
     assert!((float_pv - expected_float_pv).abs() < 1e-14);
 }
@@ -269,6 +283,7 @@ fn overnight_asset_swap_forward_paths_use_observation_average() {
         &disc,
         &fwd,
         finstack_quant_core::dates::DayCount::Act360,
+        finstack_quant_core::dates::DayCount::Act360,
         None,
         &schedule,
         0.0,
@@ -302,7 +317,9 @@ fn compute_quotes_returns_zeroes_for_effectively_zero_notional() {
 
     let quotes = compute_quotes(
         &bond,
-        &MarketContext::new().insert(curve),
+        &MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve"),
         as_of,
         BondQuoteInput::CleanPricePct(99.0),
         finstack_quant_valuations_core::instruments::PricingOptions::default()
@@ -341,16 +358,18 @@ fn z_spread_input_rejects_option_bond_without_quoted_workout_price() {
         }],
         puts: Vec::new(),
     });
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (5.0, 0.80)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (5.0, 0.80)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve");
 
     let direct_error = price_from_z_spread(&bond, &market, as_of, 0.01)
         .expect_err("direct Z-spread pricing must not ignore callability");
@@ -403,16 +422,18 @@ fn quote_engine_ytw_input_uses_callable_workout_inverse() {
         }],
         puts: Vec::new(),
     });
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (5.0, 0.80)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (5.0, 0.80)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve");
     let target_ytw = 0.05;
     let expected =
         price_from_ytw(&bond, &market, as_of, target_ytw).expect("direct callable YTW inversion");
@@ -468,16 +489,18 @@ fn compute_quotes_preserves_custom_tree_and_metric_registries_for_oas_roundtrip(
     });
     assert_eq!(bond.default_model(), ModelKey::Tree);
 
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (5.0, 0.80)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (5.0, 0.80)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount curve"),
+        )
+        .expect("insert market curve");
     let quote_date =
         crate::bond::pricing::settlement::settlement_date(&bond, as_of).expect("settlement date");
     assert_ne!(quote_date, as_of);

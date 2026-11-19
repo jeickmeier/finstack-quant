@@ -12,7 +12,11 @@ fn test_no_knockout_includes_pre_expiry_default_value() {
     let as_of = date!(2025 - 01 - 01);
     let discount = flat_discount("USD-OIS", as_of, 0.03);
     let hazard = flat_hazard("HZ-SN", as_of, 0.4, 0.10);
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let knockout = CdsOptionBuilder::new()
         .call()

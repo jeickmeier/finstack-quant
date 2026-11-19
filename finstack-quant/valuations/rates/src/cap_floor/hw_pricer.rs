@@ -701,18 +701,20 @@ mod tests {
             .hw1f_mean_reversion = Some(0.05);
         cap.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor(
+            .try_insert(flat_discount_with_tenor(
                 cap.discount_curve_id.as_str(),
                 as_of,
                 0.03,
                 10.0,
             ))
-            .insert(flat_forward_with_tenor(
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor(
                 cap.forward_curve_id.as_str(),
                 as_of,
                 0.03,
                 10.0,
-            ));
+            ))
+            .expect("insert market curve");
 
         let pricer = CapFloorHullWhitePricer;
         let result = pricer
@@ -732,18 +734,20 @@ mod tests {
         let as_of = date(2023, 12, 1);
         let cap = CapFloor::example().expect("CapFloor example should build");
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor(
+            .try_insert(flat_discount_with_tenor(
                 cap.discount_curve_id.as_str(),
                 as_of,
                 0.03,
                 10.0,
             ))
-            .insert(flat_forward_with_tenor(
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor(
                 cap.forward_curve_id.as_str(),
                 as_of,
                 0.03,
                 10.0,
-            ));
+            ))
+            .expect("insert market curve");
         let (kappa_key, sigma_key) = capfloor_hw1f_scalar_keys(cap.discount_curve_id.as_str());
         let market = market
             .insert_price(
@@ -964,8 +968,10 @@ mod tests {
             .hw1f_mean_reversion = Some(0.05);
         caplet.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
-            .insert(flat_forward_with_tenor("USD-SOFR-3M", as_of, 0.04, 5.0));
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-SOFR-3M", as_of, 0.04, 5.0))
+            .expect("insert market curve");
 
         let actual = CapFloorHullWhitePricer
             .price_internal(&caplet, &market, as_of)
@@ -1055,8 +1061,10 @@ mod tests {
         reduced_strike.spread_bp = rust_decimal::Decimal::ZERO;
         reduced_strike.strike = rust_decimal::Decimal::try_from(0.03).expect("strike");
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
-            .insert(flat_forward_with_tenor("TEST-TERM-3M", as_of, 0.04, 5.0));
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("TEST-TERM-3M", as_of, 0.04, 5.0))
+            .expect("insert market curve");
 
         let spread_pv = CapFloorHullWhitePricer
             .price_internal(&with_spread, &market, as_of)
@@ -1102,7 +1110,11 @@ mod tests {
         let discount = flat_discount_with_tenor("USD-OIS", as_of, 0.05, 5.0);
         let forward = flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.045, 5.0);
         let period = caplet.pricing_periods().expect("periods").remove(0);
-        let market = MarketContext::new().insert(discount).insert(forward);
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve");
         let projection =
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("projection");
         let kappa = 0.05;
@@ -1199,8 +1211,10 @@ mod tests {
             spread_compounding: OvernightSpreadCompounding::Exclude,
         });
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.05, 5.0))
-            .insert(flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.045, 5.0));
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.05, 5.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.045, 5.0))
+            .expect("insert market curve");
         let period = caplet.pricing_periods().expect("periods").remove(0);
         let projection =
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("projection");
@@ -1299,8 +1313,10 @@ mod tests {
             .hw1f_mean_reversion = Some(0.05);
         delayed.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.05, 5.0))
-            .insert(flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.045, 5.0));
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.05, 5.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.045, 5.0))
+            .expect("insert market curve");
         let delayed_pv = CapFloorHullWhitePricer
             .price_internal(&delayed, &market, as_of)
             .expect("delayed HW price")
@@ -1359,8 +1375,10 @@ mod tests {
         )
         .expect("fixings");
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
-            .insert(flat_forward_with_tenor("TEST-TERM-3M", as_of, 0.12, 5.0))
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("TEST-TERM-3M", as_of, 0.12, 5.0))
+            .expect("insert market curve")
             .insert_series(fixings);
 
         let standard = caplet
@@ -1430,8 +1448,10 @@ mod tests {
         )
         .expect("fixings");
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
-            .insert(flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.12, 5.0))
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.12, 5.0))
+            .expect("insert market curve")
             .insert_series(fixings);
 
         let standard = caplet
@@ -1485,7 +1505,8 @@ mod tests {
             .hw1f_mean_reversion = Some(kappa);
         caplet.instrument_pricing_overrides.model_config.hw1f_sigma = Some(sigma);
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, short_rate, 5.0));
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, short_rate, 5.0))
+            .expect("insert market curve");
         let period = caplet.pricing_periods().expect("periods").remove(0);
         let projection =
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("projection");
@@ -1613,8 +1634,9 @@ mod tests {
             .model_config
             .hw1f_mean_reversion = Some(0.05);
         caplet.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
-        let market =
-            MarketContext::new().insert(flat_discount_with_tenor("USD-OIS", as_of, 0.045, 5.0));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.045, 5.0))
+            .expect("insert market curve");
         let scalar = CapFloorHullWhitePricer
             .price_internal(&caplet, &market, as_of)
             .expect("scalar price")
@@ -1669,7 +1691,8 @@ mod tests {
         )
         .expect("schedule");
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.045, 5.0))
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.045, 5.0))
+            .expect("insert market curve")
             .insert_price(
                 &kappa_key,
                 finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.05)

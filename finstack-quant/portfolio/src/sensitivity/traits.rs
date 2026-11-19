@@ -266,7 +266,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(discount);
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve");
         let factor = FactorDefinition {
             id: FactorId::new("misclassified-credit"),
             factor_type: FactorType::Credit,

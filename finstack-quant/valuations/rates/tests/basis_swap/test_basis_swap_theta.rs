@@ -149,9 +149,12 @@ fn market() -> MarketContext {
     )
     .expect("fixings series");
     MarketContext::new()
-        .insert(disc)
-        .insert(f3m)
-        .insert(f1m)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve")
         .insert_series(fix_3m)
         .insert_series(fix_1m)
 }
@@ -163,6 +166,7 @@ fn make_swap(id: &str, start: Date, end: Date, spread_bp: Decimal) -> BasisSwap 
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -180,6 +184,7 @@ fn make_swap(id: &str, start: Date, end: Date, spread_bp: Decimal) -> BasisSwap 
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,

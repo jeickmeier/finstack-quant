@@ -73,7 +73,11 @@ fn market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("repo curve");
-    MarketContext::new().insert(discount).insert(repo)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(repo)
+        .expect("insert market curve")
 }
 
 fn floating_ctd_future() -> BondFuture {

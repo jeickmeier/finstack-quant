@@ -747,7 +747,7 @@ export type FloatingLegCompounding =
  *
  * The cashflow builder consults it whenever projecting a floating coupon
  * fails: a missing forward curve, a pre-cutoff observation with no
- * `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+ * `FIXING:{index_id}` series supplied, a reset before the curve base
  * date, or an overnight or day-count projection error. It never fills a gap
  * in recorded history: when a curve and a fixing series are both supplied, a
  * missing pre-cutoff observation is an error under every policy.
@@ -843,7 +843,8 @@ export type CFKind =
   | "variation_margin_pay"
   | "margin_interest"
   | "collateral_substitution_in"
-  | "collateral_substitution_out";
+  | "collateral_substitution_out"
+  | "derivative_settlement";
 /**
  * Meaning of the emitted schedule relative to pricing and waterfall policy.
  */
@@ -1757,25 +1758,6 @@ export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "
  * Option payoff direction used by analytical and numerical model engines.
  */
 export type OptionType = "call" | "put";
-/**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
-/**
- * Finite JSON number in the closed interval `[0, 1]`.
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
- * Finite JSON number greater than or equal to zero.
- */
-export type NonNegativeF64Wire = number;
-/**
- * Finite correlation coefficient in the closed interval `[-1, 1]`.
- */
-export type CorrelationWire = number;
 /**
  * Volatility convention (Black lognormal or Bachelier normal) used to price
  * a swaption. Wire values: `black`, `normal`.
@@ -2934,7 +2916,7 @@ export interface FloatingCouponSpec {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -3032,6 +3014,10 @@ export interface FloatingRateSpec {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: DecimalWire | null;
+  /**
+   * Contractual rate index used for historical observations in FIXING series.
+   */
+  index_id: Id;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -3300,6 +3286,10 @@ export interface CashFlowAccrual {
    */
   end: DateWire;
   /**
+   * Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.
+   */
+  nominal_dates?: DateWire[];
+  /**
    * Projected index rate before spread, gearing, caps, or floors.
    * Serialization rejects non-finite rates instead of encoding them as absent.
    */
@@ -3550,6 +3540,10 @@ export interface ModelConfig {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: Id | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: Id | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -3802,11 +3796,17 @@ export interface ModelConfig {
   vol_surface_extrapolation?: VolSurfaceExtrapolation;
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface PiecewiseConstantCurve {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Configuration for Monte Carlo PIK bond pricing.
@@ -6608,6 +6608,10 @@ export interface FloatLegSpec {
    */
   frequency: Tenor;
   /**
+   * Contractual observed index identifying historical rate publications.
+   */
+  index_id: Id;
+  /**
    * Payment lag in business days after period end (default: 0).
    *
    * Bloomberg OIS swaps typically use 2 business days payment lag.
@@ -7020,34 +7024,35 @@ export interface Swaption {
    */
   vol_model: VolatilityModel;
   /**
-   * Volatility surface ID for option pricing
+   * Volatility source ID for option pricing. A dated SABR cube needs an
+   * ACT/365F expiry clock anchored at the valuation date.
    */
   vol_surface_id: Id;
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface SabrParameters {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
-  alpha: PositiveF64Wire;
+  alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
-  beta: ClosedUnitIntervalF64Wire;
+  beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
-  nu: NonNegativeF64Wire;
+  nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
-  rho: CorrelationWire;
+  rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: PositiveF64Wire | null;
+  shift?: number | null;
 }
 /**
  * Waterfall specification for dynamic cash flow allocation.
@@ -8044,7 +8049,7 @@ export interface PeriodPlan {
    */
   calendar: PeriodCalendar;
   /**
-   * Ordered periods produced by the parser.
+   * Chronologically ordered reporting periods, with optional gaps.
    */
   periods: Period[];
 }

@@ -1,14 +1,25 @@
 # MARGIN-COLLATERAL-IM-013 — Schedule IM net-to-gross reduction
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for checked schedule netting and one net-to-gross reduction.
 
-**Implementation status:** Observed for the source scope below, including the stated limitations and discrepancies.
+**Implementation status:** Existing behavior is described below. Qualified scope, complete inputs, zero-denominator handling, checked net amounts and caller reconciliation with the accepted contract are pending.
 
-**Validation status:** Evidence inspected or specifically located; no tests/builds executed. Audit date **2026-11-05**; source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+**Validation status:** Primary references inspected. Independent Decimal and rational examples checked trade-rate aggregation, signed replacement costs, zero gross replacement cost, a repeating ratio and cancellation. Runtime, portfolio and host qualification remain pending. Audit date **2026-11-05** and source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+
+## Accepted decision for checked schedule netting and reduction
+
+1. Bind one legally enforceable netting set to its elected gross schedule, complete eligible trade population, valuation date and information cut, calculation currency and side receiving IM. Evaluate separate scopes separately. Where the elected treatment permits gross-only calculation, use record 012. Withhold net IM when required coverage is missing. [Basel MGN20.17](https://www.bis.org/committees/bcbs/basel-framework/standard/mgn?allChapters=true) · [Gross schedule contract](12-schedule-notional.md#accepted-decision-for-checked-gross-schedule-initial-margin).
+2. Use record 012's checked gross calculation for each qualified trade's effective notional, class and maturity. Apply absolute holding size to notional and signed holding size to replacement marks, once each. Normalize applicable amounts onto the common calculation basis through qualified FX. A positive mark represents exposure owed to the receiving side before collateral and thresholds. Include every eligible mark in the replacement-cost sums, including a mark on a trade with zero gross charge. [Portfolio input and netting contract](../portfolio-execution/16-margin-netting-and-initial-margin.md#accepted-decision-for-checked-portfolio-netting-and-initial-margin).
+3. Set gross replacement cost `P = Σ max(mark, 0)` and net replacement cost `N = max(Σ mark, 0)`. Validate `0 ≤ N ≤ P`. When `P > 0`, use `NGR = N/P`. When `P = 0` for a nonempty set, use `NGR = 1` and retain the full gross charge. Preserve which rule produced the ratio. [EU Annex IV replacement-cost definitions](https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX%3A32016R2251) · [CFTC zero-denominator rule](https://www.ecfr.gov/current/title-17/chapter-I/part-23/subpart-E/section-23.154).
+4. Sum the checked gross trade charges to `G` and evaluate one net charge `G × (0.4 + 0.6 × NGR)`. For positive `P`, evaluate the equivalent `G × (2P + 3N)/(5P)` from the admitted monetary amounts with one final bounded Decimal rounding. Use checked deterministic Money sums and retain `N` and `P` as ratio evidence. Publish class charges as gross and return one authoritative net charge for the set. [Money arithmetic](../core-conventions/012-money-decimal-precision.md).
+5. Return currency-bearing zero for a complete validated empty set with an empty-set reason and no applied ratio. A nonempty set with zero gross IM still validates all trades and computes the replacement costs and NGR. Missing required inputs or unusable arithmetic produce typed errors.
+6. Carry gross and net Money amounts, replacement costs, ratio and zero reason, profile, scope, receiving side, valuation cut, currency, reference horizon and coverage through the same Rust result in portfolio, Python and WASM. Apply the elected profile's reference horizon. Record 017 owns contractual collateral and transfers. Record 022 owns the wire format. [Contractual IM](17-csa-selection-and-im-terms.md) · [Result transport](22-wire-tables-and-provenance.md).
+
+Two USD 1 million notionals, short interest rate and equity, give gross IM of USD 160,000. Marks of `+100` and `−60` give a ratio of 0.4 and net IM of USD 102,400. Marks of `+100` and `−100` give net IM of USD 64,000. When every mark is zero or negative, the net charge is USD 160,000. An independent example with `G = 700`, `N = 1` and `P = 7` gives exactly 340.
 
 ## Choice and rationale
 
-Observed: calculate each trade's schedule IM before applying one net-to-gross adjustment across the supplied set. Proposed rationale: preserve heterogenous asset-class/maturity rates while recognizing directional MTM offset.
+The observed calculation applies one net-to-gross adjustment across the supplied trades. The accepted contract binds the eligible scope and applies the set-wide factor to the total of individually rated trades.
 
 ## Input domain and conventions
 
@@ -28,7 +39,7 @@ The same reduction is applied across all included classes. Notional signs do not
 
 ## Alternatives and tradeoffs
 
-Separate netting partitions may be required by a chosen contractual/regulatory interpretation; an unnetted schedule intentionally keeps gross IM. Sensitivity netting is a separate methodology and must not be mixed into this formula as a convenience.
+The observed zero-denominator rule applies a 40% multiplier without positive replacement marks. The accepted rule retains the whole gross charge in that case. The accepted result reports class totals at the gross step so the net charge is computed from one set-level product.
 
 ## Source and validation evidence
 
@@ -40,5 +51,5 @@ Existing evidence: [src/calculators/im/schedule.rs](../../../../finstack-quant/m
 
 ## Follow-up tracking
 
-Adoption, implementation reconciliation and qualification work is tracked in the
+Implementation reconciliation and qualification work is tracked in the
 [collateral and initial-margin register](../FOLLOW_UPS.md#margin-collateral-and-initial-margin).

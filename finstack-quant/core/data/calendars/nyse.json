@@ -13,7 +13,9 @@
     { "type": "nth_weekday", "name": "Labor Day", "n": 1, "weekday": "monday", "month": "september" },
     { "type": "nth_weekday", "name": "Thanksgiving Day", "n": 4, "weekday": "thursday", "month": "november" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
+    { "type": "exact_date", "name": "Hurricane Sandy", "year": 2012, "month": "october", "day": 29 },
+    { "type": "exact_date", "name": "Hurricane Sandy", "year": 2012, "month": "october", "day": 30 },
     { "type": "exact_date", "name": "National Day of Mourning for President Jimmy Carter", "year": 2025, "month": "january", "day": 9 }
   ],
-  "notes": "NYSE cash equity calendar. Saturday New Year has no preceding-Friday closure; other fixed holidays retain nearest-weekday observance. Includes the announced 2025-01-09 mourning closure. Annual fixtures cover 2025-2028; other historical exceptional closures are not exhaustively recorded. <https://www.nyse.com/trade/hours-calendars>"
+  "notes": "NYSE cash equity calendar. Saturday New Year has no preceding-Friday closure; other fixed holidays retain nearest-weekday observance. Includes Hurricane Sandy closures on 2012-10-29 and 2012-10-30 (SEC Release 34-70099) and the 2025-01-09 mourning closure. Annual fixtures cover 2025-2028; other historical exceptional closures are not exhaustively recorded. <https://www.nyse.com/trade/hours-calendars>"
 }

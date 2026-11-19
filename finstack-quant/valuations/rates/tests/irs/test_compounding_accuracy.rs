@@ -53,7 +53,11 @@ fn test_compounding_lookback_sensitivity() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     // If lookback pushes observations before `as_of`, provide minimal fixings so the test
     // remains focused on the lookback sensitivity (not fixing-data availability).
@@ -100,6 +104,7 @@ fn test_compounding_lookback_sensitivity() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -165,7 +170,11 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let mut irs = InterestRateSwap::builder()
         .id("TEST-RATE-CUTOFF-BUSINESS-DAY".into())
@@ -186,6 +195,7 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::monthly(),
             day_count: DayCount::Act360,
@@ -256,13 +266,16 @@ fn test_payment_delay_sensitivity() {
     .expect("fixings series");
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_series(fixings);
 
     let mut irs = InterestRateSwap::example().unwrap();
     irs.fixed_leg.discount_curve_id = "DISC".into();
     irs.float_leg.discount_curve_id = "DISC".into();
+    irs.float_leg.index_id = "FWD".into();
     irs.float_leg.forward_curve_id = "FWD".into();
     irs.float_leg.compounding = FloatingLegCompounding::Simple; // Standard swap
 
@@ -299,7 +312,11 @@ fn test_seasoned_compounded_swap_requires_fixings() {
 
     let fwd = ForwardCurve::flat("FWD", as_of, 0.05, DayCount::Act360).unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let irs = InterestRateSwap::builder()
         .id("TEST-SEASONED-COMP".into())
@@ -320,6 +337,7 @@ fn test_seasoned_compounded_swap_requires_fixings() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -382,8 +400,10 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
     .unwrap();
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_series(fixings);
 
     let irs = InterestRateSwap::builder()
@@ -405,6 +425,7 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -451,7 +472,11 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
     // Near-zero forward curve
     let fwd = ForwardCurve::flat("FWD", base, 0.001, DayCount::Act360).unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     // Create swap with significant spread (50bp) on near-zero rate
     let irs = InterestRateSwap::builder()
@@ -473,6 +498,7 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -533,7 +559,11 @@ fn test_compounded_swap_with_spread_negative_rates() {
     // Negative forward curve
     let fwd = ForwardCurve::flat("FWD", base, -0.005, DayCount::Act360).unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     // Create swap with spread (100bp) on negative rate
     let irs = InterestRateSwap::builder()
@@ -555,6 +585,7 @@ fn test_compounded_swap_with_spread_negative_rates() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -633,8 +664,10 @@ fn test_observation_shift_before_curve_base_date() {
     .unwrap();
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_series(fixings);
 
     // Create a swap that's already partially into its first period
@@ -657,6 +690,7 @@ fn test_observation_shift_before_curve_base_date() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::monthly(),
             day_count: DayCount::Act360,

@@ -1,14 +1,22 @@
 # FEATURES-019: Complete-pair rolling covariance, correlation and beta
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Complete-pair windows and sample estimators are implemented. Undefined correlation and beta, checked correlation, and stable scaling require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** An independent example checked covariance, correlation, and beta with an incomplete current pair. Rust fixtures were inspected. Degenerate and extreme-scale cases remain open.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Use aligned finite pairs in inclusive trailing row windows and require at least max(min_periods, 2) pairs. An incomplete current pair can receive a result from eligible earlier pairs.
+2. Use sample covariance with divisor n−1. Covariance is zero if either side is constant. Pearson correlation is missing if either side is constant. Beta is Cov(y,x)/Var(x), with values as y and other as x. Beta is missing for constant x and zero for constant y with varying x.
+3. Evaluate with checked scaling and preserve representable results across differing units. Use the checked core correlation policy in place of the current clamp. Numerical failure fails the call under [FEATURES-002](02-parameters-missing-and-failure.md). [Core statistics](../core-numerics/sample-statistics.md).
+
+For x = [1, 2, 4, 5] and y = [2, 4, 8, missing], the four-row window has three complete pairs and yields sample covariance 14/3, correlation 1, and beta 2.
+
+## Observed scope and selection
 
 `transform_timeseries_pairwise` selects `RollingCov`, `RollingCorr` or `RollingBeta`. `values` is dependent y and `other` is regressor x for beta. Required arrays are row aligned and share entity/order sorting; no join or benchmark date intersection is performed. Window defaults to 1, min_periods to window, and at least two finite pairs are always required.
 
@@ -33,5 +41,5 @@ No such extreme case was executed.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

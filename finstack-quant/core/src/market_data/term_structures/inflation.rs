@@ -60,6 +60,7 @@ use super::common::{
 };
 use crate::dates::{Date, DayCount, DayCountContext};
 use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
+use crate::market_data::scalars::InflationSeries;
 use crate::math::interp::{
     ExtrapolationPolicy, Interp, InterpStyle, exact_f64_eq, validate_knots,
     validate_positive_series,
@@ -78,6 +79,7 @@ use crate::types::CurveId;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawInflationCurve", into = "RawInflationCurve")]
 pub struct InflationCurve {
+    series: Option<InflationSeries>,
     id: CurveId,
     /// Anchor date represented by `t = 0.0` (`I₀`).
     base_date: Date,
@@ -98,6 +100,8 @@ pub struct InflationCurve {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RawInflationCurve {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    series: Option<InflationSeries>,
     /// Curve identifier.
     pub id: String,
     /// Anchor date represented by the `t = 0.0` CPI pillar.
@@ -120,6 +124,7 @@ impl From<InflationCurve> for RawInflationCurve {
     fn from(curve: InflationCurve) -> Self {
         Self {
             id: curve.id.to_string(),
+            series: curve.series.clone(),
             base_date: curve.base_date,
             day_count: curve.day_count,
             calendar_id: curve.calendar.as_ref().map(|cal| cal.id.clone()),
@@ -135,6 +140,7 @@ impl TryFrom<RawInflationCurve> for InflationCurve {
 
     fn try_from(state: RawInflationCurve) -> crate::Result<Self> {
         InflationCurve::builder(state.id)
+            .series(state.series)
             .base_date(state.base_date)
             .day_count(state.day_count)
             .calendar_id_opt(state.calendar_id)
@@ -146,6 +152,11 @@ impl TryFrom<RawInflationCurve> for InflationCurve {
 }
 
 impl InflationCurve {
+    /// Return publication metadata used to qualify projected CPI comparisons.
+    pub fn get_series(&self) -> Option<&InflationSeries> {
+        self.series.as_ref()
+    }
+
     /// Start building an [`InflationCurve`] with explicit required conventions.
     ///
     /// # Arguments
@@ -154,6 +165,7 @@ impl InflationCurve {
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> InflationCurveBuilder {
         InflationCurveBuilder {
+            series: None,
             id: id.into(),
             base_date: None,
             day_count: None,
@@ -372,6 +384,7 @@ impl InflationCurve {
 
     fn metadata_builder(&self, id: impl Into<CurveId>) -> InflationCurveBuilder {
         InflationCurve::builder(id)
+            .series(self.series.clone())
             .base_date(self.base_date)
             .day_count(self.day_count)
             .calendar_id_opt(self.calendar_id().map(str::to_owned))
@@ -406,6 +419,7 @@ impl InflationCurve {
 /// assert_eq!(curve.base_cpi(), 300.0);
 /// ```
 pub struct InflationCurveBuilder {
+    series: Option<InflationSeries>,
     id: CurveId,
     base_date: Option<Date>,
     day_count: Option<DayCount>,
@@ -416,6 +430,16 @@ pub struct InflationCurveBuilder {
 }
 
 impl InflationCurveBuilder {
+    /// Set the publication identity and units of the projected CPI levels.
+    ///
+    /// # Arguments
+    ///
+    /// * `series` - Publisher series, reference base and seasonal adjustment. An unqualified curve can price instruments but cannot measure changes between snapshots.
+    pub fn series(mut self, series: Option<InflationSeries>) -> Self {
+        self.series = series;
+        self
+    }
+
     /// Set the **base date** (`t = 0.0` anchor).
     ///
     /// # Arguments
@@ -550,7 +574,11 @@ impl InflationCurveBuilder {
         let cpi_levels = cvec.into_boxed_slice();
         let interp = style.build_enum(knots.clone(), cpi_levels.clone(), extrapolation)?;
 
+        if let Some(series) = &self.series {
+            series.validate()?;
+        }
         Ok(InflationCurve {
+            series: self.series,
             id: self.id,
             base_date,
             day_count,

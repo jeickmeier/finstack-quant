@@ -55,7 +55,9 @@ fn unknown_pricing_model_override_is_an_error() {
         .recovery_rate(0.0)
         .build()
         .expect("facility");
-    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve");
     assert!(facility.value(&market, as_of).is_ok());
 
     facility.attributes = Attributes::new().with_meta("pricing_model", "not_a_model");

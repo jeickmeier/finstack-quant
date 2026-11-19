@@ -222,11 +222,9 @@ impl CreditCascade {
         provider: &dyn RecalibrationProvider,
     ) -> Result<MarketContext> {
         match step.kind {
-            CreditStepKind::CurveShape => Ok(snap_hazard_to_t1(
-                credit_base,
-                market_t1,
-                &self.hazard_curve_ids,
-            )),
+            CreditStepKind::CurveShape => {
+                snap_hazard_to_t1(credit_base, market_t1, &self.hazard_curve_ids)
+            }
             CreditStepKind::Generic | CreditStepKind::Level(_) | CreditStepKind::Adder => {
                 shift_credit_curves_par_spread(
                     source_market,
@@ -572,7 +570,7 @@ pub(crate) fn shift_credit_curves_par_spread(
             deal_quote_override: None,
             action: HazardRecalibrationAction::DependencyMarketReplay,
         })?;
-        new_market = new_market.insert(replayed.as_ref().clone());
+        new_market.try_insert_mut(replayed.as_ref().clone())?;
         if delta_bp == 0.0 {
             continue;
         }
@@ -587,7 +585,7 @@ pub(crate) fn shift_credit_curves_par_spread(
             deal_quote_override: None,
             action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(delta_bp)),
         })?;
-        new_market = new_market.insert(bumped.as_ref().clone());
+        new_market.try_insert_mut(bumped.as_ref().clone())?;
     }
     Ok(new_market)
 }
@@ -599,14 +597,14 @@ pub(crate) fn snap_hazard_to_t1(
     base_market: &MarketContext,
     market_t1: &MarketContext,
     curve_ids: &[CurveId],
-) -> MarketContext {
+) -> Result<MarketContext> {
     let mut new_market = base_market.clone();
     for curve_id in curve_ids {
         if let Ok(curve_t1) = market_t1.get_hazard(curve_id.as_str()) {
-            new_market = new_market.insert((*curve_t1).clone());
+            new_market.try_insert_mut((*curve_t1).clone())?;
         }
     }
-    new_market
+    Ok(new_market)
 }
 
 /// Build a `CreditFactorAttribution` from per-step P&L amounts captured during
@@ -931,7 +929,8 @@ mod tests {
         let model = make_model();
         let instrument = canonical_credit_bond(curve_id.clone());
         let market_t0 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .try_insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
@@ -945,7 +944,8 @@ mod tests {
                 MarketScalar::unitless(0.0).expect("valid scalar"),
             );
         let market_t1 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t1, 0.0130))
+            .try_insert(hazard(curve_id.as_str(), as_of_t1, 0.0130))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(125.0).expect("valid scalar"),
@@ -1020,13 +1020,15 @@ mod tests {
         let instrument = canonical_credit_bond(curve_id.clone());
         // Hazard 1.00% → 1.25% at recovery 0 → ΔS = 25bp par spread.
         let market_t0 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .try_insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(3.25).expect("valid scalar"),
             );
         let market_t1 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
+            .try_insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(3.50).expect("valid scalar"),
@@ -1055,13 +1057,15 @@ mod tests {
         let model = make_model();
         let instrument = canonical_credit_bond(curve_id.clone());
         let market_t0 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .try_insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
             );
         let market_t1 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
+            .try_insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(125.0).expect("valid scalar"),
@@ -1091,13 +1095,15 @@ mod tests {
         let model = make_model();
         let instrument = canonical_credit_bond(curve_id.clone());
         let market_t0 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .try_insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
             );
         let market_t1 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
+            .try_insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::price(Money::from((125_i64, Currency::USD))),
@@ -1137,7 +1143,8 @@ mod tests {
         );
         let instrument = canonical_credit_bond(curve_id.clone());
         let market_t0 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .try_insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
@@ -1151,7 +1158,8 @@ mod tests {
                 MarketScalar::unitless(0.0).expect("valid scalar"),
             );
         let market_t1 = MarketContext::new()
-            .insert(hazard(curve_id.as_str(), as_of_t1, 0.0130))
+            .try_insert(hazard(curve_id.as_str(), as_of_t1, 0.0130))
+            .expect("insert market curve")
             .insert_price(
                 "cdx.hy.5y",
                 MarketScalar::unitless(105.0).expect("valid scalar"),

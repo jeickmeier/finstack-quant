@@ -49,7 +49,7 @@ Removing the put wing loses a positive replication contribution and biases the s
 
 Close-to-close variance uses observed log returns. Parkinson uses the intraday high/low range. Garman-Klass and Rogers-Satchell also use open/close information, with different drift assumptions. Yang-Zhang incorporates overnight and intraday components. A gappy market can show substantial close-to-close or Yang-Zhang variation while an intraday-range estimator misses much of the overnight move.
 
-Use aligned positive OHLC observations with highs and lows consistent with opens and closes. State whether the series is adjusted and what corporate-action treatment applies. The contract's chosen estimator is part of its payoff definition; analysts cannot select whichever estimator gives a preferred P&L after the fact.
+Use aligned positive OHLC observations with highs and lows consistent with opens and closes. The Python estimators return `None` when there are too few observations for the chosen method. An unchanged price series with enough observations has zero realized variance. State whether the series is adjusted and what corporate-action treatment applies. The contract's chosen estimator is part of its payoff definition; analysts cannot select whichever estimator gives a preferred P&L after the fact.
 
 The raw `variance_realized` statistic uses its observation-frequency annualization. A seasoned mark weights elapsed time on the contract's day-count basis. To combine them correctly, accrued squared log returns contribute `sum(log_returns^2)/total_years`, while the remaining forward variance contributes `remaining_years/total_years*forward_variance`. Multiplying an observation-annualized statistic by a calendar-time weight can break that identity. The 60%-elapsed proof reconciles the expected-variance metric to PV and checks the risk scaling directly.
 
@@ -137,8 +137,9 @@ observations = tracks.ohlc_observations()
 arrays = {key: np.array([value for _, value in rows]) for key, rows in observations.items()}
 estimates = {"close_to_close": stats.realized_variance(arrays["SPX-CLOSE"])}
 for method in ["parkinson", "garman_klass", "rogers_satchell", "yang_zhang"]:
-    estimates[method] = stats.realized_variance_ohlc(arrays["SPX-OPEN"], arrays["SPX-HIGH"],
-        arrays["SPX-LOW"], arrays["SPX-CLOSE"], method=method, annualization_factor=252.0)
+    estimates[method] = stats.realized_variance_ohlc(arrays["SPX-OPEN"][1:], arrays["SPX-HIGH"][1:],
+        arrays["SPX-LOW"][1:], arrays["SPX-CLOSE"][1:], method=method, annualization_factor=252.0,
+        previous_close=arrays["SPX-CLOSE"][0] if method == "yang_zhang" else None)
 print(pd.DataFrame({"variance": estimates, "vol_percent": {k:100*math.sqrt(v) for k,v in estimates.items()}}))
 ```
 {/* /notebook-block */}
@@ -154,8 +155,8 @@ for i in range(40):
     last=closed
 gap_estimates={"close_to_close":stats.realized_variance(gappy["close"])}
 for method in ["parkinson","garman_klass","rogers_satchell","yang_zhang"]:
-    gap_estimates[method]=stats.realized_variance_ohlc(gappy["open"],gappy["high"],gappy["low"],gappy["close"],
-        method=method,annualization_factor=252.)
+    gap_estimates[method]=stats.realized_variance_ohlc(gappy["open"][1:],gappy["high"][1:],gappy["low"][1:],gappy["close"][1:],
+        method=method,annualization_factor=252.,previous_close=gappy["close"][0] if method=="yang_zhang" else None)
 print(pd.Series(gap_estimates,name="annualized_variance"))
 ```
 {/* /notebook-block */}

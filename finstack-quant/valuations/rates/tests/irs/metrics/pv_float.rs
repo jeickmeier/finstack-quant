@@ -46,9 +46,12 @@ fn build_curves(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketContext
         ForwardCurve::flat("USD_LIBOR_3M", base_date, fwd_rate, DayCount::Act360).unwrap();
 
     MarketContext::new()
-        .insert(disc_curve_ois)
-        .insert(disc_curve_libor)
-        .insert(fwd_curve)
+        .try_insert(disc_curve_ois)
+        .expect("insert market curve")
+        .try_insert(disc_curve_libor)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
 }
 
 fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> InterestRateSwap {
@@ -74,6 +77,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> Int
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),

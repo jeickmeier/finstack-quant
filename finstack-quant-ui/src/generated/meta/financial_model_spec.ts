@@ -152,7 +152,7 @@ export default [
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PiecewiseConstantCurve",
-    "description": "A finite, left-continuous piecewise-constant curve."
+    "description": "A finite, right-continuous piecewise-constant curve."
   },
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f/properties/times",
@@ -161,7 +161,8 @@ export default [
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f/properties/times/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PiecewiseConstantCurve/properties/times/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f/properties/values",
@@ -170,7 +171,8 @@ export default [
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_0c72f5cb09b10476ecb7",
@@ -654,13 +656,6 @@ export default [
     "description": "True if this is a draw, false if it's a repayment."
   },
   {
-    "path": "#/$defs/d_1731f9e7372472775585",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NonNegativeF64Wire",
-    "description": "Finite JSON number greater than or equal to zero.",
-    "format": "double",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_174ce9631272c7d7f4f7",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond",
     "description": "Convertible bond instrument with embedded equity conversion option.\n\nThis fixed income instrument combines debt characteristics (coupons, principal)\nwith equity optionality (conversion rights). Uses the `CashFlowBuilder` for\nrobust schedule generation and tree-based pricing for the hybrid valuation."
@@ -989,16 +984,9 @@ export default [
     "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools."
   },
   {
-    "path": "#/$defs/d_1c91cbdbb3238adf0c02",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PositiveF64Wire",
-    "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
-    "exclusiveMinimum": 0,
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_1dad2782e09a045ad639",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateFallback",
-    "description": "Policy for handling floating rate projection failures.\n\nThe cashflow builder consults it whenever projecting a floating coupon\nfails: a missing forward curve, a pre-cutoff observation with no\n`FIXING:{forward_curve_id}` series supplied, a reset before the curve base\ndate, or an overnight or day-count projection error. It never fills a gap\nin recorded history: when a curve and a fixing series are both supplied, a\nmissing pre-cutoff observation is an error under every policy.\n\nA non-`Error` policy replaces the index for the whole coupon (every\novernight observation of the period, not only a failing one), logs\n`warn!`, and the coupon still records the substituted index as its\n`projected_index_rate`. The default (`Error`) surfaces failures\nexplicitly; the other variants are explicit opt-in degradation modes. The\nbond LSMC pricer applies the policy per overnight observation instead.\n\n# References\n\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#hull-options-futures`"
+    "description": "Policy for handling floating rate projection failures.\n\nThe cashflow builder consults it whenever projecting a floating coupon\nfails: a missing forward curve, a pre-cutoff observation with no\n`FIXING:{index_id}` series supplied, a reset before the curve base\ndate, or an overnight or day-count projection error. It never fills a gap\nin recorded history: when a curve and a fixing series are both supplied, a\nmissing pre-cutoff observation is an error under every policy.\n\nA non-`Error` policy replaces the index for the whole coupon (every\novernight observation of the period, not only a failing one), logs\n`warn!`, and the coupon still records the substituted index as its\n`projected_index_rate`. The default (`Error`) surfaces failures\nexplicitly; the other variants are explicit opt-in degradation modes. The\nbond LSMC pricer applies the policy per overnight observation instead.\n\n# References\n\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#hull-options-futures`"
   },
   {
     "path": "#/$defs/d_1dad2782e09a045ad639/oneOf/0",
@@ -1058,50 +1046,43 @@ export default [
   {
     "path": "#/$defs/d_1f0a38ebecad19081135",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters",
-    "description": "SABR model parameters"
+    "description": "Parameters of a SABR backbone, with an optional signed rate displacement."
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/alpha",
-    "description": "Initial volatility (alpha)",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PositiveF64Wire"
+    "description": "Initial volatility level, strictly positive.",
+    "exclusiveMinimum": 0,
+    "format": "double"
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/beta",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/beta",
-    "description": "CEV exponent (beta) - typically 0 to 1",
-    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ClosedUnitIntervalF64Wire"
+    "description": "CEV exponent in the closed interval `[0, 1]`.",
+    "format": "double",
+    "maximum": 1,
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/nu",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/nu",
-    "description": "Volatility of volatility (nu/volvol)",
-    "ref": "#/$defs/NonNegativeF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NonNegativeF64Wire"
+    "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/rho",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/rho",
-    "description": "Correlation between asset and volatility (rho)",
-    "ref": "#/$defs/CorrelationWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CorrelationWire"
+    "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+    "exclusiveMaximum": 1,
+    "exclusiveMinimum": -1,
+    "format": "double"
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/shift",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/shift",
-    "description": "Shift parameter for handling negative rates (optional)"
-  },
-  {
-    "path": "#/$defs/d_1f0a38ebecad19081135/properties/shift/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/shift/anyOf/0",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/d_1f0a38ebecad19081135/properties/shift/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/shift/anyOf/1"
+    "description": "Optional finite displacement applied to forward and strike.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_210ab4b44ffb533f1266",
@@ -3125,6 +3106,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Tenor"
   },
   {
+    "path": "#/$defs/d_450829dac3a74a5c8761/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/index_id",
+    "description": "Contractual observed index identifying historical rate publications.",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
+  },
+  {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/payment_lag_days",
     "default": 0,
@@ -3903,6 +3891,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_63aec3d47748d9f3d86a/properties/nominal_dates",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlowAccrual/properties/nominal_dates",
+    "description": "Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods."
+  },
+  {
+    "path": "#/$defs/d_63aec3d47748d9f3d86a/properties/nominal_dates/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlowAccrual/properties/nominal_dates/items",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
+  },
+  {
     "path": "#/$defs/d_63aec3d47748d9f3d86a/properties/projected_index_rate",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlowAccrual/properties/projected_index_rate",
     "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
@@ -3934,6 +3933,21 @@ export default [
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/asw_forward_curve_id/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/asw_forward_curve_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_65b0652ed08913529246/properties/asw_index_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/asw_index_id",
+    "description": "Contractual floating index used for asset-swap accruals and historical resets."
+  },
+  {
+    "path": "#/$defs/d_65b0652ed08913529246/properties/asw_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_65b0652ed08913529246/properties/asw_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/bdt_sigma",
@@ -5206,7 +5220,7 @@ export default [
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateSpec",
-    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),\n   BEFORE adding spread\n3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by\n   default, `index * gearing + spread` when `gearing_includes_spread` is false\n4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),\n   AFTER spread and gearing\n\nDefault formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the valuation cutoff then\nresolve from that series instead of the curve. The cutoff is the forward\ncurve base date under `build` and the valuation date under `build_as_of`:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the cutoff prefers a published same-day fixing\nwhen the series has one, otherwise projects on the curve clock.\n\nThe [`FloatingRateFallback`] policy applies when projection fails and never\nfills a gap in a supplied fixing series (see its doc): `Error` (the\ndefault) fails the build with a descriptive message naming the date,\nindex, and expected series id; `FixedRate(r)` uses `r` as the index rate\nfor the whole coupon; `SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
+    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),\n   BEFORE adding spread\n3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by\n   default, `index * gearing + spread` when `gearing_includes_spread` is false\n4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),\n   AFTER spread and gearing\n\nDefault formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the valuation cutoff then\nresolve from that series instead of the curve. The cutoff is the forward\ncurve base date under `build` and the valuation date under `build_as_of`:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the cutoff prefers a published same-day fixing\nwhen the series has one, otherwise projects on the curve clock.\n\nThe [`FloatingRateFallback`] policy applies when projection fails and never\nfills a gap in a supplied fixing series (see its doc): `Error` (the\ndefault) fails the build with a descriptive message naming the date,\nindex, and expected series id; `FixedRate(r)` uses `r` as the index rate\nfor the whole coupon; `SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
   },
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/all_in_cap_bp",
@@ -5330,6 +5344,13 @@ export default [
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/index_floor_bp/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateSpec/properties/index_floor_bp/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_7af15f20a258d1def9dd/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateSpec/properties/index_id",
+    "description": "Contractual rate index used for historical observations in FIXING series.",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/index_tenor",
@@ -5707,14 +5728,6 @@ export default [
     "description": "Moving average; requires `window`."
   },
   {
-    "path": "#/$defs/d_82d2bec48bc64b37bcef",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ClosedUnitIntervalF64Wire",
-    "description": "Finite JSON number in the closed interval `[0, 1]`.",
-    "format": "double",
-    "maximum": 1,
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_85f5d5bd79f75fc47ce3",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ClearingStatus",
     "description": "Clearing status for OTC derivatives.\n\nDetermines whether a trade is cleared through a CCP or remains bilateral\nunder a CSA agreement."
@@ -5754,7 +5767,7 @@ export default [
   {
     "path": "#/$defs/d_867bd30e1e9b7fc46878/properties/periods",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodPlan/properties/periods",
-    "description": "Ordered periods produced by the parser."
+    "description": "Chronologically ordered reporting periods, with optional gaps."
   },
   {
     "path": "#/$defs/d_867bd30e1e9b7fc46878/properties/periods/items",
@@ -6474,6 +6487,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CFKind/oneOf/26",
     "const": "collateral_substitution_out",
     "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced."
+  },
+  {
+    "path": "#/$defs/d_8ee3d9187956de7832b9/oneOf/27",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CFKind/oneOf/27",
+    "const": "derivative_settlement",
+    "description": "Net contractual derivative payoff settled in cash without exchanging principal."
   },
   {
     "path": "#/$defs/d_8ee3d9187956de7832b9/oneOf/3",
@@ -8920,7 +8939,7 @@ export default [
   {
     "path": "#/$defs/d_dcc2738b179dc9ea48c6/properties/vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Swaption/properties/vol_surface_id",
-    "description": "Volatility surface ID for option pricing",
+    "description": "Volatility source ID for option pricing. A dated SABR cube needs an\nACT/365F expiry clock anchored at the valuation date.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
   },
@@ -9003,14 +9022,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AntiDilutionPolicy/oneOf/2",
     "const": "weighted_average",
     "description": "Broad-based weighted average: conversion price is adjusted based on the\nweighted average of the old and new share prices, factoring in the number\nof shares. Less dilutive to existing shareholders than full ratchet.\n\nFormula:\n```text\nnew_cp = old_cp × (shares_outstanding + new_money / old_cp)\n                 / (shares_outstanding + new_shares_issued)\n```"
-  },
-  {
-    "path": "#/$defs/d_e9d6d028bee91ef1c9e8",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CorrelationWire",
-    "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
-    "format": "double",
-    "maximum": 1,
-    "minimum": -1
   },
   {
     "path": "#/$defs/d_ead8055e75e6ac0353b0",

@@ -148,20 +148,27 @@
       "type": "object"
     },
     "d_07856c27d945226b86ed": {
-      "description": "A dated dividend event.",
+      "additionalProperties": false,
+      "description": "One gross cash distribution per entitled share on its schedule's share basis.",
       "properties": {
-        "date": {
-          "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
-          "description": "Ex-dividend date."
+        "amount": {
+          "$ref": "#/$defs/d_d99050870612e8bfc3d3"
         },
-        "kind": {
-          "$ref": "#/$defs/d_1975b7627eb8a20fd7c3",
-          "description": "Event kind."
+        "event_id": {
+          "type": "string"
+        },
+        "ex_date": {
+          "$ref": "#/$defs/d_42ed66bb80d77e9fa456"
+        },
+        "pay_date": {
+          "$ref": "#/$defs/d_42ed66bb80d77e9fa456"
         }
       },
       "required": [
-        "date",
-        "kind"
+        "event_id",
+        "ex_date",
+        "pay_date",
+        "amount"
       ],
       "type": "object"
     },
@@ -195,9 +202,34 @@
         }
       ]
     },
+    "d_15e86d33b70e6065d029": {
+      "additionalProperties": false,
+      "description": "Identity and resolved maturity of a quote in its original evaluator.",
+      "properties": {
+        "pillar_date": {
+          "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+          "description": "Contractual maturity resolved using the instrument conventions."
+        },
+        "pillar_time": {
+          "description": "Curve-clock year fraction at the resolved maturity.",
+          "format": "double",
+          "type": "number"
+        },
+        "quote_id": {
+          "description": "Original stable market quote identifier.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "quote_id",
+        "pillar_date",
+        "pillar_time"
+      ],
+      "type": "object"
+    },
     "d_17ffcd7842a3f40268b1": {
       "additionalProperties": false,
-      "description": "Typed conventions required to replay a rate-curve calibration.",
+      "description": "Benchmark conventions and quotes associated with a rate curve.",
       "properties": {
         "currency": {
           "$ref": "#/$defs/d_b6a74bd737ef1567b144",
@@ -206,6 +238,17 @@
         "curve_day_count": {
           "$ref": "#/$defs/d_ac3149b00d5253379c16",
           "description": "Day count used for the curve's time axis."
+        },
+        "execution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_6435ec92a8bbd1a2e4bc"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original execution evidence. A transcribed benchmark list has no qualified replay."
         },
         "method": {
           "$ref": "#/$defs/d_e94fd584c7a9c31df19d",
@@ -243,61 +286,6 @@
       ],
       "type": "object"
     },
-    "d_1975b7627eb8a20fd7c3": {
-      "description": "Type of dividend event.\n\nDistinguishes between cash payments, stock distributions, and continuous\nyield approximations used in different pricing models.\n\n# Variants\n\n- **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)\n- **Stock**: Share distribution (less common, complicates option pricing)\n- **Yield**: Continuous approximation for analytical models",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Cash dividend payment.\n\nMost common type. Ex-dividend date reduces stock price by dividend amount.",
-          "properties": {
-            "cash": {
-              "$ref": "#/$defs/d_d99050870612e8bfc3d3"
-            }
-          },
-          "required": [
-            "cash"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Continuous dividend yield (annualized fraction).\n\nUsed in analytical models (Black-Scholes with dividends) that assume\ncontinuous payout rather than discrete payments.",
-          "properties": {
-            "yield": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "yield"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Stock dividend (share distribution).\n\nIncreases share count proportionally. For example, 5% stock dividend\nmeans each shareholder receives 0.05 additional shares per share held.",
-          "properties": {
-            "stock": {
-              "properties": {
-                "ratio": {
-                  "description": "Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "ratio"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "stock"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "d_1a06a0fdbb3b25f44f0d": {
       "description": "Typed maturity specification retained from an original market quote.",
       "oneOf": [
@@ -331,40 +319,32 @@
     },
     "d_1c77a48708b4a54d6160": {
       "additionalProperties": false,
-      "description": "Dividend schedule for an equity or ETF underlying.\n\nContains a time-ordered sequence of dividend events used for pricing equity\nderivatives and calculating total return. The schedule can be referenced by\nmultiple instruments via its [`CurveId`] in the market context.\n\n# Usage in Pricing\n\n- **Discrete dividends**: Subtract PV of future dividends from spot for option pricing\n- **Ex-dividend adjustments**: Reduce forward price by dividend amount\n- **Dividend futures**: Sum dividends in contract period\n- **Total return**: Include dividend reinvestment in performance\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::dividends::DividendSchedule;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet schedule = DividendSchedule::builder(\"AAPL-DIVS\")\n    .underlying(\"AAPL\")\n    .currency(Currency::USD)\n    .cash(\n        Date::from_calendar_date(2025, Month::March, 15).expect(\"Valid date\"),\n        Money::new(0.24, Currency::USD).expect(\"valid money fixture\")\n    ).build().expect(\"Valid dividends\");\n\nassert_eq!(schedule.get_events().len(), 1);\n```",
+      "description": "Validated distributions for one security, share basis and currency.",
       "properties": {
         "currency": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_b6a74bd737ef1567b144"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Quote currency for cash dividends (optional metadata)."
+          "$ref": "#/$defs/d_b6a74bd737ef1567b144"
         },
         "events": {
-          "description": "Sorted events by date (ascending).",
           "items": {
             "$ref": "#/$defs/d_07856c27d945226b86ed"
           },
           "type": "array"
         },
         "id": {
-          "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
-          "description": "Unique identifier of this schedule in the market context."
+          "$ref": "#/$defs/d_33ee2f2e4664717e30ef"
+        },
+        "share_basis": {
+          "type": "string"
         },
         "underlying": {
-          "description": "Optional display symbol/ticker for convenience.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/d_33ee2f2e4664717e30ef"
         }
       },
       "required": [
         "id",
+        "underlying",
+        "share_basis",
+        "currency",
         "events"
       ],
       "type": "object"
@@ -613,6 +593,7 @@
           "additionalProperties": {
             "type": "string"
           },
+          "default": null,
           "description": "Optional map of issuer ID → hazard curve ID",
           "type": [
             "object",
@@ -624,6 +605,7 @@
             "format": "double",
             "type": "number"
           },
+          "default": null,
           "description": "Optional map of issuer ID → recovery rate",
           "type": [
             "object",
@@ -635,6 +617,7 @@
             "format": "double",
             "type": "number"
           },
+          "default": null,
           "description": "Optional map of issuer ID → weight",
           "type": [
             "object",
@@ -685,6 +668,36 @@
         "reference_month",
         "value",
         "available_on"
+      ],
+      "type": "object"
+    },
+    "d_6435ec92a8bbd1a2e4bc": {
+      "additionalProperties": false,
+      "description": "Executed evaluator, resolved instruments and original outcome of a rate calibration.",
+      "properties": {
+        "accepted": {
+          "description": "Whether the original fit passed its recorded acceptance policy.",
+          "type": "boolean"
+        },
+        "bindings": {
+          "description": "Resolved quote identities and maturities, in input order.",
+          "items": {
+            "$ref": "#/$defs/d_15e86d33b70e6065d029"
+          },
+          "type": "array"
+        },
+        "calibration_config": {
+          "description": "Solver controls and residual acceptance thresholds used by the evaluator."
+        },
+        "step_params": {
+          "description": "Discount or projection evaluator parameters, including pricing dependencies."
+        }
+      },
+      "required": [
+        "bindings",
+        "step_params",
+        "calibration_config",
+        "accepted"
       ],
       "type": "object"
     },
@@ -1333,6 +1346,16 @@
             "type": "number"
           },
           "type": "array"
+        },
+        "expiry_clock": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_d7c93a9d6d6ba5ccd0ac"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "forwards": {
           "description": "Row-major: forwards[expiry_idx * n_tenors + tenor_idx]",
@@ -2108,6 +2131,16 @@
               },
               "type": "array"
             },
+            "series": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_f411b3891ba92dd52290"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "type": {
               "const": "inflation",
               "type": "string"
@@ -2166,6 +2199,13 @@
               "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar for the source clock.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "day_count": {
               "$ref": "#/$defs/d_ac3149b00d5253379c16",
               "description": "Day count convention"
@@ -2201,21 +2241,9 @@
               },
               "type": "array"
             },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
+            "level_kind": {
+              "$ref": "#/$defs/d_d42cbc543d2261f1cd11",
+              "description": "Native level family."
             },
             "type": {
               "const": "price",
@@ -2227,6 +2255,7 @@
             "id",
             "base",
             "day_count",
+            "level_kind",
             "knot_points",
             "interp_style",
             "extrapolation"
@@ -2304,21 +2333,27 @@
       "properties": {
         "alpha": {
           "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0,
           "format": "double",
           "type": "number"
         },
         "beta": {
           "description": "CEV exponent in the closed interval `[0, 1]`.",
           "format": "double",
+          "maximum": 1,
+          "minimum": 0,
           "type": "number"
         },
         "nu": {
           "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
           "format": "double",
+          "minimum": 0,
           "type": "number"
         },
         "rho": {
           "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": -1,
           "format": "double",
           "type": "number"
         },
@@ -3368,6 +3403,21 @@
         }
       ]
     },
+    "d_d42cbc543d2261f1cd11": {
+      "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup.",
+      "oneOf": [
+        {
+          "const": "price",
+          "description": "Signed, finite forward prices, for example in USD per barrel.",
+          "type": "string"
+        },
+        {
+          "const": "vol_index",
+          "description": "Nonnegative volatility-index levels in index points.",
+          "type": "string"
+        }
+      ]
+    },
     "d_d7c93a9d6d6ba5ccd0ac": {
       "additionalProperties": false,
       "description": "Explicit day-count clock translating calendar expiry dates into year fractions\nrelative to a surface or cube reference date.\n\nMarket data objects such as [`FxDeltaVolSurface`](crate::market_data::surfaces::FxDeltaVolSurface)\nattach an optional `VolatilityClock` so downstream pricers can validate that\nthe surface anchor matches `as_of` and bridge between instrument day-counts\nand surface variance time without silently assuming a day-count convention.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};\nuse time::macros::date;\n\nlet clock = VolatilityClock::try_new(\n    date!(2025 - 01 - 15),\n    DayCount::Act365F,\n    DayCountContextState::default(),\n)?;\nlet t = clock.expiry_time(date!(2026 - 01 - 15))?;\nassert!((t - 1.0).abs() < 1e-12);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
@@ -3451,6 +3501,16 @@
             "$ref": "#/$defs/d_5c1ce413ed4344df4437"
           },
           "type": "array"
+        },
+        "series": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_f411b3891ba92dd52290"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -3529,6 +3589,30 @@
         "source_base_date",
         "source_points",
         "adjustment"
+      ],
+      "type": "object"
+    },
+    "d_f411b3891ba92dd52290": {
+      "additionalProperties": false,
+      "description": "Publication identity and units of an observed or projected inflation level.",
+      "properties": {
+        "reference_base": {
+          "description": "Published reference period and index scale, for example `1982-84=100`.",
+          "type": "string"
+        },
+        "seasonally_adjusted": {
+          "description": "True for seasonally adjusted levels and false for unadjusted levels.",
+          "type": "boolean"
+        },
+        "series_id": {
+          "description": "Publisher-qualified identifier of the statistical series.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "series_id",
+        "reference_base",
+        "seasonally_adjusted"
       ],
       "type": "object"
     },

@@ -50,9 +50,12 @@ fn build_flat_curves(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketCo
     .expect("fixings series");
 
     MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
-        .insert(fwd_curve_6m)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve_6m)
+        .expect("insert market curve")
         .insert_series(fixings)
 }
 
@@ -79,6 +82,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: f64, side: PayReceive) -> Int
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -165,7 +169,11 @@ fn test_forward_starting_swap() {
 
     let fwd_curve = ForwardCurve::flat("USD-SOFR-3M", as_of, 0.05, DayCount::Act360).unwrap();
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     let swap = InterestRateSwap {
         adjust_fixed_accrual_dates: false,
@@ -189,6 +197,7 @@ fn test_forward_starting_swap() {
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -287,8 +296,10 @@ fn test_swap_seasoned() {
     .expect("fixings series");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(fixings);
 
     let swap = InterestRateSwap {
@@ -313,6 +324,7 @@ fn test_swap_seasoned() {
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),

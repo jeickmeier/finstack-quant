@@ -267,7 +267,9 @@ mod tests {
                     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve");
-                let market = MarketContext::new().insert(curve);
+                let market = MarketContext::new()
+                    .try_insert(curve)
+                    .expect("insert market curve");
                 prices.push(
                     SwaptionHullWhitePricer::default()
                         .price_internal(&swaption, &market, as_of)
@@ -319,12 +321,14 @@ mod tests {
             .instrument_pricing_overrides
             .model_config
             .hw1f_sigma = Some(1e-7);
-        let market = MarketContext::new().insert(flat_discount_with_tenor(
-            swaption.get_discount_curve_id().as_str(),
-            as_of,
-            0.04,
-            10.0,
-        ));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_with_tenor(
+                swaption.get_discount_curve_id().as_str(),
+                as_of,
+                0.04,
+                10.0,
+            ))
+            .expect("insert market curve");
         let mut expected = 0.0;
         let mut start = swaption.expiry;
         for end in [date(2027, 1, 1), date(2028, 1, 1)] {
@@ -362,12 +366,14 @@ mod tests {
             .instrument_pricing_overrides
             .model_config
             .hw1f_sigma = Some(0.01);
-        let market = MarketContext::new().insert(flat_discount_with_tenor(
-            swaption.get_discount_curve_id().as_str(),
-            as_of,
-            0.03,
-            10.0,
-        ));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_with_tenor(
+                swaption.get_discount_curve_id().as_str(),
+                as_of,
+                0.03,
+                10.0,
+            ))
+            .expect("insert market curve");
 
         let pricer = SwaptionHullWhitePricer::default();
         let result = pricer
@@ -389,12 +395,14 @@ mod tests {
         swaption.underlying_float_leg.forward_curve_id =
             swaption.underlying_fixed_leg.discount_curve_id.clone();
         let (kappa_key, sigma_key) = hw1f_scalar_keys(swaption.get_discount_curve_id().as_str());
-        let market = MarketContext::new().insert(flat_discount_with_tenor(
-            swaption.get_discount_curve_id().as_str(),
-            as_of,
-            0.03,
-            10.0,
-        ));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_with_tenor(
+                swaption.get_discount_curve_id().as_str(),
+                as_of,
+                0.03,
+                10.0,
+            ))
+            .expect("insert market curve");
         let market = market
             .insert_price(
                 &kappa_key,

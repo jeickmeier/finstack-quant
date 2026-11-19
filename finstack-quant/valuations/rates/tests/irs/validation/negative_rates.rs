@@ -54,7 +54,11 @@ fn create_negative_rate_market(disc_rate: f64, fwd_rate: f64, base_date: Date) -
     let disc = build_negative_rate_discount_curve(disc_rate, base_date, "USD-OIS");
     let fwd = build_negative_rate_forward_curve(fwd_rate, base_date, "USD-SOFR-3M");
 
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 // Negative Discount Rate Tests

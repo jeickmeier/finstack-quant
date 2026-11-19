@@ -5,6 +5,7 @@
 use super::tests::{assert_mean, engine_states, error_message, mean_var, spec, terminal};
 use super::*;
 use crate::monte_carlo::engine::simulate_path_fractional;
+use crate::monte_carlo::process::cheyette_rough::BaseVolatility;
 use crate::monte_carlo::rng::fbm::FractionalNoiseGenerator;
 use crate::monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
 use crate::monte_carlo::traits::{PathState, Payoff};
@@ -74,7 +75,7 @@ fn rough_heston_params() -> RoughHestonParams {
 fn cheyette_params() -> CheyetteRoughVolParams {
     CheyetteRoughVolParams::new(
         0.03,
-        ForwardVarianceCurve::flat(0.005).unwrap(),
+        BaseVolatility::flat(0.005).unwrap(),
         hurst(),
         1.5,
         -0.5,
@@ -301,6 +302,14 @@ fn json_specs_need_every_curve_and_reject_unknown_fields() {
     let mut missing = bergomi.clone();
     missing.as_object_mut().unwrap().remove("xi");
     assert!(parse(missing).is_err());
+    let mut cheyette = tagged(&ProcessSpec::CheyetteRough(cheyette_params()));
+    assert_eq!(
+        cheyette["sigma_base"]["amplitudes"],
+        serde_json::json!([[0.0, 0.005]])
+    );
+    assert!(parse(cheyette.clone()).is_ok());
+    cheyette["sigma_base"] = bergomi["xi"].clone();
+    assert!(parse(cheyette).is_err());
     let mut bad_hurst = bergomi;
     bad_hurst["hurst"]["h"] = serde_json::json!(1.5);
     assert!(parse(bad_hurst).is_err());
@@ -368,7 +377,8 @@ fn rough_bergomi_streams_match_the_pricer_path_function() {
         let mut fbm_normals = vec![0.0; num_steps * fbm_gen.normals_per_step()];
         let mut fbm_increments = vec![0.0; num_steps];
         let mut driving_normals = vec![0.0; num_steps];
-        rng.fill_std_normals(&mut fbm_normals);
+        rng.fill_std_normals(&mut fbm_normals)
+            .expect("normal draws");
         fbm_gen.generate(&fbm_normals, &mut fbm_increments);
         fbm_gen.driving_normals_into(&fbm_normals, &mut driving_normals);
 
@@ -425,7 +435,7 @@ fn lmm_streams_match_the_pricer_loop() {
         let mut z = vec![0.0; params.num_factors];
         expected.extend_from_slice(&x);
         for step in 0..STEPS {
-            rng.fill_std_normals(&mut z);
+            rng.fill_std_normals(&mut z).expect("normal draws");
             disc.step(
                 &process,
                 time_grid.time(step),
@@ -433,7 +443,8 @@ fn lmm_streams_match_the_pricer_loop() {
                 &mut x,
                 &z,
                 &mut work,
-            );
+            )
+            .expect("valid simulation step");
             expected.extend_from_slice(&x);
         }
     }

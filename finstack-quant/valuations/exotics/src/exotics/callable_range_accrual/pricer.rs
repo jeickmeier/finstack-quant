@@ -566,10 +566,13 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        MarketContext::new().insert(discount).insert_price(
-            "SOFR-RATE",
-            MarketScalar::unitless(short_rate).expect("valid scalar"),
-        )
+        MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .insert_price(
+                "SOFR-RATE",
+                MarketScalar::unitless(short_rate).expect("valid scalar"),
+            )
     }
 
     fn deterministic_pricer(paths: usize) -> CallableRangeAccrualPricer {

@@ -35,12 +35,12 @@
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let bond = Bond::example()?;
 //! let as_of = date!(2024-01-15);
-//! let market = MarketContext::new().insert(
+//! let market = MarketContext::new().try_insert(
 //!     DiscountCurve::builder("USD-TREASURY")
 //!         .base_date(as_of)
 //!         .knots([(0.0, 1.0), (30.0, 0.40)])
 //!         .build()?,
-//! );
+//! ).expect("insert market curve");
 //!
 //! // Use Instrument trait for public API
 //! let pv = bond.value(&market, as_of)?;

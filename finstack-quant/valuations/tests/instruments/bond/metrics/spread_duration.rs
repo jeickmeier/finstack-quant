@@ -49,7 +49,9 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve builds");
-    let mut market = MarketContext::new().insert(disc);
+    let mut market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     if credit {
         bond.credit_curve_id = Some(CurveId::new("USD-CREDIT"));
@@ -61,7 +63,7 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
             "USD-OIS",
         )
         .expect("hazard calibration succeeds");
-        market = market.insert(hazard);
+        market = market.try_insert(hazard).expect("insert market curve");
     }
     (bond, market)
 }
@@ -231,7 +233,9 @@ fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve builds");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(

@@ -64,9 +64,13 @@ fn attribute_bond_on_wing_curve(maturity_year: i32) -> finstack_quant_attributio
     .unwrap();
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
 
-    let market_t0 = MarketContext::new().insert(build_wing_curve("USD-OIS", as_of_t0, 0.04));
+    let market_t0 = MarketContext::new()
+        .try_insert(build_wing_curve("USD-OIS", as_of_t0, 0.04))
+        .expect("insert market curve");
     // Parallel +10bp move across the whole curve, including the wing pillars.
-    let market_t1 = MarketContext::new().insert(build_wing_curve("USD-OIS", as_of_t1, 0.041));
+    let market_t1 = MarketContext::new()
+        .try_insert(build_wing_curve("USD-OIS", as_of_t1, 0.041))
+        .expect("insert market curve");
 
     attribute_pnl(
         &AttributionMethod::Taylor(TaylorAttributionConfig::default()),
@@ -130,8 +134,12 @@ fn taylor_short_end_wing_explains_sub_3m_rates_move() {
     .unwrap();
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
 
-    let market_t0 = MarketContext::new().insert(build_wing_curve("USD-OIS", as_of_t0, 0.04));
-    let market_t1 = MarketContext::new().insert(build_wing_curve("USD-OIS", as_of_t1, 0.041));
+    let market_t0 = MarketContext::new()
+        .try_insert(build_wing_curve("USD-OIS", as_of_t0, 0.04))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(build_wing_curve("USD-OIS", as_of_t1, 0.041))
+        .expect("insert market curve");
 
     let attribution = attribute_pnl(
         &AttributionMethod::Taylor(TaylorAttributionConfig::default()),

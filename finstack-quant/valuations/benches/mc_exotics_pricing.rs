@@ -160,7 +160,8 @@ fn create_mc_market(as_of: Date, spot: f64, vol: f64, rate: f64) -> MarketContex
     );
 
     MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"))
         .insert_price(
@@ -336,10 +337,10 @@ fn bench_asian_option_mc(c: &mut Criterion) {
                         let maturity = option.day_count.year_fraction(as_of, option.expiry, DayCountContext::default()).expect("Asian maturity");
                         let required_times = future_times(&option.fixing_dates, option.day_count, as_of);
                         let base_steps = ((maturity * config.steps_per_year).round() as usize).max(config.min_steps);
-                        let grid = TimeGrid::uniform_with_required_times(maturity, base_steps as f64 / maturity, base_steps, &required_times).expect("Asian fixing grid");
+                        let grid = TimeGrid::uniform_with_required_times(maturity, base_steps, &required_times).expect("Asian fixing grid");
                         assert_eq!(grid.num_steps(), expected_steps);
                         let fixing_steps: Vec<usize> = required_times.iter().map(|required| {
-                            grid.times().iter().position(|time| (time - required).abs() < 1e-10).expect("exact fixing step")
+                            grid.get_index(*required).expect("exact fixing step")
                         }).collect();
                         serde_json::json!({
                             "fixture": {

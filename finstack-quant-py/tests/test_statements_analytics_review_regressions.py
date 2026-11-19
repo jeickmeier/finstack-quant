@@ -152,7 +152,7 @@ def test_growth_terminal_rejects_annual_identifier_with_stub_dates() -> None:
         "meta": {"currency": "USD"},
         "schema_version": 1,
     }
-    with pytest.raises(ValueError, match="differ from the calendar"):
+    with pytest.raises(ValueError, match="calendar bounds"):
         evaluate_dcf(
             json.dumps(model),
             {
@@ -198,7 +198,7 @@ def test_growth_terminal_uses_full_year_across_half_year_periods() -> None:
         return result.terminal_value_pv.amount
 
     # Annual identifiers on half-year intervals are not a canonical plan.
-    with pytest.raises(ValueError, match="differ from the calendar"):
+    with pytest.raises(ValueError, match="calendar bounds"):
         terminal_pv("2024", "2025")
     # Terminal flow 200 = both half-years; TV = 200 * 1.02 / (0.10 - 0.02),
     # discounted from the end of 2025H1 at the valuation's own convention.

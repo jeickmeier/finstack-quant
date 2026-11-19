@@ -72,7 +72,8 @@ fn bench_sabr_slice(c: &mut Criterion) {
         .build()
         .unwrap();
     let market = MarketContext::new()
-        .insert(disc)
+        .try_insert(disc)
+        .expect("insert market curve")
         .insert_price(
             "SPY",
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)

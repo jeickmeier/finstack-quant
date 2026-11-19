@@ -66,7 +66,9 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
     let currency = Currency::JPY;
 
     let disc = create_test_discount_curve(base);
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let mut quotes = vec![
         MarketQuote::Cds(CdsQuote::CdsParSpread {
@@ -199,12 +201,14 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         recipe.spread_risk_inputs()[0].pillar_time
     );
 
+    let mut mismatched_cal = recipe.calibration_inputs().to_vec();
     let mut mismatched_risk = recipe.spread_risk_inputs().to_vec();
+    mismatched_cal[0].pillar_time += 0.25;
     mismatched_risk[0].pillar_time += 0.25;
     let mismatched_recipe =
         finstack_quant_core::market_data::term_structures::HazardCalibrationRecipe::new(
             recipe.hazard_params().clone(),
-            recipe.calibration_inputs().to_vec(),
+            mismatched_cal,
             mismatched_risk,
             recipe.calibration_config().clone(),
         )
@@ -405,7 +409,9 @@ fn hazard_calibration_rejects_zero_spread() {
     let currency = Currency::USD;
 
     let disc = create_test_discount_curve(base);
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let quotes = vec![MarketQuote::Cds(CdsQuote::CdsParSpread {
         id: QuoteId::new(format!(
@@ -478,7 +484,9 @@ fn hazard_calibration_rejects_negative_spread() {
     let currency = Currency::USD;
 
     let disc = create_test_discount_curve(base);
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let quotes = vec![MarketQuote::Cds(CdsQuote::CdsParSpread {
         id: QuoteId::new(format!(
@@ -551,7 +559,9 @@ fn hazard_calibration_rejects_non_standard_upfront_running_coupon() {
     let currency = Currency::USD;
 
     let disc = create_test_discount_curve(base);
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let quotes = vec![MarketQuote::Cds(CdsQuote::CdsUpfront {
         id: QuoteId::new("CDS-UPFRONT-250BP"),
@@ -624,7 +634,9 @@ fn hazard_calibration_handles_extreme_high_spread() {
     let currency = Currency::USD;
 
     let disc = create_test_discount_curve(base);
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let quotes = vec![
         MarketQuote::Cds(CdsQuote::CdsParSpread {
@@ -739,7 +751,9 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
     let currency = Currency::USD;
 
     let disc = create_test_discount_curve(base);
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let quotes = vec![
         MarketQuote::Cds(CdsQuote::CdsParSpread {
@@ -935,7 +949,9 @@ fn hazard_calibration_reprices_par_spread() {
     let maturity = Date::from_calendar_date(2026, Month::March, 20).unwrap();
 
     let disc = create_test_discount_curve(base);
-    let source_market = MarketContext::new().insert(disc);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let cds_quote = CdsQuote::CdsParSpread {
         id: QuoteId::new("CDS-1Y"),

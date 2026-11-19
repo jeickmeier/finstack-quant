@@ -531,8 +531,12 @@ fn test_metrics_based_rates_bucketed_dv01() {
             .with_discount_curves(&["USD-OIS"]),
     );
 
-    let market_t0 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t0, 0.02));
-    let market_t1 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201));
+    let market_t0 = MarketContext::new()
+        .try_insert(make_flat_curve("USD-OIS", as_of_t0, 0.02))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201))
+        .expect("insert market curve");
 
     let mut measures_t0 = IndexMap::new();
     measures_t0.insert(MetricId::custom("bucketed_dv01::USD-OIS::5y"), -400.0);
@@ -587,11 +591,15 @@ fn inflation_attribution_uses_only_declared_market_dependencies() {
             .expect("inflation curve")
     };
     let market_t0 = MarketContext::new()
-        .insert(curve("US-CPI", 120.0))
-        .insert(curve("EU-HICP", 120.0));
+        .try_insert(curve("US-CPI", 120.0))
+        .expect("insert market curve")
+        .try_insert(curve("EU-HICP", 120.0))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(curve("US-CPI", 120.12))
-        .insert(curve("EU-HICP", 180.0));
+        .try_insert(curve("US-CPI", 120.12))
+        .expect("insert market curve")
+        .try_insert(curve("EU-HICP", 180.0))
+        .expect("insert market curve");
 
     let mut measures = IndexMap::new();
     measures.insert(MetricId::Inflation01, 100.0);
@@ -784,22 +792,26 @@ fn credit_nonstandard_buckets_all_contribute_to_public_attribution() {
         Money::from((100_000_i64, Currency::USD)),
         &["HZ"],
     ));
-    let opening = MarketContext::new().insert(exact_credit_recipe_curve(
-        base,
-        &[
-            (p1, "CDS-1Y", 100.0),
-            (p4, "CDS-4Y", 100.0),
-            (p9, "CDS-9Y", 100.0),
-        ],
-    ));
-    let closing = MarketContext::new().insert(exact_credit_recipe_curve(
-        base,
-        &[
-            (p1, "CDS-1Y", 110.0),
-            (p4, "CDS-4Y", 110.0),
-            (p9, "CDS-9Y", 110.0),
-        ],
-    ));
+    let opening = MarketContext::new()
+        .try_insert(exact_credit_recipe_curve(
+            base,
+            &[
+                (p1, "CDS-1Y", 100.0),
+                (p4, "CDS-4Y", 100.0),
+                (p9, "CDS-9Y", 100.0),
+            ],
+        ))
+        .expect("insert market curve");
+    let closing = MarketContext::new()
+        .try_insert(exact_credit_recipe_curve(
+            base,
+            &[
+                (p1, "CDS-1Y", 110.0),
+                (p4, "CDS-4Y", 110.0),
+                (p9, "CDS-9Y", 110.0),
+            ],
+        ))
+        .expect("insert market curve");
     // Verify exact intensity-diff / Hazard01 also works cleanly without fabricated par spreads
     let intensity_only = HazardCurve::builder("HZ-DIRECT")
         .base_date(base)
@@ -814,8 +826,12 @@ fn credit_nonstandard_buckets_all_contribute_to_public_attribution() {
     assert!(
         measure_credit_curve_shift_bp(
             "HZ-DIRECT",
-            &MarketContext::new().insert(intensity_only),
-            &MarketContext::new().insert(intensity_bumped),
+            &MarketContext::new()
+                .try_insert(intensity_only)
+                .expect("insert market curve"),
+            &MarketContext::new()
+                .try_insert(intensity_bumped)
+                .expect("insert market curve"),
         )
         .is_err(),
         "uncalibrated HazardCurve must not report fabricated par-spread shifts"
@@ -965,11 +981,15 @@ fn credit_duplicate_display_labels_match_exact_quote_id_and_pillar() {
             -40.0,
         ),
     ]);
-    let opening = MarketContext::new().insert(source);
-    let closing = MarketContext::new().insert(exact_credit_recipe_curve(
-        base,
-        &[(first, "FIRST", 110.0), (second, "SECOND", 220.0)],
-    ));
+    let opening = MarketContext::new()
+        .try_insert(source)
+        .expect("insert market curve");
+    let closing = MarketContext::new()
+        .try_insert(exact_credit_recipe_curve(
+            base,
+            &[(first, "FIRST", 110.0), (second, "SECOND", 220.0)],
+        ))
+        .expect("insert market curve");
     let curves = [CurveId::new("HZ")];
     let matched = extract_credit_keyrates(&measures, &curves, &opening, &closing, &provider)
         .expect("exact identities match");
@@ -1041,18 +1061,22 @@ fn credit_duplicate_display_labels_match_exact_quote_id_and_pillar() {
     let mut incomplete = measures.clone();
     incomplete.shift_remove_index(1);
     assert!(extract_credit_keyrates(&incomplete, &curves, &opening, &closing, &provider).is_err());
-    let wrong_id = MarketContext::new().insert(exact_credit_recipe_curve(
-        base,
-        &[(first, "FIRST", 110.0), (second, "OTHER", 220.0)],
-    ));
+    let wrong_id = MarketContext::new()
+        .try_insert(exact_credit_recipe_curve(
+            base,
+            &[(first, "FIRST", 110.0), (second, "OTHER", 220.0)],
+        ))
+        .expect("insert market curve");
     assert!(extract_credit_keyrates(&measures, &curves, &opening, &wrong_id, &provider).is_err());
-    let wrong_pillar = MarketContext::new().insert(exact_credit_recipe_curve(
-        base,
-        &[
-            (first, "FIRST", 110.0),
-            (date!(2026 - 09 - 20), "SECOND", 220.0),
-        ],
-    ));
+    let wrong_pillar = MarketContext::new()
+        .try_insert(exact_credit_recipe_curve(
+            base,
+            &[
+                (first, "FIRST", 110.0),
+                (date!(2026 - 09 - 20), "SECOND", 220.0),
+            ],
+        ))
+        .expect("insert market curve");
     assert!(
         extract_credit_keyrates(&measures, &curves, &opening, &wrong_pillar, &provider).is_err()
     );
@@ -1080,20 +1104,22 @@ fn credit_rejects_invalid_serialized_closing_pillar() {
         -1.0,
     )]);
 
-    // Stored coordinates still match the opening quote, but the typed closing
-    // quote now resolves to another contractual date. Core storage validation
-    // cannot interpret the calibration-owned quote payload.
+    // Both closing quotes agree with each other but resolve to a different
+    // date from their stored pillar. Attribution must reject that binding.
     let closing_recipe = closing_curve.hazard_calibration().expect("closing recipe");
+    let mut calibration_inputs = closing_recipe.calibration_inputs().to_vec();
     let mut spread_risk_inputs = closing_recipe.spread_risk_inputs().to_vec();
-    spread_risk_inputs[0].quote["pillar"] =
-        serde_json::to_value(Pillar::Date(date!(2026 - 06 - 20))).expect("pillar payload");
+    for input in [&mut calibration_inputs[0], &mut spread_risk_inputs[0]] {
+        input.quote["pillar"] =
+            serde_json::to_value(Pillar::Date(date!(2026 - 06 - 20))).expect("pillar payload");
+    }
     let recipe = finstack_quant_core::market_data::term_structures::HazardCalibrationRecipe::new(
         closing_recipe.hazard_params().clone(),
-        closing_recipe.calibration_inputs().to_vec(),
+        calibration_inputs,
         spread_risk_inputs,
         closing_recipe.calibration_config().clone(),
     )
-    .expect("core stores the opaque payload");
+    .expect("matching closing contracts");
     let invalid_closing = HazardCurve::builder("HZ")
         .base_date(base)
         .day_count(closing_curve.day_count())
@@ -1102,8 +1128,12 @@ fn credit_rejects_invalid_serialized_closing_pillar() {
         .hazard_calibration(recipe)
         .build()
         .expect("core stores the opaque payload");
-    let opening = MarketContext::new().insert(opening_curve);
-    let closing = MarketContext::new().insert(invalid_closing);
+    let opening = MarketContext::new()
+        .try_insert(opening_curve)
+        .expect("insert market curve");
+    let closing = MarketContext::new()
+        .try_insert(invalid_closing)
+        .expect("insert market curve");
     let error = extract_credit_keyrates(
         &measures,
         &[CurveId::new("HZ")],
@@ -1270,8 +1300,10 @@ fn hw1f_cap_surface_shock_does_not_affect_explicit_parameter_pricing() {
         .build()
         .expect("surface");
     let market_t0 = MarketContext::new()
-        .insert(discount)
-        .insert(forward)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
         .insert_surface(surface);
     let market_t1 = market_t0
         .bump([MarketBump::VolSurface {
@@ -1557,10 +1589,12 @@ fn test_cross_gamma_credit_vol_pairs_bp_and_vol_points() {
     };
 
     let market_t0 = MarketContext::new()
-        .insert(hazard(as_of_t0, 0.02))
+        .try_insert(hazard(as_of_t0, 0.02))
+        .expect("insert market curve")
         .insert_surface(surface(0.20));
     let market_t1 = MarketContext::new()
-        .insert(hazard(as_of_t1, 0.03))
+        .try_insert(hazard(as_of_t1, 0.03))
+        .expect("insert market curve")
         .insert_surface(surface(0.21));
 
     // The same signed par-spread move the attribution preamble measures.
@@ -1733,8 +1767,12 @@ fn credit_rejects_unmeasurable_supplied_keyrate_curves() {
     };
     // MISSING-HAZ is deliberately absent from both markets: its per-tenor
     // shift is unmeasurable, so the key-rate loop skips it.
-    let market_t0 = MarketContext::new().insert(hazard(as_of_t0, 0.02));
-    let market_t1 = MarketContext::new().insert(hazard(as_of_t1, 0.03));
+    let market_t0 = MarketContext::new()
+        .try_insert(hazard(as_of_t0, 0.02))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(hazard(as_of_t1, 0.03))
+        .expect("insert market curve");
 
     let aggregate_cs01 = -50.0_f64;
     let mut measures_t0 = IndexMap::new();
@@ -1979,10 +2017,12 @@ fn test_metrics_based_rates_keyrate_aware_for_steepener() {
     let t1_rates = [
         0.029, 0.029, 0.029, 0.0295, 0.030, 0.0305, 0.031, 0.031, 0.031,
     ];
-    let market_t0 =
-        MarketContext::new().insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates));
-    let market_t1 =
-        MarketContext::new().insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates));
+    let market_t0 = MarketContext::new()
+        .try_insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates))
+        .expect("insert market curve");
 
     // Per-tenor key-rate DV01: concentrated at the LONG end (10y/30y),
     // so the steepener's long-end rise dominates the attributed P&L.
@@ -2080,10 +2120,12 @@ fn test_rates_curve_in_both_discount_and_forward_lists_counts_once() {
     let t1_rates = [
         0.029, 0.029, 0.029, 0.0295, 0.030, 0.0305, 0.031, 0.031, 0.031,
     ];
-    let market_t0 =
-        MarketContext::new().insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates));
-    let market_t1 =
-        MarketContext::new().insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates));
+    let market_t0 = MarketContext::new()
+        .try_insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates))
+        .expect("insert market curve");
 
     let mut measures_t0 = IndexMap::new();
     for (label, dv01) in [
@@ -2162,10 +2204,12 @@ fn test_rates_convexity_uses_dv01_weighted_average_shift() {
     let t1_rates = [
         0.029, 0.029, 0.029, 0.0295, 0.030, 0.0305, 0.031, 0.031, 0.031,
     ];
-    let market_t0 =
-        MarketContext::new().insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates));
-    let market_t1 =
-        MarketContext::new().insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates));
+    let market_t0 = MarketContext::new()
+        .try_insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates))
+        .expect("insert market curve");
 
     let dv01s = [
         ("3m", -1.0),
@@ -2264,8 +2308,12 @@ fn nan_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
             .with_discount_curves(&["USD-OIS"]),
     );
 
-    let market_t0 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t0, 0.02));
-    let market_t1 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201));
+    let market_t0 = MarketContext::new()
+        .try_insert(make_flat_curve("USD-OIS", as_of_t0, 0.02))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201))
+        .expect("insert market curve");
 
     // Inject NaN as the Dv01 sensitivity — simulates an overflowed or
     // corrupt Greek value reaching the attribution engine.
@@ -2323,8 +2371,12 @@ fn inf_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
         TestInstrument::new("INF-DV01", Money::from((100000_i64, Currency::USD)))
             .with_discount_curves(&["USD-OIS"]),
     );
-    let market_t0 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t0, 0.02));
-    let market_t1 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201));
+    let market_t0 = MarketContext::new()
+        .try_insert(make_flat_curve("USD-OIS", as_of_t0, 0.02))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201))
+        .expect("insert market curve");
 
     let mut measures_t0 = IndexMap::new();
     measures_t0.insert(MetricId::Dv01, f64::INFINITY);

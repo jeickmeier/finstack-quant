@@ -1,14 +1,22 @@
 # FEATURES-010: Unannualized rolling period Sharpe feature
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** The unannualized period estimator is implemented. Zero-dispersion availability and stable ratio evaluation require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** An independent period-return example checked the formula. Rust fixtures were inspected. Zero dispersion and extreme-scale arithmetic still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Use comparable per-period returns in the inclusive trailing window. Divide arithmetic mean excess return by sample standard deviation. The finite risk_free control uses the same period and units as the input and defaults to zero. The caller supplies the period basis. The result is dimensionless and unannualized.
+2. Require at least max(min_periods, 2) finite returns. A missing current row can receive a result when the window qualifies. Return missing for insufficient history or a genuinely constant window. A varying eligible sample with mean equal to risk_free gives a valid zero.
+3. Evaluate the ratio in scaled coordinates. Preserve a representable ratio when the numerator or standard deviation would overflow if materialized separately. Fail the call when arithmetic cannot produce a valid result under [FEATURES-002](02-parameters-missing-and-failure.md).
+
+For returns of 1%, 2%, and 3% and a per-period risk-free rate of 0.5%, the result is 1.5.
+
+## Observed scope and selection
 
 `RollingSharpe` is a research-period feature, distinct from the analytics Sharpe API. `window` defaults to 1, `min_periods` to window, and effective finite count is at least two. `risk_free` defaults to 0 and must be finite; it is in the same per-period return units as the observations, not an annual cash rate. The kernel does not verify that numeric input actually represents returns.
 
@@ -30,5 +38,5 @@ No standalone annualized-performance conclusion follows from this output.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

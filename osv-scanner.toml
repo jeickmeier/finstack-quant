@@ -1,5 +1,11 @@
 # OSV-Scanner configuration for finstack-quant workspace.
 # See https://google.github.io/osv-scanner/configuration/
 
-# Ignored advisories. Each entry MUST include a reason and a reviewDate so we
-# can re-check periodically and drop the ignore once upstream fixes land.
+# Ignored advisories. Each entry MUST include a reason and an ignoreUntil
+# review date so we can re-check periodically and drop the ignore once upstream
+# fixes land.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"
+reason = "Chrono is transitively required by Arrow 57.3.2 for the Python Arrow bindings; the advisory has no safe upgrade. Reassess Arrow support by 2027-02-17."
+ignoreUntil = 2027-02-17

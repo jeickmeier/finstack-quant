@@ -142,6 +142,7 @@ fn basis_swap_exposes_cashflow_provider_bridge() {
     let primary_leg = finstack_quant_valuations::instruments::FloatLegSpec {
         end_of_month: false,
         fixing_calendar_id: None,
+        index_id: "3M-SOFR".into(),
         forward_curve_id: CurveId::new("3M-SOFR"),
         discount_curve_id: CurveId::new("OIS"),
         start,
@@ -157,6 +158,7 @@ fn basis_swap_exposes_cashflow_provider_bridge() {
         compounding: Default::default(),
     };
     let reference_leg = finstack_quant_valuations::instruments::FloatLegSpec {
+        index_id: "6M-SOFR".into(),
         forward_curve_id: CurveId::new("6M-SOFR"),
         ..primary_leg.clone()
     };
@@ -186,6 +188,7 @@ fn xccy_swap_exposes_cashflow_provider_bridge() {
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::PayReceive::Receive,
         leg: FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -207,6 +210,7 @@ fn xccy_swap_exposes_cashflow_provider_bridge() {
         notional: Money::new(900_000.0, Currency::EUR).expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::PayReceive::Pay,
         leg: FloatLegSpec {
+            index_id: "EUR-EURIBOR-3M".into(),
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
             start,

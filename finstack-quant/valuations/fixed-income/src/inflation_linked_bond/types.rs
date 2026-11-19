@@ -988,7 +988,8 @@ mod tests {
             .build()
             .expect("curve");
         let market = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_inflation_index(index);
         assert_eq!(
             bond.index_ratio_from_market(date!(2025 - 06 - 01), &market, date!(2025 - 04 - 14))
@@ -1036,7 +1037,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let payment = date!(2026 - 01 - 01);
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 InflationCurve::builder("US-CPI")
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
@@ -1046,6 +1047,7 @@ mod tests {
                     .build()
                     .expect("curve"),
             )
+            .expect("insert market curve")
             .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD));
         assert!(
             (bond
@@ -1076,8 +1078,9 @@ mod tests {
                 .payment_index_ratio(payment, &market, as_of, true)
                 .expect("floor");
             // ATM lognormal ratio: E[max(X,1)] = 2 Phi(sigma/2).
-            let expected =
-                2.0 * finstack_quant_core::math::special_functions::norm_cdf(sigma / 2.0);
+            let expected = 2.0
+                * finstack_quant_core::math::special_functions::norm_cdf(sigma / 2.0)
+                    .expect("valid normal variate");
             assert!((ratio - expected).abs() < 1e-12, "{ratio} vs {expected}");
         }
     }
@@ -1416,8 +1419,10 @@ mod tests {
             .build()
             .expect("inflation curve should build");
         MarketContext::new()
-            .insert(discount)
-            .insert(inflation)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(inflation)
+            .expect("insert market curve")
             .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD))
             .insert_surface(
                 finstack_quant_core::market_data::surfaces::VolSurface::builder("CPI-ZERO-VOL")
@@ -1542,7 +1547,8 @@ mod tests {
             .build()
             .expect("projected CPI");
         let market = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_inflation_index(index);
 
         let ratio = bond
@@ -1571,7 +1577,8 @@ mod tests {
             .build()
             .expect("inflation curve");
         let market = MarketContext::new()
-            .insert(inflation)
+            .try_insert(inflation)
+            .expect("insert market curve")
             .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD));
 
         let adjusted = d(2034, Month::January, 16);
@@ -1733,7 +1740,8 @@ mod tests {
         }])
         .unwrap();
         let market = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_inflation_index(index);
         let hybrid = bond
             .index_ratio_from_market(date, &market, d(2024, Month::September, 1))
@@ -1823,7 +1831,7 @@ mod tests {
         for forward in [0.8_f64, 1.0, 1.2] {
             for sigma in [0.05_f64, 0.2, 0.5] {
                 let market = MarketContext::new()
-                    .insert(
+                    .try_insert(
                         InflationCurve::builder("US-CPI")
                             .base_date(as_of)
                             .day_count(DayCount::Act365F)
@@ -1832,7 +1840,7 @@ mod tests {
                             .knots([(0.0, 100.0 * forward), (2.0, 100.0 * forward)])
                             .build()
                             .unwrap(),
-                    )
+                    ).expect("insert market curve")
                     .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD))
                     .insert_surface(
                         VolSurface::builder("RATIO-VOL")

@@ -3,7 +3,14 @@
   "name": "National Stock Exchange of India (NSE) Holiday Calendar",
   "ignore_weekends": false,
   "supported_years": { "from_year": 2024, "to_year": 2026 },
-  "comment": "Recurring Gregorian/statutory rules apply every year. Moving festivals use published NSE circular dates (exact_date) for 2024-2026 only (2024: NSE/CMTR/59722; 2025: NSE/CMTR/65587; 2026: NSE/CMTR/71775). Years outside that verified window have only the statutory/Gregorian rules. Full-day model: Diwali Laxmi Pujan regular sessions are holidays; Muhurat is not modeled. Weekend statutory dates are not observed on an adjacent weekday.",
+  "comment": "Recurring Gregorian/statutory rules apply every year. Moving festivals use published NSE circular dates (exact_date) for 2024-2026 only (2024: NSE/CMTR/59722; 2025: NSE/CMTR/65587; 2026: NSE/CMTR/71775), with dated election closures from exchange amendments, including NSE/CMTR/61518 and NSE/CMTR/72260. Years outside that verified window have only the statutory/Gregorian rules. Full-day model: Diwali Laxmi Pujan regular sessions are holidays; Muhurat is not modeled. Weekend statutory dates are not observed on an adjacent weekday.",
+  "open_dates": [
+    {"year": 2024, "month": 1, "day": 20, "notice": "NSE/MSD/60340"},
+    {"year": 2024, "month": 3, "day": 2, "notice": "NSE/MSD/60677"},
+    {"year": 2024, "month": 5, "day": 18, "notice": "NSE/MSD/61893"},
+    {"year": 2025, "month": 2, "day": 1, "notice": "NSE/CMTR/65729"},
+    {"year": 2026, "month": 2, "day": 1, "notice": "NSE/CMTR/72349"}
+  ],
   "rules": [
     { "type": "fixed", "name": "Republic Day", "month": "january", "day": 26, "observed": "none" },
     { "type": "fixed", "name": "Maharashtra Day", "month": "may", "day": 1, "observed": "none" },
@@ -12,18 +19,21 @@
     { "type": "fixed", "name": "Christmas", "month": "december", "day": 25, "observed": "none" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
 
+    { "type": "exact_date", "name": "Maharashtra public holiday", "year": 2024, "month": "january", "day": 22 },
     { "type": "exact_date", "name": "Mahashivratri 2024", "year": 2024, "month": "march", "day": 8 },
     { "type": "exact_date", "name": "Holi 2024", "year": 2024, "month": "march", "day": 25 },
     { "type": "exact_date", "name": "Id-Ul-Fitr 2024", "year": 2024, "month": "april", "day": 11 },
     { "type": "exact_date", "name": "Ambedkar Jayanti 2024", "year": 2024, "month": "april", "day": 14 },
     { "type": "exact_date", "name": "Ram Navami 2024", "year": 2024, "month": "april", "day": 17 },
     { "type": "exact_date", "name": "Mahavir Jayanti 2024", "year": 2024, "month": "april", "day": 21 },
+    { "type": "exact_date", "name": "Lok Sabha election", "year": 2024, "month": "may", "day": 20 },
     { "type": "exact_date", "name": "Bakri Id 2024", "year": 2024, "month": "june", "day": 17 },
     { "type": "exact_date", "name": "Muharram 2024", "year": 2024, "month": "july", "day": 17 },
     { "type": "exact_date", "name": "Ganesh Chaturthi 2024", "year": 2024, "month": "september", "day": 7 },
     { "type": "exact_date", "name": "Dussehra 2024", "year": 2024, "month": "october", "day": 12 },
     { "type": "exact_date", "name": "Diwali Laxmi Pujan 2024", "year": 2024, "month": "november", "day": 1 },
     { "type": "exact_date", "name": "Diwali-Balipratipada 2024", "year": 2024, "month": "november", "day": 2 },
+    { "type": "exact_date", "name": "Maharashtra Assembly election", "year": 2024, "month": "november", "day": 20 },
     { "type": "exact_date", "name": "Guru Nanak Jayanti 2024", "year": 2024, "month": "november", "day": 15 },
 
     { "type": "exact_date", "name": "Mahashivratri 2025", "year": 2025, "month": "february", "day": 26 },
@@ -39,6 +49,7 @@
     { "type": "exact_date", "name": "Diwali-Balipratipada 2025", "year": 2025, "month": "october", "day": 22 },
     { "type": "exact_date", "name": "Guru Nanak Jayanti 2025", "year": 2025, "month": "november", "day": 5 },
 
+    { "type": "exact_date", "name": "Maharashtra municipal election", "year": 2026, "month": "january", "day": 15 },
     { "type": "exact_date", "name": "Mahashivratri 2026", "year": 2026, "month": "february", "day": 15 },
     { "type": "exact_date", "name": "Holi 2026", "year": 2026, "month": "march", "day": 3 },
     { "type": "exact_date", "name": "Id-Ul-Fitr 2026", "year": 2026, "month": "march", "day": 21 },

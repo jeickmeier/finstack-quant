@@ -638,9 +638,7 @@ impl StatementResult {
     /// hand-built result without a period plan.
     #[must_use]
     pub fn get_periods(&self) -> &[finstack_quant_core::dates::Period] {
-        self.periods
-            .as_ref()
-            .map_or(&[], |plan| plan.periods.as_slice())
+        self.periods.as_ref().map_or(&[], |plan| plan.get_periods())
     }
 
     /// The numeric value of a cell: a scalar as stored, money as the nearest

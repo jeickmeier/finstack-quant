@@ -265,7 +265,7 @@ pub(crate) fn workout_dirty_target(
 ///     .base_date(as_of)
 ///     .knots([(0.0, 1.0), (10.0, 0.70)])
 ///     .build()?;
-/// let market = MarketContext::new().insert(curve);
+/// let market = MarketContext::new().try_insert(curve).expect("insert market curve");
 ///
 /// let ladder = bond_workout_ladder(&bond, &market, as_of)?;
 /// assert_eq!(ladder.rows.iter().filter(|row| row.is_worst).count(), 1);

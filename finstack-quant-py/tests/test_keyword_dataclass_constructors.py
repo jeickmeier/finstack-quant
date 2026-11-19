@@ -132,9 +132,13 @@ def _tranches() -> TrancheStructure:
 
 CASES: dict[str, Any] = {
     "FloatingRateSpec.min": lambda: FloatingRateSpec(
-        forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+        index_id="USD-SOFR-3M",
+        forward_curve_id="USD-SOFR-3M",
+        spread_bp=Decimal("200"),
+        reset_frequency=Tenor.parse("3M"),
     ),
     "FloatingRateSpec.full": lambda: FloatingRateSpec(
+        index_id="USD-SOFR",
         forward_curve_id="USD-SOFR",
         spread_bp="12.5",
         reset_frequency=Tenor.parse("1M"),
@@ -299,6 +303,7 @@ CASES: dict[str, Any] = {
     ),
     "FloatLegSpec.min": lambda: FloatLegSpec(
         discount_curve_id="USD-OIS",
+        index_id="USD-SOFR-3M",
         forward_curve_id="USD-SOFR-3M",
         spread_bp="0",
         frequency=Tenor.quarterly(),
@@ -308,6 +313,7 @@ CASES: dict[str, Any] = {
     ),
     "FloatLegSpec.full": lambda: FloatLegSpec(
         discount_curve_id="USD-OIS",
+        index_id="USD-SOFR",
         forward_curve_id="USD-SOFR",
         spread_bp="12.5",
         frequency=Tenor.annual(),

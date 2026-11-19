@@ -55,11 +55,25 @@ fn merton_default_probabilities_match_the_scalar_method() {
         .default_probabilities(JsValue::from(js_sys::Float64Array::from(
             [1.0, 5.0].as_slice(),
         )))
-        .expect("grid");
+        .expect("valid model horizons");
     let native = native_merton();
     assert_eq!(grid.len(), 2);
-    assert!((grid[0] - native.default_probability(1.0)).abs() < 1e-12);
-    assert!((grid[1] - native.default_probability(5.0)).abs() < 1e-12);
+    assert!(
+        (grid[0]
+            - native
+                .default_probability(1.0)
+                .expect("valid model horizon"))
+        .abs()
+            < 1e-12
+    );
+    assert!(
+        (grid[1]
+            - native
+                .default_probability(5.0)
+                .expect("valid model horizon"))
+        .abs()
+            < 1e-12
+    );
 }
 
 #[wasm_bindgen_test]

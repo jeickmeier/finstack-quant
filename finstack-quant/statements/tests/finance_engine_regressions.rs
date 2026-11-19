@@ -108,7 +108,11 @@ fn prepared_plan_rejects_embedded_identity_and_timeline_mutations() {
     assert!(evaluator.evaluate_prepared(&changed_id, &plan).is_err());
 
     let mut changed_period = model.clone();
-    changed_period.periods.periods[0].end = changed_period.periods.periods[0].start;
+    let mut rows = model.periods.to_vec();
+    rows[0].is_actual = !rows[0].is_actual;
+    changed_period.periods =
+        finstack_quant_core::dates::PeriodPlan::try_new(model.periods.get_calendar(), rows)
+            .unwrap();
     assert!(evaluator.evaluate_prepared(&changed_period, &plan).is_err());
 }
 
@@ -406,6 +410,10 @@ fn prepared_plans_are_reused_only_for_payload_edits_in_existing_slots() {
     rejected(&mut evaluator, &capital, "a changed capital structure");
 
     let mut timeline = model.clone();
-    timeline.periods.periods[1].is_actual = true;
+    let mut rows = timeline.periods.to_vec();
+    rows[1].is_actual = true;
+    timeline.periods =
+        finstack_quant_core::dates::PeriodPlan::try_new(timeline.periods.get_calendar(), rows)
+            .unwrap();
     rejected(&mut evaluator, &timeline, "a changed timeline");
 }

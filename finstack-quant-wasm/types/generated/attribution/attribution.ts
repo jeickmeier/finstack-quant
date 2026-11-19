@@ -1434,7 +1434,7 @@ export type FloatingLegCompounding =
  *
  * The cashflow builder consults it whenever projecting a floating coupon
  * fails: a missing forward curve, a pre-cutoff observation with no
- * `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+ * `FIXING:{index_id}` series supplied, a reset before the curve base
  * date, or an overnight or day-count projection error. It never fills a gap
  * in recorded history: when a curve and a fixing series are both supplied, a
  * missing pre-cutoff observation is an error under every policy.
@@ -1530,7 +1530,8 @@ export type CFKind =
   | "variation_margin_pay"
   | "margin_interest"
   | "collateral_substitution_in"
-  | "collateral_substitution_out";
+  | "collateral_substitution_out"
+  | "derivative_settlement";
 /**
  * Meaning of the emitted schedule relative to pricing and waterfall policy.
  */
@@ -3076,17 +3077,6 @@ export type InflationVolatilityExpiry = "reference_date" | "publication_date";
  */
 export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
-/**
- * Finite JSON number greater than or equal to zero.
- */
-export type NonNegativeF64Wire = number;
-/**
  * Settlement type for options
  */
 export type SettlementType = "physical" | "cash";
@@ -3441,6 +3431,13 @@ export type BarrierDirection = "up" | "down";
  * Touch type: one-touch (pays if barrier is hit) or no-touch (pays if not hit).
  */
 export type TouchType = "one_touch" | "no_touch";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ */
+export type PositiveF64Wire = number;
 /**
  * Standard commodity market conventions by product type.
  *
@@ -4517,6 +4514,7 @@ export type CurveState =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
       type: "inflation";
     }
   | {
@@ -4530,6 +4528,10 @@ export type CurveState =
        * Base date
        */
       base: DateWire;
+      /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
       /**
        * Day count convention
        */
@@ -4551,13 +4553,9 @@ export type CurveState =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
       type: "price";
     }
   | {
@@ -4806,6 +4804,12 @@ export type RateCalibrationCurveRole =
  */
 export type Seniority = "senior_secured" | "senior" | "subordinated" | "junior";
 /**
+ * Level family a [`PriceCurve`] represents.
+ *
+ * The kind determines level validation and the typed market-context lookup.
+ */
+export type PriceCurveKind = "price" | "vol_index";
+/**
  * Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters.
  */
 export type NelsonSiegelModel =
@@ -4824,34 +4828,6 @@ export type NelsonSiegelModel =
       tau1: number;
       tau2: number;
       variant: "nss";
-    };
-/**
- * Type of dividend event.
- *
- * Distinguishes between cash payments, stock distributions, and continuous
- * yield approximations used in different pricing models.
- *
- * # Variants
- *
- * - **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)
- * - **Stock**: Share distribution (less common, complicates option pricing)
- * - **Yield**: Continuous approximation for analytical models
- */
-export type DividendKind =
-  | {
-      cash: Money;
-    }
-  | {
-      yield: number;
-    }
-  | {
-      stock: {
-        /**
-         * Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.
-         */
-        ratio: number;
-        [k: string]: unknown;
-      };
     };
 /**
  * At-the-money strike convention on [`FxDeltaVolSurface`].
@@ -5532,6 +5508,10 @@ export interface ModelConfig {
    */
   asw_forward_curve_id?: Id | null;
   /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: Id | null;
+  /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
    *
@@ -5783,11 +5763,17 @@ export interface ModelConfig {
   vol_surface_extrapolation?: VolSurfaceExtrapolation;
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface PiecewiseConstantCurve {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Configuration for Monte Carlo PIK bond pricing.
@@ -7635,7 +7621,7 @@ export interface FloatingCouponSpec {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -7733,6 +7719,10 @@ export interface FloatingRateSpec {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: DecimalWire | null;
+  /**
+   * Contractual rate index used for historical observations in FIXING series.
+   */
+  index_id: Id;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -8000,6 +7990,10 @@ export interface CashFlowAccrual {
    * Contractual accrual-period end date.
    */
   end: DateWire;
+  /**
+   * Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.
+   */
+  nominal_dates?: DateWire[];
   /**
    * Projected index rate before spread, gearing, caps, or floors.
    * Serialization rejects non-finite rates instead of encoding them as absent.
@@ -11080,6 +11074,10 @@ export interface FloatLegSpec {
    */
   frequency: Tenor;
   /**
+   * Contractual observed index identifying historical rate publications.
+   */
+  index_id: Id;
+  /**
    * Payment lag in business days after period end (default: 0).
    *
    * Bloomberg OIS swaps typically use 2 business days payment lag.
@@ -11999,34 +11997,35 @@ export interface Swaption {
    */
   vol_model: VolatilityModel;
   /**
-   * Volatility surface ID for option pricing
+   * Volatility source ID for option pricing. A dated SABR cube needs an
+   * ACT/365F expiry clock anchored at the valuation date.
    */
   vol_surface_id: Id;
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface SabrParameters {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
-  alpha: PositiveF64Wire;
+  alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
-  beta: ClosedUnitIntervalF64Wire;
+  beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
-  nu: NonNegativeF64Wire;
+  nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
-  rho: CorrelationWire;
+  rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: PositiveF64Wire | null;
+  shift?: number | null;
 }
 /**
  * Bermudan swaption with multiple exercise dates.
@@ -14308,6 +14307,11 @@ export interface VarianceSwap {
    */
   open_series_id?: string | null;
   /**
+   * Contractual closing fixing immediately before the first Yang–Zhang target bar.
+   * Resolved exactly in the same close series as the target bars.
+   */
+  previous_close_date?: DateWire | null;
+  /**
    * Corporate-action policy applied to all historical price series.
    *
    * The selected policy is declarative: input series must already conform to
@@ -15339,6 +15343,11 @@ export interface FxVarianceSwap {
    */
   open_series_id?: string | null;
   /**
+   * Contractual closing fixing immediately before the first Yang–Zhang target bar.
+   * Resolved exactly in the same close series as the target bars.
+   */
+  previous_close_date?: DateWire | null;
+  /**
    * Quote-currency calendar used in the joint observation calendar.
    */
   quote_calendar_id: Id;
@@ -15943,7 +15952,10 @@ export interface CommodityForward {
    */
   settlement_days?: number | null;
   /**
-   * Optional spot price ID (for delta calculations).
+   * Optional observed spot identifier. At maturity the scalar is the delivery
+   * observation. After maturity use the exact delivery observation in the
+   * corresponding `FIXING:{spot_id}` series. Before maturity an explicitly
+   * identified spot can supply the cost-of-carry input if the forward curve is absent.
    */
   spot_id?: Id | null;
   /**
@@ -19823,7 +19835,7 @@ export interface CreditIndexState {
   recovery_rate: number;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface RateCalibrationRecipe {
   /**
@@ -19834,6 +19846,10 @@ export interface RateCalibrationRecipe {
    * Day count used for the curve's time axis.
    */
   curve_day_count: DayCount;
+  /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: RateCalibrationExecution | null;
   /**
    * Numerical calibration method.
    */
@@ -19850,6 +19866,48 @@ export interface RateCalibrationRecipe {
    * Discount/projection role and linked curve identifier.
    */
   role: RateCalibrationCurveRole;
+}
+/**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface RateCalibrationExecution {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: RateQuoteBinding[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface RateQuoteBinding {
+  /**
+   * Contractual maturity resolved using the instrument conventions.
+   */
+  pillar_date: DateWire;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
 }
 /**
  * Source interpolation and a single accumulated transformation, never a chain
@@ -19985,50 +20043,40 @@ export interface HazardConditionSource {
   knot_points: [number, number][];
 }
 /**
- * Dividend schedule for an equity or ETF underlying.
- *
- * Contains a time-ordered sequence of dividend events used for pricing equity
- * derivatives and calculating total return. The schedule can be referenced by
- * multiple instruments via its [`CurveId`] in the market context.
- *
- * # Usage in Pricing
- *
- * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
- * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
- * - **Dividend futures**: Sum dividends in contract period
- * - **Total return**: Include dividend reinvestment in performance
+ * Publication identity and units of an observed or projected inflation level.
  */
-export interface DividendSchedule {
+export interface InflationSeries {
   /**
-   * Quote currency for cash dividends (optional metadata).
+   * Published reference period and index scale, for example `1982-84=100`.
    */
-  currency?: Currency | null;
+  reference_base: string;
   /**
-   * Sorted events by date (ascending).
+   * True for seasonally adjusted levels and false for unadjusted levels.
    */
-  events: DividendEvent[];
+  seasonally_adjusted: boolean;
   /**
-   * Unique identifier of this schedule in the market context.
+   * Publisher-qualified identifier of the statistical series.
    */
-  id: Id;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
+  series_id: string;
 }
 /**
- * A dated dividend event.
+ * Validated distributions for one security, share basis and currency.
+ */
+export interface DividendSchedule {
+  currency: Currency;
+  events: DividendEvent[];
+  id: Id;
+  share_basis: string;
+  underlying: Id;
+}
+/**
+ * One gross cash distribution per entitled share on its schedule's share basis.
  */
 export interface DividendEvent {
-  /**
-   * Ex-dividend date.
-   */
-  date: DateWire;
-  /**
-   * Event kind.
-   */
-  kind: DividendKind;
-  [k: string]: unknown;
+  amount: Money;
+  event_id: string;
+  ex_date: DateWire;
+  pay_date: DateWire;
 }
 /**
  * Serializable state of an FxMatrix.
@@ -20273,6 +20321,7 @@ export interface InflationIndex {
    * Strictly ascending canonical monthly fixing observations.
    */
   observations: InflationObservation[];
+  series?: InflationSeries | null;
 }
 /**
  * One expected-release schedule assumption for a monthly CPI/RPI reference period.
@@ -20411,6 +20460,7 @@ export interface VolCube {
    * Option expiries in years, strictly increasing. Indexes the first axis.
    */
   expiries: number[];
+  expiry_clock?: VolatilityClock | null;
   /**
    * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
    */

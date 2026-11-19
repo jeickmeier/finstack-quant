@@ -279,13 +279,6 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZWG"
   | "ZWL";
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type D_73B92F56Cdc5Ce046018 = number;
-/**
  * Business day convention for payment dates
  */
 export type BusinessDayConvention =
@@ -364,6 +357,10 @@ export type Date3 = string;
  */
 export type Id4 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Spread in basis points added to the forward rate
  */
 export type Decimal1 = string;
@@ -374,7 +371,7 @@ export type Date4 = string;
 /**
  * Opaque string identifier.
  */
-export type Id5 = string;
+export type Id6 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -438,7 +435,7 @@ export interface D_818134538Ec82F6D27C9 {
    * Volatility model (Black or Normal)
    */
   vol_model: "black" | "normal";
-  vol_surface_id: Id5;
+  vol_surface_id: Id6;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -546,6 +543,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -803,11 +804,17 @@ export interface D_572Ad1Befb7D94914652 {
   vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface DCdb8Fddc0106047270C4 {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
@@ -1552,29 +1559,29 @@ export interface Money {
     | "ZWL";
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface DD09956C3320C77551Bb5 {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
   alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
   beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
   nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
   rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: D_73B92F56Cdc5Ce046018 | null;
+  shift?: number | null;
 }
 /**
  * Scenario-only pricing adjustments.
@@ -1738,6 +1745,7 @@ export interface D_173Bb13D95B6E8Cec0D7 {
   fixing_calendar_id?: Id1 | null;
   forward_curve_id: Id4;
   frequency: Tenor1;
+  index_id: Id5;
   /**
    * Payment lag in business days after period end (default: 0).
    *

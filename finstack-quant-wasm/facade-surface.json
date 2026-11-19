@@ -1455,21 +1455,21 @@
     "methods": ["free", "price", "toJson"],
     "getters": [
       "baseDate",
+      "calendarId",
       "dayCount",
       "extrapolation",
       "id",
       "interpStyle",
       "kind",
       "knots",
-      "prices",
-      "spotPrice"
+      "prices"
     ]
   },
   "core.BaseCorrelationCurve": {
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson"],
-    "methods": ["correlation", "free", "toJson"],
+    "methods": ["free", "getCorrelation", "toJson"],
     "getters": ["correlations", "detachmentPoints", "extrapolation", "id", "interpStyle"]
   },
   "core.CreditIndexData": {
@@ -2515,16 +2515,7 @@
       "jointProbabilities",
       "sampleFromUniform"
     ],
-    "getters": [
-      "correlation",
-      "jointP00",
-      "jointP01",
-      "jointP10",
-      "jointP11",
-      "p1",
-      "p2",
-      "requestedCorrelation"
-    ]
+    "getters": ["correlation", "jointP00", "jointP01", "jointP10", "jointP11", "p1", "p2"]
   },
   "models.correlation.LatentFactorSpec": {
     "kind": "class",

@@ -552,10 +552,12 @@ mod tests {
 
     #[test]
     fn ordered_bumps_compose_mixed_bucket_and_parallel_shocks_to_one_curve() {
-        let context = MarketContext::new().insert(
-            DiscountCurve::flat("USD", as_of(), 0.05, crate::dates::DayCount::Act365F)
-                .expect("flat discount curve"),
-        );
+        let context = MarketContext::new()
+            .try_insert(
+                DiscountCurve::flat("USD", as_of(), 0.05, crate::dates::DayCount::Act365F)
+                    .expect("flat discount curve"),
+            )
+            .expect("insert market curve");
         let bumps = [
             BumpSpec::parallel_bp(10.0),
             BumpSpec::triangular_key_rate_bp(3.0, 5.0, 7.0, 20.0),
@@ -661,7 +663,8 @@ mod tests {
             .build()
             .expect("inflation curve");
         let context = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_inflation_index(index);
 
         let bumped = context
@@ -700,7 +703,8 @@ mod tests {
             .build()
             .expect("inflation curve");
         let bumped = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .bump([MarketBump::InflationCurve {
                 id: CurveId::new("US-CPI"),
                 spec: BumpSpec::triangular_key_rate_bp(0.0, 1.0, 2.0, 10.0),
@@ -727,7 +731,8 @@ mod tests {
             .build()
             .expect("inflation curve");
         let bumped = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .bump([MarketBump::InflationCurve {
                 id: CurveId::new("US-CPI"),
                 spec: BumpSpec::inflation_shift_pct(0.01),
@@ -886,7 +891,9 @@ mod tests {
             .knots([(0.0, 1.0), (5.0, 0.85)])
             .build()
             .expect("curve");
-        let mut ctx = MarketContext::new().insert(curve);
+        let mut ctx = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         let token = ctx
             .apply_curve_bump_in_place(&CurveId::from("USD-OIS"), BumpSpec::parallel_bp(1.0))
@@ -932,7 +939,11 @@ mod tests {
             .knots([(0.0, 1.0), (5.0, 0.84)])
             .build()
             .expect("forward curve");
-        let mut scratch = MarketContext::new().insert(discount).insert(forward);
+        let mut scratch = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve");
         let discount_before = scratch
             .get_discount("USD-OIS")
             .expect("discount")
@@ -1006,7 +1017,9 @@ mod tests {
             .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(discount);
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve");
         // Several missing ids in an order unrelated to their hash order; the
         // error must name the first one the caller passed, on every target.
         let ids = [
@@ -1085,12 +1098,9 @@ mod tests {
         .expect("scalar time series");
 
         let multi = MarketContext::new()
-            .try_insert_surface(surface)
-            .expect("insert surface")
-            .try_insert_vol_cube(cube)
-            .expect("vol cube shares id without colliding")
-            .try_insert_fx_delta_vol_surface(fx_delta)
-            .expect("fx delta surface shares id without colliding")
+            .insert_surface(surface)
+            .insert_vol_cube(cube)
+            .insert_fx_delta_vol_surface(fx_delta)
             .try_insert(curve)
             .expect("curve collection is distinct")
             .insert_price("SHARED-ID", MarketScalar::unitless(1.0).expect("1.0"))
@@ -1262,8 +1272,10 @@ mod tests {
             .expect("credit index");
 
         let mut ctx = MarketContext::new()
-            .insert(hazard)
-            .insert(corr)
+            .try_insert(hazard)
+            .expect("insert market curve")
+            .try_insert(corr)
+            .expect("insert market curve")
             .insert_credit_index("CDX-IG", index)
             .expect("insert credit index");
 

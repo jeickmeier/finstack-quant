@@ -460,19 +460,31 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .unwrap();
 
     MarketContext::new()
-        .insert(usd_disc)
-        .insert(usd_alias)
-        .insert(usd_fwd)
-        .insert(eur_disc)
-        .insert(eur_alias)
-        .insert(gbp_disc)
-        .insert(gbp_alias)
-        .insert(jpy_disc)
-        .insert(jpy_alias)
-        .insert(hazard)
-        .insert(inflation)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(usd_alias)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(eur_alias)
+        .expect("insert market curve")
+        .try_insert(gbp_disc)
+        .expect("insert market curve")
+        .try_insert(gbp_alias)
+        .expect("insert market curve")
+        .try_insert(jpy_disc)
+        .expect("insert market curve")
+        .try_insert(jpy_alias)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(inflation)
+        .expect("insert market curve")
         .insert_inflation_index(cpi_history)
-        .insert(base_corr)
+        .try_insert(base_corr)
+        .expect("insert market curve")
         .insert_surface(equity_vol)
         .insert_surface(swaption_vol)
         .insert_surface(fx_vol)
@@ -873,6 +885,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         };
         let float = finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),

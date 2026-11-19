@@ -99,6 +99,7 @@ pub fn create_standard_payer_swaption(
     };
     let float = FloatLegSpec {
         discount_curve_id: CurveId::new("USD_OIS"),
+        index_id: "USD_LIBOR_3M".into(),
         forward_curve_id: CurveId::new("USD_LIBOR_3M"),
         spread_bp: Decimal::ZERO,
         frequency: Tenor::quarterly(),
@@ -165,8 +166,10 @@ pub fn create_flat_market(as_of: Date, rate: f64, vol: f64) -> MarketContext {
     let vol_surface = build_flat_vol_surface(vol, as_of, "USD_SWAPTION_VOL");
 
     MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
 }
 

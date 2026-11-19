@@ -69,7 +69,9 @@ fn market_context_json() -> String {
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(disc);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     serde_json::to_string(&ctx).unwrap()
 }
 
@@ -85,7 +87,7 @@ fn floating_cashflow_spec_json() -> String {
             "kind": "floating",
             "spec": {
               "rate_spec": {
-                "forward_curve_id": "USD-SOFR-3M",
+                "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
                 "spread_bp": "150.0",
                 "gearing": "1.0",
                 "gearing_includes_spread": true,
@@ -160,7 +162,7 @@ fn canonical_schedule_params_json() -> serde_json::Value {
 fn canonical_floating_coupon_json() -> serde_json::Value {
     serde_json::json!({
         "rate_spec": {
-            "forward_curve_id": "TEST-INDEX",
+            "index_id": "TEST-INDEX", "forward_curve_id": "TEST-INDEX",
             "spread_bp": "150",
             "reset_frequency": {"count": 3, "unit": "months"},
             "reset_lag_days": 0,
@@ -219,7 +221,11 @@ fn floating_market_context_json() -> String {
         .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(disc).insert(fwd);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
     serde_json::to_string(&ctx).unwrap()
 }
 

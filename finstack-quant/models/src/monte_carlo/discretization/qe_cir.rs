@@ -54,7 +54,15 @@ impl QeCir {
     /// `qe_common` for the algorithm, references, and numerical
     /// safeguards shared with `QeHeston`.
     #[inline]
-    fn step_variance(&self, v_t: f64, kappa: f64, theta: f64, sigma: f64, dt: f64, z: f64) -> f64 {
+    fn step_variance(
+        &self,
+        v_t: f64,
+        kappa: f64,
+        theta: f64,
+        sigma: f64,
+        dt: f64,
+        z: f64,
+    ) -> finstack_quant_core::Result<f64> {
         qe_step_variance(v_t, kappa, theta, sigma, dt, z, self.psi_c)
     }
 }
@@ -74,13 +82,14 @@ impl Discretization<CirProcess> for QeCir {
         x: &mut [f64],
         z: &[f64],
         _work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let params = process.params();
         let v_t = x[0].max(0.0);
 
-        let v_next = self.step_variance(v_t, params.kappa, params.theta, params.sigma, dt, z[0]);
+        let v_next = self.step_variance(v_t, params.kappa, params.theta, params.sigma, dt, z[0])?;
 
         x[0] = v_next;
+        Ok(())
     }
 
     fn work_size(&self, _process: &CirProcess) -> usize {
@@ -99,8 +108,9 @@ impl Discretization<CirPlusPlusProcess> for QeCir {
         x: &mut [f64],
         z: &[f64],
         work: &mut [f64],
-    ) {
-        self.step(process.cir(), t, dt, x, z, work);
+    ) -> finstack_quant_core::Result<()> {
+        self.step(process.cir(), t, dt, x, z, work)?;
+        Ok(())
     }
 
     fn work_size(&self, _process: &CirPlusPlusProcess) -> usize {
@@ -127,7 +137,8 @@ mod tests {
         // Test many shocks - variance should stay non-negative
         for shock in [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0] {
             let z = vec![shock];
-            disc.step(&process, t, dt, &mut x, &z, &mut work);
+            disc.step(&process, t, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
 
             assert!(x[0] >= 0.0, "Variance should be non-negative");
         }
@@ -146,7 +157,8 @@ mod tests {
         // Start above mean with no shock
         let mut x = vec![0.06];
         let z = vec![0.0];
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Should move toward mean
         assert!(x[0] < 0.06);
@@ -168,7 +180,8 @@ mod tests {
         let z = vec![-2.0]; // Large negative shock
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // QE should handle this gracefully and maintain non-negativity
         assert!(x[0] >= 0.0);

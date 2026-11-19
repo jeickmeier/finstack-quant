@@ -67,7 +67,9 @@ fn test_mc_pricer_stochastic_utilization() {
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
 
     // Build market context
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Price using MC
     let pv = facility.value(&market, val_date).unwrap();
@@ -110,7 +112,11 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
         .unwrap();
 
     // Build market context with discount + hazard
-    let market = MarketContext::new().insert(disc_curve).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     // Zero vol (should collapse toward deterministic behavior wrt default randomness off)
     let facility_zero_vol = RevolvingCredit::builder()
@@ -247,7 +253,9 @@ fn test_mc_pricer_deterministic_reproducibility() {
         .unwrap();
 
     let disc_curve = build_flat_discount_curve(0.02, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Price twice with same seed
     let pv1 = facility.value(&market, val_date).unwrap();
@@ -269,7 +277,9 @@ fn test_mc_pricer_convergence() {
     let maturity_date = date!(2026 - 01 - 01);
 
     let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Test with different number of paths
     let num_paths_list = vec![100, 1000, 5000];
@@ -367,7 +377,9 @@ fn test_mc_utilization_mean_reversion() {
         .unwrap();
 
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let pv = facility.value(&market, val_date).unwrap();
 
@@ -446,8 +458,10 @@ fn test_mc_stochastic_floating_rate_index_cap() {
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(
             finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
                 "FIXING:USD-SOFR-3M",
@@ -462,6 +476,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
     // Helper to build a floating rate spec with optional index cap
     let make_float_spec = |all_in_cap_bp: Option<Decimal>| -> FloatingRateSpec {
         FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: Decimal::try_from(100.0).expect("valid"), // 100 bp spread
             gearing: Decimal::try_from(1.0).expect("valid"),
@@ -574,6 +589,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
     let val_date = date!(2025 - 01 - 02);
     let maturity_date = date!(2026 - 01 - 02);
     let float_spec = FloatingRateSpec {
+        index_id: "USD-SOFR-OIS".into(),
         forward_curve_id: "USD-SOFR-OIS".into(),
         spread_bp: Decimal::ZERO,
         gearing: Decimal::ONE,
@@ -594,8 +610,10 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
     let fwd = ForwardCurve::flat("USD-SOFR-OIS", val_date, 0.04, DayCount::Act360)
         .expect("sofr ois forward");
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, val_date, "USD-OIS"))
-        .insert(fwd);
+        .try_insert(build_flat_discount_curve(0.03, val_date, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let make_facility = |sigma: f64| {
         RevolvingCredit::builder()
@@ -661,7 +679,9 @@ fn stochastic_utilization_coupon_integral_converges_to_independent_ou_mean() {
     use finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer;
     let start = date!(2025 - 01 - 01);
     let end = date!(2026 - 01 - 01);
-    let market = MarketContext::new().insert(build_flat_discount_curve(0.0, start, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(build_flat_discount_curve(0.0, start, "USD-OIS"))
+        .expect("insert market curve");
     let commitment = 1_000_000.0;
     // With zero discount/default and E[u(t)] = u(0) = theta = 0.5,
     // expected principal flows telescope to the opening balance and coupon

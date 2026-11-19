@@ -141,8 +141,10 @@ def test_pairwise_statistic_array_inputs_preserve_strides(function: str) -> None
 def test_ohlc_array_inputs_match_list_semantics() -> None:
     opening = np.array([100.0, 101.0, 103.0, 102.0])[::-1]
     high, low, close = opening + 2.0, opening - 2.0, opening + 1.0
-    actual = stats.realized_variance_ohlc(opening, high, low, close)
-    expected = stats.realized_variance_ohlc(opening.tolist(), high.tolist(), low.tolist(), close.tolist())
+    actual = stats.realized_variance_ohlc(opening, high, low, close, previous_close=100.0)
+    expected = stats.realized_variance_ohlc(
+        opening.tolist(), high.tolist(), low.tolist(), close.tolist(), previous_close=100.0
+    )
     assert actual == pytest.approx(expected)
 
 

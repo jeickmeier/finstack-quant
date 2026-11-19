@@ -50,7 +50,7 @@ impl HwSwaptionCashflows {
         cash_method: CashSettlementMethod,
     ) -> Result<Self> {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
-        let fixed = resolve_fixed_leg(fixed, &float.forward_curve_id, &"Swaption underlying")?;
+        let fixed = resolve_fixed_leg(fixed, &float.index_id, &"Swaption underlying")?;
         let float = resolve_float_leg(float, &"Swaption underlying")?;
         let compounded = match float.compounding {
             FloatingLegCompounding::Simple => false,

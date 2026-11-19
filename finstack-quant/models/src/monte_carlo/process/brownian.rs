@@ -96,8 +96,9 @@ impl StochasticProcess for BrownianProcess {
         out[0] = self.params.mu;
     }
 
-    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         out[0] = self.params.sigma;
+        Ok(())
     }
 }
 
@@ -198,8 +199,9 @@ impl StochasticProcess for MultiBrownianProcess {
         out.copy_from_slice(&self.mus);
     }
 
-    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         out.copy_from_slice(&self.sigmas);
+        Ok(())
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
@@ -236,7 +238,8 @@ mod tests {
         let mut mu = [0.0];
         let mut sig = [0.0];
         proc.drift(0.0, &[0.0], &mut mu);
-        proc.diffusion(0.0, &[0.0], &mut sig);
+        proc.diffusion(0.0, &[0.0], &mut sig)
+            .expect("valid diffusion");
         assert!((mu[0] - 0.1).abs() < 1e-12);
         assert!((sig[0] - 0.3).abs() < 1e-12);
         assert!(proc.factor_correlation().is_none());

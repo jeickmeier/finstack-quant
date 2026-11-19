@@ -78,10 +78,14 @@ fn build_fx_matrix(spot_eur_to_usd: f64) -> FxMatrix {
 fn build_market_context() -> MarketContext {
     let base = base_date();
     MarketContext::new()
-        .insert(build_discount("USD-OIS", base, USD_ZERO))
-        .insert(build_discount("EUR-OIS", base, EUR_ZERO))
-        .insert(build_forward("USD-SOFR-3M", base, USD_ZERO))
-        .insert(build_forward("EUR-EURIBOR-3M", base, EUR_ZERO))
+        .try_insert(build_discount("USD-OIS", base, USD_ZERO))
+        .expect("insert market curve")
+        .try_insert(build_discount("EUR-OIS", base, EUR_ZERO))
+        .expect("insert market curve")
+        .try_insert(build_forward("USD-SOFR-3M", base, USD_ZERO))
+        .expect("insert market curve")
+        .try_insert(build_forward("EUR-EURIBOR-3M", base, EUR_ZERO))
+        .expect("insert market curve")
         .insert_fx(build_fx_matrix(SPOT_USD_PER_EUR))
 }
 
@@ -92,6 +96,7 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
         notional: Money::new(N_EUR_INITIAL, Currency::EUR).expect("valid money fixture"),
         side: PayReceive::Receive,
         leg: FloatLegSpec {
+            index_id: "EUR-EURIBOR-3M".into(),
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
             start,
@@ -113,6 +118,7 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
         notional: Money::new(N_USD, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Pay,
         leg: FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -182,10 +188,14 @@ fn cip_invariance_holds_when_as_of_after_curve_base_date() {
     let eur_fwd = build_forward("EUR-EURIBOR-3M", curve_base, EUR_ZERO);
 
     let ctx = MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(usd_fwd)
-        .insert(eur_fwd)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_fwd)
+        .expect("insert market curve")
         .insert_fx(build_fx_matrix(SPOT_USD_PER_EUR));
 
     // `as_of` is 90 days AFTER the curve base date. With the bug, MtM-reset PV picks up
@@ -668,10 +678,14 @@ fn cip_invariance_holds_under_reversed_rate_ordering() {
     let fx = build_fx_matrix(SPOT_USD_PER_EUR);
 
     let ctx = MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(usd_fwd)
-        .insert(eur_fwd)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_fwd)
+        .expect("insert market curve")
         .insert_fx(fx);
 
     let as_of = base_date();

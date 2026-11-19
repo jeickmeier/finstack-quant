@@ -113,11 +113,13 @@ impl StochasticPrepayment for RegimeSwitchingPrepay {
             + high_prob * self.state_smm(true, factors, burnout)
     }
 
-    fn expected_smm(&self, seasoning: u32) -> f64 {
+    fn expected_smm(&self, seasoning: u32) -> finstack_quant_core::Result<f64> {
         let high_prob = self.high_regime_probability(seasoning);
         let volatility = self.factor_loading * self.cpr_volatility;
-        (1.0 - high_prob) * expected_shocked_smm(self.low_cpr, volatility)
-            + high_prob * expected_shocked_smm(self.high_cpr, volatility)
+        Ok(
+            (1.0 - high_prob) * expected_shocked_smm(self.low_cpr, volatility)?
+                + high_prob * expected_shocked_smm(self.high_cpr, volatility)?,
+        )
     }
 
     fn factor_loading(&self) -> f64 {
@@ -134,9 +136,12 @@ mod tests {
         let model = RegimeSwitchingPrepay::new(0.04, 0.80, 0.5, 0.5, 0.4, 0.0);
         let expected = 0.5 * capped_annual_to_monthly(0.04) + 0.5 * capped_annual_to_monthly(0.80);
         assert!((expected - 0.064455390488875).abs() < 1e-14);
-        assert!((model.expected_smm(1) - expected).abs() < 1e-14);
+        assert!((model.expected_smm(1).unwrap() - expected).abs() < 1e-14);
         assert!((model.conditional_smm(1, &[0.0], 0.05, 1.0) - expected).abs() < 1e-14);
-        assert_eq!(model.expected_smm(0), capped_annual_to_monthly(0.04));
+        assert_eq!(
+            model.expected_smm(0).unwrap(),
+            capped_annual_to_monthly(0.04)
+        );
     }
 
     #[test]
@@ -167,14 +172,14 @@ mod tests {
             }
             // At and above cap_z the clipped annual CPR and monthly SMM
             // are exactly one. The omitted lower tail has mass below 1e-23.
-            norm_cdf(-cap_z) + sum * step / 3.0
+            norm_cdf(-cap_z).expect("valid Gaussian variate") + sum * step / 3.0
         };
         let high_probability = 0.75 * (1.0 - 0.6_f64.powi(12));
         for panels in [1_024, 2_048] {
             let integrated = (1.0 - high_probability) * per_state_mean(0.04, panels)
                 + high_probability * per_state_mean(0.80, panels);
             assert!((integrated - 0.275051008022911).abs() < 1e-10);
-            assert!((model.expected_smm(12) - integrated).abs() < 1e-10);
+            assert!((model.expected_smm(12).unwrap() - integrated).abs() < 1e-10);
         }
     }
 
@@ -219,6 +224,6 @@ mod tests {
             }
         }
         let mean_smm = total_smm / f64::from(draws * draws);
-        assert!((mean_smm - model.expected_smm(seasoning + 1)).abs() < 1e-4);
+        assert!((mean_smm - model.expected_smm(seasoning + 1).unwrap()).abs() < 1e-4);
     }
 }

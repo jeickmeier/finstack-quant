@@ -1,14 +1,20 @@
 # FEATURES-012: Current-row exponential-decay weight in a trailing row window
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Window membership, finite-observation decay, and current-row output are implemented. Stable normalization and checked count arithmetic require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked a gapped window. The Rust fixture was inspected. Extreme half-lives and large counts still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Use an inclusive trailing row window with window defaulting to 1. Require a finite positive half_life in finite-observation steps. Missing rows occupy window slots, contribute no weight, and do not advance decay age. A missing current row yields missing.
+2. Return the current observation's normalized weight within its own window. Its raw weight is 1, divided by the sum of decayed weights over finite observations in that window. With half-life 1 and window 3, [10, missing, 20, 30] gives [1, missing, 2/3, 2/3].
+3. Use stable geometric normalization with limits of 1 as half-life approaches zero and 1/n as it grows, for finite count n. Avoid unchecked exponent conversions. [Parameter and failure policy](02-parameters-missing-and-failure.md).
+
+## Observed scope and selection
 
 `ExponentialDecayWeights` requires finite `half_life>0`; `window` is a positive integer defaulting to 1. It does not accept `min_periods`. Half-life is in finite-observation steps, while membership is bounded by trailing entity rows. Only input finiteness matters; numeric input magnitudes are not used as weights or returns.
 
@@ -33,5 +39,5 @@ Large-count consequences were not executed or allocated here.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

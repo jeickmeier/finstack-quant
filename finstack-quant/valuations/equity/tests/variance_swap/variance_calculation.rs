@@ -42,7 +42,9 @@ fn first_ohlc_bar_contributes_to_realized_and_seasoned_variance() {
     let df = curve
         .df_between_dates(as_of, swap.effective_settlement_date().unwrap())
         .unwrap();
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     for (id, value) in [("O", 100.0), ("H", 101.0), ("L", 99.0), ("C", 100.0)] {
         market = market.insert_series(
             ScalarTimeSeries::new(
@@ -129,16 +131,18 @@ fn test_get_historical_prices_errors_when_past_observations_lack_data() {
     // Arrange: market with no series and no spot; valuing at maturity so
     // the swap has accrued past observations.
     let swap = sample_swap(PayReceive::Receive);
-    let ctx = MarketContext::new().insert(
-        finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
-            .base_date(swap.start_date)
-            .knots([(0.0, 1.0), (1.0, 0.95)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let ctx = MarketContext::new()
+        .try_insert(
+            finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
+                .base_date(swap.start_date)
+                .knots([(0.0, 1.0), (1.0, 0.95)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
 
     // Act
     let err = swap.get_historical_prices(&ctx, swap.maturity).expect_err(
@@ -159,16 +163,18 @@ fn test_get_historical_prices_returns_empty_before_swap_starts() {
     // Arrange: market with no series and no spot, but valuing BEFORE the
     // swap starts so there are no past observations.
     let swap = sample_swap(PayReceive::Receive);
-    let ctx = MarketContext::new().insert(
-        finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
-            .base_date(swap.start_date)
-            .knots([(0.0, 1.0), (1.0, 0.95)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let ctx = MarketContext::new()
+        .try_insert(
+            finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
+                .base_date(swap.start_date)
+                .knots([(0.0, 1.0), (1.0, 0.95)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
 
     // Act: as_of one day before start_date — no past observations expected
     let pre_start = swap.start_date - time::Duration::days(1);
@@ -242,7 +248,9 @@ fn test_partial_realized_variance_matches_manual_calculation() {
         .filter(|d| **d >= swap.start_date && **d <= as_of)
         .filter_map(|d| prices.iter().find(|(pd, _)| pd == d).map(|(_, p)| *p))
         .collect();
-    let manual = realized_variance(&used_prices, Some(252.0)).expect("CloseToClose should succeed");
+    let manual = realized_variance(&used_prices, Some(252.0))
+        .expect("valid close prices")
+        .expect("observed return");
 
     // Assert
     assert!((realized - manual).abs() < EPSILON);
@@ -267,8 +275,9 @@ fn test_partial_realized_variance_uses_contract_annualization() {
         .filter(|d| **d >= swap.start_date && **d <= as_of)
         .filter_map(|d| prices.iter().find(|(pd, _)| pd == d).map(|(_, p)| *p))
         .collect();
-    let manual_260 =
-        realized_variance(&used_prices, Some(260.0)).expect("CloseToClose should succeed");
+    let manual_260 = realized_variance(&used_prices, Some(260.0))
+        .expect("valid close prices")
+        .expect("observed return");
 
     // The contract annualisation factor should be applied
     assert!((realized - manual_260).abs() < EPSILON);
@@ -451,12 +460,15 @@ fn add_ohlc_series(
         .enumerate()
         .map(|(i, &d)| (d, base_close + step * i as f64 - 8.0))
         .collect();
-    let close_prices: Vec<(Date, f64)> = obs_dates
+    let mut close_prices: Vec<(Date, f64)> = obs_dates
         .iter()
         .enumerate()
         .map(|(i, &d)| (d, base_close + step * i as f64))
         .collect();
 
+    if let Some(anchor) = swap.previous_close_date {
+        close_prices.insert(0, (anchor, base_close));
+    }
     let mk_series = |id: &str, data: Vec<(Date, f64)>| {
         ScalarTimeSeries::new(
             id,
@@ -535,7 +547,10 @@ fn test_all_ohlc_estimators_produce_positive_variance() {
         RealizedVarMethod::RogersSatchell,
         RealizedVarMethod::YangZhang,
     ] {
-        let swap = ohlc_swap(method);
+        let mut swap = ohlc_swap(method);
+        if method == RealizedVarMethod::YangZhang {
+            swap.previous_close_date = swap.start_date.previous_day();
+        }
         let ctx = add_ohlc_series(base_context(), &swap, 5_000.0, 3.0);
 
         let rv = swap.partial_realized_variance(&ctx, as_of);

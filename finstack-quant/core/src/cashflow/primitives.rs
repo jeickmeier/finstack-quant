@@ -248,6 +248,9 @@ pub enum CFKind {
     /// When a counterparty substitutes collateral, this represents the return
     /// of the original collateral being replaced.
     CollateralSubstitutionOut,
+
+    /// Net contractual derivative payoff settled in cash without exchanging principal.
+    DerivativeSettlement,
 }
 
 /// Writes the snake_case serde label (`fixed`, `floating`, ...).
@@ -356,7 +359,8 @@ impl CFKind {
             | CFKind::VariationMarginPay
             | CFKind::MarginInterest
             | CFKind::CollateralSubstitutionIn
-            | CFKind::CollateralSubstitutionOut => true,
+            | CFKind::CollateralSubstitutionOut
+            | CFKind::DerivativeSettlement => true,
         }
     }
 }
@@ -394,6 +398,10 @@ pub struct CashFlowAccrual {
     /// 30E/360 ISDA February exception (`None` is unspecified, which that
     /// convention rejects).
     context: DayCountContextState,
+    /// Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
+    nominal_dates: Option<std::sync::Arc<Vec<Date>>>,
 }
 
 /// Wire fields of [`CashFlowAccrual`]; deserialization validates them.
@@ -406,18 +414,21 @@ struct CashFlowAccrualWire {
     #[serde(default)]
     projected_index_rate: Option<f64>,
     context: DayCountContextState,
+    #[serde(default)]
+    nominal_dates: Vec<Date>,
 }
 
 impl TryFrom<CashFlowAccrualWire> for CashFlowAccrual {
     type Error = crate::Error;
 
     fn try_from(wire: CashFlowAccrualWire) -> crate::Result<Self> {
-        Self::new(
+        Self::from_fields(
             wire.start,
             wire.end,
             wire.day_count,
             wire.projected_index_rate,
             wire.context,
+            wire.nominal_dates,
         )
     }
 }
@@ -448,12 +459,62 @@ impl CashFlowAccrual {
         projected_index_rate: Option<f64>,
         context: DayCountContextState,
     ) -> crate::Result<Self> {
+        Self::from_fields(
+            start,
+            end,
+            day_count,
+            projected_index_rate,
+            context,
+            Vec::new(),
+        )
+    }
+
+    /// Construct a coupon on an explicit sequence of nominal ICMA periods.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Inclusive accrual start in the first nominal period.
+    /// * `end` - Exclusive accrual end in the last nominal period.
+    /// * `projected_index_rate` - Optional decimal floating index rate before spread and gearing.
+    /// * `context` - Contractual coupon frequency without a single reference period.
+    /// * `nominal_dates` - Ordered unadjusted boundaries of all nominal periods touched by the coupon.
+    pub fn from_nominal_dates(
+        start: Date,
+        end: Date,
+        projected_index_rate: Option<f64>,
+        context: DayCountContextState,
+        nominal_dates: Vec<Date>,
+    ) -> crate::Result<Self> {
+        if nominal_dates.len() < 3 {
+            return Err(crate::Error::Validation(
+                "multi-period ICMA requires at least three nominal dates".into(),
+            ));
+        }
+        Self::from_fields(
+            start,
+            end,
+            DayCount::ActActIsma,
+            projected_index_rate,
+            context,
+            nominal_dates,
+        )
+    }
+
+    fn from_fields(
+        start: Date,
+        end: Date,
+        day_count: DayCount,
+        projected_index_rate: Option<f64>,
+        context: DayCountContextState,
+        nominal_dates: Vec<Date>,
+    ) -> crate::Result<Self> {
         let accrual = Self {
             start,
             end,
             day_count,
             projected_index_rate,
             context,
+            nominal_dates: (!nominal_dates.is_empty()).then(|| std::sync::Arc::new(nominal_dates)),
         };
         accrual.validate()?;
         Ok(accrual)
@@ -481,6 +542,11 @@ impl CashFlowAccrual {
     #[must_use]
     pub fn get_projected_index_rate(&self) -> Option<f64> {
         self.projected_index_rate
+    }
+
+    /// Unadjusted ICMA boundaries when the accrual spans multiple nominal periods.
+    pub fn get_nominal_dates(&self) -> &[Date] {
+        self.nominal_dates.as_deref().map_or(&[], Vec::as_slice)
     }
 
     /// Day-count context the accrual factor was calculated with.
@@ -549,6 +615,27 @@ impl CashFlowAccrual {
             coupon_period: self.context.get_coupon_period(),
             end_is_termination_date: self.context.get_end_is_termination_date(),
         };
+        if let Some(dates) = &self.nominal_dates {
+            if self.day_count != DayCount::ActActIsma
+                || ctx.coupon_period.is_some()
+                || dates.len() < 3
+                || self.start < dates[0]
+                || self.start >= dates[1]
+                || self.end <= dates[dates.len() - 2]
+                || self.end > dates[dates.len() - 1]
+            {
+                return Err(crate::Error::Validation(
+                    "ICMA nominal periods must span the accrual exactly".into(),
+                ));
+            }
+            for pair in dates.windows(2) {
+                self.day_count.validate_context(DayCountContext {
+                    coupon_period: Some((pair[0], pair[1])),
+                    ..ctx
+                })?;
+            }
+            return Ok(());
+        }
         self.day_count.validate_context(ctx)?;
         match self.day_count {
             DayCount::Act365L => {
@@ -567,6 +654,77 @@ impl CashFlowAccrual {
             _ => {}
         }
         Ok(())
+    }
+
+    /// Restrict contractual metadata to a balance segment, retaining its nominal denominators.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Inclusive start within this accrual.
+    /// * `end` - Exclusive end within this accrual, strictly after `start`.
+    pub fn subperiod(&self, start: Date, end: Date) -> crate::Result<Self> {
+        if start < self.start || end > self.end || start >= end {
+            return Err(crate::Error::Validation("invalid accrual subperiod".into()));
+        }
+        let first = self
+            .get_nominal_dates()
+            .partition_point(|d| *d <= start)
+            .saturating_sub(1);
+        let last = self.get_nominal_dates().partition_point(|d| *d < end);
+        let dates = self
+            .get_nominal_dates()
+            .get(first..=last)
+            .unwrap_or_default();
+        let reference = match dates {
+            [lo, hi] => Some((*lo, *hi)),
+            _ => self.context.get_coupon_period(),
+        };
+        let context = DayCountContextState::try_new(
+            self.context.get_calendar_id().map(str::to_owned),
+            self.context.get_frequency(),
+            self.context.get_bus_basis(),
+            reference,
+            self.context
+                .get_end_is_termination_date()
+                .map(|terminal| terminal && end == self.end),
+        )?;
+        if dates.len() > 2 {
+            Self::from_nominal_dates(
+                start,
+                end,
+                self.projected_index_rate,
+                context,
+                dates.to_vec(),
+            )
+        } else {
+            Self::new(
+                start,
+                end,
+                self.day_count,
+                self.projected_index_rate,
+                context,
+            )
+        }
+    }
+
+    /// Calculate the fraction over this interval using each applicable nominal denominator.
+    pub fn year_fraction(&self) -> crate::Result<f64> {
+        let context = self.day_count_context()?;
+        if self.nominal_dates.is_none() {
+            return self.day_count.year_fraction(self.start, self.end, context);
+        }
+        let mut total = crate::math::summation::NeumaierAccumulator::new();
+        for pair in self.get_nominal_dates().windows(2) {
+            total.add(self.day_count.year_fraction(
+                self.start.max(pair[0]),
+                self.end.min(pair[1]),
+                DayCountContext {
+                    coupon_period: Some((pair[0], pair[1])),
+                    ..context
+                },
+            )?)?;
+        }
+        total.get_total()
     }
 
     /// Resolve this slice's day-count context, looking up its calendar.
@@ -967,6 +1125,7 @@ impl CashFlow {
     /// - Accrual factor must be finite (not NaN or Infinity)
     /// - Rate (if present) must be finite (not NaN or Infinity)
     /// - Reset date (if present) must not be after the payment date
+    /// - A net derivative settlement has a zero accrual factor and no coupon accrual metadata
     /// - Principal delta (if present) must share the amount's currency
     /// - Accrual metadata (if present) must have start before end, a coupon
     ///   period with start before end, and a finite projected index rate
@@ -1004,6 +1163,13 @@ impl CashFlow {
                 expected: self.amount.currency(),
                 actual: delta.currency(),
             });
+        }
+        if self.kind == CFKind::DerivativeSettlement
+            && (self.accrual.is_some() || self.accrual_factor != 0.0)
+        {
+            return Err(crate::Error::Validation(
+                "net derivative settlement cannot carry coupon accrual".into(),
+            ));
         }
         // Every principal-like row states its complete principal effect, an
         // explicit signed delta (zero included) and its balance date; other
@@ -1113,6 +1279,7 @@ mod tests {
                 day_count: DayCount::Act360,
                 projected_index_rate: Some(rate),
                 context: DayCountContextState::default(),
+                nominal_dates: None,
             };
             assert!(serde_json::to_string(&accrual).is_err());
             flow.accrual = Some(accrual);
@@ -1125,6 +1292,26 @@ mod tests {
     #[test]
     fn deserialization_validates_rows_and_accrual_slices() {
         // Record CORE-CONVENTIONS-015 #10: no wire route creates an invalid row.
+        let settlement_with_accrual = r#"{"date":"2025-07-01","amount":{"amount":"5","currency":"USD"},
+            "kind":"derivative_settlement","accrual_factor":0.25}"#;
+        assert!(serde_json::from_str::<CashFlow>(settlement_with_accrual).is_err());
+        let settlement = serde_json::json!({
+            "date": "2025-07-01", "amount": {"amount": "5", "currency": "USD"},
+            "kind": "derivative_settlement", "accrual_factor": 0.0
+        });
+        assert!(serde_json::from_value::<CashFlow>(settlement.clone()).is_ok());
+        let mut with_period = settlement;
+        with_period["accrual"] = serde_json::json!({
+            "start": "2025-01-01", "end": "2025-07-01", "day_count": "act_360",
+            "context": {"calendar_id":null,"frequency":null,"bus_basis":null,
+                "coupon_period":null,"end_is_termination_date":false}
+        });
+        assert!(
+            serde_json::from_value::<CashFlow>(with_period)
+                .unwrap_err()
+                .to_string()
+                .contains("settlement cannot carry coupon accrual")
+        );
         let pik_with_cash = r#"{"date":"2025-07-01","amount":{"amount":"5","currency":"USD"},
             "kind":"pik","accrual_factor":0.0,
             "principal_delta":{"amount":"5","currency":"USD"},"principal_date":"2025-07-01"}"#;
@@ -1161,6 +1348,7 @@ mod tests {
                 day_count: DayCount::Act360,
                 projected_index_rate: rate,
                 context: DayCountContextState::default(),
+                nominal_dates: None,
             })
             .build()
             .expect("valid cashflow");

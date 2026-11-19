@@ -990,7 +990,11 @@ mod tests {
                     )
                     .expect("flat overnight forward")
                 };
-                let market = MarketContext::new().insert(disc.clone()).insert(fwd);
+                let market = MarketContext::new()
+                    .try_insert(disc.clone())
+                    .expect("insert market curve")
+                    .try_insert(fwd)
+                    .expect("insert market curve");
                 let financing = FinancingLegSpec {
                     discount_curve_id: CurveId::new("DISC"),
                     forward_curve_id: CurveId::new("TERM"),
@@ -1110,7 +1114,9 @@ mod tests {
             .build()
             .expect("discount curve");
 
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
         let params = TotalReturnLegParams {
             schedule: &schedule,
             notional: Money::from((1_i64, Currency::USD)),
@@ -1158,7 +1164,9 @@ mod tests {
             .build()
             .expect("discount curve");
 
-        let ctx = MarketContext::new().insert(disc.clone());
+        let ctx = MarketContext::new()
+            .try_insert(disc.clone())
+            .expect("insert market curve");
         let params = TotalReturnLegParams {
             schedule: &schedule,
             notional: Money::from((1_000_000_i64, Currency::USD)),
@@ -1241,8 +1249,10 @@ mod tests {
         .expect("forward curve");
 
         let ctx = MarketContext::new()
-            .insert(disc.clone())
-            .insert(fwd.clone());
+            .try_insert(disc.clone())
+            .expect("insert market curve")
+            .try_insert(fwd.clone())
+            .expect("insert market curve");
 
         let financing = FinancingLegSpec {
             discount_curve_id: CurveId::new("DISC"),
@@ -1369,8 +1379,10 @@ mod tests {
             .expect("discount curve");
 
         let ctx = MarketContext::new()
-            .insert(disc)
-            .insert(fwd.clone())
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd.clone())
+            .expect("insert market curve")
             .insert_series(fixing_series);
 
         // TRS with a single monthly period (period_start → period_end).
@@ -1435,7 +1447,7 @@ mod tests {
 
         // Compute the all-projected value (the buggy result before the fix).
         let ctx_no_fixings = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder(CurveId::new("DISC"))
                     .base_date(as_of)
                     .day_count(DayCount::Act360)
@@ -1445,7 +1457,9 @@ mod tests {
                     .build()
                     .expect("disc no_fixings"),
             )
-            .insert(fwd);
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve");
         let pv_all_projected =
             TrsEngine::pv_financing_leg(&financing, &schedule, notional, &ctx_no_fixings, as_of);
         // Before the fix, this would succeed (no fixings required) and give a
@@ -1671,7 +1685,11 @@ mod tests {
         )
         .expect("forward curve");
 
-        let ctx = MarketContext::new().insert(disc).insert(fwd);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve");
         let notional = Money::from((1_000_000_i64, Currency::USD));
 
         let term = FinancingLegSpec::new("DISC", "FWD", Decimal::ZERO, DayCount::Act365F);

@@ -84,7 +84,7 @@ pub(crate) fn normal_forecast_with_stream(
     let mut prev = base_value;
 
     for period_id in forecast_periods {
-        let z = standard_shock(rng, p.std_dev);
+        let z = standard_shock(rng, p.std_dev)?;
         shocks.insert(*period_id, z);
         let value = normal_step(prev, p, z);
         if !value.is_finite() {
@@ -106,11 +106,11 @@ fn normal_step(prev: f64, params: &DistributionParams, z: f64) -> f64 {
 
 /// One standard-normal innovation, or zero without a draw when the
 /// transition is deterministic.
-fn standard_shock(rng: &mut Pcg64Rng, std_dev: f64) -> f64 {
+fn standard_shock(rng: &mut Pcg64Rng, std_dev: f64) -> Result<f64> {
     if std_dev == 0.0 {
-        0.0
+        Ok(0.0)
     } else {
-        rng.normal(0.0, 1.0)
+        Ok(rng.normal(0.0, 1.0)?)
     }
 }
 
@@ -198,7 +198,7 @@ pub(crate) fn lognormal_forecast_with_stream(
     let mut log_level = base_value.ln();
 
     for period_id in forecast_periods {
-        let z = standard_shock(rng, p.std_dev);
+        let z = standard_shock(rng, p.std_dev)?;
         shocks.insert(*period_id, z);
         let value = lognormal_step(&mut log_level, p, z).ok_or_else(|| {
             Error::forecast(format!(
@@ -263,7 +263,7 @@ pub(crate) fn mean_reverting_forecast_with_stream(
     let mut prev = base_value;
 
     for period_id in forecast_periods {
-        let z = standard_shock(rng, p.std_dev);
+        let z = standard_shock(rng, p.std_dev)?;
         shocks.insert(*period_id, z);
         let value = mean_reverting_step(prev, p, z);
         if !value.is_finite() {
@@ -515,7 +515,7 @@ pub(crate) fn monte_carlo_correlated_series(
         } else if rho <= -1.0 {
             -z_peer
         } else {
-            rho * z_peer + indep_weight * rng.normal(0.0, 1.0)
+            rho * z_peer + indep_weight * rng.normal(0.0, 1.0)?
         };
         z_out.insert(*period_id, z);
 
@@ -880,7 +880,10 @@ mod tests {
         .expect("forecast");
         let mut rng = rng_for(42, Some(5));
         for pid in &periods {
-            assert_eq!(shocks[pid].to_bits(), rng.normal(0.0, 1.0).to_bits());
+            assert_eq!(
+                shocks[pid].to_bits(),
+                rng.normal(0.0, 1.0).unwrap().to_bits()
+            );
         }
     }
 
@@ -952,10 +955,9 @@ mod tests {
 
     #[test]
     fn bootstrap_is_deterministic_per_seed() {
-        let periods = vec![
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-        ];
+        let periods: Vec<_> = (0..8)
+            .map(|q| PeriodId::quarter(2025 + q / 4, (q % 4 + 1) as u8).expect("valid quarter"))
+            .collect();
         let params = bootstrap_params();
         let a = bootstrap_forecast(100.0, &periods, &params).expect("forecast");
         let b = bootstrap_forecast(100.0, &periods, &params).expect("forecast");
@@ -1242,7 +1244,7 @@ mod tests {
                 assert!((values[period] / 1e16 - 1.0).abs() < 1e-12, "{method}");
                 assert_eq!(
                     shocks[period].to_bits(),
-                    rng.normal(0.0, 1.0).to_bits(),
+                    rng.normal(0.0, 1.0).unwrap().to_bits(),
                     "{method}"
                 );
             }
@@ -1319,8 +1321,8 @@ mod tests {
             .expect("forecast");
             assert!(shocks.values().all(|z| *z == 0.0), "{kernel}");
             assert_eq!(
-                rng.normal(0.0, 1.0).to_bits(),
-                rng_for(42, None).normal(0.0, 1.0).to_bits(),
+                rng.normal(0.0, 1.0).unwrap().to_bits(),
+                rng_for(42, None).normal(0.0, 1.0).unwrap().to_bits(),
                 "{kernel}"
             );
         }

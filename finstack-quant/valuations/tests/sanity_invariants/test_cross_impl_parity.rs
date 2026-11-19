@@ -150,7 +150,8 @@ mod gbm_barrier {
         // spot/variance correlation (and hence the QE variance-correction term).
         let variance = VOL * VOL;
         MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "SPX",
@@ -326,6 +327,7 @@ mod gbm_barrier {
 /// The genuine `SabrParameters` (the production pricer type) is exercised — not a
 /// re-implementation.
 mod sabr_beta {
+    use finstack_quant_core::market_data::surfaces::VolQuoteType;
     use finstack_quant_models::volatility::sabr::SabrParameters;
 
     /// **β=1 ATM, ν=0 ⇒ vol = α, for any forward.**
@@ -343,7 +345,7 @@ mod sabr_beta {
 
         for &forward in &[0.02_f64, 1.0, 100.0, 4_000.0] {
             let vol = params
-                .implied_vol(forward, forward, 1.0)
+                .implied_vol(forward, forward, 1.0, VolQuoteType::BlackLognormal)
                 .expect("β=1 ATM vol should compute");
             assert!(
                 (vol - alpha).abs() < 1e-10,
@@ -380,16 +382,21 @@ mod sabr_beta {
             let params =
                 SabrParameters::new(alpha, beta, 0.35, -0.25).expect("SABR params should be valid");
 
+            let quote_type = if beta == 0.0 {
+                VolQuoteType::Normal
+            } else {
+                VolQuoteType::BlackLognormal
+            };
             // Exactly ATM: routed through the ATM short-circuit path.
             let atm = params
-                .implied_vol(forward, forward, expiry)
+                .implied_vol(forward, forward, expiry, quote_type)
                 .expect("ATM vol should compute");
             // Strikes a hair away from the forward, from both sides: each is
             // routed through the off-ATM z/χ(z) branch, but close enough that
             // it must collapse to the ATM value.
             for &eps in &[1e-6_f64, -1e-6_f64] {
                 let near_atm = params
-                    .implied_vol(forward, forward * (1.0 + eps), expiry)
+                    .implied_vol(forward, forward * (1.0 + eps), expiry, quote_type)
                     .expect("near-ATM vol should compute");
                 let rel = (near_atm - atm).abs() / atm;
                 assert!(
@@ -428,13 +435,11 @@ mod sabr_beta {
             let params =
                 SabrParameters::new(alpha, beta, nu, rho).expect("SABR params should be valid");
             params
-                .implied_vol(forward, strike, expiry)
+                .implied_vol(forward, strike, expiry, VolQuoteType::BlackLognormal)
                 .expect("vol should compute")
         };
 
-        // Fine β grid straddling the β=1 lognormal special-case boundary. The
-        // model clamps |1-β| < 1e-4 to exactly β=1, so values just below 1
-        // exercise the general branch and β=1 exercises the special case.
+        // Fine β grid through the exact β=1 lognormal special-case boundary.
         let betas = [0.90, 0.95, 0.98, 0.999, 1.0];
         let vols: Vec<f64> = betas.iter().map(|&b| vol_at(b)).collect();
 
@@ -476,7 +481,7 @@ mod sabr_beta {
 
         for &forward in &[50.0_f64, 100.0, 250.0] {
             let vol = params
-                .implied_vol(forward, forward, 2.0)
+                .implied_vol(forward, forward, 2.0, VolQuoteType::Normal)
                 .expect("β=0 ATM vol should compute");
             assert!(
                 (vol - alpha).abs() < 1e-10,
@@ -600,7 +605,8 @@ mod asian_geometric {
             .build()
             .expect("vol surface");
         MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "SPX",

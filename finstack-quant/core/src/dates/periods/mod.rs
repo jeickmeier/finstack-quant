@@ -642,9 +642,9 @@ pub struct Period {
 #[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct PeriodPlan {
     /// Calendar context of every period in the plan, retained once.
-    pub calendar: PeriodCalendar,
-    /// Ordered periods produced by the parser.
-    pub periods: Vec<Period>,
+    calendar: PeriodCalendar,
+    /// Chronologically ordered reporting periods, with optional gaps.
+    periods: Vec<Period>,
 }
 
 #[derive(serde::Deserialize)]
@@ -698,6 +698,23 @@ impl PeriodPlan {
                 ),
             ));
         }
+        let mut previous: Option<&Period> = None;
+        for period in &periods {
+            let id = period.id;
+            if (period.start, period.end) != calendar.bounds(id.year(), id.kind(), id.index())? {
+                return Err(invalid_period(
+                    &id.to_string(),
+                    "reporting dates must match the calendar bounds of the period identifier",
+                ));
+            }
+            if previous.is_some_and(|prev| prev.id.kind() != id.kind() || prev.end > period.start) {
+                return Err(invalid_period(
+                    &id.to_string(),
+                    "periods must have one frequency and be unique, non-overlapping and in ascending order",
+                ));
+            }
+            previous = Some(period);
+        }
         Ok(Self { calendar, periods })
     }
 
@@ -706,8 +723,10 @@ impl PeriodPlan {
     /// A canonical plan is nonempty, holds one period kind, gives every
     /// period the exact `[start, end)` bounds its identifier has in the
     /// plan's calendar, and is contiguous: each period starts where the
-    /// previous one ends (record CORE-CONVENTIONS-014 #1). The actual or
-    /// forecast flags are not examined.
+    /// previous one ends (record CORE-CONVENTIONS-014 #1). Construction
+    /// already requires one kind, calendar bounds and ascending order; this
+    /// adds that the plan is nonempty and has no gap. The actual or forecast
+    /// flags are not examined.
     ///
     /// # Errors
     ///
@@ -721,9 +740,9 @@ impl PeriodPlan {
     /// let plan = build_periods("2025Q1..Q3", None)?;
     /// plan.validate_canonical()?;
     ///
-    /// let mut periods = plan.periods.clone();
+    /// let mut periods = plan.to_vec();
     /// periods.remove(1);
-    /// let gap = PeriodPlan::try_new(plan.calendar, periods)?;
+    /// let gap = PeriodPlan::try_new(plan.get_calendar(), periods)?;
     /// assert!(gap.validate_canonical().is_err());
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
@@ -771,6 +790,21 @@ impl PeriodPlan {
             }
         }
         Ok(())
+    }
+
+    /// Calendar that defines the canonical bounds of all reporting periods.
+    pub fn get_calendar(&self) -> PeriodCalendar {
+        self.calendar
+    }
+
+    /// Borrow the validated reporting rows in chronological order.
+    pub fn get_periods(&self) -> &[Period] {
+        &self.periods
+    }
+
+    /// Consume the plan and return its reporting rows in chronological order.
+    pub fn into_periods(self) -> Vec<Period> {
+        self.periods
     }
 }
 
@@ -827,9 +861,9 @@ impl<'a> IntoIterator for &'a PeriodPlan {
 /// use finstack_quant_core::dates::build_periods;
 ///
 /// let plan = build_periods("2025Q1..Q4", Some("2025Q2"))?;
-/// assert_eq!(plan.periods.len(), 4);
-/// assert!(plan.periods[1].is_actual);
-/// assert!(!plan.periods[2].is_actual);
+/// assert_eq!(plan.len(), 4);
+/// assert!(plan[1].is_actual);
+/// assert!(!plan[2].is_actual);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn build_periods(range: &str, actuals_until: Option<&str>) -> crate::Result<PeriodPlan> {

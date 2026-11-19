@@ -91,25 +91,17 @@ fn generate_effects(
             nodes,
             match_mode,
         } => adapters::curves::vol_index_node_effects(curve_id, nodes, *match_mode, ctx),
-        OperationSpec::BaseCorrParallelPts { surface_id, points } => {
-            Ok(adapters::basecorr::base_corr_effects(
-                "BaseCorrParallelPts",
-                surface_id,
-                None,
-                *points,
-                ctx,
-            ))
-        }
+        OperationSpec::BaseCorrParallelPts { surface_id, points } => Ok(
+            adapters::basecorr::base_corr_effects(surface_id, None, *points),
+        ),
         OperationSpec::BaseCorrBucketPts {
             surface_id,
             detachment_bp,
             points,
         } => Ok(adapters::basecorr::base_corr_effects(
-            "BaseCorrBucketPts",
             surface_id,
             detachment_bp.as_deref(),
             *points,
-            ctx,
         )),
         OperationSpec::VolSurfaceParallelPct {
             vol_surface_id,
@@ -538,11 +530,12 @@ pub(super) fn apply_generated_effects(
             ScenarioEffect::Warning(w) => sink.warnings.push(w),
             ScenarioEffect::UpdateCurve(storage) => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                match market_target_for_id(op, storage.id()) {
+                let target = market_target_for_id(op, storage.id());
+                ctx.market.try_insert_mut(storage)?;
+                match target {
                     Some(target) => sink.record_market_shock(target, requested_shock(op), None),
                     None => sink.changes.all_dirty = true,
                 }
-                *ctx.market = std::mem::take(ctx.market).insert(storage);
                 *sink.applied += 1;
             }
         }

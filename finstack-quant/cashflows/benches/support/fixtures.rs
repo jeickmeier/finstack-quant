@@ -83,7 +83,11 @@ pub fn make_discount_market(base: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(disc).insert(hazard)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
 }
 
 pub fn make_forward_market(base: Date) -> MarketContext {
@@ -103,7 +107,9 @@ pub fn make_forward_market(base: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(fwd)
+    MarketContext::new()
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 pub fn make_fixed_schedule(base: Date, years: i32, frequency: Tenor) -> CashFlowSchedule {
@@ -184,6 +190,7 @@ pub fn build_adjusted(
 pub fn term_float_spec(frequency: Tenor) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: INDEX_ID.into(),
             forward_curve_id: INDEX_ID.into(),
             spread_bp: dec!(200.0),
             gearing: Decimal::ONE,
@@ -212,6 +219,7 @@ pub fn overnight_float_spec(
 ) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: INDEX_ID.into(),
             forward_curve_id: INDEX_ID.into(),
             spread_bp: dec!(200.0),
             gearing: Decimal::ONE,

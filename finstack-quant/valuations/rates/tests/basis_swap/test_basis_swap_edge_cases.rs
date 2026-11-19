@@ -102,7 +102,13 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(disc).insert(f3m).insert(f1m)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve")
 }
 
 /// Vanilla basis swaps must not exchange notionals.
@@ -139,6 +145,7 @@ fn make_leg(forward_curve: &str, start: Date, end: Date, spread_bp: Decimal) -> 
     FloatLegSpec {
         end_of_month: false,
         fixing_calendar_id: None,
+        index_id: forward_curve.into(),
         forward_curve_id: CurveId::new(forward_curve),
         discount_curve_id: CurveId::new("USD-OIS"),
         start,
@@ -197,6 +204,7 @@ fn adjusted_payment_dates_control_simple_leg_pv_and_settlement() {
         primary.business_day_convention = bdc;
         primary.payment_lag_days = lag;
         let mut reference = primary.clone();
+        reference.index_id = "USD-SOFR-1M".into();
         reference.forward_curve_id = CurveId::new("USD-SOFR-1M");
         let swap = BasisSwap::new(
             "PAYMENT-DATE",
@@ -415,7 +423,13 @@ fn flat_curves_zero_rates() {
     )
     .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "ZERO-RATES",
@@ -492,7 +506,13 @@ fn negative_rates() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "NEG-RATES",
@@ -567,6 +587,7 @@ fn identical_forward_curves() {
         .reference_leg(FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -676,7 +697,13 @@ fn steep_curve() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "STEEP-CURVE",
@@ -777,7 +804,13 @@ fn seasoned_swap_requires_fixings() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
+    let ctx = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve");
 
     let swap = BasisSwap::new(
         "SEASONED-NO-FIX",
@@ -881,9 +914,12 @@ fn seasoned_swap_with_fixings_succeeds() {
     .expect("fixings series");
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(f3m)
-        .insert(f1m)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(f3m)
+        .expect("insert market curve")
+        .try_insert(f1m)
+        .expect("insert market curve")
         .insert_series(fix_3m)
         .insert_series(fix_1m);
 

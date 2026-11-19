@@ -107,10 +107,22 @@ pub struct CreditIndexState {
     /// ID of the base correlation curve (must exist in context curves)
     pub base_correlation_curve_id: String,
     /// Optional map of issuer ID → hazard curve ID
+    #[serde(
+        default,
+        deserialize_with = "crate::market_data::term_structures::deserialize_issuer_map"
+    )]
     pub issuer_credit_curve_ids: Option<std::collections::BTreeMap<String, String>>,
     /// Optional map of issuer ID → recovery rate
+    #[serde(
+        default,
+        deserialize_with = "crate::market_data::term_structures::deserialize_issuer_map"
+    )]
     pub issuer_recovery_rates: Option<std::collections::BTreeMap<String, f64>>,
     /// Optional map of issuer ID → weight
+    #[serde(
+        default,
+        deserialize_with = "crate::market_data::term_structures::deserialize_issuer_map"
+    )]
     pub issuer_weights: Option<std::collections::BTreeMap<String, f64>>,
 }
 
@@ -449,7 +461,7 @@ fn restore_market_context(
     }
 
     for surface in state.surfaces {
-        ctx.try_insert_surface_mut(surface)?;
+        ctx.insert_surface_mut(surface);
     }
 
     // Persisted state does not encode the original live FX provider, only the
@@ -483,11 +495,11 @@ fn restore_market_context(
     }
 
     for surface in state.fx_delta_vol_surfaces {
-        ctx.try_insert_fx_delta_vol_surface_mut(surface)?;
+        ctx.insert_fx_delta_vol_surface_mut(surface);
     }
 
     for cube in state.vol_cubes {
-        ctx.try_insert_vol_cube_mut(cube)?;
+        ctx.insert_vol_cube_mut(cube);
     }
 
     ctx.hierarchy = state.hierarchy;

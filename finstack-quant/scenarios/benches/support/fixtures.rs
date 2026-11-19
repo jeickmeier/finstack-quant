@@ -172,7 +172,9 @@ pub fn discount_curve(id: &str) -> DiscountCurve {
 }
 
 pub fn lean_market() -> MarketContext {
-    MarketContext::new().insert(discount_curve(USD_SOFR))
+    MarketContext::new()
+        .try_insert(discount_curve(USD_SOFR))
+        .expect("insert market curve")
 }
 
 fn vol_surface(id: &str, atm: f64) -> VolSurface {
@@ -253,38 +255,52 @@ pub fn full_market() -> MarketContext {
         .unwrap();
 
     let commodity = PriceCurve::builder(WTI)
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(AS_OF)
-        .spot_price(70.0)
         .knots([(0.0, 70.0), (1.0, 72.0), (2.0, 74.0), (5.0, 78.0)])
         .build()
         .unwrap();
 
     let vol_index = PriceCurve::builder(VIX)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .kind(PriceCurveKind::VolIndex)
         .base_date(AS_OF)
-        .spot_price(18.0)
         .knots([(0.0, 18.0), (0.25, 19.0), (1.0, 20.0), (2.0, 21.0)])
         .build()
         .unwrap();
 
     MarketContext::new()
-        .insert(discount_curve(USD_SOFR))
-        .insert(discount_curve(EUR_ESTR))
-        .insert(forward)
-        .insert(inflation)
-        .insert(commodity)
-        .insert(vol_index)
+        .try_insert(discount_curve(USD_SOFR))
+        .expect("insert market curve")
+        .try_insert(discount_curve(EUR_ESTR))
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
+        .try_insert(inflation)
+        .expect("insert market curve")
+        .try_insert(commodity)
+        .expect("insert market curve")
+        .try_insert(vol_index)
+        .expect("insert market curve")
         .insert_fx(FxMatrix::new(fx_provider, None))
         .insert_surface(vol_surface(SPX_VOL, 0.20))
         .insert_surface(vol_surface(CDX_IG_VOL, 0.30))
-        .insert(
+        .try_insert(
             BaseCorrelationCurve::builder(CDX_IG)
                 .knots(vec![(3.0, 0.30), (7.0, 0.50), (10.0, 0.60)])
                 .build()
                 .unwrap(),
         )
-        .insert(hazard_ig)
-        .insert(hazard_hy)
+        .expect("insert market curve")
+        .try_insert(hazard_ig)
+        .expect("insert market curve")
+        .try_insert(hazard_hy)
+        .expect("insert market curve")
         .insert_price(
             "SPY",
             MarketScalar::price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
@@ -311,16 +327,20 @@ pub fn hierarchy_hazard_market(n_curves: usize) -> MarketContext {
     let hierarchy = builder.build().unwrap();
 
     let usd_disc = discount_curve(USD_SOFR);
-    let mut market = MarketContext::new().insert(usd_disc.clone());
+    let mut market = MarketContext::new()
+        .try_insert(usd_disc.clone())
+        .expect("insert market curve");
     for (i, id) in ids.iter().enumerate() {
         let spread = 60.0 + i as f64;
-        market.insert_mut(calibrate_hazard(
-            AS_OF,
-            &usd_disc,
-            id.as_str(),
-            0.40,
-            &[("1Y", spread), ("5Y", spread + 60.0)],
-        ));
+        market
+            .try_insert_mut(calibrate_hazard(
+                AS_OF,
+                &usd_disc,
+                id.as_str(),
+                0.40,
+                &[("1Y", spread), ("5Y", spread + 60.0)],
+            ))
+            .expect("insert market curve");
     }
     market.set_hierarchy(hierarchy);
     market
@@ -339,7 +359,9 @@ pub fn hierarchy_market(n_curves: usize) -> MarketContext {
 
     let mut market = MarketContext::new();
     for id in &ids {
-        market.insert_mut(discount_curve(id));
+        market
+            .try_insert_mut(discount_curve(id))
+            .expect("insert market curve");
     }
     market.set_hierarchy(hierarchy);
     market
@@ -347,7 +369,7 @@ pub fn hierarchy_market(n_curves: usize) -> MarketContext {
 
 pub fn financial_model() -> FinancialModelSpec {
     let period_plan = build_periods("2025Q1..2026Q4", None).unwrap();
-    let periods = period_plan.periods;
+    let periods = period_plan.into_periods();
     let mut model = FinancialModelSpec::new(
         "test_model",
         finstack_quant_core::dates::PeriodPlan::try_new(

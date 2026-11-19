@@ -373,7 +373,7 @@ impl ModelBuilder {
     pub fn periods(&mut self, range: &str, actuals_until: Option<&str>) -> Result<&mut Self> {
         self.ensure_periods_unset()?;
         let period_plan = build_periods(range, actuals_until)?;
-        if period_plan.periods.is_empty() {
+        if period_plan.is_empty() {
             return Err(Error::period(
                 "Period range must contain at least one period",
             ));
@@ -406,7 +406,7 @@ impl ModelBuilder {
     /// validated as a whole by [`Self::build`].
     pub fn periods_explicit(&mut self, plan: PeriodPlan) -> Result<&mut Self> {
         self.ensure_periods_unset()?;
-        if plan.periods.is_empty() {
+        if plan.is_empty() {
             return Err(Error::period(
                 "Period list must contain at least one period",
             ));

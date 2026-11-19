@@ -78,7 +78,9 @@ fn test_structured_credit_bucketed_dv01_computed() {
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
-    let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.04, as_of))
+        .expect("insert market curve");
 
     let result = sc
         .price_with_metrics(
@@ -129,7 +131,9 @@ fn test_structured_credit_bucketed_cs01_reconciles_to_parallel() {
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
-    let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.04, as_of))
+        .expect("insert market curve");
     let model_price = *sc
         .price_with_metrics(
             &market,

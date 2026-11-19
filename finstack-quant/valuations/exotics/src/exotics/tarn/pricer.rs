@@ -558,7 +558,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve");
-        MarketContext::new().insert(discount).insert(forward)
+        MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve")
     }
 
     fn deterministic_pricer(paths: usize) -> TarnPricer {

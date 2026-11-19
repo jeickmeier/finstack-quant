@@ -94,10 +94,9 @@ impl RandomStream for DummyRng {
             *x = 0.5;
         }
     }
-    fn fill_std_normals(&mut self, out: &mut [f64]) {
-        for x in out {
-            *x = 0.0;
-        }
+    fn fill_std_normals(&mut self, out: &mut [f64]) -> finstack_quant_core::Result<()> {
+        out.fill(0.0);
+        Ok(())
     }
 }
 
@@ -124,10 +123,9 @@ impl RandomStream for PathIndexedRng {
         }
     }
 
-    fn fill_std_normals(&mut self, out: &mut [f64]) {
-        for x in out {
-            *x = 0.0;
-        }
+    fn fill_std_normals(&mut self, out: &mut [f64]) -> finstack_quant_core::Result<()> {
+        out.fill(0.0);
+        Ok(())
     }
 }
 
@@ -139,8 +137,9 @@ impl StochasticProcess for DummyProcess {
     fn drift(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
         out[0] = 0.0;
     }
-    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         out[0] = 0.1;
+        Ok(())
     }
 }
 
@@ -155,8 +154,9 @@ impl Discretization<DummyProcess> for DummyDisc {
         _x: &mut [f64],
         _z: &[f64],
         _work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         // Just keep state constant
+        Ok(())
     }
 }
 
@@ -591,7 +591,11 @@ fn test_antithetic_mirrors_initial_uniform() {
 
 /// A minimal RNG that declares it does not support splitting (mimicking SobolRng).
 #[derive(Clone)]
-struct NonSplittableRng;
+enum NonSplittableRng {
+    Pseudo,
+    Quasi,
+    FailedDraw,
+}
 impl RandomStream for NonSplittableRng {
     fn split(&self, _id: u64) -> Option<Self> {
         None
@@ -601,13 +605,20 @@ impl RandomStream for NonSplittableRng {
             *x = 0.5;
         }
     }
-    fn fill_std_normals(&mut self, out: &mut [f64]) {
-        for x in out {
-            *x = 0.0;
+    fn fill_std_normals(&mut self, out: &mut [f64]) -> finstack_quant_core::Result<()> {
+        if matches!(self, Self::FailedDraw) {
+            return Err(finstack_quant_core::Error::Validation(
+                "test normal draw failed".into(),
+            ));
         }
+        out.fill(0.0);
+        Ok(())
     }
     fn supports_splitting(&self) -> bool {
         false
+    }
+    fn is_quasi_random(&self) -> bool {
+        matches!(self, Self::Quasi)
     }
 }
 
@@ -620,7 +631,7 @@ fn test_serial_with_non_splittable_rng_succeeds() {
         .build()
         .expect("McEngine builder should succeed with valid test data");
 
-    let rng = NonSplittableRng;
+    let rng = NonSplittableRng::Pseudo;
     let process = DummyProcess;
     let disc = DummyDisc;
     let initial_state = vec![100.0];
@@ -653,7 +664,7 @@ fn test_parallel_with_non_splittable_rng_returns_error() {
         .build()
         .expect("McEngine builder should succeed with valid test data");
 
-    let rng = NonSplittableRng;
+    let rng = NonSplittableRng::Pseudo;
     let process = DummyProcess;
     let disc = DummyDisc;
     let initial_state = vec![100.0];
@@ -687,6 +698,28 @@ fn test_parallel_with_non_splittable_rng_returns_error() {
 }
 
 #[test]
+fn engine_propagates_normal_draw_failure() {
+    let engine = McEngine::builder()
+        .num_paths(2)
+        .uniform_grid(1.0, 1)
+        .parallel(false)
+        .build()
+        .expect("engine");
+    let err = engine
+        .price(McPricingInputs {
+            rng: &NonSplittableRng::FailedDraw,
+            process: &DummyProcess,
+            disc: &DummyDisc,
+            initial_state: &[100.0],
+            payoff: &DummyPayoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
+        .expect_err("a failed path cannot produce an estimate");
+    assert!(err.to_string().contains("test normal draw failed"));
+}
+
+#[test]
 fn test_engine_rejects_quasi_random_rng_even_in_serial_mode() {
     // Guard: the generic engine consumes draws step-by-step and reports an
     // i.i.d. stderr, both invalid for a low-discrepancy sequence. Sobol must
@@ -699,8 +732,7 @@ fn test_engine_rejects_quasi_random_rng_even_in_serial_mode() {
         .build()
         .expect("McEngine builder should succeed with valid test data");
 
-    let rng =
-        finstack_quant_core::math::random::SobolRng::try_new(1, 0).expect("valid Sobol dimension");
+    let rng = NonSplittableRng::Quasi;
     let process = DummyProcess;
     let disc = DummyDisc;
     let initial_state = vec![100.0];
@@ -784,7 +816,7 @@ fn test_price_with_capture_parallel_non_splittable_returns_error() {
         .build()
         .expect("McEngine builder should succeed with valid test data");
 
-    let rng = NonSplittableRng;
+    let rng = NonSplittableRng::Pseudo;
     let process = DummyProcess;
     let disc = DummyDisc;
     let initial_state = vec![100.0];
@@ -1797,9 +1829,9 @@ mod paired_tests {
             x: &mut [f64],
             z: &[f64],
             work: &mut [f64],
-        ) {
+        ) -> finstack_quant_core::Result<()> {
             self.steps.fetch_add(1, Ordering::Relaxed);
-            ExactGbm.step(process, t, dt, x, z, work);
+            ExactGbm.step(process, t, dt, x, z, work)
         }
     }
 
@@ -2027,8 +2059,8 @@ mod paired_tests {
             self.0.fill_u01(out);
         }
 
-        fn fill_std_normals(&mut self, out: &mut [f64]) {
-            self.0.fill_std_normals(out);
+        fn fill_std_normals(&mut self, out: &mut [f64]) -> finstack_quant_core::Result<()> {
+            self.0.fill_std_normals(out)
         }
     }
 
@@ -2206,7 +2238,7 @@ mod paired_tests {
         let err = McEngine::new(base.clone().parallel(true))
             .paired_moments(
                 McPricingInputs {
-                    rng: &NonSplittableRng,
+                    rng: &NonSplittableRng::Pseudo,
                     process: inputs.process,
                     disc: inputs.disc,
                     initial_state: inputs.initial_state,
@@ -2218,11 +2250,10 @@ mod paired_tests {
             )
             .expect_err("parallel streams must split");
         assert!(err.to_string().contains("splittable RNG"));
-        let sobol = finstack_quant_core::math::random::SobolRng::try_new(1, 0).expect("Sobol");
         let err = McEngine::new(base.clone())
             .paired_moments(
                 McPricingInputs {
-                    rng: &sobol,
+                    rng: &NonSplittableRng::Quasi,
                     process: inputs.process,
                     disc: inputs.disc,
                     initial_state: inputs.initial_state,

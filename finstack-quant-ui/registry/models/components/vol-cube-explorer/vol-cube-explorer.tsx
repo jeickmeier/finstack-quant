@@ -43,10 +43,14 @@ export interface VolCubeExplorerProps extends Omit<
   colorDomains: Record<OutputConvention, readonly [number, number]>;
   /** Supplied sampling coordinates. Omit to sample the canonical expiry/tenor nodes. */
   coordinates?: readonly { expiry: number; tenor: number }[];
-  /** Explicit strikes (and optional rate and repair passes) for the Rust-materialized slice and node smile. Omit to show no slice. */
+  /** Explicit strikes and fixed-tenor surface interpolation mode (plus optional rate and repair passes) for the Rust-materialized slice and node smile. Omit to show no slice. */
   slice?: Pick<
     VolCubeSliceProps,
-    "initialStrikes" | "initialAxis" | "initialRate" | "repairIterations"
+    | "initialStrikes"
+    | "interpolationMode"
+    | "initialAxis"
+    | "initialRate"
+    | "repairIterations"
   >;
 }
 /** Checked native SABR evaluation with an explicit strike/convention and separate original parameters. */

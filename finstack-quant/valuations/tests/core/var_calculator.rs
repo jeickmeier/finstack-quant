@@ -38,7 +38,9 @@ fn usd_ois_curve(as_of: Date) -> Result<DiscountCurve> {
 }
 
 fn usd_ois_market(as_of: Date) -> Result<MarketContext> {
-    Ok(MarketContext::new().insert(usd_ois_curve(as_of)?))
+    Ok(MarketContext::new()
+        .try_insert(usd_ois_curve(as_of)?)
+        .expect("insert market curve"))
 }
 
 /// Fixed-rate USD bond used by the VaR tests.
@@ -632,7 +634,7 @@ fn directional_taylor_keeps_nonstandard_tenor_and_unrelated_curves() -> Result<(
     usd.discount_curve_id = "USD-OIS".into();
     let mut eur = standard_bond("EUR-CURVE", as_of, date!(2028 - 01 - 01));
     eur.discount_curve_id = "EUR-OIS".into();
-    let market = usd_ois_market(as_of)?.insert(
+    let market = usd_ois_market(as_of)?.try_insert(
         DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.8)])
@@ -640,7 +642,7 @@ fn directional_taylor_keeps_nonstandard_tenor_and_unrelated_curves() -> Result<(
             .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
-    );
+    )?;
     let scenario = MarketScenario::new(
         as_of,
         vec![

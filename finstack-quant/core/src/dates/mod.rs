@@ -35,7 +35,7 @@
 //! assert!(schedule.get_dates().len() >= 4);
 //!
 //! let periods = build_periods("2024Q1..Q4", None)?;
-//! assert_eq!(periods.periods.len(), 4);
+//! assert_eq!(periods.len(), 4);
 //! # Ok(())
 //! # }
 //! ```

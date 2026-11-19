@@ -8,30 +8,30 @@ use crate::errors::core_to_py;
 
 /// Standard normal cumulative distribution function Φ(x).
 ///
-/// Returns the probability P(Z ≤ x) where Z ~ N(0, 1).
+/// Returns the probability P(Z ≤ x) where Z ~ N(0, 1). NaN raises ValueError.
 #[pyfunction]
 #[pyo3(text_signature = "(x)")]
-fn norm_cdf(x: f64) -> f64 {
-    special_functions::norm_cdf(x)
+fn norm_cdf(x: f64) -> PyResult<f64> {
+    special_functions::norm_cdf(x).map_err(core_to_py)
 }
 
 /// Natural logarithm of the standard normal cumulative distribution function.
 ///
 /// # Arguments
-/// - `x`: Standard-normal threshold in standard-deviation units; accepts infinities and propagates NaN.
+/// - `x`: Standard-normal threshold in standard-deviation units; accepts infinities. NaN raises ValueError; an unrepresentable finite-input log tail raises RuntimeError.
 #[pyfunction]
 #[pyo3(text_signature = "(x)")]
-fn log_norm_cdf(x: f64) -> f64 {
-    special_functions::log_norm_cdf(x)
+fn log_norm_cdf(x: f64) -> PyResult<f64> {
+    special_functions::log_norm_cdf(x).map_err(core_to_py)
 }
 
 /// Standard normal probability density function φ(x).
 ///
-/// Returns (1/√(2π)) · exp(-x²/2).
+/// Returns (1/√(2π)) · exp(-x²/2). NaN raises ValueError.
 #[pyfunction]
 #[pyo3(text_signature = "(x)")]
-fn norm_pdf(x: f64) -> f64 {
-    special_functions::norm_pdf(x)
+fn norm_pdf(x: f64) -> PyResult<f64> {
+    special_functions::norm_pdf(x).map_err(core_to_py)
 }
 
 /// Normal CDF with explicit mean and standard deviation: P(X ≤ x), X ~ N(mean, std_dev²).
@@ -47,7 +47,7 @@ fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
 /// Normal PDF with explicit mean and standard deviation.
 ///
 /// Raises ``ValueError`` if ``std_dev`` is not finite and strictly positive,
-/// ``mean`` is non-finite, ``x`` is ``NaN``, or the density overflows ``float64``.
+/// ``mean`` is non-finite or ``x`` is ``NaN``. An unrepresentable density raises ``RuntimeError``.
 #[pyfunction]
 #[pyo3(text_signature = "(x, mean, std_dev)")]
 fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
@@ -56,27 +56,27 @@ fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
 
 /// Inverse standard normal CDF (Φ⁻¹).
 ///
-/// Returns x such that Φ(x) = p (`-inf` at `0.0`, `+inf` at `1.0`, and `nan` outside `[0, 1]`).
+/// Returns x such that Φ(x) = p (`-inf` at `0.0` and `+inf` at `1.0`).
 #[pyfunction]
 #[pyo3(text_signature = "(p)")]
-fn standard_normal_inv_cdf(p: f64) -> f64 {
-    special_functions::standard_normal_inv_cdf(p)
+fn standard_normal_inv_cdf(p: f64) -> PyResult<f64> {
+    special_functions::standard_normal_inv_cdf(p).map_err(core_to_py)
 }
 
 /// Error function erf(x) = (2/√π) ∫₀ˣ e^(-t²) dt.
 #[pyfunction]
 #[pyo3(text_signature = "(x)")]
-fn erf(x: f64) -> f64 {
-    special_functions::erf(x)
+fn erf(x: f64) -> PyResult<f64> {
+    special_functions::erf(x).map_err(core_to_py)
 }
 
 /// Natural logarithm of the Gamma function ln(Γ(x)).
 ///
-/// Defined for x > 0. Returns positive infinity at x = 0; negative inputs are outside the supported domain and can return NaN.
+/// Defined for finite x > 0. Raises ``ValueError`` for invalid inputs and ``RuntimeError`` if the logarithm overflows.
 #[pyfunction]
 #[pyo3(text_signature = "(x)")]
-fn ln_gamma(x: f64) -> f64 {
-    special_functions::ln_gamma(x)
+fn ln_gamma(x: f64) -> PyResult<f64> {
+    special_functions::ln_gamma(x).map_err(core_to_py)
 }
 
 /// Student-t cumulative distribution function.

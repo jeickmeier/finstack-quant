@@ -46,7 +46,9 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
     .unwrap();
 
     let disc = build_simple_discount_curve(as_of);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // YTM → price → YTM
     let target_ytm = 0.045;
@@ -158,7 +160,11 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
         .unwrap();
     let fwd =
         ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 30), 0.03, DayCount::Act360).unwrap();
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let target_dm = 0.01; // 100bp
     let quotes = compute_quotes(
@@ -226,7 +232,9 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve builder should succeed");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // OAS → price → OAS
     let target_oas = 0.01; // 100bp in decimal
@@ -314,7 +322,9 @@ fn test_quote_engine_roundtrip_i_spread_fixed_bond() {
     .unwrap();
 
     let disc = build_simple_discount_curve(as_of);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let target_ispr = 0.0075; // 75bp
     let quotes = compute_quotes(
@@ -367,7 +377,9 @@ fn test_quote_engine_asw_market_rejects_matured_schedule() {
     .unwrap();
 
     let disc = build_simple_discount_curve(issue);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let err = compute_quotes(
         &bond,
@@ -400,7 +412,9 @@ fn test_quote_engine_spread_and_yield_paths_reprice_to_same_clean_price() {
     .unwrap();
 
     let disc = build_simple_discount_curve(as_of);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Start from a market clean-price quote and infer all spread/yield views.
     let base_clean_pct = 99.25;
@@ -484,7 +498,9 @@ fn test_quote_engine_i_spread_rejects_matured_schedule() {
     .unwrap();
 
     let disc = build_simple_discount_curve(issue);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let err = compute_quotes(
         &bond,

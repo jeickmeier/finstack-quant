@@ -78,7 +78,9 @@ fn named(mut bond: Bond, curve_id: &str) -> Bond {
 
 #[test]
 fn g_spread_on_the_swap_curve_is_i_spread_bit_for_bit() {
-    let market = MarketContext::new().insert(flat_curve("USD-OIS", 0.04));
+    let market = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve");
     for bond in [bullet(), quoted_callable()] {
         let values = metrics(
             &named(bond, "USD-OIS"),
@@ -94,7 +96,9 @@ fn the_callable_case_is_measured_to_the_workout_date() {
     // Pins that the bit-for-bit case above runs on the workout branch: at 106
     // the yield to the 2027 call at 101 is the worst, so the par rate is the
     // two-year one.
-    let market = MarketContext::new().insert(flat_curve("USD-OIS", 0.04));
+    let market = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve");
     let callable = metrics(
         &named(quoted_callable(), "USD-OIS"),
         &market,
@@ -134,8 +138,10 @@ fn a_curve_50bp_lower_widens_the_spread_by_its_par_rate_difference() {
     // Five-year semi-annual 30/360 par rates are 4.042099% and 3.532447%, so
     // the spread widens by 50.9652bp: the compounding basis takes it above 50.
     let market = MarketContext::new()
-        .insert(flat_curve("USD-OIS", 0.04))
-        .insert(flat_curve("UST", 0.035));
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve")
+        .try_insert(flat_curve("UST", 0.035))
+        .expect("insert market curve");
     let values = metrics(
         &named(bullet(), "UST"),
         &market,
@@ -148,7 +154,9 @@ fn a_curve_50bp_lower_widens_the_spread_by_its_par_rate_difference() {
 
 #[test]
 fn no_government_curve_is_an_error_and_never_the_discount_curve() {
-    let market = MarketContext::new().insert(flat_curve("USD-OIS", 0.04));
+    let market = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve");
     let error = bullet()
         .price_with_metrics(
             &market,
@@ -162,7 +170,9 @@ fn no_government_curve_is_an_error_and_never_the_discount_curve() {
 
 #[test]
 fn a_named_curve_missing_from_the_market_is_not_found() {
-    let market = MarketContext::new().insert(flat_curve("USD-OIS", 0.04));
+    let market = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve");
     let error = named(bullet(), "UST")
         .price_with_metrics(
             &market,
@@ -181,8 +191,10 @@ fn a_named_curve_missing_from_the_market_is_not_found() {
 #[test]
 fn naming_a_government_curve_moves_no_price_or_parallel_dv01() {
     let market = MarketContext::new()
-        .insert(flat_curve("USD-OIS", 0.04))
-        .insert(flat_curve("UST", 0.035));
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve")
+        .try_insert(flat_curve("UST", 0.035))
+        .expect("insert market curve");
     let plain = metrics(
         &bullet(),
         &market,
@@ -228,7 +240,9 @@ fn government_curve_id_is_strict_serde_and_omitted_when_unset() {
 #[test]
 fn a_workout_on_the_quote_date_is_the_same_error_as_i_spread() {
     let as_of = date!(2025 - 01 - 01);
-    let market = MarketContext::new().insert(flat_curve("USD-OIS", 0.04));
+    let market = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve");
     let mut bond = named(bullet(), "USD-OIS");
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
@@ -268,8 +282,10 @@ fn a_workout_on_the_quote_date_is_the_same_error_as_i_spread() {
 fn a_named_curve_is_a_dependency_with_no_dv01_of_its_own() {
     let as_of = date!(2025 - 01 - 01);
     let market = MarketContext::new()
-        .insert(flat_curve("USD-OIS", 0.04))
-        .insert(flat_curve("UST", 0.035));
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve")
+        .try_insert(flat_curve("UST", 0.035))
+        .expect("insert market curve");
     let bond = named(bullet(), "UST");
     assert!(
         bond.market_dependencies()
@@ -302,7 +318,9 @@ fn a_named_curve_is_a_dependency_with_no_dv01_of_its_own() {
         "{rows:?}"
     );
 
-    let without_curve = MarketContext::new().insert(flat_curve("USD-OIS", 0.04));
+    let without_curve = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.04))
+        .expect("insert market curve");
     assert_eq!(
         metrics(&bond, &without_curve, &[MetricId::Dv01]),
         metrics(&bullet(), &without_curve, &[MetricId::Dv01]),

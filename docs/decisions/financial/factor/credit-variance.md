@@ -1,14 +1,20 @@
 # FACTOR-014: Sample and normalized EWMA credit variance estimation
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Both estimators and differencing are implemented. History admission, unavailable estimates, and estimator provenance require reconciliation.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** Six EWMA tests and one sample-variance test passed using the existing Factor test binary. Exact arithmetic checked both mean conventions. A fresh build encountered a missing `thiserror_impl` artifact. Near-one decay and the accepted history rules still require qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Estimate variance from peeled spread changes in bp. Use the working changes directly in Returns mode and first-difference peeled levels once in Levels mode. Annualize by 252, 12 or 4 for daily, monthly or quarterly observations. Preserve the declared peel space in stored factor histories. [Panel and clock](credit-panel.md).
+2. Explicitly choose either demeaned sample variance with divisor `n−1`, or a finite-window EWMA second moment around zero with normalized recency weights proportional to `λ^(n−1−t)` and finite `0 < λ < 1`. Use numerically stable arithmetic across the admitted range. Two monthly changes of `+2 bp` produce annualized sample variance of `0 bp²` and annualized EWMA variance of `48 bp²`.
+3. Require at least two aligned changes. Fail calibration if a required active factor lacks a qualified estimate. Mark an unavailable issuer residual estimate for the residual source policy and preserve zero when the history qualifies. Record estimator, observation span and count, annualization frequency, and EWMA decay where applicable. [Residual volatility](credit-residual-volatility.md).
+
+## Observed choice and rationale
 
 Estimate annualized variance either from demeaned sample changes or a normalized finite-window zero-mean EWMA. Even when betas are fitted on Levels, volatility is estimated on changes of the resulting factor and residual series.
 
@@ -47,6 +53,5 @@ Weighted-demeaned EWMA, an initialized infinite-history recursion, elapsed-time 
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and independent qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

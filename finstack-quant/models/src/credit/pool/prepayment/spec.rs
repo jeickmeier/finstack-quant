@@ -266,7 +266,7 @@ mod tests {
 
         let model = spec.build().expect("regime-switching model should build");
         assert!(format!("{model:?}").starts_with("RegimeSwitchingPrepay"));
-        assert!(model.conditional_smm(24, &[2.0], 0.05, 1.0) > model.expected_smm(24));
+        assert!(model.conditional_smm(24, &[2.0], 0.05, 1.0) > model.expected_smm(24).unwrap());
     }
 
     #[test]

@@ -183,7 +183,9 @@ fn tranche_option_costs_sum_to_the_deal_cost_and_equity_bears_the_most() {
     );
     deal.credit_model.stochastic_default_spec =
         Some(StochasticDefaultSpec::gaussian_copula(0.01, 0.3));
-    let market = market().insert(widening_hazard_curve());
+    let market = market()
+        .try_insert(widening_hazard_curve())
+        .expect("insert market curve");
     let result = deal
         .price_stochastic_with_mode(&market, CLOSING, monte_carlo(100))
         .expect("pricing");
@@ -220,7 +222,9 @@ fn credit_risky_single_revolver_pool_matches_the_standalone_option_cost_in_expec
         tenor_years: None,
     };
     let facility = revolver("RCF-POOL", 0.25, spread.clone(), PATHS / 2);
-    let market = market().insert(widening_hazard_curve());
+    let market = market()
+        .try_insert(widening_hazard_curve())
+        .expect("insert market curve");
     let standalone = RevolvingCreditPricer::price_with_paths(&facility, &market, CLOSING)
         .expect("standalone pricing")
         .draw_option_cost;
@@ -288,7 +292,9 @@ fn senior_coverage_position_diverts_to_the_senior_note_only() {
     // every payment date and diverts everything below A's coupon.
     let breached = build(vec![CoverageTestSpec::oc("A", 5.0)]);
     let control = build(Vec::new());
-    let market = market().insert(widening_hazard_curve());
+    let market = market()
+        .try_insert(widening_hazard_curve())
+        .expect("insert market curve");
 
     let run = breached
         .run_simulation(&market, CLOSING)

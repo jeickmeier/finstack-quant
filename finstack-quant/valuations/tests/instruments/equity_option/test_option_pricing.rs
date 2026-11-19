@@ -61,7 +61,8 @@ fn create_test_market(base_date: Date) -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(disc)
+        .try_insert(disc)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",

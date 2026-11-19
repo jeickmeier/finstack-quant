@@ -34,7 +34,7 @@ use smallvec::SmallVec;
 /// let cols: [&[f64]; 1] = [&x];
 /// let expr = CompiledExpr::new(Expr::column("x"))?;
 ///
-/// let out = expr.eval(&ctx, &cols)?;
+/// let out = expr.eval(&ctx, &cols, cols[0].len())?;
 /// assert_eq!(out, vec![1.0, 2.0, 3.0]);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
@@ -48,7 +48,7 @@ struct EvalNodeContext<'a> {
     ctx: &'a SimpleContext,
     cols: &'a [&'a [f64]],
     arena: &'a [f64],
-    offsets: &'a [(usize, usize)],
+    rows: usize,
 }
 
 impl<'a> EvalNodeContext<'a> {
@@ -56,8 +56,23 @@ impl<'a> EvalNodeContext<'a> {
     /// its dependents, so `id` always indexes an already-written arena segment.
     #[inline]
     fn dep_slice(&self, id: u64) -> &'a [f64] {
-        let (start, end) = self.offsets[id as usize];
-        &self.arena[start..end]
+        let start = id as usize * self.rows;
+        &self.arena[start..start + self.rows]
+    }
+}
+
+impl TryFrom<&Expr> for CompiledExpr {
+    type Error = crate::Error;
+
+    /// Compile a shared syntax tree without a recursive clone.
+    ///
+    /// # Arguments
+    ///
+    /// * `ast` - Borrowed scalar expression tree with the same admission rules as [`Self::new`].
+    fn try_from(ast: &Expr) -> crate::Result<Self> {
+        Ok(Self {
+            plan: super::dag::build_borrowed_plan(ast)?,
+        })
     }
 }
 
@@ -72,8 +87,9 @@ impl CompiledExpr {
     /// Returns [`crate::Error::Validation`] when `ast` calls a function that
     /// only the statements evaluator supports (every non-elementwise
     /// [`Function`]), references the capital structure (`CsRef`), or nests
-    /// deeper than the plan limit. Column names and data shapes are checked by
-    /// [`Self::eval`].
+    /// beyond depth 511 or exceeds 100,000 syntax nodes. Nonfinite literals,
+    /// incorrect function arities and invalid round digits are rejected during
+    /// compilation. [`Self::eval`] checks column names and data shapes.
     ///
     /// # Arguments
     ///
@@ -84,67 +100,93 @@ impl CompiledExpr {
         Ok(Self { plan })
     }
 
-    /// Evaluate the expression over `cols`.
+    /// Evaluate all dependencies eagerly and return one value per requested row.
     ///
-    /// # Column length handling
-    ///
-    /// The output length is the length of the **first** column in `cols`.
-    /// Columns shorter than that are NaN-padded at the tail; columns longer
-    /// than that are truncated. Missing tail values therefore propagate as
-    /// NaN rather than being silently zero-filled.
-    ///
-    /// The context maps column names to positions in `cols`. Every call
-    /// recomputes values from the supplied columns.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a referenced column is absent from `ctx` or
-    /// `cols`.
+    /// NaN in a data column denotes missing input. Invalid finite computations,
+    /// including those in an unselected branch, fail the entire evaluation.
     ///
     /// # Arguments
     ///
-    /// * `ctx` - Column-name to index map used to resolve `Expr` column references.
-    /// * `cols` - Column arrays aligned with `ctx`; output length is the first
-    ///   column's length.
-    pub fn eval(&self, ctx: &SimpleContext, cols: &[&[f64]]) -> crate::Result<Vec<f64>> {
+    /// * `ctx` - Exact column names in data order.
+    /// * `cols` - Aligned data columns, one per context name. Every value must be finite or NaN.
+    /// * `num_rows` - Required length of every column and of the output, including literal-only expressions.
+    pub fn eval(
+        &self,
+        ctx: &SimpleContext,
+        cols: &[&[f64]],
+        num_rows: usize,
+    ) -> crate::Result<Vec<f64>> {
         let plan = &self.plan;
         tracing::debug!(
-            row_count = cols.first().map(|c| c.len()).unwrap_or(0),
+            row_count = num_rows,
             plan_nodes = plan.nodes.len(),
             "evaluating compiled expression"
         );
-
-        let len = cols.first().map(|c| c.len()).unwrap_or(0);
-        let arena_elements = len.checked_mul(plan.nodes.len()).ok_or_else(|| {
-            crate::Error::Validation("expression arena size overflows usize".to_string())
-        })?;
-        // DAG node ids are dense positions in `plan.nodes`, so offsets are
-        // indexed by id directly.
-        let mut arena = vec![0.0; arena_elements];
-        let mut offsets = vec![(0, 0); plan.nodes.len()];
-
-        let mut cursor = 0;
+        if ctx.column_count() != cols.len() {
+            return Err(crate::Error::Validation(format!(
+                "expected {} input columns, received {}",
+                ctx.column_count(),
+                cols.len()
+            )));
+        }
+        for (index, column) in cols.iter().enumerate() {
+            if column.len() != num_rows {
+                return Err(crate::Error::Validation(format!(
+                    "column {index} has {} rows, expected {num_rows}",
+                    column.len()
+                )));
+            }
+            if let Some(row) = column.iter().position(|value| value.is_infinite()) {
+                return Err(crate::Error::Validation(format!(
+                    "infinite value in column {index}, row {row}"
+                )));
+            }
+        }
         for node in &plan.nodes {
-            let start = cursor;
-            let end = cursor + len;
+            if let Operation::Column(name) = &node.operation
+                && ctx.get_index(name).is_none()
+            {
+                return Err(crate::InputError::NotFound {
+                    id: format!("expr column:{name}"),
+                }
+                .into());
+            }
+        }
+        if num_rows == 0 {
+            return Ok(Vec::new());
+        }
 
-            // Split the arena to avoid borrow conflicts
-            let (arena_deps, arena_out) = arena.split_at_mut(start);
-            let out_slice = &mut arena_out[..len];
+        // The root is the final node. Allocate its output separately so the
+        // returned vector owns only its rows, even for a large intermediate DAG.
+        let entries = num_rows.checked_mul(plan.nodes.len()).ok_or_else(|| {
+            crate::Error::Validation("expression arena size overflows usize".into())
+        })?;
+        let allocate = |len| -> crate::Result<Vec<f64>> {
+            let mut values = Vec::new();
+            values.try_reserve_exact(len).map_err(|error| {
+                crate::Error::Validation(format!("could not allocate expression rows: {error}"))
+            })?;
+            values.resize(len, 0.0);
+            Ok(values)
+        };
+        let mut arena = allocate(entries - num_rows)?;
+        let mut result = allocate(num_rows)?;
+        for node in &plan.nodes {
+            let (dependencies, remaining) = arena.split_at_mut(node.id as usize * num_rows);
+            let output = if node.id == plan.root {
+                &mut result[..]
+            } else {
+                &mut remaining[..num_rows]
+            };
             let env = EvalNodeContext {
                 ctx,
                 cols,
-                arena: arena_deps,
-                offsets: &offsets,
+                arena: dependencies,
+                rows: num_rows,
             };
-            Self::eval_node_into(&env, node, out_slice)?;
-
-            offsets[node.id as usize] = (start, end);
-            cursor = end;
+            Self::eval_node_into(&env, node, output)?;
         }
-
-        let (start, end) = offsets[plan.root as usize];
-        Ok(arena[start..end].to_vec())
+        Ok(result)
     }
 
     /// Evaluate a single DAG node directly into a provided output slice (arena-based).
@@ -155,21 +197,13 @@ impl CompiledExpr {
     ) -> crate::Result<()> {
         match &node.operation {
             Operation::Column(name) => {
-                let Some(idx) = env.ctx.index_of(name) else {
-                    return Err(crate::InputError::NotFound {
+                let idx = env
+                    .ctx
+                    .get_index(name)
+                    .ok_or_else(|| crate::InputError::NotFound {
                         id: format!("expr column:{name}"),
-                    }
-                    .into());
-                };
-                let Some(col_data) = env.cols.get(idx) else {
-                    return Err(crate::Error::Validation(format!(
-                        "Expression context resolved column '{name}' to index {idx}, but only {} data columns were provided",
-                        env.cols.len()
-                    )));
-                };
-                let len = out.len().min(col_data.len());
-                out[..len].copy_from_slice(&col_data[..len]);
-                out[len..].fill(f64::NAN);
+                    })?;
+                out.copy_from_slice(env.cols[idx]);
             }
             Operation::Literal(bits) => {
                 out.fill(f64::from_bits(*bits));
@@ -180,12 +214,12 @@ impl CompiledExpr {
                     .iter()
                     .map(|&dep_id| env.dep_slice(dep_id))
                     .collect();
-                Self::eval_function_into(*func, &arg_slices, out)?;
+                Self::eval_function_into(node.id, *func, &arg_slices, out)?;
             }
             Operation::BinOp(op) => {
                 let left = env.dep_slice(node.dependencies[0]);
                 let right = env.dep_slice(node.dependencies[1]);
-                Self::eval_bin_op_into(*op, left, right, out);
+                Self::eval_bin_op_into(node.id, *op, left, right, out)?;
             }
             Operation::UnaryOp(op) => {
                 let operand = env.dep_slice(node.dependencies[0]);
@@ -203,114 +237,65 @@ impl CompiledExpr {
 
     /// Evaluate a binary operation element-wise into a provided output slice.
     #[inline]
-    fn eval_bin_op_into(op: super::ast::BinOp, left: &[f64], right: &[f64], out: &mut [f64]) {
-        use super::ast::BinOp;
-        let len = out.len();
-
-        for (i, out_val) in out.iter_mut().enumerate().take(len) {
-            let (Some(&l), Some(&r)) = (left.get(i), right.get(i)) else {
-                *out_val = f64::NAN;
-                continue;
-            };
-
-            *out_val = match op {
-                // Arithmetic
+    fn eval_bin_op_into(
+        node: u64,
+        op: BinOp,
+        left: &[f64],
+        right: &[f64],
+        out: &mut [f64],
+    ) -> crate::Result<()> {
+        for (row, result) in out.iter_mut().enumerate() {
+            let l = left[row];
+            let r = right[row];
+            // A known false conjunction or true disjunction decides the result
+            // even when the other operand is missing.
+            *result = match op {
+                BinOp::And if l == 0.0 || r == 0.0 => 0.0,
+                BinOp::Or if (!l.is_nan() && l != 0.0) || (!r.is_nan() && r != 0.0) => 1.0,
+                _ if l.is_nan() || r.is_nan() => f64::NAN,
+                BinOp::Div | BinOp::Mod if r == 0.0 => {
+                    return Err(crate::Error::ExpressionEvaluation {
+                        node,
+                        row,
+                        message: format!("{op:?} by zero"),
+                    });
+                }
                 BinOp::Add => l + r,
                 BinOp::Sub => l - r,
                 BinOp::Mul => l * r,
-                BinOp::Div => {
-                    if r == 0.0 {
-                        f64::NAN
-                    } else {
-                        l / r
-                    }
-                }
+                BinOp::Div => l / r,
                 BinOp::Mod => l % r,
-
-                // Comparison (return 1.0 for true, 0.0 for false)
-                // Exact equality semantics for expression-language operators.
-                #[allow(clippy::float_cmp)]
-                BinOp::Eq => {
-                    if l == r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                #[allow(clippy::float_cmp)]
-                BinOp::Ne => {
-                    if l != r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Lt => {
-                    if l < r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Le => {
-                    if l <= r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Gt => {
-                    if l > r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Ge => {
-                    if l >= r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-
-                // Logical (treat non-zero as true, 0.0 as false)
-                BinOp::And => {
-                    if l != 0.0 && r != 0.0 {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Or => {
-                    if l != 0.0 || r != 0.0 {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
+                BinOp::Eq => f64::from(l.partial_cmp(&r) == Some(std::cmp::Ordering::Equal)),
+                BinOp::Ne => f64::from(l.partial_cmp(&r) != Some(std::cmp::Ordering::Equal)),
+                BinOp::Lt => f64::from(l < r),
+                BinOp::Le => f64::from(l <= r),
+                BinOp::Gt => f64::from(l > r),
+                BinOp::Ge => f64::from(l >= r),
+                BinOp::And => 1.0,
+                BinOp::Or => 0.0,
             };
+            if result.is_infinite() {
+                return Err(crate::Error::ExpressionEvaluation {
+                    node,
+                    row,
+                    message: format!("{op:?} produced a nonfinite value"),
+                });
+            }
         }
+        Ok(())
     }
 
     /// Evaluate a binary operation element-wise.
     #[inline]
     fn eval_unary_op_into(op: super::ast::UnaryOp, operand: &[f64], out: &mut [f64]) {
         use super::ast::UnaryOp;
-        let len = out.len().min(operand.len());
-        for i in 0..len {
-            out[i] = match op {
-                UnaryOp::Neg => -operand[i],
-                UnaryOp::Not => {
-                    if operand[i] == 0.0 {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
+        for (result, &value) in out.iter_mut().zip(operand) {
+            *result = match op {
+                UnaryOp::Neg => -value,
+                UnaryOp::Not if value.is_nan() => f64::NAN,
+                UnaryOp::Not => f64::from(value == 0.0),
             };
         }
-        out[len..].fill(f64::NAN);
     }
 
     /// Evaluate if-then-else element-wise into a provided output slice.
@@ -321,14 +306,10 @@ impl CompiledExpr {
         else_vals: &[f64],
         out: &mut [f64],
     ) {
-        let len = out.len();
-        for (i, out_val) in out.iter_mut().enumerate().take(len) {
-            let (Some(&cond), Some(&then_val), Some(&else_val)) =
-                (condition.get(i), then_vals.get(i), else_vals.get(i))
-            else {
-                *out_val = f64::NAN;
-                continue;
-            };
+        for (i, out_val) in out.iter_mut().enumerate() {
+            let cond = condition[i];
+            let then_val = then_vals[i];
+            let else_val = else_vals[i];
             *out_val = if cond.is_nan() {
                 f64::NAN
             } else if cond != 0.0 {
@@ -337,49 +318,6 @@ impl CompiledExpr {
                 else_val
             };
         }
-    }
-
-    /// Evaluate a function directly into `out`.
-    ///
-    /// Every elementwise arm writes the whole output slice, NaN-filling a
-    /// short result. Any other function was rejected by [`Self::new`].
-    fn eval_function_into(
-        fun: Function,
-        arg_slices: &[&[f64]],
-        out: &mut [f64],
-    ) -> crate::Result<()> {
-        match fun {
-            Function::Abs => Self::eval_unary_into(arg_slices, out, f64::abs),
-            Function::Sign => Self::eval_unary_into(arg_slices, out, Self::sign_or_zero),
-            Function::Pow => Self::eval_pow_into(arg_slices, out),
-            Function::Round => Self::eval_round_into(arg_slices, out)?,
-            Function::Floor => Self::eval_unary_into(arg_slices, out, f64::floor),
-            Function::Ceil => Self::eval_unary_into(arg_slices, out, f64::ceil),
-            Function::Ln => Self::eval_unary_into(arg_slices, out, f64::ln),
-            Function::Exp => Self::eval_unary_into(arg_slices, out, f64::exp),
-            Function::Log10 => Self::eval_unary_into(arg_slices, out, f64::log10),
-            Function::Sqrt => Self::eval_unary_into(arg_slices, out, f64::sqrt),
-            Function::Clamp => Self::eval_clamp_into(arg_slices, out),
-            Function::IsMissing => {
-                Self::eval_unary_into(
-                    arg_slices,
-                    out,
-                    |value| {
-                        if value.is_finite() { 0.0 } else { 1.0 }
-                    },
-                );
-            }
-            _ => {
-                debug_assert!(
-                    !fun.is_scalar_evaluable(),
-                    "Function::is_scalar_evaluable disagrees with eval dispatch for {fun:?}"
-                );
-                return Err(crate::Error::Validation(format!(
-                    "Expression function '{fun}' is a statements-layer function; evaluate it via the statements crate instead of core::expr::eval"
-                )));
-            }
-        }
-        Ok(())
     }
 }
 
@@ -396,6 +334,57 @@ mod tests {
     }
 
     #[test]
+    fn undefined_spread_and_missing_logical_inputs_remain_distinct() {
+        let ctx = SimpleContext::new(["spread"]).unwrap();
+        let spread = Expr::column("spread");
+        let ratio = Expr::bin_op(
+            BinOp::Div,
+            spread.clone(),
+            Expr::call(Function::Abs, vec![spread.clone()]),
+        );
+        let expr = Expr::if_then_else(
+            Expr::bin_op(BinOp::Gt, ratio, Expr::literal(0.0)),
+            Expr::literal(1.0),
+            Expr::literal(-1.0),
+        );
+        let compiled = CompiledExpr::new(expr).unwrap();
+        assert!(
+            compiled
+                .eval(&ctx, &[&[0.0]], 1)
+                .unwrap_err()
+                .to_string()
+                .contains("by zero")
+        );
+        assert_eq!(
+            compiled.eval(&ctx, &[&[1.0, -2.0]], 2).unwrap(),
+            vec![1.0, -1.0]
+        );
+        for op in [
+            BinOp::Eq,
+            BinOp::Ne,
+            BinOp::Lt,
+            BinOp::Le,
+            BinOp::Gt,
+            BinOp::Ge,
+        ] {
+            let comparison =
+                CompiledExpr::new(Expr::bin_op(op, spread.clone(), Expr::literal(0.0))).unwrap();
+            assert!(comparison.eval(&ctx, &[&[f64::NAN]], 1).unwrap()[0].is_nan());
+        }
+        for (op, other, expected) in [
+            (BinOp::And, 0.0, 0.0),
+            (BinOp::And, 1.0, f64::NAN),
+            (BinOp::Or, 1.0, 1.0),
+            (BinOp::Or, 0.0, f64::NAN),
+        ] {
+            let expression =
+                CompiledExpr::new(Expr::bin_op(op, spread.clone(), Expr::literal(other))).unwrap();
+            let actual = expression.eval(&ctx, &[&[f64::NAN]], 1).unwrap()[0];
+            assert_eq!(actual.to_bits(), expected.to_bits());
+        }
+    }
+
+    #[test]
     fn eval_plans_if_binop_and_unary_nodes() {
         let (ctx, data) = sample_context();
         let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
@@ -406,7 +395,7 @@ mod tests {
         let expr = Expr::if_then_else(condition, then_branch, else_branch);
 
         let compiled = CompiledExpr::new(expr).expect("elementwise expression compiles");
-        let result = compiled.eval(&ctx, &cols).unwrap();
+        let result = compiled.eval(&ctx, &cols, cols[0].len()).unwrap();
 
         assert_eq!(result.len(), 4);
         assert!((result[0] + 0.5).abs() < 1e-12);
@@ -457,7 +446,7 @@ mod tests {
             Expr::column("b"),
         ))
         .expect("compiled");
-        let res = ite.eval(&ctx, &cols).expect("eval");
+        let res = ite.eval(&ctx, &cols, cols[0].len()).expect("eval");
         assert!(res[0].is_nan());
         assert_eq!(res[1], 10.0);
         assert_eq!(res[2], 20.0);

@@ -59,6 +59,7 @@ fn create_swaption(expiry_months: i32, swap_tenor_years: i32) -> Swaption {
     };
     let float = FloatLegSpec {
         discount_curve_id: CurveId::new("USD-OIS"),
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: CurveId::new("USD-SOFR-3M"),
         spread_bp: Decimal::ZERO,
         frequency: Tenor::quarterly(),
@@ -243,8 +244,10 @@ fn create_market() -> MarketContext {
     .unwrap();
 
     MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
 }
 

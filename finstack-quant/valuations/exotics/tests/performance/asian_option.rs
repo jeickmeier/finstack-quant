@@ -175,7 +175,8 @@ fn fixture(case: Case, scenario: &str) -> (AsianOption, MarketContext, Date) {
         0.25,
     );
     let market = MarketContext::new()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_surface(surface)
         .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar"))
         .insert_price(
@@ -284,8 +285,14 @@ fn geometric_oracle(option: &AsianOption, market: &MarketContext, as_of: Date) -
     option.quantity
         * df
         * match option.option_type {
-            OptionType::Call => forward * norm_cdf(d1) - option.strike * norm_cdf(d2),
-            OptionType::Put => option.strike * norm_cdf(-d2) - forward * norm_cdf(-d1),
+            OptionType::Call => {
+                forward * norm_cdf(d1).expect("valid normal variate")
+                    - option.strike * norm_cdf(d2).expect("valid normal variate")
+            }
+            OptionType::Put => {
+                option.strike * norm_cdf(-d2).expect("valid normal variate")
+                    - forward * norm_cdf(-d1).expect("valid normal variate")
+            }
         }
 }
 

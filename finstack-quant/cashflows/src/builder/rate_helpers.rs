@@ -261,7 +261,7 @@ pub fn apply_bp_bounds(rate: f64, floor_bp: Option<f64>, cap_bp: Option<f64>) ->
 ///   observation is a realized historical fixing that the curve cannot
 ///   supply; this function projects only. The emission layer resolves
 ///   seasoned resets from a `MarketContext` `ScalarTimeSeries` with id
-///   `FIXING:{forward_curve_id}` *before* calling this function, and routes this
+///   `FIXING:{index_id}` *before* calling this function, and routes this
 ///   error through the spec's
 ///   [`crate::builder::FloatingRateFallback`] policy (see its doc for when
 ///   that applies). A reset exactly on the curve base date (T+0) is projected
@@ -335,9 +335,9 @@ pub fn project_floating_rate(
 ///
 /// * `observation_date` - Contractual index publication date (term reset or
 ///   overnight observation), without carrying earlier observations forward.
-/// * `fixings` - Optional recorded `FIXING:{forward_curve_id}` series of decimal
+/// * `fixings` - Optional recorded `FIXING:{index_id}` series of decimal
 ///   annual rates. Missing exact historical observations are errors.
-/// * `forward_curve_id` - Index identifier used for canonical-series guidance
+/// * `index_id` - Index identifier used for canonical-series guidance
 ///   and error diagnostics; this function does not look up a forward curve.
 /// * `as_of` - Valuation date separating realized from projected observations.
 ///
@@ -348,11 +348,11 @@ pub fn project_floating_rate(
 pub fn observed_index_fixing(
     observation_date: Date,
     fixings: Option<&ScalarTimeSeries>,
-    forward_curve_id: &str,
+    index_id: &str,
     as_of: Date,
 ) -> Result<Option<f64>> {
     if observation_date < as_of {
-        return require_fixing_value_exact(fixings, forward_curve_id, observation_date)
+        return require_fixing_value_exact(fixings, index_id, observation_date)
             .map(Some)
             .map_err(|err| {
                 finstack_quant_core::Error::Validation(format!("{err} (valuation date: {as_of})"))
@@ -447,7 +447,7 @@ pub fn project_index_rate(
     let fwd_base = fwd.base_date();
 
     // Strictly-past resets are realized fixings; the curve must not clamp them
-    // to today's short end. Emission resolves `FIXING:{forward_curve_id}` first.
+    // to today's short end. Emission resolves `FIXING:{index_id}` first.
     if reset_date < fwd_base {
         return Err(finstack_quant_core::Error::Validation(format!(
             "floating-rate observation date {} is before the '{}' curve base date {}; the \
@@ -546,7 +546,9 @@ mod tests {
             finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         )
         .expect("ForwardCurve builder should succeed with valid test data");
-        MarketContext::new().insert(fwd_curve)
+        MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve")
     }
 
     #[test]
@@ -570,7 +572,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("USD-LIBOR-3M", reset, 0.001, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 100.0,
@@ -594,7 +598,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("USD-LIBOR-3M", reset, 0.08, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 200.0,
@@ -618,7 +624,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.0001, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 100.0,
@@ -642,7 +650,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.03, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 100.0,
@@ -667,7 +677,9 @@ mod tests {
 
         let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.02, DayCount::Act360)
             .expect("ForwardCurve flat should succeed with valid test data");
-        let market = MarketContext::new().insert(fwd_curve);
+        let market = MarketContext::new()
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let params = FloatingRateParams {
             spread_bp: 100.0,
@@ -938,6 +950,7 @@ mod tests {
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: dec!(200.0),
             gearing: dec!(1.5),
@@ -976,6 +989,7 @@ mod tests {
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: dec!(100.0),
             gearing: dec!(1.0),
@@ -1010,6 +1024,7 @@ mod tests {
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: dec!(100.0),
             gearing: dec!(1.0),

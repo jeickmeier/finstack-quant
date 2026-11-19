@@ -1,14 +1,20 @@
 # FACTOR-015: Issuer residual volatility source cascade
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Source precedence and arithmetic averaging are implemented. Structural history admission, peer eligibility policy, source provenance, and failure on unavailable risk require reconciliation.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** The singleton-to-peer regression passed using the existing Factor test binary. Peer minimum, unavailable-source behavior, and held-out proxy accuracy still require qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Use a caller override first, including explicit zero, then the issuer's own qualified residual history in either `IssuerBeta` or `BucketOnly` mode. Preserve a measured zero from qualified history. Mark residuals mechanically erased by an issuer's own singleton factor as unavailable based on the peel structure. [Variance admission](credit-variance.md).
+2. Search qualified peers from the deepest bucket up. Require an explicitly selected minimum of at least two eligible peers. Allow the global pool only when explicitly elected and apply the same minimum. Use the equal-weighted arithmetic mean of eligible historical annualized volatilities. Exclude caller overrides and previously assigned proxies from the pool. Two peers at 10 and 30 bp yield 20 bp annualized volatility and 400 bp² annualized variance.
+3. Record the selected source and reason for its selection. For a proxy, identify the bucket or global pool and record the eligible peer count. Fail calibration with issuer and reason when all authorized sources are unavailable.
+
+## Observed choice and rationale
 
 Assign an issuer adder volatility by an explicit override/history/peer/global/default cascade. BucketOnly names can receive their own residual-history volatility; mode alone does not force peer substitution.
 
@@ -46,6 +52,5 @@ A variance-pooled proxy, robust median, weighted peers, explicit no-data error o
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and independent qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

@@ -335,7 +335,11 @@ mod tests {
         let disc = build_flat_discount(issue);
         let hazard_zero = build_flat_hazard("USD-CREDIT", issue, 0.0, 0.4);
 
-        let market = MarketContext::new().insert(disc).insert(hazard_zero);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(hazard_zero)
+            .expect("insert market curve");
 
         let pv_rf =
             discount::price_with_oas(&bond, &market, issue, 0.0).expect("RF price should succeed");
@@ -384,7 +388,11 @@ mod tests {
 
         let disc = build_flat_discount(issue);
         let hazard_zero = build_flat_hazard("USD-CREDIT", issue, 0.0, 0.4);
-        let market = MarketContext::new().insert(disc).insert(hazard_zero);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(hazard_zero)
+            .expect("insert market curve");
 
         // The unified settlement convention excludes the on-`as_of` coupon
         // from buyer flows.
@@ -417,7 +425,9 @@ mod tests {
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
 
         let bond = build_test_bond(issue, maturity);
-        let market = MarketContext::new().insert(build_flat_discount(issue));
+        let market = MarketContext::new()
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve");
 
         let err = price(&bond, &market, issue)
             .expect_err("hazard pricing should reject missing hazard curve");
@@ -443,8 +453,10 @@ mod tests {
             puts: Vec::new(),
         });
         let market = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4))
+            .expect("insert market curve");
 
         let err = price_raw(&callable, &market, issue)
             .expect_err("straight hazard leaf must reject embedded options");
@@ -477,7 +489,8 @@ mod tests {
         let (kappa_key, sigma_key) =
             finstack_quant_models::rates::hull_white::hw1f_scalar_keys("USD-OIS");
         let discount_only = MarketContext::new()
-            .insert(build_flat_discount(issue))
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
             .insert_price(
                 kappa_key.as_str(),
                 finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.03)
@@ -489,8 +502,10 @@ mod tests {
                     .expect("valid scalar"),
             );
         let credit_market = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4))
+            .expect("insert market curve");
         let registry = crate::FIXED_INCOME.pricers();
         let options = finstack_quant_valuations_core::instruments::PricingOptions::default();
 
@@ -610,8 +625,10 @@ mod tests {
         });
 
         let market = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4))
+            .expect("insert market curve");
         let registry = crate::FIXED_INCOME.pricers();
         let price = |bond: &Bond| {
             registry
@@ -670,8 +687,10 @@ mod tests {
         bond.instrument_pricing_overrides.model_config.mc_paths = Some(8);
         bond.instrument_pricing_overrides.model_config.tree_steps = Some(4);
         let market = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4))
+            .expect("insert market curve");
 
         let result = crate::FIXED_INCOME
             .pricers()
@@ -724,8 +743,10 @@ mod tests {
         bond.instrument_pricing_overrides.model_config.tree_steps = Some(4);
         bond.instrument_pricing_overrides.market_quotes.quoted_oas = Some(0.0025);
         let market = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4))
+            .expect("insert market curve");
 
         let result = crate::FIXED_INCOME
             .pricers()
@@ -796,7 +817,9 @@ mod tests {
             .instrument_pricing_overrides
             .market_quotes
             .quoted_dirty_price_currency = Some(1_000_000.0);
-        let market = MarketContext::new().insert(build_flat_discount(issue));
+        let market = MarketContext::new()
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve");
         let registry = crate::FIXED_INCOME.pricers();
 
         let missing_curve = registry
@@ -841,11 +864,15 @@ mod tests {
         let hazard_high = build_flat_hazard("USD-CREDIT", issue, 0.05, 0.4);
 
         let market_low = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(hazard_low);
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(hazard_low)
+            .expect("insert market curve");
         let market_high = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(hazard_high);
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(hazard_high)
+            .expect("insert market curve");
 
         let pv_low = price(&bond, &market_low, issue).expect("Low hazard price succeeds");
         let pv_high = price(&bond, &market_high, issue).expect("High hazard price succeeds");
@@ -868,11 +895,15 @@ mod tests {
         let hazard_high_recovery = build_flat_hazard("USD-CREDIT", issue, 0.03, 1.0);
 
         let market_low_r = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(hazard_low_recovery);
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(hazard_low_recovery)
+            .expect("insert market curve");
         let market_high_r = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(hazard_high_recovery);
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(hazard_high_recovery)
+            .expect("insert market curve");
 
         let pv_low_r =
             price(&bond, &market_low_r, issue).expect("Low recovery hazard price succeeds");
@@ -896,8 +927,10 @@ mod tests {
 
         let bond = build_test_bond(issue, maturity);
         let market = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4))
+            .expect("insert market curve");
 
         // Use a simple clean price quote; the quote engine should handle bonds
         // with hazard curves present in the MarketContext without error.
@@ -932,7 +965,11 @@ mod tests {
         let disc = build_flat_discount(issue);
         let hazard_zero = build_flat_hazard("USD-CREDIT", issue, 0.0, 0.4);
 
-        let market = MarketContext::new().insert(disc).insert(hazard_zero);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(hazard_zero)
+            .expect("insert market curve");
 
         let pv_rf =
             discount::price_with_oas(&bond, &market, issue, 0.0).expect("RF price should succeed");
@@ -960,16 +997,20 @@ mod tests {
         let lambda = 0.05;
         let recovery = 0.4;
         let market = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, lambda, recovery));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, lambda, recovery))
+            .expect("insert market curve");
 
         let pv_cash = price(&cash_bond, &market, issue).expect("Cash bond price succeeds");
         let pv_pik = price(&pik_bond, &market, issue).expect("PIK bond price succeeds");
 
         // With zero recovery, isolate the alive-leg difference.
         let market_no_rec = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, lambda, 0.0));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, lambda, 0.0))
+            .expect("insert market curve");
 
         let pv_cash_norec =
             price(&cash_bond, &market_no_rec, issue).expect("Cash bond no-recovery price");
@@ -999,11 +1040,15 @@ mod tests {
         let bond = build_pik_bond(issue, maturity);
 
         let market_low = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, 0.01, 0.4));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, 0.01, 0.4))
+            .expect("insert market curve");
         let market_high = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(build_flat_hazard("USD-CREDIT", issue, 0.05, 0.4));
+            .try_insert(build_flat_discount(issue))
+            .expect("insert market curve")
+            .try_insert(build_flat_hazard("USD-CREDIT", issue, 0.05, 0.4))
+            .expect("insert market curve");
 
         let pv_low = price(&bond, &market_low, issue).expect("Low hazard price succeeds");
         let pv_high = price(&bond, &market_high, issue).expect("High hazard price succeeds");
@@ -1045,7 +1090,11 @@ mod tests {
             .expect("DiscountCurve builder should succeed");
         // lambda = 10/year, FlatForward extrapolation. S(80y) = exp(-800) = 0.
         let hazard = build_flat_hazard("USD-CREDIT", issue, 10.0, 0.4);
-        let market = MarketContext::new().insert(disc).insert(hazard);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve");
 
         let result = price(&bond, &market, as_of);
         let err = result.expect_err("prior-default curve must error, not return Ok(0.0)");

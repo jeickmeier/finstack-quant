@@ -451,6 +451,10 @@ export type Id4 = string;
  */
 export type Decimal5 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Day-count convention.
  */
 export type DayCount1 =
@@ -1940,6 +1944,10 @@ export interface D_572Ad1Befb7D94914652 {
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
   /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
    *
@@ -2196,11 +2204,17 @@ export interface D_572Ad1Befb7D94914652 {
   vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface DCdb8Fddc0106047270C4 {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
@@ -3404,7 +3418,7 @@ export interface D_2E0Bc1103181D92528Ce {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -3439,6 +3453,7 @@ export interface D_2E0Bc1103181D92528Ce {
  *
  * // 3M SOFR + 200bps with 0% floor
  * let spec = FloatingRateSpec {
+ *     index_id: "USD-SOFR-3M".into(),
  *     forward_curve_id: "USD-SOFR-3M".into(),
  *     spread_bp: dec!(200.0),
  *     gearing: dec!(1.0),
@@ -3520,6 +3535,7 @@ export interface D_879C942D15Cfcad2445B {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal4 | null;
+  index_id: Id5;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *

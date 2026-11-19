@@ -1448,47 +1448,6 @@ export default [
     "description": "Return an error when querying strictly after the final observation date."
   },
   {
-    "path": "#/$defs/d_196499daa6e4b8649607",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind",
-    "description": "Type of dividend event.\n\nDistinguishes between cash payments, stock distributions, and continuous\nyield approximations used in different pricing models.\n\n# Variants\n\n- **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)\n- **Stock**: Share distribution (less common, complicates option pricing)\n- **Yield**: Continuous approximation for analytical models"
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/0",
-    "description": "Cash dividend payment.\n\nMost common type. Ex-dividend date reduces stock price by dividend amount."
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/0/properties/cash",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/0/properties/cash",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/1",
-    "description": "Continuous dividend yield (annualized fraction).\n\nUsed in analytical models (Black-Scholes with dividends) that assume\ncontinuous payout rather than discrete payments."
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/1/properties/yield",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/1/properties/yield",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/2",
-    "description": "Stock dividend (share distribution).\n\nIncreases share count proportionally. For example, 5% stock dividend\nmeans each shareholder receives 0.05 additional shares per share held."
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/2/properties/stock",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/2/properties/stock"
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/2/properties/stock/properties/ratio",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/2/properties/stock/properties/ratio",
-    "description": "Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_1a0c0b834c9e63a93be3",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment"
   },
@@ -1524,7 +1483,7 @@ export default [
   {
     "path": "#/$defs/d_1da7f2b6c0211ad55af2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationRecipe",
-    "description": "Typed conventions required to replay a rate-curve calibration."
+    "description": "Benchmark conventions and quotes associated with a rate curve."
   },
   {
     "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/currency",
@@ -1539,6 +1498,21 @@ export default [
     "description": "Day count used for the curve's time axis.",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/execution",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationRecipe/properties/execution",
+    "description": "Original execution evidence. A transcribed benchmark list has no qualified replay."
+  },
+  {
+    "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/execution/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationRecipe/properties/execution/anyOf/0",
+    "ref": "#/$defs/RateCalibrationExecution",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution"
+  },
+  {
+    "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/execution/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationRecipe/properties/execution/anyOf/1"
   },
   {
     "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/method",
@@ -2158,6 +2132,23 @@ export default [
     "description": "Delta convention governing how [`FxDeltaVolSurface`] maps wing deltas onto strikes."
   },
   {
+    "path": "#/$defs/d_5e84cbda52c98fb4f0a1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriceCurveKind",
+    "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup."
+  },
+  {
+    "path": "#/$defs/d_5e84cbda52c98fb4f0a1/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriceCurveKind/oneOf/0",
+    "const": "price",
+    "description": "Signed, finite forward prices, for example in USD per barrel."
+  },
+  {
+    "path": "#/$defs/d_5e84cbda52c98fb4f0a1/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriceCurveKind/oneOf/1",
+    "const": "vol_index",
+    "description": "Nonnegative volatility-index levels in index points."
+  },
+  {
     "path": "#/$defs/d_5f0b38036294b8235c6a",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RatesStepConventions",
     "description": "Step-level conventions for rates calibration (discount and forward curves).\n\nThis is a Bloomberg/FinCad-style design: curve construction uses a small set of\n*step-level* conventions (e.g., curve time-axis day count)."
@@ -2355,21 +2346,29 @@ export default [
   {
     "path": "#/$defs/d_63a8cdf0b3369d8089a3",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent",
-    "description": "A dated dividend event."
+    "description": "One gross cash distribution per entitled share on its schedule's share basis."
   },
   {
-    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/date",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/date",
-    "description": "Ex-dividend date.",
+    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/amount",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/event_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/event_id"
+  },
+  {
+    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/ex_date",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/ex_date",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/kind",
-    "description": "Event kind.",
-    "ref": "#/$defs/DividendKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind"
+    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/pay_date",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/pay_date",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_64f58200c6756dc5845d",
@@ -3042,6 +3041,20 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationObservation"
   },
   {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/series",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/series"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/series/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/series/anyOf/0",
+    "ref": "#/$defs/InflationSeries",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/series/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/series/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/11",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/11",
     "description": "Credit-index reference state."
@@ -3064,6 +3077,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/11/properties/issuer_credit_curve_ids",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/11/properties/issuer_credit_curve_ids",
+    "default": null,
     "description": "Optional map of issuer ID → hazard curve ID"
   },
   {
@@ -3073,6 +3087,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/11/properties/issuer_recovery_rates",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/11/properties/issuer_recovery_rates",
+    "default": null,
     "description": "Optional map of issuer ID → recovery rate"
   },
   {
@@ -3083,6 +3098,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/11/properties/issuer_weights",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/11/properties/issuer_weights",
+    "default": null,
     "description": "Optional map of issuer ID → weight"
   },
   {
@@ -3244,6 +3260,20 @@ export default [
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/13/properties/expiries/items",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/13/properties/expiries/items",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/13/properties/expiry_clock",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/13/properties/expiry_clock"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/13/properties/expiry_clock/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/13/properties/expiry_clock/anyOf/0",
+    "ref": "#/$defs/VolatilityClock",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolatilityClock"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/13/properties/expiry_clock/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/13/properties/expiry_clock/anyOf/1"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/13/properties/forwards",
@@ -3730,22 +3760,12 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency",
-    "description": "Quote currency for cash dividends (optional metadata)."
-  },
-  {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/events",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/events",
-    "description": "Sorted events by date (ascending)."
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/events"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/events/items",
@@ -3756,7 +3776,6 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/id",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/id",
-    "description": "Unique identifier of this schedule in the market context.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -3766,9 +3785,14 @@ export default [
     "const": "dividend_schedule"
   },
   {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/share_basis",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/share_basis"
+  },
+  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/underlying",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/underlying",
-    "description": "Optional display symbol/ticker for convenience."
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/9",
@@ -3871,24 +3895,30 @@ export default [
     "path": "#/$defs/d_83682026197086424468/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/alpha",
     "description": "Initial volatility level, strictly positive.",
+    "exclusiveMinimum": 0,
     "format": "double"
   },
   {
     "path": "#/$defs/d_83682026197086424468/properties/beta",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/beta",
     "description": "CEV exponent in the closed interval `[0, 1]`.",
-    "format": "double"
+    "format": "double",
+    "maximum": 1,
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_83682026197086424468/properties/nu",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/nu",
     "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_83682026197086424468/properties/rho",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/rho",
     "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+    "exclusiveMaximum": 1,
+    "exclusiveMinimum": -1,
     "format": "double"
   },
   {
@@ -3937,7 +3967,7 @@ export default [
   {
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/2/properties/shifted_lognormal/properties/shift",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionVolConvention/oneOf/2/properties/shifted_lognormal/properties/shift",
-    "description": "Finite positive additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.",
+    "description": "Finite signed additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.\nThe effective forward and strikes must be positive.",
     "format": "double"
   },
   {
@@ -5219,6 +5249,26 @@ export default [
     "description": "Weighting scheme for global solve residuals.",
     "ref": "#/$defs/ResidualWeightingScheme",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ResidualWeightingScheme"
+  },
+  {
+    "path": "#/$defs/d_af96800aab5249199d14",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries",
+    "description": "Publication identity and units of an observed or projected inflation level."
+  },
+  {
+    "path": "#/$defs/d_af96800aab5249199d14/properties/reference_base",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries/properties/reference_base",
+    "description": "Published reference period and index scale, for example `1982-84=100`."
+  },
+  {
+    "path": "#/$defs/d_af96800aab5249199d14/properties/seasonally_adjusted",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries/properties/seasonally_adjusted",
+    "description": "True for seasonally adjusted levels and false for unadjusted levels."
+  },
+  {
+    "path": "#/$defs/d_af96800aab5249199d14/properties/series_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries/properties/series_id",
+    "description": "Publisher-qualified identifier of the statistical series."
   },
   {
     "path": "#/$defs/d_b7ebd05daecf38c26828",
@@ -6869,6 +6919,29 @@ export default [
     "description": "Piecewise quadratic forwards (C¹ forwards and C² log discount factors)."
   },
   {
+    "path": "#/$defs/d_e94f4b8b51127617865d",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding",
+    "description": "Identity and resolved maturity of a quote in its original evaluator."
+  },
+  {
+    "path": "#/$defs/d_e94f4b8b51127617865d/properties/pillar_date",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding/properties/pillar_date",
+    "description": "Contractual maturity resolved using the instrument conventions.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_e94f4b8b51127617865d/properties/pillar_time",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding/properties/pillar_time",
+    "description": "Curve-clock year fraction at the resolved maturity.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_e94f4b8b51127617865d/properties/quote_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding/properties/quote_id",
+    "description": "Original stable market quote identifier."
+  },
+  {
     "path": "#/$defs/d_e98120a9ebcd8bce537a",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDataTarget",
     "description": "Canonical family-typed identifier for an addressable entry in\n[`MarketContext`](crate::market_data::context::MarketContext).\n\nIdentifiers in `MarketContext` are namespace-local: the same `CurveId` may\ncoexist across distinct stores (for example a `VolSurface` and a\n`ScalarTimeSeries`). `MarketDataTarget` pairs an exact [`CurveId`] with the\nexact store and subkind to select without multi-store probing."
@@ -7488,6 +7561,20 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/series",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/series"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/series/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/series/anyOf/0",
+    "ref": "#/$defs/InflationSeries",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/series/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/series/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/4",
     "description": "Pre-built CDS-index base-correlation curve."
@@ -7605,6 +7692,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/6/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/6/properties/calendar_id",
+    "description": "Registered holiday calendar for the source clock."
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/6/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/6/properties/day_count",
     "description": "Day count convention",
@@ -7655,16 +7747,11 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/6/properties/spot_level",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/6/properties/spot_level",
-    "description": "Spot index level (volatility index curves)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/6/properties/spot_price",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/6/properties/spot_price",
-    "description": "Spot price (signed price curves)",
-    "format": "double"
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/6/properties/level_kind",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/6/properties/level_kind",
+    "description": "Native level family.",
+    "ref": "#/$defs/PriceCurveKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriceCurveKind"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7",
@@ -7677,6 +7764,11 @@ export default [
     "description": "Base date",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/7/properties/calendar_id",
+    "description": "Registered holiday calendar for the source clock."
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/day_count",
@@ -7729,16 +7821,11 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/spot_level",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/7/properties/spot_level",
-    "description": "Spot index level (volatility index curves)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/spot_price",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/7/properties/spot_price",
-    "description": "Spot price (signed price curves)",
-    "format": "double"
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/level_kind",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/7/properties/level_kind",
+    "description": "Native level family.",
+    "ref": "#/$defs/PriceCurveKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriceCurveKind"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/8",
@@ -7863,6 +7950,37 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/HullWhiteVolatilityMode/oneOf/1",
     "const": "piecewise",
     "description": "Bootstrap a piecewise-constant short-rate volatility schedule at quote expiries."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution",
+    "description": "Executed evaluator, resolved instruments and original outcome of a rate calibration."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/accepted",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/accepted",
+    "description": "Whether the original fit passed its recorded acceptance policy."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/bindings",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/bindings",
+    "description": "Resolved quote identities and maturities, in input order."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/bindings/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/bindings/items",
+    "ref": "#/$defs/RateQuoteBinding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding"
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/calibration_config",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/calibration_config",
+    "description": "Solver controls and residual acceptance thresholds used by the evaluator."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/step_params",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/step_params",
+    "description": "Discount or projection evaluator parameters, including pricing dependencies."
   },
   {
     "path": "#/$defs/d_f1a590578006650bb43d",

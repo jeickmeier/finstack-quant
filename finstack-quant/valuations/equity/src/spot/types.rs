@@ -536,7 +536,9 @@ mod lifecycle_tests {
             .build()
             .expect("should succeed");
 
-        MarketContext::new().insert(discount_curve)
+        MarketContext::new()
+            .try_insert(discount_curve)
+            .expect("insert market curve")
     }
 
     #[test]

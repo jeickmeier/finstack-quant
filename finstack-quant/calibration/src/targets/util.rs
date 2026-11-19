@@ -11,9 +11,9 @@ use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::traits::TimeGridAndGuesses;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::Result;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::dividends::DividendKind;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -124,23 +124,41 @@ pub(crate) fn extract_equity_option_quotes<'a>(
     Ok(option_quotes)
 }
 
+/// Price for one quoted unit of the exact security named in the calibration.
+#[derive(Clone, Copy)]
+pub(crate) struct EquitySpot {
+    pub(crate) amount: f64,
+    currency: Option<Currency>,
+}
+
 /// Resolve an equity spot price from an explicit override or a `MarketContext` price scalar.
 pub(crate) fn resolve_equity_spot(
     spot_override: Option<f64>,
     underlying_ticker: &str,
     context: &MarketContext,
-) -> Result<f64> {
-    if let Some(spot) = spot_override {
-        return Ok(spot);
+) -> Result<EquitySpot> {
+    if let Some(amount) = spot_override {
+        return Ok(EquitySpot {
+            amount,
+            currency: None,
+        });
     }
     let scalar = context.get_price(underlying_ticker)?;
+    if let Some(money) = scalar.get_price() {
+        return Ok(EquitySpot {
+            amount: money.amount(),
+            currency: Some(money.currency()),
+        });
+    }
     scalar
-        .get_price()
-        .map(|money| money.amount())
-        .or_else(|| scalar.get_unitless())
+        .get_unitless()
+        .map(|amount| EquitySpot {
+            amount,
+            currency: None,
+        })
         .ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
-                "unsupported scalar for '{underlying_ticker}'"
+                "unsupported spot for '{underlying_ticker}'"
             ))
         })
 }
@@ -178,11 +196,12 @@ pub(crate) fn resolve_continuous_dividend_yield(
 pub(crate) fn resolve_equity_forward_inputs(
     ticker: &str,
     base_date: Date,
-    spot: f64,
+    quote: EquitySpot,
     dividend_yield_override: Option<f64>,
     discount: &DiscountCurve,
     context: &MarketContext,
 ) -> Result<EquityForwardInputs> {
+    let spot = quote.amount;
     if !spot.is_finite() || spot <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "equity spot must be finite and positive, got {spot}"
@@ -199,12 +218,9 @@ pub(crate) fn resolve_equity_forward_inputs(
         });
     }
 
-    let fallback_id = format!("{ticker}-DIVS");
-    let mut schedules = context.dividends_iter().filter(|(id, schedule)| {
-        schedule.get_underlying() == Some(ticker)
-            || id.as_str() == ticker
-            || id.as_str() == fallback_id
-    });
+    let mut schedules = context
+        .dividends_iter()
+        .filter(|(_, schedule)| schedule.get_underlying().as_str() == ticker);
     let (_, schedule) = schedules.next().ok_or_else(|| {
         finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
             id: format!("explicit dividend yield or dividend schedule for equity '{ticker}'"),
@@ -216,29 +232,29 @@ pub(crate) fn resolve_equity_forward_inputs(
         )));
     }
 
+    if schedule.get_share_basis() != ticker || quote.currency != Some(schedule.get_currency()) {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "equity '{ticker}' requires cash distributions on its quoted share basis and in its spot currency"
+        )));
+    }
     let mut cash_dividends = Vec::new();
     for event in schedule.get_events() {
-        if event.date <= base_date {
+        if event.get_ex_date() <= base_date {
             continue;
         }
-        match &event.kind {
-            DividendKind::Cash(amount) => {
-                let surface_time = DayCount::Act365F.year_fraction(
-                    base_date,
-                    event.date,
-                    DayCountContext::default(),
-                )?;
-                cash_dividends.push((
-                    surface_time,
-                    amount.amount() * discount.df_between_dates(base_date, event.date)?,
-                ));
-            }
-            DividendKind::Yield(_) | DividendKind::Stock { .. } => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "equity '{ticker}' dividend schedule contains non-cash events; supply an explicit continuous dividend yield"
-                )));
-            }
+        if event.get_pay_date() < event.get_ex_date() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "equity '{ticker}' forward does not support payment before entitlement for dividend '{}'",
+                event.get_event_id()
+            )));
         }
+        let ex_time = DayCount::Act365F.year_fraction(
+            base_date,
+            event.get_ex_date(),
+            DayCountContext::default(),
+        )?;
+        let discount_factor = discount.df_between_dates(base_date, event.get_pay_date())?;
+        cash_dividends.push((ex_time, event.get_amount().amount() * discount_factor));
     }
 
     Ok(EquityForwardInputs {
@@ -644,7 +660,7 @@ T={target_expiry:.6}, K={target_strike:.4}"
 mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::dividends::DividendSchedule;
+    use finstack_quant_core::market_data::dividends::{DividendEvent, DividendSchedule};
     use finstack_quant_core::money::Money;
     use time::macros::date;
 
@@ -665,7 +681,10 @@ mod tests {
         let error = resolve_equity_forward_inputs(
             "SPX",
             date!(2025 - 01 - 01),
-            100.0,
+            EquitySpot {
+                amount: 100.0,
+                currency: Some(Currency::USD),
+            },
             None,
             &discount,
             &MarketContext::new(),
@@ -680,12 +699,22 @@ mod tests {
         let surface_base = date!(2025 - 04 - 01);
         let expiry = date!(2026 - 04 - 01);
         let ex_date = date!(2025 - 07 - 01);
-        let schedule = DividendSchedule::builder("SPX-DIVS")
-            .underlying("SPX")
-            .currency(Currency::USD)
-            .cash(ex_date, Money::from((5_i64, Currency::USD)))
-            .build()
-            .expect("dividends");
+        let schedule = DividendSchedule::new(
+            "SPX-DIVS",
+            "SPX",
+            "SPX",
+            Currency::USD,
+            vec![
+                DividendEvent::new(
+                    "distribution-1",
+                    ex_date,
+                    ex_date,
+                    Money::from((5_i64, Currency::USD)),
+                )
+                .unwrap(),
+            ],
+        )
+        .expect("dividends");
         let context = MarketContext::new().insert_dividends(schedule);
         let expected = (100.0
             - 5.0 * (-0.05 * (ex_date - surface_base).whole_days() as f64 / 365.0).exp())
@@ -707,7 +736,10 @@ mod tests {
                 let inputs = resolve_equity_forward_inputs(
                     "SPX",
                     surface_base,
-                    100.0,
+                    EquitySpot {
+                        amount: 100.0,
+                        currency: Some(Currency::USD),
+                    },
                     None,
                     &curve,
                     &context,
@@ -717,7 +749,10 @@ mod tests {
                 let continuous = resolve_equity_forward_inputs(
                     "SPX",
                     surface_base,
-                    100.0,
+                    EquitySpot {
+                        amount: 100.0,
+                        currency: Some(Currency::USD),
+                    },
                     Some(0.02),
                     &curve,
                     &context,
@@ -733,20 +768,91 @@ mod tests {
     }
 
     #[test]
+    fn entitled_dividend_uses_payment_discount_and_spot_currency() {
+        let base = date!(2025 - 01 - 01);
+        let ex_date = date!(2025 - 04 - 01);
+        let pay_date = date!(2025 - 07 - 01);
+        let expiry = date!(2025 - 05 - 01);
+        let years = |day: Date| (day - base).whole_days() as f64 / 365.0;
+        let curve = DiscountCurve::builder("USD")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (years(ex_date), 0.99), (years(pay_date), 0.98)])
+            .build()
+            .unwrap();
+        let spot = EquitySpot {
+            amount: 100.0,
+            currency: Some(Currency::USD),
+        };
+        let context = |ccy, amount| {
+            let event =
+                DividendEvent::new("Q1", ex_date, pay_date, Money::new(amount, ccy).unwrap())
+                    .unwrap();
+            MarketContext::new().insert_dividends(
+                DividendSchedule::new("EQ-DIV", "EQ", "EQ", ccy, vec![event]).unwrap(),
+            )
+        };
+        assert!(
+            resolve_equity_forward_inputs(
+                "EQ",
+                base,
+                spot,
+                None,
+                &curve,
+                &context(Currency::JPY, 10.0)
+            )
+            .is_err()
+        );
+        let usd = context(Currency::USD, 10.0);
+        let inputs = resolve_equity_forward_inputs("EQ", base, spot, None, &curve, &usd).unwrap();
+        let prepaid = inputs.forward(&curve, years(expiry)).unwrap()
+            * curve.df_between_dates(base, expiry).unwrap();
+        assert!((prepaid - 90.20).abs() < 1e-10);
+        let flat = DiscountCurve::builder("FLAT")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
+            .knots([(0.0, 1.0), (1.0, 1.0)])
+            .build()
+            .unwrap();
+        let converted = context(Currency::USD, 0.10);
+        let inputs =
+            resolve_equity_forward_inputs("EQ", base, spot, None, &flat, &converted).unwrap();
+        assert!((inputs.forward(&flat, years(expiry)).unwrap() - 99.90).abs() < 1e-10);
+    }
+
+    #[test]
     fn cash_dividend_schedule_drives_prepaid_forward() {
         let discount = discount_curve();
         let ex_date = date!(2025 - 07 - 01);
-        let schedule = DividendSchedule::builder("SPX-DIVS")
-            .underlying("SPX")
-            .currency(Currency::USD)
-            .cash(ex_date, Money::from((5_i64, Currency::USD)))
-            .build()
-            .expect("dividend schedule");
+        let schedule = DividendSchedule::new(
+            "SPX-DIVS",
+            "SPX",
+            "SPX",
+            Currency::USD,
+            vec![
+                DividendEvent::new(
+                    "distribution-1",
+                    ex_date,
+                    ex_date,
+                    Money::from((5_i64, Currency::USD)),
+                )
+                .unwrap(),
+            ],
+        )
+        .expect("dividend schedule");
         let context = MarketContext::new().insert_dividends(schedule);
         let inputs = resolve_equity_forward_inputs(
             "SPX",
             date!(2025 - 01 - 01),
-            100.0,
+            EquitySpot {
+                amount: 100.0,
+                currency: Some(Currency::USD),
+            },
             None,
             &discount,
             &context,

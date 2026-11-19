@@ -2511,7 +2511,7 @@ class CorrelatedBernoulli:
         """
         Create a correlated Bernoulli distribution.
 
-        Correlation is clamped to the Fréchet-Hoeffding bounds for the
+        Correlation must satisfy the Fréchet-Hoeffding bounds for the
         given marginal probabilities.
 
         Parameters
@@ -2523,13 +2523,13 @@ class CorrelatedBernoulli:
         correlation : float
             Desired finite correlation in ``[-1, 1]``. Values inside that
             domain but outside the feasible Fréchet-Hoeffding interval are
-            clamped to the nearest feasible bound.
+            rejected. For a deterministic marginal supply zero.
 
         Raises
         ------
         ValueError
             If a marginal is not finite and in ``[0, 1]`` or correlation is
-            not finite and in ``[-1, 1]``.
+            outside the feasible interval for these marginals.
         """
         ...
 
@@ -2568,28 +2568,12 @@ class CorrelatedBernoulli:
     @property
     def correlation(self) -> float:
         """
-        Effective correlation after Fréchet-Hoeffding clamping.
+        Feasible correlation supplied at construction.
 
         Returns
         -------
         float
-            Effective correlation after Fréchet-Hoeffding clamping.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def requested_correlation(self) -> float:
-        """
-        Caller-requested correlation before Fréchet-Hoeffding clamping.
-
-        Returns
-        -------
-        float
-            Caller-requested correlation before Fréchet-Hoeffding clamping.
+            Feasible correlation supplied at construction.
 
         Notes
         -----

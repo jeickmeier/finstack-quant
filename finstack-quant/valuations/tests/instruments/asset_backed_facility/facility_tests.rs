@@ -50,7 +50,9 @@ fn market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// Five bullet first-lien loans at 8%: 30/20/20/15/15M, each its own obligor.
@@ -67,6 +69,7 @@ fn collateral() -> AssetPool {
             2,
         );
         loan.forward_curve_id = None;
+        loan.reset_lag_days = None;
         loan.spread_bp = None;
         loan.rate = 0.08;
         loan.obligor_id = Some(format!("OBL-{i}"));
@@ -740,6 +743,7 @@ fn floating_facility_interest_is_tagged_floating() {
     let fixed = facility(60_000_000.0, 100_000_000.0);
     let mut floating = fixed.clone();
     floating.rate = RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: CurveId::new("USD-SOFR-3M".to_string()),
         spread_bp: rust_decimal::Decimal::from(250),
         gearing: rust_decimal::Decimal::ONE,
@@ -772,7 +776,10 @@ fn floating_facility_interest_is_tagged_floating() {
         finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixing");
-    let market = market().insert(fwd).insert_series(fixing);
+    let market = market()
+        .try_insert(fwd)
+        .expect("insert market curve")
+        .insert_series(fixing);
     let kinds = |f: &AssetBackedFacility| -> Vec<CFKind> {
         f.cashflow_schedule(&market, close())
             .expect("schedule")

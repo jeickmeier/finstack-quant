@@ -63,7 +63,7 @@ fn test_equity_trs_missing_spot_price() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    market = market.insert(disc);
+    market = market.try_insert(disc).expect("insert market curve");
 
     let fwd = finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
         "USD-SOFR-3M",
@@ -72,7 +72,7 @@ fn test_equity_trs_missing_spot_price() {
         finstack_quant_core::dates::DayCount::Act365F,
     )
     .unwrap();
-    market = market.insert(fwd);
+    market = market.try_insert(fwd).expect("insert market curve");
 
     let trs = TestEquityTrsBuilder::new().build();
 
@@ -127,7 +127,7 @@ fn test_equity_trs_missing_forward_curve() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    market = market.insert(disc);
+    market = market.try_insert(disc).expect("insert market curve");
 
     let trs = TestEquityTrsBuilder::new().build();
 

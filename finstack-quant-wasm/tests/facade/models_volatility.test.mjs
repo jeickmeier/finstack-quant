@@ -55,7 +55,12 @@ test('models.volatility evaluates core data artifacts', () => {
     [1],
     [0.12],
     [0.01],
-    [0.002]
+    [0.002],
+    {
+      deltaConvention: 'forward_unadjusted',
+      atmConvention: 'delta_neutral_straddle',
+      butterflyConvention: 'smile',
+    }
   );
   const pillars = facade.models.volatility.getFxDeltaPillarVols(surface, 0);
   assert.deepEqual(
@@ -93,8 +98,11 @@ test('cube queries take the output convention and reject shifted lognormal', () 
   assert.ok(Math.abs(normal - black * 0.03) / normal < 0.01);
   const shifted = { shifted_lognormal: { shift: 0.01 } };
   assert.throws(() => volatility.getCubeVol(cube, 1, 5, 0.03, shifted), /shifted/);
-  assert.ok(Number.isNaN(volatility.getCubeVolClamped(cube, 1, 5, 0.03, shifted)));
-  assert.throws(() => volatility.materializeCubeTenorSlice(cube, 5, [0.03], shifted), /shifted/);
+  assert.throws(() => volatility.getCubeVolClamped(cube, 1, 5, 0.03, shifted), /shifted/);
+  assert.throws(
+    () => volatility.materializeCubeTenorSlice(cube, 5, [0.03], shifted, 'vol'),
+    /shifted/
+  );
   assert.throws(() => volatility.materializeCubeExpirySlice(cube, 1, [0.03], shifted), /shifted/);
   const slice = volatility.materializeCubeExpirySlice(cube, 1, [0.03], 'normal');
   assert.equal(slice.quoteType, 'normal');
@@ -117,7 +125,7 @@ test('normal SABR beta zero uses arithmetic moneyness across zero', () => {
     const z = (nu * (forward - strike)) / alpha;
     const chi = Math.log((Math.sqrt(1 - 2 * rho * z + z * z) + z - rho) / (1 - rho));
     const expected = ((alpha * z) / chi) * (1 + ((2 - 3 * rho * rho) * nu * nu * expiry) / 24);
-    assert.ok(Math.abs(params.impliedVol(forward, strike, expiry) - expected) < 1e-14);
+    assert.ok(Math.abs(params.impliedVol(forward, strike, expiry, 'normal') - expected) < 1e-14);
   }
   params.free();
 });
@@ -131,7 +139,8 @@ test('SABR calibration rejects a poor final quote fit', () => {
         new Float64Array([90, 95, 100, 105, 110]),
         new Float64Array([0.22, 0.2, 0.19, 0.195, 0.21]),
         1,
-        0.5
+        0.5,
+        'black_lognormal'
       ),
     /no acceptable/
   );
@@ -156,8 +165,9 @@ test('clamped cube preserves small quotes and invalid model domains', () => {
     [{ alpha: 0.008, beta: 0.5, rho: 0, nu: 0.3 }],
     [-0.01]
   );
-  assert.ok(
-    Number.isNaN(facade.models.volatility.getCubeVolClamped(invalid, 1, 5, -0.01, 'lognormal'))
+  assert.throws(
+    () => facade.models.volatility.getCubeVolClamped(invalid, 1, 5, -0.01, 'lognormal'),
+    /positive effective forward/
   );
   low.free();
   invalid.free();
@@ -232,7 +242,12 @@ test('canonical volatility state constructors preserve named parameters and opti
       [0.12],
       [0.01],
       [0.002],
-      wings ? { rr10d: [0.02], bf10d: [0.004] } : null
+      {
+        deltaConvention: 'forward_unadjusted',
+        atmConvention: 'delta_neutral_straddle',
+        butterflyConvention: 'smile',
+        ...(wings ? { rr10d: [0.02], bf10d: [0.004] } : {}),
+      }
     );
     try {
       assert.equal(
@@ -300,7 +315,7 @@ test('SABR parameters, smile and calibrator expose the Rust members', () => {
   assert.equal(SabrParameters.shiftedNormal(0.01, 0.3, -0.2, 0.02).shift, 0.02);
   assert.equal(SabrParameters.shiftedLognormal(0.2, 0.3, -0.2, 0.02).shift, 0.02);
 
-  const smile = new SabrSmile(SabrParameters.equityDefault(), 100, 1);
+  const smile = new SabrSmile(SabrParameters.equityDefault(), 100, 1, 'black_lognormal');
   assert.ok(smile.strikeFromDelta(0.25, true) > 100);
   assert.ok(smile.strikeFromDelta(0.25, false) < 100);
   const strikes = [80, 90, 100, 110, 120];
@@ -323,4 +338,25 @@ test('SABR parameters, smile and calibrator expose the Rust members', () => {
     [calibrator.tolerance, calibrator.maxIterations, calibrator.shift, calibrator.atmPinning],
     [1e-8, 77, 0.01, true]
   );
+});
+
+test('mixed-beta SABR interpolation preserves the two observed endpoint quotes', () => {
+  const cube = new facade.core.VolCube(
+    'MIXED',
+    [1],
+    [5, 10],
+    [
+      { alpha: 0.04, beta: 0.5, rho: 0, nu: 0 },
+      { alpha: 0.2, beta: 1, rho: 0, nu: 0 },
+    ],
+    [0.04, 0.04]
+  );
+  try {
+    const vol = (tenor) => facade.models.volatility.getCubeVol(cube, 1, tenor, 0.04, 'lognormal');
+    assert.ok(Math.abs(vol(5) - 0.20008333333333) < 1e-12);
+    assert.ok(Math.abs(vol(10) - 0.2) < 1e-12);
+    for (const tenor of [7.5, 7.50000001]) assert.throws(() => vol(tenor), /different beta/);
+  } finally {
+    cube.free();
+  }
 });

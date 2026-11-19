@@ -467,7 +467,8 @@ mod tests {
     fn public_helper_produces_positive_finite_override() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
         let market = MarketContext::new()
-            .insert(test_discount_curve(as_of, "D"))
+            .try_insert(test_discount_curve(as_of, "D"))
+            .expect("insert market curve")
             .insert_surface(test_surface());
         let base_vol = calibrate_bermudan_lmm_base_vol(&test_swaption(), &market, as_of)
             .expect("LMM base-vol calibration");
@@ -517,7 +518,8 @@ mod tests {
             .build()
             .expect("Black surface");
         let market = MarketContext::new()
-            .insert(curve.clone())
+            .try_insert(curve.clone())
+            .expect("insert market curve")
             .insert_surface(surface);
         let base_vol = calibrate_bermudan_lmm_base_vol_from_json(
             &bermudan_envelope_json(swaption.clone()),
@@ -581,7 +583,8 @@ mod tests {
         ] {
             let curve = test_discount_curve(as_of, "D");
             let market = MarketContext::new()
-                .insert(curve.clone())
+                .try_insert(curve.clone())
+                .expect("insert market curve")
                 .insert_surface(test_surface());
             let base_vol = calibrate_bermudan_lmm_base_vol_from_json(
                 &bermudan_envelope_json(swaption.clone()),
@@ -624,7 +627,9 @@ mod tests {
             .exercise_dates
             .last()
             .expect("last exercise");
-        let market = MarketContext::new().insert(test_discount_curve(as_of, "D"));
+        let market = MarketContext::new()
+            .try_insert(test_discount_curve(as_of, "D"))
+            .expect("insert market curve");
         let error = calibrate_bermudan_lmm_base_vol(&swaption, &market, as_of)
             .expect_err("no remaining option to calibrate")
             .to_string();
@@ -637,7 +642,9 @@ mod tests {
     #[test]
     fn calibration_rejects_overnight_compounding_before_surface_lookup() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
-        let market = MarketContext::new().insert(test_discount_curve(as_of, "USD-OIS"));
+        let market = MarketContext::new()
+            .try_insert(test_discount_curve(as_of, "USD-OIS"))
+            .expect("insert market curve");
         let mut swaption = test_swaption();
         swaption.underlying_fixed_leg.discount_curve_id = "USD-OIS".into();
         swaption.underlying_float_leg.discount_curve_id = "USD-OIS".into();
@@ -670,7 +677,8 @@ mod tests {
     fn from_json_matches_typed_helper() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
         let market = MarketContext::new()
-            .insert(test_discount_curve(as_of, "D"))
+            .try_insert(test_discount_curve(as_of, "D"))
+            .expect("insert market curve")
             .insert_surface(test_surface());
         let swaption = test_swaption();
         let typed = calibrate_bermudan_lmm_base_vol(&swaption, &market, as_of)
@@ -715,7 +723,8 @@ mod tests {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
         let curve = test_discount_curve(as_of, "D");
         let calibration_market = MarketContext::new()
-            .insert(curve.clone())
+            .try_insert(curve.clone())
+            .expect("insert market curve")
             .insert_surface(test_surface());
         let mut swaption = test_swaption();
         let base_vol = calibrate_bermudan_lmm_base_vol(&swaption, &calibration_market, as_of)
@@ -725,7 +734,9 @@ mod tests {
             .model_config
             .lmm_base_vol = Some(base_vol);
 
-        let pricing_market = MarketContext::new().insert(curve);
+        let pricing_market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let pricer = BermudanSwaptionLmmPricer::with_config(Hw1fMcConfig {
             num_paths: 32,
             min_steps_between_events: 1,
@@ -741,7 +752,9 @@ mod tests {
     #[test]
     fn pricing_rejects_missing_or_invalid_override_before_surface_lookup() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
-        let market = MarketContext::new().insert(test_discount_curve(as_of, "D"));
+        let market = MarketContext::new()
+            .try_insert(test_discount_curve(as_of, "D"))
+            .expect("insert market curve");
         let pricer = BermudanSwaptionLmmPricer::with_config(Hw1fMcConfig {
             num_paths: 8,
             min_steps_between_events: 1,

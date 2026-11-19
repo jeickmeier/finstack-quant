@@ -482,8 +482,11 @@ mod tests {
 
         // Create price curve for NG forward prices (slight contango)
         let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(3.50)
             .knots([
                 (0.0, 3.50),
                 (0.25, 3.55),
@@ -494,7 +497,11 @@ mod tests {
             .build()
             .expect("Valid price curve");
 
-        MarketContext::new().insert(disc).insert(price_curve)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve")
     }
 
     #[test]
@@ -505,7 +512,7 @@ mod tests {
         let maturity = date!(2025 - 05 - 31);
         let payment = date!(2025 - 06 - 02);
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
@@ -515,8 +522,13 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 PriceCurve::builder("NG-SPOT-AVG")
+                    .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                     .base_date(as_of)
                     .knots([
                         (0.0, 0.0),
@@ -526,7 +538,8 @@ mod tests {
                     ])
                     .build()
                     .expect("price curve"),
-            );
+            )
+            .expect("insert market curve");
         let mut swap = CommoditySwap::example().expect("example");
         swap.start_date = as_of;
         swap.maturity = maturity;
@@ -872,8 +885,11 @@ mod tests {
         // first period's averaging window straddles the curve base.
         let curve_base = Date::from_calendar_date(2025, Month::March, 15).expect("date");
         let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(curve_base)
-            .spot_price(3.50)
             .knots([(0.0, 3.50), (1.0, 3.70)])
             .build()
             .expect("price curve");
@@ -885,7 +901,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(disc).insert(price_curve);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve");
 
         // Swap starts 2025-01-01; the first monthly period (Jan-Feb) is fully
         // before the curve base — but a period straddling the base exercises
@@ -932,8 +952,11 @@ mod tests {
         // Flat price curve: every business day observes the same price, so the
         // compensated average must equal that price to full precision.
         let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(3.50)
             .knots([(0.0, 3.50), (2.0, 3.50)])
             .build()
             .expect("price curve");
@@ -945,7 +968,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(disc).insert(price_curve);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve");
 
         let swap = CommoditySwap::builder()
             .id(InstrumentId::new("W11-FLAT-SWAP"))
@@ -1034,8 +1061,11 @@ mod tests {
         let swap = seasoned_swap(fixings).expect("valid seasoned swap");
 
         let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(3.50)
             .knots([(0.0, 3.50), (2.0, 3.50)])
             .build()
             .expect("price curve");
@@ -1047,7 +1077,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(disc).insert(price_curve);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve");
 
         let npv = swap.value(&market, as_of).expect("should price").amount();
         assert!(
@@ -1073,8 +1107,11 @@ mod tests {
         let swap = seasoned_swap(fixings).expect("valid seasoned swap");
 
         let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(3.50)
             .knots([(0.0, 3.50), (2.0, 3.50)])
             .build()
             .expect("price curve");
@@ -1086,7 +1123,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(disc).insert(price_curve);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(price_curve)
+            .expect("insert market curve");
 
         let err = swap
             .value(&market, as_of)

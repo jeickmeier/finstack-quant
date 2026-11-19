@@ -784,7 +784,9 @@ mod tests {
             .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
-        Ok(MarketContext::new().insert(curve))
+        Ok(MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve"))
     }
 
     fn history_from_scenarios(

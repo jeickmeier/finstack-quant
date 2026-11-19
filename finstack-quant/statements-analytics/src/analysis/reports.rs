@@ -622,11 +622,16 @@ mod tests {
             finstack_quant_core::dates::PeriodPlan::try_new(
                 calendar,
                 ids.into_iter()
-                    .map(|id| finstack_quant_core::dates::Period {
-                        id,
-                        start: time::macros::date!(2000 - 01 - 01),
-                        end: time::macros::date!(2000 - 01 - 02),
-                        is_actual: false,
+                    .map(|id| {
+                        let range = format!("{id}..{id}");
+                        let plan = match calendar.fiscal_config() {
+                            Some(config) => finstack_quant_core::dates::build_fiscal_periods(
+                                &range, config, None,
+                            ),
+                            None => finstack_quant_core::dates::build_periods(&range, None),
+                        }
+                        .expect("valid reporting period");
+                        plan[0].clone()
                     })
                     .collect(),
             )
@@ -911,27 +916,25 @@ mod tests {
     fn daily_credit_windows_use_calendar_years_including_leap_days() {
         for (year, days) in [(2024, 366), (2025, 365)] {
             let mut results = StatementResult::new();
+            let mut rows = Vec::new();
             for ordinal in 1..=days {
                 let period = PeriodId::day(year, ordinal).expect("day");
                 let (start, end) = period.bounds().expect("bounds");
-                results
-                    .periods
-                    .get_or_insert_with(|| {
-                        finstack_quant_core::dates::PeriodPlan::try_new(
-                            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                            Vec::new(),
-                        )
-                        .expect("valid period plan")
-                    })
-                    .periods
-                    .push(finstack_quant_core::dates::Period {
-                        id: period,
-                        start,
-                        end,
-                        is_actual: true,
-                    });
+                rows.push(finstack_quant_core::dates::Period {
+                    id: period,
+                    start,
+                    end,
+                    is_actual: true,
+                });
                 results.set_scalar("ebitda", period, 1.0).expect("finite");
             }
+            results.periods = Some(
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    rows,
+                )
+                .unwrap(),
+            );
             let at = PeriodId::day(year, days).expect("last day");
             results
                 .set_scalar("total_debt", at, f64::from(days))
@@ -960,37 +963,35 @@ mod tests {
 
     #[test]
     fn business_day_credit_window_is_not_a_complete_daily_year() {
-        use finstack_quant_core::dates::{Date, Period};
+        use finstack_quant_core::dates::Date;
         use time::Month;
         // Two years of weekdays only: absent rows do not prove weekends or
         // holidays, so a business-day grid is never a complete daily LTM
         // (record CORE-CONVENTIONS-014 #11).
         let mut results = StatementResult::new();
+        let mut rows = Vec::new();
         let mut date = Date::from_calendar_date(2024, Month::January, 1).expect("start");
         let last = Date::from_calendar_date(2025, Month::December, 31).expect("end");
         while date <= last {
             if date.weekday().number_days_from_monday() < 5 {
                 let id = PeriodId::from_date(date, PeriodKind::Daily, None).expect("day");
-                results
-                    .periods
-                    .get_or_insert_with(|| {
-                        finstack_quant_core::dates::PeriodPlan::try_new(
-                            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                            Vec::new(),
-                        )
-                        .expect("valid period plan")
-                    })
-                    .periods
-                    .push(Period {
-                        id,
-                        start: date,
-                        end: date.next_day().expect("next day"),
-                        is_actual: true,
-                    });
+                rows.push(finstack_quant_core::dates::Period {
+                    id,
+                    start: date,
+                    end: date.next_day().expect("next day"),
+                    is_actual: true,
+                });
                 results.set_scalar("ebitda", id, 1.0).expect("finite");
             }
             date = date.next_day().expect("next day");
         }
+        results.periods = Some(
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                rows,
+            )
+            .unwrap(),
+        );
         let at = PeriodId::from_date(last, PeriodKind::Daily, None).expect("day");
         assert_eq!(
             trailing_sum_at(&results, "ebitda", &at).expect("valid window"),
@@ -1025,28 +1026,26 @@ mod tests {
             let mut date = Date::from_calendar_date(start.0, start.1, start.2).expect("start");
             let end = Date::from_calendar_date(end.0, end.1, end.2).expect("end");
             let mut results = StatementResult::new();
+            let mut rows = Vec::new();
             while date < end {
                 let period =
                     PeriodId::from_date(date, PeriodKind::Daily, None).expect("daily period");
-                results
-                    .periods
-                    .get_or_insert_with(|| {
-                        finstack_quant_core::dates::PeriodPlan::try_new(
-                            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                            Vec::new(),
-                        )
-                        .expect("valid period plan")
-                    })
-                    .periods
-                    .push(finstack_quant_core::dates::Period {
-                        id: period,
-                        start: date,
-                        end: date.next_day().expect("next day"),
-                        is_actual: true,
-                    });
+                rows.push(finstack_quant_core::dates::Period {
+                    id: period,
+                    start: date,
+                    end: date.next_day().expect("next day"),
+                    is_actual: true,
+                });
                 results.set_scalar("ebitda", period, 1.0).expect("finite");
                 date = date.next_day().expect("next day");
             }
+            results.periods = Some(
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    rows,
+                )
+                .unwrap(),
+            );
             let at = PeriodId::from_date(
                 end.previous_day().expect("last day"),
                 PeriodKind::Daily,

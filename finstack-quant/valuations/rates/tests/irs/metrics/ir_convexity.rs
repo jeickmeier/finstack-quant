@@ -33,7 +33,11 @@ fn build_market(rate: f64, base_date: Date) -> MarketContext {
         .build()
         .unwrap();
     let fwd_curve = ForwardCurve::flat("USD_LIBOR_3M", base_date, rate, DayCount::Act360).unwrap();
-    MarketContext::new().insert(disc_curve).insert(fwd_curve)
+    MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
 }
 
 fn create_standard_swap(as_of: Date, end: Date, side: PayReceive) -> InterestRateSwap {
@@ -59,6 +63,7 @@ fn create_standard_swap(as_of: Date, end: Date, side: PayReceive) -> InterestRat
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),

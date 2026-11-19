@@ -1411,6 +1411,169 @@ Select the vega proxy from both currencies, apply HVR before pair concentration
 and preserve signed dependence in separate checked reference-horizon charges.
 [Accepted SIMM FX aggregation](docs/decisions/financial/margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
 
+SIMM commodity preserves exact factors within each numbered bucket. Apply
+concentration by factor, then use bucket norms and signed capped sums across
+all 17 buckets. Bucket 16 contributes its squared norm inside the root.
+[Accepted SIMM commodity aggregation](docs/decisions/financial/margin-collateral-im/09-simm-commodity.md#accepted-decision-for-checked-simm-commodity-delta-and-vega).
+
+SIMM curvature binds the signed calculation side and scales each qualified
+expiry before factor netting. Square base dependence coefficients, apply the
+signed charge floor by group and preserve scaling and aggregation evidence.
+[Accepted SIMM curvature aggregation](docs/decisions/financial/margin-collateral-im/10-simm-curvature.md#accepted-decision-for-checked-simm-expiry-scaling-and-curvature-aggregation).
+
+SIMM nets and diversifies within each elected product class, then adds the
+product charges. Require complete coverage and the supported profile horizon.
+Preserve the calculation side, zero reasons and approximation status in the
+common result. [Accepted SIMM assembly](docs/decisions/financial/margin-collateral-im/11-simm-total-and-mpor.md#accepted-decision-for-product-class-simm-assembly-and-supported-horizons).
+
+Gross schedule IM uses the elected complete profile, a qualified effective
+notional and exact rate, and the applicable maturity bucket. Multiply in the
+notional currency using checked Money arithmetic at the reference horizon.
+[Accepted gross schedule calculation](docs/decisions/financial/margin-collateral-im/12-schedule-notional.md#accepted-decision-for-checked-gross-schedule-initial-margin).
+
+Schedule netting applies one ratio to the total gross charge within the
+qualified scope. A nonempty set with zero gross replacement cost retains
+the full gross charge. Preserve complete trade and ratio evidence.
+[Accepted schedule netting](docs/decisions/financial/margin-collateral-im/13-schedule-net-gross.md#accepted-decision-for-checked-schedule-netting-and-reduction).
+
+Cleared IM elects a reported amount or indicative proxy for an exact
+account, position scope and horizon. Consume a reported requirement once.
+Sum checked gross sized exposures under the elected proxy profile.
+[Accepted cleared IM routes](docs/decisions/financial/margin-collateral-im/14-ccp-external-and-proxy.md#accepted-decision-for-elected-cleared-initial-margin-routes).
+
+Collateral credit uses the elected schedule and qualified security facts.
+Determine FX mismatch from the native asset currency and governing terms.
+Apply the bounded additive haircut to account-currency value once.
+[Accepted collateral eligibility and credited value](docs/decisions/financial/margin-collateral-im/15-collateral-eligibility-and-haircuts.md#accepted-decision-for-checked-collateral-eligibility-and-credited-value).
+
+Collateral concentration counts each eligible lot once in the pool.
+Aggregate each elected group on the same gross or credited basis and
+compare against its cap before rounding.
+[Accepted concentration contract](docs/decisions/financial/margin-collateral-im/16-collateral-concentration.md#accepted-decision-for-checked-collateral-pool-concentration).
+
+Apply allocated IM threshold and transfer terms once per exact one-way
+account. Require qualified margin, credited balances and custody evidence.
+Preserve the elected MTA boundary and separate IM from VM.
+[Accepted IM account terms](docs/decisions/financial/margin-collateral-im/17-csa-selection-and-im-terms.md#accepted-decision-for-checked-csa-elections-and-one-way-im-account-terms).
+
+VM applies the elected threshold for each side to signed exposure.
+Subtract the qualified credited balance in checked Money. Test MTA on the
+unrounded difference before applying the elected transfer rounding.
+[Accepted VM contract](docs/decisions/financial/margin-collateral-im/18-variation-margin.md#accepted-decision-for-checked-signed-variation-margin-and-transfers).
+
+Use elected call and settlement calendars and maintain dated transfer state.
+Credit settled collateral and any eligible agreed pending amount at the cut
+under the elected policy. A proposal has zero balance effect.
+[Accepted VM replay contract](docs/decisions/financial/margin-collateral-im/19-margin-dates-and-replay.md#accepted-decision-for-checked-vm-schedules-and-settlement-replay).
+
+In the elected cash-only repo route, compare one dated ratio target to
+qualified collateral and credited cash. Cap refunds by settled cash after
+reserving agreed refunds. Accrue margin interest on settled cash.
+[Accepted repo margin contract](docs/decisions/financial/margin-collateral-im/20-repo-margin-cashflows.md#accepted-decision-for-checked-repo-cash-margin-and-interest).
+
+Compare matched nonnegative credited and required collateral in exact
+Money. Ratios require a positive requirement. Static funding cost and the
+one-basis-point reduction in collateral credit retain their own bases.
+[Accepted collateral metrics](docs/decisions/financial/margin-collateral-im/21-collateral-metrics.md#accepted-decision-for-checked-collateral-metrics).
+
+Carry the complete typed calculation basis with margin sensitivity batches.
+Validate contribution and snapshot identity, nested terms and results through
+one Rust admission path. Preserve effective source and qualification.
+[Accepted margin wire and provenance](docs/decisions/financial/margin-collateral-im/22-wire-tables-and-provenance.md#accepted-decision-for-checked-margin-tables-wire-state-and-provenance).
+
+FRTB binds its elected rulebook, effective data, cut and reporting currency.
+Admit the stated sensitivity scale and exact factors before netting.
+Check coverage before treating missing inputs as evaluated zero.
+[Accepted FRTB input contract](docs/decisions/financial/margin-regulatory-xva/01-frtb-inputs-and-wire.md#accepted-decision-for-checked-frtb-inputs-and-provenance).
+
+Full FRTB capital uses one binding total across the three prescribed
+scenarios and adds qualified DRC and RRAO once. Selected SBA diagnostics
+have their own scope. Use checked signed quadratics and apply the ordinary
+capped bucket sum only on a negative first quadratic.
+[Accepted FRTB aggregation contract](docs/decisions/financial/margin-regulatory-xva/02-frtb-scenarios-and-aggregation.md#accepted-decision-for-checked-frtb-scenarios-and-aggregation).
+
+GIRR delta preserves each qualified yield curve and standard vertex, flat
+inflation curve and directed cross-currency basis. Weight relief requires
+an explicit eligible election. Apply curve distinction before scenario scaling.
+[Accepted GIRR delta](docs/decisions/financial/margin-regulatory-xva/03-frtb-girr-delta.md#accepted-decision-for-checked-girr-delta).
+
+CSR delta retains class-qualified issuers, CTP reference names or non-CTP
+tranches, with dated bucket, tenor and curve-basis evidence. Apply elected
+weights and the prescribed class-specific correlation and residual rules.
+[Accepted credit spread delta](docs/decisions/financial/margin-regulatory-xva/04-frtb-credit-delta.md#accepted-decision-for-checked-credit-spread-delta).
+
+Equity delta nets exact spot or repo factors, retains qualified name and
+index evidence, and applies the distinct spot and repo weight scales.
+Bucket 11 sums absolute weighted factors and enters the cross-bucket root
+with zero cross-correlation.
+[Accepted equity spot and repo delta](docs/decisions/financial/margin-regulatory-xva/05-frtb-equity-delta.md#accepted-decision-for-checked-equity-spot-and-repo-delta).
+
+Commodity delta nets exact commodity, legal delivery-location and tenor
+factors, with `0Y` for spot positions. Apply the scenario to the product
+of commodity, tenor and location correlations. Bucket 11 uses ordinary
+within-bucket aggregation and zero cross-correlation.
+[Accepted commodity delta](docs/decisions/financial/margin-regulatory-xva/06-frtb-commodity-delta.md#accepted-decision-for-checked-commodity-delta).
+
+FX delta uses one bucket per risk currency against the reporting currency.
+Require each applicable reporting-currency leg on the exact `1%` relative
+shock basis, apply elected relief to qualified buckets and use the checked
+uniform-correlation norm on net weighted amounts.
+[Accepted FX delta](docs/decisions/financial/margin-regulatory-xva/07-frtb-fx-delta.md#accepted-decision-for-checked-fx-delta).
+
+GIRR vega uses prepared volatility-scaled amounts on the five-point option
+expiry and residual underlying maturity grids. Inflation and cross-currency
+basis vega use expiry-only treatment when qualified. Apply the vega weight
+and transform each completed correlation once per scenario.
+[Accepted GIRR vega](docs/decisions/financial/margin-regulatory-xva/08-frtb-girr-vega.md#accepted-decision-for-checked-girr-vega).
+
+Credit, equity and commodity vega retain qualified underliers and the
+five-point expiry grid. Use the class-specific weight and correlations.
+Non-CTP overlap affects pair correlation and preserves tranche identity
+for netting. Apply the elected other-sector rules.
+[Accepted credit, equity and commodity vega](docs/decisions/financial/margin-regulatory-xva/09-frtb-bucketed-vega.md#accepted-decision-for-checked-credit-equity-and-commodity-vega).
+
+FX vega uses qualified option pairs and the five-point expiry grid.
+Apply expiry decay within each pair and uniform scenario correlation
+across pairs. Keep declared quote orientation and prepared volatility
+scaling in the input and result evidence.
+[Accepted FX vega](docs/decisions/financial/margin-regulatory-xva/10-frtb-fx-vega.md#accepted-decision-for-checked-fx-vega).
+
+FRTB curvature consumes two prepared loss-positive amounts after the
+delta deduction. Select a direction independently per bucket and scenario,
+including each FX reporting pair. Square base correlations before the
+scenario transform and aggregate with the selected raw signed sums.
+[Accepted FRTB curvature](docs/decisions/financial/margin-regulatory-xva/11-frtb-curvature.md#accepted-decision-for-checked-frtb-curvature).
+
+Non-securitisation DRC uses prepared signed gross JTD. Determine credit
+direction from loss or gain on default. Scale live exposures by maturity
+before legally eligible same-obligor offsets. Use unweighted residuals for
+the bucket hedge benefit and weighted residuals for the charge.
+[Accepted default risk capital](docs/decisions/financial/margin-regulatory-xva/12-frtb-default-risk.md#accepted-decision-for-checked-non-securitisation-default-risk-capital).
+
+The residual risk add-on uses dated eligibility and exemption evidence and
+one qualified gross contribution per chargeable transaction. Apply the
+class weight once and add the checked total outside the correlation scenarios.
+[Accepted residual risk add-on](docs/decisions/financial/margin-regulatory-xva/13-frtb-residual-risk.md#accepted-decision-for-checked-residual-risk-add-on).
+
+SA-CCR binds each trade to an effective rulebook, valuation cut, reporting
+currency and eligible legal set. Keep exercise, trade maturity and the
+referenced period distinct. Derive margin treatment and MPOR from qualified
+agreement terms and calculate the prescribed supervisory delta from typed
+trade inputs in Rust.
+[Accepted SA-CCR inputs and supervisory delta](docs/decisions/financial/margin-regulatory-xva/14-saccr-inputs-and-supervisory-delta.md#accepted-decision-for-checked-sa-ccr-trade-inputs-and-supervisory-delta).
+
+SA-CCR uses ACT/365F for qualified date offsets and 250 business days per
+regulatory year for the floors and MPOR. Apply the ten-business-day
+supervisory-duration floor to IR and credit. Form effective notional from
+each contribution's applied maturity factor and report the factors used.
+[Accepted SA-CCR maturity and duration](docs/decisions/financial/margin-regulatory-xva/15-saccr-maturity-and-duration.md#accepted-decision-for-checked-sa-ccr-maturity-factors-and-supervisory-duration).
+
+The SA-CCR IR add-on assigns qualified signed effective notionals to
+typed nominal, inflation, basis or volatility hedging sets. Use the
+underlying end time for maturity buckets. Apply the prescribed partial
+offset across buckets and sum the separately weighted set charges.
+[Accepted SA-CCR interest-rate add-on](docs/decisions/financial/margin-regulatory-xva/16-saccr-ir-addon.md#accepted-decision-for-the-checked-sa-ccr-interest-rate-add-on).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

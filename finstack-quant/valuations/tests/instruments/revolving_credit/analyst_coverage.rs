@@ -30,20 +30,22 @@ fn usd(amount: f64) -> Money {
 }
 
 fn market() -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(AS_OF)
-            .day_count(DayCount::Act365F)
-            .knots([
-                (0.0, 1.0),
-                (1.0, (-0.04_f64).exp()),
-                (10.0, (-0.40_f64).exp()),
-            ])
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(AS_OF)
+                .day_count(DayCount::Act365F)
+                .knots([
+                    (0.0, 1.0),
+                    (1.0, (-0.04_f64).exp()),
+                    (10.0, (-0.40_f64).exp()),
+                ])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve")
 }
 
 fn seasoned(draw_repay_spec: DrawRepaySpec) -> RevolvingCredit {
@@ -661,6 +663,7 @@ use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
 
 fn sofr_plus(spread_bp: i64) -> RateSpec {
     RateSpec::Floating(FloatingRateSpec {
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::from(spread_bp),
         gearing: rust_decimal::Decimal::ONE,
@@ -681,15 +684,17 @@ fn sofr_plus(spread_bp: i64) -> RateSpec {
 }
 
 fn market_with_forward() -> MarketContext {
-    market().insert(
-        ForwardCurve::flat(
-            "USD-SOFR-3M",
-            AS_OF,
-            0.04,
-            finstack_quant_core::dates::DayCount::Act365F,
+    market()
+        .try_insert(
+            ForwardCurve::flat(
+                "USD-SOFR-3M",
+                AS_OF,
+                0.04,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .expect("forward"),
         )
-        .expect("forward"),
-    )
+        .expect("insert market curve")
 }
 
 fn lc_spec(outstanding: f64, events: Vec<LcEvent>, leq: f64) -> LetterOfCreditSpec {
@@ -835,7 +840,9 @@ fn lc_draw_at_default_enters_the_default_leg() {
         .knots([(1.0, 0.05), (5.0, 0.05)])
         .build()
         .expect("hazard");
-    let m = market_with_forward().insert(hazard);
+    let m = market_with_forward()
+        .try_insert(hazard)
+        .expect("insert market curve");
     let value = |leq: f64| {
         let facility = with_lc(
             DrawRepaySpec::Deterministic(vec![]),
@@ -942,7 +949,11 @@ fn flat_consistent_market() -> MarketContext {
         finstack_quant_core::dates::DayCount::Act365F,
     )
     .expect("forward");
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 fn quote_facility(
@@ -1209,7 +1220,9 @@ fn leq_without_a_default_model_is_rejected() {
 /// (uncalibrated) hazard curve fails closed naming the missing recipe.
 #[test]
 fn undrawn_exposure_shows_in_hazard_cs01_but_not_in_the_z_spread_fallback() {
-    let market = market_with_forward().insert(knot_hazard());
+    let market = market_with_forward()
+        .try_insert(knot_hazard())
+        .expect("insert market curve");
     let z_spread = measure(
         &exposure_facility(1_000_000.0, 0.0, false),
         &market,
@@ -1261,7 +1274,9 @@ fn undrawn_exposure_shows_in_hazard_cs01_but_not_in_the_z_spread_fallback() {
 /// `exposure_at_default` = drawn + leq × undrawn (+ LC leq × LC face).
 #[test]
 fn exposure_at_default_counts_the_contingent_undrawn_and_lc_draws() {
-    let market = market_with_forward().insert(knot_hazard());
+    let market = market_with_forward()
+        .try_insert(knot_hazard())
+        .expect("insert market curve");
     let ead = measure(
         &exposure_facility(1_000_000.0, 0.5, true),
         &market,
@@ -1280,7 +1295,9 @@ fn exposure_at_default_counts_the_contingent_undrawn_and_lc_draws() {
 /// a curve, larger with `leq`, zero without a curve.
 #[test]
 fn expected_loss_grows_with_the_contingent_exposure() {
-    let market = market_with_forward().insert(knot_hazard());
+    let market = market_with_forward()
+        .try_insert(knot_hazard())
+        .expect("insert market curve");
     let el_0 = measure(
         &exposure_facility(1_000_000.0, 0.0, true),
         &market,
@@ -1576,16 +1593,19 @@ fn clean_down_recipe_zeroes_the_balance_inside_the_window() {
 fn accordion_allows_draws_above_the_opening_commitment() {
     // The later valuation sits inside a coupon period that reset on
     // 2026-01-15, so that fixing must be on the market.
-    let market = market_with_forward().insert(knot_hazard()).insert_series(
-        finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
-            "FIXING:USD-SOFR-3M",
-            vec![(date!(2026 - 01 - 15), 0.04)],
-            None,
-            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
-            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
-        )
-        .expect("fixings"),
-    );
+    let market = market_with_forward()
+        .try_insert(knot_hazard())
+        .expect("insert market curve")
+        .insert_series(
+            finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(date!(2026 - 01 - 15), 0.04)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("fixings"),
+        );
     let mut facility = exposure_facility(8_000_000.0, 0.5, true);
     facility.commitment_steps = vec![CommitmentStep {
         date: date!(2026 - 01 - 15),

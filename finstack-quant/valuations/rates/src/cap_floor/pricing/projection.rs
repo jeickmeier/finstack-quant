@@ -322,8 +322,10 @@ mod tests {
             .build()
             .expect("surface");
         MarketContext::new()
-            .insert(discount)
-            .insert(forward)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve")
             .insert_surface(surface)
     }
 
@@ -379,7 +381,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("steep forward");
-        let market = market(as_of).insert(steep_forward);
+        let market = market(as_of)
+            .try_insert(steep_forward)
+            .expect("insert market curve");
         caplet
             .validate_for_pricing()
             .expect("valid overnight caplet");
@@ -599,7 +603,7 @@ mod tests {
         caplet.forward_curve_id = "TEST-TERM-3M".into();
         let period = caplet.pricing_periods().expect("periods").remove(0);
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
@@ -609,7 +613,8 @@ mod tests {
                     .build()
                     .expect("discount"),
             )
-            .insert({
+            .expect("insert market curve")
+            .try_insert({
                 let mut pts = if period.accrual_start > as_of {
                     vec![(as_of, 1.0), (period.accrual_start, 1.0)]
                 } else {
@@ -628,7 +633,8 @@ mod tests {
                     finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
                 )
                 .expect("forward")
-            });
+            })
+            .expect("insert market curve");
 
         let resolved = resolve_optioned_caplet_inputs(&caplet, &period, &market, as_of)
             .expect("same-day fixed inputs");

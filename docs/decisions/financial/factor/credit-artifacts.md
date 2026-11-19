@@ -1,14 +1,20 @@
 # FACTOR-019: Credit artifact semantic boundary, provenance, and schemas
 
-**Decision status:** Draft — observed implementation and remaining methodology/provenance choices; the wire and validation-boundary contract in [ADR 0047](../../architecture/0047-credit-factor-wire-and-validation-contract.md) is accepted.
+**Decision status:** Accepted 2026-11-17 for financial state authority, semantic checks, and replay provenance. [ADR 0047](../../architecture/0047-credit-factor-wire-and-validation-contract.md) owns the accepted wire and loader boundary.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Wire marker and validating loaders are implemented for the inspected scope. Issuer state authority, full financial validation, and replay provenance require reconciliation.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** Duplicate issuer lookups were traced in source, and validator and schema fixtures were inspected. Malformed-artifact rejection and cross-host replay still require end-to-end qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Use the calibrated issuer table as the authoritative source of issuer rows and derive the matching view from it. Use stored covariance for systematic risk and validated issuer residual variance for residual risk. Reject contradictory state at financial handoff. [Covariance authority](credit-covariance.md) · [Forecast horizon](credit-horizons.md).
+2. Validate the current state before financial use and after relevant mutation under ADR 0047. Check the calibration window and anchor, ordered factor axes, issuer tags and loadings, operative folds, residual state, and any supplied histories. Apply the relevant checks before matching, decomposition, and forecasting. [Bucket folds](credit-buckets.md) · [Snapshot basis](credit-snapshots.md).
+3. Preserve effective calibration settings, method version, and immutable identities for input data and the observation calendar so replay can resolve the same inputs and choices. Verify deterministic schema and canonical bytes separately from independent replay and financial qualification. [Replay evidence guidance](../../project/0048-reference-provenance-and-version-pinning.md).
+
+## Observed choice and rationale
 
 Accepted [ADR 0047](../../architecture/0047-credit-factor-wire-and-validation-contract.md) requires the exact namespaced v1 wire marker and explicit semantic validation. Ordinary `CreditFactorModel` serde decodes structure and the marker but does not invoke `CreditFactorModel::validate()`. Consumers must validate current state, or use a validating loader, before financial use and after relevant mutation. Inspected JSON loaders and calibration call validation; the inspected calls do not establish complete Rust, Python and WASM entry-point and consumer coverage.
 
@@ -49,6 +55,5 @@ Stronger validated constructors/loaders could establish a fuller immutable invar
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and independent qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models) and [central credit artifact validation](../../FOLLOW_UPS.md#credit-artifact-validation).

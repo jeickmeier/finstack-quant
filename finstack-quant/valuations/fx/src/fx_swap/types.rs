@@ -467,8 +467,10 @@ mod tests {
         };
 
         MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(fx_provider, None))
     }
 

@@ -541,6 +541,7 @@ def _build_swaption_fixture(
                     },
                     "underlying_float_leg": {
                         "discount_curve_id": "USD-OIS",
+                        "index_id": "USD-TERM-1Y",
                         "forward_curve_id": "USD-TERM-1Y",
                         "spread_bp": "0",
                         "frequency": {"count": 12, "unit": "months"},

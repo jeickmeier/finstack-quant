@@ -209,6 +209,11 @@ it("preserves the scoped published Float64Array return through structured clone"
     [0.12],
     [0.01],
     [0.002],
+    {
+      deltaConvention: "forward_unadjusted",
+      atmConvention: "delta_neutral_straddle",
+      butterflyConvention: "smile",
+    },
   );
   const cube = new core.VolCube(
     "USD-SWAPTION",

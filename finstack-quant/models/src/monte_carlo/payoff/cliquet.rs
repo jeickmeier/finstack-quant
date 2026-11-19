@@ -222,7 +222,6 @@ impl CliquetCallPayoff {
 
 impl Payoff for CliquetCallPayoff {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
-        const EPS: f64 = 1e-6;
         let spot = state.spot().ok_or_else(|| {
             Error::Validation(format!(
                 "CliquetCallPayoff requires SPOT at step {}",
@@ -239,7 +238,7 @@ impl Payoff for CliquetCallPayoff {
         // multiple reset dates (coarse grid); each due reset must record a spot
         // so period returns are computed against the correct number of resets.
         while self.next_reset_idx < self.reset_dates.len()
-            && state.time >= self.reset_dates[self.next_reset_idx] - EPS
+            && state.time >= self.reset_dates[self.next_reset_idx]
         {
             self.reset_spots.push(spot);
             self.next_reset_idx += 1;
@@ -371,6 +370,11 @@ mod tests {
             payoff_type: CliquetPayoffType::Additive,
         })
         .expect("test fixture is well-formed");
+
+        let mut early = PathState::new(1, 0.25_f64.next_down());
+        early.set(state_keys::SPOT, 200.0);
+        cliquet.on_event(&mut early).unwrap();
+        assert_eq!(cliquet.next_reset_idx, 0);
 
         // First coarse step at t = 0.5 spans reset dates 0 (0.25) and 1 (0.5).
         let mut state = PathState::new(1, 0.5);

@@ -186,7 +186,7 @@ impl QeHeston {
         dt: f64,
         z_v: f64,
     ) -> f64 {
-        qe_step_variance(v_t, kappa, theta, sigma_v, dt, z_v, self.psi_c)
+        qe_step_variance(v_t, kappa, theta, sigma_v, dt, z_v, self.psi_c).expect("QE sample")
     }
 
     /// Compute integrated variance for spot evolution.
@@ -279,7 +279,7 @@ impl Discretization<HestonProcess> for QeHeston {
         x: &mut [f64],
         z: &[f64],
         _work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let params = process.params();
 
         let s_t = x[0];
@@ -312,7 +312,7 @@ impl Discretization<HestonProcess> for QeHeston {
                 self.psi_c,
             ),
         };
-        let v_next = regime.sample(z_v);
+        let v_next = regime.sample(z_v)?;
 
         // Step 2: Evolve the spot. With the affine integrated-variance
         // approximation ∫v ≈ c0 + c1·v_t + c2·v_{t+Δt}, the log-return is
@@ -376,6 +376,7 @@ impl Discretization<HestonProcess> for QeHeston {
 
         x[0] = s_next;
         x[1] = v_next;
+        Ok(())
     }
 
     fn prepare(
@@ -468,7 +469,8 @@ mod tests {
         let z = vec![0.0, 0.0]; // No shocks
         let mut work = vec![];
 
-        qe.step(&heston, 0.0, 0.01, &mut x, &z, &mut work);
+        qe.step(&heston, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert!(x[0] > 0.0);
         assert!(x[1] >= 0.0);
@@ -490,7 +492,8 @@ mod tests {
         let z_neg_var = vec![0.0, -1.0]; // Negative variance shock
         let mut work = vec![];
 
-        qe.step(&heston, 0.0, 0.01, &mut x1, &z_neg_var, &mut work);
+        qe.step(&heston, 0.0, 0.01, &mut x1, &z_neg_var, &mut work)
+            .expect("valid simulation step");
 
         // With ρ=-0.7, a negative variance shock contributes positively to spot.
         assert!(x1[0] > 0.0);
@@ -690,7 +693,7 @@ mod tests {
             dt,
             1.5,
         );
-        let v_next = regime.sample(z[1]);
+        let v_next = regime.sample(z[1]).expect("QE sample");
         let (c0, c1, c2) = (0.0, 0.5 * dt, 0.5 * dt); // trapezoidal γ1=γ2=½
         let int_var = c0 + c1 * v_t + c2 * v_next;
         let rho = params.model.rho;
@@ -705,7 +708,8 @@ mod tests {
             + one_minus_rho2.sqrt() * int_var.sqrt() * z[0];
         let expected_spot = s_t * expected_log_return.exp();
 
-        qe.step(&heston, 0.0, dt, &mut x, &z, &mut work);
+        qe.step(&heston, 0.0, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert!(
             (x[0] - expected_spot).abs() < 1e-12,
@@ -735,7 +739,7 @@ mod tests {
         let mut rng = PhiloxRng::new(0xA11D_0001);
         let n = 400_000usize;
         let mut zs = vec![0.0; 2 * n];
-        rng.fill_std_normals(&mut zs);
+        rng.fill_std_normals(&mut zs).expect("normal draws");
 
         let mut sum = 0.0;
         let mut sum_sq = 0.0;
@@ -743,7 +747,8 @@ mod tests {
         for i in 0..n {
             let mut x = vec![1.0, 0.04];
             let z = [zs[2 * i], zs[2 * i + 1]];
-            qe.step(&heston, 0.0, dt, &mut x, &z, &mut work);
+            qe.step(&heston, 0.0, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
             sum += x[0];
             sum_sq += x[0] * x[0];
         }
@@ -785,11 +790,12 @@ mod tests {
         let mut sum_sq = 0.0;
         let mut work = vec![];
         for _ in 0..n_paths {
-            rng.fill_std_normals(&mut zs);
+            rng.fill_std_normals(&mut zs).expect("normal draws");
             let mut x = vec![1.0, 0.04];
             for k in 0..n_steps {
                 let z = [zs[2 * k], zs[2 * k + 1]];
-                qe.step(&heston, k as f64 * dt, dt, &mut x, &z, &mut work);
+                qe.step(&heston, k as f64 * dt, dt, &mut x, &z, &mut work)
+                    .expect("valid simulation step");
             }
             sum += x[0];
             sum_sq += x[0] * x[0];
@@ -824,7 +830,8 @@ mod tests {
         let z = vec![0.2, -0.1];
         let mut work = vec![];
 
-        qe.step(&heston, 0.0, 0.25, &mut x, &z, &mut work);
+        qe.step(&heston, 0.0, 0.25, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert!(x[0].is_finite(), "spot update should stay finite");
         assert!(x[1].is_finite(), "variance update should stay finite");

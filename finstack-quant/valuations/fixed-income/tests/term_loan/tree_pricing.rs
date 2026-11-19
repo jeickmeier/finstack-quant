@@ -58,7 +58,9 @@ fn build_callable_loan(as_of: Date) -> TermLoan {
 
 fn base_market(as_of: Date) -> MarketContext {
     let disc = flat_discount_curve(0.05, as_of, "USD-OIS");
-    MarketContext::new().insert(disc)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
 }
 
 #[test]
@@ -247,8 +249,16 @@ fn credit_tree_higher_hazard_lowers_price() {
 
     let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
-    let market_low = MarketContext::new().insert(disc.clone()).insert(low_hazard);
-    let market_high = MarketContext::new().insert(disc).insert(high_hazard);
+    let market_low = MarketContext::new()
+        .try_insert(disc.clone())
+        .expect("insert market curve")
+        .try_insert(low_hazard)
+        .expect("insert market curve");
+    let market_high = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(high_hazard)
+        .expect("insert market curve");
 
     let pv_low = pricer
         .price_callable(&loan, &market_low, as_of)
@@ -411,6 +421,7 @@ fn build_floating_callable(as_of: Date) -> TermLoan {
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::new(400, 0),
             gearing: Decimal::ONE,
@@ -479,8 +490,10 @@ fn floating_callable_deterministic_short_rate_still_prices() {
     let mut loan = build_floating_callable(as_of);
     loan.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.0);
     let market = MarketContext::new()
-        .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
-        .insert(flat_forward_curve(0.04, as_of, "USD-SOFR-3M"));
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(flat_forward_curve(0.04, as_of, "USD-SOFR-3M"))
+        .expect("insert market curve");
     let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
     let pv = pricer
         .price_callable(&loan, &market, as_of)
@@ -494,8 +507,10 @@ fn floating_callable_defaults_to_frozen_projection() {
     let as_of = date!(2025 - 01 - 01);
     let loan = build_floating_callable(as_of);
     let market = MarketContext::new()
-        .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
-        .insert(flat_forward_curve(0.04, as_of, "USD-SOFR-3M"));
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(flat_forward_curve(0.04, as_of, "USD-SOFR-3M"))
+        .expect("insert market curve");
     let pv = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer
         .price_callable(&loan, &market, as_of)
         .expect("unset rates-only floating volatility should freeze projection")
@@ -634,17 +649,25 @@ fn term_loan_tree_prices_are_bit_pinned() {
         .unwrap();
     loan.credit_curve_id = Some(CurveId::from("USD-HAZ"));
     let rates_credit = pricer
-        .price_callable(&loan, &base_market(as_of).insert(hazard), as_of)
+        .price_callable(
+            &loan,
+            &base_market(as_of)
+                .try_insert(hazard)
+                .expect("insert market curve"),
+            as_of,
+        )
         .unwrap()
         .amount();
 
     let got = [short_rate.to_bits(), rates_credit.to_bits()];
     // Both lattices move by a few ulps between macOS and the Linux libm on
     // GitHub Actions.
-    const PINS: [[u64; 2]; 3] = [
+    const PINS: [[u64; 2]; 4] = [
         [4_711_601_891_810_740_309, 4_711_280_227_318_290_582],
         [4_711_601_891_810_740_308, 4_711_280_227_318_290_583],
         [4_711_601_891_810_740_308, 4_711_280_227_318_290_584],
+        // Ubuntu 24.04.5, runner image 20261111.127.1, Rust 1.97.1.
+        [4_711_601_891_810_740_308, 4_711_280_227_318_290_578],
     ];
     assert!(
         PINS.contains(&got),

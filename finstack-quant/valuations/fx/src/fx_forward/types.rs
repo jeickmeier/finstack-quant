@@ -679,8 +679,10 @@ mod tests {
         let fx_matrix = FxMatrix::new(fx_provider, None);
 
         MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_fx(fx_matrix)
     }
 
@@ -870,8 +872,10 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])
             .expect("valid rate");
         let moved_market = MarketContext::new()
-            .insert(usd_curve)
-            .insert(eur_curve)
+            .try_insert(usd_curve)
+            .expect("insert market curve")
+            .try_insert(eur_curve)
+            .expect("insert market curve")
             .insert_fx(FxMatrix::new(fx_provider, None));
         let pv_after_spot_move = forward
             .base_value(&moved_market, as_of)

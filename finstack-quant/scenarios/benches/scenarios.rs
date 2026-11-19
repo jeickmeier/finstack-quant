@@ -159,14 +159,19 @@ fn create_base_market() -> MarketContext {
         .unwrap();
 
     MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve")
         .insert_fx(fx_matrix)
         .insert_surface(vol_surface)
         .insert_surface(credit_vol)
-        .insert(base_corr)
-        .insert(hazard_ig)
-        .insert(hazard_hy)
+        .try_insert(base_corr)
+        .expect("insert market curve")
+        .try_insert(hazard_ig)
+        .expect("insert market curve")
+        .try_insert(hazard_hy)
+        .expect("insert market curve")
         .insert_price(
             "SPY",
             MarketScalar::price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
@@ -184,7 +189,7 @@ fn create_base_market() -> MarketContext {
 /// Create a financial model with multiple nodes
 fn create_financial_model() -> FinancialModelSpec {
     let period_plan = build_periods("2025Q1..2026Q4", None).unwrap();
-    let periods = period_plan.periods;
+    let periods = period_plan.into_periods();
     let mut model = FinancialModelSpec::new(
         "test_model",
         finstack_quant_core::dates::PeriodPlan::try_new(

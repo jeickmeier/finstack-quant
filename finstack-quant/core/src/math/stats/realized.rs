@@ -1,6 +1,7 @@
 //! Realized-variance estimators from close and OHLC price series.
 
-use super::variance;
+use super::{MAX_EXACT_COUNT, variance};
+use crate::math::{log_ratio::checked_log_cross_ratio, summation::neumaier_sum};
 
 /// Methods for calculating realized variance from price series.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -52,36 +53,43 @@ fn default_annualization_factor() -> f64 {
 
 /// Calculate log returns from a price series.
 ///
-/// Each element is `ln(p_t / p_{t-1})` when both prices are finite and strictly
-/// positive. Windows with a non-positive prior price, non-finite values, or a
-/// non-positive ratio (including total wipeout to a zero price) return
-/// [`f64::NAN`] so downstream variance estimates do not silently absorb
-/// infinities.
+/// Computes each adjacent log ratio, preserving close prices and wide price ranges.
+/// Empty and singleton series yield an empty vector after input validation.
 ///
 /// # Arguments
 ///
-/// * `prices` - Chronologically ordered price levels. Adjacent prices must be
-///   finite and strictly positive to produce a finite return.
-pub fn log_returns(prices: &[f64]) -> Vec<f64> {
-    if prices.len() < 2 {
-        return vec![];
+/// * `prices` - Finite, strictly positive price levels in chronological order.
+///
+/// # Errors
+///
+/// Returns a validation error if any supplied level is nonpositive or nonfinite.
+pub fn log_returns(prices: &[f64]) -> crate::Result<Vec<f64>> {
+    validate_prices(prices)?;
+    Ok(prices.windows(2).map(|w| log_ratio(w[1], w[0])).collect())
+}
+
+fn validate_prices(prices: &[f64]) -> crate::Result<()> {
+    if prices.iter().any(|&p| !p.is_finite() || p <= 0.0) {
+        return Err(crate::Error::Validation(
+            "prices must be finite and positive".into(),
+        ));
     }
-    prices
-        .windows(2)
-        .map(|w| {
-            let p0 = w[0];
-            let p1 = w[1];
-            if p0 <= 0.0 || !p0.is_finite() || !p1.is_finite() {
-                return f64::NAN;
-            }
-            let ratio = p1 / p0;
-            if !ratio.is_finite() || ratio <= 0.0 {
-                f64::NAN
-            } else {
-                ratio.ln()
-            }
-        })
-        .collect()
+    Ok(())
+}
+
+// Price admission is complete at each public entry point.
+fn log_ratio(x: f64, y: f64) -> f64 {
+    checked_log_cross_ratio(x, 1.0, y, 1.0)
+}
+
+fn annualize(per_observation: f64, factor: f64) -> crate::Result<Option<f64>> {
+    let result = per_observation * factor;
+    if !result.is_finite() || result < 0.0 || (result == 0.0 && per_observation != 0.0) {
+        return Err(crate::Error::Internal(
+            "annualized variance outside finite representable range".into(),
+        ));
+    }
+    Ok(Some(result))
 }
 
 /// Calculate annualized close-to-close realized variance from a close price series.
@@ -111,48 +119,41 @@ pub fn log_returns(prices: &[f64]) -> Vec<f64> {
 /// factor is not finite and positive, or a price is not finite and positive.
 ///
 /// # Returns
-/// Annualized realized variance
-pub fn realized_variance(prices: &[f64], annualization_factor: Option<f64>) -> crate::Result<f64> {
+/// Annualized realized variance, or `None` when fewer than two prices are available.
+pub fn realized_variance(
+    prices: &[f64],
+    annualization_factor: Option<f64>,
+) -> crate::Result<Option<f64>> {
     let annualization_factor = annualization_factor.unwrap_or_else(default_annualization_factor);
     if !annualization_factor.is_finite() || annualization_factor <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "realized_variance: annualization_factor must be positive and finite, got {annualization_factor}"
         )));
     }
-    if prices
-        .iter()
-        .any(|price| !price.is_finite() || *price <= 0.0)
-    {
-        return Err(crate::Error::Validation(
-            "realized_variance: prices must be finite and positive".into(),
-        ));
+    validate_prices(prices)?;
+    let intervals = prices.len().saturating_sub(1);
+    if intervals > MAX_EXACT_COUNT {
+        return Err(crate::Error::Validation("too many return intervals".into()));
     }
-    if prices.len() < 2 {
-        return Ok(0.0);
+    if intervals == 0 {
+        return Ok(None);
     }
-
-    let returns = log_returns(prices);
-    let var =
-        returns.iter().map(|r| r * r).sum::<f64>() / returns.len() as f64 * annualization_factor;
-    if !var.is_finite() || var < 0.0 {
-        return Err(crate::Error::Validation(
-            "realized_variance: non-positive or non-finite prices produce undefined log returns"
-                .into(),
-        ));
-    }
-    Ok(var)
+    let mean_square =
+        neumaier_sum(prices.windows(2).map(|w| log_ratio(w[1], w[0]).powi(2)))? / intervals as f64;
+    annualize(mean_square, annualization_factor)
 }
 
 /// Calculate realized variance from OHLC data using advanced estimators.
 ///
 /// All five methods are supported. For `CloseToClose`, only the `close` slice
-/// is used; the other three legs may be the same slice as `close` or empty.
+/// enters its return calculation. All supplied bars are validated.
 ///
 /// # Arguments
 /// * `open` - Opening prices (required for `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `high` - High prices (required for `Parkinson`, `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `low` - Low prices (required for `Parkinson`, `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `close` - Closing prices (required for all methods)
+/// * `previous_close` - Finite positive close immediately preceding the first target bar for close-to-close and Yang–Zhang. Other estimators require `None`.
 /// * `method` - Estimator to use. `None` selects
 ///   [`RealizedVarMethod::OHLC_DEFAULT`] (Yang-Zhang).
 /// * `annualization_factor` - Bars per year used to annualize the per-bar
@@ -169,8 +170,7 @@ pub fn realized_variance(prices: &[f64], annualization_factor: Option<f64>) -> c
 /// # Returns
 /// Annualized realized variance. Parkinson, Garman-Klass, and Rogers-Satchell
 /// use each complete OHLC bar, including a single bar. Close-to-close requires
-/// two closing levels, and Yang-Zhang requires three bars; shorter samples
-/// return zero.
+/// one target bar and Yang–Zhang requires two. Shorter samples return `None`.
 pub fn realized_variance_ohlc(
     open: &[f64],
     high: &[f64],
@@ -178,7 +178,8 @@ pub fn realized_variance_ohlc(
     close: &[f64],
     method: Option<RealizedVarMethod>,
     annualization_factor: Option<f64>,
-) -> crate::Result<f64> {
+    previous_close: Option<f64>,
+) -> crate::Result<Option<f64>> {
     let method = method.unwrap_or(RealizedVarMethod::OHLC_DEFAULT);
     let annualization_factor = annualization_factor.unwrap_or_else(default_annualization_factor);
     let n = close.len();
@@ -218,142 +219,75 @@ pub fn realized_variance_ohlc(
             )));
         }
     }
-    if n == 0 {
-        return Ok(0.0);
-    }
-
-    let result = match method {
-        RealizedVarMethod::CloseToClose => realized_variance(close, Some(annualization_factor)),
-        RealizedVarMethod::Parkinson => {
-            // Parkinson (1980) high-low range estimator
-            // More efficient than close-to-close, using intraday range information
-            //
-            // Formula: σ² = [1/(4·ln(2))] · (1/n) · Σ[ln(H/L)]²
-            //
-            // Reference: Parkinson, M. (1980). "The Extreme Value Method for
-            // Estimating the Variance of the Rate of Return."
-            // Journal of Business, 53(1), 61-65.
-            let sum: f64 = (0..n)
-                .map(|i| {
-                    let hl_ratio = high[i] / low[i];
-                    (hl_ratio.ln()).powi(2)
-                })
-                .sum();
-            let factor = 1.0 / (4.0 * std::f64::consts::LN_2);
-            Ok((sum / n as f64) * factor * annualization_factor)
-        }
-        RealizedVarMethod::GarmanKlass => {
-            // Garman-Klass (1980) OHLC estimator
-            // Extends Parkinson by incorporating open and close prices for improved efficiency
-            //
-            // Formula: σ² = (1/n) · Σ[0.5·[ln(H/L)]² - (2·ln(2) - 1)·[ln(C/O)]²]
-            //
-            // The coefficient (2·ln(2) - 1) ≈ 0.386 is the optimal weight for the
-            // close-open component under the assumption of Brownian motion.
-            //
-            // Reference: Garman, M. B., & Klass, M. J. (1980). "On the Estimation of
-            // Security Price Volatilities from Historical Data."
-            // Journal of Business, 53(1), 67-78.
-            let gk_coeff = 2.0 * std::f64::consts::LN_2 - 1.0;
-            let sum: f64 = (0..n)
-                .map(|i| {
-                    let hl = (high[i] / low[i]).ln();
-                    let co = (close[i] / open[i]).ln();
-                    0.5 * hl.powi(2) - gk_coeff * co.powi(2)
-                })
-                .sum();
-            Ok((sum / n as f64) * annualization_factor)
-        }
-        RealizedVarMethod::RogersSatchell => {
-            // Rogers-Satchell (1991) drift-independent OHLC estimator
-            // Allows for non-zero drift, making it more robust than Parkinson or Garman-Klass
-            // when the underlying asset has significant directional movement.
-            //
-            // Formula: σ² = (1/n) · Σ[ln(H/C)·ln(H/O) + ln(L/C)·ln(L/O)]
-            //
-            // Reference: Rogers, L. C. G., & Satchell, S. E. (1991). "Estimating Variance
-            // From High, Low and Closing Prices." Annals of Applied Probability, 1(4), 504-512.
-            let sum: f64 = (0..n)
-                .map(|i| {
-                    let hc = (high[i] / close[i]).ln();
-                    let ho = (high[i] / open[i]).ln();
-                    let lc = (low[i] / close[i]).ln();
-                    let lo = (low[i] / open[i]).ln();
-                    hc * ho + lc * lo
-                })
-                .sum();
-            Ok((sum / n as f64) * annualization_factor)
-        }
-        RealizedVarMethod::YangZhang => {
-            // Yang-Zhang needs at least 3 OHLC bars (2 overnight returns for variance)
-            if n < 3 {
-                return Ok(0.0);
-            }
-            // Yang-Zhang (2000) estimator: includes overnight jumps and opening gaps
-            // Combines overnight variance with Rogers-Satchell intraday variance
-            // using optimal weighting to minimize bias and variance of the estimator.
-            //
-            // Reference: Yang, D., & Zhang, Q. (2000). "Drift-Independent Volatility
-            // Estimation Based on High, Low, Open, and Close Prices."
-            // Journal of Business, 73(3), 477-491.
-
-            /// Yang-Zhang optimal weight numerator for combining variance components
-            const YANG_ZHANG_K_NUMERATOR: f64 = 0.34;
-            /// Yang-Zhang optimal weight denominator base adjustment
-            const YANG_ZHANG_K_DENOMINATOR_BASE: f64 = 1.34;
-
-            let mut overnight_returns = Vec::with_capacity(n.saturating_sub(1));
-            let mut open_close_returns = Vec::with_capacity(n.saturating_sub(1));
-            let mut sum_rs = 0.0;
-
-            for i in 1..n {
-                // Overnight component
-                let overnight = (open[i] / close[i - 1]).ln();
-                overnight_returns.push(overnight);
-
-                // Open-to-close component
-                let open_close = (close[i] / open[i]).ln();
-                open_close_returns.push(open_close);
-
-                // Rogers-Satchell component for intraday
-                let hc = (high[i] / close[i]).ln();
-                let ho = (high[i] / open[i]).ln();
-                let lc = (low[i] / close[i]).ln();
-                let lo = (low[i] / open[i]).ln();
-                sum_rs += hc * ho + lc * lo;
-            }
-
-            // Number of return observations (periods): n bars yield n−1
-            // overnight/open-close/RS observations (bar 0 has no previous
-            // close). Yang & Zhang (2000), Eq. (10), define
-            // k = 0.34 / (1.34 + (n+1)/(n−1)) in terms of the number of
-            // *periods* in the estimator, so we use m = n−1 here.
-            let m = n - 1;
-            let k = YANG_ZHANG_K_NUMERATOR
-                / (YANG_ZHANG_K_DENOMINATOR_BASE + (m + 1) as f64 / (m - 1) as f64);
-            let var_overnight = variance(&overnight_returns)?.ok_or_else(|| {
-                crate::Error::Internal(
-                    "realized_variance_ohlc requires at least two overnight returns".into(),
-                )
-            })?;
-            let var_open_close = variance(&open_close_returns)?.ok_or_else(|| {
-                crate::Error::Internal(
-                    "realized_variance_ohlc requires at least two open-close returns".into(),
-                )
-            })?;
-            // RS component averages over the same m = n−1 periods that
-            // contribute overnight and open-close returns (Yang & Zhang 2000,
-            // Eq. (4)); dividing by the bar count n would bias it down by
-            // (n−1)/n.
-            let var_rs = sum_rs / m as f64;
-
-            Ok((var_overnight + k * var_open_close + (1.0 - k) * var_rs) * annualization_factor)
-        }
-    }?;
-    if !result.is_finite() || result < -1.0e-14 {
+    let anchored = matches!(
+        method,
+        RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang
+    );
+    if anchored != previous_close.is_some()
+        || previous_close.is_some_and(|p| !p.is_finite() || p <= 0.0)
+    {
         return Err(crate::Error::Validation(format!(
-            "realized_variance_ohlc produced invalid variance {result}"
+            "previous_close must be finite and positive for close-to-close and Yang-Zhang, and absent for range estimators (method {method:?})"
         )));
     }
-    Ok(result.max(0.0))
+    if n == 0 || (method == RealizedVarMethod::YangZhang && n < 2) {
+        return Ok(None);
+    }
+
+    if n > MAX_EXACT_COUNT {
+        return Err(crate::Error::Validation(
+            "too many OHLC observations".into(),
+        ));
+    }
+    if method == RealizedVarMethod::CloseToClose {
+        let previous = previous_close.into_iter().chain(close.iter().copied());
+        let sum = neumaier_sum(
+            close
+                .iter()
+                .zip(previous)
+                .map(|(&c, p)| log_ratio(c, p).powi(2)),
+        )?;
+        return annualize(sum / n as f64, annualization_factor);
+    }
+
+    // For each bar, a and b are the upper and lower wick log lengths, d is the body.
+    // All range contributions, including Eq. 19a of Garman and Klass, are nonnegative.
+    let ranges = (0..n).map(|i| {
+        let upper = open[i].max(close[i]);
+        let lower = open[i].min(close[i]);
+        let a = log_ratio(high[i], upper);
+        let b = log_ratio(lower, low[i]);
+        let d = log_ratio(upper, lower);
+        let s = a + b;
+        match method {
+            RealizedVarMethod::Parkinson => (s + d).powi(2) / (4.0 * std::f64::consts::LN_2),
+            RealizedVarMethod::GarmanKlass => {
+                0.5 * s * s + s * d + (1.5 - 2.0 * std::f64::consts::LN_2) * d * d
+            }
+            _ => a * a + b * b + d * s,
+        }
+    });
+    let range = neumaier_sum(ranges)? / n as f64;
+    if method != RealizedVarMethod::YangZhang {
+        return annualize(range, annualization_factor);
+    }
+
+    let previous = previous_close.into_iter().chain(close.iter().copied());
+    let overnight: Vec<_> = open
+        .iter()
+        .zip(previous)
+        .map(|(&o, p)| log_ratio(o, p))
+        .collect();
+    let intraday: Vec<_> = close
+        .iter()
+        .zip(open)
+        .map(|(&c, &o)| log_ratio(c, o))
+        .collect();
+    let k = 0.34 / (2.34 + 2.0 / (n - 1) as f64);
+    let (Some(vo), Some(vc)) = (variance(&overnight)?, variance(&intraday)?) else {
+        return Err(crate::Error::Internal(
+            "Yang-Zhang requires two observed intervals".into(),
+        ));
+    };
+    annualize(vo + k * vc + (1.0 - k) * range, annualization_factor)
 }

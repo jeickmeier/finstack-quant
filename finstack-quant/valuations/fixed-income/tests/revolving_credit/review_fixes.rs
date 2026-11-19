@@ -40,6 +40,7 @@ fn usd(amount: f64) -> Money {
 
 fn term_spec(reset: Tenor) -> FloatingRateSpec {
     FloatingRateSpec {
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::ZERO,
         gearing: rust_decimal::Decimal::ONE,
@@ -134,7 +135,9 @@ fn notional_sum(schedule: &finstack_quant_cashflows::builder::CashFlowSchedule) 
 /// funding leg always nets to the balance outstanding at the valuation date.
 #[test]
 fn seasoned_stochastic_facility_prices_and_conserves_principal() {
-    let market = MarketContext::new().insert(flat_discount_curve(0.03, COMMITMENT, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.03, COMMITMENT, "USD-OIS"))
+        .expect("insert market curve");
     let drawn = 3_000_000.0;
 
     // Valuation dates before, on, and after the first accrual period's midpoint,
@@ -318,8 +321,10 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
     )
     .expect("forward curve");
     let market = MarketContext::new()
-        .insert(flat_discount_curve(0.03, as_of, "USD-OIS"))
-        .insert(fwd);
+        .try_insert(flat_discount_curve(0.03, as_of, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
     let monthly = Tenor::new(1, TenorUnit::Months).expect("tenor");
 
     let deterministic = RevolvingCredit::builder()
@@ -417,8 +422,10 @@ fn stochastic_hull_white_rates_keep_the_index_basis() {
     let fwd = ForwardCurve::flat("USD-SOFR-3M", as_of, curve_rate, DayCount::Act360)
         .expect("forward curve");
     let market = MarketContext::new()
-        .insert(flat_discount_curve(0.03, as_of, "USD-OIS"))
-        .insert(fwd);
+        .try_insert(flat_discount_curve(0.03, as_of, "USD-OIS"))
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
     let hull_white = McConfig {
         correlation_matrix: None,
         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
@@ -498,7 +505,11 @@ fn leq_prices_the_draw_at_default() {
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard");
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let build = |id: &str, leq: f64| {
         RevolvingCredit::builder()
@@ -573,7 +584,9 @@ fn leq_prices_the_draw_at_default() {
 /// plus the terminal repayment).
 #[test]
 fn stochastic_funding_leg_conserves_cash_for_small_draws() {
-    let market = MarketContext::new().insert(flat_discount_curve(0.03, COMMITMENT, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.03, COMMITMENT, "USD-OIS"))
+        .expect("insert market curve");
     let drawn = 3_000_000.0;
     let f = facility(
         "RC-SMALL-DRAWS",
@@ -610,7 +623,7 @@ fn recovery_exposure_changes_after_each_deterministic_event() {
     let event_date = date!(2025 - 02 - 01);
     let end = date!(2025 - 03 - 01);
     let market = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(start)
                 .day_count(DayCount::Act365F)
@@ -620,7 +633,8 @@ fn recovery_exposure_changes_after_each_deterministic_event() {
                 .build()
                 .expect("discount"),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             HazardCurve::builder("USD-HZ")
                 .base_date(start)
                 .knots([(1.0, 0.12), (5.0, 0.12)])
@@ -628,7 +642,8 @@ fn recovery_exposure_changes_after_each_deterministic_event() {
                 .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard"),
-        );
+        )
+        .expect("insert market curve");
     let survival = |date: Date| (-0.12 * (date - start).whole_days() as f64 / 365.0).exp();
     for is_draw in [true, false] {
         let mut facility = RevolvingCredit::builder()

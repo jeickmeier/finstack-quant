@@ -459,6 +459,7 @@ fn floating_facility_wire_rate_matches_canonical_rate_spec() {
     use serde_json::json;
 
     let canonical = RateSpec::Floating(FloatingRateSpec {
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: Decimal::from(275),
         gearing: Decimal::ONE,
@@ -478,6 +479,7 @@ fn floating_facility_wire_rate_matches_canonical_rate_spec() {
     });
     let wire = json!({
         "floating": {
+            "index_id": "USD-SOFR-3M",
             "forward_curve_id": "USD-SOFR-3M",
             "spread_bp": "275",
             "gearing": "1",

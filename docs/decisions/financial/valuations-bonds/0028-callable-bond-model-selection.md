@@ -1,10 +1,8 @@
 # ADR 0028: Callable-bond model selection
 
-**Decision status:** Draft — observed implementation; adoption and rationale
-await agreement.
+**Decision status:** Accepted 2026-11-17 as the callable-bond model-selection overview. The linked detailed decisions govern their respective routes.
 
-**Implementation status:** Observed in bond native and registry dispatch,
-rates-only model resolution, and joint rates-credit routing.
+**Implementation status:** Native and registry dispatch, rates-only model resolution, and joint rates-credit routing were inspected. Reconciliation to the accepted contracts remains pending.
 
 **Validation status:** Evidence located and inspected; not rerun. Independent
 accuracy and coverage qualification remain incomplete.
@@ -13,18 +11,13 @@ accuracy and coverage qualification remain incomplete.
 
 **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
 
-## Decision awaiting adoption
+## Accepted decision
 
-The proposed choice covers the public callable-bond model default, supported
-rates-only alternatives, and the boundary between rates-only and credit-sensitive
-exercise valuation.
-This record covers `Bond` call/put schedules, make-whole terms and return-floor
-rights. It does not adopt convertible, term-loan or structural Merton methods,
-or the separate joint rates-credit model and regression choices.
+1. Honor an explicit compatible pricing model. For native model selection, exercise rights alone select Tree. Exercise rights with an authored hazard binding or an explicit joint-factor election select RatesCredit. Reject incomplete or incompatible selections. [Bond model routing](03-pv-models.md#accepted-decision-for-checked-bond-pv-selection-and-fractional-recovery-of-par).
+2. Require an explicit rates-only subtype of scalar Hull–White, Black–Derman–Toy, or Black–Karasinski. Apply the selected subtype's input and cashflow admission rules. [Rates-only tree exercise](04-rates-tree-exercise.md#accepted-decision-for-checked-bond-rates-trees-and-exercise).
+3. Preserve a qualified quote-derived settlement mark as a distinct price authority. OAS and same-model risk require actual repricing on the selected model. Apply ADR 0011 within its supported no-hazard CS01 scope. [Spread and OAS rules](12-spread-quotes.md) · [No-hazard bond CS01](0011-bond-cs01-without-hazard-curve.md).
 
-The detailed owners below define actual dispatch, model inputs, numerical
-controls, failure branches and evidence. Their Draft status and this selection
-record's Draft status remain independent of implementation availability.
+This overview covers Bond call and put schedules, make-whole terms, and return-floor rights. The detailed owners below govern joint replay, regression, and other numerical controls.
 
 ## Observed selection boundary
 
@@ -67,9 +60,7 @@ remain distinct from the bond's payoff and exercise choices.
 
 The source-documented resolver rationale is to share model inputs across PV,
 OAS, option decomposition and vega, including the straight comparator leg.
-The proposed adoption rationale is to expose rates-only versus credit-sensitive
-exercise assumptions and preserve that price/risk consistency. The default,
-alternatives and intended uses still require agreement.
+Explicit selection makes the exercise assumptions visible and preserves the selected basis across pricing and risk.
 
 HW permits negative normal short rates; BDT/BK use positive lognormal rates,
 with mean reversion in BK. A deterministic cashflow calculation omits exercise
@@ -95,10 +86,9 @@ calibration, regression, sampling and convergence evidence. No tests were
 rerun for this audit.
 
 The accepted z-spread CS01 direction retains its scope under
-[ADR 0011](0011-bond-cs01-without-hazard-curve.md). This selection draft does not
-approve the observed option-bearing OAS branch as an exception.
+[ADR 0011](0011-bond-cs01-without-hazard-curve.md).
 
 ## Follow-up tracking
 
-Adoption, reconciliation and validation work is tracked in the
+Implementation reconciliation and independent qualification are tracked in the
 [scoped follow-up register](../FOLLOW_UPS.md#bond-valuations).

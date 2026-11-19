@@ -53,7 +53,7 @@ use super::{Copula, DEFAULT_QUADRATURE_ORDER, select_quadrature};
 use finstack_quant_core::math::{
     integration::GaussHermiteQuadrature,
     solver::BrentSolver,
-    special_functions::{norm_cdf, norm_pdf, standard_normal_inv_cdf},
+    special_functions::{norm_cdf_unchecked, norm_pdf_unchecked, standard_normal_inv_cdf},
 };
 use std::sync::Mutex;
 
@@ -138,7 +138,7 @@ impl RandomFactorLoadingCopula {
     /// use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
     ///
     /// let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
-    /// let threshold = standard_normal_inv_cdf(0.05);
+    /// let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
     /// let cond_pd = copula.conditional_default_prob(threshold, &[0.0, 1.0], 0.30);
     ///
     /// assert!(cond_pd > 0.0 && cond_pd < 1.0);
@@ -193,7 +193,7 @@ impl RandomFactorLoadingCopula {
         // Extra correlation mass in the stress tail vs mean loading.
         let delta_rho = (rho_stress - correlation).max(0.0);
         // Mass of the loading-shock tail (η > 2).
-        let tail_mass = 1.0 - norm_cdf(2.0);
+        let tail_mass = 1.0 - norm_cdf_unchecked(2.0);
 
         // Vanishes linearly in σ_β so the Gaussian (σ_β = 0) limit is exact.
         tail_mass * delta_rho * self.loading_volatility
@@ -226,13 +226,14 @@ impl RandomFactorLoadingCopula {
         // Subtract survival probabilities in the positive tail rather than
         // two CDF values rounded to one. The final term is the atom at beta=1.
         let interior_mass = if lower >= 0.0 {
-            norm_cdf(-lower) - norm_cdf(-upper)
+            norm_cdf_unchecked(-lower) - norm_cdf_unchecked(-upper)
         } else {
-            norm_cdf(upper) - norm_cdf(lower)
+            norm_cdf_unchecked(upper) - norm_cdf_unchecked(lower)
         };
-        ((location * location + sigma * sigma) * interior_mass + location * sigma * norm_pdf(lower)
-            - sigma * (location + 1.0) * norm_pdf(upper)
-            + norm_cdf(-upper))
+        ((location * location + sigma * sigma) * interior_mass
+            + location * sigma * norm_pdf_unchecked(lower)
+            - sigma * (location + 1.0) * norm_pdf_unchecked(upper)
+            + norm_cdf_unchecked(-upper))
         .clamp(0.0, 1.0)
     }
 
@@ -330,7 +331,7 @@ impl Copula for RandomFactorLoadingCopula {
 
         // P(default | Z, β) = Φ((threshold - β·Z) / γ)
         let conditional_threshold = (default_threshold - beta * z) / gamma;
-        norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
+        crate::gaussian::norm_cdf_or_nan(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
     }
 
     fn conditional_default_prob_given_systematic_and_mixing(
@@ -346,7 +347,10 @@ impl Copula for RandomFactorLoadingCopula {
         self.conditional_default_prob(default_threshold, &[systematic, mixing], correlation)
     }
 
-    fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
+    fn integrate_fn(
+        &self,
+        f: &dyn Fn(&[f64]) -> finstack_quant_core::Result<f64>,
+    ) -> finstack_quant_core::Result<f64> {
         // Double integral: outer over loading shock η, inner over market Z
         self.outer_quadrature
             .integrate(|eta| self.inner_quadrature.integrate(|z| f(&[z, eta])))
@@ -379,7 +383,7 @@ impl Copula for RandomFactorLoadingCopula {
         // η ~ N(0,1): one inverse-CDF draw keeps the realization
         // deterministic and order-stable, mirroring the Student-t W draw.
         super::validate_mixing_uniform(u01)?;
-        let mixing = standard_normal_inv_cdf(u01);
+        let mixing = standard_normal_inv_cdf(u01)?;
         if !mixing.is_finite() {
             return Err(finstack_quant_core::Error::Validation(
                 "RFL mixing transform must produce a finite loading shock".into(),
@@ -418,7 +422,7 @@ impl Copula for RandomFactorLoadingCopula {
         }
         // For every beta < 1 the conditional Gaussian copula has zero
         // tail dependence. The atom at beta=1 contributes its entire mass.
-        norm_cdf((location - 1.0) / self.loading_volatility)
+        crate::gaussian::norm_cdf_or_nan((location - 1.0) / self.loading_volatility)
     }
 }
 
@@ -427,6 +431,7 @@ mod tests {
     use super::super::GaussianCopula;
     use super::*;
     use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
+    use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
 
     #[test]
     fn test_rfl_creation() {
@@ -459,7 +464,7 @@ mod tests {
     #[test]
     fn test_conditional_prob_varies_with_loading_shock() {
         let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
-        let threshold = standard_normal_inv_cdf(0.05);
+        let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
         let correlation = 0.30;
 
         // Same market factor Z=0, different loading shocks
@@ -490,13 +495,15 @@ mod tests {
     fn test_integration_recovers_unconditional() {
         let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
         let pd = 0.05;
-        let threshold = standard_normal_inv_cdf(pd);
+        let threshold = standard_normal_inv_cdf(pd).expect("valid probability");
         let correlation = 0.30;
 
         // E[P(default|Z,η)] should equal P(default)
-        let integrated_prob = copula.integrate_fn(&|factors| {
-            copula.conditional_default_prob(threshold, factors, correlation)
-        });
+        let integrated_prob = copula
+            .integrate_fn(&|factors| {
+                Ok(copula.conditional_default_prob(threshold, factors, correlation))
+            })
+            .unwrap();
 
         assert!(
             (integrated_prob - pd).abs() < 0.01,
@@ -570,7 +577,12 @@ mod tests {
             1.0
         );
         assert!(copula.latent_variable(1.0, 0.0, eta_at_perfect_loading - 1e-8, rho) < 1.0);
-        assert!((copula.tail_dependence(rho) - norm_cdf(-eta_at_perfect_loading)).abs() < 1e-14);
+        assert!(
+            (copula.tail_dependence(rho)
+                - norm_cdf(-eta_at_perfect_loading).expect("valid Gaussian variate"))
+            .abs()
+                < 1e-14
+        );
 
         let zero_vol = RandomFactorLoadingCopula::new(0.0).expect("valid loading vol");
         assert_eq!(zero_vol.tail_dependence(0.5), 0.0);
@@ -595,7 +607,7 @@ mod tests {
     #[test]
     fn test_factor_length_mismatch_panics_in_debug() {
         let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
-        let threshold = standard_normal_inv_cdf(0.05);
+        let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
         let correlation = 0.30;
 
         let assert_contract = |factors: &[f64]| {
@@ -629,7 +641,10 @@ mod tests {
             let copula = RandomFactorLoadingCopula::new(sigma).expect("valid loading vol");
             for rho in [0.0, 0.01, 0.04, 0.30, 0.90, 0.999, 1.0] {
                 let realized = adaptive_simpson(
-                    |eta| copula.latent_variable(1.0, 0.0, eta, rho).powi(2) * norm_pdf(eta),
+                    |eta| {
+                        copula.latent_variable(1.0, 0.0, eta, rho).powi(2)
+                            * norm_pdf(eta).expect("valid Gaussian variate")
+                    },
                     -10.0,
                     10.0,
                     1e-11,
@@ -658,6 +673,7 @@ mod tests {
                     f64::from(z <= threshold)
                 } else {
                     norm_cdf((threshold - beta * z) / (1.0 - beta * beta).sqrt())
+                        .expect("valid Gaussian variate")
                 };
                 let actual = copula
                     .conditional_default_prob_checked(threshold, &[z, eta], rho)
@@ -672,7 +688,7 @@ mod tests {
         let rfl_copula = RandomFactorLoadingCopula::new(0.0).expect("valid loading vol");
         let gaussian_copula = GaussianCopula::new();
 
-        let threshold = standard_normal_inv_cdf(0.05);
+        let threshold = standard_normal_inv_cdf(0.05).expect("valid probability");
         let correlation = 0.30;
 
         // With zero loading vol, RFL should behave like Gaussian

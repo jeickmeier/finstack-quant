@@ -1,14 +1,20 @@
 # MARGIN-REGULATORY-XVA-017: SA-CCR credit, equity, commodity and FX effective-notional aggregation
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed** in the stated source scope.
-- Validation status: **Evidence inspected/located, not executed.** Selected test bodies were read; no runtime test, build or numerical experiment was run.
+- Decision status: **Accepted 2026-11-17 for checked SA-CCR credit, equity, commodity, and FX add-ons.**
+- Implementation status: Observed behavior is retained below. Typed hedging sets, checked aggregation, and replayable supervisory inputs require reconciliation.
+- Validation status: Primary Basel provisions and the Rust add-on path were inspected. Independent arithmetic checked within-pair and cross-pair FX add-ons. Pair orientation, special sets, and cross-host replay still require qualification.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope and hashes: [inventory](README.md), [coverage ledger](coverage.json).
 
-## Choice and domain
+## Accepted decision
 
-This describes the observed design. No historical adoption rationale is inferred; the alternatives and tradeoffs below are the audit's assessment.
+1. Use signed effective notional equal to adjusted notional times supervisory delta and maturity factor. Apply supervisory duration to the reporting-currency credit notional. Use qualified FX leg conversion and equity or commodity price-times-units sizing, including the prescribed volatility or variance sizing. [Trade inputs](14-saccr-inputs-and-supervisory-delta.md) · [Maturity factors and supervisory duration](15-saccr-maturity-and-duration.md) · [Basel CRE52.30–37](https://www.bis.org/committees/bcbs/basel-framework/standard/cre/52/inforce/2023-01-01/published/2020-06-05).
+2. Derive hedging-set identities from validated trade terms. For FX, orient each currency pair consistently and net signed effective notionals within the eligible pair set. Apply the FX factor to the absolute pair total. For credit and equity, net by reference entity or distinct index and apply the prescribed supervisory factors and partial offsets across entities within each set. For commodities, net by commodity type within energy, metals, agriculture, or other and use the prescribed within-set partial offsets. Sum distinct set add-ons. Keep eligible basis and volatility trades in their prescribed separate sets with supervisory-factor multipliers of 0.5 and 5, respectively. [Basel CRE52.45–47 and 52.58–73](https://www.bis.org/committees/bcbs/basel-framework/standard/cre/52/inforce/2023-01-01/published/2020-06-05).
+3. Retain the derived set and entity, signed effective notional, applied supervisory parameters, and set and class add-ons for replay. Sum class add-ons without cross-class diversification. Reject unresolved assignments and nonfinite calculations. [Basel CRE52.25–30](https://www.bis.org/committees/bcbs/basel-framework/standard/cre/52/inforce/2023-01-01/published/2020-06-05) · [PFE and EAD assembly](18-saccr-rc-pfe-ead.md).
+
+With ordinary FX effective notionals of +100 and −100, the 4% factor gives an add-on of zero in the same eligible pair and 8 across two different pairs.
+
+## Observed choice and domain
 
 Non-IR classes share an entity-factor aggregation but preserve different supervisory factors, correlations and grouping. Credit and equity are pooled across all hedging-set labels; commodity and FX retain the supplied hedging-set label. This dispatch is financially material.
 
@@ -36,4 +42,4 @@ Separate per-class engines could make exceptions explicit but duplicate the pres
 
 Runtime grouping and norm: [src/regulatory/sa_ccr/add_on.rs](../../../../finstack-quant/margin/src/regulatory/sa_ccr/add_on.rs); parameter table and validation: [src/regulatory/sa_ccr/types.rs](../../../../finstack-quant/margin/src/regulatory/sa_ccr/types.rs); class summation: [src/regulatory/sa_ccr/pfe.rs](../../../../finstack-quant/margin/src/regulatory/sa_ccr/pfe.rs). Inspected [tests/audit_regressions.rs](../../../../finstack-quant/margin/tests/audit_regressions.rs) pins electricity factor 0.40 and BBB credit factor with SD; inspected add-on tests show different FX sets do not offset. They do not establish all category combinations or external classification validity. [SA-CCR reference index](../../../REFERENCES.md#bcbs-279-saccr).
 
-The implementation establishes observed behavior, not financial adoption or regulatory compliance. Actionable work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
+Implementation reconciliation and independent qualification are tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).

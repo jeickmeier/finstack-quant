@@ -96,7 +96,8 @@ impl HierarchyBuilder {
         self
     }
 
-    /// Add one typed [`MarketDataTarget`] to the active node.
+    /// Add one typed [`MarketDataTarget`](crate::market_data::bumps::MarketDataTarget)
+    /// to the active node.
     ///
     /// # Arguments
     ///
@@ -105,7 +106,8 @@ impl HierarchyBuilder {
         self.targets(std::iter::once(target))
     }
 
-    /// Add typed [`MarketDataTarget`] entries to the active node in order.
+    /// Add typed [`MarketDataTarget`](crate::market_data::bumps::MarketDataTarget)
+    /// entries to the active node in order.
     ///
     /// # Arguments
     ///
@@ -148,7 +150,8 @@ impl HierarchyBuilder {
     ///
     /// Returns the first deferred builder error (from [`Self::add_node`],
     /// [`Self::tag`], [`Self::target`], or [`Self::targets`]) or a structural
-    /// validation error such as a duplicate exact [`MarketDataTarget`] across
+    /// validation error such as a duplicate exact
+    /// [`MarketDataTarget`](crate::market_data::bumps::MarketDataTarget) across
     /// multiple hierarchy locations.
     pub fn build(self) -> crate::Result<MarketDataHierarchy> {
         if let Some(err) = self.validation_error {

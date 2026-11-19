@@ -248,14 +248,18 @@ fn scaling_rough_heston_steps(c: &mut Criterion) {
                 let z = [0.5_f64, -0.3, 0.2];
                 let mut work = vec![0.0; scheme.work_size(&process)];
                 let mut first_step = [SPOT, 0.04];
-                scheme.step(&process, 0.0, dt, &mut first_step, &z, &mut work);
+                scheme
+                    .step(&process, 0.0, dt, &mut first_step, &z, &mut work)
+                    .expect("valid simulation step");
                 check_rough_first_step(&first_step, dt, &z);
                 let path = |work: &mut [f64]| {
                     let mut x = [SPOT, 0.04];
                     work.fill(0.0);
                     let mut t = 0.0;
                     for _ in 0..n {
-                        scheme.step(&process, t, dt, &mut x, black_box(&z), work);
+                        scheme
+                            .step(&process, t, dt, &mut x, black_box(&z), work)
+                            .expect("valid simulation step");
                         t += dt;
                     }
                     assert!(x[0].is_finite() && x[1].is_finite());
@@ -329,14 +333,16 @@ fn bench_lmm_case(b: &mut criterion::Bencher<'_>, forwards: usize, steps: usize)
         let mut x = initial.clone();
         work.fill(0.0);
         for step in 0..steps {
-            scheme.step(
-                &process,
-                grid.time(step),
-                grid.dt(step),
-                &mut x,
-                black_box(&z),
-                &mut work,
-            );
+            scheme
+                .step(
+                    &process,
+                    grid.time(step),
+                    grid.dt(step),
+                    &mut x,
+                    black_box(&z),
+                    &mut work,
+                )
+                .expect("valid simulation step");
         }
         assert!(x.iter().all(|value| value.is_finite()));
         x
@@ -411,14 +417,16 @@ fn scaling_lmm_controls(c: &mut Criterion) {
                 let mut state = process.params().initial_forwards.clone();
                 work.fill(0.0);
                 for step in 0..grid.num_steps() {
-                    scheme.step(
-                        &process,
-                        grid.time(step),
-                        grid.dt(step),
-                        &mut state,
-                        black_box(&z[..factors]),
-                        work,
-                    );
+                    scheme
+                        .step(
+                            &process,
+                            grid.time(step),
+                            grid.dt(step),
+                            &mut state,
+                            black_box(&z[..factors]),
+                            work,
+                        )
+                        .expect("valid simulation step");
                 }
                 assert!(state.iter().all(|value| value.is_finite()));
                 state
@@ -479,15 +487,17 @@ fn price_lmm_caplet(params: &LmmParams, grid: &TimeGrid) -> MoneyEstimate {
         state.copy_from_slice(&params.initial_forwards);
         work.fill(0.0);
         for step in 0..grid.num_steps() {
-            rng.fill_std_normals(&mut z);
-            scheme.step(
-                &process,
-                grid.time(step),
-                grid.dt(step),
-                &mut state,
-                &z,
-                &mut work,
-            );
+            rng.fill_std_normals(&mut z).expect("normal draws");
+            scheme
+                .step(
+                    &process,
+                    grid.time(step),
+                    grid.dt(step),
+                    &mut state,
+                    &z,
+                    &mut work,
+                )
+                .expect("valid simulation step");
         }
         // Fix F2 at T2=2 and pay the annual caplet at T3=3. D3 is
         // P(T2,T3)/P(T2,T40), so this is a terminal-measure estimand.
@@ -612,7 +622,7 @@ fn scaling_volterra_steps(c: &mut Criterion) {
             // order/filtering. RNG generation remains outside the measured call.
             let mut rng = philox();
             let mut normals = vec![0.0; 2 * n];
-            rng.fill_std_normals(&mut normals);
+            rng.fill_std_normals(&mut normals).expect("normal draws");
             let mut out = vec![0.0; n];
             generator.generate(&normals, &mut out);
             assert!(out.iter().all(|value| value.is_finite()));
@@ -648,7 +658,9 @@ fn scaling_exact_gbm_steps(c: &mut Criterion) {
                 let mut x = [SPOT];
                 let mut t = 0.0;
                 for _ in 0..n {
-                    scheme.step(&process, t, dt, &mut x, black_box(&z), &mut []);
+                    scheme
+                        .step(&process, t, dt, &mut x, black_box(&z), &mut [])
+                        .expect("valid simulation step");
                     t += dt;
                 }
                 assert!(x[0].is_finite());

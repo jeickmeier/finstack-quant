@@ -1,14 +1,20 @@
 # FACTOR-006: Residual variance overlay and contribution rescaling
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for checked additive residual variance and common risk transformation.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Single-overlay variance addition and component rescaling are implemented in part. Direct retention of variance, basis and source reconciliation, and checked zero-overlay admission remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** Both focused residual Rust tests passed on 2026-11-17 against current behavior. Independent arithmetic verified the combined variance and signed allocation example. The accepted source and zero-overlay checks remain to be qualified.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Bind systematic variance and residual sources to the same reporting currency and horizon, and add variance under an explicit zero cross-covariance assumption. Positions on one issuer share its residual shock and net before squaring. The [accepted credit residual model](../portfolio-attribution/13-credit-residual-risk-and-reporting.md#accepted-decision-for-checked-issuer-residual-risk-and-hierarchy-reporting) assumes zero covariance between distinct issuer residuals and between residuals and systematic factors.
+2. Carry the checked systematic variance and allocations directly from [FACTOR-005](factor-risk.md). Require nonnegative residual source totals and reconcile their signed position allocations. Transform the combined variance once and use a common component scale for the selected measure. With `25 USD²` systematic variance and `+22` and `−11 USD²` residual allocations, the combined variance is `36 USD²` and volatility is `6 USD`.
+3. Check the factor-only result, position and source identities, finite values and conservation before committing an overlay. Apply those checks to zero overlays, retain covered zero rows and reject repeated overlays without changing the result. Publish variance allocations and their transformed contributions explicitly.
+
+## Observed choice and rationale
 
 Apply all residual variance allocations once to a factor-only decomposition, treating their aggregate as additive to systematic variance. The caller owns derivation of residual allocations and their issuer/position dependence assumptions.
 
@@ -41,10 +47,9 @@ A joint augmented covariance matrix would model residual correlations explicitly
 - [src/risk/residual.rs](../../../../finstack-quant/factor/src/risk/residual.rs) — inspected implementation.
 - [src/risk/types.rs](../../../../finstack-quant/factor/src/risk/types.rs) — inspected implementation.
 
-[src/risk/residual.rs](../../../../finstack-quant/factor/src/risk/residual.rs) contains overlay/rescaling and repeated-application checks. [Euler allocation reference](../../../REFERENCES.md#tasche-2008-capital-allocation) supports the interpretation; derivation of the actual residual allocations belongs to the portfolio/model caller and must be evidenced separately.
+[Residual overlay tests](../../../../finstack-quant/factor/src/risk/residual.rs) passed for current successful rescaling, signed allocations, invalid totals and rejected repeated application. Qualify the accepted shared basis, source-level reconciliation, retained variance fields and zero-overlay behavior.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

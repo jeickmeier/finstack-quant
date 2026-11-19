@@ -306,3 +306,34 @@ test('composite exposures and history price cs01 like priceInstrument', () => {
     'composite'
   );
 });
+
+test('an undefined spread rejects initial and replacement holdings', () => {
+  const formula = structuredClone(spec);
+  formula.weighting_method = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant/valuations/tests/fixtures/composite_spread_quantity.json',
+        import.meta.url
+      ),
+      'utf8'
+    )
+  );
+  for (const leg of formula.legs)
+    Object.assign(leg.instrument.spec, { spot_id: leg.instrument_id, quoted_spot: null });
+  const prices = (a) => ({ ...market, prices: { A: { unitless: a }, B: { unitless: 100 } } });
+  const api = facade.valuations.composite;
+  assert.throws(() => api.initialize(formula, prices(100), '2025-01-01'), /by zero/);
+  for (const [price, sign] of [
+    [101, 1],
+    [99, -1],
+  ]) {
+    const initialized = api.initialize(formula, prices(price), '2025-01-01');
+    assert.equal(initialized.trades.find((t) => t.instrument_id === 'A').quantity_delta, sign);
+    const original = structuredClone(initialized.instrument);
+    assert.throws(
+      () => api.rebalance(initialized.instrument, prices(100), '2025-01-02'),
+      /by zero/
+    );
+    assert.deepEqual(initialized.instrument, original);
+  }
+});

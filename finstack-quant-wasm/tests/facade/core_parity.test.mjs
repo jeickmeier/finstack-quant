@@ -55,7 +55,10 @@ const price = () =>
     id: 'WTI',
     baseDate: '2025-01-02',
     knots: [0.0, 72.0, 1.0, 70.5],
-    spotPrice: 72.0,
+    kind: 'price',
+    dayCount: 'act_365f',
+    interp: 'linear',
+    extrapolation: 'flat',
   });
 const baseCorrelation = () => new core.BaseCorrelationCurve('CDX-IG', [3.0, 0.25, 7.0, 0.45]);
 const surface = () =>
@@ -424,7 +427,7 @@ const CASES = {
   price_curve: () => JSON.parse(price().toJson()),
   price_curve_queries: () => [price().price(0.5), price().price('2025-07-02'), price().kind],
   base_correlation_curve: () => JSON.parse(baseCorrelation().toJson()),
-  base_correlation: () => baseCorrelation().correlation(5.0),
+  base_correlation: () => baseCorrelation().getCorrelation(5.0),
   vol_surface: () => JSON.parse(surface().toJson()),
   vol_surface_queries: () => [
     models.volatility.getSurfaceVol(surface(), 0.75, 100.0),
@@ -643,7 +646,15 @@ test('unknown names carry the Rust error kind', () => {
   assert.throws(() => market().getDiscount('missing'), kind('not_found'));
   assert.throws(
     () =>
-      new core.PriceCurve({ id: 'X', baseDate: '2025-01-02', knots: [0, 1, 1, 2], kind: 'Price' }),
+      new core.PriceCurve({
+        id: 'X',
+        baseDate: '2025-01-02',
+        knots: [0, 1, 1, 2],
+        kind: 'Price',
+        dayCount: 'act_365f',
+        interp: 'linear',
+        extrapolation: 'flat',
+      }),
     kind('validation', /price curve kind/)
   );
   assert.throws(() => core.PeriodId.month(2025, 13), kind('validation'));
@@ -653,7 +664,7 @@ test('unknown names carry the Rust error kind', () => {
   assert.throws(() => core.studentTInvCdf(1.1, 5.0), kind('validation'));
   assert.equal(core.studentTInvCdf(0.0, 5.0), -Infinity);
   assert.equal(core.studentTInvCdf(1.0, 5.0), Infinity);
-  assert.ok(Number.isNaN(core.standardNormalInvCdf(-0.1)));
+  assert.throws(() => core.standardNormalInvCdf(-0.1), kind('validation'));
   assert.throws(() => core.choleskyDecomposition([1.0, 0.5, 0.4, 1.0], 2), kind('validation'));
   assert.throws(() => core.symmetricEigen([1.0, 0.5, 0.4, 1.0], 2), kind('validation'));
   assert.throws(() => core.thirdWednesday(13, 2025), kind('validation'));
@@ -725,6 +736,13 @@ test('handles round-trip through their JSON wire form', () => {
   );
 });
 
+test('base-correlation lookup rejects detachments outside the financial domain', () => {
+  const curve = baseCorrelation();
+  for (const invalid of [-1, 300, NaN, Infinity]) {
+    assert.throws(() => curve.getCorrelation(invalid), /detachment/i);
+  }
+});
+
 test('ScheduleBuilder setters update the builder in place and round-trip its spec', () => {
   const base = core.Schedule.builder(ep('2025-01-15'), ep('2025-07-15'));
   // Record CORE-CONVENTIONS-008 #2: every financial choice is explicit.
@@ -758,14 +776,14 @@ test('MarketContext.len counts the FX matrix', () => {
   assert.deepEqual([fxOnly.len(), fxOnly.isEmpty()], [1, false]);
 });
 
-test('CreditIndexData issuer accessors fall back to the index data', () => {
+test('CreditIndexData issuer accessors require a named pool member', () => {
   const hazard = core.HazardCurve.flat('CDX-IG-HZD', '2025-01-02', 0.01, 0.4, 'act_365f');
   const data = new core.CreditIndexData(4, 0.4, hazard, baseCorrelation());
   assert.equal(data.hasIssuerCurves(), false);
   assert.deepEqual(data.issuerIds(), []);
-  assert.equal(data.getIssuerCurve('A').id, 'CDX-IG-HZD');
-  assert.equal(data.getIssuerRecovery('A'), 0.4);
-  assert.equal(data.getIssuerWeight('A'), 0.25);
+  assert.equal(data.numConstituents, 4);
+  assert.equal(data.recoveryRate, 0.4);
+  assert.throws(() => data.getIssuerCurve('A'));
   assert.throws(() => data.getIssuerWeight(1), { name: 'TypeError' });
 
   const context = new core.MarketContext();
@@ -777,13 +795,15 @@ test('CreditIndexData issuer accessors fall back to the index data', () => {
   Object.assign(state.credit_indices[0], {
     issuer_credit_curve_ids: { A: 'A-HZD', B: 'CDX-IG-HZD' },
     issuer_recovery_rates: { A: 0.3 },
-    issuer_weights: { A: 0.25, B: 0.75 },
+    issuer_weights: { A: 0.9, B: 0.1 },
   });
   const loaded = core.MarketContext.fromJson(JSON.stringify(state)).getCreditIndex('CDX');
   assert.deepEqual(loaded.issuerIds(), ['A', 'B']);
   assert.equal(loaded.getIssuerCurve('A').id, 'A-HZD');
   assert.deepEqual([loaded.getIssuerRecovery('A'), loaded.getIssuerRecovery('B')], [0.3, 0.4]);
-  assert.deepEqual([loaded.getIssuerWeight('A'), loaded.getIssuerWeight('B')], [0.25, 0.75]);
+  assert.deepEqual([loaded.getIssuerWeight('A'), loaded.getIssuerWeight('B')], [0.9, 0.1]);
+  for (const method of ['getIssuerWeight', 'getIssuerCurve', 'getIssuerRecovery'])
+    assert.throws(() => loaded[method]('C'));
 });
 
 test('MarketContext inserts change the context in place and share curve data', () => {
@@ -800,11 +820,11 @@ test('MarketContext inserts change the context in place and share curve data', (
   );
   assert.deepEqual(market().getPrice('SPX'), { unitless: 5900.0 });
   assert.deepEqual(market().getPrice('ACME'), { price: { amount: '12.5', currency: 'USD' } });
-  assert.equal(market().getPriceCurve('WTI').spotPrice, 72.0);
+  assert.equal(market().getPriceCurve('WTI').price(0), 72.0);
   assert.equal(market().getInflationCurve('US-CPI').baseCpi, 300.0);
   assert.equal(
-    market().getBaseCorrelation('CDX-IG').correlation(5.0),
-    baseCorrelation().correlation(5.0)
+    market().getBaseCorrelation('CDX-IG').getCorrelation(5.0),
+    baseCorrelation().getCorrelation(5.0)
   );
   assert.equal(market().getCreditIndex('CDX-IG-43').indexCreditCurve.id, 'CDX-IG-HZD');
 
@@ -842,7 +862,13 @@ test('MarketContext keeps volatility registries namespace-local, rejects cross-f
   );
   assert.equal(context.getDiscount('SHARED').id, 'SHARED');
   assert.equal(context.getSeries('SHARED').id, 'SHARED');
-  context.insert(new core.FxDeltaVolSurface('SHARED', 'EUR/USD', [1.0], [0.12], [0.01], [0.002]));
+  context.insert(
+    new core.FxDeltaVolSurface('SHARED', 'EUR/USD', [1.0], [0.12], [0.01], [0.002], {
+      deltaConvention: 'forward_unadjusted',
+      atmConvention: 'delta_neutral_straddle',
+      butterflyConvention: 'smile',
+    })
+  );
   assert.equal(context.getFxDeltaVolSurface('SHARED').id, 'SHARED');
   assert.throws(
     () => context.insert(core.ForwardCurve.flat('SHARED', '2025-01-02', 0.04, 'act_360')),
@@ -866,4 +892,64 @@ test('FinstackConfig extensions hold JSON values, not JSON text', () => {
   cfg.setIngestScale('USD', 8);
   assert.deepEqual(cfg.ingestScaleOverrides(), { USD: 8 });
   assert.deepEqual(cfg.outputScaleOverrides(), {});
+});
+
+test('following rolls respect exchange amendments and early closes', () => {
+  for (const [calendar, start, expected] of [
+    ['nse', '2026-01-15', '2026-01-16'],
+    ['nyse', '2012-10-29', '2012-10-31'],
+    ['sifma', '2021-12-31', '2021-12-31'],
+  ]) {
+    assert.equal(iso(core.adjust(ep(start), 'following', calendar)), expected);
+  }
+});
+
+test('market restoration retains the published CPI series and reference base', () => {
+  const series = {
+    series_id: 'BLS:CUUR0000SA0',
+    reference_base: '1982-84=100',
+    seasonally_adjusted: false,
+  };
+  const state = JSON.parse(new core.MarketContext().toJson());
+  state.inflation_indices = [
+    {
+      id: 'US-CPI',
+      currency: 'USD',
+      knowledge_date: '2025-02-12',
+      series,
+      observations: [{ reference_month: '2025-01-01', available_on: '2025-02-12', value: 105 }],
+    },
+  ];
+  const restored = core.MarketContext.fromJson(JSON.stringify(state));
+  assert.deepEqual(JSON.parse(restored.toJson()).inflation_indices[0].series, series);
+});
+
+test('hazard market restoration rejects a 10Y risk quote attached to the 5Y source', () => {
+  const market = new core.MarketContext();
+  market.insert(core.HazardCurve.flat('ACME-HZD', '2025-01-01', 0.02, 0.4, 'act_365f'));
+  const state = JSON.parse(market.toJson());
+  const input = {
+    quote: {
+      type: 'cds_par_spread',
+      id: 'ACME',
+      entity: 'ACME',
+      recovery_rate: 0.4,
+      convention: { currency: 'USD', doc_clause: 'isda_na' },
+      pillar: { date: '2030-01-01' },
+      spread_bp: 120,
+    },
+    pillar_date: '2030-01-01',
+    pillar_time: 5,
+  };
+  state.curves[0].hazard_calibration = {
+    hazard_params: { curve_id: 'ACME-HZD' },
+    calibration_config: {},
+    calibration_inputs: [input],
+    spread_risk_inputs: [structuredClone(input)],
+  };
+  assert.doesNotThrow(() => core.MarketContext.fromJson(JSON.stringify(state)));
+  const risk = state.curves[0].hazard_calibration.spread_risk_inputs[0];
+  risk.quote.pillar.date = risk.pillar_date = '2035-01-01';
+  risk.pillar_time = 10;
+  assert.throws(() => core.MarketContext.fromJson(JSON.stringify(state)));
 });

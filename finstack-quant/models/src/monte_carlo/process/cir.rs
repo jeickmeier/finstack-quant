@@ -158,10 +158,11 @@ impl StochasticProcess for CirProcess {
         out[0] = self.params.kappa * (self.params.theta - v);
     }
 
-    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         // σ(v) = σ√(v⁺) — full truncation, see `drift`.
         let v = x[0].max(0.0);
         out[0] = self.params.sigma * v.sqrt();
+        Ok(())
     }
 
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
@@ -277,9 +278,10 @@ impl StochasticProcess for CirPlusPlusProcess {
         self.cir.drift(t, x, out);
     }
 
-    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         // Diffusion is same as base CIR
-        self.cir.diffusion(t, x, out);
+        self.cir.diffusion(t, x, out)?;
+        Ok(())
     }
 
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
@@ -347,7 +349,9 @@ mod tests {
 
         let x = vec![0.04];
         let mut diffusion = vec![0.0];
-        process.diffusion(0.0, &x, &mut diffusion);
+        process
+            .diffusion(0.0, &x, &mut diffusion)
+            .expect("valid diffusion");
 
         // σ√v = 0.1 * √0.04 = 0.1 * 0.2 = 0.02
         assert_eq!(diffusion[0], 0.1 * 0.04_f64.sqrt());

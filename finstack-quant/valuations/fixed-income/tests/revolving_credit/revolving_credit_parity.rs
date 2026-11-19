@@ -104,9 +104,12 @@ mod tests {
             .unwrap();
 
         MarketContext::new()
-            .insert(disc_curve)
-            .insert(fwd_curve)
-            .insert(hazard_curve)
+            .try_insert(disc_curve)
+            .expect("insert market curve")
+            .try_insert(fwd_curve)
+            .expect("insert market curve")
+            .try_insert(hazard_curve)
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:USD-SOFR-3M",
@@ -221,6 +224,7 @@ mod tests {
             .maturity(end)
             .rate(RateSpec::Floating(
                 finstack_quant_cashflows::builder::FloatingRateSpec {
+                    index_id: "USD-SOFR-3M".into(),
                     forward_curve_id: "USD-SOFR-3M".into(),
                     spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
                     gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -259,6 +263,7 @@ mod tests {
             .maturity(end)
             .rate(RateSpec::Floating(
                 finstack_quant_cashflows::builder::FloatingRateSpec {
+                    index_id: "USD-SOFR-3M".into(),
                     forward_curve_id: "USD-SOFR-3M".into(),
                     spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
                     gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),

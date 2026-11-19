@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from finstack_quant.valuations.instruments import price_instrument
+from finstack_quant.valuations.instruments import instrument_cashflows, price_instrument
 
 
 def fixture(kind: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -99,3 +99,52 @@ def test_discrete_barrier_contract_cannot_use_continuous_analytical_engine() -> 
     spec["monitoring"] = {"type": "discrete", "observation_dates": [spec["expiry"]]}
     with pytest.raises(RuntimeError, match="continuous monitoring"):
         price_instrument(json.dumps(instrument), json.dumps(market), "2024-01-02", "barrier_bs_continuous", [])
+
+
+def test_fixed_ndf_exports_only_settlement_cash() -> None:
+    instrument, market = fixture("ndf")
+    instrument["instrument"]["spec"]["observed_fixing"] = 7.30
+    market_json = json.dumps(market)
+    result = instrument_cashflows(instrument, market_json, "2025-03-14", "discounting")
+    (row,) = result.flows
+    assert row["kind"] == "derivative_settlement"
+    assert row["currency"] == "USD"
+    assert row["amount"] == pytest.approx(10_000_000 * (1 / 7.30 - 1 / 7.25))
+    assert row.get("principal_delta") is None
+    assert row.get("principal_date") is None
+    pv = price_instrument(json.dumps(instrument), market_json, "2025-03-14", "discounting", [])
+    assert row["native_pv"] == pytest.approx(pv.value.amount)
+
+
+def test_variance_settlement_includes_preceding_close() -> None:
+    instrument, market = fixture("variance_swap")
+    spec = instrument["instrument"]["spec"]
+    spec.update(
+        start_date="2025-01-06",
+        maturity="2025-01-08",
+        previous_close_date="2025-01-03",
+        realized_var_method="yang_zhang",
+        open_series_id="bars",
+        high_series_id="bars",
+        low_series_id="bars",
+        close_series_id="bars",
+    )
+    market["series"] = [
+        {
+            "id": "bars",
+            "interpolation": "step",
+            "extrapolation": "error",
+            "observations": [
+                ["2025-01-03", 100.0],
+                ["2025-01-06", 110.0],
+                ["2025-01-07", 110.0],
+                ["2025-01-08", 110.0],
+            ],
+        }
+    ]
+    variance = 252 * math.log(1.1) ** 2 / 3
+    settlement = price_instrument(json.dumps(instrument), json.dumps(market), spec["maturity"], "discounting", [])
+    assert float(settlement.value.amount) == pytest.approx(1_000_000 * (variance - 0.04), abs=1e-7)
+    del spec["previous_close_date"]
+    with pytest.raises((ValueError, RuntimeError), match="previous_close_date"):
+        price_instrument(json.dumps(instrument), json.dumps(market), spec["maturity"], "discounting", [])

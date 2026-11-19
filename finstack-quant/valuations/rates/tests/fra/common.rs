@@ -183,7 +183,11 @@ pub fn build_inverted_forward_curve(base_date: Date, curve_id: &str) -> ForwardC
 pub fn standard_market() -> MarketContext {
     let disc = build_flat_discount_curve(0.05, BASE_DATE, "USD_OIS");
     let fwd = build_flat_forward_curve(0.05, BASE_DATE, "USD_LIBOR_3M");
-    MarketContext::new().insert(disc).insert(fwd)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
 }
 
 /// Creates a standard 3M x 6M FRA for testing

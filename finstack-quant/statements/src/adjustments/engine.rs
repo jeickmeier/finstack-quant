@@ -194,7 +194,7 @@ fn validate(results: &StatementResult, config: &NormalizationConfig) -> Result<N
         match &adjustment.value {
             AdjustmentValue::Fixed { amounts } => {
                 for (period, amount) in amounts {
-                    if !plan.periods.iter().any(|known| known.id == *period) {
+                    if !plan.iter().any(|known| known.id == *period) {
                         return Err(Error::invalid_input(format!(
                             "Adjustment '{id}' has an amount for {period}, which is not a \
                              period of the results"

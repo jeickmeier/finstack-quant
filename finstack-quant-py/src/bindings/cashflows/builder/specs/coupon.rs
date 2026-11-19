@@ -351,7 +351,7 @@ impl PyFloatingRateSpec {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, forward_curve_id, spread_bp, reset_frequency, gearing='1', gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints='daily', index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback='error')"
+        text_signature = "(*, index_id, forward_curve_id, spread_bp, reset_frequency, gearing='1', gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints='daily', index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback='error')"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: FloatingRateSpec =
@@ -385,6 +385,12 @@ impl PyFloatingRateSpec {
         Ok(Self {
             inner: FloatingRateSpec::euribor_3m(decimal_from_any(spread_bp)?),
         })
+    }
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.index_id")]
+    #[getter]
+    fn index_id(&self) -> String {
+        self.inner.index_id.to_string()
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.forward_curve_id")]

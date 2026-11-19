@@ -53,6 +53,7 @@ export default [
                 "count": 3,
                 "unit": "months"
               },
+              "index_id": "USD-OIS",
               "payment_lag_days": 0,
               "reset_lag_days": 0,
               "spread_bp": "0",
@@ -240,13 +241,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/OptionType/oneOf/1",
     "const": "put",
     "description": "Put option."
-  },
-  {
-    "path": "#/$defs/d_0d1f74f8f487020c0407",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/NonNegativeF64Wire",
-    "description": "Finite JSON number greater than or equal to zero.",
-    "format": "double",
-    "minimum": 0
   },
   {
     "path": "#/$defs/d_0da16f48ff9941483821",
@@ -539,6 +533,13 @@ export default [
     "description": "Payment frequency",
     "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_173bb13d95b6e8cec0d7/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FloatLegSpec/properties/index_id",
+    "description": "Contractual observed index identifying historical rate publications.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_173bb13d95b6e8cec0d7/properties/payment_lag_days",
@@ -1185,6 +1186,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_forward_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id",
+    "description": "Contractual floating index used for asset-swap accruals and historical resets."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
     "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
@@ -1434,14 +1450,6 @@ export default [
     "description": "Use the leverage ratio."
   },
   {
-    "path": "#/$defs/d_6772ff84bb100f4fa73d",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/ClosedUnitIntervalF64Wire",
-    "description": "Finite JSON number in the closed interval `[0, 1]`.",
-    "format": "double",
-    "maximum": 1,
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_69148dfad1155676d8a6",
     "source": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#/$defs/TenorUnit",
     "description": "Unit of a tenor period."
@@ -1469,13 +1477,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#/$defs/TenorUnit/oneOf/3",
     "const": "years",
     "description": "Years (Y)"
-  },
-  {
-    "path": "#/$defs/d_73b92f56cdc5ce046018",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/PositiveF64Wire",
-    "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
-    "exclusiveMinimum": 0,
-    "format": "double"
   },
   {
     "path": "#/$defs/d_780b68ee5d41351b65ca",
@@ -1688,7 +1689,7 @@ export default [
   {
     "path": "#/$defs/d_818134538ec82f6d27c9/properties/vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/Swaption/properties/vol_surface_id",
-    "description": "Volatility surface ID for option pricing",
+    "description": "Volatility source ID for option pricing. A dated SABR cube needs an\nACT/365F expiry clock anchored at the valuation date.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -2794,14 +2795,6 @@ export default [
       "US912828XG33"
     ],
     "title": "Id"
-  },
-  {
-    "path": "#/$defs/d_9ce633eb1d1806a74a03",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/CorrelationWire",
-    "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
-    "format": "double",
-    "maximum": 1,
-    "minimum": -1
   },
   {
     "path": "#/$defs/d_ae5d75ed4e313ae3bc25",
@@ -4118,7 +4111,7 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve",
-    "description": "A finite, left-continuous piecewise-constant curve."
+    "description": "A finite, right-continuous piecewise-constant curve."
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times",
@@ -4127,7 +4120,8 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/times/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/times/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values",
@@ -4136,55 +4130,49 @@ export default [
   {
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_d09956c3320c77551bb5",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/SabrParameters",
-    "description": "SABR model parameters"
+    "description": "Parameters of a SABR backbone, with an optional signed rate displacement."
   },
   {
     "path": "#/$defs/d_d09956c3320c77551bb5/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/SabrParameters/properties/alpha",
-    "description": "Initial volatility (alpha)",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/PositiveF64Wire"
+    "description": "Initial volatility level, strictly positive.",
+    "exclusiveMinimum": 0,
+    "format": "double"
   },
   {
     "path": "#/$defs/d_d09956c3320c77551bb5/properties/beta",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/SabrParameters/properties/beta",
-    "description": "CEV exponent (beta) - typically 0 to 1",
-    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/ClosedUnitIntervalF64Wire"
+    "description": "CEV exponent in the closed interval `[0, 1]`.",
+    "format": "double",
+    "maximum": 1,
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_d09956c3320c77551bb5/properties/nu",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/SabrParameters/properties/nu",
-    "description": "Volatility of volatility (nu/volvol)",
-    "ref": "#/$defs/NonNegativeF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/NonNegativeF64Wire"
+    "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_d09956c3320c77551bb5/properties/rho",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/SabrParameters/properties/rho",
-    "description": "Correlation between asset and volatility (rho)",
-    "ref": "#/$defs/CorrelationWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/CorrelationWire"
+    "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+    "exclusiveMaximum": 1,
+    "exclusiveMinimum": -1,
+    "format": "double"
   },
   {
     "path": "#/$defs/d_d09956c3320c77551bb5/properties/shift",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/SabrParameters/properties/shift",
-    "description": "Shift parameter for handling negative rates (optional)"
-  },
-  {
-    "path": "#/$defs/d_d09956c3320c77551bb5/properties/shift/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/SabrParameters/properties/shift/anyOf/0",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/d_d09956c3320c77551bb5/properties/shift/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/SabrParameters/properties/shift/anyOf/1"
+    "description": "Optional finite displacement applied to forward and strike.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_d30540ea90ce7eca3dee",

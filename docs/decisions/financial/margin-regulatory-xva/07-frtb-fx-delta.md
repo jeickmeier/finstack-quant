@@ -1,10 +1,59 @@
 # MARGIN-REGULATORY-XVA-007: FX delta equicorrelation norm
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed** in the stated source scope.
-- Validation status: **Evidence inspected/located, not executed.** Selected test bodies were read; no runtime test, build or numerical experiment was run.
+- Decision status: **Accepted 2026-11-17 for checked FX delta.**
+- Implementation status: Existing behavior is described below. Canonical reporting-currency factor identity, elective pair relief and checked aggregation and result paths remain pending.
+- Validation status: Primary references and published pair list checked. Independent examples covered the reciprocal shock, pair and first-order cross eligibility, weight scales and all three scenario norms. Runtime, schema, host and regulatory qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope and hashes: [inventory](README.md), [coverage ledger](coverage.json).
+
+## Accepted decision for checked FX delta
+
+1. **Use one canonical bucket per risk currency.** Fix the reporting
+   currency for the calculation and identify each bucket by its distinct
+   risk currency. Reject self-pairs. Map qualified onshore, offshore,
+   deliverable and non-deliverable variants to the same regulatory currency
+   and retain their source evidence. Net only contributions to the same
+   canonical bucket.
+   [Basel MAR21.14 and MAR21.86](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+2. **Require signed P&L for the exact `1%` relative shock.** Define the
+   quote as reporting-currency units per unit of risk currency. Reprice
+   at `1.01 × quote`, holding the other factors fixed. A reciprocal
+   source quote reproduces the prescribed shock by dividing its quote by
+   `1.01`. Require every applicable reporting-currency leg. For example,
+   a USD/JPY forward in a CAD report requires USD/CAD and JPY/CAD
+   sensitivities.
+   [FRTB input contract](01-frtb-inputs-and-wire.md#accepted-decision-for-checked-frtb-inputs-and-provenance) ·
+   [Basel MAR21.14–16 and MAR21.24](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+3. **Support the direct reporting-currency method.** A calculation
+   against a separate base currency is unavailable until a qualified route
+   supports one supervisory-approved base currency, explicit translation
+   risk and dated spot conversion of the resulting capital charge.
+   [Basel MAR21.14(1)](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+4. **Make pair relief an explicit profile election.** Use `15` as the
+   standard multiplier on prepared P&L. Apply `15/√2` to eligible buckets
+   under a profile that elects and permits relief. Eligible pairs are the
+   published pairs and their first-order crosses formed from two listed
+   pairs sharing one currency. Evaluate eligibility from the two
+   currencies, retain the prescribed reporting quote orientation and
+   apply the election consistently to all eligible buckets. EUR/AUD
+   qualifies through USD/EUR and USD/AUD under the published list.
+   [Basel MAR21.87–88 and footnotes 22–23](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+5. **Keep the checked linear-time aggregation.** Let `w_b` be the net
+   weighted sensitivity of bucket `b`. Report `K_b = |w_b|` and `S_b = w_b`.
+   Transform the `0.60` cross-bucket correlation to `0.45`, `0.60` and `0.75`
+   for Low, Medium and High. Calculate
+   `√((1 − r) Σ_b w_b² + r (Σ_b w_b)²)` with checked, scaled arithmetic
+   in canonical order. Two weighted buckets of `+150` and `−150` give
+   approximately `134.1641` in Medium.
+   [FRTB aggregation](02-frtb-scenarios-and-aggregation.md#accepted-decision-for-checked-frtb-scenarios-and-aggregation) ·
+   [Basel MAR21.4, MAR21.6 and MAR21.89](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+6. **Preserve coverage and the applied weight.** Carry the currency, net
+   amount, relief evidence, weight and scenario results through Rust,
+   wire, Python and WASM. Report evaluated zero only when coverage
+   establishes it. Pass the elected delta weight to the curvature owner
+   for the applicable shock size.
+   [Curvature record](11-frtb-curvature.md) ·
+   [Basel MAR21.98](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
 
 ## Choice and domain
 
@@ -21,18 +70,23 @@ FX delta treats each ordered currency-pair key as a risk factor and uses one uni
 
 ## Selection and controls
 
-Selected by the FX delta branch; an empty map returns zero. Engine validation verifies finite amounts, but neither distinct currencies nor pair orientation relative to `base_currency`. The fixed weight has no runtime pair-relief selector.
+The FX delta branch returns zero for an empty map. Engine validation checks finite amounts and admits arbitrary ordered currency pairs, including self-pairs and pairs unrelated to `base_currency`. The runtime applies the fixed standard weight.
 
 ## Limitations and failure behavior
 
-The source documents absent specified-pair relief. Current regulation/jurisdiction eligibility was not independently assessed. A caller must normalize pair conventions and convert sensitivities; otherwise equal economic exposures may occupy different factors or create false diversification. No valuation-date or currency-conversion provenance is stored by the charge.
+The current norm consumes pair keys without validating the normalization. Equal economic exposures can occupy different factors and create false diversification. The current result omits the valuation date, currency-conversion provenance and the pair-relief election. The acceptance review verified the published Basel eligibility list. Jurisdictional applicability requires qualification under the elected profile.
 
 ## Alternatives and tradeoffs
 
-Canonical reporting-currency risk mapping would make offset logic more controlled but requires an explicit market-risk conversion method. A dense pairwise implementation is mathematically equivalent for the uniform rho and adds quadratic cost.
+Canonical reporting-currency mapping makes the offset rule explicit and requires qualified sensitivities on the declared basis. The linear-time norm evaluates the prescribed uniform-correlation quadratic after applying each bucket's weight.
 
 ## Evidence and role
 
-Runtime norm: [src/regulatory/frtb/delta.rs](../../../../finstack-quant/margin/src/regulatory/frtb/delta.rs); fixed constants/provenance notes: [src/regulatory/frtb/params/fx.rs](../../../../finstack-quant/margin/src/regulatory/frtb/params/fx.rs). [src/regulatory/frtb/engine.rs](../../../../finstack-quant/margin/src/regulatory/frtb/engine.rs) locates a single FX factor weight check and multi-factor scenario differences. [FRTB reference index](../../../REFERENCES.md#bcbs-frtb-minimum-capital-requirements).
+The inspected source covers the runtime norm, ordered-pair inputs and fixed parameters. Existing examples cover a single FX factor and scenario differences. Independent arithmetic checked the published pair list and first-order crosses, the inverse shock, both weight scales and mixed-sign charges under all three scenarios. Runtime verification remains pending.
+[Runtime norm](../../../../finstack-quant/margin/src/regulatory/frtb/delta.rs) ·
+[Input validation](../../../../finstack-quant/margin/src/regulatory/frtb/types.rs) ·
+[FX parameters](../../../../finstack-quant/margin/src/regulatory/frtb/params/fx.rs) ·
+[Engine examples](../../../../finstack-quant/margin/src/regulatory/frtb/engine.rs) ·
+[FRTB reference index](../../../REFERENCES.md#bcbs-frtb-minimum-capital-requirements).
 
-The implementation establishes observed behavior, not financial adoption or regulatory compliance. Actionable work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
+Reconciliation and qualification work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).

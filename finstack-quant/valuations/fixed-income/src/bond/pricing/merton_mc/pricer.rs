@@ -321,16 +321,18 @@ mod tests {
     }
 
     fn test_market() -> MarketContext {
-        MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(date!(2025 - 01 - 15))
-                .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("valid discount curve"),
-        )
+        MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(date!(2025 - 01 - 15))
+                    .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("valid discount curve"),
+            )
+            .expect("insert market curve")
     }
 
     /// Merton config with default risk switched off: asset value far above a
@@ -345,16 +347,18 @@ mod tests {
     }
 
     fn flat_act365_market(base: finstack_quant_core::dates::Date, rate: f64) -> MarketContext {
-        MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(base)
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
-                .knots([(0.0, 1.0), (30.0, (-rate * 30.0).exp())])
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("valid discount curve"),
-        )
+        MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(base)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .knots([(0.0, 1.0), (30.0, (-rate * 30.0).exp())])
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("valid discount curve"),
+            )
+            .expect("insert market curve")
     }
 
     /// W1.3: a seasoned bond at zero default risk must price at the

@@ -21,11 +21,9 @@ fn test_forward_swap_rate_includes_first_multicurve_float_period() {
     let expiry = date!(2024 - 12 - 31);
     let swap_start = date!(2025 - 01 - 02);
     let swap_end = date!(2027 - 01 - 02);
-    let market = create_flat_market(as_of, 0.02, 0.30).insert(build_flat_forward_curve(
-        0.06,
-        as_of,
-        "USD_LIBOR_3M",
-    ));
+    let market = create_flat_market(as_of, 0.02, 0.30)
+        .try_insert(build_flat_forward_curve(0.06, as_of, "USD_LIBOR_3M"))
+        .expect("insert market curve");
 
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.04);
     let actual = swaption.forward_swap_rate(&market, as_of).unwrap();
@@ -46,6 +44,7 @@ fn test_forward_swap_rate_includes_first_multicurve_float_period() {
     };
     let float = FloatLegSpec {
         discount_curve_id: "USD_OIS".into(),
+        index_id: "USD_LIBOR_3M".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         spread_bp: Decimal::ZERO,
         frequency: Tenor::quarterly(),

@@ -448,39 +448,27 @@ for_all_functions! {
     ///
     /// Evaluated in the statements layer where period spacing is known.
     GrowthRate => ("growth_rate", false),
-    /// Exponentiation (`pow(base, exp)`), computed as `base^exp` with IEEE 754
-    /// semantics: `pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf, and overflow
-    /// saturates to ±inf.
+    /// Exponentiation (`pow(base, exponent)`). Core rejects domain and overflow errors.
     Pow => ("pow", true),
-    /// Round to a number of decimal digits (`round(expr[, digits])`).
-    ///
-    /// Ties round half away from zero (Excel convention): `round(2.5)` is 3,
-    /// `round(-2.5)` is -3. `digits` defaults to 0 and may be negative to
-    /// round to tens/hundreds (`round(1234, -2)` is 1200). Non-finite inputs
-    /// pass through unchanged.
+    /// Quantize the represented value to a decimal place, with ties away from zero.
+    /// Digits default to zero. Core requires a direct, integral i32 literal.
     Round => ("round", true),
     /// Largest integer less than or equal to the value (`floor(expr)`).
     Floor => ("floor", true),
     /// Smallest integer greater than or equal to the value (`ceil(expr)`).
     Ceil => ("ceil", true),
-    /// Natural logarithm (`ln(expr)`), IEEE semantics: `ln(0)` is -inf and
-    /// `ln(x)` for `x < 0` is NaN.
+    /// Natural logarithm of a positive operand (`ln(expr)`).
     Ln => ("ln", true),
-    /// Natural exponential (`exp(expr)`); overflow saturates to +inf.
+    /// Natural exponential (`exp(expr)`).
     Exp => ("exp", true),
-    /// Base-10 logarithm (`log10(expr)`), IEEE semantics: `log10(0)` is -inf
-    /// and `log10(x)` for `x < 0` is NaN.
+    /// Base-10 logarithm of a positive operand (`log10(expr)`).
     Log10 => ("log10", true),
-    /// Square root (`sqrt(expr)`), IEEE semantics: `sqrt(x)` for `x < 0` is
-    /// NaN.
+    /// Square root of a nonnegative operand (`sqrt(expr)`).
     Sqrt => ("sqrt", true),
-    /// Clamp a value to an inclusive range (`clamp(expr, lo, hi)`),
-    /// equivalent to `min(max(expr, lo), hi)`. Returns NaN when any argument
-    /// is NaN or when `lo > hi`; it never panics on an inverted range.
+    /// Restrict a value to ordered, inclusive finite bounds (`clamp(expr, lo, hi)`).
+    /// Missing operands propagate and infinite operands fail.
     Clamp => ("clamp", true),
-    /// Missing-value predicate (`is_missing(expr)`), returning 1 when the
-    /// value is non-finite (NaN or ±inf) and 0 otherwise — the same
-    /// "finite" convention used by `coalesce`.
+    /// Missing-value predicate (`is_missing(expr)`); core admits NaN as its missing sentinel.
     IsMissing => ("is_missing", true),
 }
 

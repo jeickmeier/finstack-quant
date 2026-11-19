@@ -170,12 +170,11 @@ pub trait HolidayCalendar: Send + Sync {
     fn is_holiday(&self, date: Date) -> crate::Result<bool>;
 
     /// Returns `true` if the `date` is a business day according to the
-    /// calendar (i.e. not weekend and not holiday).
+    /// calendar.
     ///
-    /// Each calendar applies its own weekend convention here (every built-in
-    /// calendar closes on Saturday and Sunday, see
-    /// [`DateExt::is_weekend`](crate::dates::DateExt::is_weekend)); it is
-    /// independent of how the calendar labels weekends in [`Self::is_holiday`].
+    /// Built-in calendars normally close on Saturdays and Sundays, with
+    /// documented exchange sessions listed as exceptions. Holiday labels
+    /// follow [`Self::is_holiday`].
     ///
     /// # Errors
     ///

@@ -183,6 +183,9 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.equal(beta.stdDev, 0.2);
   assert.ok(beta.mode === undefined || typeof beta.mode === 'number');
   assert.throws(() => new credit.lgd.BetaRecovery(0.4, 2), kind('validation'));
+  assert.throws(() => new credit.lgd.BetaRecovery(0.5, 1e-300), kind('validation'));
+  const concentrated = new credit.lgd.BetaRecovery(0.5, 3e-155);
+  assert.deepEqual(Array.from(concentrated.sampleSeeded(4, 173)), [0.5, 0.5, 0.5, 0.5]);
   assert.throws(() => beta.quantile(2), kind('validation'));
   assert.throws(() => beta.sampleSeeded(1.5, 7), invalidType);
   assert.throws(
@@ -305,7 +308,22 @@ test('correlation handles expose their accessors and reject bad input', () => {
   const pair = new correlation.CorrelatedBernoulli(0.1, 0.2, 0.3);
   assert.equal(pair.p1, 0.1);
   assert.equal(pair.p2, 0.2);
-  assert.equal(pair.requestedCorrelation, 0.3);
+  const [low, high] = correlation.correlationBounds(0.2, 0.6);
+  for (const [rho, joint] of [
+    [low, 0],
+    [high, 0.2],
+  ]) {
+    const endpoint = new correlation.CorrelatedBernoulli(0.2, 0.6, rho);
+    assert.equal(endpoint.jointP11, joint);
+    endpoint.free();
+  }
+  for (const p of [2 ** -35, 2 ** -40]) {
+    const rare = new models.correlation.CorrelatedBernoulli(p, p, 1);
+    assert.equal(rare.jointP11, p);
+    assert.equal(rare.conditionalP2GivenX1(), 1);
+    assert.equal(new models.correlation.CorrelatedBernoulli(p, p, 0).jointP11, p * p);
+    assert.throws(() => new models.correlation.CorrelatedBernoulli(p, p, -1), /infeasible/);
+  }
   assert.ok(Math.abs(pair.jointP11 + pair.jointP10 + pair.jointP01 + pair.jointP00 - 1) < 1e-15);
   assert.ok(pair.sampleFromUniform(0.5) instanceof Uint8Array);
   assert.throws(() => pair.sampleFromUniform(2), kind('validation'));
@@ -624,6 +642,8 @@ test('rates handles expose their accessors and reject bad input', () => {
   assert.deepEqual(Array.from(params.getValues()), [0.01]);
   assert.equal(params.getTimes().length, 1);
   assert.equal(params.getSigma(10), 0.01);
+  assert.throws(() => params.getSigma(-1), kind('validation'));
+  assert.throws(() => params.stateCovariance(1, -1), kind('validation'));
   assert.throws(() => new hullWhite.HullWhiteParams(-1, 0.01), kind('validation'));
   assert.throws(
     () => hullWhite.HullWhiteParams.piecewise(0.05, [0], [0.01, 0.02]),
@@ -738,7 +758,13 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
   );
   // Materialized surfaces are `core.VolSurface` handles, the type the
   // surface evaluators take.
-  const surface = volatility.materializeCubeTenorSlice(cube, 5, [0.02, 0.03, 0.04], 'lognormal');
+  const surface = volatility.materializeCubeTenorSlice(
+    cube,
+    5,
+    [0.02, 0.03, 0.04],
+    'lognormal',
+    'vol'
+  );
   assert.ok(surface instanceof core.VolSurface);
   assert.deepEqual(Array.from(surface.expiries), [1, 2]);
   assert.deepEqual(Array.from(surface.secondaryValues), [0.02, 0.03, 0.04]);
@@ -755,7 +781,7 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
   );
   assert.throws(() => volatility.getSurfaceVol({ id: 'x' }, 1, 0.03));
   assert.throws(
-    () => volatility.materializeCubeTenorSlice(cube, 5, [0.04, 0.03], 'lognormal'),
+    () => volatility.materializeCubeTenorSlice(cube, 5, [0.04, 0.03], 'lognormal', 'vol'),
     kind('validation')
   );
 

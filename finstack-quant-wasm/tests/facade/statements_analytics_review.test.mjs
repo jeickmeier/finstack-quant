@@ -82,7 +82,7 @@ test('an annual identifier on a half-year interval is not a canonical plan', () 
         'ufcf',
         0
       ),
-    /differ from the calendar/
+    /calendar bounds/
   );
 });
 

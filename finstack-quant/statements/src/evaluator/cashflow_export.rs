@@ -132,7 +132,6 @@ pub fn node_to_dated_schedule(
         .get_node(node_id)
         .ok_or_else(|| Error::node_not_found(node_id))?;
     Ok(result_plan(results)?
-        .periods
         .iter()
         .map(|period| DatedCell {
             date: date_convention.anchor(period),
@@ -181,15 +180,14 @@ pub fn node_to_pricing_flows(
                 "Pricing flow for node '{node_id}' requests period {requested} more than once"
             )));
         }
-        if !plan.periods.iter().any(|period| period.id == *requested) {
+        if !plan.iter().any(|period| period.id == *requested) {
             return Err(Error::invalid_input(format!(
                 "Pricing flow for node '{node_id}' requests period {requested}, which is not in \
                  the result"
             )));
         }
     }
-    plan.periods
-        .iter()
+    plan.iter()
         .filter(|period| selection.periods.contains(&period.id))
         .map(|period| {
             let cell = cells.get(&period.id);

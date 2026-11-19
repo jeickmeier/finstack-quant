@@ -107,7 +107,7 @@ fn recalibrated_market_at_bumped_recovery(
         .build()?;
     base_market
         .clone()
-        .insert(recalibrated)
+        .try_insert(recalibrated)?
         .insert_credit_index(&tranche.credit_index_id, bumped_index)
 }
 

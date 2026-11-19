@@ -149,7 +149,11 @@ pub fn market_with_curves() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(eur_curve).insert(usd_curve)
+    MarketContext::new()
+        .try_insert(eur_curve)
+        .expect("insert market curve")
+        .try_insert(usd_curve)
+        .expect("insert market curve")
 }
 
 /// Create comprehensive market context with both curves and FX
@@ -178,8 +182,10 @@ pub fn market_full() -> MarketContext {
 
     MarketContext::new()
         .insert_fx(fx_matrix)
-        .insert(eur_curve)
-        .insert(usd_curve)
+        .try_insert(eur_curve)
+        .expect("insert market curve")
+        .try_insert(usd_curve)
+        .expect("insert market curve")
 }
 
 /// Floating-point comparison tolerance

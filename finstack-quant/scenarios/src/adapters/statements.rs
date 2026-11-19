@@ -306,7 +306,7 @@ mod tests {
         use time::macros::date;
         let periods = build_periods("2025Q1..Q2", Some("2025Q1"))
             .expect("periods")
-            .periods;
+            .into_periods();
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -369,7 +369,11 @@ mod tests {
             .add_to_date(start, None, BusinessDayConvention::Unadjusted)
             .expect("end");
         let log_growth = -forward.df_between_dates(start, end).expect("growth").ln();
-        let market = MarketContext::new().insert(discount).insert(forward);
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve");
         let mut binding = RateBindingSpec {
             node_id: "rate".into(),
             curve_id: "DISC".into(),

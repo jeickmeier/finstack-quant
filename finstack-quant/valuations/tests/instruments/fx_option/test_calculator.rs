@@ -190,16 +190,18 @@ fn test_missing_vol_surface_errors() {
     let call = build_call_option(as_of, expiry, 1.20, 1_000_000.0);
     let params = MarketParams::atm();
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(
+        .try_insert(build_flat_discount_curve(
             params.r_domestic,
             as_of,
             DOMESTIC_ID,
         ))
-        .insert(build_flat_discount_curve(
+        .expect("insert market curve")
+        .try_insert(build_flat_discount_curve(
             params.r_foreign,
             as_of,
             FOREIGN_ID,
         ))
+        .expect("insert market curve")
         .insert_fx(create_fx_matrix(params.spot));
 
     // Act & Assert: Missing vol surface should fail pricing

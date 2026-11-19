@@ -11,12 +11,14 @@ from __future__ import annotations
 import json
 
 import pandas as pd
+import pytest
 
 from finstack_quant.statements import (
     CapitalStructureCashflows,
     CheckReport,
     CheckSuiteSpec,
     Evaluator,
+    FinancialModelSpec,
     ForecastSpec,
     ModelBuilder,
     StatementResult,
@@ -263,3 +265,15 @@ def test_cashflows_written_before_the_split_still_load() -> None:
     assert "scheduled_principal" not in set(frame["flow_type"])
     assert "opening_balance" not in set(frame["flow_type"])
     assert "principal_payment" in set(frame["flow_type"])
+
+
+def test_model_restore_rejects_duplicate_daily_reporting_period() -> None:
+    builder = ModelBuilder("duplicate-day")
+    builder.periods("2025D001..D365")
+    builder.compute("ebitda", "1")
+    payload = json.loads(builder.build().to_json())
+    rows = payload["periods"]["periods"]
+    assert len(rows) == 365
+    rows[1] = rows[0]
+    with pytest.raises(ValueError, match="unique"):
+        FinancialModelSpec.from_json(json.dumps(payload))

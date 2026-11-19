@@ -17,16 +17,18 @@ fn deal_and_market() -> (StructuredCredit, MarketContext) {
     let mut deal = StructuredCredit::example().expect("example");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(deal.closing_date)
-            .knots([(0.0, 1.0), (20.0, (-0.03_f64 * 20.0).exp())])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(deal.closing_date)
+                .knots([(0.0, 1.0), (20.0, (-0.03_f64 * 20.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount curve"),
+        )
+        .expect("insert market curve");
     (deal, market)
 }
 
@@ -312,6 +314,7 @@ fn production_structured_metrics_discount_margin_settles_clean_price_at_quote_da
     let settlement = date!(2024 - 05 - 15);
     deal.quote_settlement_date = Some(settlement);
     deal.tranches.tranches[0].coupon = RateSpec::Floating(FloatingRateSpec {
+        index_id: "SOFR-3M".into(),
         forward_curve_id: CurveId::new("SOFR-3M"),
         spread_bp: dec!(100),
         gearing: dec!(1),
@@ -330,10 +333,11 @@ fn production_structured_metrics_discount_margin_settles_clean_price_at_quote_da
         fallback: Default::default(),
     });
     let market = market
-        .insert(
+        .try_insert(
             ForwardCurve::flat("SOFR-3M", deal.closing_date, 0.05, DayCount::Act365F)
                 .expect("forward"),
         )
+        .expect("insert market curve")
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:SOFR-3M",

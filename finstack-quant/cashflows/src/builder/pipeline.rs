@@ -271,7 +271,8 @@ impl CompiledCashFlowPlan {
                     let forward_curve_id = schedule.spec.rate_spec.forward_curve_id.as_str();
                     (
                         mkt.get_forward(forward_curve_id).ok(),
-                        mkt.get_series(fixing_series_id(forward_curve_id)).ok(),
+                        mkt.get_series(fixing_series_id(schedule.spec.rate_spec.index_id.as_str()))
+                            .ok(),
                     )
                 })
                 .unzip()

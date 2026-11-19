@@ -578,8 +578,10 @@ fn test_breakeven_inflation_metric_non_flat_nominal_curve() {
         .build()
         .unwrap();
     let ctx = MarketContext::new()
-        .insert(discount)
-        .insert(inflation)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(inflation)
+        .expect("insert market curve")
         .insert_inflation_index(
             finstack_quant_valuations_test_support::inflation::simple_index(
                 "US-CPI",

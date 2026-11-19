@@ -1066,6 +1066,7 @@ mod tests {
             .balance(Money::from((900_000_000_i64, Currency::USD)))
             .coupon(RateSpec::Floating(
                 finstack_quant_cashflows::builder::FloatingRateSpec {
+                    index_id: "SOFR-3M".into(),
                     forward_curve_id: CurveId::new("SOFR-3M".to_string()),
                     spread_bp: rust_decimal::Decimal::try_from(150.0).expect("valid"),
                     gearing: rust_decimal::Decimal::ONE,

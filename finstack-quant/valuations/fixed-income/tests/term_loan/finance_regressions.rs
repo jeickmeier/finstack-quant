@@ -47,16 +47,18 @@ fn base_loan() -> TermLoan {
 }
 
 fn discount_market(as_of: Date) -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("D")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (10.0, 1.0)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount"),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("D")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (10.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount"),
+        )
+        .expect("insert market curve")
 }
 
 fn overnight_loan(mode: FloatingLegCompounding) -> (TermLoan, MarketContext, Date) {
@@ -65,6 +67,7 @@ fn overnight_loan(mode: FloatingLegCompounding) -> (TermLoan, MarketContext, Dat
     loan.frequency = Tenor::quarterly();
     loan.day_count = DayCount::Act360;
     let mut spec = FloatingRateSpec::sofr(0.into());
+    spec.index_id = "TEST-ON".into();
     spec.forward_curve_id = "TEST-ON".into();
     spec.reset_frequency = Tenor::quarterly();
     spec.compounding = Some(mode);
@@ -92,7 +95,8 @@ fn overnight_loan(mode: FloatingLegCompounding) -> (TermLoan, MarketContext, Dat
     (
         loan,
         discount_market(as_of)
-            .insert(forward)
+            .try_insert(forward)
+            .expect("insert market curve")
             .insert_series(history),
         as_of,
     )
@@ -206,16 +210,18 @@ fn make_whole_loan(spread_bp: f64) -> TermLoan {
 }
 
 fn make_whole_market(as_of: Date, reference_rate: f64) -> MarketContext {
-    discount_market(as_of).insert(
-        DiscountCurve::builder("REF")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (10.0, (-10.0 * reference_rate).exp())])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("reference"),
-    )
+    discount_market(as_of)
+        .try_insert(
+            DiscountCurve::builder("REF")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (10.0, (-10.0 * reference_rate).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("reference"),
+        )
+        .expect("insert market curve")
 }
 
 #[test]

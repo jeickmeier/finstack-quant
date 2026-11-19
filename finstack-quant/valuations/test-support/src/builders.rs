@@ -89,7 +89,8 @@ impl TestMarketBuilder {
         );
 
         let mut market = MarketContext::new()
-            .insert(disc_curve)
+            .try_insert(disc_curve)
+            .expect("insert market curve")
             .insert_surface(vol_surface)
             .insert_price(
                 SPOT_ID,

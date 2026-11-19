@@ -534,15 +534,3 @@ def test_volatility_models_have_one_canonical_host_namespace() -> None:
     assert not hasattr(core_market_data, "arbitrage")
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("finstack_quant.core.market_data.arbitrage")
-
-
-def test_correlated_bernoulli_requested_correlation_matches_rust_and_stub() -> None:
-    """Python exposes the canonical Rust requested-correlation diagnostic."""
-    module = importlib.import_module("finstack_quant.models.correlation")
-    assert hasattr(module.CorrelatedBernoulli, "requested_correlation")
-
-    stub = (CONTRACT_PATH.parent / "finstack_quant" / "models" / "correlation" / "__init__.pyi").read_text()
-    assert "def requested_correlation(self) -> float:" in stub
-
-    rust = (CONTRACT_PATH.parent.parent / "finstack-quant" / "core" / "src" / "math" / "probability.rs").read_text()
-    assert "pub fn requested_correlation(&self) -> f64" in rust

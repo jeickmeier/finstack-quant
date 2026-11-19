@@ -122,7 +122,11 @@ fn test_par_spread_approximation() {
     let disc_curve = build_flat_discount(0.0, as_of, "USD_OIS");
     let hazard_curve = build_flat_hazard(hazard_rate, recovery, as_of, "CORP_HAZARD");
 
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let mut cds = test_utils::cds_buy_protection(
         "PAR_SPREAD_APPROX",
@@ -188,7 +192,11 @@ fn test_clean_upfront_adjustment_changes_npv_not_leg_pvs() {
 
     let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
     let hazard_curve = build_flat_hazard(0.015, 0.40, as_of, "CORP_HAZARD");
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let mut cds = test_utils::cds_buy_protection(
         "CLEAN_DIRTY_UPFRONT",
@@ -254,7 +262,11 @@ fn test_risky_pv01_market_standard() {
 
     let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
     let hazard_curve = build_flat_hazard(0.01, 0.40, as_of, "CORP_HAZARD");
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let mut cds = test_utils::cds_buy_protection(
         "RISKY_PV01_MKT",
@@ -297,12 +309,16 @@ fn test_cs01_positive_for_protection_buyer() {
     let end = date!(2029 - 01 - 01);
 
     let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
-    let source = MarketContext::new().insert(disc_curve);
+    let source = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
     let hazard_curve =
         test_utils::calibrated_hazard_curve(&source, as_of, "CORP_HAZARD", "CORP", "USD_OIS")
             .expect("hazard calibration should succeed");
     assert!(hazard_curve.hazard_calibration().is_some());
-    let market = source.insert(hazard_curve);
+    let market = source
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let mut cds = test_utils::cds_buy_protection(
         "CS01_BUYER",
@@ -354,7 +370,11 @@ fn test_hazard_rate_sensitivity_monotonic() {
         let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
         let hazard_curve = build_flat_hazard(hazard_rate, 0.40, as_of, "CORP_HAZARD");
 
-        let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+        let market = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve")
+            .try_insert(hazard_curve)
+            .expect("insert market curve");
 
         let mut cds = test_utils::cds_buy_protection(
             "HAZARD_SENS",
@@ -399,7 +419,11 @@ fn test_recovery_rate_sensitivity_monotonic() {
         let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
         let hazard_curve = build_flat_hazard(0.015, recovery, as_of, "CORP_HAZARD");
 
-        let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+        let market = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve")
+            .try_insert(hazard_curve)
+            .expect("insert market curve");
 
         let mut cds = test_utils::cds_buy_protection(
             "RECOVERY_SENS",
@@ -453,7 +477,11 @@ fn test_expected_loss_formula_validation() {
     let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
     let hazard_curve = build_flat_hazard(hazard_rate, recovery, as_of, "CORP_HAZARD");
 
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let mut cds = test_utils::cds_buy_protection(
         "EL_FORMULA_TEST",
@@ -521,7 +549,11 @@ fn test_jump_to_default_equals_lgd_times_notional() {
     let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
     let hazard_curve = build_flat_hazard(0.01, recovery, as_of, "CORP_HAZARD");
 
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let mut cds = test_utils::cds_buy_protection(
         "JTD_TEST",
@@ -567,7 +599,11 @@ fn test_survival_probability_decreases_over_time() {
     let disc_curve = build_flat_discount(0.05, start, "USD_OIS");
     let hazard_curve = build_flat_hazard(0.015, 0.40, start, "CORP_HAZARD");
 
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let mut cds = test_utils::cds_buy_protection(
         "SURVIVAL_TEST",
@@ -615,7 +651,11 @@ fn test_standard_tenors_reasonable_par_spreads() {
     let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
     let hazard_curve = build_flat_hazard(hazard_rate, recovery, as_of, "CORP_HAZARD");
 
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let tenors = [
         (1, date!(2025 - 01 - 01)),
@@ -670,7 +710,11 @@ fn test_term_structure_upward_sloping_spreads() {
     let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
     let hazard_curve = build_flat_hazard(hazard_rate, recovery, as_of, "CORP_HAZARD");
 
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(hazard_curve)
+        .expect("insert market curve");
 
     let mut par_spreads = Vec::new();
 

@@ -888,7 +888,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat curve");
-        finstack_quant_core::market_data::context::MarketContext::new().insert(curve)
+        finstack_quant_core::market_data::context::MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve")
     }
 
     #[test]

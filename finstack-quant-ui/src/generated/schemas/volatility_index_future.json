@@ -762,6 +762,17 @@
           ],
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
         },
+        "asw_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_94cb251104de5cf587b6"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual floating index used for asset-swap accruals and historical resets."
+        },
         "bdt_sigma": {
           "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
           "format": "double",
@@ -3203,20 +3214,24 @@
     },
     "d_cdb8fddc0106047270c4": {
       "additionalProperties": false,
-      "description": "A finite, left-continuous piecewise-constant curve.",
+      "description": "A finite, right-continuous piecewise-constant curve.",
       "properties": {
         "times": {
           "items": {
             "format": "double",
+            "minimum": 0,
             "type": "number"
           },
+          "minItems": 1,
           "type": "array"
         },
         "values": {
           "items": {
             "format": "double",
+            "minimum": 0,
             "type": "number"
           },
+          "minItems": 1,
           "type": "array"
         }
       },

@@ -1,14 +1,20 @@
 # FACTOR-013: Sequential generic and leave-one-out hierarchy beta fitting
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** The sequential peel is implemented. Fit admission, explicit proxy policy, and fit and application diagnostics require reconciliation.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** The targeted leave-one-out test and both peel tests passed. Fit admission, fallback provenance, and held-out performance still require qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Fit the generic slope by centered OLS and remove only `beta × factor`. Then process active buckets from broadest to narrowest. At each step, fit the issuer slope against the weighted leave-one-out mean of pre-step residuals and apply the loading to the published inclusive factor. Folded levels retain zero loadings.
+2. Require at least three aligned observations and an identifiable regressor for an estimated loading. Apply shrinkage toward one only when explicitly selected. `BucketOnly` uses elected unit loadings. An unavailable fit requires an explicitly authorized unit proxy with a recorded reason, or calibration fails. Nonfinite arithmetic produces an error.
+3. Distinguish fitted, elected, and proxy loadings. Report the raw fitted slope when available, the applied loading after any shrinkage, and the residual diagnostics measured on application to the inclusive factor. Preserve negative residual R² when it occurs.
+
+## Observed choice and rationale
 
 Fit issuer loadings sequentially: remove the external generic factor, then weighted hierarchy means of successive residuals. For issuer-specific level betas, regress on a leave-one-out bucket mean to reduce mechanical self-inclusion; residual peeling still uses the all-member factor.
 
@@ -43,10 +49,9 @@ Simultaneous constrained regression can reduce order dependence but loses the si
 - [src/credit/calibration/panel.rs](../../../../finstack-quant/factor/src/credit/calibration/panel.rs) — inspected implementation.
 - [src/credit/calibration/calibrator.rs](../../../../finstack-quant/factor/src/credit/calibration/calibrator.rs) — inspected implementation.
 
-[src/credit/calibration/tests.rs](../../../../finstack-quant/factor/src/credit/calibration/tests.rs) contains an inspected synthetic six-name case (five identical plus one doubled series) checking LOO beta near 2 and distinct from inclusive beta 12/7; also non-refining/unit fallback and per-level quality cases. [Analytics beta](../../../../finstack-quant/analytics/src/benchmark.rs) supplies the centered slope and >=3-observation rule. These are constructed examples, not out-of-sample validation.
+[src/credit/calibration/tests.rs](../../../../finstack-quant/factor/src/credit/calibration/tests.rs) contains a passing synthetic six-name case (five identical plus one doubled series). Exact arithmetic gives a leave-one-out slope of 2 and an inclusive slope of 12/7. Both targeted peel tests passed and cover observed behavior. [Analytics beta](../../../../finstack-quant/analytics/src/benchmark.rs) supplies the centered slope and three-observation minimum.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and independent qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

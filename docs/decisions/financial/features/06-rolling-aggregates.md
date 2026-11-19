@@ -1,14 +1,20 @@
 # FEATURES-006: Trailing-row aggregates and current-value sample z-scores
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Inclusive windows and observation eligibility are implemented. Checked scaled accumulation and z-score evaluation require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Independent examples checked missing-current behavior and avoidable sum overflow. Rust fixtures were inspected. Revised arithmetic still requires qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Use inclusive trailing row windows and the shared window controls. Mean, sum, minimum, maximum, and sample standard deviation may return an estimate at a missing current row if enough finite observations remain. Sample standard deviation requires at least max(min_periods, 2) finite observations. Return missing when the applicable count is insufficient.
+2. Rolling z-score requires a finite current observation and at least max(min_periods, 2) finite observations. Score it against the inclusive window mean and sample standard deviation. Use zero for a genuinely constant eligible window. Retain the dimensionless result. With [2, 4, missing], window 3, and minimum count 2, the last row has mean 3, sum 6, sample standard deviation √2, and a missing z-score. [Shared statistics](04-scaled-statistics-and-quantiles.md).
+3. Use checked, scaled, compensated summation. Preserve representable sums such as f64::MAX + f64::MAX − f64::MAX, and fail the whole call when the final statistic is unrepresentable. [Failure policy](02-parameters-missing-and-failure.md).
+
+## Observed scope and selection
 
 `RollingMean`, `RollingSum`, `RollingStd`, `RollingMin`, `RollingMax` and `RollingZscore` use `window=1` and `min_periods=window` by default. The window includes the current row and spans entity rows. Finite counts gate output; standard deviation and z-score raise the effective count to at least two. A window smaller than that floor returns None throughout rather than rejecting the request.
 
@@ -34,5 +40,5 @@ Alternatives include compensated/rebased sums, population rather than sample z-s
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

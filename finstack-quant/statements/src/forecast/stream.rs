@@ -78,7 +78,7 @@ impl StreamKey<'_> {
     /// The generator positioned at the start of this key's stream.
     pub(crate) fn rng(&self) -> Result<Pcg64Rng> {
         let (state, stream) = self.derive()?;
-        Ok(Pcg64Rng::new_with_stream(state, stream))
+        Ok(Pcg64Rng::new(state, stream))
     }
 }
 
@@ -121,11 +121,11 @@ mod tests {
         let key = key(7, "revenue", None);
         let (state, stream) = key.derive().unwrap();
         let mut original = key.rng().unwrap();
-        let mut replayed = Pcg64Rng::new_with_stream(state, stream);
+        let mut replayed = Pcg64Rng::new(state, stream);
         for _ in 0..8 {
             assert_eq!(
-                original.normal(0.0, 1.0).to_bits(),
-                replayed.normal(0.0, 1.0).to_bits()
+                original.normal(0.0, 1.0).unwrap().to_bits(),
+                replayed.normal(0.0, 1.0).unwrap().to_bits()
             );
         }
     }
@@ -138,7 +138,9 @@ mod tests {
         assert_eq!(derived, PINNED);
         // The draws of the stream are part of the version, not only its key.
         let mut rng = key(42, "revenue", None).rng().unwrap();
-        let normals: Vec<u64> = (0..3).map(|_| rng.normal(0.0, 1.0).to_bits()).collect();
+        let normals: Vec<u64> = (0..3)
+            .map(|_| rng.normal(0.0, 1.0).unwrap().to_bits())
+            .collect();
         let indices: Vec<usize> = (0..6).map(|_| rng.index(3)).collect();
         assert_eq!(
             (normals, indices),
@@ -147,11 +149,11 @@ mod tests {
     }
 
     const PINNED_NORMALS: [u64; 3] = [
-        4_608_841_250_242_571_330,
-        13_830_133_336_873_686_510,
-        13_809_749_431_602_484_183,
+        13_832_018_856_111_886_045,
+        4_595_048_052_394_679_694,
+        4_605_199_554_829_406_705,
     ];
-    const PINNED_INDICES: [usize; 6] = [0, 0, 0, 0, 1, 1];
+    const PINNED_INDICES: [usize; 6] = [2, 0, 0, 2, 1, 0];
 
     const PINNED: (u64, u64) = (3_751_829_398_131_865_565, 15_411_871_087_006_207_807);
 }

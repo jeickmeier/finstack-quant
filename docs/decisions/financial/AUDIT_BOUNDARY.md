@@ -2241,6 +2241,177 @@ and invalid custom effective dependence. Runtime, portfolio and host
 qualification remain pending.
 [MARGIN-COLLATERAL-IM-008](margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
 
+The accepted commodity package has a comparison of all published inter-bucket
+coefficients, positive exact-rational pivots and Decimal examples of exact
+factor delta, signed caps, bucket 16 and vega concentration. Runtime,
+portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-009](margin-collateral-im/09-simm-commodity.md#accepted-decision-for-checked-simm-commodity-delta-and-vega).
+
+Independent arithmetic for the accepted curvature package covered expiry
+weighting, signed perspective, the normal quantile, squared FX dependence,
+commodity Other and the IR adjustment. Runtime, portfolio and host
+qualification remain pending.
+[MARGIN-COLLATERAL-IM-010](margin-collateral-im/10-simm-curvature.md#accepted-decision-for-checked-simm-expiry-scaling-and-curvature-aggregation).
+
+Independent arithmetic for accepted SIMM assembly checked separate product
+totals and the historical IR/equity correlation within a product. The
+accepted historical profile uses its own ten-business-day horizon. Runtime,
+portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-011](margin-collateral-im/11-simm-total-and-mpor.md#accepted-decision-for-product-class-simm-assembly-and-supported-horizons).
+
+The gross schedule decision has an independent comparison of all 18
+embedded rate cells to Basel Table 1 and Decimal examples at the two-year
+and five-year cutoffs. Runtime, portfolio and host qualification remain
+pending.
+[MARGIN-COLLATERAL-IM-012](margin-collateral-im/12-schedule-notional.md#accepted-decision-for-checked-gross-schedule-initial-margin).
+
+Independent examples for schedule netting covered partial and exact
+offsets, zero gross replacement cost, a repeating ratio and cancellation.
+Runtime, portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-013](margin-collateral-im/13-schedule-net-gross.md#accepted-decision-for-checked-schedule-netting-and-reduction).
+
+Primary CCP disclosures and independent gross-sizing arithmetic support
+the cleared initial-margin scope and proxy example. Runtime, portfolio,
+external source and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-014](margin-collateral-im/14-ccp-external-and-proxy.md#accepted-decision-for-elected-cleared-initial-margin-routes).
+
+Independent checks for collateral valuation covered the published
+reference rates, exact maturity boundaries, additive haircut bounds and
+credited value. Runtime, portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-015](margin-collateral-im/15-collateral-eligibility-and-haircuts.md#accepted-decision-for-checked-collateral-eligibility-and-credited-value).
+
+Independent examples for concentration checked repeated class holdings,
+gross and credited shares, exact equality and a large-value comparison.
+Runtime and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-016](margin-collateral-im/16-collateral-concentration.md#accepted-decision-for-checked-collateral-pool-concentration).
+
+Independent IM account examples covered target and signed transfer
+amounts, elected MTA equality and exact subtraction at large values.
+Runtime, portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-017](margin-collateral-im/17-csa-selection-and-im-terms.md#accepted-decision-for-checked-csa-elections-and-one-way-im-account-terms).
+
+Independent VM examples covered side thresholds, MTA equality, transfers
+rounded after the gate, a change of collateral side and elected full return.
+Runtime, replay and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-018](margin-collateral-im/18-variation-margin.md#accepted-decision-for-checked-signed-variation-margin-and-transfers).
+
+Independent VM replay examples checked effective window boundaries,
+calendar-day versus business-day lag and partial settlement. Runtime,
+portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-019](margin-collateral-im/19-margin-dates-and-replay.md#accepted-decision-for-checked-vm-schedules-and-settlement-replay).
+
+Independent repo margin examples checked trigger equality, full
+shortfall, credit for elected pending transfers, capped refunds and
+signed interest. Runtime, portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-020](margin-collateral-im/20-repo-margin-cashflows.md#accepted-decision-for-checked-repo-cash-margin-and-interest).
+
+Independent collateral metric examples checked zero requirements, small
+shortfalls on large balances, signed funding cost and the full haircut-step
+boundary. Runtime and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-021](margin-collateral-im/21-collateral-metrics.md#accepted-decision-for-checked-collateral-metrics).
+
+Independent margin wire examples checked contribution and snapshot identity,
+explicit zero and paired curvature. Runtime, generated schema and host
+qualification remain pending.
+[MARGIN-COLLATERAL-IM-022](margin-collateral-im/22-wire-tables-and-provenance.md#accepted-decision-for-checked-margin-tables-wire-state-and-provenance).
+
+Independent FRTB input examples checked delta scale, equity repo
+weights, reporting-currency legs and snapshot admission. Runtime,
+schema, host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-001](margin-regulatory-xva/01-frtb-inputs-and-wire.md#accepted-decision-for-checked-frtb-inputs-and-provenance).
+
+Independent FRTB aggregation examples checked scenario scaling, conditional
+capping and its error case, non-CTP addition, tie order and scaled norms.
+Runtime, host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-002](margin-regulatory-xva/02-frtb-scenarios-and-aggregation.md#accepted-decision-for-checked-frtb-scenarios-and-aggregation).
+
+Independent GIRR delta examples checked the tenor floor, distinct-curve
+correlation, offsetting weighted sensitivities and relief arithmetic.
+Runtime, host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-003](margin-regulatory-xva/03-frtb-girr-delta.md#accepted-decision-for-checked-girr-delta).
+
+Independent credit spread delta evidence compared the three weight
+schedules and 55 sector-pair coefficients with the published tables,
+and checked index assignment, basis correlation and residual addition.
+Runtime, host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-004](margin-regulatory-xva/04-frtb-credit-delta.md#accepted-decision-for-checked-credit-spread-delta).
+
+Independent equity delta examples checked the size and index classification
+thresholds, repo scaling, mixed-pair correlation and bucket 11 aggregation.
+Both weight schedules were compared with Table 10. Runtime, host and
+regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-005](margin-regulatory-xva/05-frtb-equity-delta.md#accepted-decision-for-checked-equity-spot-and-repo-delta).
+
+The commodity delta weights and correlations were compared with Tables 11
+and 12. Independent examples checked the relative shock and weight scales,
+three-axis pair correlation and mixed-sign bucket 11 aggregation. Runtime,
+host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-006](margin-regulatory-xva/06-frtb-commodity-delta.md#accepted-decision-for-checked-commodity-delta).
+
+The FX delta review checked the published pair list and first-order cross
+rule. Independent examples verified reciprocal shock direction, both
+weight scales and the uniform-correlation quadratic under all three
+scenarios. Runtime, host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-007](margin-regulatory-xva/07-frtb-fx-delta.md#accepted-decision-for-checked-fx-delta).
+
+The GIRR vega review checked both prescribed grids, the liquidity-horizon
+weight and expiry-only scope. Independent examples covered input scaling,
+pairs differing on both axes and the scenario coefficients. Runtime, host
+and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-008](margin-regulatory-xva/08-frtb-girr-vega.md#accepted-decision-for-checked-girr-vega).
+
+The credit, equity and commodity vega review checked the expiry grid,
+weight schedules and pair and bucket rules. Independent arithmetic covered
+the equity weight and cap, index and overlap boundaries, and commodity
+and non-CTP other-sector aggregation. Runtime, host and regulatory
+qualification remain pending.
+[MARGIN-REGULATORY-XVA-009](margin-regulatory-xva/09-frtb-bucketed-vega.md#accepted-decision-for-checked-credit-equity-and-commodity-vega).
+
+The FX vega review checked the prescribed expiry grid and liquidity-horizon
+weight. Independent examples covered same-pair expiry decay and cross-pair
+charges with different expiries and signs. Runtime, host and regulatory
+qualification remain pending.
+[MARGIN-REGULATORY-XVA-010](margin-regulatory-xva/10-frtb-fx-vega.md#accepted-decision-for-checked-fx-vega).
+
+The curvature review checked the prescribed input, shock, correlation
+and direction rules. Independent examples covered delta removal, shock
+adjustments, opposite directions across FX buckets, ties, signed sums
+and zero floors. Runtime, host and regulatory qualification remain
+pending.
+[MARGIN-REGULATORY-XVA-011](margin-regulatory-xva/11-frtb-curvature.md#accepted-decision-for-checked-frtb-curvature).
+
+The default risk review checked the nine rating weights and the gross JTD
+rules. Independent examples covered zero-notional bond calls, maturity
+boundaries, seniority offsets and mixed-rating hedge benefit. Runtime,
+host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-012](margin-regulatory-xva/12-frtb-default-risk.md#accepted-decision-for-checked-non-securitisation-default-risk-capital).
+
+The residual risk add-on review checked chargeable scope, the exemptions
+and both prescribed weights. Independent examples covered unmatched gross
+aggregation and finite-input overflow. Runtime, host and regulatory
+qualification remain pending.
+[MARGIN-REGULATORY-XVA-013](margin-regulatory-xva/13-frtb-residual-risk.md#accepted-decision-for-checked-residual-risk-add-on).
+
+The SA-CCR trade input review checked Basel eligibility, classification,
+delta and MPOR rules and the current Rust validation paths. Independent
+examples covered ordinary option deltas, tranche magnitude, physical
+exercise maturity, FX leg selection and MPOR floors. Runtime, schema,
+host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-014](margin-regulatory-xva/14-saccr-inputs-and-supervisory-delta.md#accepted-decision-for-checked-sa-ccr-trade-inputs-and-supervisory-delta).
+
+The SA-CCR maturity and duration review checked the prescribed floors,
+maturity horizons and current Rust and host result paths. Independent
+examples covered short and forward-starting duration, cash and physical
+exercise, and MPOR factors above one. Runtime, schema, host and regulatory
+qualification remain pending.
+[MARGIN-REGULATORY-XVA-015](margin-regulatory-xva/15-saccr-maturity-and-duration.md#accepted-decision-for-checked-sa-ccr-maturity-factors-and-supervisory-duration).
+
+The SA-CCR IR add-on review checked prescribed hedging sets, maturity
+buckets, offsets and factors. Independent examples covered boundaries,
+opposing contributions, set separation and the scaled norm on large finite
+amounts. Runtime, schema, host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-016](margin-regulatory-xva/16-saccr-ir-addon.md#accepted-decision-for-the-checked-sa-ccr-interest-rate-add-on).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

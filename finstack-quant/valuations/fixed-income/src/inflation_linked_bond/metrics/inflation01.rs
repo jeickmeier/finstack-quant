@@ -121,8 +121,10 @@ mod tests {
             .build()
             .expect("inflation curve");
         MarketContext::new()
-            .insert(discount)
-            .insert(inflation)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(inflation)
+            .expect("insert market curve")
             .insert_inflation_index(
                 finstack_quant_valuations_test_support::inflation::simple_index(
                     "US-CPI",
@@ -249,7 +251,8 @@ mod tests {
             Currency::USD,
         );
         let market = MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_inflation_index(index);
         let bond = sample_bond();
 
@@ -272,7 +275,9 @@ mod tests {
             .knots([(0.0, 100.6), (10.0, 125.0)])
             .build()
             .expect("projected inflation curve");
-        let hybrid_market = market.insert(projected_curve);
+        let hybrid_market = market
+            .try_insert(projected_curve)
+            .expect("insert market curve");
         let hybrid = bond
             .price_with_metrics(
                 &hybrid_market,

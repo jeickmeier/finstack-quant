@@ -52,7 +52,11 @@ fn flat_market() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(discount).insert(forward)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
 }
 
 fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
@@ -447,7 +451,9 @@ mod afc_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// Pool earns 5%; senior coupon is 6%. The pool has enough cash to pay the
@@ -680,7 +686,9 @@ mod excess_spread_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// Pool earns 8%, senior pays 5%, so ~3% excess spread flows to equity each
@@ -845,8 +853,10 @@ mod excess_spread_tests {
             .build()
             .unwrap();
         MarketContext::new()
-            .insert(disc)
-            .insert(sofr)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(sofr)
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:SOFR-3M",
@@ -864,6 +874,7 @@ mod excess_spread_tests {
 
     fn floating_senior_spec() -> FloatingRateSpec {
         FloatingRateSpec {
+            index_id: "SOFR-3M".into(),
             forward_curve_id: CurveId::new("SOFR-3M"),
             spread_bp: rust_decimal_macros::dec!(100),
             gearing: rust_decimal_macros::dec!(1),
@@ -1042,7 +1053,9 @@ mod step_down_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// 70/20/10 senior/sub/equity ABS with a 20% CPR throwing off prepayment
@@ -1308,7 +1321,9 @@ mod shifting_interest_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     fn deal(shifting: Option<ShiftingInterestSpec>) -> StructuredCredit {
@@ -1717,7 +1732,9 @@ mod early_amortization_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// Revolving deal (4y reinvestment period). `early_am_threshold` sets the
@@ -1866,7 +1883,9 @@ mod controlled_accumulation_tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// 80/20 senior/equity ABS throwing off a 20% CPR. With a controlled

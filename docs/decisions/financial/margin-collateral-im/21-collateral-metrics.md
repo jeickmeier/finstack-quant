@@ -1,14 +1,52 @@
 # MARGIN-COLLATERAL-IM-021 — Collateral adequacy, funding spread and haircut sensitivity
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for checked collateral adequacy, static funding cost and haircut sensitivity.
 
-**Implementation status:** Observed for the source scope below, including the stated limitations and discrepancies.
+**Implementation status:** Existing behavior is described below. Exact adequacy comparisons, optional ratios, checked funding and haircut calculations, and validated restoration through callers remain pending.
 
-**Validation status:** Evidence inspected or specifically located; no tests/builds executed. Audit date **2026-11-05**; source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+**Validation status:** Source and financial references inspected. Independent Decimal examples checked zero-requirement cases, a shortfall hidden by the displayed ratio, signed funding cost and the full one-basis-point haircut boundary. Runtime and host qualification remain pending. Audit date **2026-11-05** and source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+
+## Accepted decision for checked collateral metrics
+
+1. **Compare qualified amounts on the same basis.** Require nonnegative exact
+   Money for credited collateral `C` and required collateral `R`, in the same
+   currency and for the same account, side and cut. The caller supplies the
+   credited amount under the elected eligibility and FX rules. Reject invalid
+   amounts and currency mismatches.
+   [Credited collateral rules](15-collateral-eligibility-and-haircuts.md#accepted-decision-for-checked-collateral-eligibility-and-credited-value).
+2. **Decide adequacy from Money and make ratios optional.** Adequacy is `C ≥ R`,
+   signed excess is `C − R` and shortfall is `max(R − C, 0)`. For `R > 0`,
+   report `C/R` and `(C − R)/R` as decimal fractions. When `R = 0`, both ratios
+   are unavailable. The account is still adequate, shortfall is zero and
+   monetary excess equals `C`. A ratio displayed as `1.0` can coexist with a
+   one-cent shortfall on a large balance.
+   [Money comparison and ratio rules](../core-conventions/012-money-decimal-precision.md).
+3. **Report static, signed funding cost.** Require a nonnegative funded posted
+   balance, signed Decimal annual funding and collateral rates on the same basis,
+   and an explicit nonnegative year fraction for period cost. Annual cost is
+   `balance × (funding rate − collateral rate)`. Period cost scales that amount
+   by the year fraction using checked Money. Positive cost is an expense and
+   negative cost is a benefit. Dated expected margin profiles, discounting and
+   reuse belong to the valuation model. [Green and Kenyon on MVA](https://arxiv.org/abs/1405.0508).
+4. **Define `Haircut01` as the reduction in collateral credit.** Replace
+   `pv_change` with `credit_reduction`. Holding gross value, FX and eligibility
+   fixed, a full positive one-basis-point increase reduces credit by
+   `gross value × 0.0001`. Validate total haircut in `[0, 1]` and report it in
+   basis points without whole-basis-point rounding. The full step is available
+   through `99.99%`. Above that, the reduction is unavailable. An admissible
+   step on 100 million of gross collateral reduces credit by 10,000.
+   [Collateral valuation formula](15-collateral-eligibility-and-haircuts.md#accepted-decision-for-checked-collateral-eligibility-and-credited-value) ·
+   [EU collateral haircut formula, Annex II](https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX%3A02016R2251-20230214).
+5. **Restore results from validated inputs.** Use one checked Rust calculation
+   for construction and restoration. Persist primitive inputs and reject supplied
+   derived fields in restorable state. Expose derived values through Rust accessors
+   in Python, WASM and reports. Preserve exact Money outputs and distinguish
+   unavailable diagnostics from zero and from input or arithmetic errors.
+   Record 022 owns the wire format. [Wire and provenance](22-wire-tables-and-provenance.md#accepted-decision-for-checked-margin-tables-wire-state-and-provenance).
 
 ## Choice and rationale
 
-Observed: these are deterministic reporting metrics, not pricing engines or dynamic XVA. Proposed rationale: expose transparent monetary/ratio diagnostics with explicit currency handling.
+These metrics describe one observed balance, funding spread or collateral mark. The accepted contract uses exact monetary comparisons and gives each optional ratio or haircut change its own availability rule.
 
 ## Input domain and conventions
 
@@ -28,11 +66,11 @@ Money operations provide currency/finite arithmetic failure behavior, but only u
 
 ## Alternatives and tradeoffs
 
-Optional ratios would avoid infinity and 0/0 conventions but change reporting. Curve-discounted funding over dated margin profiles belongs to XVA/MVA; numerical haircut bumps would include nonlinear eligibility/price effects omitted from this linear diagnostic.
+The accepted ratios require a positive denominator. Dynamic funding valuation and collateral repricing under changed prices, FX or eligibility belong to the relevant valuation methods.
 
 ## Source and validation evidence
 
-Inspected metric tests check12m/10m=1.2,8m/10m shortfall2m,105m-100m=5m,50m×20bp=100k, and 100m×1bp=10k. A zero-requirement JSON roundtrip is an invariant check; none establishes dynamic funding cost accuracy.
+Inspected metric tests cover 12 million over 10 million (1.2), an 8 million balance against a 10 million requirement (2 million shortfall), 5 million of excess on a 100 million requirement, 100,000 of annual cost at 20 bp on 50 million, and a 10,000 reduction for one bp on 100 million. The observed zero-requirement JSON roundtrip checks state restoration. Dynamic funding valuation requires separate evidence.
 
 Implementation and data: [src/metrics/mod.rs](../../../../finstack-quant/margin/src/metrics/mod.rs), [src/schema.rs](../../../../finstack-quant/margin/src/schema.rs).
 
@@ -40,5 +78,5 @@ Existing evidence: [src/metrics/mod.rs](../../../../finstack-quant/margin/src/me
 
 ## Follow-up tracking
 
-Adoption, implementation reconciliation and qualification work is tracked in the
+Implementation reconciliation and qualification work is tracked in the
 [collateral and initial-margin register](../FOLLOW_UPS.md#margin-collateral-and-initial-margin).

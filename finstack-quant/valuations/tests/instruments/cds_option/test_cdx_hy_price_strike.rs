@@ -227,13 +227,17 @@ fn expiry_boundary_and_missing_curves_fail_or_degrade_explicitly() {
     );
 
     // Missing hazard curve: explicit error.
-    let no_hazard = MarketContext::new().insert(flat_discount("USD-OIS", as_of, 0.03));
+    let no_hazard = MarketContext::new()
+        .try_insert(flat_discount("USD-OIS", as_of, 0.03))
+        .expect("insert market curve");
     option
         .value(&no_hazard, as_of)
         .expect_err("missing hazard curve must fail");
 
     // Missing discount curve: explicit error.
-    let no_discount = MarketContext::new().insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02));
+    let no_discount = MarketContext::new()
+        .try_insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02))
+        .expect("insert market curve");
     option
         .value(&no_discount, as_of)
         .expect_err("missing discount curve must fail");

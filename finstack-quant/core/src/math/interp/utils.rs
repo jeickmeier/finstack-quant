@@ -71,6 +71,8 @@ pub(super) fn classify_value_query(
     Ok(BoundaryDecision::Interior)
 }
 
+/// True for equal finite binary64 values, treating signed zeros as equal.
+/// Adjacent representable values remain distinct for exact knot and endpoint tests.
 #[inline]
 pub(crate) fn exact_f64_eq(a: f64, b: f64) -> bool {
     a.is_finite() && b.is_finite() && (a.to_bits() == b.to_bits() || (a == 0.0 && b == 0.0))

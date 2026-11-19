@@ -39,7 +39,7 @@ fn debt(flows: Vec<CashFlow>) -> ScheduleInstrument {
 }
 
 fn months(range: &str) -> Vec<Period> {
-    build_periods(range, None).expect("periods").periods
+    build_periods(range, None).expect("periods").into_periods()
 }
 
 /// The record's example: a USD 100 liability extinguished on March 31 is a

@@ -18,7 +18,7 @@
 //!
 //! Point samples use piecewise linear interpolation. Interval forward variances
 //! use piecewise constant interpolation so their integrated areas are preserved.
-//! Both representations extrapolate flat at their boundaries.
+//! Both representations extend flat within the nonnegative model-time domain.
 //!
 //! # References
 //!
@@ -38,14 +38,14 @@
 /// not perform market calibration.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(try_from = "RawForwardVarianceCurve")]
+#[serde(try_from = "RawForwardVarianceCurve", deny_unknown_fields)]
 #[cfg_attr(feature = "json-schema", schemars(!try_from))]
 pub struct ForwardVarianceCurve {
     /// Interpolation contract used by the constructor.
     interpolation: Interpolation,
     /// Point times or interval ends (strictly increasing year fractions).
     times: Vec<f64>,
-    /// Point samples or constant interval variances (all > 0).
+    /// Point samples or constant interval variances (all nonnegative).
     values: Vec<f64>,
 }
 
@@ -84,10 +84,7 @@ impl TryFrom<RawForwardVarianceCurve> for ForwardVarianceCurve {
             )));
         }
         let points: Vec<(f64, f64)> = raw.times.into_iter().zip(raw.values).collect();
-        match raw.interpolation {
-            Interpolation::Linear => ForwardVarianceCurve::from_points(&points),
-            Interpolation::ConstantIntervals => ForwardVarianceCurve::from_intervals(&points),
-        }
+        Self::from_samples(&points, raw.interpolation)
     }
 }
 
@@ -96,33 +93,22 @@ impl ForwardVarianceCurve {
     ///
     /// # Arguments
     ///
-    /// * `v0` - Finite, strictly positive annualized variance in decimal units
+    /// * `v0` - Finite, nonnegative annualized variance in decimal units
     ///   (for example, 0.04 corresponds to 20% annualized volatility).
     ///
     /// # Errors
     ///
-    /// Returns an error if `v0` is not positive.
+    /// Returns an error if `v0` is negative or non-finite.
     pub fn flat(v0: f64) -> crate::Result<Self> {
-        if !v0.is_finite() || v0 <= 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "ForwardVarianceCurve: flat variance must be positive, got {v0}"
-            )));
-        }
-        Ok(Self {
-            interpolation: Interpolation::Linear,
-            times: vec![0.0],
-            values: vec![v0],
-        })
+        Self::from_points(&[(0.0, v0)])
     }
 
     /// Creates a forward variance curve from (time, forward_variance) pairs.
     ///
-    /// Points are sorted by time internally before validation.
-    ///
     /// # Arguments
     ///
     /// * `points` - Nonempty `(time, variance)` samples. Times are finite,
-    ///   nonnegative year fractions; variances are finite, strictly positive,
+    ///   nonnegative, strictly increasing year fractions; variances are finite, nonnegative,
     ///   annualized decimal variances. Duplicate times are rejected. Values
     ///   interpolate linearly between samples and extrapolate flat.
     ///
@@ -131,49 +117,10 @@ impl ForwardVarianceCurve {
     /// Returns an error if:
     /// - `points` is empty
     /// - any time is negative
-    /// - times are not strictly increasing (after sorting)
-    /// - any forward variance value is not positive
+    /// - times are not strictly increasing in the supplied order
+    /// - any variance is negative or non-finite
     pub fn from_points(points: &[(f64, f64)]) -> crate::Result<Self> {
-        if points.is_empty() {
-            return Err(crate::Error::Validation(
-                "ForwardVarianceCurve: at least one point is required".to_string(),
-            ));
-        }
-
-        let mut sorted: Vec<(f64, f64)> = points.to_vec();
-        sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
-
-        let mut times = Vec::with_capacity(sorted.len());
-        let mut values = Vec::with_capacity(sorted.len());
-
-        for (i, &(t, v)) in sorted.iter().enumerate() {
-            if !t.is_finite() || t < 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "ForwardVarianceCurve: time must be >= 0, got {t} at index {i}"
-                )));
-            }
-            if i > 0 && t <= times[i - 1] {
-                return Err(crate::Error::Validation(format!(
-                    "ForwardVarianceCurve: times must be strictly increasing, \
-                     got {} then {t} at index {i}",
-                    times[i - 1]
-                )));
-            }
-            if !v.is_finite() || v <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "ForwardVarianceCurve: forward variance must be positive, \
-                     got {v} at time {t}"
-                )));
-            }
-            times.push(t);
-            values.push(v);
-        }
-
-        Ok(Self {
-            interpolation: Interpolation::Linear,
-            times,
-            values,
-        })
+        Self::from_samples(points, Interpolation::Linear)
     }
 
     /// Creates a piecewise constant curve from interval forward variances.
@@ -186,27 +133,58 @@ impl ForwardVarianceCurve {
     ///
     /// * `intervals` - Nonempty `(end_time, variance)` pairs in strictly increasing
     ///   end-time order. The first interval starts at zero; every end is a finite,
-    ///   positive year fraction. Variances are finite, strictly positive,
+    ///   positive year fraction. Variances are finite, nonnegative,
     ///   annualized decimal variances. The last variance extrapolates flat beyond
-    ///   the final end, and the first variance extrapolates to negative times.
+    ///   the final end.
     ///
     /// # Errors
     ///
     /// Returns an error for empty input, invalid times or variances, or unordered
     /// interval ends. Inputs are not sorted because order defines interval areas.
     pub fn from_intervals(intervals: &[(f64, f64)]) -> crate::Result<Self> {
-        let mut previous = 0.0;
-        for &(end, _) in intervals {
-            if !end.is_finite() || end <= previous {
+        Self::from_samples(intervals, Interpolation::ConstantIntervals)
+    }
+
+    fn from_samples(points: &[(f64, f64)], interpolation: Interpolation) -> crate::Result<Self> {
+        if points.is_empty() {
+            return Err(crate::Error::Validation(
+                "ForwardVarianceCurve: at least one point is required".to_string(),
+            ));
+        }
+
+        let mut times = Vec::with_capacity(points.len());
+        let mut values = Vec::with_capacity(points.len());
+        for (i, &(t, v)) in points.iter().enumerate() {
+            if !t.is_finite()
+                || t < 0.0
+                || (matches!(interpolation, Interpolation::ConstantIntervals) && t == 0.0)
+            {
                 return Err(crate::Error::Validation(format!(
-                    "ForwardVarianceCurve: interval ends must increase strictly from zero, got {end} after {previous}"
+                    "ForwardVarianceCurve: invalid time {t} at index {i} for {interpolation:?}"
                 )));
             }
-            previous = end;
+            if i > 0 && t <= times[i - 1] {
+                return Err(crate::Error::Validation(format!(
+                    "ForwardVarianceCurve: times must be strictly increasing, \
+                     got {} then {t} at index {i}",
+                    times[i - 1]
+                )));
+            }
+            if !v.is_finite() || v < 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "ForwardVarianceCurve: forward variance must be finite and nonnegative, \
+                     got {v} at time {t}"
+                )));
+            }
+            times.push(t);
+            values.push(v);
         }
-        let mut curve = Self::from_points(intervals)?;
-        curve.interpolation = Interpolation::ConstantIntervals;
-        Ok(curve)
+
+        Ok(Self {
+            interpolation,
+            times,
+            values,
+        })
     }
 
     /// Evaluates the forward variance ξ₀(t) at time `t`.
@@ -216,45 +194,34 @@ impl ForwardVarianceCurve {
     ///
     /// # Arguments
     ///
-    /// * `t` - Evaluation time in year fractions. Nonfinite times return NaN.
-    pub fn value(&self, t: f64) -> f64 {
-        debug_assert!(!self.times.is_empty());
-        if !t.is_finite() {
-            return f64::NAN;
+    /// * `t` - Finite, nonnegative time in years from the curve's origin.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a negative or non-finite query time.
+    pub fn get_value(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() || t < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "forward variance requires finite nonnegative time, got {t}"
+            )));
         }
-
-        let n = self.times.len();
-
+        let right = self.times.partition_point(|&time| time <= t);
+        let last = self.times.len() - 1;
         if matches!(self.interpolation, Interpolation::ConstantIntervals) {
-            let i = self.times.partition_point(|&end| end <= t).min(n - 1);
-            return self.values[i];
+            return Ok(self.values[right.min(last)]);
         }
-
-        // Flat extrapolation at boundaries
-        if t <= self.times[0] {
-            return self.values[0];
+        if right == 0 {
+            return Ok(self.values[0]);
         }
-        if t >= self.times[n - 1] {
-            return self.values[n - 1];
+        let left = right - 1;
+        if left == last || crate::math::interp::exact_f64_eq(self.times[left], t) {
+            return Ok(self.values[left]);
         }
-
-        // Find the interval [times[i], times[i+1]] containing t
-        // Binary search: find rightmost index where times[i] <= t
-        let i = match self
-            .times
-            .binary_search_by(|x| x.partial_cmp(&t).unwrap_or(std::cmp::Ordering::Equal))
-        {
-            Ok(idx) => return self.values[idx], // exact knot hit
-            Err(idx) => idx - 1,                // t is between idx-1 and idx
-        };
-
-        let t0 = self.times[i];
-        let t1 = self.times[i + 1];
-        let v0 = self.values[i];
-        let v1 = self.values[i + 1];
-
-        let w = (t - t0) / (t1 - t0);
-        v0 + w * (v1 - v0)
+        crate::math::interp::LinearStrategy::interpolate_segment(
+            (self.times[left], self.values[left]),
+            (self.times[right], self.values[right]),
+            t,
+        )
     }
 }
 
@@ -265,32 +232,53 @@ mod tests {
     const TOL: f64 = 1e-12;
 
     #[test]
+    fn preserves_subnormal_blends_and_zero_intervals() {
+        let m = f64::from_bits(1);
+        let curve = ForwardVarianceCurve::from_points(&[(0.0, m), (1.0, 2.0 * m)]).unwrap();
+        assert_eq!(curve.get_value(0.5).unwrap(), 2.0 * m);
+        let wide = ForwardVarianceCurve::from_points(&[(0.0, 0.0), (f64::MAX, f64::MAX)]).unwrap();
+        assert_eq!(wide.get_value(0.125).unwrap(), 0.125);
+        let intervals = ForwardVarianceCurve::from_intervals(&[(0.25, 0.0), (1.0, 0.12)]).unwrap();
+        assert_eq!(intervals.get_value(0.0).unwrap(), 0.0);
+        assert_eq!(intervals.get_value(0.25).unwrap(), 0.12);
+        assert!(intervals.get_value(-1.0).is_err());
+        for mode in ["linear", "constant_intervals"] {
+            assert!(
+                serde_json::from_value::<ForwardVarianceCurve>(serde_json::json!({
+                    "interpolation": mode, "times": [2.0, 1.0], "values": [0.2, 0.1]
+                }))
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
     fn flat_curve_value() {
         let c = ForwardVarianceCurve::flat(0.04).unwrap();
-        assert!((c.value(0.0) - 0.04).abs() < TOL);
-        assert!((c.value(1.0) - 0.04).abs() < TOL);
-        assert!((c.value(10.0) - 0.04).abs() < TOL);
+        assert!((c.get_value(0.0).unwrap() - 0.04).abs() < TOL);
+        assert!((c.get_value(1.0).unwrap() - 0.04).abs() < TOL);
+        assert!((c.get_value(10.0).unwrap() - 0.04).abs() < TOL);
     }
 
     #[test]
     fn interval_variances_are_right_continuous_step_values() {
         let curve = ForwardVarianceCurve::from_intervals(&[(0.25, 0.04), (1.0, 0.12), (1.5, 0.02)])
             .unwrap();
-        assert_eq!(curve.value(0.0), 0.04);
-        assert_eq!(curve.value(0.25), 0.12);
-        assert_eq!(curve.value(1.0), 0.02);
-        assert_eq!(curve.value(3.0), 0.02);
+        assert_eq!(curve.get_value(0.0).unwrap(), 0.04);
+        assert_eq!(curve.get_value(0.25).unwrap(), 0.12);
+        assert_eq!(curve.get_value(1.0).unwrap(), 0.02);
+        assert_eq!(curve.get_value(3.0).unwrap(), 0.02);
     }
 
     #[test]
-    fn intervals_require_ordered_positive_ends_and_positive_variance() {
+    fn intervals_require_ordered_positive_ends_and_nonnegative_variance() {
         for intervals in [
             vec![],
             vec![(0.0, 0.04)],
             vec![(1.0, 0.04), (0.5, 0.12)],
             vec![(0.5, 0.04), (0.5, 0.12)],
             vec![(f64::NAN, 0.04)],
-            vec![(1.0, 0.0)],
+            vec![(1.0, -0.01)],
             vec![(1.0, f64::INFINITY)],
         ] {
             assert!(ForwardVarianceCurve::from_intervals(&intervals).is_err());
@@ -308,7 +296,10 @@ mod tests {
             let restored: ForwardVarianceCurve =
                 serde_json::from_value(serialized.clone()).unwrap();
             for time in [0.0, 0.25, 0.5, 1.0, 2.0] {
-                assert_eq!(restored.value(time), curve.value(time));
+                assert_eq!(
+                    restored.get_value(time).unwrap(),
+                    curve.get_value(time).unwrap()
+                );
             }
             let mut unknown = serialized;
             unknown["unknown_field"] = serde_json::json!(true);
@@ -328,24 +319,30 @@ mod tests {
         let c = ForwardVarianceCurve::from_points(&[(1.0, 0.04), (3.0, 0.08)]).unwrap();
 
         // Flat extrapolation left
-        assert!((c.value(0.0) - 0.04).abs() < TOL);
-        assert!((c.value(0.5) - 0.04).abs() < TOL);
+        assert!((c.get_value(0.0).unwrap() - 0.04).abs() < TOL);
+        assert!((c.get_value(0.5).unwrap() - 0.04).abs() < TOL);
 
         // At knots
-        assert!((c.value(1.0) - 0.04).abs() < TOL);
-        assert!((c.value(3.0) - 0.08).abs() < TOL);
+        assert!((c.get_value(1.0).unwrap() - 0.04).abs() < TOL);
+        assert!((c.get_value(3.0).unwrap() - 0.08).abs() < TOL);
 
         // Linear interpolation: midpoint at t=2.0
-        assert!((c.value(2.0) - 0.06).abs() < TOL);
+        assert!((c.get_value(2.0).unwrap() - 0.06).abs() < TOL);
 
         // Flat extrapolation right
-        assert!((c.value(5.0) - 0.08).abs() < TOL);
+        assert!((c.get_value(5.0).unwrap() - 0.08).abs() < TOL);
     }
 
     #[test]
     fn validation_rejects_negative_variance() {
         assert!(ForwardVarianceCurve::flat(-0.01).is_err());
-        assert!(ForwardVarianceCurve::flat(0.0).is_err());
+        assert_eq!(
+            ForwardVarianceCurve::flat(0.0)
+                .unwrap()
+                .get_value(1.0)
+                .unwrap(),
+            0.0
+        );
         assert!(ForwardVarianceCurve::from_points(&[(0.0, -0.01)]).is_err());
     }
 
@@ -358,7 +355,8 @@ mod tests {
     fn validation_rejects_non_monotonic_times() {
         // Duplicate times
         assert!(ForwardVarianceCurve::from_points(&[(1.0, 0.04), (1.0, 0.05)]).is_err());
-        // Reversed after sort still duplicates
+        assert!(ForwardVarianceCurve::from_points(&[(2.0, 0.04), (1.0, 0.05)]).is_err());
+        // Reject both a reversal and a duplicate.
         assert!(
             ForwardVarianceCurve::from_points(&[(2.0, 0.04), (1.0, 0.05), (1.0, 0.06)]).is_err()
         );
@@ -370,13 +368,15 @@ mod tests {
     }
 
     #[test]
-    fn validation_rejects_non_finite_data_and_queries_propagate_nan() {
+    fn validation_rejects_invalid_data_and_queries() {
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(ForwardVarianceCurve::flat(value).is_err());
             assert!(ForwardVarianceCurve::from_points(&[(value, 0.04)]).is_err());
             assert!(ForwardVarianceCurve::from_points(&[(1.0, value)]).is_err());
         }
         let curve = ForwardVarianceCurve::flat(0.04).unwrap();
-        assert!(curve.value(f64::NAN).is_nan());
+        for t in [f64::NAN, f64::NEG_INFINITY, f64::INFINITY, -0.01] {
+            assert!(curve.get_value(t).is_err());
+        }
     }
 }

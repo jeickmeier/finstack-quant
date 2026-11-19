@@ -36,8 +36,9 @@
 //!         out[0] = 0.0;
 //!     }
 //!
-//!     fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+//!     fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
 //!         out[0] = 0.0;
+//!         Ok(())
 //!     }
 //!
 //!     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
@@ -109,7 +110,11 @@ pub trait RandomStream: Clone + Send + Sync {
     /// Fill a buffer with standard normal random numbers N(0,1).
     ///
     /// Implementations may use Box-Muller, inverse CDF, or other transforms.
-    fn fill_std_normals(&mut self, out: &mut [f64]);
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Caller-owned standard normal buffer. Discard its contents on error.
+    fn fill_std_normals(&mut self, out: &mut [f64]) -> finstack_quant_core::Result<()>;
 
     /// Generate a single uniform random number in the open interval (0, 1).
     fn next_u01(&mut self) -> f64 {
@@ -119,10 +124,10 @@ pub trait RandomStream: Clone + Send + Sync {
     }
 
     /// Generate a single standard normal random number.
-    fn next_std_normal(&mut self) -> f64 {
+    fn next_std_normal(&mut self) -> finstack_quant_core::Result<f64> {
         let mut buf = [0.0];
-        self.fill_std_normals(&mut buf);
-        buf[0]
+        self.fill_std_normals(&mut buf)?;
+        Ok(buf[0])
     }
 
     /// Returns whether this RNG supports stream splitting for parallel execution.
@@ -466,7 +471,7 @@ pub trait StochasticProcess: Send + Sync {
     /// * `t` - Time in years
     /// * `x` - Current state vector (length = dim)
     /// * `out` - Output diffusion vector/matrix
-    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]);
+    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()>;
 
     /// Optional factor correlation matrix (`num_factors × num_factors`, row-major).
     ///
@@ -634,8 +639,25 @@ pub trait ProportionalDiffusion: StochasticProcess {}
 /// * `z` - Standard normal shocks (length = num_factors)
 /// * `work` - Workspace buffer for intermediate calculations
 pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
-    /// Advance state from t to t + dt.
-    fn step(&self, process: &P, t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]);
+    /// Advance one simulation interval and propagate model evaluation failures.
+    ///
+    /// # Arguments
+    ///
+    /// * `process` - Stochastic dynamics whose coefficients drive the step.
+    /// * `t` - Left endpoint in years on the process clock.
+    /// * `dt` - Length of the interval in model years.
+    /// * `x` - Current state, overwritten with the next state on success.
+    /// * `z` - Innovations in the scheme's documented factor order.
+    /// * `work` - Per-path scratch and history of size [`Self::work_size`].
+    fn step(
+        &self,
+        process: &P,
+        t: f64,
+        dt: f64,
+        x: &mut [f64],
+        z: &[f64],
+        work: &mut [f64],
+    ) -> finstack_quant_core::Result<()>;
 
     /// Precompute per-run constants that depend on the process and the time
     /// grid but not on the simulated path.

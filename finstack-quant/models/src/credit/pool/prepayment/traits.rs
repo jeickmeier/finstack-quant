@@ -109,7 +109,7 @@ pub trait StochasticPrepayment: Send + Sync + std::fmt::Debug {
     ///
     /// * `seasoning` - Months since origination at which to average monthly
     ///   prepayment, including the latent regime distribution where present.
-    fn expected_smm(&self, seasoning: u32) -> f64;
+    fn expected_smm(&self, seasoning: u32) -> finstack_quant_core::Result<f64>;
 
     /// Factor loading for correlation calculation.
     ///
@@ -183,8 +183,8 @@ mod tests {
             (shocked * burnout).clamp(0.0, 1.0)
         }
 
-        fn expected_smm(&self, _seasoning: u32) -> f64 {
-            self.base_smm
+        fn expected_smm(&self, _seasoning: u32) -> finstack_quant_core::Result<f64> {
+            Ok(self.base_smm)
         }
 
         fn factor_loading(&self) -> f64 {

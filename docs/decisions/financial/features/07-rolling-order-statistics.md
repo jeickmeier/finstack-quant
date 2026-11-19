@@ -1,14 +1,22 @@
 # FEATURES-007: Rolling ranks, Type-7 quantiles and quantile winsorization
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Inclusive windows, lowest-position ranking, and winsorization are implemented. Checked Type-7 evaluation and boundary qualification remain open.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Independent arithmetic checked a tied rank, median, and winsorized value. Rust fixtures were inspected. Boundary and cross-host qualification remain open.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. All three operations use inclusive trailing row windows with at least min_periods finite observations. Rolling rank requires a finite current value. Divide its lowest tied zero-based position by n−1. A singleton or all-equal window gives zero. A missing current value gives missing.
+2. Use checked Type-7 quantiles with median as the default. A missing current value can receive a quantile if the window has enough eligible observations. [Shared quantiles](04-scaled-statistics-and-quantiles.md).
+3. Winsorize a finite current value against the same window's Type-7 bounds. Default to probabilities 0.01 and 0.99, and require 0 ≤ lower ≤ upper ≤ 1. Equal bounds select one quantile. Reapplication recomputes the bounds and can change the result.
+
+For [1, 9, 9], the final 9 has rank 0.5, the median is 9, and winsorizing with the 25th percentile as upper bound gives 5.
+
+## Observed scope and selection
 
 `RollingRank`, `RollingQuantile` and `RollingWinsorize` share trailing row windows with positive `window` and `min_periods` defaults 1/window. Quantile defaults to 0.5. Winsor limits default to lower=0.01, upper=0.99; probabilities must be in [0,1], with lower<=upper. Invalid parameters fail before any ready window, including empty data.
 
@@ -33,5 +41,5 @@ These are research transforms, not evidence of unbiased predictive signals.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

@@ -1144,7 +1144,9 @@ mod tests {
                 .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()?;
-            Ok(MarketContext::new().insert(curve))
+            Ok(MarketContext::new()
+                .try_insert(curve)
+                .expect("insert market curve"))
         };
         let market_t0 = market(as_of_t0, 0.04)?;
         let market_t1 = market(as_of_t1, 0.041)?;

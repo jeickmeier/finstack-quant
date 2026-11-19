@@ -228,22 +228,41 @@ pub(crate) fn solve(
             .with_max_iterations(config.solver.max_iterations());
 
         let res = match params.vol_convention {
-            SwaptionVolConvention::Normal => sabr_calibrator
-                .with_atm_pinning(true)
-                .calibrate(fwd_rate, &strikes, &vols, t_exp, 0.0),
-            SwaptionVolConvention::Lognormal => sabr_calibrator
-                .with_shift(SabrShift::None)
-                .calibrate(fwd_rate, &strikes, &vols, t_exp, params.sabr_beta),
+            SwaptionVolConvention::Normal => sabr_calibrator.with_atm_pinning(true).calibrate(
+                fwd_rate,
+                &strikes,
+                &vols,
+                t_exp,
+                params.sabr_beta,
+                VolQuoteType::Normal,
+            ),
+            SwaptionVolConvention::Lognormal => {
+                sabr_calibrator.with_shift(SabrShift::None).calibrate(
+                    fwd_rate,
+                    &strikes,
+                    &vols,
+                    t_exp,
+                    params.sabr_beta,
+                    VolQuoteType::BlackLognormal,
+                )
+            }
             SwaptionVolConvention::ShiftedLognormal { shift } => {
-                if !shift.is_finite() || shift <= 0.0 {
+                if !shift.is_finite() {
                     Err(finstack_quant_core::Error::Validation(format!(
-                        "Shifted lognormal convention requires a finite, positive shift; got {}",
+                        "Shifted lognormal convention requires a finite shift; got {}",
                         shift
                     )))
                 } else {
                     sabr_calibrator
                         .with_shift(SabrShift::Fixed(shift))
-                        .calibrate(fwd_rate, &strikes, &vols, t_exp, params.sabr_beta)
+                        .calibrate(
+                            fwd_rate,
+                            &strikes,
+                            &vols,
+                            t_exp,
+                            params.sabr_beta,
+                            VolQuoteType::ShiftedBlackLognormal,
+                        )
                 }
             }
         };
@@ -419,7 +438,12 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         &target_tenors,
         &cube_params,
         &cube_forwards,
-    )?;
+    )?
+    .with_expiry_clock(finstack_quant_core::dates::VolatilityClock::try_new(
+        params.base_date,
+        day_count,
+        Default::default(),
+    )?);
 
     // Acceptance must describe the artifact used by pricing. Resampling
     // onto target axes can discard a successfully calibrated smile.
@@ -459,13 +483,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                         finstack_quant_models::volatility::VolatilityConvention::Lognormal,
                     )
                 }
-            };
-            if !fitted.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "published swaption cube cannot evaluate quote '{}'",
-                    vol_quote.id()
-                )));
-            }
+            }?;
             residuals.insert(vol_quote.id().to_string(), fitted - vol);
         }
     }
@@ -1055,7 +1073,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let context = MarketContext::new().insert(discount);
+        let context = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve");
         let mut p = params(base);
         p.vol_convention = SwaptionVolConvention::Normal;
         p.sabr_beta = 0.0;
@@ -1246,7 +1266,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let expiry_years: f64 = 1.0;
         let tenor_years: f64 = 5.0;
@@ -1282,7 +1304,9 @@ mod tests {
 
         let mut quotes = Vec::new();
         for &k in &strikes {
-            let vol_dec = sabr_true.implied_vol(fwd, k, t_exp).expect("true vol");
+            let vol_dec = sabr_true
+                .implied_vol(fwd, k, t_exp, VolQuoteType::Normal)
+                .expect("true vol");
             quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
                 id: QuoteId::new(format!("USD-SWPTN-VOL-1Yx5Y-{k}")),
                 expiry: expiry_date,
@@ -1339,7 +1363,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let expiry_years: f64 = 1.0;
         let tenor_years: f64 = 5.0;
@@ -1347,6 +1373,11 @@ mod tests {
         p.vol_convention = match shift {
             Some(shift) => SwaptionVolConvention::ShiftedLognormal { shift },
             None => SwaptionVolConvention::Lognormal,
+        };
+        let quote_type = if shift.is_some() {
+            VolQuoteType::ShiftedBlackLognormal
+        } else {
+            VolQuoteType::BlackLognormal
         };
         p.sabr_beta = 0.5;
         p.vol_tolerance = Some(0.0020);
@@ -1377,7 +1408,9 @@ mod tests {
 
         let mut quotes = Vec::new();
         for &k in &strikes {
-            let vol_dec = sabr_true.implied_vol(fwd, k, t_exp).expect("true vol");
+            let vol_dec = sabr_true
+                .implied_vol(fwd, k, t_exp, quote_type)
+                .expect("true vol");
             quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
                 id: QuoteId::new(format!("USD-SWPTN-VOL-LN-1Yx5Y-{k}")),
                 expiry: expiry_date,
@@ -1407,7 +1440,9 @@ mod tests {
             finstack_quant_models::volatility::VolatilityConvention::Lognormal,
         )
         .expect("cube vol");
-        let true_atm = sabr_true.implied_vol(fwd, fwd, t_exp).expect("true atm");
+        let true_atm = sabr_true
+            .implied_vol(fwd, fwd, t_exp, quote_type)
+            .expect("true atm");
 
         assert!(
             (fitted_atm - true_atm).abs() <= 0.0005,
@@ -1420,6 +1455,7 @@ mod tests {
             t_ten,
             &strikes,
             finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+            finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
         )
         .expect("materialized cube");
         match shift {
@@ -1454,7 +1490,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         // --- Good bucket: 1Y x 5Y, five strikes. ---
         let good_expiry_years = 1.0_f64;
@@ -1496,7 +1534,7 @@ mod tests {
             good_fwd + 0.010,
         ] {
             let vol_dec = sabr_true
-                .implied_vol(good_fwd, k, good_t_exp)
+                .implied_vol(good_fwd, k, good_t_exp, VolQuoteType::BlackLognormal)
                 .expect("true vol");
             quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
                 id: QuoteId::new(format!("GOOD-1Yx5Y-{k}")),
@@ -1574,7 +1612,11 @@ mod tests {
             DayCount::Act365F,
         )
         .expect("forward curve");
-        let ctx = MarketContext::new().insert(disc).insert(fwd_curve);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd_curve)
+            .expect("insert market curve");
 
         let expiry_years: f64 = 1.0;
         let tenor_years: f64 = 5.0;
@@ -1644,7 +1686,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let p = params(base_date);
         let mut leg = default_leg_conventions(&p).expect("leg conventions");
@@ -1707,7 +1751,11 @@ mod tests {
                 finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
             )
             .expect("forward curve");
-        let ctx = MarketContext::new().insert(disc).insert(forward);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve");
 
         let mut p = params(base_date);
         p.forward_id = Some("USD-FWD".to_string());

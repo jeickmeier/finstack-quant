@@ -810,6 +810,7 @@ fn order_independence_fixed_spec() -> FixedCouponSpec {
 fn order_independence_float_spec() -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: dec!(200),
             gearing: Decimal::ONE,

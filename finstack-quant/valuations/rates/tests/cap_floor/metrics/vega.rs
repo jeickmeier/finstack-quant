@@ -95,8 +95,10 @@ fn test_cap_vega_positive() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = cap
@@ -152,8 +154,10 @@ fn test_floor_vega_positive() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = floor
@@ -184,8 +188,10 @@ fn test_atm_vega_higher_than_otm() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let otm_vega = *otm_cap
@@ -233,8 +239,10 @@ fn test_vega_scales_with_maturity() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let short_vega = *short_cap
@@ -287,8 +295,10 @@ fn test_hull_white_1f_market_and_sigma_vegas_are_distinct() {
     .expect("valid quote convention");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let opts = finstack_quant_valuations_core::instruments::PricingOptions::default()
@@ -378,8 +388,10 @@ fn test_hull_white_1f_pricing_does_not_sample_vol_surface() {
     )
     .expect("valid quote convention");
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
     let shocked_market = market
         .bump([MarketBump::VolSurface {
@@ -424,8 +436,10 @@ fn test_vega_reasonable_magnitude() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = cap

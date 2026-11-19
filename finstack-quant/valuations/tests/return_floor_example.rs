@@ -94,7 +94,9 @@ fn build_floored_loan() -> Bond {
 fn return_floor_loan_prices_successfully() {
     let as_of = date!(2025 - 01 - 01);
     let loan = build_floored_loan();
-    let market = MarketContext::new().insert(flat_curve("USD-OIS", 0.06, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.06, as_of))
+        .expect("insert market curve");
 
     let pv = loan
         .value(&market, as_of)
@@ -121,7 +123,9 @@ fn return_floor_loan_prices_successfully() {
 fn return_floor_metrics_are_sane() {
     let as_of = date!(2025 - 01 - 01);
     let loan = build_floored_loan();
-    let market = MarketContext::new().insert(flat_curve("USD-OIS", 0.06, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.06, as_of))
+        .expect("insert market curve");
 
     // Request all four return metrics in a single call.
     let result = loan
@@ -207,7 +211,9 @@ fn min_moic_shortcut_equivalent_to_explicit_full_window_spec() {
     let as_of = date!(2025 - 01 - 01);
     let issue = date!(2025 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
-    let market = MarketContext::new().insert(flat_curve("USD-OIS", 0.06, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", 0.06, as_of))
+        .expect("insert market curve");
 
     // Shortcut: .min_moic(1.25) → ProtectionWindow::Full
     let loan_shortcut = Bond::fixed(

@@ -155,10 +155,10 @@ fn daily_grid(start: Date, end: Date, calendar_id: &str, denominator: f64) -> Ve
 fn raw_rate(
     market: &MarketContext,
     as_of: Date,
+    index_id: &str,
     forward_id: Option<&str>,
     observation: &Observation,
 ) -> f64 {
-    let index_id = forward_id.unwrap_or("USD-OIS");
     if observation.start < as_of {
         return market
             .get_series(format!("FIXING:{index_id}"))
@@ -200,6 +200,7 @@ fn raw_rate(
 fn product(
     market: &MarketContext,
     as_of: Date,
+    index_id: &str,
     forward_id: Option<&str>,
     observations: &[Observation],
     compounded_spread: f64,
@@ -207,11 +208,11 @@ fn product(
     let mut factor = 1.0;
     let mut fixings = Vec::new();
     for observation in observations {
-        let rate = raw_rate(market, as_of, forward_id, observation);
+        let rate = raw_rate(market, as_of, index_id, forward_id, observation);
         assert!(rate.is_finite());
         factor *= 1.0 + (rate + compounded_spread) * observation.factor_alpha;
         fixings.push(ProjectedFixing {
-            series_id: format!("FIXING:{}", forward_id.unwrap_or("USD-OIS")),
+            series_id: format!("FIXING:{index_id}"),
             date: observation.start,
             value: Some(rate),
         });
@@ -226,7 +227,14 @@ fn coupon_oracle(
     forward_id: Option<&str>,
     grid: CouponGrid,
 ) -> CouponOracle {
-    let (factor, fixings) = product(market, as_of, forward_id, &grid.observations, 0.0);
+    let (factor, fixings) = product(
+        market,
+        as_of,
+        swap.float_leg.index_id.as_str(),
+        forward_id,
+        &grid.observations,
+        0.0,
+    );
     let spread = swap.float_leg.spread_bp.to_f64().unwrap() * 1e-4;
     let curve = market.get_discount("USD-OIS").unwrap();
     let discount = curve.df_on_date(grid.payment).unwrap() / curve.df_on_date(as_of).unwrap();
@@ -512,7 +520,7 @@ fn history_market(
     }
     market.clone().insert_series(
         ScalarTimeSeries::new(
-            format!("FIXING:{}", float.forward_curve_id),
+            format!("FIXING:{}", float.index_id),
             observations.into_iter().collect(),
             None,
             finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
@@ -627,7 +635,15 @@ fn suffix_oracle(
             .iter()
             .take_while(|observation| observation.start < as_of);
         let mut factor = historical.fold(1.0, |product, observation| {
-            product * (1.0 + raw_rate(market, as_of, None, observation) * observation.factor_alpha)
+            product
+                * (1.0
+                    + raw_rate(
+                        market,
+                        as_of,
+                        swap.float_leg.index_id.as_str(),
+                        None,
+                        observation,
+                    ) * observation.factor_alpha)
         });
         if let Some(first_future) = coupon
             .grid
@@ -874,7 +890,10 @@ fn ois_control_explicit_forward_sources_match_manual_products() {
         ("explicit_forward", explicit),
         ("discount_derived_forward", derived),
     ] {
-        let market = base.clone().insert(forward);
+        let market = base
+            .clone()
+            .try_insert(forward)
+            .expect("insert market curve");
         assert!(market.get_forward("USD-OIS").is_err());
         assert_eq!(
             market.get_forward("USD-SOFR-OIS").unwrap().base_date(),
@@ -1013,8 +1032,14 @@ fn ois_control_compounded_spread_stays_on_daily_projection() {
     let swap = benchmark_swap(1);
     let oracle = full_oracle(&swap, &market, as_of, None, "usny", 360.0);
     let grid = &oracle.coupons[0].grid;
-    let (expected_factor, expected_fixings) =
-        product(&market, as_of, None, &grid.observations, 0.001);
+    let (expected_factor, expected_fixings) = product(
+        &market,
+        as_of,
+        swap.float_leg.index_id.as_str(),
+        None,
+        &grid.observations,
+        0.001,
+    );
     let expected_rate = (expected_factor - 1.0) / grid.alpha;
     let curve = market.get_discount("USD-OIS").unwrap();
     let calendar = calendar_by_id_strict("usny").unwrap();
@@ -1143,16 +1168,18 @@ fn ois_control_holiday_adjusted_spread_matches_full_export() {
     swap.float_leg.stub = StubKind::ShortFront;
     swap.float_leg.spread_bp = dec!(100);
     swap.validate().unwrap();
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (2.0, 1.0)])
-            .interp(InterpStyle::Linear)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (2.0, 1.0)])
+                .interp(InterpStyle::Linear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
     let oracle = full_oracle(&swap, &market, as_of, None, "usny", 360.0);
     assert_eq!(oracle.coupons.len(), 1);
     assert_eq!(oracle.fixed_rows.len(), 1);
@@ -1221,16 +1248,18 @@ fn ois_control_act365l_preserves_full_coupon_context() {
     swap.float_leg.fixing_calendar_id = Some("weekends_only".into());
     swap.float_leg.day_count = DayCount::Act365L;
     swap.validate().unwrap();
-    let base = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(origin)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-            .interp(InterpStyle::Linear)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let base = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(origin)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                .interp(InterpStyle::Linear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
     let full_grid = daily_grid(origin, end, "weekends_only", 366.0);
     assert_eq!(full_grid.len(), 262);
     assert_eq!(
@@ -1257,17 +1286,19 @@ fn ois_control_act365l_preserves_full_coupon_context() {
                 fac /= 1.0 + 0.05 * dcf;
                 pts.push((item.end, fac));
             }
-            base.clone().insert(
-                ForwardCurve::from_dates(
-                    id,
-                    origin,
-                    &pts,
-                    DayCount::Act365F,
-                    InterpStyle::LogLinear,
-                    finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+            base.clone()
+                .try_insert(
+                    ForwardCurve::from_dates(
+                        id,
+                        origin,
+                        &pts,
+                        DayCount::Act365F,
+                        InterpStyle::LogLinear,
+                        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                    )
+                    .unwrap(),
                 )
-                .unwrap(),
-            )
+                .expect("insert market curve")
         } else {
             base.clone()
         };
@@ -1378,16 +1409,18 @@ fn ois_control_nonpositive_daily_accrual_preserves_errors() {
                 .unwrap(),
             0.0,
         );
-        let base = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(start)
-                .day_count(DayCount::Act365F)
-                .knots([(0.0, 1.0), (1.0, 0.96)])
-                .interp(InterpStyle::Linear)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .unwrap(),
-        );
+        let base = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(start)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, 0.96)])
+                    .interp(InterpStyle::Linear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .unwrap(),
+            )
+            .expect("insert market curve");
         let expected_error = format!(
             "Overnight observation has non-positive day-count fraction for {zero_start} -> {zero_end}"
         );
@@ -1493,16 +1526,18 @@ fn ois_control_calendar_range_exhaustion_preserves_errors() {
         finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound { id })
             if id.contains("equinox") && id.contains("9999")
     ));
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(start)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (1.0, 0.96)])
-            .interp(InterpStyle::Linear)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(start)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, 0.96)])
+                .interp(InterpStyle::Linear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
     assert!(market.get_forward("USD-OIS").is_err());
     let value_error = swap.value(&market, start).unwrap_err();
     let schedule_error = swap.cashflow_schedule(&market, start).unwrap_err();
@@ -1587,16 +1622,18 @@ fn ois_control_nonbusiness_minimum_date_preserves_success() {
         end
     );
 
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(start)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (1.0, 0.96)])
-            .interp(InterpStyle::Linear)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(start)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, 0.96)])
+                .interp(InterpStyle::Linear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
     assert!(market.get_forward("USD-OIS").is_err());
     let curve = market.get_discount("USD-OIS").unwrap();
     assert_eq!(curve.base_date(), start);

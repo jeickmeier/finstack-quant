@@ -137,8 +137,10 @@ pub fn build_market_context(as_of: Date, params: MarketParams) -> MarketContext 
     let fx_matrix = create_fx_matrix(params.spot);
 
     MarketContext::new()
-        .insert(disc_curve_usd)
-        .insert(disc_curve_eur)
+        .try_insert(disc_curve_usd)
+        .expect("insert market curve")
+        .try_insert(disc_curve_eur)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_fx(fx_matrix)
 }

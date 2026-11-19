@@ -1,10 +1,8 @@
 # ADR 0029: Rate-option selection by quotation and exercise
 
-**Decision status:** Draft — observed implementation; adoption and rationale
-pending agreement.
+**Decision status:** Accepted 2026-11-17 as the rate-option selection overview. The linked detailed decisions govern their respective pricing routes.
 
-**Implementation status:** Observed for vanilla cap/floor and swaption
-dispatch, including registered Hull-White and Bermudan alternatives.
+**Implementation status:** Cap/floor and swaption dispatch were inspected. Reconciliation to explicit model selection and the detailed contracts remains pending.
 
 **Validation status:** Evidence located, not rerun; independent reference and
 convergence coverage remain to be assessed.
@@ -13,19 +11,13 @@ convergence coverage remain to be assessed.
 
 **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
 
-## Decision awaiting adoption
+## Accepted decision
 
-The proposed rate-option selection boundary preserves declared volatility
-quotation and contractual exercise within explicitly scoped engine domains and
-acceptance criteria. A registry name alone does not always identify the formula:
-cap/floor `Black76` dispatches internally by quotation convention. This record
-does not adopt every factor model, calibration objective, settlement annuity or
-numerical default behind the selected route.
+1. Explicitly select Normal, unshifted or shifted Black76, or Hull–White for caps and floors. Analytic pricing requires a compatible volatility quote with the correct units, expiry, and shift. Remove the automatic cap/floor quote-family switch. [Cap/floor pricing](05-cap-floor-pricing.md#accepted-decision-for-checked-cap-and-floor-optionlet-pricing).
+2. Explicitly select the analytic quote law for European swaptions and use the annuity for the contractual settlement method. Hull–White tree pricing is a separate explicit election. [European swaptions](07-european-swaptions.md#accepted-decision-for-checked-european-swaption-pricing-and-risk).
+3. Explicitly select the Hull–White tree, Hull–White LSMC, or LMM Monte Carlo for Bermudan swaptions. Apply each engine's exercise and schedule requirements. LMM requires the admitted physical co-terminal contract and matching schedules, including at the valuation-origin exercise. [Hull–White exercise](08-hull-white-swaptions.md#accepted-decision-for-checked-hull-white-swaption-exercise-and-risk) · [LMM Bermudans](09-lmm-bermudans.md#accepted-decision-for-checked-lmm-bermudan-pricing-and-risk).
 
-Scope is European cash-settled caps/floors, European payer/receiver swaptions
-with supported settlement methods, and scheduled-exercise Bermudan swaptions.
-CMS, inflation options and futures options retain separate economics. Detailed
-owners below define exact admissibility, lifecycle and failure branches.
+This overview covers European cash-settled caps and floors, supported European payer and receiver swaptions, and scheduled-exercise Bermudan swaptions. Pricing, settlement, calibration, and numerical details are governed by the linked owners.
 
 ## Observed selection boundary
 
@@ -67,10 +59,7 @@ fitting choices without adopting the pricing adapters or their accuracy budgets.
 ## Rationale and material selection limits
 
 Source-documented rationale is to retain quote units in the shared volatility
-resolver and let European/Bermudan swaptions share the HW exercise model. The
-proposed adoption rationale is to make quotation and exercise explicit and
-reject unsupported combinations. Actual product gates and exceptions must be
-assessed before adopting that as a uniform contract.
+resolver and let European/Bermudan swaptions share the HW exercise model. Explicit selection keeps the volatility basis and exercise model visible and makes incompatible combinations fail.
 
 HW swaption paths are single-curve. Future-exercise LMM simulation has the
 narrower physical/co-terminal/matching-schedule gate in its detailed owner;
@@ -98,5 +87,5 @@ benchmarks were executed.
 
 ## Follow-up tracking
 
-Adoption, reconciliation and validation work is tracked in the
+Implementation reconciliation and independent qualification are tracked in the
 [scoped follow-up register](../FOLLOW_UPS.md#rates-valuations).

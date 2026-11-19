@@ -139,12 +139,12 @@ impl RateSpec {
                 if reset_date <= as_of {
                     match finstack_quant_core::market_data::fixings::get_fixing_series(
                         market,
-                        spec.forward_curve_id.as_str(),
+                        spec.index_id.as_str(),
                     ) {
                         Ok(fixings) => {
                             let raw = finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                 Some(fixings),
-                                spec.forward_curve_id.as_str(),
+                                spec.index_id.as_str(),
                                 reset_date,
                             )?;
                             return Ok(crate::builder::calculate_floating_rate(raw, &params));
@@ -241,6 +241,45 @@ mod tests {
     use time::Month;
 
     #[test]
+    fn past_coupon_uses_the_contractual_index_after_projection_curve_replacement() {
+        use finstack_quant_core::market_data::scalars::{
+            ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+        };
+        let start = Date::from_calendar_date(2025, Month::January, 2).expect("reset");
+        let end = Date::from_calendar_date(2025, Month::April, 2).expect("payment");
+        let observed = |index, rate| {
+            ScalarTimeSeries::new(
+                index,
+                vec![(start, rate)],
+                None,
+                SeriesInterpolation::Step,
+                SeriesExtrapolation::Error,
+            )
+            .expect("observed series")
+        };
+        let proxy_only = MarketContext::new().insert_series(observed("FIXING:PROXY", 0.05));
+        let market = proxy_only
+            .clone()
+            .insert_series(observed("FIXING:EUR-EURIBOR-3M", 0.04));
+        let mut spec = FloatingRateSpec::euribor_3m(Decimal::ZERO);
+        spec.index_id = "EUR-EURIBOR-3M".into();
+        spec.reset_lag_days = 0;
+        for projection in ["EUR-EURIBOR-3M", "PROXY"] {
+            spec.forward_curve_id = projection.into();
+            let coupon = RateSpec::Floating(spec.clone());
+            let rate = coupon
+                .try_rate_for_period(start, end, 0.25, end, &market)
+                .expect("historical rate");
+            assert!((100_000_000.0 * 0.25 * rate - 1_000_000.0).abs() < 1e-8);
+            assert!(
+                coupon
+                    .try_rate_for_period(start, end, 0.25, end, &proxy_only)
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
     fn try_rate_for_period_validates_inputs_and_enforces_reset_date_cutoff() {
         let base = Date::from_calendar_date(2025, Month::April, 4).expect("valid date");
         let start = Date::from_calendar_date(2025, Month::April, 7).expect("valid date");
@@ -258,7 +297,9 @@ mod tests {
         let expected_proj = fwd
             .rate_between_dates(start, end, 91.0 / 360.0)
             .expect("factor projection");
-        let market = MarketContext::new().insert(fwd);
+        let market = MarketContext::new()
+            .try_insert(fwd)
+            .expect("insert market curve");
 
         assert!(
             RateSpec::Fixed { rate: f64::NAN }
@@ -267,6 +308,7 @@ mod tests {
         );
 
         let base_float = FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::ZERO,
             gearing: Decimal::ONE,

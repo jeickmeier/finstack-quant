@@ -96,8 +96,10 @@ fn test_cap_forward_pv01() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = cap
@@ -163,8 +165,10 @@ fn test_floor_forward_pv01() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let result = floor
@@ -199,8 +203,10 @@ fn test_forward_pv01_scales_with_maturity() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let short_fpv01 = *short_cap
@@ -268,8 +274,10 @@ fn test_forward_pv01_keeps_the_forward_curve_interpolation() {
     };
     let make_market = |style: InterpStyle, shift: f64| {
         MarketContext::new()
-            .insert(build_flat_discount_curve(0.04, as_of, "USD_OIS"))
-            .insert(make_curve(style, shift))
+            .try_insert(build_flat_discount_curve(0.04, as_of, "USD_OIS"))
+            .expect("insert market curve")
+            .try_insert(make_curve(style, shift))
+            .expect("insert market curve")
             .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"))
     };
     let fpv01 = |style: InterpStyle| {

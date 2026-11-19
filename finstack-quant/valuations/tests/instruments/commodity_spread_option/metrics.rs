@@ -32,11 +32,14 @@ fn spread_call() -> (CommoditySpreadOption, MarketContext, Date) {
     let discount_curve = flat_discount_with_tenor("USD-OIS", as_of, 0.03, 2.0);
 
     let market = MarketContext::new()
-        .insert(leg1_fwd)
-        .insert(leg2_fwd)
+        .try_insert(leg1_fwd)
+        .expect("insert market curve")
+        .try_insert(leg2_fwd)
+        .expect("insert market curve")
         .insert_surface(leg1_vol)
         .insert_surface(leg2_vol)
-        .insert(discount_curve);
+        .try_insert(discount_curve)
+        .expect("insert market curve");
 
     let option = CommoditySpreadOption::builder()
         .id(InstrumentId::new("SPREAD-METRICS"))

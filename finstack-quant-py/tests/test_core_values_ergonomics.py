@@ -243,7 +243,9 @@ class TestMathAdditions:
         assert stats.median([3.0, 1.0, 2.0, 4.0]) == 2.5
         assert stats.finite_count([1.0, float("nan")]) == 1
         assert len(stats.log_returns([1.0, 2.0, 4.0])) == 2
-        assert stats.realized_variance([100.0, 101.0, 100.0], annualization_factor=1.0) > 0.0
+        estimate = stats.realized_variance([100.0, 101.0, 100.0], annualization_factor=1.0)
+        assert estimate is not None
+        assert estimate > 0.0
 
     def test_linalg_and_special(self) -> None:
         from finstack_quant.core.math import linalg, special_functions
@@ -252,7 +254,7 @@ class TestMathAdditions:
         assert sorted(round(v, 10) for v in values) == [2.0, 5.0]
         _, delta = linalg.ledoit_wolf_shrinkage([[1.0, 1.0], [-1.0, -1.0], [2.0, -2.0], [-2.0, 2.0]])
         assert abs(delta - 17.0 / 18.0) < 1e-12
-        with pytest.raises(ValueError, match="square nested list"):
+        with pytest.raises(ValueError, match="rectangular nested list"):
             linalg.cholesky_decomposition([1.0, 2.0])
         assert special_functions.norm_cdf_with_params(1.0, 1.0, 2.0) == pytest.approx(0.5)
         assert special_functions.log_norm_cdf(-40.0) == pytest.approx(-804.6084420137538, abs=1e-12)

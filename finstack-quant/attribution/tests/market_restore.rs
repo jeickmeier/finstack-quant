@@ -121,7 +121,7 @@ impl Instrument for RestoreTestInstrument {
 
     fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
         let amount = match self.kind {
-            Kind::PriceCurve => 100_000.0 * market.get_price_curve("WTI")?.spot_price(),
+            Kind::PriceCurve => 100_000.0 * market.get_price_curve("WTI")?.price(0.0)?,
             Kind::VolCube => {
                 let cube = market.get_vol_cube("SWPT-CUBE")?;
                 1_000_000.0
@@ -131,7 +131,7 @@ impl Instrument for RestoreTestInstrument {
                         1.0,
                         0.05,
                         finstack_quant_models::volatility::VolatilityConvention::Lognormal,
-                    )
+                    )?
             }
             Kind::RatesInflation => {
                 let rate = -market.get_forward("USD-FWD")?.df(1.0)?.ln();
@@ -140,7 +140,9 @@ impl Instrument for RestoreTestInstrument {
             }
             Kind::CreditCorrelation => {
                 let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0)?;
-                let corr = market.get_base_correlation("CDX-BC")?.correlation(0.07);
+                let corr = market
+                    .get_base_correlation("CDX-BC")?
+                    .get_correlation(0.07)?;
                 1_000_000.0 * hazard * corr
             }
         };
@@ -165,19 +167,24 @@ impl Instrument for RestoreTestInstrument {
 
 fn price_curve(spot: f64) -> PriceCurve {
     PriceCurve::builder("WTI")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(AS_OF_T0)
-        .spot_price(spot)
-        .knots([(0.5, spot + 0.05), (1.0, spot + 0.10)])
+        .knots([(0.0, spot), (0.5, spot + 0.05), (1.0, spot + 0.10)])
         .build()
         .expect("price curve should build")
 }
 
 fn vol_index_curve(level: f64) -> PriceCurve {
     PriceCurve::builder("VIX")
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .kind(PriceCurveKind::VolIndex)
         .base_date(AS_OF_T0)
-        .spot_price(level)
-        .knots([(0.5, level + 1.0), (1.0, level + 2.0)])
+        .knots([(0.0, level), (0.5, level + 1.0), (1.0, level + 2.0)])
         .build()
         .expect("vol index curve should build")
 }
@@ -259,8 +266,12 @@ fn base_correlation_curve(corr_7pct: f64) -> BaseCorrelationCurve {
 #[test]
 fn waterfall_price_curve_pnl_lands_in_market_scalars_not_residual() {
     let instrument = RestoreTestInstrument::build("WTI-FWD-1", Kind::PriceCurve);
-    let market_t0 = MarketContext::new().insert(price_curve(3.00));
-    let market_t1 = MarketContext::new().insert(price_curve(3.30));
+    let market_t0 = MarketContext::new()
+        .try_insert(price_curve(3.00))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(price_curve(3.30))
+        .expect("insert market curve");
     let config = FinstackConfig::default();
 
     let attribution = attribute_pnl(
@@ -302,8 +313,12 @@ fn waterfall_price_curve_pnl_lands_in_market_scalars_not_residual() {
 #[test]
 fn parallel_price_curve_pnl_lands_in_market_scalars_not_residual() {
     let instrument = RestoreTestInstrument::build("WTI-FWD-2", Kind::PriceCurve);
-    let market_t0 = MarketContext::new().insert(price_curve(3.00));
-    let market_t1 = MarketContext::new().insert(price_curve(3.30));
+    let market_t0 = MarketContext::new()
+        .try_insert(price_curve(3.00))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(price_curve(3.30))
+        .expect("insert market curve");
     let config = FinstackConfig::default();
 
     let attribution = attribute_pnl(
@@ -341,13 +356,19 @@ fn parallel_price_curve_pnl_lands_in_market_scalars_not_residual() {
 #[test]
 fn restore_market_moves_all_eight_curve_storage_families() {
     let market_t0 = MarketContext::new()
-        .insert(price_curve(3.00))
-        .insert(vol_index_curve(15.0))
-        .insert(parametric_curve(0.045));
+        .try_insert(price_curve(3.00))
+        .expect("insert market curve")
+        .try_insert(vol_index_curve(15.0))
+        .expect("insert market curve")
+        .try_insert(parametric_curve(0.045))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(price_curve(3.30))
-        .insert(vol_index_curve(19.0))
-        .insert(parametric_curve(0.050));
+        .try_insert(price_curve(3.30))
+        .expect("insert market curve")
+        .try_insert(vol_index_curve(19.0))
+        .expect("insert market curve")
+        .try_insert(parametric_curve(0.050))
+        .expect("insert market curve");
 
     let snapshot_t1 = MarketSnapshot::extract(&market_t1, MarketRestoreFlags::all());
     let restored =
@@ -357,7 +378,8 @@ fn restore_market_moves_all_eight_curve_storage_families() {
     let spot = restored
         .get_price_curve("WTI")
         .expect("price curve present")
-        .spot_price();
+        .price(0.0)
+        .unwrap();
     assert!(
         (spot - 3.30).abs() < 1e-12,
         "Price curve must restore to T1 spot 3.30, got {spot}"
@@ -366,7 +388,8 @@ fn restore_market_moves_all_eight_curve_storage_families() {
     let level = restored
         .get_vol_index_curve("VIX")
         .expect("vol index curve present")
-        .spot_price();
+        .price(0.0)
+        .unwrap();
     assert!(
         (level - 19.0).abs() < 1e-12,
         "VolIndex curve must restore to T1 level 19.0, got {level}"
@@ -441,8 +464,12 @@ fn parallel_vol_cube_only_market_receives_vol_pnl() {
 #[test]
 fn waterfall_stamps_executed_factor_order_into_notes() {
     let instrument = RestoreTestInstrument::build("WTI-FWD-3", Kind::PriceCurve);
-    let market_t0 = MarketContext::new().insert(price_curve(3.00));
-    let market_t1 = MarketContext::new().insert(price_curve(3.30));
+    let market_t0 = MarketContext::new()
+        .try_insert(price_curve(3.00))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(price_curve(3.30))
+        .expect("insert market curve");
     let config = FinstackConfig::default();
 
     let attribution = attribute_pnl(
@@ -486,11 +513,15 @@ fn waterfall_stamps_executed_factor_order_into_notes() {
 fn parallel_default_cross_pairs_include_rates_inflation() {
     let instrument = RestoreTestInstrument::build("LINKER-1", Kind::RatesInflation);
     let market_t0 = MarketContext::new()
-        .insert(forward_curve(0.02))
-        .insert(inflation_curve(102.0));
+        .try_insert(forward_curve(0.02))
+        .expect("insert market curve")
+        .try_insert(inflation_curve(102.0))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(forward_curve(0.03))
-        .insert(inflation_curve(106.0));
+        .try_insert(forward_curve(0.03))
+        .expect("insert market curve")
+        .try_insert(inflation_curve(106.0))
+        .expect("insert market curve");
     let config = FinstackConfig::default();
 
     let attribution = attribute_pnl(
@@ -531,11 +562,15 @@ fn parallel_default_cross_pairs_include_rates_inflation() {
 fn parallel_default_cross_pairs_include_credit_correlations() {
     let instrument = RestoreTestInstrument::build("TRANCHE-1", Kind::CreditCorrelation);
     let market_t0 = MarketContext::new()
-        .insert(hazard_curve(0.005))
-        .insert(base_correlation_curve(0.40));
+        .try_insert(hazard_curve(0.005))
+        .expect("insert market curve")
+        .try_insert(base_correlation_curve(0.40))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(hazard_curve(0.008))
-        .insert(base_correlation_curve(0.50));
+        .try_insert(hazard_curve(0.008))
+        .expect("insert market curve")
+        .try_insert(base_correlation_curve(0.50))
+        .expect("insert market curve");
     let config = FinstackConfig::default();
 
     let attribution = attribute_pnl(
@@ -573,21 +608,35 @@ fn parallel_default_cross_pairs_include_credit_correlations() {
 #[test]
 fn broad_snapshot_respects_narrow_restore_flags() {
     let opening = MarketContext::new()
-        .insert(price_curve(3.0))
-        .insert(vol_index_curve(15.0))
-        .insert(parametric_curve(0.045))
-        .insert(forward_curve(0.04))
-        .insert(hazard_curve(0.02))
-        .insert(inflation_curve(105.0))
-        .insert(base_correlation_curve(0.2));
+        .try_insert(price_curve(3.0))
+        .expect("insert market curve")
+        .try_insert(vol_index_curve(15.0))
+        .expect("insert market curve")
+        .try_insert(parametric_curve(0.045))
+        .expect("insert market curve")
+        .try_insert(forward_curve(0.04))
+        .expect("insert market curve")
+        .try_insert(hazard_curve(0.02))
+        .expect("insert market curve")
+        .try_insert(inflation_curve(105.0))
+        .expect("insert market curve")
+        .try_insert(base_correlation_curve(0.2))
+        .expect("insert market curve");
     let closing = MarketContext::new()
-        .insert(price_curve(3.3))
-        .insert(vol_index_curve(19.0))
-        .insert(parametric_curve(0.05))
-        .insert(forward_curve(0.05))
-        .insert(hazard_curve(0.03))
-        .insert(inflation_curve(110.0))
-        .insert(base_correlation_curve(0.3));
+        .try_insert(price_curve(3.3))
+        .expect("insert market curve")
+        .try_insert(vol_index_curve(19.0))
+        .expect("insert market curve")
+        .try_insert(parametric_curve(0.05))
+        .expect("insert market curve")
+        .try_insert(forward_curve(0.05))
+        .expect("insert market curve")
+        .try_insert(hazard_curve(0.03))
+        .expect("insert market curve")
+        .try_insert(inflation_curve(110.0))
+        .expect("insert market curve")
+        .try_insert(base_correlation_curve(0.3))
+        .expect("insert market curve");
     let snapshot = MarketSnapshot::extract(&opening, MarketRestoreFlags::all());
     for flag in [
         MarketRestoreFlags::DISCOUNT,

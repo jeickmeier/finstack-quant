@@ -145,7 +145,7 @@ fn simulate_rate_paths(
     num_paths: usize,
     num_steps: usize,
     seed: u64,
-) -> Vec<RatePath> {
+) -> finstack_quant_core::Result<Vec<RatePath>> {
     let dt = 1.0 / 12.0; // Monthly steps
     let kappa = params.model.kappa;
     let exp_kappa_dt = (-kappa * dt).exp();
@@ -157,13 +157,8 @@ fn simulate_rate_paths(
         .collect();
 
     let std_devs: Vec<f64> = (0..num_steps)
-        .map(|step| {
-            params
-                .sigma_variance_for_step(step as f64 * dt, dt)
-                .max(0.0)
-                .sqrt()
-        })
-        .collect();
+        .map(|step| params.sigma_variance(step as f64 * dt, dt).map(f64::sqrt))
+        .collect::<finstack_quant_core::Result<_>>()?;
 
     let mut paths = Vec::with_capacity(num_paths);
     let base_rng = PhiloxRng::new(seed);
@@ -173,7 +168,7 @@ fn simulate_rate_paths(
         // Each path gets an independent counter-based substream — deterministic
         // across runs and platforms, statistically sound (Philox4x32-10).
         let mut rng = base_rng.substream(path_idx as u64);
-        rng.fill_std_normals(&mut normals);
+        rng.fill_std_normals(&mut normals)?;
 
         let mut rates = Vec::with_capacity(num_steps + 1);
         rates.push(initial_rate);
@@ -189,7 +184,7 @@ fn simulate_rate_paths(
         paths.push(RatePath { rates });
     }
 
-    paths
+    Ok(paths)
 }
 
 /// Per-step accrual and payment schedule shared by every simulated path.
@@ -531,7 +526,7 @@ pub(crate) fn calculate_mc_oas(
         config.num_paths,
         num_steps,
         config.seed,
-    );
+    )?;
 
     // Projection and path discounting are independent of OAS. The objective
     // only applies spread discounting to the mean monthly coefficients.
@@ -630,13 +625,15 @@ mod tests {
             .build()
             .expect("valid curve");
 
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     #[test]
     fn test_rate_path_simulation() {
         let params = HullWhite1FParams::new(0.05, 0.01, 0.04).expect("valid Hull-White parameters");
-        let paths = simulate_rate_paths(0.04, &params, 100, 120, 42);
+        let paths = simulate_rate_paths(0.04, &params, 100, 120, 42).expect("rate paths");
         assert_eq!(paths.len(), 100);
 
         for path in &paths {
@@ -658,7 +655,7 @@ mod tests {
         mbs.maturity = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
         let steps = mc_step_schedule(&mbs, mbs.issue_date, 12, DayCount::Act365F).expect("steps");
         let params = HullWhite1FParams::new(0.05, 0.01, 0.04).expect("HW parameters");
-        let paths = simulate_rate_paths(0.04, &params, 65, 12, 42);
+        let paths = simulate_rate_paths(0.04, &params, 65, 12, 42).expect("rate paths");
         let prepare = |threads| {
             rayon::ThreadPoolBuilder::new()
                 .num_threads(threads)
@@ -835,7 +832,8 @@ mod tests {
         let hw = HullWhiteCalibrationParams::new(config.hw1f_mean_reversion, config.hw1f_sigma)
             .expect("hw");
         let hw1f = prepare_hw1f_params(hw, curve.as_ref(), as_of, 30.0).expect("theta prepared");
-        let paths = simulate_rate_paths(initial_rate, &hw1f, 64, 360, config.seed);
+        let paths =
+            simulate_rate_paths(initial_rate, &hw1f, 64, 360, config.seed).expect("rate paths");
         let steps = mc_step_schedule(&mbs, as_of, 360, curve.day_count()).expect("steps");
         let total: f64 = paths
             .iter()
@@ -1097,7 +1095,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let det_pv = price_mbs(&mbs, &market, as_of).expect("det pv").amount();
 
@@ -1178,16 +1178,18 @@ mod production_mortgage_audit {
         mbs.issue_date = date!(2024 - 01 - 01);
         mbs.wam_months = 12;
         mbs.maturity = date!(2025 - 01 - 01);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (5.0, 1.0)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (5.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve");
         let dirty = generate_cashflows(&mbs, as_of, None)
             .expect("flows")
             .iter()
@@ -1230,16 +1232,20 @@ mod production_mortgage_audit {
             ..McOasConfig::resolve(&mbs).expect("config")
         };
         let oas_at = |as_of: Date| {
-            let market = MarketContext::new().insert(
-                DiscountCurve::builder("USD-OIS")
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
-                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
-                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                    .build()
-                    .expect("curve"),
-            );
+            let market = MarketContext::new()
+                .try_insert(
+                    DiscountCurve::builder("USD-OIS")
+                        .base_date(as_of)
+                        .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
+                        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                        .extrapolation(
+                            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                        )
+                        .build()
+                        .expect("curve"),
+                )
+                .expect("insert market curve");
             calculate_mc_oas(&mbs, quote, &market, as_of, &config).expect("oas")
         };
         let before = oas_at(date!(2024 - 02 - 10));

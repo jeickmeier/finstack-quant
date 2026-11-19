@@ -1267,7 +1267,7 @@ mod tests {
             puts: Vec::new(),
         });
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, 0.90)])
@@ -1277,7 +1277,8 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("USD-REF")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, 1.0)])
@@ -1286,7 +1287,8 @@ mod tests {
                     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("reference curve"),
-            );
+            )
+            .expect("insert market curve");
         let flows = bond
             .pricing_dated_cashflows(&market, as_of)
             .expect("pricing flows");
@@ -1351,7 +1353,7 @@ mod tests {
             .calls[0]
             .make_whole = None;
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, 0.90)])
@@ -1361,7 +1363,8 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 DiscountCurve::builder("USD-REF")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, 1.0)])
@@ -1370,7 +1373,8 @@ mod tests {
                     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("reference curve"),
-            );
+            )
+            .expect("insert market curve");
 
         let make_whole_flows = make_whole_bond
             .pricing_dated_cashflows(&market, as_of)

@@ -501,9 +501,15 @@ resolve the stated scope question explicitly.
   [validator](../../finstack-quant/factor/src/credit/hierarchy.rs) does not
   inspect `diagnostics.fold_ups`; the
   [decomposition consumer](../../finstack-quant/factor/src/credit/decomposition.rs)
-  checks an out-of-range fold-up level later. Establish validation responsibility
-  for all computational fields and add malformed-artifact and post-mutation
-  evidence. Inspected Rust/Python/WASM JSON loaders and the
+  checks an out-of-range fold-up level later. Reconcile
+  [FACTOR-019](financial/factor/credit-artifacts.md) by deriving the matching
+  view from the calibrated issuer table. Use stored systematic covariance and
+  validated issuer residual variance. Check the calibration window and anchor,
+  ordered axes, issuer tags and loadings, operative folds, residual state, and
+  supplied histories. Add malformed-artifact and post-mutation evidence.
+  Preserve effective settings, method version, and immutable data and observation
+  calendar identities. Qualify independent replay across hosts separately from
+  schema and canonical-byte checks. Inspected Rust/Python/WASM JSON loaders and the
   [calibrator](../../finstack-quant/factor/src/credit/calibration/calibrator.rs)
   call semantic validation, but that does not prove every invariant or consumer
   is covered. Verify ordinary `from_json` separately from `from_slice_strict`'s
@@ -679,8 +685,9 @@ the items below connect it to broader decisions and qualification boundaries.
 
 [ADR 0026](financial/governance/0026-methodology-decisions-and-inventory.md) accepts the
 documentation process. [ADR 0033](financial/analytics/0033-value-at-risk-method-selection.md#accepted-decision-fixed-historical-tail-selection)
-accepts fixed historical tail-method selection; overview records 0027–0032
-remain Draft. Detailed algorithm records identify their accepted scopes;
+accepts fixed historical tail-method selection. The
+[methodology catalogue](financial/README.md#methodology-records) tracks the
+current statuses of the model-selection overviews. These records identify their accepted scopes;
 all 15 [analytics records](financial/analytics/README.md#accepted-scopes-in-detailed-records)
 are accepted as of 2026-11-07 and implemented on 2026-11-08, with
 [scoped implementation evidence](financial/analytics/README.md#implementation-evidence)
@@ -1903,21 +1910,19 @@ requiring reproduction, adoption choices and missing validation are distinct.
 
 - **Options and exercise:** agree the vanilla option domains, dividend and
   lifecycle treatment, tree choice and accuracy targets in
-  [0027](financial/valuations-equity-and-composition/0027-vanilla-option-model-selection.md). Agree the callable
-  bond default and supported rate-only alternatives in
-  [0028](financial/valuations-bonds/0028-callable-bond-model-selection.md), and the quotation/
-  exercise selection boundary in
-  [0029](financial/valuations-rates/0029-rate-option-exercise-and-volatility.md). Joint stochastic
-  rates-credit, LSMC policy, HW versus LMM, settlement annuities, and stochastic
-  volatility require their own scoped choices.
+  [0027](financial/valuations-equity-and-composition/0027-vanilla-option-model-selection.md). Reconcile the accepted callable-bond routing
+  and explicit rates-only subtype in
+  [0028](financial/valuations-bonds/0028-callable-bond-model-selection.md).
+  Reconcile explicit quote-law and exercise-engine selection under
+  [0029](financial/valuations-rates/0029-rate-option-exercise-and-volatility.md).
+  The linked detailed records own the model, settlement, and exercise requirements.
 - **Credit conventions and dependence:** reconcile the accepted single-name CDS
   [leg and quote-basis contract](financial/models-and-valuations-credit/12-cds-legs.md#accepted-decision-for-checked-cds-legs-and-quote-basis) linked from
-  [0030](financial/models-and-valuations-credit/0030-cds-survival-and-integration.md). Agree tranche
-  copula/calibration scope, settlement overrides, correlation clipping, and
-  interim loss/monotonicity repairs in
-  [0031](financial/models-and-valuations-credit/0031-tranche-loss-model-selection.md). Observed repairs are
-  not approved fallbacks. Standalone copula configuration also needs a host
-  reachability and result-provenance assessment.
+  [0030](financial/models-and-valuations-credit/0030-cds-survival-and-integration.md). Reconcile the accepted synthetic tranche model selection in
+  [0031](financial/models-and-valuations-credit/0031-tranche-loss-model-selection.md).
+  Verify explicit copula selection, fit and source identity, checked interim
+  losses, and consistent pricing and risk. Qualify calibration replay and host
+  reachability and provenance.
 - **Curve construction:** direct discount selection, tails and checked
   evaluation are accepted in [CORE-MARKET-01](financial/core-market/discount-evaluation.md#accepted-decision-explicit-discount-sources-and-checked-rate-extraction);
   index-specific projection factors and contractual rates are accepted in
@@ -2395,6 +2400,175 @@ requiring reproduction, adoption choices and missing validation are distinct.
   canonical pairs, pair-specific proxies, concentration categories and signed
   dependence under the
   [accepted FX contract](financial/margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
+
+- **SIMM commodity delta and vega.** Reconcile exact factors, qualified
+  parallel forward shocks, index and basket treatment, expiry-weighted vega
+  and checked signed bucket aggregation under the
+  [accepted commodity contract](financial/margin-collateral-im/09-simm-commodity.md#accepted-decision-for-checked-simm-commodity-delta-and-vega).
+
+- **SIMM curvature.** Reconcile qualified factor and expiry mapping, signed
+  calculation side, squared dependence, special zero rules and checked charge
+  and replay evidence under the
+  [accepted curvature contract](financial/margin-collateral-im/10-simm-curvature.md#accepted-decision-for-checked-simm-expiry-scaling-and-curvature-aggregation).
+
+- **SIMM total and horizon.** Reconcile product-class netting and assembly,
+  supported calibrated horizons, required-risk coverage and result provenance
+  through portfolio, MVA and hosts under the
+  [accepted assembly contract](financial/margin-collateral-im/11-simm-total-and-mpor.md#accepted-decision-for-product-class-simm-assembly-and-supported-horizons).
+
+- **Gross schedule initial margin.** Reconcile complete profile selection,
+  qualified effective notionals, exact maturity cutoffs, Decimal rates,
+  checked gross amounts and reference horizons through portfolio and hosts.
+  [Accepted gross schedule contract](financial/margin-collateral-im/12-schedule-notional.md#accepted-decision-for-checked-gross-schedule-initial-margin).
+
+- **Schedule netting.** Reconcile eligible scope, sized replacement marks,
+  the zero-denominator and empty-set rules, one checked net amount and replay
+  evidence through portfolio and hosts.
+  [Accepted schedule netting contract](financial/margin-collateral-im/13-schedule-net-gross.md#accepted-decision-for-checked-schedule-netting-and-reduction).
+
+- **Cleared initial margin.** Reconcile exact service and account scope,
+  reported amount admission, explicit proxy profiles, gross sizing and
+  horizon preservation through portfolio and hosts.
+  [Accepted cleared IM contract](financial/margin-collateral-im/14-ccp-external-and-proxy.md#accepted-decision-for-elected-cleared-initial-margin-routes).
+
+- **Collateral eligibility and credited value.** Reconcile the strict
+  schedule lookup, qualified asset evidence, native currency comparison
+  and checked value and deduction through portfolio and hosts.
+  [Accepted collateral valuation contract](financial/margin-collateral-im/15-collateral-eligibility-and-haircuts.md#accepted-decision-for-checked-collateral-eligibility-and-credited-value).
+
+- **Collateral concentration.** Reconcile complete eligible pools,
+  explicit gross or credited basis, exact grouping and checked comparisons.
+  Preserve coverage, exclusions and rule results through hosts.
+  [Accepted concentration contract](financial/margin-collateral-im/16-collateral-concentration.md#accepted-decision-for-checked-collateral-pool-concentration).
+
+- **CSA elections and IM accounts.** Reconcile exact account scope, complete
+  dated terms, group allocation, credited balances, MTA boundaries and
+  required versus observed custody through portfolio and hosts.
+  [Accepted IM account terms](financial/margin-collateral-im/17-csa-selection-and-im-terms.md#accepted-decision-for-checked-csa-elections-and-one-way-im-account-terms).
+
+- **Signed variation margin.** Reconcile the two side thresholds, credited
+  balances, independent-amount boundary, elected MTA and checked rounding
+  and transfer evidence through portfolio, replay and hosts.
+  [Accepted VM contract](financial/margin-collateral-im/18-variation-margin.md#accepted-decision-for-checked-signed-variation-margin-and-transfers).
+
+- **VM schedules and settlement replay.** Reconcile effective call slots,
+  settlement-day units, cut-aware event order and opening balances. Verify
+  proposal, agreement and partial settlement handling and preserve the
+  approved cash and collateral outputs through portfolio and hosts.
+  [Accepted VM replay contract](financial/margin-collateral-im/19-margin-dates-and-replay.md#accepted-decision-for-checked-vm-schedules-and-settlement-replay).
+
+- **Repo cash margin and interest.** Reconcile the agreement-qualified
+  ratio projection, settled refund cap, interest and signed cash exports.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-collateral-and-initial-margin) ·
+  [Accepted repo margin contract](financial/margin-collateral-im/20-repo-margin-cashflows.md#accepted-decision-for-checked-repo-cash-margin-and-interest).
+
+- **Collateral metrics.** Reconcile exact adequacy, nullable ratios,
+  signed static funding cost, the admissible haircut step and restoration
+  through existing reports and hosts.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-collateral-and-initial-margin) ·
+  [Accepted collateral metrics](financial/margin-collateral-im/21-collateral-metrics.md#accepted-decision-for-checked-collateral-metrics).
+
+- **Margin tables and provenance.** Reconcile typed basis and dimensions,
+  snapshot and contribution admission, versioned nested state and
+  source qualifications through the existing schema and host surfaces.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-collateral-and-initial-margin) ·
+  [Accepted margin wire and provenance](financial/margin-collateral-im/22-wire-tables-and-provenance.md#accepted-decision-for-checked-margin-tables-wire-state-and-provenance).
+
+- **FRTB sensitivity inputs and provenance.** Reconcile selected rulebook
+  scope, typed units and factor identity, ordered contribution admission and
+  actual result provenance through the shared wire and host surfaces.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted FRTB input contract](financial/margin-regulatory-xva/01-frtb-inputs-and-wire.md#accepted-decision-for-checked-frtb-inputs-and-provenance).
+
+- **FRTB scenarios and aggregation.** Reconcile full-capital and SBA
+  diagnostic scope, checked quadratics, a conditional capped retry and
+  binding result evidence through the existing result and host paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted FRTB aggregation contract](financial/margin-regulatory-xva/02-frtb-scenarios-and-aggregation.md#accepted-decision-for-checked-frtb-scenarios-and-aggregation).
+
+- **GIRR delta.** Reconcile curve-specific factors, qualified flat inflation
+  and basis risk, applicable relief, and correlation and bucket evidence.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted GIRR delta](financial/margin-regulatory-xva/03-frtb-girr-delta.md#accepted-decision-for-checked-girr-delta).
+
+- **Credit spread delta.** Reconcile class-specific factor and index
+  admission, elected covered-bond weight, same-tranche evidence and
+  checked sector and residual aggregation through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted credit spread delta](financial/margin-regulatory-xva/04-frtb-credit-delta.md#accepted-decision-for-checked-credit-spread-delta).
+
+- **Equity spot and repo delta.** Reconcile qualified factor and index
+  admission, spot and repo weights, name-based mixed correlation and
+  bucket 11 aggregation through the existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted equity spot and repo delta](financial/margin-regulatory-xva/05-frtb-equity-delta.md#accepted-decision-for-checked-equity-spot-and-repo-delta).
+
+- **Commodity delta.** Reconcile qualified delivery terms, the `0Y` spot
+  vertex, relative-shock amounts and ordinary aggregation for all 11
+  buckets through the existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted commodity delta](financial/margin-regulatory-xva/06-frtb-commodity-delta.md#accepted-decision-for-checked-commodity-delta).
+
+- **FX delta.** Reconcile canonical reporting-currency buckets, exact
+  relative shocks and complete legs, elected pair relief and the checked
+  scenario norm through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted FX delta](financial/margin-regulatory-xva/07-frtb-fx-delta.md#accepted-decision-for-checked-fx-delta).
+
+- **GIRR vega.** Reconcile both five-point maturity axes, the prepared
+  volatility scale, expiry-only coverage and checked currency aggregation
+  through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted GIRR vega](financial/margin-regulatory-xva/08-frtb-girr-vega.md#accepted-decision-for-checked-girr-vega).
+
+- **Credit, equity and commodity vega.** Reconcile qualified underlier and
+  expiry mapping, index and tranche-pair evidence, and class-specific
+  weights and other-sector aggregation through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted credit, equity and commodity vega](financial/margin-regulatory-xva/09-frtb-bucketed-vega.md#accepted-decision-for-checked-credit-equity-and-commodity-vega).
+
+- **FX vega.** Reconcile qualified option pairs, exact expiry vertices,
+  volatility scaling, and within-pair and cross-pair aggregation through
+  existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted FX vega](financial/margin-regulatory-xva/10-frtb-fx-vega.md#accepted-decision-for-checked-fx-vega).
+
+- **FRTB curvature.** Reconcile full-shock inputs, coverage and elected
+  relief, per-bucket direction selection, residual treatment and checked
+  signed aggregation through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted FRTB curvature](financial/margin-regulatory-xva/11-frtb-curvature.md#accepted-decision-for-checked-frtb-curvature).
+
+- **Non-securitisation default risk capital.** Reconcile prepared gross
+  JTD, live exposure and maturity evidence, eligible obligor offsets and
+  checked bucket hedge benefit through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted default risk capital](financial/margin-regulatory-xva/12-frtb-default-risk.md#accepted-decision-for-checked-non-securitisation-default-risk-capital).
+
+- **Residual risk add-on.** Reconcile chargeable categories, exemption and
+  lifecycle evidence, one gross contribution per transaction and checked
+  full-capital assembly through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted residual risk add-on](financial/margin-regulatory-xva/13-frtb-residual-risk.md#accepted-decision-for-checked-residual-risk-add-on).
+
+- **SA-CCR trade inputs and supervisory delta.** Reconcile rulebook and
+  legal set identity, margin eligibility and MPOR, contractual clocks and
+  qualified size, and typed supervisory delta through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted SA-CCR inputs and supervisory delta](financial/margin-regulatory-xva/14-saccr-inputs-and-supervisory-delta.md#accepted-decision-for-checked-sa-ccr-trade-inputs-and-supervisory-delta).
+
+- **SA-CCR maturity factors and supervisory duration.** Reconcile the
+  qualified clocks, duration floor, per-contribution MF and signed effective
+  notional. Carry applied factor evidence through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted SA-CCR maturity and duration](financial/margin-regulatory-xva/15-saccr-maturity-and-duration.md#accepted-decision-for-checked-sa-ccr-maturity-factors-and-supervisory-duration).
+
+- **SA-CCR interest-rate add-on.** Reconcile typed hedging-set identity,
+  underlying maturity buckets, prescribed partial offsets and checked set
+  charges. Carry contribution, factor and coverage evidence through the
+  existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted SA-CCR interest-rate add-on](financial/margin-regulatory-xva/16-saccr-ir-addon.md#accepted-decision-for-the-checked-sa-ccr-interest-rate-add-on).
 
 ### Implementation reconciliation
 

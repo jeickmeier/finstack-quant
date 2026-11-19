@@ -55,13 +55,12 @@ const slice = (
   axis: CubeSliceRequest["axis"],
   convention: CubeSliceRequest["convention"],
   at = axis === "tenor" ? cube.tenors[0]! : cube.expiries[0]!,
-): CubeSliceRequest => ({
-  cube,
-  axis,
-  at,
-  strikes: strikesFor(cube),
-  convention,
-});
+): CubeSliceRequest => {
+  const grid = { cube, at, strikes: strikesFor(cube), convention };
+  return axis === "tenor"
+    ? { ...grid, axis, interpolationMode: "vol" }
+    : { ...grid, axis };
+};
 const smile = (
   cube = normal,
   extra: Partial<CubeSmileRequest> = {},
@@ -71,21 +70,23 @@ const smile = (
   tenorIndex: 2,
   strikes: strikesFor(cube),
   rate: 0.04,
+  quoteType: cube === shifted ? "shifted_black_lognormal" : "normal",
   ...extra,
 });
-const materializer = {
-  tenor: "materializeCubeTenorSlice",
-  expiry: "materializeCubeExpirySlice",
-} as const;
 function directSlice(r: CubeSliceRequest) {
   const cube = native.VolCube.fromJson(serializeHost(r.cube));
   try {
-    const handle = native[materializer[r.axis]](
-      cube,
-      r.at,
-      [...r.strikes],
-      r.convention,
-    );
+    const strikes = [...r.strikes];
+    const handle =
+      r.axis === "tenor"
+        ? native.materializeCubeTenorSlice(
+            cube,
+            r.at,
+            strikes,
+            r.convention,
+            r.interpolationMode,
+          )
+        : native.materializeCubeExpirySlice(cube, r.at, strikes, r.convention);
     try {
       return JSON.parse(handle.toJson());
     } finally {
@@ -103,7 +104,7 @@ function directSmile(r: CubeSmileRequest) {
     const expiry = r.cube.expiries[r.expiryIndex]!;
     const params = native.SabrParameters.fromJson(parameters);
     try {
-      const s = new native.SabrSmile(params, forward, expiry);
+      const s = new native.SabrSmile(params, forward, expiry, r.quoteType);
       try {
         const strikes = [...r.strikes];
         return {
@@ -140,6 +141,11 @@ it("returns every native slice for both cubes, axes and conventions and frees bo
   variants.push(slice(normal, "expiry", "lognormal", 1.5));
   const strikes = slice(normal, "tenor", "normal");
   variants.push({ ...strikes, strikes: [0.035, 0.05, 0.065] });
+  variants.push({
+    ...strikes,
+    axis: "tenor",
+    interpolationMode: "total_variance",
+  });
   const keys = variants.map((r) =>
     JSON.stringify(cubeSliceOptions(null, 1, r).queryKey),
   );
@@ -150,6 +156,8 @@ it("returns every native slice for both cubes, axes and conventions and frees bo
     const json = directSlice(r);
     if (result.axis === "tenor") {
       expect(result.surface).toEqual(json);
+      if (r.axis === "tenor")
+        expect(result.surface.interpolation_mode).toBe(r.interpolationMode);
       // The tenor slice is the canonical stored surface the surface views read.
       expect(surfaceNodes(result.surface)).toHaveLength(
         r.cube.expiries.length * r.strikes.length,
@@ -197,6 +205,7 @@ it("retains native slice failures and frees the cube handle", async () => {
 it("returns the native node smile, arbitrage report and optional repair and frees all three handles", async () => {
   const variants: CubeSmileRequest[] = [
     smile(),
+    smile(normal, { quoteType: "black_lognormal" }),
     smile(normal, { repairIterations: 10 }),
     smile(normal, { repairIterations: 0 }),
     smile(normal, { rate: 0.01 }),
@@ -226,7 +235,7 @@ it("returns the native node smile, arbitrage report and optional repair and free
     smileFreed: variants.length,
   });
   // On a node the smile is the node's own column of the materialized slice in
-  // the SABR convention (normal for this beta = 0 cube).
+  // the selected normal quoting convention.
   const node = unwrap(
     await worker.proxy.cubeSlice({
       ...slice(normal, "expiry", "normal", normal.expiries[1]),

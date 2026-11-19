@@ -28,21 +28,25 @@ fn single_curve_market(as_of: Date, r: f64, v: f64) -> MarketContext {
     .map(|&t| (t, (-r * t).exp()))
     .collect();
 
-    mkt = mkt.insert(
-        DiscountCurve::builder(CurveId::new("USD-FLAT"))
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots(ois_knots)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    mkt = mkt
+        .try_insert(
+            DiscountCurve::builder(CurveId::new("USD-FLAT"))
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots(ois_knots)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
 
     // Separate forward curve for multi-curve regressions.
-    mkt = mkt.insert(
-        ForwardCurve::flat(CurveId::new("USD-FLAT-FWD"), as_of, r, DayCount::Act365F).unwrap(),
-    );
+    mkt = mkt
+        .try_insert(
+            ForwardCurve::flat(CurveId::new("USD-FLAT-FWD"), as_of, r, DayCount::Act365F).unwrap(),
+        )
+        .expect("insert market curve");
 
     // Flat vol surface
     let strikes = vec![

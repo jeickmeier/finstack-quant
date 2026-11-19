@@ -2698,6 +2698,21 @@ mod fx_resolution_rules {
     }
 
     #[test]
+    fn missing_direct_pivot_quote_remains_a_single_lookup() {
+        for revision in [None, Some(0)] {
+            let (provider, matrix) = routed(revision, false);
+            let error = matrix
+                .rate(query(Currency::USD, Currency::JPY))
+                .unwrap_err();
+            assert!(matches!(
+                error,
+                finstack_quant_core::Error::Input(InputError::NotFound { .. })
+            ));
+            assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+        }
+    }
+
+    #[test]
     fn a_missing_pivot_leg_names_the_ordered_leg() {
         let (_, matrix) = routed(Some(0), false);
         let error = matrix

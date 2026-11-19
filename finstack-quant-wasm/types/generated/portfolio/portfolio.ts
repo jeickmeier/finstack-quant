@@ -590,14 +590,6 @@ export type Warning =
       [k: string]: unknown;
     }
   | {
-      kind: "base_corr_bucket_no_match";
-      /**
-       * Surface identifier.
-       */
-      surface_id: string;
-      [k: string]: unknown;
-    }
-  | {
       /**
        * Free-text from `ArbitrageViolation` Display.
        */
@@ -877,7 +869,8 @@ export type CFKind =
   | "variation_margin_pay"
   | "margin_interest"
   | "collateral_substitution_in"
-  | "collateral_substitution_out";
+  | "collateral_substitution_out"
+  | "derivative_settlement";
 /**
  * Unit of position measurement.
  *

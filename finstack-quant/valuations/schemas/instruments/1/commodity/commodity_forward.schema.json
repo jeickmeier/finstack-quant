@@ -190,7 +190,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional spot price ID (for delta calculations)."
+          "description": "Optional observed spot identifier. At maturity the scalar is the delivery\nobservation. After maturity use the exact delivery observation in the\ncorresponding `FIXING:{spot_id}` series. Before maturity an explicitly\nidentified spot can supply the cost-of-carry input if the forward curve is absent."
         },
         "underlying_ticker": {
           "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",

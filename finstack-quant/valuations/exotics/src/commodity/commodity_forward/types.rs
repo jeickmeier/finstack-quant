@@ -171,7 +171,10 @@ pub struct CommodityForward {
     ///
     /// Should reference a `PriceCurve` in the `MarketContext`.
     pub forward_curve_id: CurveId,
-    /// Optional spot price ID (for delta calculations).
+    /// Optional observed spot identifier. At maturity the scalar is the delivery
+    /// observation. After maturity use the exact delivery observation in the
+    /// corresponding `FIXING:{spot_id}` series. Before maturity an explicitly
+    /// identified spot can supply the cost-of-carry input if the forward curve is absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spot_id: Option<PriceId>,
     /// Discount curve ID.
@@ -337,10 +340,11 @@ impl CommodityForward {
     /// # Resolution Order
     ///
     /// 1. `quoted_forward`, when set.
-    /// 2. The `PriceCurve` `forward_curve_id`: its spot once `maturity <= as_of`,
-    ///    otherwise `price_on_date(maturity)` (on the curve's own day count).
-    /// 3. Cost of carry from `spot_id`: the spot once delivered, otherwise
-    ///    `spot / DF(as_of, maturity)` on `discount_curve_id`.
+    /// 2. Before delivery, the declared forward curve at the maturity date.
+    /// 3. Before delivery, an explicitly named `spot_id` supports a cost-of-carry
+    ///    estimate when the forward curve is absent. On delivery use the observed
+    ///    spot scalar. After delivery require the exact maturity fixing in
+    ///    `FIXING:{spot_id}`. A quoted override at settlement must be the realized price.
     ///
     /// # Arguments
     ///
@@ -361,13 +365,21 @@ impl CommodityForward {
             return Ok(price);
         }
         let delivered = self.maturity <= as_of;
-        if let Ok(price_curve) = market.get_price_curve(self.forward_curve_id.as_str()) {
-            if delivered {
-                return Ok(price_curve.spot_price());
+        if !delivered {
+            match market.get_price_curve(self.forward_curve_id.as_str()) {
+                Ok(curve) => return curve.price_on_date(self.maturity),
+                Err(finstack_quant_core::Error::Input(
+                    finstack_quant_core::InputError::MissingCurve { .. },
+                )) if self.spot_id.is_some() => {}
+                Err(error) => return Err(error),
             }
-            return price_curve.price_on_date(self.maturity);
         }
         if let Some(spot_id) = self.spot_id.as_deref() {
+            if as_of > self.maturity {
+                let series =
+                    finstack_quant_core::market_data::fixings::get_fixing_series(market, spot_id)?;
+                return series.get_value_exact(self.maturity);
+            }
             let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
                 market.get_price(spot_id)?,
             );
@@ -381,9 +393,8 @@ impl CommodityForward {
         Err(finstack_quant_core::Error::Input(
             finstack_quant_core::InputError::NotFound {
                 id: format!(
-                    "PriceCurve '{}' not found. \
-                     Use MarketContext::insert_price_curve() to add a commodity forward price curve.",
-                    self.forward_curve_id
+                    "delivered commodity forward '{}' requires an observed settlement price or spot_id",
+                    self.id
                 ),
             },
         ))
@@ -478,6 +489,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommodityForwar
         deps.add_forward_curve(self.forward_curve_id.clone());
         if let Some(spot_id) = self.spot_id.as_deref() {
             deps.add_market_scalar_id(spot_id);
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                spot_id,
+            ));
         }
         Ok(deps)
     }
@@ -608,8 +622,11 @@ mod tests {
     fn test_market(as_of: Date) -> MarketContext {
         // Create a PriceCurve for WTI forward prices
         let price_curve = PriceCurve::builder("WTI-FORWARD")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(75.0)
             .knots([(0.0, 75.0), (0.25, 76.0), (0.5, 77.0), (1.0, 78.0)])
             .build()
             .expect("Valid price curve");
@@ -624,7 +641,49 @@ mod tests {
             .build()
             .expect("Valid discount curve");
 
-        MarketContext::new().insert(price_curve).insert(disc)
+        use finstack_quant_core::market_data::scalars::{
+            MarketScalar, ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+        };
+        let fixing = ScalarTimeSeries::new(
+            "FIXING:WTI-SETTLE",
+            vec![(date!(2025 - 04 - 15), 77.0)],
+            None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
+        )
+        .expect("fixing");
+        MarketContext::new()
+            .insert_price("WTI-SETTLE", MarketScalar::unitless(77.0).expect("spot"))
+            .insert_series(fixing)
+            .try_insert(price_curve)
+            .expect("insert market curve")
+            .try_insert(disc)
+            .expect("insert market curve")
+    }
+
+    #[test]
+    fn delivered_forward_requires_an_observation_instead_of_projected_levels() {
+        let market = test_market(date!(2025 - 01 - 15));
+        let mut forward = CommodityForward::example().unwrap();
+        forward.maturity = date!(2025 - 04 - 15);
+        forward.forward_curve_id = CurveId::new("WTI-FORWARD");
+        assert!(forward.forward_price(&market, forward.maturity).is_err());
+        forward.spot_id = Some("WTI-SETTLE".into());
+        assert_eq!(
+            forward.forward_price(&market, forward.maturity).unwrap(),
+            77.0
+        );
+        // A later live spot cannot overwrite the contractual settlement fixing.
+        let market = market.insert_price(
+            "WTI-SETTLE",
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(90.0).unwrap(),
+        );
+        assert_eq!(
+            forward
+                .forward_price(&market, date!(2025 - 04 - 16))
+                .unwrap(),
+            77.0
+        );
     }
 
     #[test]
@@ -1082,6 +1141,7 @@ mod tests {
         let market = test_market(as_of);
         let mut forward = CommodityForward::example().expect("example");
         forward.maturity = Date::from_calendar_date(2025, Month::April, 15).expect("maturity");
+        forward.spot_id = Some("WTI-SETTLE".into());
         forward.forward_curve_id = CurveId::new("WTI-FORWARD");
         forward.discount_curve_id = CurveId::new("USD-OIS");
         forward.quantity = 1000.0;
@@ -1194,6 +1254,7 @@ mod tests {
         let market = test_market(as_of);
         let mut forward = CommodityForward::example().expect("example");
         forward.maturity = date!(2025 - 04 - 15);
+        forward.spot_id = Some("WTI-SETTLE".into());
         forward.forward_curve_id = CurveId::new("WTI-FORWARD");
         forward.discount_curve_id = CurveId::new("USD-OIS");
         forward.contract_price = Some(70.0);

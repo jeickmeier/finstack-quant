@@ -45,7 +45,7 @@
     },
     {
       "id": "FACTOR-009",
-      "title": "Whole-scenario tail stress attribution",
+      "title": "Historical tail stress attribution",
       "path": "tail-stress.md"
     },
     {

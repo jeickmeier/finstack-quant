@@ -56,7 +56,9 @@ fn an_isma_bond_accrues_its_contractual_coupon_mid_period() {
 
     let mut instruments: IndexMap<String, Arc<dyn Instrument>> = IndexMap::new();
     instruments.insert("UST".into(), Arc::new(bond));
-    let periods = build_periods("2025Q1..Q3", None).expect("periods").periods;
+    let periods = build_periods("2025Q1..Q3", None)
+        .expect("periods")
+        .into_periods();
     let cashflows = aggregate_period_flows(
         &instruments,
         &periods,
@@ -240,7 +242,9 @@ fn new_funding_and_redraws_close_on_balance_dates_not_cash_dates() {
         },
     );
     let instrument = ScheduleInstrument::new(schedule.clone());
-    let periods = build_periods("2025Q1..Q2", None).expect("periods").periods;
+    let periods = build_periods("2025Q1..Q2", None)
+        .expect("periods")
+        .into_periods();
     let market = MarketContext::new();
     let flows_of = |index: usize, opening: Money| {
         calculate_period_flows(&instrument, &periods[index], opening, &market, issue, None)
@@ -318,7 +322,9 @@ fn principal_cash_and_face_are_reported_on_their_own_dates() {
         },
     );
     let instrument = ScheduleInstrument::new(schedule);
-    let periods = build_periods("2025M3..M4", None).expect("periods").periods;
+    let periods = build_periods("2025M3..M4", None)
+        .expect("periods")
+        .into_periods();
     let market = MarketContext::new();
     let read = |index: usize, opening: Money| {
         calculate_period_flows(

@@ -129,7 +129,9 @@ fn create_test_market() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    MarketContext::new().insert(discount_curve)
+    MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert market curve")
 }
 
 fn create_test_deal() -> StructuredCredit {
@@ -399,6 +401,7 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+            index_id: "SOFR-3M".into(),
             forward_curve_id: finstack_quant_core::types::CurveId::new("SOFR-3M".to_string()),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
             gearing: rust_decimal::Decimal::ONE,
@@ -431,16 +434,19 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve");
-    let market = MarketContext::new().insert(forward_curve).insert_series(
-        ScalarTimeSeries::new(
-            "FIXING:SOFR-3M",
-            vec![(test_date(), 0.05)],
-            None,
-            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
-            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
-        )
-        .expect("fixings"),
-    );
+    let market = MarketContext::new()
+        .try_insert(forward_curve)
+        .expect("insert market curve")
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:SOFR-3M",
+                vec![(test_date(), 0.05)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("fixings"),
+        );
 
     let waterfall = Waterfall::builder(Currency::USD)
         .add_tier(

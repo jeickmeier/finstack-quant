@@ -109,8 +109,10 @@ mod tests {
             .build()
             .expect("vol surface");
         MarketContext::new()
-            .insert(disc)
-            .insert(fwd)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve")
             .insert_surface(surface)
     }
 
@@ -135,6 +137,7 @@ mod tests {
         };
         let float = FloatLegSpec {
             discount_curve_id: CurveId::new("USD_OIS"),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: CurveId::new("USD_LIBOR_3M"),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),

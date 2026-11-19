@@ -567,7 +567,7 @@ fn fiscal_quarters_roll_up_to_fiscal_years_and_halves() {
         None,
     )
     .expect("fiscal quarters")
-    .periods;
+    .into_periods();
     let values: Vec<_> = periods
         .iter()
         .zip([1.0, 2.0, 4.0, 8.0])
@@ -615,7 +615,11 @@ fn rollup_rejects_incomplete_years_and_invalid_targets() {
     let results = Evaluator::new().evaluate(&model).expect("evaluation");
 
     let mut trimmed = model.clone();
-    trimmed.periods.periods.remove(0);
+    trimmed.periods = finstack_quant_core::dates::PeriodPlan::try_new(
+        trimmed.periods.get_calendar(),
+        trimmed.periods[1..].to_vec(),
+    )
+    .unwrap();
     let err = results
         .rollup(&trimmed, &annual_spec())
         .expect_err("2024 has three quarters");

@@ -40,7 +40,9 @@ fn test_convexity_positive() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(

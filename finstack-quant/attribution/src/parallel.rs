@@ -854,8 +854,12 @@ mod tests {
             .build()
             .expect("DiscountCurve builder should succeed with valid test data");
 
-        let market_t0 = MarketContext::new().insert(curve_t0);
-        let market_t1 = MarketContext::new().insert(curve_t1);
+        let market_t0 = MarketContext::new()
+            .try_insert(curve_t0)
+            .expect("insert market curve");
+        let market_t1 = MarketContext::new()
+            .try_insert(curve_t1)
+            .expect("insert market curve");
 
         // Extract and verify snapshots work
         let rates_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::RATES);
@@ -876,7 +880,7 @@ mod tests {
             Arc::new(RatesCreditInteractionInstrument::new("TEST-RATES-CREDIT"));
 
         let market_t0 = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of_t0)
                     .knots(vec![(0.0, 1.0), (1.0, 0.99)])
@@ -886,7 +890,8 @@ mod tests {
                     .build()
                     .expect("discount curve should build"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 HazardCurve::builder("ACME-HAZ")
                     .base_date(as_of_t0)
                     .knots(vec![(1.0, 0.01)])
@@ -894,10 +899,11 @@ mod tests {
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .build()
                     .expect("hazard curve should build"),
-            );
+            )
+            .expect("insert market curve");
 
         let market_t1 = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of_t1)
                     .knots(vec![(0.0, 1.0), (1.0, 0.98)])
@@ -907,7 +913,8 @@ mod tests {
                     .build()
                     .expect("discount curve should build"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 HazardCurve::builder("ACME-HAZ")
                     .base_date(as_of_t1)
                     .knots(vec![(1.0, 0.02)])
@@ -915,7 +922,8 @@ mod tests {
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .build()
                     .expect("hazard curve should build"),
-            );
+            )
+            .expect("insert market curve");
 
         let attribution = crate::attribute_pnl(
             &AttributionMethod::Parallel,

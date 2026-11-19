@@ -1,14 +1,71 @@
 # MARGIN-REGULATORY-XVA-001: FRTB sensitivity units, factor identity, wire reconstruction and provenance
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed** in the stated source scope.
-- Validation status: **Evidence inspected/located, not executed.** Selected test bodies were read; no runtime test, build or numerical experiment was run.
+- Decision status: **Accepted 2026-11-17 for checked FRTB sensitivity inputs, factor identity and provenance.**
+- Implementation status: Existing behavior is described below. Input basis, factor admission, checked restoration and caller reconciliation remain pending.
+- Validation status: Source and primary references inspected. Independent examples checked delta units, equity repo weights, reporting-currency legs and snapshot admission. Runtime, schema, host and regulatory qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope and hashes: [inventory](README.md), [coverage ledger](coverage.json).
 
+## Accepted decision for checked FRTB inputs and provenance
+
+1. **Bind the inputs to one explicit calculation basis.** Elect a supported
+   rulebook edition, jurisdictional profile and immutable parameter set.
+   Require the valuation date, information cutoff, reporting currency,
+   position scope and component coverage. Valuation and classification owners
+   supply qualified reprices, buckets and dated FX evidence. The receiving
+   engine admits those inputs on their declared basis.
+2. **Keep delta amounts and weights on matching scales.** For GIRR, credit
+   spread and equity repo, multiply the signed P&L from the prescribed upward
+   1 bp reprice by 100 to express it per percentage point. Equity spot,
+   commodity and FX use signed P&L from an upward 1% relative move. Pair these
+   amounts with percentage-point weight numbers. A signed 120 per bp gives
+   12,000 on this basis. A 1.7% weight then gives 20,400 of weighted sensitivity.
+   Equity repo uses its own smaller weight.
+   [Basel MAR21.19–24 and Table 10](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+3. **Require prepared vega and curvature on their stated bases.** Vega is signed
+   `σ × ∂PV/∂σ` before the decimal vega weight, with matching volatility and
+   derivative conventions. The Basel reference permits normal or lognormal
+   inputs for GIRR and credit spread and uses lognormal for equity, commodity
+   and FX. Curvature carries both signed loss-positive P&L amounts after
+   delta removal under the prescribed full shocks. Those amounts already
+   reflect the shock size.
+   [Basel MAR21.5 and MAR21.25–28](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+4. **Preserve full factor identity and risk-specific tenor grids.** Require
+   applicable curve, currency, tenor, issuer or tranche, credit basis,
+   commodity location, equity spot or repo identity, and option maturity.
+   Reject conflicting classifications for the same factor and require an
+   explicit residual assignment where applicable. Keep the ten ordinary GIRR
+   delta vertices `0.25Y`, `0.5Y`, `1Y`, `2Y`, `3Y`, `5Y`, `10Y`, `15Y`, `20Y`
+   and `30Y`. Ordinary GIRR vega uses `0.5Y`, `1Y`, `3Y`, `5Y` and `10Y` on
+   each applicable maturity axis. Missing required coordinates make the
+   affected result unavailable.
+   [Basel MAR21.8–14](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+5. **Use the direct reporting-currency basis for FX.** Define an upward FX
+   move as more reporting currency per unit of risk currency. Require both
+   reporting-currency legs for cross-FX exposures where applicable, including
+   translation risk, and reject self-pairs. Retain the qualified option pair,
+   quote convention and expiry for vega. A reciprocal quote or alternative
+   base-currency method requires an explicitly qualified transformation or
+   reprice.
+   [Basel MAR21.14 and MAR21.24](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+6. **Check coverage before reporting zero or complete capital.** Keep DRC and
+   residual-risk inputs as separate positions with explicit amount roles and
+   classifications. Required securitisation DRC is unavailable until a
+   qualified route exists. Distinguish evaluated zero, qualified inapplicability
+   and missing risk. Incomplete scope can support explicitly labelled
+   diagnostics. [Record 002](02-frtb-scenarios-and-aggregation.md#accepted-decision-for-checked-frtb-scenarios-and-aggregation) owns
+   aggregation and diagnostic assembly.
+7. **Use the accepted wire rules at every entry point.** Sum qualified
+   contributions by the full matching key with checked accumulation in the
+   declared order. Reject duplicate snapshot keys. Validate complete changes
+   before committing them through Rust, JSON, tables, Python or WASM. Stamp
+   results with the actual profile, parameter identity, currency, cut,
+   coverage and source history.
+   [Margin wire contract](../margin-collateral-im/22-wire-tables-and-provenance.md#accepted-decision-for-checked-margin-tables-wire-state-and-provenance).
+
 ## Choice and domain
 
-This describes the observed design. No historical adoption rationale is inferred; the alternatives and tradeoffs below are the audit's assessment.
+The observations below describe the audited design. The accepted contract binds the reporting currency and sensitivity scale to the qualified factor and position scope.
 
 The FRTB engine consumes already-classified, already-converted sensitivities in one reporting currency. It does not extract instrument risk, choose regulatory buckets, compute curvature shocks, perform FX conversion, or establish portfolio completeness. `base_currency` labels the input container; the charge arithmetic does not use it to convert values. The recorded D457/MAR21 provenance is source metadata, not a new verification of a rulebook or jurisdiction.
 
@@ -30,7 +87,7 @@ Ordered FX pairs are not inverted/canonicalized, same-currency FX pairs are not 
 
 ## Alternatives and tradeoffs
 
-Rejecting duplicate wire rows would surface ambiguous feeds; accumulating duplicates would match mutators but changes current reconstruction. A richer typed factor feed can encode curve, currency and sensitivity units at greater API cost. Automatically deriving buckets/risk from instruments is a distinct capability and is absent here.
+The accepted contract separates additive contributions from unique-key snapshots. Typed coordinates keep distinct curves and qualified classifications visible before netting. Valuation and classification owners prepare the input risk.
 
 ## Evidence and role
 
@@ -38,4 +95,4 @@ Runtime and domain contracts: [src/regulatory/frtb/types.rs](../../../../finstac
 
 [tests/regulatory_determinism.rs](../../../../finstack-quant/margin/tests/regulatory_determinism.rs) contains inspected sorted-JSON/roundtrip and wrong-shape assertions; these are transport evidence, not independent capital calculations. [src/regulatory/frtb/engine.rs](../../../../finstack-quant/margin/src/regulatory/frtb/engine.rs) locates unknown-label/bucket/nonfinite rejection tests. [FRTB reference index](../../../REFERENCES.md#bcbs-frtb-minimum-capital-requirements) supplies the existing canonical pointer; the external standard was not re-certified in this audit.
 
-The implementation establishes observed behavior, not financial adoption or regulatory compliance. Actionable work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
+Implementation reconciliation and independent qualification are tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).

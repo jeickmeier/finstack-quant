@@ -315,6 +315,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -717,6 +721,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -1123,6 +1131,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -1521,6 +1533,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -1621,6 +1637,7 @@
           "#/$defs/StepUpCouponSpec/properties/step_schedule",
           "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule",
           "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items",
+          "#/$defs/CashFlowAccrual/properties/nominal_dates",
           "#/$defs/CashFlowMeta/properties/calendar_ids",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values",
@@ -2606,6 +2623,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -3228,6 +3249,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -3780,6 +3805,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -4179,6 +4208,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -4314,6 +4347,7 @@
           "#/$defs/StepUpCouponSpec/properties/step_schedule",
           "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule",
           "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items",
+          "#/$defs/CashFlowAccrual/properties/nominal_dates",
           "#/$defs/CashFlowMeta/properties/calendar_ids",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values",
@@ -4732,10 +4766,11 @@
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
-          "#/$defs/PositiveF64Wire",
-          "#/$defs/ClosedUnitIntervalF64Wire",
-          "#/$defs/NonNegativeF64Wire",
-          "#/$defs/CorrelationWire",
+          "#/$defs/SabrParameters/properties/alpha",
+          "#/$defs/SabrParameters/properties/beta",
+          "#/$defs/SabrParameters/properties/nu",
+          "#/$defs/SabrParameters/properties/rho",
+          "#/$defs/SabrParameters/properties/shift",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/FutureContractSpecs/properties/face_value",
           "#/$defs/FutureContractSpecs/properties/tick_size",
@@ -4819,12 +4854,14 @@
           "#/$defs/QuantoOption/properties/quantity",
           "#/$defs/QuantoOption/properties/strike",
           "#/$defs/CommoditySpotOptionExercise/properties/spot",
+          "#/$defs/PositiveF64Wire",
           "#/$defs/CommoditySpotOption/properties/quoted_forward",
           "#/$defs/CommodityAsianOption/properties/past_fixings/items/prefixItems/1",
           "#/$defs/CommodityForward/properties/contract_price",
           "#/$defs/CommodityForward/properties/quoted_forward",
           "#/$defs/CommoditySwap/properties/fixed_price",
           "#/$defs/CommoditySwap/properties/past_fixings/items/prefixItems/1",
+          "#/$defs/CorrelationWire",
           "#/$defs/CommoditySpreadOption/properties/strike",
           "#/$defs/CommodityFutureFixing/oneOf/0/properties/realized_price",
           "#/$defs/CommodityFutureFixing/oneOf/1/properties/past_fixings/items/prefixItems/1",
@@ -5030,6 +5067,7 @@
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/low_cpr",
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_down",
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_up",
+          "#/$defs/ClosedUnitIntervalF64Wire",
           "#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
           "#/$defs/Tranche/properties/attach_pct",
           "#/$defs/Tranche/properties/detach_pct",
@@ -5535,6 +5573,7 @@
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
+          "#/$defs/SabrParameters/properties/shift",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/ListedFutureTerms/properties/quoted_price",
           "#/$defs/ListedFutureTerms/properties/settlement_price",
@@ -5745,6 +5784,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -6017,10 +6060,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/SabrParameters/properties/shift",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/BermudanSchedule/properties/lockout_end",
             "keyword": "anyOf"
           },
@@ -6217,6 +6256,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/VarianceSwap/properties/previous_close_date",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/VarianceSwap/properties/settlement_date",
             "keyword": "anyOf"
           },
@@ -6286,6 +6329,10 @@
           },
           {
             "pointer": "#/$defs/FxBarrierOption/properties/rebate_timing",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxVarianceSwap/properties/previous_close_date",
             "keyword": "anyOf"
           },
           {
@@ -7526,6 +7573,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -7651,6 +7702,7 @@
           "#/$defs/d_336250c98cf023a4b5e2/properties/step_schedule",
           "#/$defs/d_2aa2f1b15784c3fa7d81/oneOf/2/properties/step_remaining/properties/schedule",
           "#/$defs/d_2aa2f1b15784c3fa7d81/oneOf/6/properties/custom_principal/properties/items",
+          "#/$defs/d_931ca4fd1b880c77b04d/properties/nominal_dates",
           "#/$defs/d_ff91f56de5ec0b73d330/properties/calendar_ids",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values"
@@ -8066,6 +8118,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -8214,6 +8270,7 @@
           "#/$defs/d_7fdd8d325754c89e8272/properties/step_schedule",
           "#/$defs/d_3c60928e1d0f7a794057/oneOf/2/properties/step_remaining/properties/schedule",
           "#/$defs/d_3c60928e1d0f7a794057/oneOf/6/properties/custom_principal/properties/items",
+          "#/$defs/d_7658f074507acce0d3be/properties/nominal_dates",
           "#/$defs/d_b298e98ea5050d260a3b/properties/calendar_ids",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values"
@@ -8818,6 +8875,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -9430,6 +9491,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -9857,6 +9922,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -10465,6 +10534,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -10895,6 +10968,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -11287,6 +11364,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -11691,6 +11772,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -12073,6 +12158,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -12475,6 +12564,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -12907,6 +13000,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -13308,6 +13405,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -13682,6 +13783,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -14074,6 +14179,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -14457,6 +14566,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -14846,6 +14959,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -15221,6 +15338,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -15589,6 +15710,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -15989,6 +16114,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -16115,6 +16244,7 @@
           "#/$defs/StepUpCouponSpec/properties/step_schedule",
           "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule",
           "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items",
+          "#/$defs/CashFlowAccrual/properties/nominal_dates",
           "#/$defs/CashFlowMeta/properties/calendar_ids",
           "#/$defs/TermLoanCovenantEvents/properties/draw_stop_dates",
           "#/$defs/McConfig/properties/correlation_matrix",
@@ -16531,10 +16661,11 @@
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
-          "#/$defs/PositiveF64Wire",
-          "#/$defs/ClosedUnitIntervalF64Wire",
-          "#/$defs/NonNegativeF64Wire",
-          "#/$defs/CorrelationWire",
+          "#/$defs/SabrParameters/properties/alpha",
+          "#/$defs/SabrParameters/properties/beta",
+          "#/$defs/SabrParameters/properties/nu",
+          "#/$defs/SabrParameters/properties/rho",
+          "#/$defs/SabrParameters/properties/shift",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/FutureContractSpecs/properties/face_value",
           "#/$defs/FutureContractSpecs/properties/tick_size",
@@ -16618,12 +16749,14 @@
           "#/$defs/QuantoOption/properties/quantity",
           "#/$defs/QuantoOption/properties/strike",
           "#/$defs/CommoditySpotOptionExercise/properties/spot",
+          "#/$defs/PositiveF64Wire",
           "#/$defs/CommoditySpotOption/properties/quoted_forward",
           "#/$defs/CommodityAsianOption/properties/past_fixings/items/prefixItems/1",
           "#/$defs/CommodityForward/properties/contract_price",
           "#/$defs/CommodityForward/properties/quoted_forward",
           "#/$defs/CommoditySwap/properties/fixed_price",
           "#/$defs/CommoditySwap/properties/past_fixings/items/prefixItems/1",
+          "#/$defs/CorrelationWire",
           "#/$defs/CommoditySpreadOption/properties/strike",
           "#/$defs/CommodityFutureFixing/oneOf/0/properties/realized_price",
           "#/$defs/CommodityFutureFixing/oneOf/1/properties/past_fixings/items/prefixItems/1",
@@ -16833,6 +16966,7 @@
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/low_cpr",
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_down",
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_up",
+          "#/$defs/ClosedUnitIntervalF64Wire",
           "#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
           "#/$defs/Tranche/properties/attach_pct",
           "#/$defs/Tranche/properties/detach_pct",
@@ -17334,6 +17468,7 @@
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
+          "#/$defs/SabrParameters/properties/shift",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/ListedFutureTerms/properties/quoted_price",
           "#/$defs/ListedFutureTerms/properties/settlement_price",
@@ -17463,6 +17598,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -17816,10 +17955,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/SabrParameters/properties/shift",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/BermudanSchedule/properties/lockout_end",
             "keyword": "anyOf"
           },
@@ -18016,6 +18151,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/VarianceSwap/properties/previous_close_date",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/VarianceSwap/properties/settlement_date",
             "keyword": "anyOf"
           },
@@ -18085,6 +18224,10 @@
           },
           {
             "pointer": "#/$defs/FxBarrierOption/properties/rebate_timing",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxVarianceSwap/properties/previous_close_date",
             "keyword": "anyOf"
           },
           {
@@ -19397,6 +19540,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -20017,6 +20164,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -20467,6 +20618,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -20848,6 +21003,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -21241,6 +21400,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -21618,6 +21781,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -21991,6 +22158,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -22388,6 +22559,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -22779,6 +22954,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -23162,6 +23341,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -23559,6 +23742,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -24110,6 +24297,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -24658,6 +24849,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -25187,6 +25382,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -25553,6 +25752,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -25936,6 +26139,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -26480,6 +26687,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -27009,6 +27220,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -27547,6 +27762,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -28081,6 +28300,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -28638,6 +28861,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -28683,6 +28910,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_6e351f851936941d91a0/properties/previous_close_date",
             "keyword": "anyOf"
           },
           {
@@ -29044,6 +29275,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -29464,6 +29699,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -29866,6 +30105,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -30282,6 +30525,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -30679,6 +30926,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -31276,6 +31527,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -31430,6 +31685,7 @@
           "#/$defs/d_c40e1d7b8b06c6a5365d/properties/step_schedule",
           "#/$defs/d_b68d80acd3bb73b369bf/oneOf/2/properties/step_remaining/properties/schedule",
           "#/$defs/d_b68d80acd3bb73b369bf/oneOf/6/properties/custom_principal/properties/items",
+          "#/$defs/d_380d6451b5a9b6d4b9ca/properties/nominal_dates",
           "#/$defs/d_cf2b490be81aa851e8fe/properties/calendar_ids",
           "#/$defs/d_86a72099b58d92668ef1/properties/draw_stop_dates",
           "#/$defs/d_7ab5bac7015d046b3dfb/properties/correlation_matrix",
@@ -32005,6 +32261,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -32659,6 +32919,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -33196,6 +33460,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -33747,6 +34015,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -34313,6 +34585,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -34866,6 +35142,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -35446,6 +35726,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -35875,6 +36159,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -36348,6 +36636,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -36805,6 +37097,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -36924,6 +37220,7 @@
           "#/$defs/StepUpCouponSpec/properties/step_schedule",
           "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule",
           "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items",
+          "#/$defs/CashFlowAccrual/properties/nominal_dates",
           "#/$defs/CashFlowMeta/properties/calendar_ids",
           "#/$defs/McConfig/properties/correlation_matrix",
           "#/$defs/McConfig/properties/correlation_matrix/items",
@@ -37898,6 +38195,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -38597,10 +38898,11 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
-          "#/$defs/d_73b92f56cdc5ce046018",
-          "#/$defs/d_6772ff84bb100f4fa73d",
-          "#/$defs/d_0d1f74f8f487020c0407",
-          "#/$defs/d_9ce633eb1d1806a74a03",
+          "#/$defs/d_d09956c3320c77551bb5/properties/alpha",
+          "#/$defs/d_d09956c3320c77551bb5/properties/beta",
+          "#/$defs/d_d09956c3320c77551bb5/properties/nu",
+          "#/$defs/d_d09956c3320c77551bb5/properties/rho",
+          "#/$defs/d_d09956c3320c77551bb5/properties/shift",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -38817,6 +39119,7 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
+          "#/$defs/d_d09956c3320c77551bb5/properties/shift",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -38826,6 +39129,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -38878,10 +39185,6 @@
           },
           {
             "pointer": "#/$defs/d_818134538ec82f6d27c9/properties/sabr_params",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/d_d09956c3320c77551bb5/properties/shift",
             "keyword": "anyOf"
           },
           {
@@ -39238,6 +39541,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -39844,6 +40151,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -40495,6 +40806,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -41122,6 +41437,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -41565,6 +41884,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -41610,6 +41933,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_85bc3ccea16ecaa23151/properties/previous_close_date",
             "keyword": "anyOf"
           },
           {
@@ -41944,6 +42271,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -42327,6 +42658,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {
@@ -42891,6 +43226,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
@@ -43303,6 +43642,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
             "keyword": "anyOf"
           },
           {

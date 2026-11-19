@@ -307,7 +307,7 @@ impl CashflowScheduleBuildSpec {
     /// # Arguments
     ///
     /// * `market` - Optional market context providing forward curves and
-    ///   `FIXING:{forward_curve_id}` series for floating coupons.
+    ///   `FIXING:{index_id}` series for floating coupons.
     /// * `as_of` - Optional cutoff date overriding `self.as_of`. Resets before
     ///   the effective cutoff require historical fixings; on the cutoff
     ///   published fixings take precedence over projection.

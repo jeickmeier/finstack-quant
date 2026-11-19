@@ -1,14 +1,20 @@
 # MARGIN-REGULATORY-XVA-022: One-time SIMM calculation and deterministic IM decay
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed** in the stated source scope.
-- Validation status: **Evidence inspected/located, not executed.** Selected test bodies were read; no runtime test, build or numerical experiment was run.
+- Decision status: **Accepted 2026-11-17 for opening-anchored deterministic IM and qualified external expected IM profiles.**
+- Implementation status: The SIMM decay bridge is implemented. Opening-node admission, authoritative SIMM and profile provenance, and qualified external profile admission require reconciliation.
+- Validation status: Exact arithmetic checked linear runoff. Rust fixtures were inspected. Profile admission and proxy accuracy against simulated future IM require qualification.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope and hashes: [inventory](README.md), [coverage ledger](coverage.json).
 
-## Choice and domain
+## Accepted decision
 
-This describes the observed design. No historical adoption rationale is inferred; the alternatives and tradeoffs below are the audit's assessment.
+1. Use one qualified current SIMM result and anchor the projected IM profile to that value at time zero. Record valuation cut, currency, portfolio scope, SIMM edition, and selected decay rule. [SIMM assembly](../margin-collateral-im/11-simm-total-and-mpor.md).
+2. Explicitly select constant, linear, or square-root decay. Constant holds the opening value through the declared horizon. Linear and square-root runoff require a declared maturity and reach zero there. Include a maturity node when runoff occurs within the projection horizon.
+3. Identify deterministic decay as an MVA approximation. Admit a qualified external expected posted-IM profile with its own opening value and provenance. Use the profile for MVA. Credit adjustments retain the collateral-aware exposure basis under [XVA 020](20-xva-credit-adjustments.md). [Simulated future IM research](https://arxiv.org/abs/1405.0508).
+
+With opening IM 100 and linear runoff to one year, the profile values at years 0, 0.5, and 1 are 100, 50, and 0.
+
+## Observed choice and domain
 
 The SIMM-to-IM bridge computes today's SIMM once, then applies a chosen deterministic decay over supplied future times. It is a projection proxy; it does not recalculate future sensitivities, simulate collateral calls, apply MPOR exposure dynamics, or estimate an expected pathwise future SIMM distribution.
 
@@ -35,4 +41,4 @@ Recomputing SIMM along future risk paths captures changing portfolio risk at sig
 
 Runtime bridge, validation and decay: [src/xva/mva.rs](../../../../finstack-quant/margin/src/xva/mva.rs); SIMM implementation is linked from [collateral/IM methodology scope](../margin-collateral-im/README.md). Located unit tests cover decay values and SIMM-profile construction; inspected MVA linear-grid example demonstrates how the first sampled IM is held back to zero. They are functional examples, not calibration to future margin. [SIMM reference index](../../../REFERENCES.md#isda-simm), [Green XVA](../../../REFERENCES.md#green-xva).
 
-The implementation establishes observed behavior, not financial adoption or regulatory compliance. Actionable work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
+Implementation reconciliation and independent qualification are tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).

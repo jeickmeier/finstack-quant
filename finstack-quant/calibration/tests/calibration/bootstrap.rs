@@ -153,7 +153,9 @@ fn run_hazard_plan(
 ) -> finstack_quant_core::market_data::term_structures::HazardCurve {
     use finstack_quant_calibration::api::schema::HazardCurveParams;
     let currency = Currency::USD;
-    let source_market = MarketContext::new().insert(create_test_discount_curve(base_date));
+    let source_market = MarketContext::new()
+        .try_insert(create_test_discount_curve(base_date))
+        .expect("insert market curve");
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
     let mut quote_sets: finstack_quant_core::FxHashMap<String, Vec<QuoteId>> =
@@ -390,7 +392,9 @@ fn global_solve_residuals_are_keyed_by_quote_id() {
             cds_valuation_convention: None,
         }),
         &credit_quotes,
-        &MarketContext::new().insert(create_test_discount_curve(base_date)),
+        &MarketContext::new()
+            .try_insert(create_test_discount_curve(base_date))
+            .expect("insert market curve"),
         &CalibrationConfig::default(),
     )
     .expect("hazard global solve");

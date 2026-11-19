@@ -402,12 +402,17 @@ pub(super) fn ledoit_wolf_cov_and_corr(
         )));
     }
 
-    let lw = finstack_quant_core::math::linalg::ledoit_wolf_shrinkage(&rows, t_complete, n)
-        .map_err(|e| validation_err(format!("LedoitWolf: shrinkage failed: {e}")))?;
+    let lw = finstack_quant_core::math::linalg::ledoit_wolf_shrinkage(&rows, t_complete, n)?;
 
     let mut cov_ann = lw.covariance.clone();
     for v in &mut cov_ann {
-        *v *= annualization_factor;
+        let annual = *v * annualization_factor;
+        if !annual.is_finite() || (annual == 0.0 && *v != 0.0) {
+            return Err(finstack_quant_core::Error::Internal(
+                "annualized credit covariance outside finite representable range".into(),
+            ));
+        }
+        *v = annual;
     }
 
     let mut corr_rows: Vec<Vec<f64>> = Vec::with_capacity(n);
@@ -421,7 +426,17 @@ pub(super) fn ledoit_wolf_cov_and_corr(
             let var_i = lw.covariance[i * n + i];
             let var_j = lw.covariance[j * n + j];
             if var_i > 0.0 && var_j > 0.0 {
-                row.push((lw.covariance[i * n + j] / (var_i * var_j).sqrt()).clamp(-1.0, 1.0));
+                let cov = lw.covariance[i * n + j];
+                let corr = (cov / var_i.min(var_j).sqrt()) / var_i.max(var_j).sqrt();
+                if !corr.is_finite()
+                    || corr.abs() > 1.0 + 8.0 * f64::EPSILON
+                    || (cov != 0.0 && corr == 0.0)
+                {
+                    return Err(finstack_quant_core::Error::Internal(format!(
+                        "invalid credit correlation for factors {i}, {j}"
+                    )));
+                }
+                row.push(corr.clamp(-1.0, 1.0));
             } else {
                 row.push(0.0);
             }

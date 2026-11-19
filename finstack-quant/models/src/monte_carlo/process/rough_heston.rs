@@ -164,11 +164,11 @@ impl RoughHestonParams {
 
         if !hurst.is_rough() {
             tracing::warn!(
-                h = hurst.value(),
+                h = hurst.get_value(),
                 "Rough Heston Hurst exponent H = {:.4} is not rough (H >= 0.5). \
                  The model is designed for rough volatility; results may not \
                  match empirical skew behavior.",
-                hurst.value()
+                hurst.get_value()
             );
         }
         Ok(())
@@ -224,7 +224,7 @@ impl StochasticProcess for RoughHestonProcess {
     /// Formal diffusion — mirrors classical Heston coefficients for metadata.
     ///
     /// The actual variance dynamics are handled by the Volterra discretization.
-    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         let s = x[0];
         let v = x[1].max(0.0);
 
@@ -232,6 +232,7 @@ impl StochasticProcess for RoughHestonProcess {
         out[0] = v.sqrt() * s;
         // σ_v = σᵥ √v — formal
         out[1] = self.params.model.sigma_v * v.sqrt();
+        Ok(())
     }
 
     fn dedicated_scheme(&self) -> Option<&'static str> {
@@ -249,7 +250,7 @@ impl ProcessMetadata for RoughHestonProcess {
         let mut params = ProcessParams::new("RoughHeston");
         params.add_param("r", self.params.r);
         params.add_param("q", self.params.q);
-        params.add_param("H", self.params.hurst.value());
+        params.add_param("H", self.params.hurst.get_value());
         params.add_param("kappa", self.params.model.kappa);
         params.add_param("theta", self.params.model.theta);
         params.add_param("sigma_v", self.params.model.sigma_v);
@@ -530,7 +531,9 @@ mod tests {
         let mut diffusion = vec![0.0_f64; 2];
 
         process.drift(0.0, &x, &mut drift);
-        process.diffusion(0.0, &x, &mut diffusion);
+        process
+            .diffusion(0.0, &x, &mut diffusion)
+            .expect("valid diffusion");
 
         // S drift: (r − q) S = 0.03 × 100 = 3.0
         assert!((drift[0] - 3.0).abs() < 1e-10);

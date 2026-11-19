@@ -363,7 +363,7 @@ impl CommoditySpotOption {
                         exercise.settlement_date,
                         DayCountContext::default(),
                     )?;
-                    let delivery_forward = curve.price(t);
+                    let delivery_forward = curve.price(t)?;
                     let sign = if self.option_type == OptionType::Call {
                         1.0
                     } else {
@@ -927,7 +927,7 @@ impl CommoditySpotOption {
 
         let d1 =
             finstack_quant_models::closed_form::d1_d2_black76(forward, self.strike, sigma, t).0;
-        let nd1 = norm_cdf(d1);
+        let nd1 = norm_cdf(d1)?;
 
         let delta_unit = match self.option_type {
             OptionType::Call => df * nd1,
@@ -1026,7 +1026,7 @@ impl CommoditySpotOption {
         let df = disc.df_between_dates(as_of, self.expiry)?;
         let d1 =
             finstack_quant_models::closed_form::d1_d2_black76(forward, self.strike, sigma, t).0;
-        let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
+        let vega_abs = df * forward * norm_pdf(d1)? * t.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
     }
     fn option_vanna(
@@ -1208,7 +1208,7 @@ mod tests {
         let option = CommoditySpotOption::example().expect("example");
         let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid date");
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
@@ -1218,14 +1218,19 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 PriceCurve::builder("WTI-FORWARD")
+                    .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                     .base_date(as_of)
-                    .spot_price(75.0)
                     .knots([(0.0, 75.0), (1.0, 76.0)])
                     .build()
                     .expect("price curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("WTI-VOL")
                     .secondary_axis(
@@ -1288,7 +1293,7 @@ mod tests {
         option.spot_id = Some("WTI-SPOT".into());
         let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid");
         let market = finstack_quant_core::market_data::context::MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
@@ -1298,14 +1303,19 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 PriceCurve::builder("WTI-FORWARD")
+                    .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                     .base_date(as_of)
-                    .spot_price(75.0)
                     .knots([(0.0, 75.0), (1.0, 76.0)])
                     .build()
                     .expect("price curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("WTI-VOL")
                     .secondary_axis(
@@ -1385,7 +1395,7 @@ mod tests {
                 "WTI-SPOT",
                 MarketScalar::unitless(75.0).expect("valid scalar"),
             )
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (5.0, 0.9)])
@@ -1394,7 +1404,8 @@ mod tests {
                     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .unwrap(),
-            );
+            )
+            .expect("insert market curve");
         let mut registry = PricerRegistry::new();
         registry
             .register(super::super::pricer::CommoditySpotOptionMcPricer::new(
@@ -1442,7 +1453,7 @@ mod tests {
             exercised: true,
         });
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
@@ -1452,13 +1463,19 @@ mod tests {
                     .build()
                     .unwrap(),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 PriceCurve::builder("WTI-FORWARD")
+                    .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                     .base_date(as_of)
                     .knots([(0.0, 80.0), (1.0, 80.0)])
                     .build()
                     .unwrap(),
-            );
+            )
+            .expect("insert market curve");
         assert!((option.value(&market, as_of).unwrap().amount() - 10.0).abs() < 1e-12);
         option.settlement = SettlementType::Physical;
         assert!((option.value(&market, as_of).unwrap().amount() + 10.0).abs() < 1e-12);
@@ -1502,7 +1519,7 @@ mod tests {
         option.quoted_forward = Some(80.0);
         let as_of = date!(2025 - 01 - 15);
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
@@ -1512,6 +1529,7 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("WTI-VOL")
                     .secondary_axis(

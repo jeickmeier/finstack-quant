@@ -1,14 +1,25 @@
 # MARGIN-COLLATERAL-IM-010 — SIMM expiry scaling and curvature aggregation
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for checked SIMM expiry scaling and curvature aggregation.
 
-**Implementation status:** Observed for the source scope below, including the stated limitations and discrepancies.
+**Implementation status:** Existing behavior is described below. Classified factors, expiry grids, calculation perspective, checked arithmetic, replay evidence and host reconciliation with the accepted contract are pending.
 
-**Validation status:** Evidence inspected or specifically located; no tests/builds executed. Audit date **2026-11-05**; source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+**Validation status:** Independent arithmetic checked expiry weighting before netting, signed charge asymmetry, squared FX correlation, commodity Other, the normal quantile and the IR adjustment. Runtime, portfolio and host qualification remain pending. Audit date **2026-11-05** and source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+
+## Accepted decision for checked SIMM expiry scaling and curvature aggregation
+
+1. Bind the elected historical USD profile, valuation cut, netting scope, product-class partition and calculation side. Admit signed `σ × vega` before expiry scaling, ordinary HVR, vega risk weights and concentration. Rates and credit use matching ATM volatility and derivative conventions. Equity, FX and commodity use the elected proxy and matching volatility units. Evaluate the selected side once. An opposite-side result requires explicit sign conversion and reevaluation. Distinguish missing applicable curvature from qualified inapplicability and evaluated zero. [Accepted sensitivity contract](03-sensitivity-inputs.md#accepted-decision-for-checked-simm-sensitivity-identity-scaling-and-netting) · [ISDA SIMM v2.6, §§B.9–11 and C.3](https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf) · [ORE side handling](https://github.com/OpenSourceRisk/Engine/blob/master/OREAnalytics/orea/simm/simmcalculator.cpp#L1049-L1104).
+2. Require an owner-qualified exact factor mapping and retain the applicable IR or credit risk vertex and underlying source maturity separately from option expiry. Admit credit expiry labels `1Y`, `2Y`, `3Y`, `5Y` and `10Y`, and the twelve standard labels for IR, equity, FX and commodity. Reject unsupported labels or mappings before scaling, including on explicit zero rows. This selects class-specific expiry grids while the observed validator accepts twelve credit expiry labels. [ORE v2.6 expiry configuration](https://github.com/OpenSourceRisk/Engine/blob/master/OREAnalytics/orea/simm/simmconfigurationisdav2_6.cpp#L255-L281).
+3. Apply `SF(t) = 0.5 × min(1, 14/t)` to each contribution using fixed calendar days, with `2W = 14`, each month `365/12` days and each year `365` days. Net scaled contributions only by the exact qualified factor, using checked compensated sums in declared contribution order. Preserve row multiplicity and that order through export and restoration. [ISDA SIMM v2.6, §B.11(a)–(b)](https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf).
+4. Use the applicable base factor and bucket dependence from records 004–009, including classified nonqualifying credit and equity. Square the base coefficients as `ρ²` within buckets and `γ²` across buckets and retain unit diagonals. Apply ordinary concentration attenuation only in its delta and vega owners. Compute each bucket norm `K` and cap its signed sum at `±K`. The outer quadratic has `K²` diagonals and capped signed sums in its cross-terms. FX uses one bucket of distinct canonical pairs. Commodity Other stays in the numbered quadratic and its signed totals. Qualified equity bucket 12 has prescribed zero and is excluded from norms and sign totals. [ISDA SIMM v2.6, §B.11 and §§D–I](https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf).
+5. For the non-residual group and separately any applicable residual group, define `N` as the signed sum of net factor exposures and `A` as the sum of their absolute values. Exact `A = 0` gives zero. Otherwise use `θ = min(N/A, 0)`, `λ = (z²−1)(1+θ)−θ` and the financial charge floor `max(N + λK_group, 0)`. Pin `z = Φ⁻¹(0.995)` to nearest binary64 `2.575829303548901`. Add the separately evaluated residual charge. Multiply completed IR curvature by `HVR_IR⁻²`, with historical `HVR_IR = 0.47`. [ISDA SIMM v2.6, §B.11(d)](https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf).
+6. Establish PSD structurally or apply the [accepted read-only dependence gate](02-simm-parameter-validation.md#accepted-decision-for-checked-simm-parameter-profiles-and-correlation-validation) to the squared effective matrix. Use scaled checked quadratics and return typed errors for negative computed variance, invalid dependence or unusable arithmetic. Preserve the profile, side, expiry weights, factor nets, bucket norms and caps, `N`, `A`, `θ`, `λ` and any prescribed-zero reason through the common Rust path. [Record 011](11-simm-total-and-mpor.md) owns total assembly and MPOR. [Record 022](22-wire-tables-and-provenance.md) owns wire format.
+
+Independent arithmetic on one qualified factor gave net curvature exposure of USD 480.8219 from raw `+1,000 USD` at 2W and `−1,000 USD` at 1Y. The single-factor equity example charged USD 3,190.20. A single net curvature exposure of `+100 USD` gave USD 663.49 and `−100 USD` gave zero.
 
 ## Choice and rationale
 
-Observed: curvature consumes separate signed volatility-weighted vega rows and applies expiry scaling before factor netting. Proposed rationale: opposite vegas at different expiries must not cancel before their different short-horizon scaling factors are applied.
+The observed calculation consumes signed volatility-weighted vega rows and applies expiry scaling before factor netting. It currently supports fewer classifications and has different summation and failure boundaries from the accepted contract.
 
 ## Input domain and conventions
 
@@ -29,7 +40,7 @@ There is no concentration multiplier in this curvature kernel and no multiplicat
 
 ## Alternatives and tradeoffs
 
-Pricing explicit up/down risk shocks or gamma would be a different model/input contract. Keeping one expiry scalar would be smaller but erase the scale-before-netting distinction. Full product-class separation and more detailed factor grids would widen the supported historical model.
+The accepted calculation preserves source option expiry until scaling and qualified risk identity until factor netting. The independent valuation mapping remains part of the input qualification. Complete portfolio and host comparison remains open.
 
 ## Source and validation evidence
 
@@ -41,5 +52,5 @@ Existing evidence: [tests/production_simm_csa_audit.rs](../../../../finstack-qua
 
 ## Follow-up tracking
 
-Adoption, implementation reconciliation and qualification work is tracked in the
+Implementation reconciliation and qualification work is tracked in the
 [collateral and initial-margin register](../FOLLOW_UPS.md#margin-collateral-and-initial-margin).

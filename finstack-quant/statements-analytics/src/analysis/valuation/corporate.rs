@@ -1847,35 +1847,33 @@ mod tests {
 
     #[test]
     fn exit_multiple_metric_requires_complete_trailing_year() {
-        use time::macros::date;
-        for boundaries in [[
-            date!(2024 - 01 - 01),
-            date!(2024 - 04 - 01),
-            date!(2024 - 07 - 01),
-            date!(2024 - 10 - 01),
-            date!(2025 - 01 - 01),
-        ]] {
-            let vals: Vec<_> = (1..=4)
-                .map(|q| {
+        use finstack_quant_core::dates::{FiscalConfig, build_fiscal_periods, build_periods};
+        for plan in [
+            build_periods("2024Q1..Q4", Some("2024Q2")).unwrap(),
+            build_fiscal_periods(
+                "FY2024Q1..FY2024Q4",
+                FiscalConfig::new(3, 1).unwrap(),
+                Some("FY2024Q2"),
+            )
+            .unwrap(),
+        ] {
+            let vals: Vec<_> = plan
+                .iter()
+                .enumerate()
+                .map(|(i, p)| {
                     (
-                        PeriodId::quarter(2024, q).unwrap(),
-                        AmountOrScalar::amount(f64::from(q) * 10., Currency::USD).unwrap(),
+                        p.id,
+                        AmountOrScalar::amount((i + 1) as f64 * 10., Currency::USD).unwrap(),
                     )
                 })
                 .collect();
             let mut model = {
                 let mut model_builder_1 = ModelBuilder::new("ltm");
-                model_builder_1
-                    .periods("2024Q1..Q4", Some("2024Q2"))
-                    .unwrap();
+                model_builder_1.periods_explicit(plan).unwrap();
                 model_builder_1.value("ebitda", &vals);
                 model_builder_1.with_meta("currency", serde_json::json!("USD"));
                 model_builder_1.build().unwrap()
             };
-            for (p, w) in model.periods.periods.iter_mut().zip(boundaries.windows(2)) {
-                p.start = w[0];
-                p.end = w[1];
-            }
             let results = Evaluator::new().evaluate(&model).unwrap();
             let terminal = TerminalValueSpec::ExitMultiple {
                 terminal_metric: 999.,
@@ -1891,7 +1889,11 @@ mod tests {
                 unreachable!()
             };
             assert_eq!(terminal_metric, 100.);
-            model.periods.periods.remove(0);
+            model.periods = finstack_quant_core::dates::PeriodPlan::try_new(
+                model.periods.get_calendar(),
+                model.periods[1..].to_vec(),
+            )
+            .unwrap();
             assert!(
                 resolve_exit_multiple_metric(&model, &results, terminal.clone(), Some("ebitda"))
                     .is_err()

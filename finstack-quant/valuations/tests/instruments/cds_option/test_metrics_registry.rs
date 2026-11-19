@@ -2,14 +2,11 @@
 
 use super::common::*;
 use finstack_quant_calibration::recalibration::bump_discount_curve_from_rate_calibration;
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, HazardCurve, RateCalibrationCurveRole, RateCalibrationMethod,
-    RateCalibrationPillar, RateCalibrationQuote, RateCalibrationRecipe,
+    DiscountCurve, HazardCurve, RateCalibrationRecipe,
 };
-use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations::pricer::STANDARD;
@@ -19,35 +16,6 @@ use time::macros::date;
 
 fn quote_calibrated_discount(rate: f64, as_of: finstack_quant_core::dates::Date) -> DiscountCurve {
     flat_discount("USD-OIS", as_of, rate)
-        .to_builder_with_id("USD-OIS")
-        .rate_calibration(RateCalibrationRecipe {
-            currency: Currency::USD,
-            method: RateCalibrationMethod::Bootstrap,
-            curve_day_count: DayCount::Act365F,
-            ois_compounding: None,
-            role: RateCalibrationCurveRole::Discount {
-                projection_curve_id: CurveId::new("USD-OIS"),
-            },
-            quotes: vec![
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("1Y".parse().unwrap()),
-                    rate,
-                },
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("5Y".parse().unwrap()),
-                    rate,
-                },
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("10Y".parse().unwrap()),
-                    rate,
-                },
-            ],
-        })
-        .build()
-        .unwrap()
 }
 
 fn bump_quote_calibrated_discount(
@@ -137,7 +105,11 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
         .knots([(1.0, 0.02), (5.0, 0.02), (10.0, 0.02)])
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let result = option
         .price_with_metrics(
@@ -156,7 +128,10 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
         let calibration = base_discount.rate_calibration().unwrap();
         let bumped_discount =
             bump_quote_calibrated_discount(base_discount.as_ref(), calibration, &market, bump_bp);
-        let bumped_market = market.clone().insert(bumped_discount);
+        let bumped_market = market
+            .clone()
+            .try_insert(bumped_discount)
+            .expect("insert market curve");
         option.value_raw(&bumped_market, as_of).unwrap()
     };
     let expected = (bumped_pv(1.0) - bumped_pv(-1.0)) / 2.0;
@@ -185,7 +160,11 @@ fn test_cds_option_dv01_falls_back_to_direct_bump_without_calibration() {
         .build()
         .unwrap();
     let hazard = flat_hazard("HZ-SN", as_of, 0.4, 0.02);
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let option = CdsOptionBuilder::new().build(as_of);
 
     let result = option
@@ -279,7 +258,11 @@ fn test_cds_option_cs01_requires_replay_recipe() {
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let option = CdsOptionBuilder::new().build(as_of);
 
     let pv = option.value(&market, as_of).unwrap();

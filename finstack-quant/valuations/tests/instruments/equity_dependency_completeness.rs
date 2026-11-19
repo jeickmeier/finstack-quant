@@ -99,17 +99,21 @@ fn test_commodity_spot_option_equity_dependencies_complete() {
 
     let mut market = MarketContext::new();
     for id in curve_deps.discount_curves.iter() {
-        market = market.insert(build_discount_curve(id.as_str(), 0.03));
+        market = market
+            .try_insert(build_discount_curve(id.as_str(), 0.03))
+            .expect("insert market curve");
     }
     for id in curve_deps.forward_curves.iter() {
-        market = market.insert(
-            finstack_quant_valuations_test_support::commodity_curves::flat_price_curve(
-                id.as_str(),
-                as_of,
-                100.0,
-                2.0,
-            ),
-        );
+        market = market
+            .try_insert(
+                finstack_quant_valuations_test_support::commodity_curves::flat_price_curve(
+                    id.as_str(),
+                    as_of,
+                    100.0,
+                    2.0,
+                ),
+            )
+            .expect("insert market curve");
     }
     for volatility in &market_deps.volatility_dependencies {
         market = market.insert_surface(build_vol_surface(volatility.vol_surface_id.as_str()));
@@ -163,10 +167,14 @@ fn test_missing_equity_spot_fails() {
 
     let mut market = MarketContext::new();
     for id in curve_deps.discount_curves.iter() {
-        market = market.insert(build_discount_curve(id.as_str(), 0.03));
+        market = market
+            .try_insert(build_discount_curve(id.as_str(), 0.03))
+            .expect("insert market curve");
     }
     for id in curve_deps.forward_curves.iter() {
-        market = market.insert(build_forward_curve(id.as_str(), 0.25, 0.04));
+        market = market
+            .try_insert(build_forward_curve(id.as_str(), 0.25, 0.04))
+            .expect("insert market curve");
     }
     for volatility in &market_deps.volatility_dependencies {
         market = market.insert_surface(build_vol_surface(volatility.vol_surface_id.as_str()));

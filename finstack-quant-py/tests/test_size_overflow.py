@@ -43,8 +43,9 @@ def test_merton_path_simulation_rejects_overflowing_sizes() -> None:
     assert len(model.simulate_paths(2, 4, 1.0, 7, False).asset_values) == 2 * 5
 
 
-def test_student_t_propagates_nan_instead_of_panicking() -> None:
-    assert math.isnan(special_functions.student_t_cdf(math.nan, 5.0))
+def test_student_t_rejects_nan_instead_of_panicking() -> None:
+    with pytest.raises(ValueError, match="non-NaN"):
+        special_functions.student_t_cdf(math.nan, 5.0)
     copula = correlation.CopulaSpec.student_t(5.0).build()
     assert math.isnan(copula.tail_dependence(math.nan))
     assert copula.tail_dependence(0.5) > 0.0

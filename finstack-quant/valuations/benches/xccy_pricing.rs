@@ -188,10 +188,14 @@ fn create_market() -> MarketContext {
     let fx = FxMatrix::new(provider, None);
 
     MarketContext::new()
-        .insert(usd_disc)
-        .insert(eur_disc)
-        .insert(usd_fwd)
-        .insert(eur_fwd)
+        .try_insert(usd_disc)
+        .expect("insert market curve")
+        .try_insert(eur_disc)
+        .expect("insert market curve")
+        .try_insert(usd_fwd)
+        .expect("insert market curve")
+        .try_insert(eur_fwd)
+        .expect("insert market curve")
         .insert_fx(fx)
 }
 
@@ -205,6 +209,7 @@ fn make_xccy(base: Date, maturity: Date, exchange: NotionalExchange) -> XccySwap
         notional: Money::new(usd_notional, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         leg: FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::from("USD-SOFR-3M"),
             discount_curve_id: CurveId::from("USD-OIS"),
             start: base,
@@ -227,6 +232,7 @@ fn make_xccy(base: Date, maturity: Date, exchange: NotionalExchange) -> XccySwap
         notional: Money::new(eur_notional, Currency::EUR).expect("valid money fixture"),
         side: PayReceive::Pay,
         leg: FloatLegSpec {
+            index_id: "EUR-EURIBOR-3M".into(),
             forward_curve_id: CurveId::from("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::from("EUR-OIS"),
             start: base,

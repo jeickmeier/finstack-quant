@@ -171,7 +171,9 @@ mod tests {
         // no time elapses.
         let as_of = date!(2026 - 01 - 15);
         let bond = zero_coupon_bond();
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
         let mut context = context_for(bond, market, as_of, Tenor::daily(), Some(0.05));
 
         let total = CarryDecompositionCalculator::with_clock(BondYieldClock)
@@ -202,7 +204,9 @@ mod tests {
             spec.schedule.business_day_convention =
                 finstack_quant_core::dates::BusinessDayConvention::Unadjusted;
         }
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
         let ytm: f64 = 0.047;
         let mut context = context_for(bond, market, as_of, Tenor::quarterly(), Some(ytm));
         let base_pv = context.base_value.amount();
@@ -253,7 +257,9 @@ mod tests {
             date!(2025 - 01 - 15),
             date!(2026 - 01 - 15),
         );
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
         let mut context = context_for(
             bond,
             market,
@@ -283,7 +289,9 @@ mod tests {
     fn test_zero_coupon_bond_flat_curve_has_positive_pull_to_par_and_no_roll_down() {
         let as_of = date!(2025 - 01 - 15);
         let bond = act365_semi_bond("ZERO365", 0.0, as_of, date!(2026 - 01 - 15));
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
         let ytm = street_equivalent_yield(0.05);
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(ytm));
         let base_pv = context.base_value.amount();
@@ -341,7 +349,9 @@ mod tests {
         // Coupons on Jan-15 / Jul-15; the 6M horizon [2025-01-20, 2025-07-20)
         // contains the 2025-07-15 coupon (~2.5 per 100).
         let bond = act365_semi_bond("CPN5", 0.05, date!(2025 - 01 - 15), date!(2030 - 01 - 15));
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
         let ytm = street_equivalent_yield(0.05);
         let mut context = context_for(bond, market, as_of, Tenor::semi_annual(), Some(ytm));
 
@@ -387,7 +397,9 @@ mod tests {
     fn test_missing_ytm_keeps_pull_to_par_zero() {
         let as_of = date!(2025 - 01 - 15);
         let bond = zero_coupon_bond();
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), None);
 
         CarryDecompositionCalculator::with_clock(BondYieldClock)
@@ -405,7 +417,9 @@ mod tests {
     fn test_missing_ytm_flags_decomposition_as_degenerate() {
         let as_of = date!(2025 - 01 - 15);
         let bond = zero_coupon_bond();
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), None);
 
         CarryDecompositionCalculator::with_clock(BondYieldClock)
@@ -437,7 +451,9 @@ mod tests {
     fn test_present_ytm_marks_decomposition_non_degenerate() {
         let as_of = date!(2025 - 01 - 15);
         let bond = zero_coupon_bond();
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
 
         CarryDecompositionCalculator::with_clock(BondYieldClock)
@@ -459,8 +475,10 @@ mod tests {
         let mut bond = zero_coupon_bond();
         bond.repo_curve_id = Some(CurveId::new("USD-REPO"));
         let market = MarketContext::new()
-            .insert(flat_discount_curve("USD-OIS", 0.05, as_of))
-            .insert(flat_discount_curve("USD-REPO", 0.02, as_of));
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve")
+            .try_insert(flat_discount_curve("USD-REPO", 0.02, as_of))
+            .expect("insert market curve");
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
         context.day_count = Some(DayCount::Thirty360);
 
@@ -520,8 +538,10 @@ mod tests {
         // continuously compounded forward rate is 5%, rather than its zero rate.
         let expected_factor = (0.05 * (t_end - t_start)).exp() - 1.0;
         let market = MarketContext::new()
-            .insert(flat_discount_curve("USD-OIS", 0.05, as_of))
-            .insert(repo);
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve")
+            .try_insert(repo)
+            .expect("insert market curve");
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
         context.day_count = None;
         let funding_cost = compute_funding_cost(&context, rolled)
@@ -541,7 +561,9 @@ mod tests {
     fn test_standard_registry_exposes_all_carry_metrics() {
         let as_of = date!(2025 - 01 - 15);
         let bond = zero_coupon_bond();
-        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_curve("USD-OIS", 0.05, as_of))
+            .expect("insert market curve");
 
         let result = bond
             .price_with_metrics(

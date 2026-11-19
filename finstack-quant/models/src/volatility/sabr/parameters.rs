@@ -1,75 +1,58 @@
 //! SABR model, smile, parameter, and calibration support.
 //!
-use finstack_quant_core::{Error, Result};
+use finstack_quant_core::Result;
+use finstack_quant_core::market_data::surfaces::SabrParameterData;
 
-/// SABR model parameters
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Parameters of a SABR backbone, with an optional signed rate displacement.
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(from = "SabrParameterData")]
 pub struct SabrParameters {
-    /// Initial volatility (alpha)
-    #[serde(
-        serialize_with = "finstack_quant_core::wire::serialize_positive_f64",
-        deserialize_with = "finstack_quant_core::wire::deserialize_positive_f64"
-    )]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::PositiveF64Wire")
-    )]
+    /// Positive initial volatility level.
     pub alpha: f64,
-    /// CEV exponent (beta) - typically 0 to 1
-    #[serde(
-        serialize_with = "finstack_quant_core::wire::serialize_closed_unit_interval_f64",
-        deserialize_with = "finstack_quant_core::wire::deserialize_closed_unit_interval_f64"
-    )]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::ClosedUnitIntervalF64Wire")
-    )]
+    /// CEV elasticity in the closed unit interval.
     pub beta: f64,
-    /// Volatility of volatility (nu/volvol)
-    #[serde(
-        serialize_with = "finstack_quant_core::wire::serialize_non_negative_f64",
-        deserialize_with = "finstack_quant_core::wire::deserialize_non_negative_f64"
-    )]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::NonNegativeF64Wire")
-    )]
+    /// Nonnegative volatility of volatility.
     pub nu: f64,
-    /// Correlation between asset and volatility (rho)
-    #[serde(
-        serialize_with = "finstack_quant_core::wire::serialize_correlation",
-        deserialize_with = "finstack_quant_core::wire::deserialize_correlation"
-    )]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::CorrelationWire")
-    )]
+    /// Brownian correlation strictly between minus one and one.
     pub rho: f64,
-    /// Shift parameter for handling negative rates (optional)
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "finstack_quant_core::wire::serialize_optional_positive_f64",
-        deserialize_with = "finstack_quant_core::wire::deserialize_optional_positive_f64"
-    )]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::PositiveF64Wire>")
-    )]
+    /// Finite model displacement in forward and strike units.
     pub shift: Option<f64>,
+}
+
+impl From<SabrParameterData> for SabrParameters {
+    fn from(node: SabrParameterData) -> Self {
+        Self {
+            alpha: node.alpha(),
+            beta: node.beta(),
+            rho: node.rho(),
+            nu: node.nu(),
+            shift: node.shift(),
+        }
+    }
+}
+
+impl serde::Serialize for SabrParameters {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        self.to_node()
+            .map_err(serde::ser::Error::custom)?
+            .serialize(serializer)
+    }
 }
 
 impl SabrParameters {
     /// Create new SABR parameters with validation.
     ///
-    /// Enforces market-standard parameter bounds:
-    /// - α (alpha) > 0: Initial volatility must be positive
-    /// - β (beta) ∈ [0, 1]: CEV exponent (0=normal, 1=lognormal)
-    /// - ν (nu) ≥ 0: Volatility of volatility must be non-negative
-    /// - ρ (rho) ∈ [-1, 1]: Correlation must be valid
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha` - Positive initial volatility coefficient, expressed in the units of the CEV backbone.
+    /// * `beta` - CEV elasticity between zero and one, inclusive.
+    /// * `nu` - Nonnegative volatility of volatility per square root of a year.
+    /// * `rho` - Instantaneous Brownian correlation strictly between −1 and 1.
     pub fn new(alpha: f64, beta: f64, nu: f64, rho: f64) -> Result<Self> {
         let parameters = Self {
             alpha,
@@ -86,41 +69,14 @@ impl SabrParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] when any parameter is non-finite or lies
-    /// outside its market-standard range, including a non-positive shift.
+    /// Returns [`finstack_quant_core::Error::Validation`] when any parameter is non-finite or lies
+    /// outside its market-standard range, including a non-finite shift.
     pub fn validate(&self) -> Result<()> {
-        if !self.alpha.is_finite() || self.alpha <= 0.0 {
-            return Err(Error::Validation(format!(
-                "SABR parameter α (alpha) must be positive, got: {:.6}",
-                self.alpha
-            )));
-        }
-        if !self.beta.is_finite() || !(0.0..=1.0).contains(&self.beta) {
-            return Err(Error::Validation(format!(
-                "SABR parameter β (beta) must be in [0, 1], got: {:.6}",
-                self.beta
-            )));
-        }
-        if !self.nu.is_finite() || self.nu < 0.0 {
-            return Err(Error::Validation(format!(
-                "SABR parameter ν (nu) must be non-negative, got: {:.6}",
-                self.nu
-            )));
-        }
-        if !self.rho.is_finite() || !(-1.0..=1.0).contains(&self.rho) {
-            return Err(Error::Validation(format!(
-                "SABR parameter ρ (rho) must be in [-1, 1], got: {:.6}",
-                self.rho
-            )));
-        }
-        if let Some(shift) = self.shift
-            && (!shift.is_finite() || shift <= 0.0)
-        {
-            return Err(Error::Validation(format!(
-                "SABR shift parameter must be positive for negative rate support, got: {shift:.6}"
-            )));
-        }
-        Ok(())
+        self.to_node().map(|_| ())
+    }
+
+    fn to_node(&self) -> Result<SabrParameterData> {
+        SabrParameterData::new(self.alpha, self.beta, self.nu, self.rho, self.shift)
     }
 
     /// Rates market standard (beta = 0.5).
@@ -128,6 +84,12 @@ impl SabrParameters {
     /// # Errors
     ///
     /// Returns an error if any SABR parameter is invalid.
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha` - Positive initial volatility coefficient, expressed in the units of the CEV backbone.
+    /// * `nu` - Nonnegative volatility of volatility per square root of a year.
+    /// * `rho` - Instantaneous Brownian correlation strictly between −1 and 1.
     pub fn rates_standard(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
         Self::new(alpha, 0.5, nu, rho)
     }
@@ -135,14 +97,14 @@ impl SabrParameters {
     /// Create new SABR parameters with shift for negative rates.
     ///
     /// Same validation as `new()` plus shift validation:
-    /// - shift > 0: Shift must be positive for negative rate support
+    /// - The signed shift must be finite; Black evaluation checks effective rates.
     ///
     /// # Arguments
     ///
     /// * `alpha` - SABR or SVI alpha parameter controlling the overall volatility level
     /// * `beta` - SABR beta CEV exponent controlling the backbone between 0 and 1
     /// * `nu` - SABR vol-of-vol parameter controlling smile wing curvature
-    /// * `rho` - Instantaneous correlation between Brownian drivers, in `[-1, 1]`
+    /// * `rho` - Instantaneous correlation between Brownian drivers, in `(-1, 1)`
     /// * `shift` - Displacement shift applied to forward/strike for negative-rate SABR
     pub fn new_with_shift(alpha: f64, beta: f64, nu: f64, rho: f64, shift: f64) -> Result<Self> {
         let mut params = Self::new(alpha, beta, nu, rho)?;
@@ -151,22 +113,48 @@ impl SabrParameters {
         Ok(params)
     }
 
-    /// Create parameters for normal SABR (beta = 0)
+    /// Create an additive SABR backbone (beta = 0).
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha` - Positive initial volatility coefficient, expressed in the units of the CEV backbone.
+    /// * `nu` - Nonnegative volatility of volatility per square root of a year.
+    /// * `rho` - Instantaneous Brownian correlation strictly between −1 and 1.
     pub fn normal(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
         Self::new(alpha, 0.0, nu, rho)
     }
 
-    /// Create parameters for lognormal SABR (beta = 1)
+    /// Create a multiplicative SABR backbone (beta = 1).
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha` - Positive initial volatility coefficient, expressed in the units of the CEV backbone.
+    /// * `nu` - Nonnegative volatility of volatility per square root of a year.
+    /// * `rho` - Instantaneous Brownian correlation strictly between −1 and 1.
     pub fn lognormal(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
         Self::new(alpha, 1.0, nu, rho)
     }
 
-    /// Create parameters for shifted normal SABR (beta = 0, with shift)
+    /// Create a displaced additive SABR backbone (beta = 0).
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha` - Positive initial volatility coefficient, expressed in the units of the CEV backbone.
+    /// * `nu` - Nonnegative volatility of volatility per square root of a year.
+    /// * `rho` - Instantaneous Brownian correlation strictly between −1 and 1.
+    /// * `shift` - Finite displacement added to rates and strikes in their native units.
     pub fn shifted_normal(alpha: f64, nu: f64, rho: f64, shift: f64) -> Result<Self> {
         Self::new_with_shift(alpha, 0.0, nu, rho, shift)
     }
 
-    /// Create parameters for shifted lognormal SABR (beta = 1, with shift)
+    /// Create a displaced multiplicative SABR backbone (beta = 1).
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha` - Positive initial volatility coefficient, expressed in the units of the CEV backbone.
+    /// * `nu` - Nonnegative volatility of volatility per square root of a year.
+    /// * `rho` - Instantaneous Brownian correlation strictly between −1 and 1.
+    /// * `shift` - Finite displacement added to rates and strikes in their native units.
     pub fn shifted_lognormal(alpha: f64, nu: f64, rho: f64, shift: f64) -> Result<Self> {
         Self::new_with_shift(alpha, 1.0, nu, rho, shift)
     }
@@ -249,7 +237,7 @@ mod tests {
                 ..SabrParameters::rates_default()
             },
             SabrParameters {
-                shift: Some(0.0),
+                rho: 1.0,
                 ..SabrParameters::rates_default()
             },
         ];
@@ -263,7 +251,7 @@ mod tests {
             json!({"alpha": 0.02, "beta": 1.1, "nu": 0.3, "rho": 0.0}),
             json!({"alpha": 0.02, "beta": 0.5, "nu": -0.1, "rho": 0.0}),
             json!({"alpha": 0.02, "beta": 0.5, "nu": 0.3, "rho": 1.1}),
-            json!({"alpha": 0.02, "beta": 0.5, "nu": 0.3, "rho": 0.0, "shift": 0.0}),
+            json!({"alpha": 0.02, "beta": 0.5, "nu": 0.3, "rho": -1.0, "shift": 0.0}),
             json!({"alpha": 0.02, "beta": 0.5, "nu": 0.3, "rho": 0.0, "extra": true}),
         ] {
             assert!(serde_json::from_value::<SabrParameters>(value).is_err());
@@ -274,12 +262,11 @@ mod tests {
     fn generated_schema_carries_all_sabr_bounds() {
         let schema =
             serde_json::to_value(schemars::schema_for!(SabrParameters)).expect("SABR schema");
-        assert_eq!(schema["additionalProperties"], false);
-        assert_eq!(schema["$defs"]["PositiveF64Wire"]["exclusiveMinimum"], 0.0);
-        assert_eq!(schema["$defs"]["ClosedUnitIntervalF64Wire"]["minimum"], 0.0);
-        assert_eq!(schema["$defs"]["ClosedUnitIntervalF64Wire"]["maximum"], 1.0);
-        assert_eq!(schema["$defs"]["NonNegativeF64Wire"]["minimum"], 0.0);
-        assert_eq!(schema["$defs"]["CorrelationWire"]["minimum"], -1.0);
-        assert_eq!(schema["$defs"]["CorrelationWire"]["maximum"], 1.0);
+        let node = &schema["$defs"]["SabrParameterData"];
+        let node = if node.is_null() { &schema } else { node };
+        assert_eq!(node["additionalProperties"], false);
+        assert_eq!(node["properties"]["alpha"]["exclusiveMinimum"], 0.0);
+        assert_eq!(node["properties"]["rho"]["exclusiveMinimum"], -1.0);
+        assert_eq!(node["properties"]["rho"]["exclusiveMaximum"], 1.0);
     }
 }

@@ -99,7 +99,8 @@ fn create_test_market_context() -> MarketContext {
         .expect("should succeed");
 
     MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
@@ -174,7 +175,8 @@ fn deep_itm_convertible_matches_parity_on_non_flat_curve() {
     // Spot 5000 with ratio 10 => conversion value 50,000 >> 1,000 face,
     // so the redemption floor contributes only a ~1e-12 tail probability.
     let market = MarketContext::new()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_price(
             "AAPL",
             MarketScalar::unitless(5000.0).expect("valid scalar"),
@@ -238,7 +240,8 @@ fn dividend_protection_restores_parity_independent_of_yield() {
             .build()
             .expect("curve");
         MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_price(
                 "AAPL",
                 MarketScalar::unitless(5000.0).expect("valid scalar"),
@@ -387,7 +390,8 @@ fn theta_rolls_the_discount_curve() {
         .build()
         .expect("steep curve");
     let market = MarketContext::new()
-        .insert(steep_curve)
+        .try_insert(steep_curve)
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
@@ -476,7 +480,8 @@ fn test_mandatory_conversion_forced_at_loss() {
         .expect("should succeed");
 
     let market = MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(50.0).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
@@ -565,7 +570,8 @@ fn call_branch_does_not_force_disallowed_conversion() {
         .build()
         .expect("curve");
     let market = MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price(
             "AAPL",
             MarketScalar::unitless(5000.0).expect("valid scalar"),
@@ -830,7 +836,9 @@ fn theta_propagates_market_roll_failure() {
         .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
         .build()
         .expect("sparse curve");
-    let market = create_test_market_context().insert(sparse);
+    let market = create_test_market_context()
+        .try_insert(sparse)
+        .expect("insert market curve");
     let next_day = as_of.next_day().expect("next day");
     assert!(
         market.condition(next_day).is_err(),
@@ -942,8 +950,10 @@ fn atm_credit_risky_case(spot: f64) -> (ConvertibleBond, MarketContext) {
             .build()
             .expect("hazard curve");
     let market = MarketContext::new()
-        .insert(ois)
-        .insert(hazard)
+        .try_insert(ois)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
@@ -1070,7 +1080,7 @@ fn lifecycle_bond() -> ConvertibleBond {
 
 fn lifecycle_market(as_of: Date, spot: f64) -> MarketContext {
     MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 1.0), (10.0, 1.0)])
@@ -1080,6 +1090,7 @@ fn lifecycle_market(as_of: Date, spot: f64) -> MarketContext {
                 .build()
                 .expect("flat curve"),
         )
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
@@ -1100,10 +1111,12 @@ fn convertible_forced_delivery_overrides_put_and_retains_risky_coupon() {
     let as_of = date!(2025 - 01 - 01);
     let event = date!(2025 - 07 - 01);
     for hazard in [0.0, 0.1] {
-        let market = lifecycle_market(as_of, 50.0).insert(
-            HazardCurve::flat("CREDIT", as_of, hazard, 0.0, DayCount::Act365F)
-                .expect("hazard curve"),
-        );
+        let market = lifecycle_market(as_of, 50.0)
+            .try_insert(
+                HazardCurve::flat("CREDIT", as_of, hazard, 0.0, DayCount::Act365F)
+                    .expect("hazard curve"),
+            )
+            .expect("insert market curve");
         for policy in [
             ConversionPolicy::MandatoryOn(event),
             ConversionPolicy::MandatoryVariable {
@@ -1252,7 +1265,7 @@ fn convertible_amortization_and_pik_follow_the_live_debt_schedule() {
             "AAPL-VOL",
             MarketScalar::unitless(0.25).expect("valid scalar"),
         )
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, (-1.0_f64).exp())])
@@ -1261,7 +1274,8 @@ fn convertible_amortization_and_pik_follow_the_live_debt_schedule() {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve"),
-        );
+        )
+        .expect("insert market curve");
     for pik in [false, true] {
         let CashflowSpec::Fixed(mut spec) = create_test_bond().cashflow_spec else {
             unreachable!("fixed fixture")
@@ -1287,16 +1301,19 @@ fn convertible_amortization_and_pik_follow_the_live_debt_schedule() {
             let hazard = 0.07;
             bond.credit_curve_id = Some("CREDIT".into());
             bond.recovery_rate = Some(recovery);
-            let market = market.clone().insert(
-                finstack_quant_core::market_data::term_structures::HazardCurve::flat(
-                    "CREDIT",
-                    as_of,
-                    hazard,
-                    recovery,
-                    DayCount::Act365F,
+            let market = market
+                .clone()
+                .try_insert(
+                    finstack_quant_core::market_data::term_structures::HazardCurve::flat(
+                        "CREDIT",
+                        as_of,
+                        hazard,
+                        recovery,
+                        DayCount::Act365F,
+                    )
+                    .expect("hazard"),
                 )
-                .expect("hazard"),
-            );
+                .expect("insert market curve");
             let k = 0.1 + hazard;
             let (first, last, second_balance) = if pik {
                 (55.0, 60.5, 55.0)
@@ -1397,7 +1414,7 @@ fn convertible_clean_price_excludes_cash_paid_before_settlement() {
             "AAPL-VOL",
             MarketScalar::unitless(0.25).expect("valid scalar"),
         )
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, (-0.5_f64).exp())])
@@ -1406,7 +1423,8 @@ fn convertible_clean_price_excludes_cash_paid_before_settlement() {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
-        );
+        )
+        .expect("insert market curve");
     let settle = settlement_date(&bond, as_of).expect("settlement");
     assert_eq!(settle, date!(2025 - 07 - 02));
     let discount = market.get_discount("USD-OIS").expect("curve");

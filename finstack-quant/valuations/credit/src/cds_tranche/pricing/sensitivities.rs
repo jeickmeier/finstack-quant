@@ -9,7 +9,7 @@ use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
-use finstack_quant_core::math::distributions::BinomialPmf;
+use finstack_quant_core::math::distributions::binomial_pmf_all_into;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::instruments::CdsDateRegime;
@@ -74,14 +74,14 @@ impl CdsTranchePricer {
     /// Uses the binomial distribution to sum over all possible numbers of defaults.
     pub(super) fn conditional_equity_tranche_capped(
         &self,
-        binomial: &BinomialPmf,
+        num_constituents: usize,
         cap_notional: f64,
         conditional_default_prob: f64,
         exposure: f64,
     ) -> Result<f64> {
-        let individual_notional = 1.0 / binomial.get_count() as f64; // Normalized to 1.0 total
+        let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
 
-        with_conditional_pmf(binomial, conditional_default_prob, |pmf| {
+        with_conditional_pmf(num_constituents, conditional_default_prob, |pmf| {
             let mut expected = 0.0;
 
             // Sum over all possible numbers of defaults
@@ -103,15 +103,15 @@ impl CdsTranchePricer {
     /// distribution.
     pub(super) fn conditional_equity_tranche_pair(
         &self,
-        binomial: &BinomialPmf,
+        num_constituents: usize,
         loss_cap: f64,
         recovery_cap: f64,
         conditional_default_prob: f64,
         loss_exposure: f64,
         recovery_exposure: f64,
     ) -> Result<(f64, f64)> {
-        let individual_notional = 1.0 / binomial.get_count() as f64;
-        with_conditional_pmf(binomial, conditional_default_prob, |pmf| {
+        let individual_notional = 1.0 / num_constituents as f64;
+        with_conditional_pmf(num_constituents, conditional_default_prob, |pmf| {
             let mut loss = 0.0;
             let mut recovery = 0.0;
             for (k, &prob_k_defaults) in pmf.iter().enumerate() {
@@ -127,9 +127,7 @@ impl CdsTranchePricer {
     ///
     /// Clamps the result to `[0.0, 1.0]` to guard against floating-point rounding
     /// in the credit-curve interpolation producing a survival probability marginally
-    /// outside `[0, 1]`.  Without the clamp a negative `default_prob` would reach
-    /// `standard_normal_inv_cdf` (via the homogeneous Gaussian path), which panics
-    /// for arguments strictly outside `[0, 1]` (see Task C2).
+    /// outside `[0, 1]`. Downstream copula transforms require a probability.
     pub(super) fn get_default_probability(
         &self,
         index_data: &CreditIndexData,
@@ -147,66 +145,6 @@ impl CdsTranchePricer {
             date,
             finstack_quant_core::dates::DayCountContext::default(),
         )
-    }
-
-    /// Create a bumped base correlation curve for sensitivity analysis.
-    ///
-    /// Applies a **pure parallel shift** of `bump_abs` to every knot
-    /// correlation. This is a genuine symmetric perturbation: the up-bump
-    /// (`+h`) and down-bump (`−h`) are exact mirror images, which is required
-    /// for the central-difference Correlation01
-    /// `(PV(+h) − PV(−h)) / (2h)` to be unbiased.
-    ///
-    /// # Why no monotonicity repair
-    ///
-    /// A parallel shift of a monotone curve is *itself* monotone — shifting
-    /// every point by the same `h` preserves the ordering exactly. The
-    /// previous implementation ran a monotonicity-repair loop *after*
-    /// bumping; that loop only ever fired because of the additional
-    /// `[MIN_CORRELATION, MAX_CORRELATION]` clamp, and when it did fire it
-    /// adjusted the up- and down-bumped curves *differently* — destroying the
-    /// symmetry of the central difference and biasing Correlation01 near
-    /// base-correlation-curve kinks. The repair loop has therefore been
-    /// removed and decreasing correlation shapes remain representable so the
-    /// pure shift is never silently re-shaped.
-    ///
-    /// # Bounds
-    ///
-    /// Correlations are clamped only to the curve type's hard `[0, 1]`
-    /// domain (a `BaseCorrelationCurve` cannot hold values outside it). For
-    /// realistic curves (`ρ ≈ 0.2–0.9`) and realistic bumps (`h ≈ 0.01`)
-    /// this clamp never fires, so symmetry is preserved. The
-    /// numerical-stability band `[MIN_CORRELATION, MAX_CORRELATION]` is *not*
-    /// applied here — it is enforced downstream by
-    /// [`Self::smooth_correlation_boundary`] inside the EL evaluation;
-    /// re-applying it here would double-clamp and re-introduce the
-    /// asymmetry this fix removes.
-    pub(super) fn bump_base_correlation(
-        &self,
-        original_curve: &finstack_quant_core::market_data::term_structures::BaseCorrelationCurve,
-        bump_abs: f64,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_core::market_data::term_structures::BaseCorrelationCurve,
-    > {
-        use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
-
-        // Pure parallel shift. Clamp only to the [0, 1] correlation domain
-        // the curve type requires; no min/max-correlation band, no
-        // monotonicity repair — both broke the up/down bump symmetry.
-        let bumped_points: Vec<(f64, f64)> = original_curve
-            .detachment_points()
-            .iter()
-            .zip(original_curve.correlations().iter())
-            .map(|(&detach, &corr)| (detach, (corr + bump_abs).clamp(0.0, 1.0)))
-            .collect();
-
-        // `allow_non_monotonic`: a parallel shift of a monotone curve stays
-        // monotone, but a non-monotone *input* curve must not be silently
-        // rejected by the sensitivity path — the bump is a perturbation, not
-        // an arbitrage-free pricing curve.
-        BaseCorrelationCurve::builder("TEMP_BUMPED_CORR")
-            .knots(bumped_points)
-            .build()
     }
 
     /// Calculate prior realized loss on the tranche as a fraction of original tranche notional.
@@ -491,7 +429,17 @@ impl CdsTranchePricer {
     /// the base-correlation curve, matching the per-1% convention of
     /// `Recovery01`. The curve is bumped by `CORRELATION_BUMP` (0.01 absolute),
     /// the same shift the quanto Correlation01 uses, which is also the
-    /// reporting unit.
+    /// reporting unit. Both shocked curves must stay within the closed unit interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche` - Index tranche whose mark is repriced under both correlation shifts.
+    /// * `market` - Base snapshot containing its index, hazard, correlation and discount curves.
+    /// * `as_of` - Valuation date for both shocked marks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either parallel shock leaves the correlation domain, or if repricing fails.
     #[must_use = "Correlation01 result should be used for hedging"]
     pub fn calculate_correlation_delta(
         &self,
@@ -503,34 +451,13 @@ impl CdsTranchePricer {
         let bump_abs = finstack_quant_valuations_core::metrics::CORRELATION_BUMP;
         let original_index_arc = market.get_credit_index(&tranche.credit_index_id)?;
 
-        // Central difference: (PV_up - PV_down) / (2 * bump) for O(h²) accuracy
-        let bumped_corr_curve_up =
-            self.bump_base_correlation(original_index_arc.base_correlation_curve(), bump_abs)?;
-        let bumped_corr_curve_down =
-            self.bump_base_correlation(original_index_arc.base_correlation_curve(), -bump_abs)?;
-
-        let bumped_index_up = original_index_arc
-            .to_builder()
-            .base_correlation_curve(std::sync::Arc::new(bumped_corr_curve_up))
-            .build()?;
-
-        let bumped_index_down = original_index_arc
-            .to_builder()
-            .base_correlation_curve(std::sync::Arc::new(bumped_corr_curve_down))
-            .build()?;
-
+        let curve = original_index_arc.base_correlation_curve();
         let ctx_up = market
             .clone()
-            .insert(std::sync::Arc::clone(
-                bumped_index_up.base_correlation_curve(),
-            ))
-            .insert_credit_index(&tranche.credit_index_id, bumped_index_up)?;
+            .try_insert(curve.apply_bucket_bump(None, bump_abs)?)?;
         let ctx_down = market
             .clone()
-            .insert(std::sync::Arc::clone(
-                bumped_index_down.base_correlation_curve(),
-            ))
-            .insert_credit_index(&tranche.credit_index_id, bumped_index_down)?;
+            .try_insert(curve.apply_bucket_bump(None, -bump_abs)?)?;
 
         let pv_up = self
             .price_validated_tranche(tranche, &ctx_up, as_of)?
@@ -597,8 +524,8 @@ impl CdsTranchePricer {
             let mut sorted_ids: Vec<&str> = curves.keys().map(String::as_str).collect();
             sorted_ids.sort();
             for id in sorted_ids {
-                let individual_weight = index_data.get_issuer_weight(id);
-                let recovery = index_data.get_issuer_recovery(id);
+                let individual_weight = index_data.get_issuer_weight(id)?;
+                let recovery = index_data.get_issuer_recovery(id)?;
                 impacts.push(impact_of(individual_weight * (1.0 - recovery)));
             }
         } else {
@@ -623,24 +550,19 @@ impl CdsTranchePricer {
 /// `(N + 1)`-element vector on every call. The buffer is thread-local, so
 /// parallel tranche pricing remains correct and deterministic.
 fn with_conditional_pmf<T>(
-    binomial: &BinomialPmf,
+    num_constituents: usize,
     conditional_default_prob: f64,
     f: impl FnOnce(&[f64]) -> T,
 ) -> Result<T> {
     #[cfg(test)]
     PMF_EVALUATIONS.with(|count| count.set(count.get() + 1));
-    if !conditional_default_prob.is_finite() {
-        return Err(Error::Validation(
-            "conditional default probability must be finite".to_owned(),
-        ));
-    }
     thread_local! {
         static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
             const { std::cell::RefCell::new(Vec::new()) };
     }
     PMF_SCRATCH.with(|cell| {
         let mut pmf = cell.borrow_mut();
-        binomial.fill(&mut pmf, conditional_default_prob)?;
+        binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
         Ok(f(&pmf))
     })
 }
@@ -679,10 +601,10 @@ mod tests {
         let pricer = CdsTranchePricer::new();
         let el = pricer
             .conditional_equity_tranche_capped(
-                &BinomialPmf::new(125), // num_constituents
-                0.03,                   // cap_notional (3% equity tranche)
-                0.10,                   // conditional default probability
-                1.0 - 0.40,             // exposure = LGD at 40% recovery
+                125,        // num_constituents
+                0.03,       // cap_notional (3% equity tranche)
+                0.10,       // conditional default probability
+                1.0 - 0.40, // exposure = LGD at 40% recovery
             )
             .expect("valid probability should produce an expected loss");
         assert!(
@@ -716,7 +638,7 @@ mod tests {
     #[test]
     fn index_sized_homogeneous_pool_uses_finite_binomial() {
         let binomial = CdsTranchePricer::new()
-            .conditional_equity_tranche_capped(&BinomialPmf::new(125), 0.08, 0.20, 0.60)
+            .conditional_equity_tranche_capped(125, 0.08, 0.20, 0.60)
             .expect("binomial");
         let lhp = (0.20_f64 * 0.60).min(0.08);
         assert!(
@@ -727,10 +649,13 @@ mod tests {
     }
 
     #[test]
-    fn conditional_equity_tranche_rejects_nan_probability() {
-        let error = CdsTranchePricer::new()
-            .conditional_equity_tranche_capped(&BinomialPmf::new(125), 0.03, f64::NAN, 0.60)
-            .expect_err("NaN conditional probability must fail before integration");
-        assert!(matches!(error, finstack_quant_core::Error::Validation(_)));
+    fn conditional_equity_tranche_rejects_invalid_probabilities() {
+        let pricer = CdsTranchePricer::new();
+        for probability in [f64::NAN, -0.01, 1.01, f64::INFINITY] {
+            let error = pricer
+                .conditional_equity_tranche_capped(125, 0.03, probability, 0.60)
+                .expect_err("invalid conditional probability must fail before integration");
+            assert!(matches!(error, finstack_quant_core::Error::Validation(_)));
+        }
     }
 }

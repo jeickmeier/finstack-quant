@@ -1029,13 +1029,33 @@ def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = No
                     extrapolation="extend",
                 )
             )
-        market.insert(PriceCurve("VIX", as_of, [(0.0, 20.0), (0.25, 22.0), (0.5, 23.0), (1.0, 24.0)], kind="vol_index"))
+        market.insert(
+            PriceCurve({
+                "id": "VIX",
+                "base_date": as_of,
+                "knots": [(0.0, 20.0), (0.25, 22.0), (0.5, 23.0), (1.0, 24.0)],
+                "kind": "vol_index",
+                "day_count": "act_365f",
+                "interp": "linear",
+                "extrapolation": "flat",
+            })
+        )
         for ticker, prices, sigma in (
             ("WTI", (75.0, 74.0, 72.0, 70.0), 0.30),
             ("BRENT", (78.0, 77.0, 75.0, 73.0), 0.28),
             ("NG", (3.0, 3.3, 3.1, 3.5), 0.45),
         ):
-            market.insert(PriceCurve(f"{ticker}-FORWARD", as_of, list(zip((0.0, 0.5, 1.0, 2.0), prices, strict=True))))
+            market.insert(
+                PriceCurve({
+                    "id": f"{ticker}-FORWARD",
+                    "base_date": as_of,
+                    "knots": list(zip((0.0, 0.5, 1.0, 2.0), prices, strict=True)),
+                    "kind": "price",
+                    "day_count": "act_365f",
+                    "interp": "linear",
+                    "extrapolation": "flat",
+                })
+            )
             strikes = [1.0, 3.0, 6.0] if ticker == "NG" else [20.0, 75.0, 150.0]
             market.insert(
                 VolSurface(

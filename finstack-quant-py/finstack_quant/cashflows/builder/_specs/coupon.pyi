@@ -269,7 +269,10 @@ class FloatingCouponSpec:
     ... )
     >>> from finstack_quant.core.dates import Tenor
     >>> rate_spec = FloatingRateSpec(
-    ...     forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+    ...     index_id="USD-SOFR-3M",
+    ...     forward_curve_id="USD-SOFR-3M",
+    ...     spread_bp=Decimal("200"),
+    ...     reset_frequency=Tenor.parse("3M"),
     ... )
     >>> spec = FloatingCouponSpec(rate_spec, ScheduleParams.usd_sofr_swap())
     >>> spec.rate_spec.forward_curve_id
@@ -505,7 +508,10 @@ class FloatingRateSpec:
     >>> from finstack_quant.cashflows.builder import FloatingRateSpec
     >>> from finstack_quant.core.dates import Tenor
     >>> spec = FloatingRateSpec(
-    ...     forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+    ...     index_id="USD-SOFR-3M",
+    ...     forward_curve_id="USD-SOFR-3M",
+    ...     spread_bp=Decimal("200"),
+    ...     reset_frequency=Tenor.parse("3M"),
     ... )
     >>> spec.forward_curve_id
     'USD-SOFR-3M'
@@ -514,6 +520,7 @@ class FloatingRateSpec:
     def __init__(
         self,
         *,
+        index_id: str,
         forward_curve_id: str,
         spread_bp: Decimal | str,
         reset_frequency: Tenor,
@@ -541,6 +548,8 @@ class FloatingRateSpec:
 
         Parameters
         ----------
+        index_id : str
+            Contractual fixing series identifier without the FIXING prefix.
         forward_curve_id : str
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
         spread_bp : decimal.Decimal | str
@@ -623,10 +632,24 @@ class FloatingRateSpec:
         >>> from finstack_quant.cashflows.builder import FloatingRateSpec
         >>> from finstack_quant.core.dates import Tenor
         >>> spec = FloatingRateSpec(
-        ...     forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+        ...     index_id="USD-SOFR-3M",
+        ...     forward_curve_id="USD-SOFR-3M",
+        ...     spread_bp=Decimal("200"),
+        ...     reset_frequency=Tenor.parse("3M"),
         ... )
         >>> (spec.gearing, spec.reset_lag_days)
         (Decimal('1'), 2)
+        """
+        ...
+
+    @property
+    def index_id(self) -> str:
+        """Return the observed index used to resolve historical fixings.
+
+        Returns
+        -------
+        str
+            Contractual index name without the FIXING prefix. Access does not raise domain errors.
         """
         ...
 

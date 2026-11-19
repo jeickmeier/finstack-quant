@@ -1,14 +1,20 @@
 # FEATURES-017: Centered unit-gross, rank and inverse-risk signal weights
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** The three weight compositions are implemented. Stable inverse-risk scaling and final allocation checks require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** An exact inverse-risk example checked a representable allocation despite overflowing raw ratios. Rust fixtures were inspected. Extreme ratios and net and gross checks remain pending.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Demean eligible signals within each partition and divide each centered signal by their sum of absolute magnitudes. A varying partition targets net zero and gross one. A constant partition, including a singleton, gives zero weights. Preserve missing rows. Rank-derived weights first apply the accepted closed ranks. [Rank convention](15-cross-sectional-ranks-and-normal-scores.md).
+2. For inverse-risk weights, divide each eligible signal by aligned positive volatility before demeaning. Zero, absent, or nonfinite volatility makes the row unavailable. Any finite negative volatility fails the call, including at a missing signal. The caller supplies a comparable volatility basis and horizon.
+3. Check final net and gross targets with a rounding tolerance. Use a common scale for inverse-risk signals so representable final weights remain available when raw ratios would overflow. Two signals of f64::MAX with volatilities 0.5 and 0.25 have exact weights [−0.5, +0.5].
+
+## Observed scope and selection
 
 `LongShortWeights` accepts no parameters. `rank_to_weights` explicitly chains closed cross-sectional ranks into this transform; `risk_scaled_weights` first divides by row-aligned positive volatility. Each exact time partition is normalized independently. These are signal-to-weight helpers, not portfolio optimizers: no holdings, covariance matrix, transaction costs, leverage budget or exposure constraints other than demeaning/gross normalization are inputs.
 
@@ -30,9 +36,7 @@ Source documentation specifies the demeaning and gross denominator. Proposed rat
 - Owning [long-short kernel](../../../../finstack-quant/features/src/cross_sectional.rs) `long_short_weights`; [compositions](../../../../finstack-quant/features/src/multi.rs) `rank_to_weights`, `risk_scaled_weights`.
 - Inspected [transform tests](../../../../finstack-quant/features/tests/transforms.rs): hand centered weights, flat-rank zeros and risk-scaled equal groups. Inspected [audit regressions](../../../../finstack-quant/features/tests/audit_regressions.rs): scale invariance and rejection of a finite negative volatility. Typical tolerances are 1e-12 absolute in transform tests and 1e-11*max(1,abs(expected)) in audit tests.
 
-Raw overflow is an observed check; avoidable failure for a representable final allocation has not been reproduced.
-
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

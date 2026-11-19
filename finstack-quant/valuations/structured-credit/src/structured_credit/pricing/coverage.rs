@@ -1520,8 +1520,12 @@ mod haircut_tests {
             finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("fixing series");
-        let market = MarketContext::new().insert(forward).insert_series(fixing);
+        let market = MarketContext::new()
+            .try_insert(forward)
+            .expect("insert market curve")
+            .insert_series(fixing);
         let floating_coupon = RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-3M".into(),
             forward_curve_id,
             spread_bp: Decimal::from(100),
             gearing: Decimal::ONE,

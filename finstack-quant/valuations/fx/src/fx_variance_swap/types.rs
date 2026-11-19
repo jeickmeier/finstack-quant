@@ -120,6 +120,14 @@ pub struct FxVarianceSwap {
     /// Series ID for close prices. Defaults to `spot_id` (or currency-pair string) when absent.
     #[serde(default)]
     pub close_series_id: Option<String>,
+    /// Contractual closing fixing immediately before the first Yang–Zhang target bar.
+    /// Resolved exactly in the same close series as the target bars.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub previous_close_date: Option<Date>,
     /// Pay/receive variance
     pub side: PayReceive,
     /// Domestic currency discount curve ID

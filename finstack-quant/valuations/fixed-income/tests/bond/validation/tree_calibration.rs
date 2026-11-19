@@ -151,7 +151,9 @@ fn test_callable_bond_tree_pricing_reasonable() {
     callable_bond.call_put = Some(call_schedule);
 
     let curve = create_flat_curve(as_of, 0.04, "USD-OIS");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let straight_pv = straight_bond.value(&market, as_of).unwrap();
     let callable_pv = callable_bond.value(&market, as_of).unwrap();
@@ -226,7 +228,9 @@ fn test_tree_convergence_with_steps() {
     callable_bond.call_put = Some(call_schedule);
 
     let curve = create_flat_curve(as_of, 0.05, "USD-OIS");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     // Price with default tree (100 steps)
     let pv_100 = callable_bond.value(&market, as_of).unwrap();
@@ -292,7 +296,9 @@ fn test_putable_bond_tree_pricing_reasonable() {
     putable_bond.call_put = Some(put_schedule);
 
     let curve = create_flat_curve(as_of, 0.07, "USD-OIS");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let straight_pv = straight_bond.value(&market, as_of).unwrap();
     let putable_pv = putable_bond.value(&market, as_of).unwrap();

@@ -191,7 +191,7 @@ impl MertonModel {
         let mut times: Vec<f64> = reserve_values(values_per_path)?;
         let mut normals: Vec<f64> = reserve_values(num_steps)?;
         normals.resize(num_steps, 0.0);
-        let mut rng = Pcg64Rng::new(seed);
+        let mut rng = Pcg64Rng::new(seed, 0);
 
         let dt = horizon / num_steps as f64;
         let sqrt_dt = dt.sqrt();
@@ -234,7 +234,9 @@ impl MertonModel {
         };
 
         for _ in 0..n_base {
-            normals.iter_mut().for_each(|z| *z = rng.normal(0.0, 1.0));
+            for z in &mut normals {
+                *z = rng.normal(0.0, 1.0)?;
+            }
 
             let jump_data: Option<Vec<StepJumpData>> = if let Some((lambda, _, _)) = jump_params {
                 let lambda_dt = lambda * dt;
@@ -246,8 +248,9 @@ impl MertonModel {
                             let anti_count =
                                 poisson_inverse_cdf(lambda_dt, (1.0 - u).min(1.0 - f64::EPSILON))?;
                             let max_count = base_count.max(anti_count);
-                            let jump_normals: Vec<f64> =
-                                (0..max_count).map(|_| rng.normal(0.0, 1.0)).collect();
+                            let jump_normals: Vec<f64> = (0..max_count)
+                                .map(|_| rng.normal(0.0, 1.0))
+                                .collect::<Result<_>>()?;
                             Ok(StepJumpData {
                                 base_count,
                                 anti_count,
@@ -361,45 +364,28 @@ mod tests {
         assert_ne!(a.asset_values, other.asset_values);
     }
 
-    /// FNV-1a over 64-bit words: an exact fingerprint of a simulated stream.
-    fn fingerprint(values: &[f64]) -> u64 {
-        values.iter().fold(0xcbf2_9ce4_8422_2325, |hash, value| {
-            (hash ^ value.to_bits()).wrapping_mul(0x0000_0100_0000_01b3)
-        })
-    }
-
-    /// Pins the seed-to-path mapping of the seeded entry point (core PCG64,
-    /// normal draw order, antithetic pairing). Platform `exp` yields one
-    /// fingerprint on macOS and another on the Linux libm used by GitHub
-    /// Actions. A third fingerprint means the seeded stream moved.
+    /// All path values were computed independently from integer PCG XSL-RR
+    /// transitions, reflected Box–Muller pairs and the GBM recurrence. Quantize
+    /// asset levels at 1e-8 to accommodate platform transcendental rounding.
     #[test]
-    fn merton_seed_to_stream_mapping_is_bit_stable() {
+    fn merton_seeded_paths_match_pcg_reference() {
         let gbm = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
-        let paths = gbm.simulate_paths(8, 12, 1.0, 7, true).unwrap();
-        let plain = gbm.simulate_paths(5, 6, 2.0, 11, false).unwrap();
-        let got = (
-            fingerprint(&paths.times),
-            fingerprint(&paths.asset_values),
-            fingerprint(&plain.asset_values),
-        );
-        // (times, antithetic assets, plain assets). The times grid is pure
-        // arithmetic, so that fingerprint matches on both hosts.
-        const PINS: [(u64, u64, u64); 2] = [
-            (
-                5_718_244_427_887_314_902,
-                9_843_094_568_569_784_566,
-                9_861_744_696_887_898_460,
-            ),
-            (
-                5_718_244_427_887_314_902,
-                6_510_477_273_109_661_970,
-                9_861_744_696_887_898_460,
-            ),
-        ];
-        assert!(
-            PINS.contains(&got),
-            "Merton seed stream moved off the macOS and Linux libm pins: {got:?}"
-        );
+        for (paths, steps, horizon, seed, antithetic, expected) in [
+            (8, 12, 1.0, 7, true, 0x26a12bf8b0fa08ca_u64),
+            (5, 6, 2.0, 11, false, 0xc1d43aa6985792d5_u64),
+        ] {
+            let sample = gbm
+                .simulate_paths(paths, steps, horizon, seed, antithetic)
+                .unwrap();
+            let digest =
+                sample
+                    .asset_values
+                    .iter()
+                    .fold(0xcbf2_9ce4_8422_2325_u64, |hash, value| {
+                        (hash ^ (value * 1e8).round() as u64).wrapping_mul(0x0000_0100_0000_01b3)
+                    });
+            assert_eq!(digest, expected);
+        }
     }
 
     #[test]

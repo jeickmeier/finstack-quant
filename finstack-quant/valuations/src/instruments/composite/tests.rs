@@ -475,7 +475,9 @@ fn deposit_pair_composite(
             .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut own = crate::instruments::rates::deposit::Deposit::example()?;
     own.id = InstrumentId::new("DEP-OWN");
     own.metric_pricing_overrides.theta_period = Some(Tenor::parse(own_theta)?);

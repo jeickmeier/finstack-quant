@@ -268,10 +268,11 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
         Some(100.0)
     );
     let missing_period = PeriodId::quarter(2026, 1).unwrap();
-    model
-        .periods
-        .periods
-        .retain(|period| period.id != missing_period);
+    let mut rows = model.periods.to_vec();
+    rows.retain(|period| period.id != missing_period);
+    model.periods =
+        finstack_quant_core::dates::PeriodPlan::try_new(model.periods.get_calendar(), rows)
+            .unwrap();
     model
         .nodes
         .get_mut("ufcf")
@@ -340,35 +341,18 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
 
 #[test]
 fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
-    use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
-    let period = PeriodId::annual(2025).expect("valid annual period");
-    let model = {
-        let mut model_builder = ModelBuilder::new("annual stub");
-        model_builder
-            .periods_explicit(
-                finstack_quant_core::dates::PeriodPlan::try_new(
-                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                    vec![Period {
-                        id: period,
-                        start: time::macros::date!(2025 - 07 - 01),
-                        end: time::macros::date!(2026 - 01 - 01),
-                        is_actual: false,
-                    }],
-                )
-                .expect("valid period plan"),
-            )
-            .unwrap();
-        model_builder.value_money("ufcf", &[(period, Money::from((100_i64, Currency::USD)))]);
-        model_builder.with_meta("currency", serde_json::json!("USD"));
-        model_builder
-    };
-    let error = model
-        .build()
-        .expect_err("an annual identifier on a half-year interval is not canonical");
-    assert!(
-        error.to_string().contains("differ from the calendar"),
-        "{error}"
-    );
+    use finstack_quant_core::dates::{Period, PeriodCalendar, PeriodPlan};
+    let error = PeriodPlan::try_new(
+        PeriodCalendar::Gregorian,
+        vec![Period {
+            id: PeriodId::annual(2025).unwrap(),
+            start: time::macros::date!(2025 - 07 - 01),
+            end: time::macros::date!(2026 - 01 - 01),
+            is_actual: false,
+        }],
+    )
+    .expect_err("annual stub must be rejected before valuation");
+    assert!(error.to_string().contains("calendar bounds"));
 }
 
 #[test]

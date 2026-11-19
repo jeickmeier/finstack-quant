@@ -1,14 +1,20 @@
 # FACTOR-012: Hierarchy inventory and small-bucket fold-up
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for eligible bucket membership, explicit thresholds and replayable folds.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** All-member counting and independent level folds are implemented. Explicit threshold admission and checked fold evidence remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** Four focused credit fold tests passed on 2026-11-17 against current behavior. Threshold admission and replay across folded parents and active children remain to be qualified.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Build canonical nested membership from the admitted panel and validated tags. Count each eligible issuer once per level, including `BucketOnly` members that contribute to the bucket. Ignore tags for issuers outside the panel. [Credit identity](credit-matching.md) · [Panel eligibility](credit-panel.md).
+2. Require one explicit positive threshold per hierarchy level. Compare each bucket independently against its original membership. A narrower bucket can remain active when its parent folds. For example, a parent with three members folds at threshold four while a child with two members passes threshold two.
+3. Treat a fold as skipping that level. Set its loading to zero and exclude folded members from that level's mean. Continue the residual through later active levels without refitting ancestors. Preserve and validate issuer, level, bucket, member count and threshold for replay. Parent paths describe ancestry. They confer no active factor or pooled exposure.
+
+## Observed choice and rationale
 
 Build nested bucket paths from ordered issuer tags and suppress factor levels whose membership is below a configured threshold. Fold-up records are operative state used again during snapshot decomposition, not merely diagnostic decoration.
 
@@ -34,7 +40,7 @@ Fold-up is not literal pooling or refitting into the recorded parent: ancestors 
 
 ## Alternatives and tradeoffs
 
-Bottom-up merging/refitting, adaptive thresholds based on effective observations or weight concentration, and pure shrinkage are distinct alternatives. Count thresholds are simple but do not establish estimation precision or independence.
+Count thresholds govern eligibility. Estimation precision and concentration require separate qualification. Skipping a bucket can leave common spread variation in the issuer residuals.
 
 ## Implementation and evidence
 
@@ -42,10 +48,9 @@ Bottom-up merging/refitting, adaptive thresholds based on effective observations
 - [src/credit/calibration/config.rs](../../../../finstack-quant/factor/src/credit/calibration/config.rs) — inspected implementation.
 - [src/credit/hierarchy.rs](../../../../finstack-quant/factor/src/credit/hierarchy.rs) — inspected implementation.
 
-[src/credit/calibration/tests.rs](../../../../finstack-quant/factor/src/credit/calibration/tests.rs) locates all-member counting and BucketOnly fold checks; [tests/credit_calibration.rs](../../../../finstack-quant/factor/tests/credit_calibration.rs) locates sparse-bucket parent labels. [tests/credit_decomposition.rs](../../../../finstack-quant/factor/tests/credit_decomposition.rs) checks that folded names are excluded from snapshot bucket means. These are contract/conservation tests, not evidence that five members is statistically adequate.
+[Calibration tests](../../../../finstack-quant/factor/src/credit/calibration/tests.rs), [integration tests](../../../../finstack-quant/factor/tests/credit_calibration.rs) and [snapshot tests](../../../../finstack-quant/factor/tests/credit_decomposition.rs) passed for current membership and fold behavior. Qualify exact threshold counts, independent levels and checked replay of folds.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

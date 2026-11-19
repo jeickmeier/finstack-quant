@@ -237,7 +237,8 @@ mod tests {
     fn test_constituent_delta_mixed_references() {
         let as_of = date_support::date(2024, 1, 2);
         let market = MarketContext::new()
-            .insert(flat_discount("USD-OIS", as_of, 0.02))
+            .try_insert(flat_discount("USD-OIS", as_of, 0.02))
+            .expect("insert market curve")
             .insert_price(
                 "AAPL-SPOT",
                 MarketScalar::price(Money::from((150_i64, Currency::USD))),

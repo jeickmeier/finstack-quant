@@ -68,7 +68,9 @@ mod tests {
             .build()
             .expect("should succeed");
 
-        let market = MarketContext::new().insert(disc_curve);
+        let market = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve");
 
         // Test unified pricing
         let pv_unified =
@@ -142,7 +144,9 @@ mod tests {
             .build()
             .expect("should succeed");
 
-        let market = MarketContext::new().insert(disc_curve);
+        let market = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve");
 
         // Test unified pricing
         let pv_unified =

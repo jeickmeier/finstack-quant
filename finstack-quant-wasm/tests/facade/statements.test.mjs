@@ -335,3 +335,12 @@ test('statements correlated paths retain sampled shocks when peer values round f
     }
   }
 });
+
+test('model restoration rejects a second Jan 1 in place of Jan 2', () => {
+  const model = JSON.parse(MODEL_JSON);
+  model.periods = facade.core.buildPeriods('2025D001..D365');
+  model.nodes.revenue.values = { '2025D001': 1 };
+  assert.equal(model.periods.periods.length, 365);
+  model.periods.periods[1] = model.periods.periods[0];
+  assert.throws(() => statements.validateFinancialModelJson(JSON.stringify(model)), /unique/);
+});

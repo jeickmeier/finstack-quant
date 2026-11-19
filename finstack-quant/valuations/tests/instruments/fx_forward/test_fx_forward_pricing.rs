@@ -49,8 +49,10 @@ fn create_test_market(as_of: Date) -> MarketContext {
     let fx_matrix = FxMatrix::new(fx_provider, None);
 
     MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve")
         .insert_fx(fx_matrix)
 }
 

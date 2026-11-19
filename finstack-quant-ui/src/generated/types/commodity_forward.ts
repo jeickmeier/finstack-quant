@@ -683,7 +683,10 @@ export interface DD34Fe8D294Aafaa3E650 {
    */
   settlement_days?: number | null;
   /**
-   * Optional spot price ID (for delta calculations).
+   * Optional observed spot identifier. At maturity the scalar is the delivery
+   * observation. After maturity use the exact delivery observation in the
+   * corresponding `FIXING:{spot_id}` series. Before maturity an explicitly
+   * identified spot can supply the cost-of-carry input if the forward curve is absent.
    */
   spot_id?: Id3 | null;
   /**
@@ -801,6 +804,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -1058,11 +1065,17 @@ export interface D_572Ad1Befb7D94914652 {
   vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface DCdb8Fddc0106047270C4 {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.

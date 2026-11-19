@@ -28,7 +28,9 @@ fn test_curve_parallel_shock() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        let mut market = MarketContext::new().insert(curve);
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -245,7 +247,9 @@ fn test_base_correlation_parallel_shock() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(basecorr);
+    let mut market = MarketContext::new()
+        .try_insert(basecorr)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

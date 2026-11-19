@@ -39,7 +39,9 @@ fn flat_curve(as_of: Date, rate: f64) -> DiscountCurve {
 }
 
 fn test_market(as_of: Date, rate: f64) -> MarketContext {
-    MarketContext::new().insert(flat_curve(as_of, rate))
+    MarketContext::new()
+        .try_insert(flat_curve(as_of, rate))
+        .expect("insert market curve")
 }
 
 /// Create a 2Y US Treasury style bond with semi-annual coupons.

@@ -78,8 +78,12 @@ fn test_bond_attribution_parallel() {
         .build()
         .unwrap();
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
 
@@ -167,7 +171,9 @@ fn test_bond_attribution_structure() {
         .build()
         .unwrap();
 
-    let market_t0 = MarketContext::new().insert(curve);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let market_t1 = market_t0.clone();
 
     let config = FinstackConfig::default();
@@ -217,8 +223,10 @@ fn test_parallel_bond_attribution_isolates_funding_when_repo_curve_present() {
     bond.repo_curve_id = Some(finstack_quant_core::types::CurveId::new("USD-REPO"));
 
     let market_t0 = MarketContext::new()
-        .insert(flat_curve("USD-OIS", as_of_t0, 0.05))
-        .insert(flat_curve("USD-REPO", as_of_t0, 0.03));
+        .try_insert(flat_curve("USD-OIS", as_of_t0, 0.05))
+        .expect("insert market curve")
+        .try_insert(flat_curve("USD-REPO", as_of_t0, 0.03))
+        .expect("insert market curve");
     let market_t1 = market_t0.clone();
 
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -284,9 +292,13 @@ fn test_metrics_based_bond_attribution_populates_carry_decomposition() {
     bond.repo_curve_id = Some(finstack_quant_core::types::CurveId::new("USD-REPO"));
 
     let market_t0 = MarketContext::new()
-        .insert(flat_curve("USD-OIS", as_of_t0, 0.05))
-        .insert(flat_curve("USD-REPO", as_of_t0, 0.03));
-    let market_t1 = MarketContext::new().insert(flat_curve("USD-OIS", as_of_t1, 0.05));
+        .try_insert(flat_curve("USD-OIS", as_of_t0, 0.05))
+        .expect("insert market curve")
+        .try_insert(flat_curve("USD-REPO", as_of_t0, 0.03))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", as_of_t1, 0.05))
+        .expect("insert market curve");
 
     let metrics = [
         MetricId::Theta,
@@ -364,8 +376,12 @@ fn test_metrics_based_bond_attribution_without_carry_metrics_keeps_legacy_shape(
     )
     .unwrap();
 
-    let market_t0 = MarketContext::new().insert(flat_curve("USD-OIS", as_of_t0, 0.05));
-    let market_t1 = MarketContext::new().insert(flat_curve("USD-OIS", as_of_t1, 0.05));
+    let market_t0 = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", as_of_t0, 0.05))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(flat_curve("USD-OIS", as_of_t1, 0.05))
+        .expect("insert market curve");
 
     let val_t0 = bond
         .price_with_metrics(
@@ -450,11 +466,15 @@ fn test_bond_metrics_based_on_unreplayable_hazard_curve() {
             .expect("hazard curve")
     };
     let market_t0 = MarketContext::new()
-        .insert(flat_curve("USD-OIS", as_of_t0, 0.04))
-        .insert(hazard(as_of_t0, 0.02));
+        .try_insert(flat_curve("USD-OIS", as_of_t0, 0.04))
+        .expect("insert market curve")
+        .try_insert(hazard(as_of_t0, 0.02))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(flat_curve("USD-OIS", as_of_t1, 0.041))
-        .insert(hazard(as_of_t1, 0.02));
+        .try_insert(flat_curve("USD-OIS", as_of_t1, 0.041))
+        .expect("insert market curve")
+        .try_insert(hazard(as_of_t1, 0.02))
+        .expect("insert market curve");
     let config = FinstackConfig::default();
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
     let request = AttributionRequest::new(

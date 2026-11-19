@@ -255,6 +255,7 @@ impl RevolvingCredit {
         let start = date!(2024 - 01 - 01);
         let end = date!(2027 - 01 - 01);
         let base_rate = RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::from(250),
             gearing: Decimal::ONE,
@@ -1245,7 +1246,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for RevolvingCredit
         if let RateSpec::Floating(spec) = &self.rate {
             deps.add_forward_curve(spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                spec.forward_curve_id.as_str(),
+                spec.index_id.as_str(),
             ));
         }
         Ok(deps)
@@ -1418,9 +1419,8 @@ mod dependency_tests {
         let RateSpec::Floating(spec) = &facility.rate else {
             unreachable!("example must use a floating base rate");
         };
-        let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
-            spec.forward_curve_id.as_str(),
-        );
+        let expected =
+            finstack_quant_core::market_data::fixings::fixing_series_id(spec.index_id.as_str());
 
         let deps =
             finstack_quant_valuations_core::instruments::Instrument::market_dependencies(&facility)

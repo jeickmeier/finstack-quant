@@ -24,6 +24,30 @@ use crate::{Error, InputError, Result};
 use serde::{Deserialize, Serialize};
 use std::num::{NonZeroU8, NonZeroU16};
 
+/// Publication identity and units of an observed or projected inflation level.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct InflationSeries {
+    /// Publisher-qualified identifier of the statistical series.
+    pub series_id: String,
+    /// Published reference period and index scale, for example `1982-84=100`.
+    pub reference_base: String,
+    /// True for seasonally adjusted levels and false for unadjusted levels.
+    pub seasonally_adjusted: bool,
+}
+
+impl InflationSeries {
+    pub(crate) fn validate(&self) -> Result<()> {
+        if self.series_id.trim().is_empty() || self.reference_base.trim().is_empty() {
+            return Err(Error::Validation(
+                "inflation series identity and reference base must be nonempty".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Contractual observation lag for inflation index reference dates.
 ///
 /// Specifies how far before a contractual reference date the historical or
@@ -229,6 +253,7 @@ pub struct InflationExpectedRelease {
 #[serde(try_from = "InflationIndexWire", into = "InflationIndexWire")]
 #[cfg_attr(feature = "json-schema", schemars(try_from = "InflationIndexWire"))]
 pub struct InflationIndex {
+    series: Option<InflationSeries>,
     id: CurveId,
     currency: Currency,
     knowledge_date: Date,
@@ -305,8 +330,25 @@ impl InflationIndex {
             currency,
             knowledge_date,
             observations,
+            series: None,
             expected_releases: Vec::new(),
         })
+    }
+
+    /// Attach the publisher, reference-base and seasonal identity of these fixings.
+    ///
+    /// # Arguments
+    ///
+    /// * `series` - Publication metadata for the levels as supplied, including their reference scale.
+    pub fn with_series(mut self, series: InflationSeries) -> Result<Self> {
+        series.validate()?;
+        self.series = Some(series);
+        Ok(self)
+    }
+
+    /// Return publication metadata used to qualify comparisons between snapshots.
+    pub fn get_series(&self) -> Option<&InflationSeries> {
+        self.series.as_ref()
     }
 
     /// Attach strictly ordered expected-release schedule assumptions to this snapshot.
@@ -503,6 +545,8 @@ impl InflationIndex {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct InflationIndexWire {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    series: Option<InflationSeries>,
     /// Unique identifier.
     pub id: String,
     /// Reporting currency association.
@@ -521,6 +565,7 @@ impl From<InflationIndex> for InflationIndexWire {
     fn from(index: InflationIndex) -> Self {
         Self {
             id: index.id.to_string(),
+            series: index.series,
             currency: index.currency,
             knowledge_date: index.knowledge_date,
             observations: index.observations,
@@ -533,13 +578,17 @@ impl TryFrom<InflationIndexWire> for InflationIndex {
     type Error = crate::Error;
 
     fn try_from(state: InflationIndexWire) -> Result<Self> {
-        Self::new(
+        let index = Self::new(
             state.id,
             state.observations,
             state.currency,
             state.knowledge_date,
         )?
-        .with_expected_releases(state.expected_releases)
+        .with_expected_releases(state.expected_releases)?;
+        match state.series {
+            Some(series) => index.with_series(series),
+            None => Ok(index),
+        }
     }
 }
 
