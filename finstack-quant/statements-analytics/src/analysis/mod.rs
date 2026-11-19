@@ -54,9 +54,12 @@ mod reports;
 pub use backtesting::{ForecastMetrics, backtest_forecast};
 pub use credit::{
     CapitalStructureSummary, CapitalStructureSummaryConfig, CapitalStructureTranche,
-    CreditContextMetrics, CreditNumeratorNodes, DebtInstrumentKind, MaturityWallBucket,
-    StatementsAdapter, capital_structure_summary, compute_credit_context, evaluate_covenants,
-    forecast_breaches,
+    CreditContextMetrics, CreditContextReport, CreditContextSpec, CreditMeasure,
+    CreditMeasureCoverage, CreditMeasureRow, CreditMeasureValue, CreditNumeratorNodes,
+    CreditReferenceValue, CreditScoringModel, DebtInstrumentKind, MaturityWallBucket,
+    StatementScoringMapping, StatementsAdapter, capital_structure_summary, compute_credit_context,
+    evaluate_covenants, evaluate_credit_context, forecast_breaches, score_statement,
+    score_statement_series,
 };
 pub use goal_seek::{GoalSeekResult, GoalSeekSpec, goal_seek};
 pub use introspection::{

@@ -438,6 +438,82 @@ export type TerminalFcffBasis =
       kind: "trailing_additive";
     };
 /**
+ * The measure to calculate for an identified borrowing and reporting period.
+ */
+export type CreditMeasure =
+  | "cash_dscr"
+  | "cash_and_pik_dscr"
+  | "cash_dscr_with_fees"
+  | "interest_coverage"
+  | "loan_to_value"
+  | "debt_to_enterprise_value";
+/**
+ * Typed result for one measure and period, retaining reasons for missing or zero debt service.
+ */
+export type CreditMeasureValue =
+  | {
+      /**
+       * Positive denominator in reporting currency.
+       */
+      denominator: Money;
+      /**
+       * Signed numerator in reporting currency.
+       */
+      numerator: Money;
+      /**
+       * Unitless ratio, where 1.5 represents 1.5x or 150%.
+       */
+      ratio: number;
+      status: "measured";
+    }
+  | {
+      status: "inapplicable";
+    }
+  | {
+      /**
+       * Specific input or exposure admission evidence that is missing.
+       */
+      reason: string;
+      status: "unavailable";
+    };
+/**
+ * Which explicit observations an evaluation may read.
+ *
+ * On the wire: `"full_snapshot"`, or `{"through": "2025-04-25"}`.
+ */
+export type ObservationCutoff =
+  | "full_snapshot"
+  | {
+      through: DateWire;
+    };
+/**
+ * Elected statistical credit model and any matching market-equity observation.
+ */
+export type CreditScoringModel =
+  | {
+      /**
+       * Date of market capitalization, matching the selected financial close.
+       */
+      as_of: DateWire;
+      /**
+       * Dated equity market capitalization in the statement currency.
+       */
+      market_equity: Money;
+      model: "altman_z";
+    }
+  | {
+      model: "altman_z_prime";
+    }
+  | {
+      model: "altman_z_double_prime";
+    }
+  | {
+      model: "altman_em";
+    }
+  | {
+      model: "zmijewski";
+    };
+/**
  * How a matched earnings observation is read.
  */
 export type LboEarningsBasis = "as_observed" | "trailing_additive";
@@ -462,16 +538,6 @@ export type LboAcquisition =
        * Agreed nonnegative purchase consideration paid to the seller.
        */
       seller_consideration: Money;
-    };
-/**
- * Which explicit observations an evaluation may read.
- *
- * On the wire: `"full_snapshot"`, or `{"through": "2025-04-25"}`.
- */
-export type ObservationCutoff =
-  | "full_snapshot"
-  | {
-      through: DateWire;
     };
 /**
  * Explicit low and high directions for an enterprise exit multiple.
@@ -2173,12 +2239,6 @@ export interface CorporateAnalysis {
    */
   equity?: CorporateValuationResult | null;
   /**
-   * `true` when a DCF enterprise value was computed but suppressed as the
-   * LTV reference because it was non-positive. Credit metrics are then
-   * computed without an enterprise-value reference.
-   */
-  ev_suppressed_non_positive: boolean;
-  /**
    * Full statement evaluation (all nodes, all periods)
    */
   statement: statements.StatementResult;
@@ -2242,13 +2302,8 @@ export interface CreditContextMetrics {
    */
   interest_coverage_min?: number | null;
   /**
-   * LTV by period: `debt_balance[t] / reference_value[t]`.
-   *
-   * A scalar DCF enterprise value is broadcast as the same denominator
-   * on every requested period (current valuation versus forward debt,
-   * not a rolled enterprise-value path). A per-period statement node
-   * supplies a varying value path; a missing period omits LTV for that
-   * period only.
+   * LTV by period: current debt face divided by the selected same-date collateral value.
+   * A missing value leaves LTV unavailable for that period.
    */
   ltv: [PeriodId, number][];
   /**
@@ -2464,8 +2519,8 @@ export interface CorporateAnalysisOptions {
    */
   interest_coverage_node?: string | null;
   /**
-   * Statement node supplying a per-period LTV denominator; `None`
-   * broadcasts a positive DCF enterprise value instead.
+   * Same-date monetary collateral value for each LTV observation.
+   * Omitting the node leaves LTV unavailable.
    */
   ltv_value_node?: string | null;
   /**
@@ -2753,6 +2808,222 @@ export interface CreditAssessmentPoint {
    */
   period: string;
   [k: string]: unknown;
+}
+/**
+ * Borrower credit observations and available minima on selected periods.
+ */
+export interface CreditContextReport {
+  /**
+   * Borrowing whose obligations and balance were measured.
+   */
+  borrowing_id: string;
+  /**
+   * Coverage counts and minima in requested measure order.
+   */
+  coverage: CreditMeasureCoverage[];
+  /**
+   * Same currency for all reported monetary operands.
+   */
+  currency: Currency;
+  /**
+   * All elected period and measure pairs, including unavailable rows.
+   */
+  rows: CreditMeasureRow[];
+  /**
+   * Verified statement run that produced both cash flows and period metadata.
+   */
+  run: RunProvenance;
+}
+/**
+ * Coverage summary for one elected measure.
+ */
+export interface CreditMeasureCoverage {
+  /**
+   * Minimum of the eligible path, present only when every applicable period is measured.
+   */
+  full_path_minimum?: number | null;
+  /**
+   * Number of verified periods where the measure had zero debt service.
+   */
+  inapplicable: number;
+  /**
+   * Elected measure summarized.
+   */
+  measure: CreditMeasure;
+  /**
+   * Number of measured periods.
+   */
+  measured: number;
+  /**
+   * Minimum among the available observed periods.
+   */
+  observed_minimum?: number | null;
+  /**
+   * Number of requested periods where applicable coverage could not be verified.
+   */
+  unavailable: number;
+}
+/**
+ * Per-period calculation evidence for one of the elected credit measures.
+ */
+export interface CreditMeasureRow {
+  /**
+   * Contractual reporting date that closes the period.
+   */
+  date: DateWire;
+  /**
+   * Elected measure for this row.
+   */
+  measure: CreditMeasure;
+  /**
+   * Elected reporting period.
+   */
+  period: PeriodId;
+  /**
+   * Source valuation identifier for a collateral or enterprise denominator.
+   */
+  reference_source_id?: string | null;
+  /**
+   * Ratio, absence or explicit inapplicability.
+   */
+  value: CreditMeasureValue;
+}
+/**
+ * What a result was evaluated from.
+ *
+ * A consumer that is handed a result checks this against the model, period
+ * plan and run it expects before trusting the cells.
+ */
+export interface RunProvenance {
+  /**
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
+   */
+  forecast_streams?: ForecastStream[];
+  /**
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
+   */
+  model_content_hash: string;
+  /**
+   * Identifier of the evaluated model.
+   */
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff: ObservationCutoff;
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above. Two runs of the same model content, snapshot, cutoff
+   * and valuation date share it.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: DateWire | null;
+}
+/**
+ * Replay provenance of one stochastic forecast node in a single run.
+ *
+ * The generator is the shared PCG64 started at `state` on stream `stream`
+ * (`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the
+ * versioned key: the key version, the configured seed, the node and the
+ * single-run mode. Unsigned 64-bit values are decimal strings in JSON.
+ */
+export interface ForecastStream {
+  /**
+   * The stochastic forecast node.
+   */
+  node_id: string;
+  /**
+   * The forecast method's exact configured seed.
+   */
+  seed: string;
+  /**
+   * Effective PCG64 starting state.
+   */
+  state: string;
+  /**
+   * Effective PCG64 stream selector.
+   */
+  stream: string;
+  /**
+   * Version of the mapping from the key to the stream.
+   */
+  stream_version: number;
+}
+/**
+ * Explicit same-run borrowing, ratio selections and reference valuations.
+ */
+export interface CreditContextSpec {
+  /**
+   * Exact borrowing identifier carried by the verified capital result.
+   */
+  borrowing_id: string;
+  /**
+   * Named cash-fee amount required by the fee-inclusive measure.
+   */
+  cash_fees_node?: string | null;
+  /**
+   * Same-currency cash-flow numerator for every requested DSCR.
+   */
+  cfads_node?: string | null;
+  /**
+   * Reporting currency for all financial operands.
+   */
+  currency: Currency;
+  /**
+   * Same-currency earnings numerator used for interest coverage.
+   */
+  earnings_node?: string | null;
+  /**
+   * Explicit nonempty list of distinct measures in reporting order.
+   */
+  measures: CreditMeasure[];
+  /**
+   * Explicit unique reporting periods from that statement run.
+   */
+  periods: PeriodId[];
+  /**
+   * Verified recognized interest including PIK on the same borrowing and period basis.
+   */
+  recognized_interest_node?: string | null;
+  /**
+   * Explicit borrowing-scoped valuations, at most one date for each elected reference basis.
+   */
+  reference_values: CreditReferenceValue[];
+  /**
+   * Expected statement and capital run identity.
+   */
+  run_id: string;
+}
+/**
+ * Identified collateral or enterprise value matched to a particular closing date and debt scope.
+ */
+export interface CreditReferenceValue {
+  /**
+   * Positive value of the specified collateral or enterprise in reporting currency.
+   */
+  amount: Money;
+  /**
+   * Reported calendar close matched to an exact model period.
+   */
+  date: DateWire;
+  /**
+   * Basis supported by the evidence. Use LoanToValue for collateral and DebtToEnterpriseValue for enterprise value.
+   */
+  measure: CreditMeasure;
+  /**
+   * Identifier of the underlying valuation and its direct scope evidence.
+   */
+  source_id: string;
 }
 /**
  * Maps node IDs for credit underwriting analysis.
@@ -3050,77 +3321,6 @@ export interface LboFundingResult {
    */
   required_sponsor_cash: Money;
   [k: string]: unknown;
-}
-/**
- * What a result was evaluated from.
- *
- * A consumer that is handed a result checks this against the model, period
- * plan and run it expects before trusting the cells.
- */
-export interface RunProvenance {
-  /**
-   * The random stream of every stochastic forecast node in a single run,
-   * in model node order: enough to replay its draws.
-   */
-  forecast_streams?: ForecastStream[];
-  /**
-   * Canonical content hash of the evaluated model
-   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
-   */
-  model_content_hash: string;
-  /**
-   * Identifier of the evaluated model.
-   */
-  model_id: string;
-  /**
-   * Observations the run was allowed to read.
-   */
-  observation_cutoff: ObservationCutoff;
-  /**
-   * Identity of this evaluation run: the canonical content hash of the
-   * fields above. Two runs of the same model content, snapshot, cutoff
-   * and valuation date share it.
-   */
-  run_id: string;
-  /**
-   * Identity of the source snapshot the model's observations came from.
-   */
-  source_snapshot?: string | null;
-  /**
-   * Valuation date the capital structure was priced at, when the run used
-   * a market.
-   */
-  valuation_date?: DateWire | null;
-}
-/**
- * Replay provenance of one stochastic forecast node in a single run.
- *
- * The generator is the shared PCG64 started at `state` on stream `stream`
- * (`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the
- * versioned key: the key version, the configured seed, the node and the
- * single-run mode. Unsigned 64-bit values are decimal strings in JSON.
- */
-export interface ForecastStream {
-  /**
-   * The stochastic forecast node.
-   */
-  node_id: string;
-  /**
-   * The forecast method's exact configured seed.
-   */
-  seed: string;
-  /**
-   * Effective PCG64 starting state.
-   */
-  state: string;
-  /**
-   * Effective PCG64 stream selector.
-   */
-  stream: string;
-  /**
-   * Version of the mapping from the key to the stream.
-   */
-  stream_version: number;
 }
 /**
  * Coherent repriced Monte Carlo enterprise and equity values by path and quantile.
@@ -5742,6 +5942,51 @@ export interface StageResult {
    */
   triggers: StagingTrigger[];
   [k: string]: unknown;
+}
+/**
+ * Annual monetary statement sources for a canonical credit score.
+ */
+export interface StatementScoringMapping {
+  /**
+   * Closing book equity for the book-value Altman models.
+   */
+  book_equity?: string | null;
+  /**
+   * Closing current assets for Zmijewski.
+   */
+  current_assets?: string | null;
+  /**
+   * Closing current liabilities for Zmijewski.
+   */
+  current_liabilities?: string | null;
+  /**
+   * Full-year EBIT used by the Altman models.
+   */
+  ebit?: string | null;
+  /**
+   * Full-year net income for Zmijewski.
+   */
+  net_income?: string | null;
+  /**
+   * Closing retained earnings used by the Altman models.
+   */
+  retained_earnings?: string | null;
+  /**
+   * Full-year sales used by the manufacturing Altman models.
+   */
+  sales?: string | null;
+  /**
+   * Closing total assets, a positive same-currency monetary observation.
+   */
+  total_assets: string;
+  /**
+   * Closing total liabilities in statement currency.
+   */
+  total_liabilities: string;
+  /**
+   * Closing net working capital used by the Altman models.
+   */
+  working_capital?: string | null;
 }
 /**
  * Flags a metric that has been deteriorating for `lookback_periods` consecutive periods.

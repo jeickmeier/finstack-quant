@@ -61,7 +61,8 @@ use crate::{
     analysis::BridgeChart, analysis::CapexReconciliation, analysis::CapitalStructureSummary,
     analysis::CapitalStructureSummaryConfig, analysis::CeclConfig, analysis::CeclResult,
     analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CorporateDcfRequest,
-    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::DatedLboRequest,
+    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::CreditContextReport,
+    analysis::CreditContextSpec, analysis::CreditScoringModel, analysis::DatedLboRequest,
     analysis::DatedLboResult, analysis::DcfDistributionResult, analysis::DcfInputs,
     analysis::DcfOptions, analysis::DcfProjection, analysis::DcfSensitivityGridResult,
     analysis::DcfSensitivityGridSpec, analysis::DcfSensitivityResult,
@@ -77,11 +78,11 @@ use crate::{
     analysis::RatingPdMap, analysis::RegressionResult, analysis::RelativeValueReport,
     analysis::RelativeValueReportConfig, analysis::RelativeValueResult, analysis::ScenarioDiff,
     analysis::ScenarioResults, analysis::ScenarioSet, analysis::ScoringDimension,
-    analysis::SensitivityResult, analysis::StageResult, analysis::StatementValuationCut,
-    analysis::TerminalFcffBasis, analysis::TrendCheck, analysis::VarianceConfig,
-    analysis::WaccInputs, analysis::WeightedEclResult, analysis::WorkingCapitalConsistency,
-    extensions::CorkscrewConfig, extensions::CorkscrewReport, extensions::ScorecardConfig,
-    extensions::ScorecardReport, templates::real_estate::LeaseSpec,
+    analysis::SensitivityResult, analysis::StageResult, analysis::StatementScoringMapping,
+    analysis::StatementValuationCut, analysis::TerminalFcffBasis, analysis::TrendCheck,
+    analysis::VarianceConfig, analysis::WaccInputs, analysis::WeightedEclResult,
+    analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig, extensions::CorkscrewReport,
+    extensions::ScorecardConfig, extensions::ScorecardReport, templates::real_estate::LeaseSpec,
     templates::real_estate::ManagementFeeSpec, templates::real_estate::PropertyTemplateNodes,
 };
 
@@ -173,6 +174,38 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "coverage_floor_check",
         Component,
         "Flags periods where a coverage ratio (e.g."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CreditContextSpec,
+        "statements_analytics",
+        "credit_context_spec",
+        Input,
+        "Explicit same-run borrowing, ratio selections and reference valuations."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CreditContextReport,
+        "statements_analytics",
+        "credit_context_report",
+        Output,
+        "Borrower credit observations and available minima on selected periods."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CreditScoringModel,
+        "statements_analytics",
+        "credit_scoring_model",
+        Input,
+        "Elected statistical credit model and any matching market-equity observation."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementScoringMapping,
+        "statements_analytics",
+        "statement_scoring_mapping",
+        Input,
+        "Annual monetary statement sources for a canonical credit score."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

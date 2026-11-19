@@ -12,6 +12,7 @@ from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics._checks import CreditMapping, ThreeStatementMapping
+from finstack_quant.statements_analytics._credit_context import CreditContextMetrics
 from finstack_quant.statements_analytics._typed import TornadoEntry
 
 class CorporateAnalysis:
@@ -25,8 +26,8 @@ class CorporateAnalysis:
     >>> _ = b.periods("2024Q1..Q2", None)
     >>> _ = b.value("revenue", [("2024Q1", 1.0), ("2024Q2", 2.0)])
     >>> analysis = run_corporate_analysis(b.build())
-    >>> analysis.equity is None, analysis.ev_suppressed_non_positive
-    (True, False)
+    >>> analysis.equity is None
+    True
     """
     @property
     def statement(self) -> StatementResult:
@@ -53,30 +54,17 @@ class CorporateAnalysis:
             DCF valuation, or ``None`` when no ``wacc`` was configured.
         """
     @property
-    def credit(self) -> Any:
-        """
-                Per-instrument credit metrics as ``{instrument_id: CreditContextMetrics dict}``
-        (serde form, including ``dscr_incl_fees`` / ``dscr_incl_fees_min``).
-
-                This property does not raise.
-
-                Returns
-                -------
-                Any
-                    Per-instrument credit metrics as ``{instrument_id: CreditContextMetrics dict}`` (serde form, including ``dscr_incl_fees`` / ``dscr_incl_fees_min``).
-        """
-    @property
-    def ev_suppressed_non_positive(self) -> bool:
-        """
-        Whether a non-positive DCF enterprise value was excluded from LTV.
+    def credit(self) -> dict[str, CreditContextMetrics]:
+        """Get the per-instrument credit coverage and leverage observations.
 
         This property does not raise.
 
         Returns
         -------
-        bool
-            Whether a non-positive DCF enterprise value was excluded from LTV.
+        dict[str, CreditContextMetrics]
+            Instrument IDs mapped to their typed period series and minima.
         """
+        ...
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export the per-instrument credit metrics as a long pandas ``DataFrame``.
@@ -1646,9 +1634,7 @@ def run_corporate_analysis(
         * ``ltv_value_node`` (str): monetary statement node supplying a
           per-period LTV denominator in reporting currency; scalar,
           foreign-currency or non-finite values are rejected. Missing or
-          non-positive values do not supply a denominator. When omitted, a
-          positive DCF enterprise value is broadcast as a constant
-          denominator.
+          non-positive values or an omitted node leave LTV unavailable.
     market : MarketContext | str | None
         Market context for statement evaluation and instrument pricing (not
         WACC discounting); requires ``options["as_of"]``.
@@ -1658,7 +1644,7 @@ def run_corporate_analysis(
     CorporateAnalysis
         ``statement`` (``StatementResult``), ``equity``
         (``CorporateValuationResult`` or ``None``), ``credit`` (per-instrument
-        metrics) and ``ev_suppressed_non_positive``.
+        metrics).
 
     Raises
     ------

@@ -105,6 +105,19 @@ from finstack_quant.statements_analytics._lbo import (
     DatedLboResult as DatedLboResult,
     evaluate_dated_lbo as evaluate_dated_lbo,
 )
+from finstack_quant.statements_analytics._credit_context import (
+    CreditContextSpec as CreditContextSpec,
+    CreditContextReport as CreditContextReport,
+    CreditContextMetrics as CreditContextMetrics,
+    CreditMeasureRow as CreditMeasureRow,
+    evaluate_credit_context as evaluate_credit_context,
+)
+from finstack_quant.statements_analytics._scoring import (
+    StatementScoringMapping as StatementScoringMapping,
+    CreditScoringModel as CreditScoringModel,
+    score_statement as score_statement,
+    score_statement_series as score_statement_series,
+)
 from finstack_quant.statements_analytics._valuation import (
     CorporateAnalysis as CorporateAnalysis,
     CorporateValuationResult as CorporateValuationResult,
@@ -195,6 +208,15 @@ __all__ = [
     "CorkscrewReport",
     "CorporateAnalysis",
     "CorporateValuationResult",
+    "CreditContextSpec",
+    "CreditContextReport",
+    "CreditContextMetrics",
+    "CreditMeasureRow",
+    "evaluate_credit_context",
+    "StatementScoringMapping",
+    "CreditScoringModel",
+    "score_statement",
+    "score_statement_series",
     "CreditAssessment",
     "CreditAssessmentPoint",
     "CreditMapping",

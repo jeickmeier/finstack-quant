@@ -152,7 +152,6 @@ fn test_full_lbo_analysis() {
             );
         }
     }
-    assert!(!analysis.ev_suppressed_non_positive);
 }
 
 #[test]
@@ -184,7 +183,6 @@ fn test_statement_only_no_equity_no_credit() {
 
     assert!(analysis.equity.is_none());
     assert!(analysis.credit.is_empty());
-    assert!(!analysis.ev_suppressed_non_positive);
     assert!(
         analysis
             .statement

@@ -1620,8 +1620,13 @@ public = [
     "CorporateValuationResult",
     "CreditAssessment",
     "CreditAssessmentPoint",
+    "CreditContextMetrics",
+    "CreditContextReport",
+    "CreditContextSpec",
     "CreditMapping",
+    "CreditMeasureRow",
     "CreditScorecardExtension",
+    "CreditScoringModel",
     "DatedLboRequest",
     "DatedLboResult",
     "DcfDistributionResult",
@@ -1686,6 +1691,7 @@ public = [
     "Stage",
     "StageResult",
     "StagingConfig",
+    "StatementScoringMapping",
     "StatementValuationCut",
     "TerminalFcffBasis",
     "TerminalValueSpec",
@@ -1717,6 +1723,7 @@ public = [
     "dcf_sensitivity_on_results",
     "evaluate_corporate_dcf",
     "evaluate_covenants",
+    "evaluate_credit_context",
     "evaluate_dated_lbo",
     "evaluate_dcf",
     "evaluate_dcf_from_results",
@@ -1743,6 +1750,8 @@ public = [
     "run_variance",
     "scenario_diff",
     "score_relative_value",
+    "score_statement",
+    "score_statement_series",
     "variance_bridge",
     "wacc",
     "z_score",
@@ -2488,7 +2497,7 @@ js = "statements.schema"
 [parity.modules."finstack_quant.statements_analytics"]
 js = "statements_analytics"
 renames = { PLSummaryReport = { js = "statements_analytics.plSummaryReport", reason = "the Rust PLSummaryReport borrows the statement result, so it is not a WASM handle; plSummaryReport returns its to_table TableEnvelope and plSummaryReportText its text rendering" } }
-types = { DatedLboRequest = "DatedLboRequest", DatedLboResult = "DatedLboResult", LboEarnings = "LboEarnings", LboDebtFunding = "LboDebtFunding", LboFunding = "LboFunding", LboFundingResult = "LboFundingResult", LboExitBridge = "LboExitBridge", EclScenario = "EclScenario", EclScenarioOutcome = "EclScenarioOutcome", CorporateDcfRequest = "CorporateDcfRequest", StatementValuationCut = "StatementValuationCut", DcfProjection = "DcfProjection", TerminalFcffBasis = "TerminalFcffBasis", DcfInputs = "DcfInputs", DcfOptions = "DcfOptions", DcfSensitivityGridSpec = "DcfSensitivityGridSpec", DcfSensitivityGridResult = "DcfSensitivityGridResult", DcfDistributionResult = "DcfDistributionResult", AccountType = "AccountType", BridgeChart = "BridgeChart", BridgeStep = "BridgeStep", CapitalStructureSummary = "CapitalStructureSummary", CapitalStructureTranche = "CapitalStructureTranche", CompanyMetrics = "CompanyMetrics", CorkscrewAccount = "CorkscrewAccount", CorkscrewConfig = "CorkscrewConfig", CorkscrewReport = "CorkscrewReport", CorporateAnalysis = "CorporateAnalysis", CorporateValuationResult = "CorporateValuationResult", CreditAssessment = "CreditAssessment", CreditAssessmentPoint = "CreditAssessmentPoint", CreditMapping = "CreditMapping", DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", DimensionScore = "DimensionScore", EclBucket = "EclBucket", EclResult = "EclResult", EquityBridge = "EquityBridge", Explanation = "Explanation", ExplanationStep = "ExplanationStep", Exposure = "Exposure", ForecastMetrics = "ForecastMetrics", FreeRentWindowSpec = "FreeRentWindowSpec", GoalSeekResult = "GoalSeekResult", LboCheckMappings = "LboCheckMappings", LboResult = "LboResult", LeaseGrowthConvention = "LeaseGrowthConvention", LeaseSpec = "LeaseSpec", ManagementFeeBase = "ManagementFeeBase", ManagementFeeSpec = "ManagementFeeSpec", MaturityWallBucket = "MaturityWallBucket", ParameterSpec = "ParameterSpec", PeerFilter = "PeerFilter", PeerSet = "PeerSet", PeerStats = "PeerStats", PropertyTemplateNodes = "PropertyTemplateNodes", QualitativeFlags = "QualitativeFlags", RegressionResult = "RegressionResult", RelativeValueCompany = "RelativeValueCompany", RelativeValueDimension = "RelativeValueDimension", RelativeValueMultiple = "RelativeValueMultiple", RelativeValuePoint = "RelativeValuePoint", RelativeValueReport = "RelativeValueReport", RelativeValueResult = "RelativeValueResult", RenewalSpec = "RenewalSpec", RentRollOutputNodes = "RentRollOutputNodes", RentStepSpec = "RentStepSpec", ScenarioDiff = "ScenarioDiff", ScenarioResults = "ScenarioResults", ScenarioSet = "ScenarioSet", ScorecardConfig = "ScorecardConfig", ScorecardMetric = "ScorecardMetric", ScorecardReport = "ScorecardReport", ScoringDimension = "ScoringDimension", SensitivityConfig = "SensitivityConfig", SensitivityResult = "SensitivityResult", Stage = "Stage", StageResult = "StageResult", StagingConfig = "StagingConfig", TerminalValueSpec = "TerminalValueSpec", ThreeStatementMapping = "ThreeStatementMapping", TornadoEntry = "TornadoEntry", ValuationDiscounts = "ValuationDiscounts", VarianceConfig = "VarianceConfig", VarianceReport = "VarianceReport", VarianceRow = "VarianceRow", WeightedEclResult = "WeightedEclResult", WaccInputs = "WaccInputs"}
+types = { StatementScoringMapping = "StatementScoringMapping", CreditScoringModel = "CreditScoringModel", CreditContextReport = "CreditContextReport", CreditContextSpec = "CreditContextSpec", CreditContextMetrics = "CreditContextMetrics", CreditMeasureRow = "CreditMeasureRow", DatedLboRequest = "DatedLboRequest", DatedLboResult = "DatedLboResult", LboEarnings = "LboEarnings", LboDebtFunding = "LboDebtFunding", LboFunding = "LboFunding", LboFundingResult = "LboFundingResult", LboExitBridge = "LboExitBridge", EclScenario = "EclScenario", EclScenarioOutcome = "EclScenarioOutcome", CorporateDcfRequest = "CorporateDcfRequest", StatementValuationCut = "StatementValuationCut", DcfProjection = "DcfProjection", TerminalFcffBasis = "TerminalFcffBasis", DcfInputs = "DcfInputs", DcfOptions = "DcfOptions", DcfSensitivityGridSpec = "DcfSensitivityGridSpec", DcfSensitivityGridResult = "DcfSensitivityGridResult", DcfDistributionResult = "DcfDistributionResult", AccountType = "AccountType", BridgeChart = "BridgeChart", BridgeStep = "BridgeStep", CapitalStructureSummary = "CapitalStructureSummary", CapitalStructureTranche = "CapitalStructureTranche", CompanyMetrics = "CompanyMetrics", CorkscrewAccount = "CorkscrewAccount", CorkscrewConfig = "CorkscrewConfig", CorkscrewReport = "CorkscrewReport", CorporateAnalysis = "CorporateAnalysis", CorporateValuationResult = "CorporateValuationResult", CreditAssessment = "CreditAssessment", CreditAssessmentPoint = "CreditAssessmentPoint", CreditMapping = "CreditMapping", DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", DimensionScore = "DimensionScore", EclBucket = "EclBucket", EclResult = "EclResult", EquityBridge = "EquityBridge", Explanation = "Explanation", ExplanationStep = "ExplanationStep", Exposure = "Exposure", ForecastMetrics = "ForecastMetrics", FreeRentWindowSpec = "FreeRentWindowSpec", GoalSeekResult = "GoalSeekResult", LboCheckMappings = "LboCheckMappings", LboResult = "LboResult", LeaseGrowthConvention = "LeaseGrowthConvention", LeaseSpec = "LeaseSpec", ManagementFeeBase = "ManagementFeeBase", ManagementFeeSpec = "ManagementFeeSpec", MaturityWallBucket = "MaturityWallBucket", ParameterSpec = "ParameterSpec", PeerFilter = "PeerFilter", PeerSet = "PeerSet", PeerStats = "PeerStats", PropertyTemplateNodes = "PropertyTemplateNodes", QualitativeFlags = "QualitativeFlags", RegressionResult = "RegressionResult", RelativeValueCompany = "RelativeValueCompany", RelativeValueDimension = "RelativeValueDimension", RelativeValueMultiple = "RelativeValueMultiple", RelativeValuePoint = "RelativeValuePoint", RelativeValueReport = "RelativeValueReport", RelativeValueResult = "RelativeValueResult", RenewalSpec = "RenewalSpec", RentRollOutputNodes = "RentRollOutputNodes", RentStepSpec = "RentStepSpec", ScenarioDiff = "ScenarioDiff", ScenarioResults = "ScenarioResults", ScenarioSet = "ScenarioSet", ScorecardConfig = "ScorecardConfig", ScorecardMetric = "ScorecardMetric", ScorecardReport = "ScorecardReport", ScoringDimension = "ScoringDimension", SensitivityConfig = "SensitivityConfig", SensitivityResult = "SensitivityResult", Stage = "Stage", StageResult = "StageResult", StagingConfig = "StagingConfig", TerminalValueSpec = "TerminalValueSpec", ThreeStatementMapping = "ThreeStatementMapping", TornadoEntry = "TornadoEntry", ValuationDiscounts = "ValuationDiscounts", VarianceConfig = "VarianceConfig", VarianceReport = "VarianceReport", VarianceRow = "VarianceRow", WeightedEclResult = "WeightedEclResult", WaccInputs = "WaccInputs"}
 constructors = { DcfInputs = "statements_analytics.dcfInputs", DcfOptions = "statements_analytics.dcfOptions", DcfSensitivityGridSpec = "statements_analytics.dcfSensitivityGridSpec" }
 
 [parity.modules."finstack_quant.valuations"]
@@ -3256,3 +3265,22 @@ status = "literal"
 result = "literal"
 weighted_allowance = "literal"
 reason = "literal"
+
+
+[parity.members."finstack_quant.statements_analytics.CreditMeasureRow".excluded]
+denominator = "literal"
+numerator = "literal"
+ratio = "literal"
+reason = "literal"
+
+
+[parity.members."finstack_quant.statements_analytics.CreditContextReport".excluded]
+coverage_to_dataframe = "pandas"
+
+
+[parity.members."finstack_quant.statements_analytics.CreditScoringModel".excluded]
+altman_z = "literal"
+altman_z_prime = "literal"
+altman_z_double_prime = "literal"
+altman_em = "literal"
+zmijewski = "literal"

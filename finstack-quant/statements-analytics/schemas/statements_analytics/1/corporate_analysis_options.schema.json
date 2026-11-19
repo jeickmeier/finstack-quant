@@ -1579,7 +1579,7 @@
     },
     "ltv_value_node": {
       "default": null,
-      "description": "Statement node supplying a per-period LTV denominator; `None`\nbroadcasts a positive DCF enterprise value instead.",
+      "description": "Same-date monetary collateral value for each LTV observation.\nOmitting the node leaves LTV unavailable.",
       "type": [
         "string",
         "null"

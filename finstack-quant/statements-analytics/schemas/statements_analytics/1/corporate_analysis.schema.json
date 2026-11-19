@@ -218,7 +218,7 @@
           ]
         },
         "ltv": {
-          "description": "LTV by period: `debt_balance[t] / reference_value[t]`.\n\nA scalar DCF enterprise value is broadcast as the same denominator\non every requested period (current valuation versus forward debt,\nnot a rolled enterprise-value path). A per-period statement node\nsupplies a varying value path; a missing period omits LTV for that\nperiod only.",
+          "description": "LTV by period: current debt face divided by the selected same-date collateral value.\nA missing value leaves LTV unavailable for that period.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -1217,10 +1217,6 @@
       ],
       "description": "Equity valuation result (if DCF was configured)"
     },
-    "ev_suppressed_non_positive": {
-      "description": "`true` when a DCF enterprise value was computed but suppressed as the\nLTV reference because it was non-positive. Credit metrics are then\ncomputed without an enterprise-value reference.",
-      "type": "boolean"
-    },
     "statement": {
       "$ref": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
       "description": "Full statement evaluation (all nodes, all periods)"
@@ -1228,8 +1224,7 @@
   },
   "required": [
     "statement",
-    "credit",
-    "ev_suppressed_non_positive"
+    "credit"
   ],
   "title": "CorporateAnalysis",
   "type": "object"

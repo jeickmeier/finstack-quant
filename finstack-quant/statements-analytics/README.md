@@ -86,7 +86,7 @@ should use `three_statement_checks`. Credit analysis also requires explicit
 `.cfads_node(...)` and `.interest_coverage_node(...)` mappings. `.as_of(date)`
 is the DCF valuation date and, with `.market(ctx)`, the statement visibility and
 curve date. DCF discounting remains WACC-only. `.ltv_value_node(...)` supplies a
-per-period denominator; otherwise a positive DCF EV is broadcast.
+same-date collateral denominator for LTV.
 
 ## Module layout
 
@@ -143,8 +143,7 @@ year gives null ratios, never an annualised one. `compute_credit_context` derive
 and LTV metrics from a `StatementResult` plus capital-structure cashflows.
 `CreditNumeratorNodes` separates CFADS for DSCR from EBITDA/EBIT for interest
 coverage. Instrument cashflows must already be in the reporting currency;
-mixed-currency ratios fail. LTV is `debt_t / value_t`; scalar EV references may
-be broadcast across periods. Metrics include cash DSCR, total (PIK) DSCR, and
+mixed-currency ratios fail. LTV is debt face divided by same-date collateral value. Metrics include cash DSCR, total (PIK) DSCR, and
 fee-inclusive DSCR. `StatementsAdapter` implements the covenants crate's
 `ModelTimeSeries` bridge, so covenant forecasts do not make that crate depend
 on statements. `evaluate_covenants(&engine, &results)` tests compliance
@@ -236,11 +235,9 @@ then `execute(&model, &results)` — not trait objects.
 - Monetary outputs (`equity_value`, `enterprise_value`, `net_debt`,
   `terminal_value_pv`) are `Money` in the evaluated model's currency; coverage
   and leverage metrics are unitless scalars.
-- A non-positive DCF enterprise value is not used as an LTV reference; the
-  pipeline records that in `CorporateAnalysis::ev_suppressed_non_positive` and
-  computes credit metrics without one. A positive EV is broadcast as one
-  constant denominator per requested period; `.ltv_value_node` supplies a
-  varying statement path instead.
+- `.ltv_value_node` elects a same-date collateral valuation path for LTV.
+  `evaluate_credit_context` separately admits explicit debt-to-enterprise-value
+  observations and gives coverage for requested dates.
 - `SensitivityMode::Diagonal` runs in parallel on rayon on native targets and
   serially on `wasm32`. `FullGrid` and `Tornado` are always serial. Every mode
   drives `Evaluator::prepare` / `evaluate_prepared`, so the model's formulas are

@@ -616,3 +616,37 @@ test('dated DCF reuses matching statements for its grid and coherent sample path
     builder.free();
   }
 });
+
+test('statement credit scores use annual monetary sources and a string period', () => {
+  const builder = new statements.ModelBuilder('score-annual');
+  const evaluator = new statements.Evaluator();
+  try {
+    builder.periods('2025..2025');
+    builder.currency('USD');
+    for (const [node, amount] of Object.entries({
+      assets: '1000',
+      liabilities: '500',
+      income: '75',
+      liquid_assets: '200',
+      short_debt: '125',
+    })) {
+      builder.valueMoney(node, { 2025: { amount, currency: 'USD' } });
+    }
+    const results = evaluator.evaluate(builder.build());
+    const mapping = {
+      total_assets: 'assets',
+      total_liabilities: 'liabilities',
+      net_income: 'income',
+      current_assets: 'liquid_assets',
+      current_liabilities: 'short_debt',
+    };
+    const model = { model: 'zmijewski' };
+    const score = sa.scoreStatement(results, '2025', mapping, model);
+    assert.ok(Math.abs(score.score - (-4.336 - 4.513 * 0.075 + 5.679 * 0.5 + 0.004 * 1.6)) < 1e-12);
+    assert.throws(() => sa.scoreStatement(results, 2025, mapping, model), /period/);
+    assert.throws(() => sa.scoreStatement(results, '2025Q4', mapping, model), /full-year/);
+  } finally {
+    evaluator.free();
+    builder.free();
+  }
+});

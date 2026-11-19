@@ -126,9 +126,8 @@ class TestRunChecks:
 
 
 class TestCorporateAnalysis:
-    def test_suppressed_enterprise_value_status_is_top_level(self) -> None:
+    def test_corporate_analysis_without_dcf_returns_statement_result(self) -> None:
         result = run_corporate_analysis(_model_json())
-        assert result.ev_suppressed_non_positive is False
         assert isinstance(result.statement, statements.StatementResult)
         assert result.equity is None
         assert isinstance(result.credit, dict)

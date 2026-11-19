@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Period, PeriodId};
+use finstack_quant_core::money::Money;
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::{Error, Result};
@@ -44,13 +45,8 @@ pub struct CreditContextMetrics {
     /// Interest coverage by period:
     /// `interest_coverage_node_value / interest_expense_total`.
     pub interest_coverage: Vec<(PeriodId, f64)>,
-    /// LTV by period: `debt_balance[t] / reference_value[t]`.
-    ///
-    /// A scalar DCF enterprise value is broadcast as the same denominator
-    /// on every requested period (current valuation versus forward debt,
-    /// not a rolled enterprise-value path). A per-period statement node
-    /// supplies a varying value path; a missing period omits LTV for that
-    /// period only.
+    /// LTV by period: current debt face divided by the selected same-date collateral value.
+    /// A missing value leaves LTV unavailable for that period.
     pub ltv: Vec<(PeriodId, f64)>,
     /// Minimum cash DSCR across all periods.
     pub dscr_min: Option<f64>,
@@ -343,6 +339,403 @@ pub fn compute_credit_context(
     })
 }
 
+/// The measure to calculate for an identified borrowing and reporting period.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CreditMeasure {
+    /// Cash flow available for debt service divided by scheduled cash interest and principal due.
+    CashDscr,
+    /// Cash flow available for debt service divided by scheduled debt service and recognized PIK.
+    CashAndPikDscr,
+    /// Cash flow available for debt service divided by scheduled debt service and selected cash fees.
+    CashDscrWithFees,
+    /// Elected earnings divided by separately evidenced recognized interest including PIK.
+    InterestCoverage,
+    /// Closing economic face divided by a matched positive collateral valuation.
+    LoanToValue,
+    /// Closing economic face divided by an explicitly elected enterprise valuation at the same cut.
+    DebtToEnterpriseValue,
+}
+
+/// Identified collateral or enterprise value matched to a particular closing date and debt scope.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CreditReferenceValue {
+    /// Basis supported by the evidence. Use LoanToValue for collateral and DebtToEnterpriseValue for enterprise value.
+    pub measure: CreditMeasure,
+    /// Reported calendar close matched to an exact model period.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: finstack_quant_core::dates::Date,
+    /// Positive value of the specified collateral or enterprise in reporting currency.
+    pub amount: finstack_quant_core::money::Money,
+    /// Identifier of the underlying valuation and its direct scope evidence.
+    pub source_id: String,
+}
+
+/// Identified statement-run input and borrower measures.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CreditContextSpec {
+    /// Exact borrowing identifier carried by the verified capital result.
+    pub borrowing_id: String,
+    /// Expected statement and capital run identity.
+    pub run_id: String,
+    /// Reporting currency for all financial operands.
+    pub currency: Currency,
+    /// Explicit unique reporting periods from that statement run.
+    pub periods: Vec<PeriodId>,
+    /// Explicit nonempty list of distinct measures in reporting order.
+    pub measures: Vec<CreditMeasure>,
+    /// Same-currency cash-flow numerator for every requested DSCR.
+    pub cfads_node: Option<String>,
+    /// Same-currency earnings numerator used for interest coverage.
+    pub earnings_node: Option<String>,
+    /// Verified recognized interest including PIK on the same borrowing and period basis.
+    pub recognized_interest_node: Option<String>,
+    /// Named cash-fee amount required by the fee-inclusive measure.
+    pub cash_fees_node: Option<String>,
+    /// Explicit borrowing-scoped valuations, at most one date for each elected reference basis.
+    pub reference_values: Vec<CreditReferenceValue>,
+}
+
+/// Typed result for one measure and period, retaining reasons for missing or zero debt service.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CreditMeasureValue {
+    /// Complete monetary operands and calculated ratio.
+    Measured {
+        /// Signed numerator in reporting currency.
+        numerator: finstack_quant_core::money::Money,
+        /// Positive denominator in reporting currency.
+        denominator: finstack_quant_core::money::Money,
+        /// Unitless ratio, where 1.5 represents 1.5x or 150%.
+        ratio: f64,
+    },
+    /// The specifically measured denominator was exactly zero.
+    Inapplicable,
+    /// One or more required inputs were unavailable.
+    Unavailable {
+        /// Specific input or exposure admission evidence that is missing.
+        reason: String,
+    },
+}
+
+/// Per-period calculation evidence for one of the elected credit measures.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CreditMeasureRow {
+    /// Elected reporting period.
+    pub period: PeriodId,
+    /// Contractual reporting date that closes the period.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: finstack_quant_core::dates::Date,
+    /// Elected measure for this row.
+    pub measure: CreditMeasure,
+    /// Source valuation identifier for a collateral or enterprise denominator.
+    pub reference_source_id: Option<String>,
+    /// Ratio, absence or explicit inapplicability.
+    pub value: CreditMeasureValue,
+}
+
+/// Coverage summary for one elected measure.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CreditMeasureCoverage {
+    /// Elected measure summarized.
+    pub measure: CreditMeasure,
+    /// Number of measured periods.
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
+    pub measured: usize,
+    /// Number of verified periods where the measure had zero debt service.
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
+    pub inapplicable: usize,
+    /// Number of requested periods where applicable coverage could not be verified.
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
+    pub unavailable: usize,
+    /// Minimum among the available observed periods.
+    pub observed_minimum: Option<f64>,
+    /// Minimum of the eligible path, present only when every applicable period is measured.
+    pub full_path_minimum: Option<f64>,
+}
+
+/// Dated credit measurements and coverage for an identified borrowing.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CreditContextReport {
+    /// Borrowing whose obligations and balance were measured.
+    pub borrowing_id: String,
+    /// Verified statement run that produced both cash flows and period metadata.
+    pub run: finstack_quant_statements::evaluator::RunProvenance,
+    /// Same currency for all reported monetary operands.
+    pub currency: Currency,
+    /// All elected period and measure pairs, including unavailable rows.
+    pub rows: Vec<CreditMeasureRow>,
+    /// Coverage counts and minima in requested measure order.
+    pub coverage: Vec<CreditMeasureCoverage>,
+}
+
+fn absent(reason: impl Into<String>) -> CreditMeasureValue {
+    CreditMeasureValue::Unavailable {
+        reason: reason.into(),
+    }
+}
+
+fn credit_money(
+    results: &StatementResult,
+    node: Option<&str>,
+    period: &PeriodId,
+    currency: Currency,
+) -> Result<Option<Money>> {
+    let Some(node) = node else {
+        return Err(Error::invalid_input(
+            "An explicitly selected credit measure requires a named monetary node",
+        ));
+    };
+    if !matches!(
+        results.node_value_types.get(node),
+        Some(finstack_quant_statements::types::NodeValueType::Monetary { .. })
+    ) {
+        return Err(Error::invalid_input(format!(
+            "Credit measure node '{node}' must be identified monetary data"
+        )));
+    }
+    require_currency(results, node, period, currency)?;
+    Ok(results.get_money(node, period))
+}
+
+/// Measure explicitly selected credit ratios over verified statement periods.
+///
+/// # Arguments
+/// * `results` - Point-in-time statements containing the selected borrowing's capital cashflows.
+/// * `spec` - Borrowing and run IDs, reporting currency, requested periods and ratio sources.
+///
+/// # Errors
+/// Rejects conflicting run identity, invalid scopes, duplicate periods and
+/// measures, mismatched units, and invalid values or ratio operands. Missing
+/// observations on otherwise admitted rows are reported as unavailable.
+pub fn evaluate_credit_context(
+    results: &StatementResult,
+    spec: &CreditContextSpec,
+) -> Result<CreditContextReport> {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let run = results
+        .provenance
+        .as_ref()
+        .filter(|run| {
+            run.run_id == spec.run_id
+                && run.source_snapshot.is_some()
+                && matches!(
+                    run.observation_cutoff,
+                    finstack_quant_statements::evaluator::ObservationCutoff::Through(_)
+                )
+        })
+        .ok_or_else(|| {
+            Error::invalid_input(
+                "Credit context requires its identified point-in-time statement run",
+            )
+        })?;
+    let cashflows = results
+        .cs_cashflows
+        .as_ref()
+        .and_then(|book| book.by_instrument.get(&spec.borrowing_id))
+        .ok_or_else(|| {
+            Error::invalid_input(format!(
+                "Borrowing '{}' is absent from the admitted capital structure",
+                spec.borrowing_id
+            ))
+        })?;
+    let distinct_periods: BTreeSet<_> = spec.periods.iter().copied().collect();
+    let distinct_measures: BTreeSet<_> = spec.measures.iter().copied().collect();
+    if spec.periods.is_empty()
+        || distinct_periods.len() != spec.periods.len()
+        || spec.measures.is_empty()
+        || distinct_measures.len() != spec.measures.len()
+    {
+        return Err(Error::invalid_input(
+            "Credit context requires nonempty, unique period and measure selections",
+        ));
+    }
+    let dates = spec
+        .periods
+        .iter()
+        .map(|id| {
+            results
+                .get_periods()
+                .iter()
+                .find(|period| period.id == *id)
+                .and_then(|period| period.end.previous_day())
+                .map(|date| (*id, date))
+                .ok_or_else(|| {
+                    Error::invalid_input(format!("Credit period {id} is not in the statement run"))
+                })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut references = BTreeMap::new();
+    for reference in &spec.reference_values {
+        if reference.source_id.trim().is_empty()
+            || reference.amount.currency() != spec.currency
+            || reference.amount.amount_decimal() <= rust_decimal::Decimal::ZERO
+            || !matches!(
+                reference.measure,
+                CreditMeasure::LoanToValue | CreditMeasure::DebtToEnterpriseValue
+            )
+            || !distinct_measures.contains(&reference.measure)
+            || !dates.iter().any(|(_, date)| *date == reference.date)
+            || references
+                .insert((reference.measure, reference.date), reference)
+                .is_some()
+        {
+            return Err(Error::invalid_input(
+                "Credit reference valuation needs unique admitted scope, close, currency and positive value",
+            ));
+        }
+    }
+    let mut rows = Vec::new();
+    let mut coverage = Vec::with_capacity(spec.measures.len());
+    for &measure in &spec.measures {
+        let mut measured = 0usize;
+        let mut unavailable = 0usize;
+        let mut inapplicable = 0usize;
+        let mut observed_minimum: Option<f64> = None;
+        for &(period, date) in &dates {
+            let reference = references.get(&(measure, date));
+            let value = match cashflows.get(&period) {
+                Some(cashflow) => {
+                    cashflow.validate_currency_invariant()?;
+                    if cashflow.debt_balance.currency() != spec.currency {
+                        return Err(Error::CurrencyMismatch(
+                            spec.currency,
+                            cashflow.debt_balance.currency(),
+                        ));
+                    }
+                    measure_credit_row(
+                        results,
+                        spec,
+                        &period,
+                        cashflow,
+                        measure,
+                        reference.map(|entry| entry.amount),
+                    )?
+                }
+                None => absent("selected borrowing has no period cashflow evidence"),
+            };
+            match value {
+                CreditMeasureValue::Measured { ratio, .. } => {
+                    measured += 1;
+                    observed_minimum = Some(observed_minimum.map_or(ratio, |min| min.min(ratio)));
+                }
+                CreditMeasureValue::Inapplicable => inapplicable += 1,
+                CreditMeasureValue::Unavailable { .. } => unavailable += 1,
+            }
+            rows.push(CreditMeasureRow {
+                period,
+                date,
+                measure,
+                reference_source_id: reference.map(|entry| entry.source_id.clone()),
+                value,
+            });
+        }
+        coverage.push(CreditMeasureCoverage {
+            measure,
+            measured,
+            unavailable,
+            inapplicable,
+            observed_minimum,
+            full_path_minimum: if unavailable == 0 {
+                observed_minimum
+            } else {
+                None
+            },
+        });
+    }
+    Ok(CreditContextReport {
+        borrowing_id: spec.borrowing_id.clone(),
+        run: run.clone(),
+        currency: spec.currency,
+        rows,
+        coverage,
+    })
+}
+
+fn measure_credit_row(
+    results: &StatementResult,
+    spec: &CreditContextSpec,
+    period: &PeriodId,
+    cashflow: &finstack_quant_statements::capital_structure::CashflowBreakdown,
+    measure: CreditMeasure,
+    reference: Option<Money>,
+) -> Result<CreditMeasureValue> {
+    let amount = |node: Option<&str>| credit_money(results, node, period, spec.currency);
+    let (numerator, denominator) = match measure {
+        CreditMeasure::CashDscr
+        | CreditMeasure::CashAndPikDscr
+        | CreditMeasure::CashDscrWithFees => {
+            let (Some(interest), Some(principal)) = (
+                cashflow.scheduled_cash_interest_due,
+                cashflow.scheduled_principal_due,
+            ) else {
+                return Ok(absent(
+                    "contractual cash interest or principal due is unavailable",
+                ));
+            };
+            let due = interest.checked_add(principal)?;
+            let supplemental = match measure {
+                CreditMeasure::CashAndPikDscr => Some(cashflow.interest_expense_pik),
+                CreditMeasure::CashDscrWithFees => amount(spec.cash_fees_node.as_deref())?,
+                _ => Some(Money::zero(spec.currency)),
+            };
+            (
+                amount(spec.cfads_node.as_deref())?,
+                supplemental
+                    .map(|supplemental| due.checked_add(supplemental))
+                    .transpose()?,
+            )
+        }
+        CreditMeasure::InterestCoverage => (
+            amount(spec.earnings_node.as_deref())?,
+            amount(spec.recognized_interest_node.as_deref())?,
+        ),
+        CreditMeasure::LoanToValue | CreditMeasure::DebtToEnterpriseValue => {
+            (Some(cashflow.debt_balance), reference)
+        }
+    };
+    let (Some(numerator), Some(denominator)) = (numerator, denominator) else {
+        return Ok(absent(
+            "required credit ratio operand is unavailable on this close",
+        ));
+    };
+    if denominator.amount_decimal() < rust_decimal::Decimal::ZERO {
+        return Err(Error::invalid_input(
+            "Credit measure denominator cannot be negative",
+        ));
+    }
+    if denominator.amount_decimal().is_zero() {
+        return Ok(CreditMeasureValue::Inapplicable);
+    }
+    let ratio = finite_ratio(numerator.amount(), denominator.amount())?;
+    Ok(CreditMeasureValue::Measured {
+        numerator,
+        denominator,
+        ratio,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -350,6 +743,85 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_statements::capital_structure::CashflowBreakdown;
     use indexmap::IndexMap;
+
+    #[test]
+    fn checked_credit_dscr_uses_scheduled_due_and_preserves_incomplete_path() {
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_statements::builder::ModelBuilder;
+        use finstack_quant_statements::capital_structure::CashflowBreakdown;
+        use finstack_quant_statements::evaluator::{Evaluator, ObservationCutoff};
+        use time::macros::date;
+
+        let first = PeriodId::quarter(2025, 1).unwrap();
+        let next = PeriodId::quarter(2025, 2).unwrap();
+        let valuation = date!(2024 - 12 - 31);
+        let usd = |x| Money::from((x, Currency::USD));
+        let mut builder = ModelBuilder::new("borrower");
+        builder.periods("2025Q1..Q2", None).unwrap();
+        builder.source_snapshot("admitted-source");
+        builder.value_money("free_cash", &[(first, usd(12_i64)), (next, usd(12))]);
+        let model = builder.build().unwrap();
+        let mut results = Evaluator::new()
+            .evaluate_with_market(
+                &model,
+                &MarketContext::new(),
+                valuation,
+                ObservationCutoff::Through(valuation),
+            )
+            .unwrap();
+        let mut cf = CashflowBreakdown::with_currency(Currency::USD);
+        cf.interest_expense_cash = usd(1);
+        cf.principal_payment = usd(50);
+        cf.scheduled_cash_interest_due = Some(usd(2));
+        cf.scheduled_principal_due = Some(usd(4));
+        cf.debt_balance = usd(60);
+        let mut book = CapitalStructureCashflows::new();
+        book.by_instrument
+            .entry("term".to_owned())
+            .or_default()
+            .insert(first, cf.clone());
+        cf.scheduled_principal_due = None;
+        book.by_instrument
+            .entry("term".to_owned())
+            .or_default()
+            .insert(next, cf);
+        results.cs_cashflows = Some(book);
+        let report = evaluate_credit_context(
+            &results,
+            &CreditContextSpec {
+                borrowing_id: "term".to_owned(),
+                run_id: results.provenance.as_ref().unwrap().run_id.clone(),
+                currency: Currency::USD,
+                periods: vec![first, next],
+                measures: vec![
+                    CreditMeasure::CashDscr,
+                    CreditMeasure::DebtToEnterpriseValue,
+                ],
+                cfads_node: Some("free_cash".to_owned()),
+                earnings_node: None,
+                recognized_interest_node: None,
+                cash_fees_node: None,
+                reference_values: vec![CreditReferenceValue {
+                    measure: CreditMeasure::DebtToEnterpriseValue,
+                    date: date!(2025 - 03 - 31),
+                    amount: usd(150),
+                    source_id: "independent-matched-ev".to_owned(),
+                }],
+            },
+        )
+        .unwrap();
+        assert!(matches!(
+            report.rows[0].value,
+            CreditMeasureValue::Measured { ratio: 2.0, .. }
+        ));
+        assert_eq!(report.coverage[0].observed_minimum, Some(2.0));
+        assert_eq!(report.coverage[0].full_path_minimum, None);
+        assert_eq!(report.coverage[1].observed_minimum, Some(0.4));
+        assert!(matches!(
+            report.rows[3].value,
+            CreditMeasureValue::Unavailable { .. }
+        ));
+    }
 
     #[test]
     fn rejects_foreign_principal_fees_and_debt_balance() {

@@ -6,6 +6,7 @@ mod migration;
 mod pd;
 mod recovery_waterfall;
 mod scoring;
+pub(crate) use scoring::PyScoringResult;
 
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pydoc::pydoc;

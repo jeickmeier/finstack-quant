@@ -68,7 +68,7 @@ pub fn evaluate_dcf(
 /// @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency` when a DCF is requested.
 /// @param options - Optional Rust `CorporateAnalysisOptions`; every field is optional: `wacc` (decimal; enables the DCF and requires `terminal_value`), `terminal_value`, `net_debt_override` (model currency), `cfads_node`, `interest_coverage_node` (default `"ebitda"`), `check_suite` (`CheckSuiteSpec`; DCF and capital-structure analyses need one including the `non_finite` check), `as_of` (ISO date) and `ltv_value_node`. Unknown keys are rejected (object or JSON).
 /// @param market - Optional `MarketContext` state for statement evaluation and instrument pricing; requires `options.as_of` (object or JSON).
-/// @returns `CorporateAnalysis`: the `statement` result, the `equity` valuation (or `null`), per-instrument `credit` metrics and `ev_suppressed_non_positive`.
+/// @returns `CorporateAnalysis`: the `statement` result, the `equity` valuation (or `null`), and per-instrument `credit` metrics.
 ///
 /// # Errors
 ///
@@ -657,4 +657,75 @@ pub fn evaluate_dated_lbo(
     let request = from_js_json(&request, "request")?;
     let market = crate::utils::wire::js_opt_wire(market.as_ref(), "market")?;
     to_js_value(&fa::evaluate_dated_lbo(&model, &request, market.as_ref()).map_err(to_js_err)?)
+}
+
+/// Measure qualified same-currency credit ratios for one borrowing in a dated statement run.
+/// @param results - Statement run and capital cash flows with verified observation metadata.
+/// @param spec - Explicit borrowing, expected run identity, currency, periods and selected credit measures.
+/// @returns Dated measurements with numerator and denominator or explicit availability, and coverage by measure.
+/// @throws If source provenance, dates, borrowing scope, monetary units or requested measures are invalid.
+#[wasm_bindgen(js_name = evaluateCreditContext, unchecked_return_type = "generated.statements_analytics.CreditContextReport")]
+pub fn evaluate_credit_context(
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CreditContextSpec | string"
+    )]
+    spec: JsValue,
+) -> Result<JsValue, JsValue> {
+    let results = from_js_json(&results, "results")?;
+    let spec = from_js_json(&spec, "spec")?;
+    to_js_value(&fa::evaluate_credit_context(&results, &spec).map_err(to_js_err)?)
+}
+
+/// Calculate the elected credit score from admitted annual monetary statement observations.
+/// @param results - Evaluated statements and reporting periods.
+/// @param period - Exact full-year period label with matched stocks and flows.
+/// @param mapping - Monetary node IDs required by the selected statistical model.
+/// @param model - Scoring model, including dated market equity where required.
+/// @returns Canonical score, classification zone and model-implied PD when present.
+/// @throws If observations, units, dates, model inputs or resulting ratios are inadmissible.
+#[wasm_bindgen(js_name = scoreStatement, unchecked_return_type = "generated.models.ScoringResult")]
+pub fn score_statement(
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.StatementScoringMapping | string"
+    )]
+    mapping: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CreditScoringModel | string"
+    )]
+    model: JsValue,
+) -> Result<JsValue, JsValue> {
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let period = crate::utils::input::js_string(&period, "period")?
+        .parse()
+        .map_err(to_js_err)?;
+    let mapping = from_js_json(&mapping, "mapping")?;
+    let model = from_js_json(&model, "model")?;
+    to_js_value(&fa::score_statement(&results, &period, &mapping, &model).map_err(to_js_err)?)
+}
+
+/// Calculate one credit score for each explicitly elected annual reporting period.
+/// @param results - Evaluated statements and their authoritative period plan.
+/// @param rows - Distinct full-year labels and the selected score model for each.
+/// @param mapping - Names of monetary statement inputs shared by the requested periods.
+/// @returns Canonical score results in request order.
+/// @throws If any selected year repeats or lacks an admissible scoring observation.
+#[wasm_bindgen(js_name = scoreStatementSeries, unchecked_return_type = "generated.models.ScoringResult[]")]
+pub fn score_statement_series(
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly [string, generated.statements_analytics.CreditScoringModel][] | string"
+    )]
+    rows: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.StatementScoringMapping | string"
+    )]
+    mapping: JsValue,
+) -> Result<JsValue, JsValue> {
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let rows = from_js_json::<Vec<(PeriodId, fa::CreditScoringModel)>>(&rows, "rows")?;
+    let mapping = from_js_json(&mapping, "mapping")?;
+    to_js_value(&fa::score_statement_series(&results, &rows, &mapping).map_err(to_js_err)?)
 }

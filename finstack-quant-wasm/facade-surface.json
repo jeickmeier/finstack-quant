@@ -4386,6 +4386,7 @@
       "dcfSensitivityOnResults",
       "evaluateCorporateDcf",
       "evaluateCovenants",
+      "evaluateCreditContext",
       "evaluateDatedLbo",
       "evaluateDcf",
       "evaluateDcfFromResults",
@@ -4422,6 +4423,8 @@
       "scenarioResultsGet",
       "scenarioSetTrace",
       "scoreRelativeValue",
+      "scoreStatement",
+      "scoreStatementSeries",
       "sensitivityResultGetParameterValue",
       "sensitivityResultGetValue",
       "validateLeaseSpecJson",
@@ -4507,6 +4510,15 @@
     "kind": "function"
   },
   "statements_analytics.creditAssessmentReportText": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateCreditContext": {
+    "kind": "function"
+  },
+  "statements_analytics.scoreStatement": {
+    "kind": "function"
+  },
+  "statements_analytics.scoreStatementSeries": {
     "kind": "function"
   },
   "statements_analytics.creditAssessment": {

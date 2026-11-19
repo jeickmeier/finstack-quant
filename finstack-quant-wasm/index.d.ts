@@ -10832,6 +10832,33 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly creditAssessmentReportText: typeof wasm.creditAssessmentReportText;
   /**
+   * Measure qualified same-currency credit ratios for one borrowing in a dated statement run.
+   * @param results - Statement run and capital cash flows with verified observation metadata.
+   * @param spec - Explicit borrowing, expected run identity, currency, periods and selected credit measures.
+   * @returns Dated measurements with numerator and denominator or explicit availability, and coverage by measure.
+   * @throws If source provenance, dates, borrowing scope, monetary units or requested measures are invalid.
+   */
+  readonly evaluateCreditContext: typeof wasm.evaluateCreditContext;
+  /**
+   * Calculate the elected credit score from admitted annual monetary statement observations.
+   * @param results - Evaluated statements and reporting periods.
+   * @param period - Exact full-year period label with matched stocks and flows.
+   * @param mapping - Monetary node IDs required by the selected statistical model.
+   * @param model - Scoring model, including dated market equity where required.
+   * @returns Canonical score, classification zone and model-implied PD when present.
+   * @throws If observations, units, dates, model inputs or resulting ratios are inadmissible.
+   */
+  readonly scoreStatement: typeof wasm.scoreStatement;
+  /**
+   * Calculate one credit score for each explicitly elected annual reporting period.
+   * @param results - Evaluated statements and their authoritative period plan.
+   * @param rows - Distinct full-year labels and the selected score model for each.
+   * @param mapping - Names of monetary statement inputs shared by the requested periods.
+   * @returns Canonical score results in request order.
+   * @throws If any selected year repeats or lacks an admissible scoring observation.
+   */
+  readonly scoreStatementSeries: typeof wasm.scoreStatementSeries;
+  /**
    * Compute a structured credit assessment (leverage, coverage, FCF).
    *
    * Returns a structured JavaScript object whose `series` covers every period
@@ -11417,7 +11444,7 @@ export interface StatementsAnalyticsNamespace {
    * @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency` when a DCF is requested.
    * @param options - Optional Rust `CorporateAnalysisOptions`; every field is optional: `wacc` (decimal; enables the DCF and requires `terminal_value`), `terminal_value`, `net_debt_override` (model currency), `cfads_node`, `interest_coverage_node` (default `"ebitda"`), `check_suite` (`CheckSuiteSpec`; DCF and capital-structure analyses need one including the `non_finite` check), `as_of` (ISO date) and `ltv_value_node`. Unknown keys are rejected (object or JSON).
    * @param market - Optional `MarketContext` state for statement evaluation and instrument pricing; requires `options.as_of` (object or JSON).
-   * @returns `CorporateAnalysis`: the `statement` result, the `equity` valuation (or `null`), per-instrument `credit` metrics and `ev_suppressed_non_positive`.
+   * @returns `CorporateAnalysis`: the `statement` result, the `equity` valuation (or `null`), and per-instrument `credit` metrics.
    *
    * # Errors
    *

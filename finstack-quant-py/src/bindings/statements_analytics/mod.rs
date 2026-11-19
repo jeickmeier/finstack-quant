@@ -12,11 +12,13 @@ mod checks;
 mod comps;
 mod corkscrew;
 mod covenants;
+mod credit_context;
 pub(crate) mod ecl;
 mod lbo;
 mod relative_value;
 mod reports;
 mod scorecards;
+mod scoring;
 pub(crate) mod templates_real_estate;
 mod templates_roll_forward;
 mod templates_vintage;
@@ -70,10 +72,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     capital_structure::register(py, &m)?;
     relative_value::register(py, &m)?;
     covenants::register(py, &m)?;
+    credit_context::register(&m)?;
     reports::register(py, &m)?;
     ecl::register(py, &m)?;
     comps::register(py, &m)?;
     scorecards::register(py, &m)?;
+    scoring::register(&m)?;
     corkscrew::register(py, &m)?;
     templates_vintage::register(py, &m)?;
     templates_roll_forward::register(py, &m)?;
@@ -94,6 +98,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "CorkscrewReport",
             "CorporateAnalysis",
             "CorporateValuationResult",
+            "CreditContextSpec",
+            "CreditContextReport",
+            "CreditContextMetrics",
+            "CreditMeasureRow",
+            "evaluate_credit_context",
+            "StatementScoringMapping",
+            "CreditScoringModel",
+            "score_statement",
+            "score_statement_series",
             "CreditAssessment",
             "CreditAssessmentPoint",
             "CreditMapping",

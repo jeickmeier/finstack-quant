@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis.schema.json",
-      "bytes": 37105,
+      "bytes": 36595,
       "kind": "output",
       "path": "schemas/statements_analytics/1/corporate_analysis.schema.json",
       "summary": "Unified analysis result combining statement, equity, and credit perspectives.",
@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis_options.schema.json",
-      "bytes": 55766,
+      "bytes": 55756,
       "kind": "input",
       "path": "schemas/statements_analytics/1/corporate_analysis_options.schema.json",
       "summary": "Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline.",
@@ -116,6 +116,33 @@
       "summary": "Structured credit assessment: leverage, interest coverage, and free cash flow at a `period` plus a per-period series for trend display.",
       "title": "CreditAssessment",
       "type_name": "CreditAssessment"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_context_report.schema.json",
+      "bytes": 33088,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/credit_context_report.schema.json",
+      "summary": "Borrower credit observations and available minima on selected periods.",
+      "title": "CreditContextReport",
+      "type_name": "CreditContextReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_context_spec.schema.json",
+      "bytes": 26304,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/credit_context_spec.schema.json",
+      "summary": "Explicit same-run borrowing, ratio selections and reference valuations.",
+      "title": "CreditContextSpec",
+      "type_name": "CreditContextSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_scoring_model.schema.json",
+      "bytes": 23796,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/credit_scoring_model.schema.json",
+      "summary": "Elected statistical credit model and any matching market-equity observation.",
+      "title": "CreditScoringModel",
+      "type_name": "CreditScoringModel"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json",
@@ -602,6 +629,15 @@
       "summary": "IFRS 9 stage classification with its ordered trigger audit trail.",
       "title": "StageResult",
       "type_name": "StageResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_scoring_mapping.schema.json",
+      "bytes": 1966,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/statement_scoring_mapping.schema.json",
+      "summary": "Annual monetary statement sources for a canonical credit score.",
+      "title": "StatementScoringMapping",
+      "type_name": "StatementScoringMapping"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_valuation_cut.schema.json",

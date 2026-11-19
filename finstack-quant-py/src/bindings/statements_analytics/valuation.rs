@@ -1350,8 +1350,8 @@ impl_repr_html_via_dataframe!(PyLboResult);
 /// >>> from finstack_quant.statements_analytics import run_corporate_analysis
 /// >>> b = ModelBuilder("m"); b.periods("2024Q1..Q2", None); b.value("revenue", [("2024Q1", 1.0), ("2024Q2", 2.0)])
 /// >>> analysis = run_corporate_analysis(b.build())
-/// >>> analysis.equity is None, analysis.ev_suppressed_non_positive
-/// (True, False)
+/// >>> analysis.equity is None
+/// True
 #[pyclass(
     name = "CorporateAnalysis",
     module = "finstack_quant.statements_analytics",
@@ -1381,17 +1381,23 @@ impl PyCorporateAnalysis {
             .map(|inner| PyCorporateValuationResult { inner })
     }
 
-    /// Per-instrument credit metrics as ``{instrument_id: CreditContextMetrics dict}``
-    /// (serde form, including ``dscr_incl_fees`` / ``dscr_incl_fees_min``).
     #[getter]
-    fn credit<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.credit)
-    }
-
-    /// Whether a non-positive DCF enterprise value was excluded from LTV.
-    #[getter]
-    fn ev_suppressed_non_positive(&self) -> bool {
-        self.inner.ev_suppressed_non_positive
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "CorporateAnalysis.credit")]
+    fn credit(
+        &self,
+    ) -> std::collections::HashMap<String, super::credit_context::PyCreditContextMetrics> {
+        self.inner
+            .credit
+            .iter()
+            .map(|(id, metrics)| {
+                (
+                    id.clone(),
+                    super::credit_context::PyCreditContextMetrics {
+                        inner: metrics.clone(),
+                    },
+                )
+            })
+            .collect()
     }
 
     /// Export the per-instrument credit metrics as a long pandas ``DataFrame``.
@@ -1401,23 +1407,12 @@ impl PyCorporateAnalysis {
     /// ``NaN`` where a metric is not available for that period). One row per
     /// (instrument, period) present on any metric series.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        use std::collections::BTreeMap;
         let mut rows = Vec::new();
         for (instrument_id, metrics) in &self.inner.credit {
-            let mut by_period: BTreeMap<finstack_quant_core::dates::PeriodId, [Option<f64>; 4]> =
-                BTreeMap::new();
-            let series = [
-                (&metrics.dscr, 0usize),
-                (&metrics.dscr_total, 1),
-                (&metrics.dscr_incl_fees, 2),
-                (&metrics.interest_coverage, 3),
-            ];
-            for (values, slot) in series {
-                for (period, value) in values {
-                    by_period.entry(*period).or_default()[slot] = Some(*value);
+            for (period, values) in super::credit_context::observations(metrics) {
+                if values[..4].iter().all(Option::is_none) {
+                    continue;
                 }
-            }
-            for (period, values) in by_period {
                 rows.push(serde_json::json!({
                     "instrument_id": instrument_id,
                     "period": period.to_string(),
@@ -1433,15 +1428,14 @@ impl PyCorporateAnalysis {
 
     fn __repr__(&self) -> String {
         format!(
-            "CorporateAnalysis(statement_nodes={}, equity={}, credit_instruments={}, ev_suppressed_non_positive={})",
+            "CorporateAnalysis(statement_nodes={}, equity={}, credit_instruments={})",
             self.inner.statement.cells.len(),
             if self.inner.equity.is_some() {
                 "CorporateValuationResult(...)"
             } else {
                 "None"
             },
-            self.inner.credit.len(),
-            crate::bindings::statements_analytics::py_bool(self.inner.ev_suppressed_non_positive)
+            self.inner.credit.len()
         )
     }
 }

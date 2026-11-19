@@ -141,6 +141,15 @@ RelativeValueReport = _sa.RelativeValueReport
 CompanyMetrics = _sa.CompanyMetrics
 CorporateAnalysis = _sa.CorporateAnalysis
 CorporateValuationResult = _sa.CorporateValuationResult
+CreditContextSpec = _sa.CreditContextSpec
+CreditContextReport = _sa.CreditContextReport
+CreditContextMetrics = _sa.CreditContextMetrics
+CreditMeasureRow = _sa.CreditMeasureRow
+evaluate_credit_context = _sa.evaluate_credit_context
+StatementScoringMapping = _sa.StatementScoringMapping
+CreditScoringModel = _sa.CreditScoringModel
+score_statement = _sa.score_statement
+score_statement_series = _sa.score_statement_series
 CreditAssessment = _sa.CreditAssessment
 CreditAssessmentPoint = _sa.CreditAssessmentPoint
 CreditMapping = _sa.CreditMapping
@@ -191,8 +200,13 @@ __all__: list[str] = [
     "CorporateValuationResult",
     "CreditAssessment",
     "CreditAssessmentPoint",
+    "CreditContextMetrics",
+    "CreditContextReport",
+    "CreditContextSpec",
     "CreditMapping",
+    "CreditMeasureRow",
     "CreditScorecardExtension",
+    "CreditScoringModel",
     "DatedLboRequest",
     "DatedLboResult",
     "DcfDistributionResult",
@@ -257,6 +271,7 @@ __all__: list[str] = [
     "Stage",
     "StageResult",
     "StagingConfig",
+    "StatementScoringMapping",
     "StatementValuationCut",
     "TerminalFcffBasis",
     "TerminalValueSpec",
@@ -288,6 +303,7 @@ __all__: list[str] = [
     "dcf_sensitivity_on_results",
     "evaluate_corporate_dcf",
     "evaluate_covenants",
+    "evaluate_credit_context",
     "evaluate_dated_lbo",
     "evaluate_dcf",
     "evaluate_dcf_from_results",
@@ -314,6 +330,8 @@ __all__: list[str] = [
     "run_variance",
     "scenario_diff",
     "score_relative_value",
+    "score_statement",
+    "score_statement_series",
     "variance_bridge",
     "wacc",
     "z_score",
