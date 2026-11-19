@@ -10,6 +10,23 @@ from finstack_quant.core.dates import Schedule
 from finstack_quant.core.market_data import DiscountCurve, HazardCurve, InflationCurve, MarketContext, PriceCurve
 
 
+def test_schedule_notebook_preview_limits_the_displayed_periods() -> None:
+    schedule = (
+        Schedule
+        .builder("2025-01-01", "2027-01-01")
+        .frequency("1M")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+        .build()
+    )
+    assert len(schedule.to_dataframe()) == 24
+    html = schedule._repr_html_()
+    assert html is not None
+    assert html.count("<tr>") == 12
+    assert "period_end" in html
+
+
 def cpi_curve() -> InflationCurve:
     return InflationCurve(
         "CPI",

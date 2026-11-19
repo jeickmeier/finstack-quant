@@ -222,6 +222,7 @@ class ApplicationReport:
         """
         ...
 
+    def _repr_html_(self) -> str | None: ...
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export the report counters as a single-row pandas DataFrame.

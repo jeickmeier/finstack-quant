@@ -252,6 +252,8 @@ impl PyApplicationReport {
     }
 }
 
+crate::bindings::macros::impl_repr_html_via_dataframe!(PyApplicationReport);
+
 /// Result of applying a scenario: the mutated market, the mutated model (when
 /// one was supplied), and the application report.
 ///
