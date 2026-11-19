@@ -6843,6 +6843,28 @@ export interface ModelsNamespace {
    */
   readonly optionMarketParams: typeof wasm.optionMarketParams;
   /**
+   * Validate model-independent option inputs.
+   * @param contract - Positive matching spot and strike, finite annual continuous decimal discount and carry rates, nonnegative expiry in years and payoff direction.
+   * @returns Validated model-independent contract.
+   * @throws FinstackError if its shape or values fail validation.
+   */
+  readonly optionContractParams: typeof wasm.optionContractParams;
+  /**
+   * Read the model-independent portion of constant-volatility option inputs.
+   * @param market - Spot, strike, continuous decimal rate and carry, annualized decimal volatility, expiry in years and direction.
+   * @returns The same contract inputs without its volatility assumption.
+   * @throws FinstackError when the inputs cannot be read as an option market.
+   */
+  readonly optionMarketParamsContract: typeof wasm.optionMarketParamsContract;
+  /**
+   * Combine a model-independent contract with annualized constant volatility.
+   * @param contract - Positive matching spot and strike, continuous decimal carrying rates, expiry in years and payoff direction.
+   * @param volatility - Nonnegative finite annualized volatility as a decimal.
+   * @returns Validated option inputs for a constant-volatility model.
+   * @throws FinstackError when the contract or volatility fail validation.
+   */
+  readonly optionContractParamsWithVolatility: typeof wasm.optionContractParamsWithVolatility;
+  /**
    * Vanilla option payoff at expiry: `max(±(spot - strike), 0)`.
    *
    * @param spot - Underlying level at expiry, in the same price units as `strike`.
@@ -7172,83 +7194,44 @@ export interface ModelsNamespace {
    */
   readonly hestonPrice: typeof wasm.hestonPrice;
   /**
-   * Price a European option under the Black-Scholes model using the COS method.
-   *
-   * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
-   * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
-   * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
-   *
-   * # Errors
-   *
-   * Throws a `validation` error if `market` does not match `CosMarketParams`,
-   * spot, strike, expiry, or volatility is not finite and positive, rates/carry
-   * are non-finite, `n_terms` is outside `1..=65536` or `vol` is not positive,
-   * and a `computation` error if the model produces a degenerate or invalid COS
-   * truncation range, a non-finite characteristic-function value or forward
-   * moment, or a non-finite option price.
-   * @returns Discounted European option price in the same units as `spot`.
-   *
+   * Price a European option under a constant annualized lognormal volatility.
+   * @param market - Spot, strike, annual continuous decimal discount and carry rates, positive expiry in years, payoff direction and positive decimal annual volatility.
+   * @param nTerms - Expansion terms from 1 to 65,536. Omit for 128 terms.
+   * @returns Discounted option price per underlying unit.
+   * @throws FinstackError for invalid input, invalid term count, degenerate cumulants or an unrepresentable price.
    * @example
-   * ```javascript
-   * const call = models.bsCosPrice(
-   *   {
-   *     spot: 100,
-   *     strike: 100,
-   *     rate: 0.05,
-   *     dividend_yield: 0.0,
-   *     time_to_expiry: 1.0,
-   *     option_type: "call",
-   *   },
-   *   0.2,
-   * );
-   * // call ≈ 10.45, the Black-Scholes price
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const price = models.bsCosPrice({
+   *   spot: 100, strike: 100, rate: 0.05, dividend_yield: 0,
+   *   time_to_expiry: 1, option_type: "call", volatility: 0.2,
+   * });
+   * console.log(price); // about 10.45
    * ```
    */
   readonly bsCosPrice: typeof wasm.bsCosPrice;
   /**
-   * Price a European option under the Variance Gamma model using the COS method.
-   *
-   * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
-   * Madan-Carr-Chang (1998): see docs/REFERENCES.md#madan-carr-chang-1998.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
-   * @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
-   * @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
-   * @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
-   *
-   * # Errors
-   *
-   * Throws a `validation` error if `market` does not match `CosMarketParams`,
-   * spot, strike, expiry, sigma, or nu is not finite and positive,
-   * rates/carry/theta are non-finite, the VG martingale condition fails or
-   * `n_terms` is outside `1..=65536`, and a `computation` error if the model
-   * produces a degenerate or invalid COS truncation range, a non-finite
-   * characteristic-function value or forward moment, or a non-finite option
-   * price.
-   * @returns Discounted European option price in the same units as `spot`.
+   * Price a European option under the Variance Gamma process.
+   * @param contract - Spot and strike in matching units, positive expiry in years, continuous annual discount and carry rates in decimals, and call or put direction.
+   * @param sigma - Positive annual volatility of the subordinated Brownian motion as a decimal.
+   * @param theta - Annual drift of the subordinated Brownian motion with finite forward moment.
+   * @param nu - Positive variance rate of the Gamma subordinator.
+   * @param nTerms - Expansion terms from 1 to 65,536. Omit for 128 terms.
+   * @returns Discounted option price per underlying unit.
+   * @throws FinstackError for invalid input, a missing forward moment, invalid term count, degenerate cumulants or unrepresentable price.
    */
   readonly vgCosPrice: typeof wasm.vgCosPrice;
   /**
-   * Price a European option under Merton (1976) jump-diffusion using the COS method.
-   *
-   * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
-   * Merton jump-diffusion (1976): see docs/REFERENCES.md#merton-1976-jump.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
-   * @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-   * @param muJump - Mean log jump size in the Merton jump-diffusion model.
-   * @param sigmaJump - Standard deviation of log jump sizes in the Merton jump-diffusion model.
-   * @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
-   *
-   * # Errors
-   *
-   * Throws a `validation` error if `market` does not match `CosMarketParams`,
-   * spot, strike, or expiry is not finite and positive, rates/carry or
-   * log-jump mean are non-finite, volatility/intensity is negative or
-   * non-finite, the jump compensator overflows or `n_terms` is outside
-   * `1..=65536`, and a `computation` error if the model produces a degenerate
-   * or invalid COS truncation range, a non-finite characteristic-function
-   * value or forward moment, or a non-finite option price.
-   * @returns Discounted European option price in the same units as `spot`.
+   * Price a European option under Merton lognormal jump diffusion.
+   * @param contract - Spot and strike in matching units, positive expiry in years, continuous annual discount and carry rates in decimals, and call or put direction.
+   * @param sigma - Finite nonnegative annualized diffusion volatility as a decimal.
+   * @param muJump - Mean log jump size with finite risk-neutral compensator.
+   * @param sigmaJump - Finite nonnegative standard deviation of log jump size.
+   * @param lambda - Finite nonnegative expected jump count per year.
+   * @param nTerms - Expansion terms from 1 to 65,536. Omit for 128 terms.
+   * @returns Discounted option price per underlying unit.
+   * @throws FinstackError for invalid input, a missing forward moment, invalid term count, degenerate cumulants or unrepresentable price.
    */
   readonly mertonJumpCosPrice: typeof wasm.mertonJumpCosPrice;
 }

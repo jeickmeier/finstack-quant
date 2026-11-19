@@ -235,17 +235,17 @@ inputs (for the quanto, `rate` is the domestic rate and `volatility` the asset
 volatility); `geometric_asian_price_times` and
 `arithmetic_asian_tw_price_times` take the new `AsianFixingSchedule`
 (expiry, discount factor, fixing times). `OptionMarketParams`,
-`CosMarketParams`, `GbmEuropeanFdSpec` and `HestonMcSettings` are serde types
-with JSON schemas (`option_market_params`, `cos_market_params`,
-`gbm_european_fd_spec`, `heston_mc_settings`).
+`OptionContractParams`, `GbmEuropeanFdSpec` and `HestonMcSettings` have
+published JSON schemas.
 
 Python passes them as a dict or JSON text, WASM as the schema-typed object or
 JSON text. The `market` keys are `spot, strike, rate, dividend_yield,
 volatility, time_to_expiry, option_type` (`"call"`/`"put"`, replacing `is_call`);
 the finite-difference Greek `spec` takes the same keys plus optional
-`num_paths, seed, num_steps, bump_size, currency`; the COS `market` takes
-them without `volatility` (each COS model passes its own) plus optional
-`n_terms`; Heston `params` are `r, q, v0, kappa, theta,
+`num_paths, seed, num_steps, bump_size, currency`. Black–Scholes COS uses
+`OptionMarketParams`. Variance Gamma and Merton COS share
+`OptionContractParams` and take model dynamics separately. COS term counts
+are optional arguments. Heston `params` are `r, q, v0, kappa, theta,
 sigma_v, rho`. A non-finite number inside one of these objects is rejected
 when the object is read (Python `ValueError`, WASM `TypeError`). Prices are
 unchanged. Old → new (WASM: the camelCase twin with the same arguments):
@@ -256,9 +256,9 @@ unchanged. Old → new (WASM: the camelCase twin with the same arguments):
 - `lookback_option_price(spot, strike, rate, div_yield, vol, expiry, extremum, strike_type, is_call)` → `lookback_option_price(market, extremum, strike_type)`
 - `quanto_option_price(spot, strike, expiry, rate_domestic, rate_foreign, div_yield, vol_asset, vol_fx, correlation, is_call)` → `quanto_option_price(market, rate_foreign, vol_fx, correlation)`
 - `heston_price(spot, strike, expiry, rate, div_yield, kappa, theta, sigma_v, rho, v0, is_call)` → `heston_price(spot, strike, expiry, params, is_call)`
-- `bs_cos_price(spot, strike, rate, div_yield, vol, expiry, is_call, n_terms)` → `bs_cos_price(market, vol)`
-- `vg_cos_price(spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms)` → `vg_cos_price(market, sigma, theta, nu)`
-- `merton_jump_cos_price(spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms)` → `merton_jump_cos_price(market, sigma, mu_jump, sigma_jump, lambda_)` (WASM `lambda`)
+- `bs_cos_price(spot, strike, rate, div_yield, vol, expiry, is_call, n_terms)` → `bs_cos_price(market, n_terms)`
+- `vg_cos_price(spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms)` → `vg_cos_price(contract, sigma, theta, nu, n_terms)`
+- `merton_jump_cos_price(spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms)` → `merton_jump_cos_price(contract, sigma, mu_jump, sigma_jump, lambda_, n_terms)` (WASM `lambda`)
 - `monte_carlo.price_heston(spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths, seed, num_steps, currency)` → `price_heston(spot, strike, expiry, params, is_call, settings)` (`settings`: optional `num_paths`, `seed`, `num_steps`, `currency`)
 - `monte_carlo.finite_diff_delta` / `finite_diff_gamma(spot, strike, rate, div_yield, vol, expiry, is_call, num_paths, seed, num_steps, bump_size, currency)` → `finite_diff_delta(spec)` / `finite_diff_gamma(spec)`
 - `EuropeanPricer.price_gbm`, `PathDependentPricer.price_asian` and `price_with_lrm_greeks(spot, strike, rate, div_yield, vol, expiry, is_call, num_steps, currency)` → `(market, num_steps, currency)`

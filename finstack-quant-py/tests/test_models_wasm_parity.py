@@ -984,11 +984,11 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
                     "dividend_yield": 0.0,
                     "time_to_expiry": 1.0,
                     "option_type": "put",
-                    "n_terms": 512,
                 },
                 0.2,
                 -0.14,
                 0.2,
+                n_terms=512,
             ),
             models.merton_jump_cos_price(
                 {
@@ -1012,12 +1012,12 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
                     "dividend_yield": 0.0,
                     "time_to_expiry": 1.0,
                     "option_type": "put",
-                    "n_terms": 512,
                 },
                 0.2,
                 -0.1,
                 0.15,
                 0.5,
+                n_terms=512,
             ),
         ],
         "volatility.convert_atm": lambda: [

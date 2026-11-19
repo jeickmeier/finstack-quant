@@ -98,6 +98,50 @@ pub fn option_market_params(
     crate::utils::to_js_value(&market)
 }
 
+/// Validate model-independent option inputs.
+/// @param contract - Positive matching spot and strike, finite annual continuous decimal discount and carry rates, nonnegative expiry in years and payoff direction.
+/// @returns Validated model-independent contract.
+/// @throws FinstackError if its shape or values fail validation.
+#[wasm_bindgen(js_name = optionContractParams, unchecked_return_type = "generated.models.OptionContractParams")]
+pub fn option_contract_params(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionContractParams")]
+    contract: JsValue,
+) -> Result<JsValue, JsValue> {
+    let contract: finstack_quant_models::types::OptionContractParams =
+        from_js_json_exact(&contract, "contract")?;
+    contract.validate().map_err(to_js_err)?;
+    crate::utils::to_js_value(&contract)
+}
+
+/// Read the model-independent portion of constant-volatility option inputs.
+/// @param market - Spot, strike, continuous decimal rate and carry, annualized decimal volatility, expiry in years and direction.
+/// @returns The same contract inputs without its volatility assumption.
+/// @throws FinstackError when the inputs cannot be read as an option market.
+#[wasm_bindgen(js_name = optionMarketParamsContract, unchecked_return_type = "generated.models.OptionContractParams")]
+pub fn option_market_params_contract(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams")] market: JsValue,
+) -> Result<JsValue, JsValue> {
+    let market: OptionMarketParams = from_js_json_exact(&market, "market")?;
+    crate::utils::to_js_value(&market.contract())
+}
+
+/// Combine a model-independent contract with annualized constant volatility.
+/// @param contract - Positive matching spot and strike, continuous decimal carrying rates, expiry in years and payoff direction.
+/// @param volatility - Nonnegative finite annualized volatility as a decimal.
+/// @returns Validated option inputs for a constant-volatility model.
+/// @throws FinstackError when the contract or volatility fail validation.
+#[wasm_bindgen(js_name = optionContractParamsWithVolatility, unchecked_return_type = "generated.models.OptionMarketParams")]
+pub fn option_contract_params_with_volatility(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionContractParams")]
+    contract: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] volatility: JsValue,
+) -> Result<JsValue, JsValue> {
+    let contract: finstack_quant_models::types::OptionContractParams =
+        from_js_json_exact(&contract, "contract")?;
+    let volatility = js_f64(&volatility, "volatility")?;
+    crate::utils::to_js_value(&contract.with_volatility(volatility).map_err(to_js_err)?)
+}
+
 /// Per-unit Black-Scholes or Garman-Kohlhagen price of a European option.
 /// @param market - Canonical option inputs as an object or JSON text. Spot and strike share units; rate and dividend yield are continuously compounded decimal rates (foreign rate for FX); volatility is annualized decimal; time to expiry is in years; option type is call or put.
 /// @returns Price per unit. At zero expiry this is the intrinsic value; at zero volatility it is the discounted deterministic payoff.

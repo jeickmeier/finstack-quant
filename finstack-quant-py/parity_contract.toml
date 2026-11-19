@@ -491,9 +491,10 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # barrier / Asian / lookback / quanto dispatchers) take its serde form as one
 # `market` argument (OptionMarketParams, dict or JSON in Python, the schema-generated object /
 # JSON text in WASM: `spot, strike, rate, dividend_yield, volatility,
-# time_to_expiry, option_type`), the COS pricers take `CosMarketParams` the same
-# way, and `heston_price` takes `HestonPricingParams` as `params`, so those
-# two wire parameter types have no host class. `bs_greeks`
+# time_to_expiry, option_type`). The BS COS method uses the same market shape.
+# Variance Gamma and Merton COS use OptionContractParams, with their dynamics
+# and optional term count supplied separately. `heston_price` takes its existing
+# structural `HestonPricingParams` input. `bs_greeks`
 # returns the typed `BsGreeks` (`rho_r`, not `rho`); `black76_greeks` /
 # `bachelier_greeks` return the typed `ForwardGreeks`. Each host function makes
 # one call into the same-named checked Rust entry point in `closed_form`
@@ -519,6 +520,7 @@ public = [
     "BsGreeks",
     "ForwardGreeks",
     "OptionCalculationResult",
+    "OptionContractParams",
     "OptionMarketParams",
     "asian_option_price",
     "bachelier_greeks",
@@ -2338,8 +2340,8 @@ js = "margin.schema"
 
 [parity.modules."finstack_quant.models"]
 js = "models"
-types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks", OptionCalculationResult = "OptionCalculationResult", OptionMarketParams = "OptionMarketParams" }
-constructors = { OptionMarketParams = "models.optionMarketParams" }
+types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks", OptionCalculationResult = "OptionCalculationResult", OptionMarketParams = "OptionMarketParams", OptionContractParams = "OptionContractParams" }
+constructors = { OptionMarketParams = "models.optionMarketParams", OptionContractParams = "models.optionContractParams" }
 
 [parity.modules."finstack_quant.models.correlation"]
 js = "models.correlation"
@@ -3188,3 +3190,9 @@ excluded = { qualifying = "literal", non_qualifying = "literal" }
 
 [parity.members."finstack_quant.portfolio.FiPositionSnapshot"]
 excluded = { with_quote_legs = "literal" }
+
+[parity.members."finstack_quant.models.OptionMarketParams"]
+renames = { contract = { js = "models.optionMarketParamsContract", reason = "WASM option inputs are plain objects and the method reads their contract fields" } }
+
+[parity.members."finstack_quant.models.OptionContractParams"]
+renames = { with_volatility = { js = "models.optionContractParamsWithVolatility", reason = "WASM contract inputs are plain objects and the method validates the combined option inputs" } }

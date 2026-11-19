@@ -33,9 +33,9 @@ test('COS rejects an empty expansion', () => {
         dividend_yield: 0,
         time_to_expiry: 1,
         option_type: 'call',
-        n_terms: 0,
+        volatility: 0.2,
       },
-      0.2
+      0
     )
   );
 });
@@ -45,32 +45,28 @@ test('COS reports invalid market inputs as exceptions without a panic', () => {
     for (const isCall of [true, false]) {
       assert.throws(
         () =>
-          facade.models.bsCosPrice(
-            {
-              spot: invalid,
-              strike: 100,
-              rate: 0.05,
-              dividend_yield: 0,
-              time_to_expiry: 1,
-              option_type: isCall ? 'call' : 'put',
-            },
-            0.2
-          ),
+          facade.models.bsCosPrice({
+            spot: invalid,
+            strike: 100,
+            rate: 0.05,
+            dividend_yield: 0,
+            time_to_expiry: 1,
+            option_type: isCall ? 'call' : 'put',
+            volatility: 0.2,
+          }),
         /spot/
       );
       assert.throws(
         () =>
-          facade.models.bsCosPrice(
-            {
-              spot: 100,
-              strike: invalid,
-              rate: 0.05,
-              dividend_yield: 0,
-              time_to_expiry: 1,
-              option_type: isCall ? 'call' : 'put',
-            },
-            0.2
-          ),
+          facade.models.bsCosPrice({
+            spot: 100,
+            strike: invalid,
+            rate: 0.05,
+            dividend_yield: 0,
+            time_to_expiry: 1,
+            option_type: isCall ? 'call' : 'put',
+            volatility: 0.2,
+          }),
         /strike/
       );
     }

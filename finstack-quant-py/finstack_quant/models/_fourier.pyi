@@ -1,217 +1,157 @@
-"""Stub declarations mirroring ``finstack-quant-py/src/bindings/models/fourier.rs``."""
+"""European option COS pricing on canonical option inputs."""
 
 from typing import Any
 
-# Fourier option pricing helpers
+from finstack_quant.models._closed_form import OptionContractParams, OptionMarketParams
 
-def bs_cos_price(
-    market: dict[str, Any] | str,
-    vol: float,
-) -> float:
-    """
-    Price a European option under Black-Scholes with the COS method.
+def bs_cos_price(market: OptionMarketParams | dict[str, Any] | str, n_terms: int | None = None) -> float:
+    """Price a European call or put under a constant lognormal volatility.
 
     Parameters
     ----------
-    market : dict or str
-        Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
-        ``spot`` and ``strike`` (float, the same price units); ``rate``
-        (continuously compounded risk-free rate, decimal); ``dividend_yield``
-        (continuous dividend yield, decimal); ``time_to_expiry`` (years);
-        ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
-        (int, number of COS terms in ``1..=65536``) is optional and defaults
-        to 128 when omitted or ``None``.
-    vol : float
-        Annualized volatility (decimal); must be strictly positive.
+    market : OptionMarketParams or dict or str
+        Spot and strike in equal units, continuous annual discount and carry
+        rates as decimals, positive expiry in years and strictly positive
+        decimal annual volatility. A dictionary or JSON string uses the same fields.
+    n_terms : int or None
+        Expansion terms from 1 through 65,536. None uses 128.
 
     Returns
     -------
     float
-        Per-unit option price.
+        Present value per underlying unit.
 
     Raises
     ------
     ValueError
-        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike``, ``time_to_expiry`` or ``vol`` is not finite and
-        positive, ``rate`` or ``dividend_yield`` is non-finite, or ``n_terms`` is
-        outside ``1..=65536``.
+        For invalid values, malformed inputs, or an invalid term count.
     RuntimeError
-        If the inputs produce an invalid COS truncation range, a non-finite
-        characteristic-function value, or a non-finite option price.
+        If the model cannot represent its cumulants or finite option price.
+    OverflowError
+        If n_terms cannot be represented as a native nonnegative integer.
 
     Examples
     --------
-    >>> from finstack_quant.models import bs_cos_price
-    >>> round(
-    ...     bs_cos_price(
-    ...         {
-    ...             "spot": 100.0,
-    ...             "strike": 100.0,
-    ...             "rate": 0.05,
-    ...             "dividend_yield": 0.0,
-    ...             "time_to_expiry": 1.0,
-    ...             "option_type": "call",
-    ...         },
-    ...         0.2,
-    ...     ),
-    ...     4,
+    >>> from finstack_quant.models import OptionMarketParams, bs_cos_price
+    >>> inputs = OptionMarketParams(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.05,
+    ...     dividend_yield=0.0,
+    ...     volatility=0.2,
+    ...     time_to_expiry=1.0,
+    ...     option_type="call",
     ... )
-    10.4506
-
-    Sources
-    -------
-    - Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008
-    - Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973
-
+    >>> round(bs_cos_price(inputs), 2)
+    10.45
     """
     ...
 
 def vg_cos_price(
-    market: dict[str, Any] | str,
+    contract: OptionContractParams | dict[str, Any] | str,
     sigma: float,
     theta: float,
     nu: float,
+    n_terms: int | None = None,
 ) -> float:
-    """
-    Price a European option under Variance Gamma with the COS method.
+    """Price a European call or put under the Variance Gamma process.
 
     Parameters
     ----------
-    market : dict or str
-        Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
-        ``spot`` and ``strike`` (float, the same price units); ``rate``
-        (continuously compounded risk-free rate, decimal); ``dividend_yield``
-        (continuous dividend yield, decimal); ``time_to_expiry`` (years);
-        ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
-        (int, number of COS terms in ``1..=65536``) is optional and defaults
-        to 128 when omitted or ``None``.
+    contract : OptionContractParams or dict or str
+        Matching spot and strike units, continuous annual decimal discount and
+        carry rates, positive expiry in years and call or put direction.
     sigma : float
-        Positive finite volatility of the subordinated Brownian motion.
+        Positive annual decimal volatility of the subordinated Brownian motion.
     theta : float
-        Finite annual log-return drift of the subordinated Brownian motion;
-        its sign controls skew.
+        Annual drift of the subordinated Brownian motion with a finite forward moment.
     nu : float
-        Positive finite variance rate of the Gamma time change, in years;
-        larger values increase log-return tail thickness.
+        Positive variance rate of the Gamma subordinator.
+    n_terms : int or None
+        Expansion terms from 1 through 65,536. None uses 128.
 
     Returns
     -------
     float
-        Per-unit option price.
+        Present value per underlying unit.
 
     Raises
     ------
     ValueError
-        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike`` or ``time_to_expiry`` is not finite and positive, a
-        model input is non-finite, ``sigma`` or ``nu`` is not positive, the
-        martingale condition ``1 - theta*nu - 0.5*sigma**2*nu > 0`` fails, or
-        ``n_terms`` is outside ``1..=65536``.
+        If the contract, process domain or term count is invalid.
     RuntimeError
-        If the Variance Gamma parameters produce an invalid COS truncation
-        range, a non-finite characteristic-function value, or a non-finite
-        option price.
+        If the model cannot represent its cumulants or finite option price.
+    OverflowError
+        If n_terms cannot be represented as a native nonnegative integer.
 
     Examples
     --------
-    >>> from finstack_quant.models import vg_cos_price
-    >>> round(
-    ...     vg_cos_price(
-    ...         {
-    ...             "spot": 100.0,
-    ...             "strike": 100.0,
-    ...             "rate": 0.05,
-    ...             "dividend_yield": 0.0,
-    ...             "time_to_expiry": 1.0,
-    ...             "option_type": "call",
-    ...         },
-    ...         0.2,
-    ...         -0.1,
-    ...         0.2,
-    ...     ),
-    ...     4,
+    >>> from finstack_quant.models import OptionContractParams, vg_cos_price
+    >>> contract = OptionContractParams(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.05,
+    ...     dividend_yield=0.0,
+    ...     time_to_expiry=1.0,
+    ...     option_type="call",
     ... )
-    10.4445
-
-    Sources
-    -------
-    - Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008
-    - Madan-Carr-Chang (1998): see docs/REFERENCES.md#madan-carr-chang-1998
-
+    >>> vg_cos_price(contract, 0.2, -0.14, 0.2) > 0
+    True
     """
     ...
 
 def merton_jump_cos_price(
-    market: dict[str, Any] | str,
+    contract: OptionContractParams | dict[str, Any] | str,
     sigma: float,
     mu_jump: float,
     sigma_jump: float,
     lambda_: float,
+    n_terms: int | None = None,
 ) -> float:
-    """
-    Price a European option under Merton jump-diffusion with the COS method.
+    """Price a European call or put under lognormal jump diffusion.
 
     Parameters
     ----------
-    market : dict or str
-        Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
-        ``spot`` and ``strike`` (float, the same price units); ``rate``
-        (continuously compounded risk-free rate, decimal); ``dividend_yield``
-        (continuous dividend yield, decimal); ``time_to_expiry`` (years);
-        ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
-        (int, number of COS terms in ``1..=65536``) is optional and defaults
-        to 128 when omitted or ``None``.
+    contract : OptionContractParams or dict or str
+        Matching spot and strike units, continuous annual decimal discount and
+        carry rates, positive expiry in years and call or put direction.
     sigma : float
-        Diffusion volatility (decimal).
+        Finite nonnegative annual diffusion volatility as a decimal.
     mu_jump : float
-        Mean of the jump size distribution.
+        Mean log jump size with a finite risk-neutral compensator.
     sigma_jump : float
-        Standard deviation of the jump size.
+        Finite nonnegative standard deviation of the log jump size.
     lambda_ : float
-        Jump intensity (expected jumps per year).
+        Expected jump count per year, finite and nonnegative.
+    n_terms : int or None
+        Expansion terms from 1 through 65,536. None uses 128.
 
     Returns
     -------
     float
-        Per-unit option price.
+        Present value per underlying unit.
 
     Raises
     ------
     ValueError
-        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike`` or ``time_to_expiry`` is not finite and positive, a
-        model input is non-finite, ``sigma``, ``sigma_jump`` or ``lambda_`` is
-        negative, the jump compensator is non-finite, or ``n_terms`` is
-        outside ``1..=65536``.
+        If the contract, process domain or term count is invalid.
     RuntimeError
-        If the jump-diffusion parameters produce an invalid COS truncation
-        range, a non-finite characteristic-function value, or a non-finite
-        option price.
+        If the model cannot represent its cumulants or finite option price.
+    OverflowError
+        If n_terms cannot be represented as a native nonnegative integer.
 
     Examples
     --------
-    >>> from finstack_quant.models import merton_jump_cos_price
-    >>> round(
-    ...     merton_jump_cos_price(
-    ...         {
-    ...             "spot": 100.0,
-    ...             "strike": 100.0,
-    ...             "rate": 0.05,
-    ...             "dividend_yield": 0.0,
-    ...             "time_to_expiry": 1.0,
-    ...             "option_type": "call",
-    ...         },
-    ...         0.2,
-    ...         -0.1,
-    ...         0.2,
-    ...         0.5,
-    ...     ),
-    ...     4,
+    >>> from finstack_quant.models import OptionContractParams, merton_jump_cos_price
+    >>> contract = OptionContractParams(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.05,
+    ...     dividend_yield=0.0,
+    ...     time_to_expiry=1.0,
+    ...     option_type="call",
     ... )
-    12.1642
-
-    Sources
-    -------
-    - Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008
-    - Merton jump-diffusion (1976): see docs/REFERENCES.md#merton-1976-jump
-
+    >>> merton_jump_cos_price(contract, 0.2, -0.05, 0.15, 0.7) > 0
+    True
     """
     ...

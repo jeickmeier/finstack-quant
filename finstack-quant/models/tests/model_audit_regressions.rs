@@ -3,7 +3,7 @@
 use finstack_quant_core::{currency::Currency, market_data::surfaces::VolSurface};
 use finstack_quant_models::closed_form::bs_price;
 use finstack_quant_models::correlation::PortfolioLossResult;
-use finstack_quant_models::fourier::cos::{CosMarketParams, bs_cos_price};
+use finstack_quant_models::fourier::cos::bs_cos_price;
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
@@ -95,18 +95,7 @@ fn checked_black_scholes_rejects_invalid_inputs_without_masking_nan() {
 
 #[test]
 fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
-    let mut market = CosMarketParams {
-        spot: 100.0,
-        strike: 100.0,
-        rate: 0.05,
-        dividend_yield: 0.0,
-        time_to_expiry: 1.0,
-        option_type: OptionType::Call,
-        n_terms: Some(0),
-    };
-    assert!(bs_cos_price(market, 0.2).is_err());
-    market.n_terms = Some(128);
-    let exact = bs_price(&finstack_quant_models::types::OptionMarketParams {
+    let market = finstack_quant_models::types::OptionMarketParams {
         spot: 100.0,
         strike: 100.0,
         rate: 0.05,
@@ -114,9 +103,10 @@ fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
         volatility: 0.2,
         time_to_expiry: 1.0,
         option_type: OptionType::Call,
-    })
-    .unwrap();
-    assert!((bs_cos_price(market, 0.2).unwrap() - exact).abs() < 1e-8);
+    };
+    assert!(bs_cos_price(&market, Some(0)).is_err());
+    let exact = bs_price(&market).unwrap();
+    assert!((bs_cos_price(&market, Some(128)).unwrap() - exact).abs() < 1e-8);
 }
 
 #[test]

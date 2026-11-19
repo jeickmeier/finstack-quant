@@ -18,7 +18,7 @@ use crate::monte_carlo::pricer::lsmc::LsmcResult;
 use crate::monte_carlo::simulate::{
     FbmSpec, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec,
 };
-use crate::types::{ExerciseStyle, OptionMarketParams, OptionType};
+use crate::types::{ExerciseStyle, OptionContractParams, OptionMarketParams, OptionType};
 use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
@@ -41,9 +41,9 @@ use crate::{
     credit::scoring::ZmijewskiInput, fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
     fourier::characteristic_function::VarianceGammaCf, fourier::cos::CosConfig,
-    fourier::cos::CosMarketParams, liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory,
-    liquidity::ImpactEstimate, liquidity::KyleLambdaModel, liquidity::LiquidityTier,
-    liquidity::LvarBangiaScalar, liquidity::TradeParams, monte_carlo::estimate::Estimate,
+    liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
+    liquidity::KyleLambdaModel, liquidity::LiquidityTier, liquidity::LvarBangiaScalar,
+    liquidity::TradeParams, monte_carlo::estimate::Estimate,
     monte_carlo::greeks::gbm_european::GbmEuropeanFdSpec, monte_carlo::greeks::lrm::LrmGreeks,
     monte_carlo::payoff::asian::AveragingMethod, monte_carlo::pricer::basis::BasisKind,
     monte_carlo::pricer::heston::HestonMcSettings, monte_carlo::process::brownian::BrownianParams,
@@ -186,11 +186,11 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "COS method configuration."
     ),
     finstack_quant_core::schema_artifact!(
-        CosMarketParams,
+        OptionContractParams,
         "models",
-        "cos_market_params",
+        "option_contract_params",
         Input,
-        "Option and market inputs of the COS Fourier pricers."
+        "Spot, strike, carry, expiry and direction shared by option pricing models."
     ),
     finstack_quant_core::schema_artifact!(
         CreditExposure,

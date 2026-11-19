@@ -181,15 +181,6 @@
       "type_name": "CosConfig"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/models/1/cos_market_params.schema.json",
-      "bytes": 1878,
-      "kind": "input",
-      "path": "schemas/models/1/cos_market_params.schema.json",
-      "summary": "Option and market inputs of the COS Fourier pricers.",
-      "title": "CosMarketParams",
-      "type_name": "CosMarketParams"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/models/1/credit_exposure.schema.json",
       "bytes": 1145,
       "kind": "component",
@@ -638,6 +629,15 @@
       "summary": "Price, volatility and Greeks of one closed-form option calculation.",
       "title": "OptionCalculationResult",
       "type_name": "OptionCalculationResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/option_contract_params.schema.json",
+      "bytes": 1737,
+      "kind": "input",
+      "path": "schemas/models/1/option_contract_params.schema.json",
+      "summary": "Spot, strike, carry, expiry and direction shared by option pricing models.",
+      "title": "OptionContractParams",
+      "type_name": "OptionContractParams"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/option_market_params.schema.json",

@@ -170,6 +170,185 @@ class OptionMarketParams:
         """
         ...
 
+    def contract(self) -> OptionContractParams:
+        """Read the model-independent option inputs.
+
+        Returns
+        -------
+        OptionContractParams
+            Underlier, payoff and continuously compounded carry used by this option.
+
+        Raises
+        ------
+        This method does not raise.
+        """
+        ...
+
+class OptionContractParams:
+    """Spot, strike, expiry, continuous carry and payoff direction shared by option models.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import OptionContractParams
+    >>> contract = OptionContractParams(
+    ...     spot=100.0,
+    ...     strike=105.0,
+    ...     rate=0.03,
+    ...     dividend_yield=0.01,
+    ...     time_to_expiry=2.0,
+    ...     option_type="call",
+    ... )
+    >>> contract.with_volatility(0.2).volatility
+    0.2
+    """
+
+    def __init__(
+        self,
+        *,
+        spot: float,
+        strike: float,
+        rate: float,
+        dividend_yield: float,
+        time_to_expiry: float,
+        option_type: Literal["call", "put"],
+    ) -> None:
+        """Validate and store the market inputs.
+
+        Parameters
+        ----------
+        spot : float
+            Underlying spot price, in the same units as strike.
+        strike : float
+            Exercise price in the same units as spot.
+        rate : float
+            Continuously compounded annual risk-free rate as a decimal.
+        dividend_yield : float
+            Continuous annual dividend yield or foreign-rate carry as a decimal.
+        time_to_expiry : float
+            Time remaining until expiry, in years.
+        option_type : {"call", "put"}
+            Direction of the option payoff.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type.
+        ValueError
+            If a number is non-finite, spot or strike is nonpositive,
+            volatility or expiry is negative, or the option type is unknown.
+        """
+        ...
+
+    @property
+    def spot(self) -> float:
+        """Read the option's spot.
+
+        Returns
+        -------
+        float
+            Underlying spot price, in the same units as strike.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def strike(self) -> float:
+        """Read the option's strike.
+
+        Returns
+        -------
+        float
+            Exercise price in the same units as spot.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def rate(self) -> float:
+        """Read the option's rate.
+
+        Returns
+        -------
+        float
+            Continuously compounded annual risk-free rate as a decimal.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def dividend_yield(self) -> float:
+        """Read the option's dividend yield.
+
+        Returns
+        -------
+        float
+            Continuous annual dividend yield or foreign-rate carry as a decimal.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def time_to_expiry(self) -> float:
+        """Read the option's time to expiry.
+
+        Returns
+        -------
+        float
+            Time remaining until expiry, in years.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def option_type(self) -> str:
+        """Read the option's option type.
+
+        Returns
+        -------
+        str
+            Payoff direction, call or put.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    def with_volatility(self, volatility: float) -> OptionMarketParams:
+        """Add constant annual volatility to the option inputs.
+
+        Parameters
+        ----------
+        volatility : float
+            Finite nonnegative annualized volatility in decimal units.
+
+        Returns
+        -------
+        OptionMarketParams
+            The same contract with the specified volatility.
+
+        Raises
+        ------
+        ValueError
+            If volatility is negative or nonfinite.
+        """
+        ...
+
 class BsGreeks:
     """
     Black-Scholes / Garman-Kohlhagen Greeks for one European option (per unit).

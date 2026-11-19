@@ -2522,7 +2522,10 @@
       "mertonJumpCosPrice",
       "monteCarlo",
       "optionCalculation",
+      "optionContractParams",
+      "optionContractParamsWithVolatility",
       "optionMarketParams",
+      "optionMarketParamsContract",
       "quantoOptionPrice",
       "rates",
       "vanillaExpiryPayoff",
@@ -3574,6 +3577,15 @@
     "kind": "function"
   },
   "models.optionMarketParams": {
+    "kind": "function"
+  },
+  "models.optionContractParams": {
+    "kind": "function"
+  },
+  "models.optionMarketParamsContract": {
+    "kind": "function"
+  },
+  "models.optionContractParamsWithVolatility": {
     "kind": "function"
   },
   "models.vanillaExpiryPayoff": {

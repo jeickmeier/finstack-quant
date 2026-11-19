@@ -101,11 +101,11 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
               dividend_yield: 0,
               time_to_expiry: 1,
               option_type: 'call',
-              n_terms: count,
+              volatility: 0.2,
             },
-            0.2
+            count
           ),
-        invalidObjectCount('market')
+        invalidCount('nTerms')
       );
       assert.throws(
         () =>
@@ -117,13 +117,13 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
               dividend_yield: 0,
               time_to_expiry: 1,
               option_type: 'call',
-              n_terms: count,
             },
             0.2,
             -0.1,
-            0.2
+            0.2,
+            count
           ),
-        invalidObjectCount('market')
+        invalidCount('nTerms')
       );
       assert.throws(
         () =>
@@ -135,14 +135,14 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
               dividend_yield: 0,
               time_to_expiry: 1,
               option_type: 'call',
-              n_terms: count,
             },
             0.2,
             -0.1,
             0.1,
-            0.1
+            0.1,
+            count
           ),
-        invalidObjectCount('market')
+        invalidCount('nTerms')
       );
       for (const isCall of [true, false]) {
         const price = (settings) =>

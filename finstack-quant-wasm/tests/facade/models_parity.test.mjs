@@ -1056,11 +1056,11 @@ const CASES = {
         dividend_yield: 0.0,
         time_to_expiry: 1.0,
         option_type: 'put',
-        n_terms: 512,
       },
       0.2,
       -0.14,
-      0.2
+      0.2,
+      512
     ),
     models.mertonJumpCosPrice(
       {
@@ -1084,12 +1084,12 @@ const CASES = {
         dividend_yield: 0.0,
         time_to_expiry: 1.0,
         option_type: 'put',
-        n_terms: 512,
       },
       0.2,
       -0.1,
       0.15,
-      0.5
+      0.5,
+      512
     ),
   ],
   'volatility.convert_atm': () => [
@@ -1162,4 +1162,19 @@ test('option market construction shares the validated greeks inputs', () => {
   const zeroVol = models.optionMarketParams({ ...wire, volatility: 0.0 });
   assert.throws(() => models.bsGreeks(zeroVol), /positive vol/);
   assert.throws(() => models.optionMarketParams({ ...wire, volatility: Number.NaN }), /volatility/);
+});
+
+test('option contract inputs are shared by closed-form and COS pricing', () => {
+  const contract = models.optionContractParams({
+    spot: 100,
+    strike: 85,
+    rate: 0.05,
+    dividend_yield: 0.02,
+    time_to_expiry: 1,
+    option_type: 'call',
+  });
+  const market = models.optionContractParamsWithVolatility(contract, 0.2);
+  assert.deepEqual(models.optionMarketParamsContract(market), contract);
+  assert.ok(Math.abs(models.bsCosPrice(market, 256) - models.bsPrice(market)) < 1e-8);
+  assert.throws(() => models.optionContractParams({ ...contract, strike: 0 }), /strike/);
 });

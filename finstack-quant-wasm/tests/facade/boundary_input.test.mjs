@@ -179,10 +179,9 @@ test('counts reject negatives, fractions and oversized values before Rust sizes 
     time_to_expiry: 1,
     option_type: 'call',
   };
-  // `n_terms` travels inside the `CosMarketParams` object, so the Rust
-  // deserializer rejects a non-count before any series is sized.
-  const badCount = (error) => error.kind === 'validation' && /market: /.test(error.message);
-  const bsCos = (nTerms) => models.bsCosPrice({ ...cos, n_terms: nTerms }, 0.2);
+  // The optional expansion count travels separately from the model inputs.
+  const badCount = invalidType('nTerms');
+  const bsCos = (nTerms) => models.bsCosPrice({ ...cos, volatility: 0.2 }, nTerms);
   assert.ok(bsCos(256) > 0);
   assert.throws(() => bsCos(-1), badCount);
   assert.throws(() => bsCos(2.5), badCount);
@@ -202,8 +201,8 @@ test('counts reject negatives, fractions and oversized values before Rust sizes 
   assert.throws(() => models.asianOptionPrice(asian, 2 ** 53), invalidType('numFixings'));
   // The other COS kernels share the count check (audit finding F128).
   for (const price of [
-    (nTerms) => models.vgCosPrice({ ...cos, n_terms: nTerms }, 0.2, -0.14, 0.2),
-    (nTerms) => models.mertonJumpCosPrice({ ...cos, n_terms: nTerms }, 0.2, -0.1, 0.15, 0.5),
+    (nTerms) => models.vgCosPrice({ ...cos }, 0.2, -0.14, 0.2, nTerms),
+    (nTerms) => models.mertonJumpCosPrice({ ...cos }, 0.2, -0.1, 0.15, 0.5, nTerms),
   ]) {
     assert.ok(price(256) > 0);
     for (const bad of [-1, 2.5, 2 ** 53]) assert.throws(() => price(bad), badCount);

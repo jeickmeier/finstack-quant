@@ -7,6 +7,7 @@ import pickle
 import pytest
 
 from finstack_quant.models import (
+    OptionContractParams,
     bachelier_price,
     black76_implied_vol,
     black76_price,
@@ -40,6 +41,25 @@ def test_checked_black_scholes_raises_for_invalid_spot(spot: float) -> None:
         })
 
 
+def test_cos_and_closed_form_share_the_checked_option_contract() -> None:
+    contract = OptionContractParams(
+        spot=100.0,
+        strike=85.0,
+        rate=0.05,
+        dividend_yield=0.02,
+        time_to_expiry=1.0,
+        option_type="call",
+    )
+    market = contract.with_volatility(0.0)
+    assert market.contract() == contract
+    expected = 100.0 * math.exp(-0.02) - 85.0 * math.exp(-0.05)
+    assert bs_price(market) == pytest.approx(expected, abs=1e-12)
+    with pytest.raises(ValueError, match="volatility"):
+        bs_cos_price(market)
+    market_with_vol = contract.with_volatility(0.2)
+    assert bs_cos_price(market_with_vol) == pytest.approx(bs_price(market_with_vol), abs=1e-8)
+
+
 def test_cos_rejects_zero_terms() -> None:
     with pytest.raises(ValueError, match="num_terms"):
         bs_cos_price(
@@ -50,9 +70,9 @@ def test_cos_rejects_zero_terms() -> None:
                 "dividend_yield": 0.0,
                 "time_to_expiry": 1.0,
                 "option_type": "call",
-                "n_terms": 0,
+                "volatility": 0.2,
             },
-            0.2,
+            n_terms=0,
         )
 
 
@@ -61,30 +81,26 @@ def test_cos_rejects_zero_terms() -> None:
 def test_cos_invalid_prices_raise_value_error(invalid: float, is_call: bool) -> None:
     # A non-finite float has no JSON form, so the `market` object itself is rejected.
     finite = math.isfinite(invalid)
-    with pytest.raises(ValueError, match="spot" if finite else "invalid CosMarketParams"):
-        bs_cos_price(
-            {
-                "spot": invalid,
-                "strike": 100.0,
-                "rate": 0.05,
-                "dividend_yield": 0.0,
-                "time_to_expiry": 1.0,
-                "option_type": ("call" if is_call else "put"),
-            },
-            0.2,
-        )
-    with pytest.raises(ValueError, match="strike" if finite else "invalid CosMarketParams"):
-        bs_cos_price(
-            {
-                "spot": 100.0,
-                "strike": invalid,
-                "rate": 0.05,
-                "dividend_yield": 0.0,
-                "time_to_expiry": 1.0,
-                "option_type": ("call" if is_call else "put"),
-            },
-            0.2,
-        )
+    with pytest.raises(ValueError, match="spot" if finite else "invalid OptionMarketParams"):
+        bs_cos_price({
+            "spot": invalid,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "time_to_expiry": 1.0,
+            "option_type": "call" if is_call else "put",
+            "volatility": 0.2,
+        })
+    with pytest.raises(ValueError, match="strike" if finite else "invalid OptionMarketParams"):
+        bs_cos_price({
+            "spot": 100.0,
+            "strike": invalid,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "time_to_expiry": 1.0,
+            "option_type": "call" if is_call else "put",
+            "volatility": 0.2,
+        })
 
 
 def test_cos_rejects_invalid_process_parameters() -> None:

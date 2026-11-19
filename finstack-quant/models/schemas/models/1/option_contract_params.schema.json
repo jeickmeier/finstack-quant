@@ -16,42 +16,32 @@
       ]
     }
   },
-  "$id": "https://finstack_quant.dev/schemas/models/1/cos_market_params.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/models/1/option_contract_params.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Option and market inputs of the COS Fourier pricers.",
+  "description": "Spot, strike, carry, expiry and direction shared by option pricing models.",
   "properties": {
     "dividend_yield": {
-      "description": "Continuous dividend yield (decimal, annualized).",
+      "description": "Continuous dividend yield or cost of carry as a decimal.",
       "format": "double",
       "type": "number"
     },
-    "n_terms": {
-      "default": null,
-      "description": "Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to\n[`CosConfig::default`].",
-      "format": "uint",
-      "minimum": 0,
-      "type": [
-        "integer",
-        "null"
-      ]
-    },
     "option_type": {
       "$ref": "#/$defs/OptionType",
-      "description": "Call or put payoff."
+      "description": "Call or put payoff direction."
     },
     "rate": {
-      "description": "Continuously-compounded risk-free rate.",
+      "description": "Continuously compounded annual risk-free rate as a decimal.",
       "format": "double",
       "type": "number"
     },
     "spot": {
-      "description": "Current spot price of the underlying.",
+      "description": "Current spot or forward price in the instrument's quote units.",
       "format": "double",
       "type": "number"
     },
     "strike": {
-      "description": "Option strike.",
+      "description": "Strike price in the same quote units as `spot`.",
       "format": "double",
       "type": "number"
     },
@@ -65,10 +55,10 @@
     "spot",
     "strike",
     "rate",
-    "dividend_yield",
     "time_to_expiry",
+    "dividend_yield",
     "option_type"
   ],
-  "title": "CosMarketParams",
+  "title": "OptionContractParams",
   "type": "object"
 }

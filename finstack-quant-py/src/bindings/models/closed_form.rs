@@ -37,7 +37,7 @@ use finstack_quant_models::closed_form::{
     quanto_option_price, vanilla_expiry_payoff,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_models::types::{OptionMarketParams, OptionType};
+use finstack_quant_models::types::{OptionContractParams, OptionMarketParams, OptionType};
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
 
@@ -91,6 +91,13 @@ impl PyOptionMarketParams {
         Ok(Self { inner })
     }
 
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.contract")]
+    fn contract(&self) -> PyOptionContractParams {
+        PyOptionContractParams {
+            inner: self.inner.contract(),
+        }
+    }
+
     #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.option_type")]
     #[getter]
     fn option_type(&self) -> String {
@@ -115,6 +122,82 @@ crate::bindings::macros::py_getters!(PyOptionMarketParams |market| {
     volatility -> f64 = market.inner.volatility;
 
     #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.time_to_expiry")]
+    time_to_expiry -> f64 = market.inner.time_to_expiry;
+
+});
+
+pub(crate) fn option_contract(contract: &Bound<'_, PyAny>) -> PyResult<OptionContractParams> {
+    if let Ok(typed) = contract.cast::<PyOptionContractParams>() {
+        return Ok(typed.get().inner);
+    }
+    spec_from_py(contract.py(), contract, "OptionContractParams")
+}
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams")]
+#[pyclass(
+    name = "OptionContractParams",
+    module = "finstack_quant.models",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+struct PyOptionContractParams {
+    inner: OptionContractParams,
+}
+
+#[pymethods]
+impl PyOptionContractParams {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.__init__")]
+    #[new]
+    #[pyo3(signature = (*, spot, strike, rate, dividend_yield, time_to_expiry, option_type))]
+    fn new(
+        spot: f64,
+        strike: f64,
+        rate: f64,
+        dividend_yield: f64,
+        time_to_expiry: f64,
+        option_type: &str,
+    ) -> PyResult<Self> {
+        let inner = OptionContractParams {
+            spot,
+            strike,
+            rate,
+            time_to_expiry,
+            dividend_yield,
+            option_type: serde_parse(option_type).map_err(core_to_py)?,
+        };
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.with_volatility")]
+    fn with_volatility(&self, volatility: f64) -> PyResult<PyOptionMarketParams> {
+        let inner = self.inner.with_volatility(volatility).map_err(core_to_py)?;
+        Ok(PyOptionMarketParams { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.option_type")]
+    #[getter]
+    fn option_type(&self) -> String {
+        self.inner.option_type.to_string()
+    }
+}
+
+crate::bindings::macros::py_getters!(PyOptionContractParams |market| {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.spot")]
+    spot -> f64 = market.inner.spot;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.strike")]
+    strike -> f64 = market.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.rate")]
+    rate -> f64 = market.inner.rate;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.dividend_yield")]
+    dividend_yield -> f64 = market.inner.dividend_yield;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.time_to_expiry")]
     time_to_expiry -> f64 = market.inner.time_to_expiry;
 
 });
@@ -690,6 +773,7 @@ fn heston_price_wrapper(
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBsGreeks>()?;
     m.add_class::<PyOptionMarketParams>()?;
+    m.add_class::<PyOptionContractParams>()?;
     m.add_class::<PyForwardGreeks>()?;
     m.add_class::<PyOptionCalculationResult>()?;
     m.add_function(wrap_pyfunction!(option_calculation_wrapper, m)?)?;

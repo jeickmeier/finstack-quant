@@ -217,10 +217,6 @@ export type CorrelationStructure =
  */
 export type CorrelationWire = number;
 /**
- * Option payoff direction used by analytical and numerical model engines.
- */
-export type OptionType = "call" | "put";
-/**
  * Strategy for assembling the factor covariance matrix.
  */
 export type CovarianceStrategy =
@@ -985,6 +981,10 @@ export type FbmSpec =
       type: "windowed_conditional";
     };
 export type Interpolation = "linear" | "constant_intervals";
+/**
+ * Option payoff direction used by analytical and numerical model engines.
+ */
+export type OptionType = "call" | "put";
 /**
  * Factor model specification for configuration and serialization.
  */
@@ -2609,40 +2609,6 @@ export interface CosConfig {
    */
   truncation_l: number;
   [k: string]: unknown;
-}
-/**
- * Option and market inputs of the COS Fourier pricers.
- */
-export interface CosMarketParams {
-  /**
-   * Continuous dividend yield (decimal, annualized).
-   */
-  dividend_yield: number;
-  /**
-   * Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
-   * [`CosConfig::default`].
-   */
-  n_terms?: number | null;
-  /**
-   * Call or put payoff.
-   */
-  option_type: OptionType;
-  /**
-   * Continuously-compounded risk-free rate.
-   */
-  rate: number;
-  /**
-   * Current spot price of the underlying.
-   */
-  spot: number;
-  /**
-   * Option strike.
-   */
-  strike: number;
-  /**
-   * Time to expiry in years.
-   */
-  time_to_expiry: number;
 }
 /**
  * Configuration for the deterministic credit factor-model calibrator.
@@ -5280,6 +5246,35 @@ export interface OptionCalculationResult {
    * for an implied-volatility solve.
    */
   price: number;
+}
+/**
+ * Spot, strike, carry, expiry and direction shared by option pricing models.
+ */
+export interface OptionContractParams {
+  /**
+   * Continuous dividend yield or cost of carry as a decimal.
+   */
+  dividend_yield: number;
+  /**
+   * Call or put payoff direction.
+   */
+  option_type: OptionType;
+  /**
+   * Continuously compounded annual risk-free rate as a decimal.
+   */
+  rate: number;
+  /**
+   * Current spot or forward price in the instrument's quote units.
+   */
+  spot: number;
+  /**
+   * Strike price in the same quote units as `spot`.
+   */
+  strike: number;
+  /**
+   * Time to expiry in years.
+   */
+  time_to_expiry: number;
 }
 /**
  * Spot, strike, rates, volatility, expiry and payoff direction of an option model call.
