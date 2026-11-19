@@ -890,39 +890,104 @@
               "check_name": "Balance Sheet Articulation",
               "comparisons": [
                 {
-                  "actual": 100.0,
-                  "expected": 100.0,
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q1",
-                  "tolerance": 0.0
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 },
                 {
-                  "actual": 100.0,
-                  "expected": 100.0,
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q2",
-                  "tolerance": 0.0
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 },
                 {
-                  "actual": 100.0,
-                  "expected": 100.0,
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q3",
-                  "tolerance": 0.0
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 },
                 {
-                  "actual": 100.0,
-                  "expected": 100.0,
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q4",
-                  "tolerance": 0.0
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 },
                 {
-                  "actual": 120.0,
-                  "expected": 120.0,
+                  "actual": {
+                    "amount": "120",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "120",
+                    "currency": "USD"
+                  },
                   "identity": "balance_sheet_articulation",
                   "period": "2026Q1",
-                  "tolerance": 0.0
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
                 }
               ],
               "evaluated": 5,
@@ -981,7 +1046,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q1 below Warning floor 1.50x",
                   "nodes": [
@@ -997,7 +1062,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q2 below Warning floor 1.50x",
                   "nodes": [
@@ -1013,7 +1078,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q3 below Warning floor 1.50x",
                   "nodes": [
@@ -1029,7 +1094,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q4 below Warning floor 1.50x",
                   "nodes": [
@@ -1045,7 +1110,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 120.0,
-                    "relative_pct": 0.0
+                    "relative_pct": null
                   },
                   "message": "Coverage ratio 1.00x in 2026Q1 below Warning floor 1.50x",
                   "nodes": [

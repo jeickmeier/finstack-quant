@@ -49,6 +49,7 @@ CHECK_FINDING_COLUMNS = [
     "comparison_actual",
     "comparison_expected",
     "comparison_tolerance",
+    "comparison_currency",
 ]
 
 PATH_COLUMNS = ["path_id", "period", "metric", "value"]

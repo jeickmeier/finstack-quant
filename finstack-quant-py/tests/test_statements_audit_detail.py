@@ -140,10 +140,12 @@ def test_failed_finding_reports_actual_expected_and_tolerance() -> None:
         "period": Q1,
         "actual": 1000.0,
         "expected": 900.0,
+        "difference": 100.0,
         "tolerance": 0.0,
     }
     # The numbers reconcile with the reported materiality and the verdict.
-    difference = abs(comparison["actual"] - comparison["expected"])
+    difference = abs(comparison["difference"])
+    assert difference == abs(comparison["actual"] - comparison["expected"])
     assert difference == finding.materiality_absolute
     assert difference > comparison["tolerance"]
 
@@ -166,6 +168,7 @@ def test_comparisons_dataframe_lists_passing_periods_too() -> None:
         "expected",
         "difference",
         "tolerance",
+        "currency",
         "within_tolerance",
     ]
     by_period = frame.set_index("period")
@@ -233,7 +236,7 @@ def _cashflows(*, with_detail: bool) -> CapitalStructureCashflows:
 
 def test_principal_sources_sum_to_principal_payment() -> None:
     frame = _cashflows(with_detail=True).to_dataframe()
-    amounts = frame.set_index("flow_type")["amount"]
+    amounts = frame.set_index("flow_type")["value"]
 
     sources = ["scheduled_principal", "mandatory_prepayment", "sweep_prepayment", "voluntary_prepayment"]
     assert amounts[sources].sum() == amounts["principal_payment"] == 465.0
@@ -242,7 +245,7 @@ def test_principal_sources_sum_to_principal_payment() -> None:
 
 def test_available_cash_reconciles_the_period_uses() -> None:
     cashflows = _cashflows(with_detail=True)
-    amounts = cashflows.to_dataframe().set_index("flow_type")["amount"]
+    amounts = cashflows.to_dataframe().set_index("flow_type")["value"]
     available = cashflows.available_cash[Q1]
     equity = cashflows.equity_distribution[Q1]
 

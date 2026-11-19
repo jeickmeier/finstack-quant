@@ -84,7 +84,7 @@ function performance() {
   });
 }
 
-test('a statements dependency cycle is a computation failure', () => {
+test('a model document with a dependency cycle is a located validation failure', () => {
   assert.throws(
     () =>
       new statements.Evaluator().evaluate(
@@ -93,7 +93,11 @@ test('a statements dependency cycle is a computation failure', () => {
           ['b', 'a + 1'],
         ])
       ),
-    kind('computation', /circular/i)
+    (error) =>
+      error.kind === 'validation' &&
+      /circular/i.test(error.message) &&
+      error.report.diagnostics[0].code === 'statements/circular_dependency' &&
+      error.report.diagnostics[0].pointer === '/nodes/a'
   );
 });
 

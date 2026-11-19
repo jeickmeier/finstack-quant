@@ -408,6 +408,6 @@ test('PIK elections are required and nonempty', () => {
     elections: [{ instrument_id: 'TL', pik_fraction: '0.4' }],
   };
   assert.deepEqual(JSON.parse(statements.validatePikToggleSpecJson(spec)).elections, [
-    { instrument_id: 'TL', pik_fraction: '0.4', min_coupon_periods: 0 },
+    { instrument_id: 'TL', pik_fraction: '0.4', notice_days: 0, min_coupon_periods: 0 },
   ]);
 });

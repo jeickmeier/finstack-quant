@@ -77,7 +77,9 @@ class TestPikToggleSpec:
         pik = statements.PikToggleSpec(
             liquidity_metric="cash", threshold=1e6, elections=[{"instrument_id": "TL", "pik_fraction": "1"}]
         )
-        assert pik.elections == [{"instrument_id": "TL", "pik_fraction": "1", "min_coupon_periods": 0}]
+        assert pik.elections == [
+            {"instrument_id": "TL", "pik_fraction": "1", "notice_days": 0, "min_coupon_periods": 0}
+        ]
 
     def test_json_roundtrip(self) -> None:
         pik = statements.PikToggleSpec(
