@@ -226,6 +226,7 @@
       "calibrateHullWhiteToCapFloors",
       "calibrateHullWhiteToSwaptions",
       "calibrationEnvelopeContentHash",
+      "calibrationEnvelopeFromSteps",
       "calibrationResultContentHash",
       "calibrationResultResiduals",
       "calibrationResultStepReport",
@@ -279,6 +280,9 @@
     "kind": "function"
   },
   "calibration.calibrationEnvelopeContentHash": {
+    "kind": "function"
+  },
+  "calibration.calibrationEnvelopeFromSteps": {
     "kind": "function"
   },
   "calibration.calibrationResultContentHash": {
@@ -4462,6 +4466,7 @@
   "valuations": {
     "kind": "namespace",
     "keys": [
+      "calculateSimm",
       "composite",
       "instruments",
       "market",
@@ -6282,6 +6287,9 @@
     "kind": "function"
   },
   "valuations.schema.validateInstrumentTypeJson": {
+    "kind": "function"
+  },
+  "valuations.calculateSimm": {
     "kind": "function"
   },
   "valuations.valuationResultToJson": {

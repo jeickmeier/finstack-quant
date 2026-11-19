@@ -35,12 +35,15 @@ from finstack_quant.valuations import instruments as instruments
 from finstack_quant.valuations import market as market
 from finstack_quant.valuations import schema as schema
 
+from finstack_quant.valuations._margin import calculate_simm as calculate_simm
+
 __all__ = [
     "composite",
     "instruments",
     "market",
     "schema",
     "ValuationResult",
+    "calculate_simm",
 ]
 
 class ValuationResult:

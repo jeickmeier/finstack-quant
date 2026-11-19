@@ -501,6 +501,7 @@ class TestCalibrationNamespace:
             "RateBounds",
             "RateQuote",
             "SolverConfig",
+            "StepWithQuotes",
             "ValidationConfig",
             "VolQuote",
             "XccyQuote",

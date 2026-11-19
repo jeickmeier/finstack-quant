@@ -446,7 +446,7 @@ pub struct PyImResult {
 }
 
 impl PyImResult {
-    pub(super) fn from_inner(inner: fm::calculators::ImResult) -> Self {
+    pub(crate) fn from_inner(inner: fm::calculators::ImResult) -> Self {
         Self { inner }
     }
 }

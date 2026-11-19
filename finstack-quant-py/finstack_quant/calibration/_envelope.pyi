@@ -1,5 +1,6 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/calibration/envelope.rs``."""
 
+from collections.abc import Sequence
 from typing import Any
 from finstack_quant.calibration._config import CalibrationConfig
 from finstack_quant.calibration._quotes import (
@@ -1114,6 +1115,52 @@ class CalibrationPlan:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
+class StepWithQuotes:
+    """One typed calibration step and its inline quote inputs.
+
+    Examples
+    --------
+    >>> from finstack_quant.calibration import CalibrationStep, StepWithQuotes
+    >>> step = CalibrationStep.discount("USD-OIS", {"base_date": "2025-01-15", "currency": "USD"})
+    >>> StepWithQuotes(step, []).step.id
+    'USD-OIS'
+    """
+
+    def __init__(self, step: CalibrationStep, quotes: Sequence[object]) -> None:
+        """Pair a step with observations for its named quote set.
+
+        Parameters
+        ----------
+        step : CalibrationStep
+            The step defining the calibrated object and its quote-set identifier.
+        quotes : Sequence[object]
+            Typed quote values or canonical market-datum dictionaries. Use an
+            empty sequence to reuse a quote set already supplied to the plan.
+
+        Raises
+        ------
+        TypeError
+            If the step or quote iterable has an incompatible type.
+        ValueError
+            If a market-datum dictionary cannot be parsed.
+        """
+        ...
+
+    @property
+    def step(self) -> CalibrationStep:
+        """Read the stored calibration step.
+
+        Returns
+        -------
+        CalibrationStep
+            Copy of the step, including its parameter variant and quote-set id.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
 class CalibrationEnvelope:
     """A calibration plan together with its market data and optional prior market.
 
@@ -1127,6 +1174,51 @@ class CalibrationEnvelope:
     'finstack_quant.calibration/1'
 
     """
+
+    @staticmethod
+    def from_steps(
+        id: str,
+        steps: Sequence[StepWithQuotes],
+        *,
+        settings: CalibrationConfig | dict[str, object] | None = None,
+        prior_market: Sequence[dict[str, object]] | None = None,
+    ) -> CalibrationEnvelope:
+        """Build a calibration request from ordered steps with inline inputs.
+
+        Parameters
+        ----------
+        id : str
+            Nonempty identifier used to name the plan and its execution report.
+        steps : Sequence[StepWithQuotes]
+            Typed steps in dependency order. The first reference to a quote
+            set defines its quotes, and later steps can reuse it.
+        settings : CalibrationConfig | dict[str, object] | None
+            Solver and validation config, a shallow settings override, or None
+            for Rust defaults.
+        prior_market : Sequence[dict[str, object]] | None
+            Previously built curves or surfaces as canonical market objects.
+
+        Returns
+        -------
+        CalibrationEnvelope
+            A request with quote IDs wired into the plan and market inputs
+            registered once. Calibration checks its financial dependencies.
+
+        Raises
+        ------
+        TypeError
+            If a parameter has the wrong Python type.
+        ValueError
+            If an identifier is blank or repeated or settings and prior objects
+            cannot be parsed.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import CalibrationEnvelope
+        >>> CalibrationEnvelope.from_steps("empty", []).plan.id
+        'empty'
+        """
+        ...
 
     def __init__(
         self,

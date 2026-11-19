@@ -117,7 +117,7 @@ print(mapping.to_string(index=False))
 
 <ExecutedOutput lesson="3.6" block="margin-proof-2" />
 
-The hand check uses USD 1,000/bp at 5Y times the embedded 51bp weight, giving USD 51,000. The native engine must match within USD 1e-8. A 7Y IR bucket is deliberately rejected with `ValueError` because it is not in the prescribed grid.
+The hand check uses USD 1,000/bp at 5Y times the embedded 60 bp weight, giving USD 60,000. The native engine must match within USD 1e-8. A 7Y IR bucket is deliberately rejected with `ValueError` because it is not in the prescribed grid.
 
 {/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="margin-proof-3" role="build" */}
 ```python exec id=margin-proof-3 role=build
@@ -125,16 +125,25 @@ simm = SimmSensitivities("USD")
 for row in mapping[mapping.framework == "SIMM"].itertuples():
     simm.add_ir_delta(row.currency, row.tenor, row.amount)
 simm_result = SimmCalculator("v2_6").calculate_from_sensitivities(simm, "USD", AS_OF)
+from finstack_quant.valuations import calculate_simm
+from finstack_quant.valuations.instruments import InterestRateSwap
+
+# One contractual swap in the SIMM netting set; the native mapping uses its own risk conventions.
+native_simm = calculate_simm([InterestRateSwap.from_json(swap)], market, AS_OF, version="v2_6")
+assert native_simm.amount > 0 and native_simm.approximation
+print("Instrument-derived SIMM estimate (USD):", native_simm.amount)
 frtb = FrtbSensitivities("USD")
 for row in mapping[mapping.framework == "FRTB"].itertuples():
     frtb.add_girr_delta(row.currency, row.tenor, row.amount)
 capital = FrtbSbaEngine().calculate(frtb)
+assert simm_result.amount > 0 and capital.total > 0
 
 # Independently reconcile one 5Y IR bucket, below the concentration threshold.
 one_bucket = SimmSensitivities("USD")
 one_bucket.add_ir_delta("USD", "5Y", 1000.0)
 one_result = SimmCalculator("v2_6").calculate_from_sensitivities(one_bucket, "USD", AS_OF)
 manual = abs(1000.0 * 60.0)  # ISDA SIMM v2.6 D.1 p14: regular-currency 5Y weight 60bp.
+assert abs(one_result.amount - manual) < 1e-8, "USD: single-bucket SIMM must equal weighted sensitivity."
 invalid_bucket_error = None
 try:
     invalid = SimmSensitivities("USD")
@@ -142,6 +151,7 @@ try:
     SimmCalculator("v2_6").calculate_from_sensitivities(invalid, "USD", AS_OF)
 except ValueError as error:
     invalid_bucket_error = str(error)
+assert invalid_bucket_error is not None
 print("Invalid 7Y SIMM bucket rejected:", invalid_bucket_error)
 print({"simm_v2_6_2023_usd": simm_result.amount, "frtb_bcbs_d457_usd": capital.total, "single_bucket_manual_usd": manual})
 ```

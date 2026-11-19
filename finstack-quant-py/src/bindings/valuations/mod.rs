@@ -9,6 +9,7 @@ pub(crate) mod composite;
 pub(crate) mod convert;
 mod convertible_spot_ladder;
 pub(crate) mod instruments;
+mod margin;
 pub(crate) mod market;
 mod merton_mc;
 mod pricing;
@@ -337,6 +338,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.setattr("__doc__", pydoc!("finstack_quant.valuations", "__module__"))?;
 
     m.add_class::<PyValuationResult>()?;
+    margin::register(&m)?;
     composite::register(py, &m)?;
     schema::register(py, &m)?;
     register_instruments(py, &m)?;
@@ -346,6 +348,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "ValuationResult",
+            "calculate_simm",
             "composite",
             "instruments",
             "market",

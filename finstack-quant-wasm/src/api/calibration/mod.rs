@@ -36,14 +36,51 @@ mod result;
 mod steps;
 mod validation;
 
-use crate::utils::input::{js_string, json_text};
+use crate::utils::input::{from_js_json, js_string, json_text, opt_from_js_json};
 #[cfg(target_arch = "wasm32")]
 use crate::utils::structured_js_error;
-use crate::utils::to_js_value;
+use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::api::engine::{self, ExecuteError};
-use finstack_quant_calibration::api::schema::CalibrationResultEnvelope;
+use finstack_quant_calibration::api::schema::{
+    CalibrationEnvelope, CalibrationResultEnvelope, StepWithQuotes,
+};
 use finstack_quant_calibration::api::validate;
 use wasm_bindgen::prelude::*;
+
+/// Build a calibration envelope from ordered steps with inline observations.
+/// @param id - Nonempty plan identifier.
+/// @param steps - Ordered step and quote-input pairs. An empty quote list can reference a previously defined quote set.
+/// @param settings - Optional solver and validation configuration overrides.
+/// @param priorMarket - Optional previously calibrated objects used as dependencies.
+/// @returns Canonical calibration envelope ready for validation or execution.
+/// @throws `TypeError` for a mistyped argument or `FinstackError` for invalid settings, malformed data, blank or duplicate identifiers, or duplicate quote-set definitions.
+#[wasm_bindgen(js_name = calibrationEnvelopeFromSteps, unchecked_return_type = "CalibrationEnvelope")]
+pub fn calibration_envelope_from_steps(
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly generated.calibration.StepWithQuotes[]")] steps: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.calibration.CalibrationConfig | null"
+    )]
+    settings: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "priorMarket",
+        unchecked_optional_param_type = "readonly generated.calibration.PriorMarketObject[] | null"
+    )]
+    prior_market: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let id = js_string(&id, "id")?;
+    let steps: Vec<StepWithQuotes> = from_js_json(&steps, "steps")?;
+    let settings = opt_from_js_json::<serde_json::Value>(settings.as_ref(), "settings")?
+        .map(|overrides| CalibrationConfig::default().with_json_overrides(overrides))
+        .transpose()
+        .map_err(to_js_err)?
+        .unwrap_or_default();
+    let prior_market = opt_from_js_json(prior_market.as_ref(), "priorMarket")?.unwrap_or_default();
+    let envelope =
+        CalibrationEnvelope::from_steps(id, steps, settings, prior_market).map_err(to_js_err)?;
+    to_js_value(&envelope)
+}
 
 /// Validate a calibration envelope and return it as a plain `CalibrationEnvelope` object.
 ///

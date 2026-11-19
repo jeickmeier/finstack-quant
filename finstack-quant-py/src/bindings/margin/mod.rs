@@ -4,6 +4,7 @@
 //! collateral types, XVA configuration/results, and margin metrics.
 
 mod calculators;
+pub(crate) use calculators::PyImResult;
 mod frame;
 pub(crate) mod im;
 mod im_curvature;

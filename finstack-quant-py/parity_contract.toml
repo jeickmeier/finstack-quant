@@ -732,6 +732,7 @@ public = [
     "RateBounds",
     "RateQuote",
     "SolverConfig",
+    "StepWithQuotes",
     "ValidationConfig",
     "VolQuote",
     "XccyQuote",
@@ -797,6 +798,7 @@ schema       = { python = "finstack_quant.valuations.schema",       status = "ex
 # inventory covers the whole crate root. None is surfaced as a host namespace.
 constants    = { python = "finstack_quant.valuations.constants",    status = "missing", note = "Rust-only numeric/convention constants; hosts see the values through APIs that consume them (e.g. theta_days_per_year defaults), not as a namespace" }
 error        = { python = "finstack_quant.valuations.error",        status = "missing", note = "Rust-only error types; hosts receive mapped exceptions (Python ValueError/KeyError, JS Error), not the enum" }
+margin       = { python = "finstack_quant.valuations.margin",       status = "missing", note = "Instrument initial margin is exposed as calculate_simm directly under valuations." }
 market       = { python = "finstack_quant.valuations.market",       status = "exists", note = "Listed-product coverage metadata plus the read-only ConventionRegistry lookups (rate index, CDS, swaption, inflation swap, IR future, xccy) and their frozen convention records. Rust-only: resolve_vol_source internals and the market-object builders behind the calibration pipeline." }
 metrics      = { python = "finstack_quant.valuations.metrics",      status = "missing", note = "Rust-only MetricId/MetricRegistry plumbing; hosts enumerate metrics via list_standard_metrics* (the whole registry) and metrics_for_instrument (the grouped metrics registered for one instrument type, WASM valuations.instruments.metricsForInstrument) instead. The metrics::risk computation entry points are bound under instruments, not as a metrics namespace: MarketHistory, calculate_var (multi-instrument full-revaluation historical VaR/ES) and its VarResult (WASM valuations.instruments.calculateVar returning the VarResult object). VarConfig/VarMethod are its dict/JSON config argument." }
 pricer       = { python = "finstack_quant.valuations.pricer",       status = "missing", note = "Rust-only pricer registry and JSON pricing entry points; hosts reach them through the flattened price_* / validate_* / instrument_envelope_from_spec helpers under instruments" }
@@ -809,6 +811,7 @@ results      = { python = "finstack_quant.valuations.results",      status = "mi
 [crates.valuations.symbols]
 public = [
     "ValuationResult",
+    "calculate_simm",
 ]
 
 [crates.valuations.composite]
@@ -2039,7 +2042,7 @@ js = "attribution.schema"
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
 constructors = { XccyQuote = "calibration.xccyQuote", CdsTrancheQuote = "calibration.cdsTrancheQuote" }
-types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResultEnvelope = "CalibrationResultEnvelope", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
+types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResultEnvelope = "CalibrationResultEnvelope", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", StepWithQuotes = "StepWithQuotes", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
 
 [parity.modules."finstack_quant.calibration.hull_white"]
 js = "calibration"
@@ -2558,7 +2561,7 @@ renames = { threshold_for = { js = "covenants.thresholdScheduleThresholdFor", re
 renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain method is a free function taking the object" }, pct_of_total = { js = "attribution.pnlAttributionPctOfTotal", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::pct_of_total method is a free function taking the object" }, pct_of_total_by_bucket = { js = "attribution.pnlAttributionPctOfTotalByBucket", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::pct_of_total_by_bucket method is a free function taking the object" }, required_metrics = { js = "attribution.pnlAttributionRequiredMetrics", reason = "WASM attribution results are plain objects; Rust AttributionMethod::required_metrics of meta.method is a free function taking the object" }, residual_within_tolerance = { js = "attribution.pnlAttributionResidualWithinTolerance", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::residual_within_tolerance method is a free function taking the object" }, validate_currencies = { js = "attribution.pnlAttributionValidateCurrencies", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::validate_currencies method is a free function taking the object" } }
 
 [parity.members."finstack_quant.calibration.CalibrationEnvelope"]
-renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" } }
+renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" }, from_steps = { js = "calibration.calibrationEnvelopeFromSteps", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::from_steps constructor is a facade function" } }
 
 [parity.members."finstack_quant.calibration.CalibrationResultEnvelope"]
 renames = { content_hash = { js = "calibration.calibrationResultContentHash", reason = "WASM calibration results are plain objects; the Rust CalibrationResultEnvelope::content_hash method is a free function taking the result" }, residuals = { js = "calibration.calibrationResultResiduals", reason = "WASM calibration results are plain objects; the free function returns the Rust CalibrationReport::quote_rows rows that Python frames as a pandas DataFrame" }, step_report = { js = "calibration.calibrationResultStepReport", reason = "WASM calibration results are plain objects; the Rust CalibrationResult::step_report method is a free function taking the result" } }

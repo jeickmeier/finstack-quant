@@ -1,0 +1,3134 @@
+{
+  "$defs": {
+    "CalibrationMethod": {
+      "description": "Calibration method selection (bootstrap vs global solve).\n\nDefines the numerical approach used to solve for curve/surface parameters.\nBootstrap is the traditional sequential approach, while GlobalSolve\nsolves all parameters simultaneously.\n\n# Variants\n- `Bootstrap`: Traditional sequential bootstrap where each knot is solved\n  independently based on the previous knots.\n- `GlobalSolve`: Simultaneous optimization of all knots using Levenberg-Marquardt\n  or Newton-Raphson.\n\n# Examples\n```rust\nuse finstack_quant_calibration::CalibrationMethod;\n\nlet method = CalibrationMethod::GlobalSolve { use_analytical_jacobian: true };\n```",
+      "oneOf": [
+        {
+          "const": "bootstrap",
+          "description": "Traditional sequential bootstrap (default).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Global solve of all knots simultaneously (Newton/LM).",
+          "properties": {
+            "global_solve": {
+              "properties": {
+                "use_analytical_jacobian": {
+                  "description": "Use analytical Jacobian if available (otherwise finite-difference).",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "use_analytical_jacobian"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "global_solve"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CalibrationStep": {
+      "description": "A single step in the calibration process.\n\nEach step targets the construction or update of a specific market object\n(e.g., a yield curve) using a specified set of quotes.",
+      "oneOf": [
+        {
+          "description": "Discount curve calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the curve."
+            },
+            "conventions": {
+              "$ref": "#/$defs/RatesStepConventions",
+              "default": {
+                "curve_day_count": null,
+                "ois_compounding": null
+              },
+              "description": "Step-level conventions for pricing and curve time axis."
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Currency of the curve."
+            },
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the discount curve being built."
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/ExtrapolationPolicy",
+              "default": "extend",
+              "description": "Extrapolation policy for the curve."
+            },
+            "interpolation": {
+              "$ref": "#/$defs/InterpStyle",
+              "default": "log_linear",
+              "description": "Interpolation style for the constructed discount curve.\n\nDefaults to log-linear discount factors, preserving positive discount\nfactors and piecewise-constant continuously compounded forwards.\n`Linear` remains available only when explicitly requested."
+            },
+            "kind": {
+              "const": "discount",
+              "type": "string"
+            },
+            "method": {
+              "$ref": "#/$defs/CalibrationMethod",
+              "default": "bootstrap",
+              "description": "Calibration method to use."
+            },
+            "pricing_discount_id": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional separate ID for pricing logic (defaults to curve_id)."
+            },
+            "pricing_forward_id": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional forward curve ID for pricing (if needed)."
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "currency",
+            "base_date"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Forward curve calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the curve."
+            },
+            "conventions": {
+              "$ref": "#/$defs/RatesStepConventions",
+              "default": {
+                "curve_day_count": null,
+                "ois_compounding": null
+              },
+              "description": "Step-level conventions for pricing and curve time axis."
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Currency of the curve."
+            },
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the forward curve being built."
+            },
+            "discount_curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the discount curve to use."
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/ExtrapolationPolicy",
+              "default": "extend",
+              "description": "Policy controlling queries beyond the final calibrated pillar time."
+            },
+            "index_tenor": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Contractual index tenor metadata attached to the calibrated forward curve."
+            },
+            "interpolation": {
+              "$ref": "#/$defs/InterpStyle",
+              "default": "log_linear",
+              "description": "Interpolation style for the constructed forward curve's projection factors.\n\nDefaults to log-linear factor interpolation (`log_linear`). All five\n[`InterpStyle`] variants (`linear`, `log_linear`, `cubic_hermite`,\n`piecewise_quadratic_forward`, `monotone_convex`) are supported on the\nunderlying positive projection-factor evaluator."
+            },
+            "kind": {
+              "const": "forward",
+              "type": "string"
+            },
+            "method": {
+              "$ref": "#/$defs/CalibrationMethod",
+              "default": {
+                "global_solve": {
+                  "use_analytical_jacobian": false
+                }
+              },
+              "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`], which is the\ndefault (finite-difference Jacobian). Sequential bootstrap is rejected\nbecause contractual off-grid reset intervals couple adjacent rates\nthrough projection discount factors."
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "currency",
+            "base_date",
+            "discount_curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Hazard curve calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the curve."
+            },
+            "cds_valuation_convention": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CdsValuationConvention"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional CDS valuation convention used by synthetic CDS instruments\nduring hazard calibration and rebootstrap."
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Currency of the curve."
+            },
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the hazard curve being built."
+            },
+            "discount_curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the discount curve to use."
+            },
+            "doc_clause": {
+              "description": "Optional CDS documentation-clause assertion.\n\nHazard schedule conventions come from the quote `CdsConventionKey`. When\nthis field is set, it must be consistent with those quote-derived\nconventions (same clause or the matching regional family).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "entity": {
+              "description": "Entity name.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "hazard",
+              "type": "string"
+            },
+            "method": {
+              "$ref": "#/$defs/CalibrationMethod",
+              "default": "bootstrap",
+              "description": "Calibration method to use."
+            },
+            "notional": {
+              "default": 1.0,
+              "description": "Notional used to price synthetic CDS instruments during calibration.\n\nCalibration normalizes residuals by notional, so this is typically left as\nthe unit-notional default unless you have a specific reason to change it.",
+              "format": "double",
+              "type": "number"
+            },
+            "recovery_rate": {
+              "description": "Required recovery-rate assumption as a decimal fraction in `[0, 1]`.",
+              "format": "double",
+              "type": "number"
+            },
+            "seniority": {
+              "$ref": "#/$defs/Seniority",
+              "description": "Seniority of the debt."
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "entity",
+            "seniority",
+            "currency",
+            "base_date",
+            "discount_curve_id",
+            "recovery_rate"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Inflation curve calibration.",
+          "properties": {
+            "base_cpi": {
+              "description": "Explicit contractual reference CPI at the start date, after lag and interpolation.\nThis denominator is independent of the projection source's origin CPI.",
+              "format": "double",
+              "type": "number"
+            },
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Valuation and calibration-instrument start date, independent of the source origin."
+            },
+            "calendar_id": {
+              "description": "Source-clock holiday calendar; required for business-day clocks.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Currency of the curve."
+            },
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the inflation curve being built."
+            },
+            "day_count": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+              "description": "Complete source-clock convention used for every projected anchor."
+            },
+            "discount_curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the discount curve to use."
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/ExtrapolationPolicy",
+              "description": "Explicit scalar CPI tail policy, applied without lag or normalization."
+            },
+            "index": {
+              "description": "Reference index (e.g. \"USA-CPI-U\").",
+              "type": "string"
+            },
+            "interpolation": {
+              "$ref": "#/$defs/InterpStyle",
+              "description": "Interpolation style for the curve."
+            },
+            "kind": {
+              "const": "inflation",
+              "type": "string"
+            },
+            "method": {
+              "$ref": "#/$defs/CalibrationMethod",
+              "default": "bootstrap",
+              "description": "Calibration method to use."
+            },
+            "notional": {
+              "default": 1.0,
+              "description": "Notional used to price synthetic inflation swaps during calibration.\n\nCalibration normalizes residuals by notional, so this is typically left as\nthe unit-notional default unless you have a specific reason to change it.",
+              "format": "double",
+              "type": "number"
+            },
+            "observation_lag": {
+              "description": "Explicit contractual month observation lag (e.g. \"3M\"); \"none\" means zero months.\nOverrides the quote convention's lag without changing the projection source origin.",
+              "type": "string"
+            },
+            "source_base_cpi": {
+              "description": "Finite positive absolute CPI level at the projection source's origin.",
+              "format": "double",
+              "type": "number"
+            },
+            "source_base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Explicit original date of the absolute CPI projection source."
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "currency",
+            "base_date",
+            "discount_curve_id",
+            "index",
+            "observation_lag",
+            "base_cpi",
+            "source_base_date",
+            "source_base_cpi",
+            "day_count",
+            "interpolation",
+            "extrapolation"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Volatility surface calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the surface."
+            },
+            "beta": {
+              "default": 0.5,
+              "description": "SABR Beta parameter.",
+              "format": "double",
+              "type": "number"
+            },
+            "discount_curve_id": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Discount curve ID."
+            },
+            "dividend_yield_override": {
+              "default": null,
+              "description": "Optional dividend yield override.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "expiry_extrapolation": {
+              "$ref": "#/$defs/SurfaceExtrapolationPolicy",
+              "default": "error",
+              "description": "Extrapolation policy for total-variance fill across expiries.\n\nAfter each quoted expiry is calibrated, the published expiry×strike\ngrid is filled by interpolating total variance `w = σ²T` in expiry\n(not by interpolating SABR α/ν/ρ and evaluating Hagan at the target\n`T`). This policy controls targets that fall outside the calibrated\nexpiry range: `Error` rejects them; `Clamp` holds the nearest slice's\ntotal variance flat."
+            },
+            "kind": {
+              "const": "vol_surface",
+              "type": "string"
+            },
+            "spot_override": {
+              "default": null,
+              "description": "Optional spot price override.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "target_expiries": {
+              "default": [],
+              "description": "Target expiries for calibration.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "target_strikes": {
+              "default": [],
+              "description": "Target strikes for calibration.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "underlying_ticker": {
+              "description": "Identifier for the underlying instrument.",
+              "type": "string"
+            },
+            "vol_surface_id": {
+              "description": "Identifier for the volatility surface being built.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id",
+            "base_date",
+            "underlying_ticker"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Swaption volatility surface calibration.",
+          "properties": {
+            "allow_sabr_missing_bucket_fallback": {
+              "default": false,
+              "description": "Allow deterministic fallbacks when SABR grid corners are missing during interpolation.\n\nIf `false` (default), missing corner buckets are treated as an error instead of\nsilently substituting a nearby bucket.",
+              "type": "boolean"
+            },
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the calibration."
+            },
+            "calendar_id": {
+              "default": null,
+              "description": "Optional calendar identifier for date adjustments.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Currency for the swaption surface."
+            },
+            "discount_curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Discount curve identifier for pricing."
+            },
+            "fixed_day_count": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional day count convention for fixed-leg coupon accrual only.\nOption expiry and variance always use ACT/365F."
+            },
+            "forward_id": {
+              "default": null,
+              "description": "Optional forward curve identifier (if different from discount curve).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "swaption_vol",
+              "type": "string"
+            },
+            "sabr_beta": {
+              "default": 0.5,
+              "description": "SABR beta parameter (typically 0.0 for normal, 1.0 for lognormal).",
+              "format": "double",
+              "type": "number"
+            },
+            "sabr_extrapolation": {
+              "$ref": "#/$defs/SurfaceExtrapolationPolicy",
+              "default": "error",
+              "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry–tenor grid for target points that do not have a directly calibrated bucket."
+            },
+            "swap_index": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional floating index identifier used to resolve market swap conventions.\n\nSwaption forward/par rate calculations require swap schedule conventions (fixed frequency,\nday count, calendar, BDC) that are now indexed off a rate index conventions registry.\n\nIf omitted, individual swaption quotes must provide `float_leg_conventions.index`."
+            },
+            "target_expiries": {
+              "default": [],
+              "description": "Target option expiry times in ACT/365F years from `base_date`, independent\nof the fixed-leg coupon day-count convention.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "target_tenors": {
+              "default": [],
+              "description": "Target tenor times (in years) for the surface grid.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "vol_convention": {
+              "$ref": "#/$defs/SwaptionVolConvention",
+              "default": "lognormal",
+              "description": "Volatility quoting convention (normal or lognormal)."
+            },
+            "vol_surface_id": {
+              "description": "Identifier for the volatility surface.",
+              "type": "string"
+            },
+            "vol_tolerance": {
+              "default": null,
+              "description": "Maximum absolute error of any fitted volatility quote; defaults to 0.0015.\n\nThis is distinct from `plan.settings.tolerance` (solver tolerance). For swaption-vol\ncalibration, success should reflect whether the fitted smile residuals are within a\nmarket-appropriate tolerance (e.g., 10–20 normal vol bp), not machine epsilon.\nNormal quotes use decimal rate per square-root year; Black quotes use\ndimensionless annual volatility. Errors are never scaled by vega.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id",
+            "base_date",
+            "discount_curve_id",
+            "currency"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Base correlation calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the calibration."
+            },
+            "business_day_convention": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Business day convention for synthetic tranche schedule adjustments."
+            },
+            "calendar_id": {
+              "default": null,
+              "description": "Optional calendar identifier for schedule generation and date adjustments.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Currency used for synthetic tranche pricing."
+            },
+            "date_regime": {
+              "$ref": "#/$defs/CdsDateRegime",
+              "description": "Contractual date regime of the synthetic tranches (record\nCALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of\nMar/Jun/Sep/Dec) or `bespoke` for a schedule from the convention\nfrequency and stub. Required; there is no default regime."
+            },
+            "day_count": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Day count convention for synthetic tranche premium accrual."
+            },
+            "detachment_points": {
+              "default": [],
+              "description": "Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`\nfor 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,\nevery quote must match one point and every point must be quoted.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "discount_curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Discount curve identifier for pricing."
+            },
+            "frequency": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Payment frequency for synthetic tranches (e.g., quarterly)."
+            },
+            "index_id": {
+              "description": "Credit index identifier (e.g., CDX, iTraxx).",
+              "type": "string"
+            },
+            "kind": {
+              "const": "base_correlation",
+              "type": "string"
+            },
+            "maturity_years": {
+              "description": "Finite positive CDS tenor in years, representable as a whole number of months.\nQuotes must resolve to the same CDS convention maturity as this tenor.",
+              "format": "double",
+              "type": "number"
+            },
+            "notional": {
+              "default": 1.0,
+              "description": "Notional used to price synthetic tranches during calibration.\n\nCalibration can be expressed in upfront % terms, so this is typically left\nas unit-notional unless you have a specific reason to change it.",
+              "format": "double",
+              "type": "number"
+            },
+            "series": {
+              "description": "Series number of the credit index.",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "index_id",
+            "series",
+            "maturity_years",
+            "base_date",
+            "discount_curve_id",
+            "currency",
+            "date_regime"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Student-t copula degrees of freedom calibration.",
+          "properties": {
+            "base_correlation_curve_id": {
+              "description": "Identifier for the pre-calibrated base correlation curve.",
+              "type": "string"
+            },
+            "correlation": {
+              "default": 0.3,
+              "description": "Market-implied flat correlation for the tranche.",
+              "format": "double",
+              "type": "number"
+            },
+            "df_bounds": {
+              "default": [
+                2.1,
+                50.0
+              ],
+              "description": "Feasible domain for `df` as `(lower_bound, upper_bound)`.\n\n`df` must be > 2 for finite variance. Typical range: `(2.1, 50.0)`.",
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "format": "double",
+                  "type": "number"
+                },
+                {
+                  "format": "double",
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "discount_curve_id": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Discount curve identifier used to price the tranche.\n\nWhen omitted, calibration falls back to the only discount curve present\nin the market context as a convenience default."
+            },
+            "initial_df": {
+              "default": 5.0,
+              "description": "Starting guess for degrees of freedom (typically 4-10).",
+              "format": "double",
+              "type": "number"
+            },
+            "kind": {
+              "const": "student_t",
+              "type": "string"
+            },
+            "tranche_instrument_id": {
+              "description": "Identifier for the reference tranche instrument.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "tranche_instrument_id",
+            "base_correlation_curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Hull-White 1-factor model calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the calibration."
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Currency for conventions."
+            },
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Discount curve ID (must already exist in market context)."
+            },
+            "fit_tolerance": {
+              "description": "Required positive maximum implied-quote error in quoted volatility units.\nNormal quotes use decimal rate volatility; Black quotes use relative volatility.\nThis acceptance budget is independent of the numerical solver tolerance.",
+              "format": "double",
+              "type": "number"
+            },
+            "initial_kappa": {
+              "default": null,
+              "description": "Optional initial guess for mean reversion κ.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "initial_sigma": {
+              "default": null,
+              "description": "Optional initial guess for short rate vol σ.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "hull_white",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "fit_tolerance",
+            "curve_id",
+            "currency",
+            "base_date"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Hull-White 1-factor calibration to cap/floor volatility quotes.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the calibration."
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Currency for conventions."
+            },
+            "discount_curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Discount curve ID (must already exist in market context)."
+            },
+            "fit_tolerance": {
+              "description": "Required positive maximum implied-quote error in quoted volatility units.\nNormal quotes use decimal rate volatility; Black quotes use relative volatility.\nThis acceptance budget is independent of the numerical solver tolerance.",
+              "format": "double",
+              "type": "number"
+            },
+            "fixed_kappa": {
+              "default": null,
+              "description": "Optional source mean reversion κ. Required for one-quote calibration.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "forward_curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Forward/projection curve ID. If equal to `discount_curve_id`, the\ndiscount curve is used as the single-curve projection proxy."
+            },
+            "index_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Term-rate index defining settlement, reset tenor, accrual day count,\ncalendar, business-day adjustments, and payment lag for caplets.\nIts currency must match `currency`; overnight indices are unsupported."
+            },
+            "initial_kappa": {
+              "default": null,
+              "description": "Optional initial guess for mean reversion κ when solving both κ and σ.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "initial_sigma": {
+              "default": null,
+              "description": "Optional initial guess for short-rate volatility σ when solving both κ and σ.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "cap_floor_hull_white",
+              "type": "string"
+            },
+            "volatility_mode": {
+              "$ref": "#/$defs/HullWhiteVolatilityMode",
+              "default": "scalar",
+              "description": "Scalar or expiry-bootstraped piecewise short-rate volatility calibration."
+            }
+          },
+          "required": [
+            "kind",
+            "fit_tolerance",
+            "discount_curve_id",
+            "forward_curve_id",
+            "currency",
+            "base_date",
+            "index_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "SVI volatility surface calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the surface."
+            },
+            "discount_curve_id": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Discount curve ID (optional)."
+            },
+            "dividend_yield_override": {
+              "default": null,
+              "description": "Optional continuous dividend yield in decimal units. Without an override,\nuses the unitless market scalar `\"<underlying_ticker>-DIVYIELD\"`. When a\ndiscount curve is supplied, a matching cash-dividend schedule may supply\ncarry instead; otherwise an explicit yield is required.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "svi_surface",
+              "type": "string"
+            },
+            "spot_override": {
+              "default": null,
+              "description": "Optional spot price override.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "target_expiries": {
+              "default": [],
+              "description": "Target expiries for calibration.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "target_strikes": {
+              "default": [],
+              "description": "Target strikes for calibration.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "underlying_ticker": {
+              "description": "Underlying instrument ticker.",
+              "type": "string"
+            },
+            "vol_surface_id": {
+              "description": "Identifier for the volatility surface being built.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id",
+            "base_date",
+            "underlying_ticker"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Cross-currency basis curve calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the curve."
+            },
+            "conventions": {
+              "$ref": "#/$defs/RatesStepConventions",
+              "default": {
+                "curve_day_count": null,
+                "ois_compounding": null
+              },
+              "description": "Step-level conventions for pricing and curve time axis."
+            },
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Foreign currency being calibrated."
+            },
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the foreign discount curve being built."
+            },
+            "domestic_discount_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the pre-calibrated domestic discount curve."
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/ExtrapolationPolicy",
+              "default": "extend",
+              "description": "Extrapolation policy for the foreign curve."
+            },
+            "fx_spot": {
+              "description": "T+0 cash FX rate (domestic per foreign), used when a quote omits `spot_fx`.\n\nCovered-interest parity from today needs the cash FX, not the screen\n\"spot\". Market spot is T+2 for most G10 pairs and T+1 for USD/CAD;\nconvert to T+0 using ON/TN points before passing the rate here.\nMixing T+2 screen spot with T+0 discounting biases long-tenor basis\nby roughly 1–2 bp.",
+              "format": "double",
+              "type": "number"
+            },
+            "interpolation": {
+              "$ref": "#/$defs/InterpStyle",
+              "default": "log_linear",
+              "description": "Interpolation style for the constructed foreign discount curve.\n\nDefaults to log-linear discount factors. `Linear` remains available\nonly when explicitly requested."
+            },
+            "kind": {
+              "const": "xccy_basis",
+              "type": "string"
+            },
+            "method": {
+              "$ref": "#/$defs/CalibrationMethod",
+              "default": "bootstrap",
+              "description": "Sequential bootstrap method. `GlobalSolve` is unsupported and rejected."
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "currency",
+            "base_date",
+            "fx_spot",
+            "domestic_discount_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Parametric (Nelson-Siegel / NSS) curve calibration.",
+          "properties": {
+            "base_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Base date for the curve."
+            },
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier for the single discount curve being fitted. All calibration\ninstruments use this curve for discounting and implied projection."
+            },
+            "initial_params": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NelsonSiegelModel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional initial parameter guesses."
+            },
+            "kind": {
+              "const": "parametric",
+              "type": "string"
+            },
+            "model": {
+              "$ref": "#/$defs/NsVariant",
+              "description": "Nelson-Siegel variant (NS or NSS)."
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "base_date",
+            "model"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the object being calibrated in this step.",
+          "type": "string"
+        },
+        "quote_set": {
+          "description": "Reference to a named quote set in the parent plan.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "quote_set"
+      ],
+      "type": "object",
+      "unevaluatedProperties": false
+    },
+    "CdsConventionKey": {
+      "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```",
+      "properties": {
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "The currency of the CDS."
+        },
+        "doc_clause": {
+          "$ref": "#/$defs/CdsDocClause",
+          "description": "The documentation clause (e.g. CR14, MM14)."
+        }
+      },
+      "required": [
+        "currency",
+        "doc_clause"
+      ],
+      "type": "object"
+    },
+    "CdsDateRegime": {
+      "description": "Named contractual date regime of a CDS product (record\nCALIBRATION-FRAMEWORK-007, O7).\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default.",
+      "oneOf": [
+        {
+          "const": "standard",
+          "description": "Standard quarterly CDS roll dates (20 March, June, September and\nDecember): the premium grid runs quarterly from an accrual start on a\nroll date, with a short final period when the maturity is off the\ngrid. The leg's `frequency` must be quarterly; its `stub` is not used.",
+          "type": "string"
+        },
+        {
+          "const": "bespoke",
+          "description": "A bespoke schedule from the leg's own `frequency`, `stub` and\nboundaries.",
+          "type": "string"
+        }
+      ]
+    },
+    "CdsDocClause": {
+      "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```",
+      "oneOf": [
+        {
+          "const": "cr14",
+          "description": "Cum-Restructuring 2014 (CR14)",
+          "type": "string"
+        },
+        {
+          "const": "mr14",
+          "description": "Modified-Restructuring 2014 (MR14)",
+          "type": "string"
+        },
+        {
+          "const": "mm14",
+          "description": "Modified-Modified-Restructuring 2014 (MM14)",
+          "type": "string"
+        },
+        {
+          "const": "xr14",
+          "description": "No-Restructuring 2014 (XR14)",
+          "type": "string"
+        },
+        {
+          "const": "isda_na",
+          "description": "ISDA North American Corporate (IsdaNa)",
+          "type": "string"
+        },
+        {
+          "const": "isda_eu",
+          "description": "ISDA European Corporate (IsdaEu)",
+          "type": "string"
+        },
+        {
+          "const": "isda_as",
+          "description": "ISDA Asia Corporate (IsdaAs)",
+          "type": "string"
+        },
+        {
+          "const": "isda_au",
+          "description": "ISDA Australia Corporate (IsdaAu)",
+          "type": "string"
+        },
+        {
+          "const": "isda_nz",
+          "description": "ISDA New Zealand Corporate (IsdaNz)",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "Custom / Other",
+          "type": "string"
+        }
+      ]
+    },
+    "CdsValuationConvention": {
+      "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice.",
+      "oneOf": [
+        {
+          "const": "isda_dirty",
+          "description": "ISDA-style dirty model PV.\n\nPremium-leg cashflows accrue between unadjusted IMM dates, the final\ncoupon excludes the maturity day, and the reported NPV is the dirty\nmodel PV (no add-back of accrued premium). Par spread uses the risky\nannuity denominator. Use only for direct reproduction of academic ISDA\nStandard Model literature.",
+          "type": "string"
+        },
+        {
+          "const": "bloomberg_cdsw_clean",
+          "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV.",
+          "type": "string"
+        },
+        {
+          "const": "bloomberg_cdsw_clean_full_premium",
+          "description": "Bloomberg CDSW clean principal with full premium leg in the par-spread\ndenominator (distressed-credit variant).\n\nIdentical to [`Self::BloombergCdswClean`] except the par spread\ndenominator includes accrual-on-default. The difference vs. risky\nannuity is typically < 1bp for investment grade and 2-5bps for\ndistressed credits (hazard rate > 3%).",
+          "type": "string"
+        },
+        {
+          "const": "quant_lib_isda_parity",
+          "description": "QuantLib `IsdaCdsEngine` parity convention.\n\nReproduces QuantLib's CDS output: dirty PV (no clean add-back),\nbusiness-day-adjusted premium accrual periods, full premium leg in\nthe par-spread denominator, QuantLib `Actual360(true)` accrual (every\nAct/360 premium period includes its end date) and the `IsdaCdsEngine`\n`HalfDayBias` accrual-on-default adjustment.",
+          "type": "string"
+        }
+      ]
+    },
+    "CurrencyPair": {
+      "additionalProperties": false,
+      "description": "An ordered `base/quote` currency pair parsed from host text.\n\n[`FromStr`](std::str::FromStr) accepts the slash form `\"EUR/USD\"` and the\nsix-letter compact form `\"EURUSD\"`. Each half parses with [`Currency`]'s\ncase-insensitive, non-trimming parser, so a bad half reports the code it\nrejected. Orientation is kept: a quote on the pair means\n`1 base = rate quote`.\n\n# Examples\n```\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::fx::CurrencyPair;\n\nlet pair: CurrencyPair = \"eur/usd\".parse().expect(\"slash form\");\nassert_eq!((pair.base, pair.quote), (Currency::EUR, Currency::USD));\nassert_eq!(\"GBPJPY\".parse::<CurrencyPair>().expect(\"compact form\").quote, Currency::JPY);\nassert!(\"EURUS\".parse::<CurrencyPair>().is_err());\n```",
+      "properties": {
+        "base": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Base (from) currency: one unit of it is worth `rate` quote units."
+        },
+        "quote": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Quote (to) currency in which the rate is expressed."
+        }
+      },
+      "required": [
+        "base",
+        "quote"
+      ],
+      "type": "object"
+    },
+    "DayCountContextState": {
+      "additionalProperties": false,
+      "description": "Serializable snapshot of [`DayCountContext`] state for persistence and interchange.\n\nThis struct captures the optional context parameters (calendar, frequency, business-day basis)\nneeded to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.\n`Default` is the empty context (no calendar, frequency, basis, coupon\nperiod or termination status), the snapshot of\n[`DayCountContext::default`].",
+      "properties": {
+        "bus_basis": {
+          "description": "Optional custom business-day divisor (defaults to 252 when `None`).",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "calendar_id": {
+          "description": "Optional calendar code (e.g. \"target2\").",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "coupon_period": {
+          "default": null,
+          "description": "Optional unadjusted regular ICMA reference period or ACT/365L enclosing\ncoupon `(start, end)`, serialized as two ISO dates.\n\nRequired for exact ICMA accrual on round-trip. `None` selects the\nfrequency-only ICMA calculation path; ACT/365L requires these dates.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "end_is_termination_date": {
+          "default": null,
+          "description": "Whether the later accrual endpoint is the contractual termination\ndate; `None` (omitted or `null` on the wire) means unspecified, which\n30E/360 ISDA rejects.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "frequency": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional coupon frequency, required for ACT/ACT ISMA."
+        }
+      },
+      "type": "object"
+    },
+    "DividendEvent": {
+      "additionalProperties": false,
+      "description": "One gross cash distribution per entitled share on its schedule's share basis.",
+      "properties": {
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+        },
+        "event_id": {
+          "type": "string"
+        },
+        "ex_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+        },
+        "pay_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+        }
+      },
+      "required": [
+        "event_id",
+        "ex_date",
+        "pay_date",
+        "amount"
+      ],
+      "type": "object"
+    },
+    "ExtrapolationPolicy": {
+      "description": "Extrapolation policy for evaluation outside the knot range.\n\nEvery interpolation strategy honours this policy at both ends of the knot\nrange. Callers must choose an explicit policy:\n\n- `Flat`: hold the boundary ordinate constant outside the knot range\n  (and return derivative `0.0` strictly outside the knot range).\n- `Extend`: extend the boundary segment's slope in the interpolation style's\n  working space (table below).\n- `Error`: refuse to extrapolate; return an explicit error for queries\n  outside `[knots[0], knots[last]]`.\n\nWhat `Extend` extends depends on the [`InterpStyle`]:\n\n| Style | `Extend` extends | On a discount-factor curve | On a rate-valued curve |\n|---|---|---|---|\n| `Linear` | the value linearly | - | rates keep trending |\n| `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |\n| `LogLinear` | `ln(value)` linearly | flat forward rate | - |\n| `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |\n| `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |\n\nThe market-standard tail for a discount-factor curve is a flat forward\nrate (`Extend` with a log-space style). For a curve that stores rates or\nspreads, holding the last rate constant is `Flat`.",
+      "oneOf": [
+        {
+          "const": "flat",
+          "description": "Hold the boundary value constant outside `[knots[0], knots[last]]`.",
+          "type": "string"
+        },
+        {
+          "const": "extend",
+          "description": "Extend the boundary segment's slope in the interpolation style's\nworking space; see the table on [`ExtrapolationPolicy`].",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "Return an error for queries outside `[knots[0], knots[last]]`.",
+          "type": "string"
+        }
+      ]
+    },
+    "FloatingLegCompounding": {
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
+      "oneOf": [
+        {
+          "const": "simple",
+          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
+          "type": "string"
+        },
+        {
+          "const": "simple_average",
+          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
+          "properties": {
+            "compounded_in_arrears": {
+              "additionalProperties": false,
+              "properties": {
+                "lookback_days": {
+                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_in_arrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
+          "properties": {
+            "compounded_with_observation_shift": {
+              "additionalProperties": false,
+              "properties": {
+                "shift_days": {
+                  "description": "Business days to shift both observation dates and weights.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_observation_shift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
+          "properties": {
+            "compounded_with_rate_cutoff": {
+              "additionalProperties": false,
+              "properties": {
+                "cutoff_days": {
+                  "description": "Business days before period end over which the rate is frozen.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_rate_cutoff"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FxAtmConvention": {
+      "const": "delta_neutral_straddle",
+      "description": "At-the-money strike convention on [`FxDeltaVolSurface`].",
+      "type": "string"
+    },
+    "FxButterflyConvention": {
+      "const": "smile",
+      "description": "Butterfly quote convention on [`FxDeltaVolSurface`].",
+      "type": "string"
+    },
+    "FxSurfaceDeltaConvention": {
+      "const": "forward_unadjusted",
+      "description": "Delta convention governing how [`FxDeltaVolSurface`] maps wing deltas onto strikes.",
+      "type": "string"
+    },
+    "HullWhiteVolatilityMode": {
+      "description": "Parameters for Hull-White 1-factor calibration to cap/floor volatility quotes.",
+      "oneOf": [
+        {
+          "const": "scalar",
+          "description": "Calibrate and persist one scalar short-rate volatility.",
+          "type": "string"
+        },
+        {
+          "const": "piecewise",
+          "description": "Bootstrap a piecewise-constant short-rate volatility schedule at quote expiries.",
+          "type": "string"
+        }
+      ]
+    },
+    "InflationExpectedRelease": {
+      "additionalProperties": false,
+      "description": "One expected-release schedule assumption for a monthly CPI/RPI reference period.",
+      "properties": {
+        "expected_release": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Scheduled or expected release date on or after `reference_month`."
+        },
+        "known_on": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Inclusive date on or before the snapshot `knowledge_date` when this release assumption was known."
+        },
+        "reference_month": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Canonical first calendar day of the reference inflation month (`day() == 1`)."
+        }
+      },
+      "required": [
+        "reference_month",
+        "expected_release",
+        "known_on"
+      ],
+      "type": "object"
+    },
+    "InflationObservation": {
+      "additionalProperties": false,
+      "description": "One published monthly CPI/RPI fixing record inside an [`InflationIndex`] snapshot.",
+      "properties": {
+        "available_on": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Inclusive end-of-day availability date for this selected observation version."
+        },
+        "reference_month": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Canonical first calendar day of the reference inflation month (`day() == 1`)."
+        },
+        "value": {
+          "description": "Published finite, strictly positive index level.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "reference_month",
+        "value",
+        "available_on"
+      ],
+      "type": "object"
+    },
+    "InflationSeries": {
+      "additionalProperties": false,
+      "description": "Publication identity and units of an observed or projected inflation level.",
+      "properties": {
+        "reference_base": {
+          "description": "Published reference period and index scale, for example `1982-84=100`.",
+          "type": "string"
+        },
+        "seasonally_adjusted": {
+          "description": "True for seasonally adjusted levels and false for unadjusted levels.",
+          "type": "boolean"
+        },
+        "series_id": {
+          "description": "Publisher-qualified identifier of the statistical series.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "series_id",
+        "reference_base",
+        "seasonally_adjusted"
+      ],
+      "type": "object"
+    },
+    "InflationSwapConventionId": {
+      "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::InflationSwapConventions)\nfrom the convention registry.",
+      "type": "string"
+    },
+    "InterpStyle": {
+      "description": "Enum of supported interpolation styles. The default is `Linear`.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Linear interpolation in values.",
+          "type": "string"
+        },
+        {
+          "const": "log_linear",
+          "description": "Log‐linear interpolation of positive values.",
+          "type": "string"
+        },
+        {
+          "const": "monotone_convex",
+          "description": "Hagan‐West monotone‐convex interpolation of positive values.",
+          "type": "string"
+        },
+        {
+          "const": "cubic_hermite",
+          "description": "Cubic Hermite interpolation (Fritsch‐Butland / Moler PCHIP slopes).",
+          "type": "string"
+        },
+        {
+          "const": "piecewise_quadratic_forward",
+          "description": "Piecewise quadratic forwards (C¹ forwards and C² log discount factors).",
+          "type": "string"
+        }
+      ]
+    },
+    "IrFutureContractId": {
+      "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::IrFutureConventions)\nfrom the convention registry.",
+      "type": "string"
+    },
+    "MarketDatum": {
+      "description": "A single id-addressable input to the calibrator.\n\nEach variant is tagged via serde as `{\"kind\": \"<snake_case_variant>\", ...}`\nso callers can author flat heterogeneous lists in JSON/YAML.",
+      "oneOf": [
+        {
+          "description": "Interest-rate quote (deposit, FRA, future, swap, ...).",
+          "oneOf": [
+            {
+              "description": "Money market deposit rate.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/QuoteId",
+                  "description": "Unique identifier for the quote."
+                },
+                "index": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+                  "description": "Rate index identifier (e.g. \"USD-SOFR-3M\")."
+                },
+                "pillar": {
+                  "$ref": "#/$defs/Pillar",
+                  "description": "Maturity pillar; on the wire `{\"tenor\": {\"count\": 3, \"unit\": \"months\"}}`\nor `{\"date\": \"2024-01-01\"}`."
+                },
+                "rate": {
+                  "description": "Rate value (decimal).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "type": {
+                  "const": "deposit",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "id",
+                "index",
+                "pillar",
+                "rate"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Forward Rate Agreement.",
+              "properties": {
+                "end": {
+                  "$ref": "#/$defs/Pillar",
+                  "description": "End date pillar."
+                },
+                "id": {
+                  "$ref": "#/$defs/QuoteId",
+                  "description": "Unique identifier for the quote."
+                },
+                "index": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+                  "description": "Rate index identifier."
+                },
+                "rate": {
+                  "description": "Rate value (decimal).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "start": {
+                  "$ref": "#/$defs/Pillar",
+                  "description": "Start date pillar."
+                },
+                "type": {
+                  "const": "fra",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "id",
+                "index",
+                "start",
+                "end",
+                "rate"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Interest Rate Future (price).",
+              "properties": {
+                "contract": {
+                  "$ref": "#/$defs/IrFutureContractId",
+                  "description": "Future contract identifier (e.g. \"CME:SR3\")."
+                },
+                "convexity_adjustment": {
+                  "description": "Convexity adjustment as a decimal rate (Hull convention).\n\nThe implied forward is\n`forward = (100 - price) / 100 − convexity_adjustment`.\nA positive adjustment lowers the futures-implied rate toward the true\nforward. The wire field is required; the host authoring\nconstructor ([`RateQuote::futures`]) fills an omitted value\nwith [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].",
+                  "format": "double",
+                  "type": "number"
+                },
+                "expiry": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                  "description": "Last trading date of the future.\n\nThe convention registry derives the underlying reference period from\nthis date. For in-arrears IMM contracts such as `CME:SR3`, pass the\nbusiness day before the ending IMM Wednesday, not the named contract\nmonth's starting IMM date."
+                },
+                "id": {
+                  "$ref": "#/$defs/QuoteId",
+                  "description": "Unique identifier for the quote."
+                },
+                "price": {
+                  "description": "Price of the future (e.g. 98.50).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "type": {
+                  "const": "futures",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "id",
+                "contract",
+                "expiry",
+                "price",
+                "convexity_adjustment"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Interest Rate Swap (par rate).",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/QuoteId",
+                  "description": "Unique identifier for the quote."
+                },
+                "index": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+                  "description": "Rate index identifier (floating leg)."
+                },
+                "pillar": {
+                  "$ref": "#/$defs/Pillar",
+                  "description": "Maturity pillar of the swap."
+                },
+                "rate": {
+                  "description": "Fixed rate (decimal) making the swap PV=0.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "spread_decimal": {
+                  "default": null,
+                  "description": "Optional spread over the index in decimal format (e.g., 0.0010 for 10 basis points).\n\nThis spread is added to the floating leg rate. The value is in decimal format\nand will be converted to basis points internally (multiplied by 10,000).",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "swap",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "id",
+                "index",
+                "pillar",
+                "rate"
+              ],
+              "type": "object"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "rate_quote",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Single-name credit-default-swap quote.",
+          "oneOf": [
+            {
+              "description": "Credit Default Swap (par spread).",
+              "properties": {
+                "convention": {
+                  "$ref": "#/$defs/CdsConventionKey",
+                  "description": "Convention key (currency + doc clause)."
+                },
+                "entity": {
+                  "description": "Reference entity name.",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/$defs/QuoteId",
+                  "description": "Unique identifier for the quote."
+                },
+                "pillar": {
+                  "$ref": "#/$defs/Pillar",
+                  "description": "Maturity pillar."
+                },
+                "recovery_rate": {
+                  "description": "Recovery rate assumption (e.g. 0.40).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "spread_bp": {
+                  "description": "Par spread in basis points (e.g. 100.0).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "type": {
+                  "const": "cds_par_spread",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "id",
+                "entity",
+                "convention",
+                "pillar",
+                "spread_bp",
+                "recovery_rate"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Credit Default Swap (upfront + running).",
+              "properties": {
+                "convention": {
+                  "$ref": "#/$defs/CdsConventionKey",
+                  "description": "Convention key."
+                },
+                "coupon_bp": {
+                  "description": "Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "entity": {
+                  "description": "Reference entity name.",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/$defs/QuoteId",
+                  "description": "Unique identifier for the quote."
+                },
+                "pillar": {
+                  "$ref": "#/$defs/Pillar",
+                  "description": "Maturity pillar."
+                },
+                "recovery_rate": {
+                  "description": "Recovery rate assumption.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "type": {
+                  "const": "cds_upfront",
+                  "type": "string"
+                },
+                "upfront_pct": {
+                  "description": "Upfront payment percentage of notional (e.g. 0.01 for 1%).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "id",
+                "entity",
+                "convention",
+                "pillar",
+                "coupon_bp",
+                "upfront_pct",
+                "recovery_rate"
+              ],
+              "type": "object"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "cds_quote",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "CDS index tranche quote.",
+          "properties": {
+            "attachment": {
+              "description": "Attachment point (decimal, e.g. 0.03).",
+              "format": "double",
+              "type": "number"
+            },
+            "convention": {
+              "$ref": "#/$defs/CdsConventionKey",
+              "description": "Convention key (currency + doc clause)."
+            },
+            "coupon_bp": {
+              "description": "Contractual running coupon of the tranche, in basis points.",
+              "format": "double",
+              "type": "number"
+            },
+            "detachment": {
+              "description": "Detachment point (decimal, e.g. 0.07).",
+              "format": "double",
+              "type": "number"
+            },
+            "id": {
+              "$ref": "#/$defs/QuoteId",
+              "description": "Unique identifier."
+            },
+            "index": {
+              "description": "Index identifier (e.g. CDX.NA.HY).",
+              "type": "string"
+            },
+            "kind": {
+              "const": "cds_tranche_quote",
+              "type": "string"
+            },
+            "maturity": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Maturity date."
+            },
+            "series": {
+              "description": "CDS index series number.",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "upfront_pct": {
+              "description": "Upfront payment as a decimal fraction of tranche notional (e.g., -0.025 for -2.5%).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "index",
+            "series",
+            "attachment",
+            "detachment",
+            "maturity",
+            "upfront_pct",
+            "coupon_bp",
+            "convention"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Inflation quote (zero-coupon swap, year-on-year, ...).",
+          "oneOf": [
+            {
+              "description": "Zero-coupon inflation swap (ZCIS) quote.",
+              "properties": {
+                "inflation_swap": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "convention": {
+                      "$ref": "#/$defs/InflationSwapConventionId",
+                      "description": "Per-instrument conventions"
+                    },
+                    "id": {
+                      "$ref": "#/$defs/QuoteId",
+                      "description": "Unique identifier for the quote."
+                    },
+                    "index": {
+                      "description": "Inflation index identifier",
+                      "type": "string"
+                    },
+                    "maturity": {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                      "description": "Swap maturity"
+                    },
+                    "rate": {
+                      "description": "Fixed rate (decimal)",
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "maturity",
+                    "rate",
+                    "index",
+                    "convention"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "inflation_swap"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Year-on-year (YoY) inflation swap quote.",
+              "properties": {
+                "yoy_inflation_swap": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "convention": {
+                      "$ref": "#/$defs/InflationSwapConventionId",
+                      "description": "Instrument-wide conventions"
+                    },
+                    "frequency": {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+                      "description": "Payment frequency"
+                    },
+                    "id": {
+                      "$ref": "#/$defs/QuoteId",
+                      "description": "Unique identifier for the quote."
+                    },
+                    "index": {
+                      "description": "Inflation index identifier",
+                      "type": "string"
+                    },
+                    "maturity": {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                      "description": "Swap maturity"
+                    },
+                    "rate": {
+                      "description": "Fixed rate (decimal)",
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "maturity",
+                    "rate",
+                    "index",
+                    "frequency",
+                    "convention"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "yoy_inflation_swap"
+              ],
+              "type": "object"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "inflation_quote",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Volatility quote (cap/floor, swaption, ...).",
+          "oneOf": [
+            {
+              "description": "Equity or commodity option implied volatility quote.",
+              "properties": {
+                "option_vol": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "expiry": {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                      "description": "Option expiry"
+                    },
+                    "id": {
+                      "$ref": "#/$defs/QuoteId",
+                      "description": "Unique identifier for the quote."
+                    },
+                    "option_type": {
+                      "$ref": "#/$defs/OptionType",
+                      "description": "Option type (Call or Put)."
+                    },
+                    "strike": {
+                      "description": "Strike",
+                      "format": "double",
+                      "type": "number"
+                    },
+                    "underlying": {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+                      "description": "Underlying identifier"
+                    },
+                    "vol": {
+                      "description": "Implied volatility in decimal units (for example, `0.20` for 20%).",
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "underlying",
+                    "expiry",
+                    "strike",
+                    "vol",
+                    "option_type"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "option_vol"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Interest rate swaption implied volatility quote.",
+              "properties": {
+                "swaption_vol": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "convention": {
+                      "$ref": "#/$defs/SwaptionConventionId",
+                      "description": "Option exercise conventions"
+                    },
+                    "expiry": {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                      "description": "Option expiry"
+                    },
+                    "id": {
+                      "$ref": "#/$defs/QuoteId",
+                      "description": "Unique identifier for the quote."
+                    },
+                    "maturity": {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                      "description": "Underlying swap maturity date"
+                    },
+                    "quote_type": {
+                      "$ref": "#/$defs/VolQuoteType",
+                      "description": "Volatility quoting convention. Shifted Black quotes require a\n`ShiftedLognormal` calibration plan supplying their displacement;\nHull-White calibration rejects them because its quote contract\ncarries no displacement."
+                    },
+                    "strike": {
+                      "description": "Strike rate",
+                      "format": "double",
+                      "type": "number"
+                    },
+                    "vol": {
+                      "description": "Implied volatility in canonical decimal units: absolute rate\nvolatility for normal quotes and Black volatility for lognormal quotes.",
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "expiry",
+                    "maturity",
+                    "strike",
+                    "vol",
+                    "quote_type",
+                    "convention"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "swaption_vol"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Interest rate cap/floor implied volatility quote.",
+              "properties": {
+                "cap_floor_vol": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "expiry": {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                      "description": "Cap/floor maturity or caplet expiry."
+                    },
+                    "id": {
+                      "$ref": "#/$defs/QuoteId",
+                      "description": "Unique identifier for the quote."
+                    },
+                    "is_cap": {
+                      "description": "`true` for cap, `false` for floor.",
+                      "type": "boolean"
+                    },
+                    "quote_type": {
+                      "$ref": "#/$defs/VolQuoteType",
+                      "description": "Volatility quoting convention. Hull-White calibration accepts\nnormal and unshifted Black quotes; it rejects shifted Black\nbecause this quote does not carry a displacement."
+                    },
+                    "strike": {
+                      "description": "Strike rate.",
+                      "format": "double",
+                      "type": "number"
+                    },
+                    "vol": {
+                      "description": "Implied volatility in canonical decimal units: absolute rate\nvolatility for normal quotes and Black volatility for lognormal quotes.",
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "expiry",
+                    "strike",
+                    "vol",
+                    "quote_type",
+                    "is_cap"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "cap_floor_vol"
+              ],
+              "type": "object"
+            }
+          ],
+          "properties": {
+            "kind": {
+              "const": "vol_quote",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Cross-currency basis-swap quote.",
+          "properties": {
+            "basis_spread_bp": {
+              "description": "Basis spread in basis points on the base-currency leg.",
+              "format": "double",
+              "type": "number"
+            },
+            "convention": {
+              "$ref": "#/$defs/XccyConventionId",
+              "description": "XCCY pair convention identifier (e.g., `EUR/USD-XCCY`)."
+            },
+            "far_pillar": {
+              "$ref": "#/$defs/Pillar",
+              "description": "Far-leg maturity pillar; near leg is the convention spot date."
+            },
+            "id": {
+              "$ref": "#/$defs/QuoteId",
+              "description": "Unique identifier for the quote."
+            },
+            "kind": {
+              "const": "xccy_quote",
+              "type": "string"
+            },
+            "spot_fx": {
+              "description": "Optional spot FX quote (quote currency per 1 unit of base currency).",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "convention",
+            "far_pillar",
+            "basis_spread_bp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "FX spot quote.",
+          "properties": {
+            "from": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Base currency (e.g. `EUR` in `EUR/USD`)."
+            },
+            "id": {
+              "description": "Stable identifier for this datum.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "fx_spot",
+              "type": "string"
+            },
+            "rate": {
+              "description": "Rate such that `1 from = rate to`.",
+              "format": "double",
+              "type": "number"
+            },
+            "to": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Quote currency (e.g. `USD` in `EUR/USD`)."
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "from",
+            "to",
+            "rate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Spot price for a single asset.",
+          "properties": {
+            "id": {
+              "description": "Stable identifier (e.g., asset ticker).",
+              "type": "string"
+            },
+            "kind": {
+              "const": "price",
+              "type": "string"
+            },
+            "scalar": {
+              "$ref": "#/$defs/MarketScalar",
+              "description": "Scalar value (unitless or monetary)."
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "scalar"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Dividend schedule for an underlier.",
+          "properties": {
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+            },
+            "events": {
+              "items": {
+                "$ref": "#/$defs/DividendEvent"
+              },
+              "type": "array"
+            },
+            "id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            "kind": {
+              "const": "dividend_schedule",
+              "type": "string"
+            },
+            "share_basis": {
+              "type": "string"
+            },
+            "underlying": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "underlying",
+            "share_basis",
+            "currency",
+            "events"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Generic scalar time series (CPI, historical fixings, ...).",
+          "properties": {
+            "currency": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional currency"
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/SeriesExtrapolation",
+              "description": "Right-tail extrapolation policy"
+            },
+            "id": {
+              "description": "Series identifier",
+              "type": "string"
+            },
+            "interpolation": {
+              "$ref": "#/$defs/SeriesInterpolation",
+              "description": "Interpolation method"
+            },
+            "kind": {
+              "const": "fixing_series",
+              "type": "string"
+            },
+            "observations": {
+              "description": "Observations as (date, value) pairs",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "observations",
+            "interpolation",
+            "extrapolation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Inflation index fixings.",
+          "properties": {
+            "currency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Reporting currency association."
+            },
+            "expected_releases": {
+              "description": "Distinct strictly ascending monthly expected-release schedule assumptions.",
+              "items": {
+                "$ref": "#/$defs/InflationExpectedRelease"
+              },
+              "type": "array"
+            },
+            "id": {
+              "description": "Unique identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "inflation_fixings",
+              "type": "string"
+            },
+            "knowledge_date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Inclusive end-of-day snapshot knowledge cutoff date `K`."
+            },
+            "observations": {
+              "description": "Strictly ascending canonical monthly fixing observations.",
+              "items": {
+                "$ref": "#/$defs/InflationObservation"
+              },
+              "type": "array"
+            },
+            "series": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InflationSeries"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "currency",
+            "knowledge_date",
+            "observations"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Credit-index reference state.",
+          "properties": {
+            "base_correlation_curve_id": {
+              "description": "ID of the base correlation curve (must exist in context curves)",
+              "type": "string"
+            },
+            "id": {
+              "description": "Unique identifier for this credit index",
+              "type": "string"
+            },
+            "index_credit_curve_id": {
+              "description": "ID of the index hazard curve (must exist in context curves)",
+              "type": "string"
+            },
+            "issuer_credit_curve_ids": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": null,
+              "description": "Optional map of issuer ID → hazard curve ID",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "issuer_recovery_rates": {
+              "additionalProperties": {
+                "format": "double",
+                "type": "number"
+              },
+              "default": null,
+              "description": "Optional map of issuer ID → recovery rate",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "issuer_weights": {
+              "additionalProperties": {
+                "format": "double",
+                "type": "number"
+              },
+              "default": null,
+              "description": "Optional map of issuer ID → weight",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "credit_index",
+              "type": "string"
+            },
+            "num_constituents": {
+              "description": "Number of constituents",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "recovery_rate": {
+              "description": "Recovery rate",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "num_constituents",
+            "recovery_rate",
+            "index_credit_curve_id",
+            "base_correlation_curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "FX delta-vol surface.",
+          "properties": {
+            "atm_convention": {
+              "$ref": "#/$defs/FxAtmConvention",
+              "description": "At-the-money strike convention."
+            },
+            "atm_vols": {
+              "description": "ATM delta-neutral straddle vols per expiry.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "bf_10d": {
+              "description": "Optional 10-delta arithmetic smile butterfly per expiry.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "bf_25d": {
+              "description": "25-delta arithmetic smile butterfly per expiry.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "butterfly_convention": {
+              "$ref": "#/$defs/FxButterflyConvention",
+              "description": "Butterfly quote convention."
+            },
+            "delta_convention": {
+              "$ref": "#/$defs/FxSurfaceDeltaConvention",
+              "description": "Delta convention governing wing delta-to-strike conversion."
+            },
+            "expiries": {
+              "description": "Expiry times in years.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "expiry_clock": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VolatilityClock"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional volatility clock translating calendar expiry dates to `expiries`."
+            },
+            "id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Surface identifier."
+            },
+            "kind": {
+              "const": "fx_vol_surface",
+              "type": "string"
+            },
+            "pair": {
+              "$ref": "#/$defs/CurrencyPair",
+              "description": "Currency pair (`base/quote`) matching quoted FX forward orientation."
+            },
+            "rr_10d": {
+              "description": "Optional 10-delta risk reversal per expiry.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "rr_25d": {
+              "description": "25-delta risk reversal per expiry.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "pair",
+            "delta_convention",
+            "atm_convention",
+            "butterfly_convention",
+            "expiries",
+            "atm_vols",
+            "rr_25d",
+            "bf_25d"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Generic vol cube.",
+          "properties": {
+            "expiries": {
+              "description": "Option expiries in years, strictly increasing. Indexes the first axis.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "expiry_clock": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/VolatilityClock"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "forwards": {
+              "description": "Row-major: forwards[expiry_idx * n_tenors + tenor_idx]",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "id": {
+              "description": "Identifier the cube is registered and looked up under.",
+              "type": "string"
+            },
+            "interpolation_mode": {
+              "$ref": "#/$defs/VolInterpolationMode",
+              "description": "How volatilities are interpolated between the cube's grid points."
+            },
+            "kind": {
+              "const": "vol_cube",
+              "type": "string"
+            },
+            "params": {
+              "description": "Row-major: params[expiry_idx * n_tenors + tenor_idx]",
+              "items": {
+                "$ref": "#/$defs/SabrParameterData"
+              },
+              "type": "array"
+            },
+            "tenors": {
+              "description": "Underlying swap tenors in years, strictly increasing. Indexes the\nsecond axis.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "expiries",
+            "tenors",
+            "params",
+            "forwards",
+            "interpolation_mode"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MarketScalar": {
+      "description": "Single market observable that doesn't require a full curve.\n\nRepresents point-in-time market data like spot prices, spreads, or unitless\nparameters. Stored in [`MarketContext`](crate::market_data::context::MarketContext)\nalongside curves for simple lookups.\n\n# Use Cases\n\n- **Spot prices**: Equity spots, commodity prices, FX spots\n- **Recovery rates**: Credit recovery assumptions (unitless)\n- **Correlation parameters**: Equity-FX correlation, basis correlations\n- **Spreads**: Credit spreads, basis spreads (unitless or monetary)\n- **Multipliers**: Beta, vega notionals, adjustment factors\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::MarketScalar;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n# fn main() -> finstack_quant_core::Result<()> {\n\n// Equity beta (unitless)\nlet beta = MarketScalar::unitless(1.2)?;\n\n// Spot price (with currency)\nlet spot = MarketScalar::price(Money::new(152.75, Currency::USD).expect(\"valid money fixture\"));\n\nassert!(beta.is_unitless());\nif let Some(m) = spot.get_price() {\n    assert_eq!(m.currency(), Currency::USD);\n}\n# Ok(())\n# }\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "unitless": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "unitless"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "price": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          },
+          "required": [
+            "price"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NelsonSiegelModel": {
+      "description": "Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Four-parameter Nelson-Siegel.",
+          "properties": {
+            "beta0": {
+              "format": "double",
+              "type": "number"
+            },
+            "beta1": {
+              "format": "double",
+              "type": "number"
+            },
+            "beta2": {
+              "format": "double",
+              "type": "number"
+            },
+            "tau": {
+              "format": "double",
+              "type": "number"
+            },
+            "variant": {
+              "const": "ns",
+              "type": "string"
+            }
+          },
+          "required": [
+            "variant",
+            "beta0",
+            "beta1",
+            "beta2",
+            "tau"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Six-parameter Nelson-Siegel-Svensson.",
+          "properties": {
+            "beta0": {
+              "format": "double",
+              "type": "number"
+            },
+            "beta1": {
+              "format": "double",
+              "type": "number"
+            },
+            "beta2": {
+              "format": "double",
+              "type": "number"
+            },
+            "beta3": {
+              "format": "double",
+              "type": "number"
+            },
+            "tau1": {
+              "format": "double",
+              "type": "number"
+            },
+            "tau2": {
+              "format": "double",
+              "type": "number"
+            },
+            "variant": {
+              "const": "nss",
+              "type": "string"
+            }
+          },
+          "required": [
+            "variant",
+            "beta0",
+            "beta1",
+            "beta2",
+            "beta3",
+            "tau1",
+            "tau2"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NsVariant": {
+      "description": "Nelson-Siegel model variant selector.",
+      "oneOf": [
+        {
+          "const": "ns",
+          "description": "Four-parameter Nelson-Siegel model.",
+          "type": "string"
+        },
+        {
+          "const": "nss",
+          "description": "Six-parameter Nelson-Siegel-Svensson model.",
+          "type": "string"
+        }
+      ]
+    },
+    "OptionType": {
+      "description": "Option payoff direction used by analytical and numerical model engines.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "Call option.",
+          "type": "string"
+        },
+        {
+          "const": "put",
+          "description": "Put option.",
+          "type": "string"
+        }
+      ]
+    },
+    "Pillar": {
+      "description": "The maturity pillar of a quote.\n\nThe pillar represents the maturity of the instrument referenced by the quote. OTC instruments\n(swaps, deposits) typically use `Tenor` (e.g., \"5Y\") to allow rolling headers that automatically\nadjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific\nmaturity date.\n\nThe JSON wire form is externally tagged: `{\"tenor\": {\"count\": 5, \"unit\": \"years\"}}`\nor `{\"date\": \"2029-06-20\"}`. A bare string such as `\"5Y\"` is rejected.\n\n# Examples\n\nUsing a tenor pillar:\n```rust\nuse finstack_quant_calibration::quotes::Pillar;\n\n# fn example() -> finstack_quant_core::Result<()> {\nlet pillar = Pillar::Tenor(\"5Y\".parse()?);\n# Ok(())\n# }\n```\n\nUsing a date pillar:\n```rust\nuse finstack_quant_calibration::quotes::Pillar;\nuse finstack_quant_core::dates::Date;\n\nlet pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A relative tenor (e.g., 5Y, 3M).\n\nThe maturity is calculated relative to the valuation date, allowing quotes to \"roll\"\nforward automatically. This is the standard approach for OTC instruments.",
+          "properties": {
+            "tenor": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            }
+          },
+          "required": [
+            "tenor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An absolute date.\n\nThe maturity is fixed to a specific date, regardless of the valuation date. This is\ntypically used for futures contracts or bespoke instruments with fixed maturities.",
+          "properties": {
+            "date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "QuoteId": {
+      "description": "A stable identifier for a market quote (e.g., \"USD-OIS-SWAP-5Y\").\n\nThis ID is used for human readability, logging, and potentially matching against external\ndata sources. Quote IDs should be unique within a calibration set and follow a consistent\nnaming convention (e.g., \"{currency}-{index}-{type}-{pillar}\").\n\n[`QuoteId::new`] is infallible, including for empty strings. Empty or\nwhitespace-only IDs are rejected when this type is deserialized from the\nwire, and again by [`MarketQuote::validate`](super::market_quote::MarketQuote::validate).\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::quotes::QuoteId;\n\nlet id = QuoteId::new(\"USD-SOFR-DEP-1M\");\nassert_eq!(id.as_str(), \"USD-SOFR-DEP-1M\");\n```",
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "type": "string"
+    },
+    "RatesStepConventions": {
+      "additionalProperties": false,
+      "description": "Step-level conventions for rates calibration (discount and forward curves).\n\nThis is a Bloomberg/FinCad-style design: curve construction uses a small set of\n*step-level* conventions (e.g., curve time-axis day count).",
+      "properties": {
+        "curve_day_count": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Day count used to map dates to year fractions for curve knot times."
+        },
+        "ois_compounding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FloatingLegCompounding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional override for the OIS floating-leg compounding mode used by\nthe calibration's bootstrap-internal swaps.\n\nWhen unset, the bootstrap uses the registered per-index default\n(e.g. SOFR → `CompoundedInArrears { lookback_days: 0 }`, the cleared\nOIS plain in-arrears convention).\nSet this to match a vendor convention that differs from the registry\ndefault — e.g. Bloomberg SWPM SOFR uses\n`CompoundedWithRateCutoff { cutoff_days: 1 }` for the daily-compounded\nfloat leg, and a curve calibrated against SWPM screen rates needs to\nprice its bootstrap swaps with the same compounding to bit-match\nBloomberg's resulting DFs."
+        }
+      },
+      "type": "object"
+    },
+    "SabrParameterData": {
+      "additionalProperties": false,
+      "description": "Data-only SABR parameters for one volatility-cube node.\n\nThis type records calibrated market data. SABR evaluation, interpolation,\ncalibration, and convention conversion are owned by\n`finstack-quant-models`.",
+      "properties": {
+        "alpha": {
+          "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "beta": {
+          "description": "CEV exponent in the closed interval `[0, 1]`.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "nu": {
+          "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+          "format": "double",
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "rho": {
+          "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": -1.0,
+          "format": "double",
+          "type": "number"
+        },
+        "shift": {
+          "description": "Optional finite displacement applied to forward and strike.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "alpha",
+        "beta",
+        "rho",
+        "nu"
+      ],
+      "type": "object"
+    },
+    "Seniority": {
+      "description": "Seniority level for credit exposures.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
+      "oneOf": [
+        {
+          "const": "senior_secured",
+          "description": "Senior secured debt.",
+          "type": "string"
+        },
+        {
+          "const": "senior",
+          "description": "Senior unsecured debt.",
+          "type": "string"
+        },
+        {
+          "const": "subordinated",
+          "description": "Subordinated debt.",
+          "type": "string"
+        },
+        {
+          "const": "junior",
+          "description": "Junior/mezzanine debt.",
+          "type": "string"
+        }
+      ]
+    },
+    "SeriesExtrapolation": {
+      "description": "Right-tail extrapolation policy for [`ScalarTimeSeries`].\n\nApplies only to dates strictly after the latest observation; queries on an\nempty series or strictly before the earliest observation always fail.",
+      "oneOf": [
+        {
+          "const": "flat",
+          "description": "Hold the latest observed value flat after the final observation date.",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "Return an error when querying strictly after the final observation date.",
+          "type": "string"
+        }
+      ]
+    },
+    "SeriesInterpolation": {
+      "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,\n};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n    SeriesInterpolation::Step,\n    SeriesExtrapolation::Error,\n)\n.expect(\"Series creation should succeed\");\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(series.get_value(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```",
+      "oneOf": [
+        {
+          "const": "step",
+          "description": "Last observation carried forward",
+          "type": "string"
+        },
+        {
+          "const": "linear",
+          "description": "Linear interpolation between observed points",
+          "type": "string"
+        }
+      ]
+    },
+    "SurfaceExtrapolationPolicy": {
+      "description": "Extrapolation policy for volatility surface construction.",
+      "oneOf": [
+        {
+          "const": "error",
+          "description": "Reject out-of-bounds targets with an explicit error (vendor-matching).",
+          "type": "string"
+        },
+        {
+          "const": "clamp",
+          "description": "Clamp targets to the nearest boundary (flat extrapolation).",
+          "type": "string"
+        }
+      ]
+    },
+    "SwaptionConventionId": {
+      "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::SwaptionConventions)\nfrom the convention registry.",
+      "type": "string"
+    },
+    "SwaptionVolConvention": {
+      "description": "Volatility quoting convention for swaptions.",
+      "oneOf": [
+        {
+          "const": "normal",
+          "description": "Normal (Bachelier) absolute volatility in decimal rate units.\n\nExample: `0.0050` means 50 basis points of absolute volatility.",
+          "type": "string"
+        },
+        {
+          "const": "lognormal",
+          "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility.\nRequires `black_lognormal` quotes and positive forwards/strikes;\ncalibration does not introduce a displacement automatically.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility on displaced forward/strike\ncoordinates. Requires `shifted_black_lognormal` quotes.",
+          "properties": {
+            "shifted_lognormal": {
+              "properties": {
+                "shift": {
+                  "description": "Finite signed additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.\nThe effective forward and strikes must be positive.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "shift"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "shifted_lognormal"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "VolInterpolationMode": {
+      "description": "Interpolation contract for vol surfaces.",
+      "oneOf": [
+        {
+          "const": "vol",
+          "description": "Interpolate implied volatility directly.\n\nThis is the literal choice when market quotes are given as implied\nvolatilities on the stored grid and you want local interpolation in\nquote space.\n\n# ⚠️ Not calendar-arbitrage-safe across expiry\n\nLinear-in-vol interpolation along the **expiry** axis does not preserve\nmonotonicity of total variance `σ²·t`, so an off-grid vol read between\ntwo expiry pillars can imply *decreasing* total variance with time —\ni.e. calendar arbitrage — even when the pillar grid is itself\narbitrage-free. For arbitrage-sensitive workflows (Dupire local vol,\nno-arb checks, term-structure interpolation) select\n[`TotalVariance`](Self::TotalVariance) via\n[`VolSurfaceBuilder::interpolation_mode`].",
+          "type": "string"
+        },
+        {
+          "const": "total_variance",
+          "description": "Interpolate total variance `sigma^2 * t`, then convert back to implied vol.\n\nPreferred when blending across expiries: total variance behaves more\nlinearly in time and preserves the no-arbitrage intuition for variance\naccumulation, avoiding the calendar-arbitrage trap of linear-in-vol\ninterpolation (see [`Vol`](Self::Vol)).",
+          "type": "string"
+        }
+      ]
+    },
+    "VolQuoteType": {
+      "description": "Quoting convention of the volatilities stored on a [`VolSurface`].\n\nThe same `vol_surface_id` channel is read by consumers with very different\nexpectations: rates calibrations typically read normal (Bachelier, absolute)\nvols on an `expiry × tenor` ATM matrix, while equity/FX/swaption smile\nconsumers read Black (lognormal, relative) vols on `expiry × strike`. The\nstored numbers are an order of magnitude apart (e.g. 0.008 normal vs 0.20\nBlack), so misreading one as the other silently mis-prices. Tagging the\nquote type lets consumers enforce their convention via\n[`VolSurface::require_quote_type`].",
+      "oneOf": [
+        {
+          "const": "black_lognormal",
+          "description": "Black (lognormal) implied volatility in relative units per square-root source year.",
+          "type": "string"
+        },
+        {
+          "const": "shifted_black_lognormal",
+          "description": "Displaced Black volatility; one per-expiry displacement accompanies the grid.",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Normal (Bachelier) implied volatility in underlying units per square-root source year.",
+          "type": "string"
+        }
+      ]
+    },
+    "VolatilityClock": {
+      "additionalProperties": false,
+      "description": "Explicit day-count clock translating calendar expiry dates into year fractions\nrelative to a surface or cube reference date.\n\nMarket data objects such as [`FxDeltaVolSurface`](crate::market_data::surfaces::FxDeltaVolSurface)\nattach an optional `VolatilityClock` so downstream pricers can validate that\nthe surface anchor matches `as_of` and bridge between instrument day-counts\nand surface variance time without silently assuming a day-count convention.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};\nuse time::macros::date;\n\nlet clock = VolatilityClock::try_new(\n    date!(2025 - 01 - 15),\n    DayCount::Act365F,\n    DayCountContextState::default(),\n)?;\nlet t = clock.expiry_time(date!(2026 - 01 - 15))?;\nassert!((t - 1.0).abs() < 1e-12);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/DayCountContextState",
+          "default": {
+            "bus_basis": null,
+            "calendar_id": null,
+            "coupon_period": null,
+            "end_is_termination_date": null,
+            "frequency": null
+          },
+          "description": "Owned, canonicalized day-count context parameters."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day-count convention used to measure expiry times from `reference_date`."
+        },
+        "reference_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Valuation reference date anchored to year fraction `0.0`."
+        }
+      },
+      "required": [
+        "reference_date",
+        "day_count"
+      ],
+      "type": "object"
+    },
+    "XccyConventionId": {
+      "description": "Identifier for cross-currency swap market conventions (e.g., \"EUR/USD-XCCY\").",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/calibration/1/step_with_quotes.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One typed calibration step with inline observations.",
+  "properties": {
+    "quotes": {
+      "description": "Inputs to register in the named quote set, in calibration order.\nA later step can pass an empty list to reuse a previously registered set.",
+      "items": {
+        "$ref": "#/$defs/MarketDatum"
+      },
+      "type": "array"
+    },
+    "step": {
+      "$ref": "#/$defs/CalibrationStep",
+      "description": "Typed step containing its parameters and quote-set identifier."
+    }
+  },
+  "required": [
+    "step",
+    "quotes"
+  ],
+  "title": "Step With Quotes",
+  "type": "object"
+}

@@ -64,6 +64,7 @@ export const calibration = {
   dryRun: wasm.dryRun,
   calibrateBermudanLmmBaseVol: wasm.calibrateBermudanLmmBaseVol,
   calibrationEnvelopeContentHash: wasm.calibrationEnvelopeContentHash,
+  calibrationEnvelopeFromSteps: wasm.calibrationEnvelopeFromSteps,
   calibrationResultContentHash: wasm.calibrationResultContentHash,
   calibrationResultStepReport: wasm.calibrationResultStepReport,
   calibrationResultResiduals: wasm.calibrationResultResiduals,

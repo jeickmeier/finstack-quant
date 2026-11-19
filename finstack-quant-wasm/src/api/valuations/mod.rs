@@ -14,6 +14,7 @@
 //!   constructors.
 
 pub mod composite;
+pub mod margin;
 pub mod market;
 pub mod pricing;
 pub mod results;

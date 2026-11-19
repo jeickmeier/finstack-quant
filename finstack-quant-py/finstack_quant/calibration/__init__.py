@@ -33,6 +33,7 @@ QuoteQuality = _calibration.QuoteQuality
 RateBounds = _calibration.RateBounds
 RateQuote = _calibration.RateQuote
 SolverConfig = _calibration.SolverConfig
+StepWithQuotes = _calibration.StepWithQuotes
 ValidationConfig = _calibration.ValidationConfig
 VolQuote = _calibration.VolQuote
 XccyQuote = _calibration.XccyQuote
@@ -66,6 +67,7 @@ __all__ = [
     "RateBounds",
     "RateQuote",
     "SolverConfig",
+    "StepWithQuotes",
     "ValidationConfig",
     "VolQuote",
     "XccyQuote",

@@ -103,6 +103,7 @@ pub use finstack_quant_valuations_core::{
     constants, contract_specs, market, metrics, recalibration, results,
 };
 /// Pricing dispatch and registry infrastructure.
+pub mod margin;
 pub mod pricer;
 /// JSON Schema generation for API contracts.
 pub mod schema;

@@ -73,6 +73,15 @@
       "type_name": "StepParams"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/calibration/1/step_with_quotes.schema.json",
+      "bytes": 127581,
+      "kind": "input",
+      "path": "schemas/calibration/1/step_with_quotes.schema.json",
+      "summary": "One typed calibration step with inline observations.",
+      "title": "Step With Quotes",
+      "type_name": "StepWithQuotes"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
       "bytes": 9180,
       "kind": "component",

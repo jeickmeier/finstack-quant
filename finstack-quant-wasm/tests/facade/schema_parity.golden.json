@@ -1089,6 +1089,13 @@
             "bytes": 59144
           },
           {
+            "path": "schemas/calibration/1/step_with_quotes.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/calibration/1/step_with_quotes.schema.json",
+            "type_name": "StepWithQuotes",
+            "kind": "input",
+            "bytes": 127581
+          },
+          {
             "path": "schemas/market/1/cds_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
             "type_name": "CdsQuote",
@@ -4298,6 +4305,14 @@
             "type_name": "StepParams",
             "kind": "component",
             "bytes": 59144
+          },
+          {
+            "domain": "calibration",
+            "path": "schemas/calibration/1/step_with_quotes.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/calibration/1/step_with_quotes.schema.json",
+            "type_name": "StepWithQuotes",
+            "kind": "input",
+            "bytes": 127581
           },
           {
             "domain": "calibration",

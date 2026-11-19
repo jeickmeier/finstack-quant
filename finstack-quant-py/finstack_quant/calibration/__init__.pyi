@@ -40,6 +40,7 @@ from finstack_quant.calibration._envelope import (
     CalibrationEnvelope as CalibrationEnvelope,
     CalibrationPlan as CalibrationPlan,
     CalibrationStep as CalibrationStep,
+    StepWithQuotes as StepWithQuotes,
 )
 from finstack_quant.calibration._report import (
     CalibrationDiagnostics as CalibrationDiagnostics,
@@ -74,6 +75,7 @@ __all__ = [
     "RateBounds",
     "RateQuote",
     "SolverConfig",
+    "StepWithQuotes",
     "ValidationConfig",
     "VolQuote",
     "XccyQuote",

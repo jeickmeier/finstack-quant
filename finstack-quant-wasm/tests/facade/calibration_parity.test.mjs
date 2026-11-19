@@ -301,6 +301,20 @@ test('a plan built from the step and quote twins calibrates', () => {
   assert.equal(calibration.calibrate(envelope).result.report.success, true);
 });
 
+test('inline quotes produce the same envelope as explicit calibration inputs', () => {
+  const { plan, market_data: quotes } = GOLDEN.envelope;
+  const step = calibration.calibrationStepDiscount('USD-OIS', RATES);
+  const authored = calibration.calibrationEnvelopeFromSteps(plan.id, [{ step, quotes }]);
+  assert.deepEqual(plain(authored.plan.quote_sets), plan.quote_sets);
+  assert.deepEqual(plain(authored.market_data), quotes);
+  assert.equal(calibration.calibrate(authored).result.report.success, true);
+  assert.throws(
+    () =>
+      calibration.calibrationEnvelopeFromSteps(plan.id, [{ step, quotes: [quotes[0], quotes[0]] }]),
+    /duplicate calibration market input/
+  );
+});
+
 test('validateCalibration returns the validated envelope object', () => {
   const validated = calibration.validateCalibration(GOLDEN.envelope);
   assert.equal(validated.plan.id, 'parity');

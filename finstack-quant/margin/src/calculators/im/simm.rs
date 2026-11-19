@@ -1487,6 +1487,47 @@ impl SimmCalculator {
         Ok(result)
     }
 
+    /// Calculate model initial margin for a single explicitly selected netting set.
+    ///
+    /// Sensitivities are netted by their existing risk keys before applying the
+    /// SIMM risk weights, concentration and correlation. The result keeps the
+    /// approximation classification of the sensitivity-based calculator.
+    ///
+    /// # Arguments
+    /// * `instruments` - Trades in the same netting set, each with its own
+    ///   contractual notional and direction, counted once in input order.
+    /// * `market` - Valuation market supplying each trade's risk factors.
+    /// * `as_of` - Valuation date used for every trade and stamped on the result.
+    /// * `currency` - USD calculation currency. Trade sensitivity amounts must
+    ///   already use this currency; the method applies no FX conversion.
+    ///
+    /// # Errors
+    /// Rejects an empty selection, unsupported currency or sensitivity inputs
+    /// in another currency, and propagates failures from trade repricing and
+    /// the sensitivity-based IM calculation.
+    pub fn calculate_netting_set<'a>(
+        &self,
+        instruments: impl IntoIterator<Item = &'a dyn crate::traits::Marginable>,
+        market: &MarketContext,
+        as_of: Date,
+        currency: Currency,
+    ) -> Result<ImResult> {
+        if currency != Currency::USD {
+            return Err(finstack_quant_core::Error::Validation(
+                "SIMM calculation currency must be USD".into(),
+            ));
+        }
+        let mut instruments = instruments.into_iter();
+        let first = instruments.next().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("SIMM netting set is empty".into())
+        })?;
+        let mut sensitivities = SimmSensitivities::new(currency);
+        for instrument in std::iter::once(first).chain(instruments) {
+            sensitivities.merge(&instrument.simm_sensitivities(market, as_of)?)?;
+        }
+        self.calculate_from_sensitivities(&sensitivities, currency, as_of)
+    }
+
     /// Aggregate risk class margins with the SIMM inter-risk-class correlation matrix.
     ///
     /// `Total = sqrt(sum_i sum_j rho(i,j) * K_i * K_j)`

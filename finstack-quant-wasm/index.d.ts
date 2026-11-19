@@ -2380,6 +2380,16 @@ export interface CalibrationNamespace {
    */
   readonly calibrationEnvelopeContentHash: typeof wasm.calibrationEnvelopeContentHash;
   /**
+   * Build a calibration envelope from ordered steps with inline observations.
+   * @param id - Nonempty plan identifier.
+   * @param steps - Ordered step and quote-input pairs. An empty quote list can reference a previously defined quote set.
+   * @param settings - Optional solver and validation configuration overrides.
+   * @param priorMarket - Optional previously calibrated objects used as dependencies.
+   * @returns Canonical calibration envelope ready for validation or execution.
+   * @throws `TypeError` for a mistyped argument or `FinstackError` for invalid settings, malformed data, blank or duplicate identifiers, or duplicate quote-set definitions.
+   */
+  readonly calibrationEnvelopeFromSteps: typeof wasm.calibrationEnvelopeFromSteps;
+  /**
    * Canonical content hash of a calibration result envelope.
    *
    * Free-function twin of Python `CalibrationResultEnvelope.content_hash` (Rust
@@ -9361,6 +9371,18 @@ export interface ValuationsNamespace {
   readonly instruments: ValuationsInstrumentsNamespace;
   readonly market: ValuationsMarketNamespace;
   readonly schema: ValuationsSchemaNamespace;
+  /**
+   * Calculate model SIMM for a single selected set of trades.
+   * @param instruments - Canonical instrument envelopes from one netting set. Each trades at its own contractual amount and direction.
+   * @param market - MarketContext supplying the trades' SIMM risk factors.
+   * @param asOf - ISO-8601 valuation date used for sensitivities and the result.
+   * @param version - Embedded SIMM label, omitted for the registered default.
+   * @param mporDays - Positive margin period of risk in business days, omitted for the version's default.
+   * @param currency - USD calculation currency, omitted for USD. Sensitivities must already be USD.
+   * @returns Initial margin in USD, with breakdown, methodology, valuation date and approximation flag.
+   * @throws TypeError for a mistyped input, or FinstackError for an invalid instrument, empty set, unsupported currency, invalid version or margin period, missing market data or failed repricing.
+   */
+  readonly calculateSimm: typeof wasm.calculateSimm;
   /**
    * Validate and serialize a `ValuationResult` object or JSON text to canonical JSON.
    *

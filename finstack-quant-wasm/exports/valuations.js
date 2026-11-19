@@ -18,6 +18,7 @@ export const valuations = {
   instruments,
   market,
   schema,
+  calculateSimm: wasm.calculateSimm,
   valuationResultToJson: wasm.valuationResultToJson,
   valuationResultMetricSeries: wasm.valuationResultMetricSeries,
   valuationResultGetMetric: wasm.valuationResultGetMetric,

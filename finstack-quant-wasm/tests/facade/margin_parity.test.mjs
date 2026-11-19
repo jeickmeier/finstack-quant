@@ -775,3 +775,20 @@ test('instrument roundtrip preserves the CSA-owned no-IM election', () => {
     );
   }
 });
+
+test('standalone SIMM nets opposing contractual sensitivities before calculating IM', () => {
+  const asOf = '2023-12-20';
+  const snapshot = new core.MarketContext();
+  snapshot.insert(core.DiscountCurve.flat('USD-OIS', asOf, 0.04, 'act_365f'));
+  snapshot.insert(core.ForwardCurve.flat('USD-SOFR-3M', asOf, 0.045, 'act_360'));
+  const payer = JSON.parse(valuations.instruments.InterestRateSwap.example().toJson());
+  const receiver = structuredClone(payer);
+  receiver.instrument.spec.id = 'RECEIVER';
+  receiver.instrument.spec.side = 'receive';
+  const single = valuations.calculateSimm([payer], snapshot, asOf);
+  const net = valuations.calculateSimm([payer, receiver], snapshot, asOf);
+  assert.ok(Number(single.amount.amount) > 0);
+  assert.ok(Number(net.amount.amount) < 1e-5);
+  assert.throws(() => valuations.calculateSimm([], snapshot, asOf), /empty/);
+  assert.throws(() => valuations.calculateSimm([payer], snapshot, asOf, null, 0), /MPOR/);
+});

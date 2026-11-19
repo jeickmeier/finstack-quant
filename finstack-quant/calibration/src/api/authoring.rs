@@ -8,7 +8,9 @@
 //! only restate the struct (`CdsQuote::CdsUpfront`, [`crate::quotes::CdsTrancheQuote`]) are
 //! built as literals (or deserialized) and checked with their `validate()`.
 
-use crate::api::schema::CalibrationStep;
+use crate::api::prior_market::PriorMarketObject;
+use crate::api::schema::{CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepWithQuotes};
+use crate::config::CalibrationConfig;
 use crate::quotes::CdsQuote;
 use crate::quotes::InflationQuote;
 use crate::quotes::RateQuote;
@@ -25,7 +27,89 @@ use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
     SwaptionConventionId, XccyConventionId,
 };
+use indexmap::IndexMap;
 use serde_json::{Map, Value};
+use std::collections::HashSet;
+
+impl CalibrationEnvelope {
+    /// Author a calibration envelope from ordered steps with inline inputs.
+    ///
+    /// Each quote appears once in the envelope. A later step can reference an
+    /// already registered quote set by supplying the same set identifier and
+    /// an empty quote list. The normal calibration validator checks that each
+    /// step receives the required market inputs and dependencies.
+    ///
+    /// # Arguments
+    /// * `id` - Nonempty identifier for the new calibration plan.
+    /// * `steps` - Ordered native steps with inline market inputs.
+    /// * `settings` - Global solver and validation policy for the plan.
+    /// * `prior_market` - Previously calibrated objects available as dependencies.
+    ///
+    /// # Errors
+    /// Rejects blank plan, step, set or input identifiers, duplicate steps or
+    /// market input identifiers, and duplicate definitions of a quote set.
+    pub fn from_steps(
+        id: impl Into<String>,
+        steps: Vec<StepWithQuotes>,
+        settings: CalibrationConfig,
+        prior_market: Vec<PriorMarketObject>,
+    ) -> Result<Self> {
+        let id = id.into();
+        if id.trim().is_empty() {
+            return Err(Error::Validation(
+                "Calibration plan id must be nonempty".into(),
+            ));
+        }
+        let mut plan = CalibrationPlan {
+            id,
+            description: None,
+            quote_sets: IndexMap::new(),
+            steps: Vec::with_capacity(steps.len()),
+            settings,
+        };
+        let mut step_ids = HashSet::new();
+        let mut datum_ids = HashSet::new();
+        let mut market_data = Vec::new();
+        for StepWithQuotes { step, quotes } in steps {
+            if step.id.trim().is_empty() || step.quote_set.trim().is_empty() {
+                return Err(Error::Validation(
+                    "Calibration steps require nonempty step and quote set ids".into(),
+                ));
+            }
+            if !step_ids.insert(step.id.clone()) {
+                return Err(Error::Validation(format!(
+                    "Duplicate calibration step '{}'",
+                    step.id
+                )));
+            }
+            if !quotes.is_empty() || !plan.quote_sets.contains_key(&step.quote_set) {
+                let mut ids = Vec::with_capacity(quotes.len());
+                for quote in quotes {
+                    let id = quote.id();
+                    if id.trim().is_empty() || !datum_ids.insert(id.to_owned()) {
+                        return Err(Error::Validation(format!(
+                            "Invalid or duplicate calibration market input '{id}'"
+                        )));
+                    }
+                    ids.push(QuoteId::from(id));
+                    market_data.push(quote);
+                }
+                if plan
+                    .quote_sets
+                    .insert(step.quote_set.clone(), ids)
+                    .is_some()
+                {
+                    return Err(Error::Validation(format!(
+                        "Duplicate definition of calibration quote set '{}'",
+                        step.quote_set
+                    )));
+                }
+            }
+            plan.steps.push(step);
+        }
+        Ok(Self::new(plan, market_data, prior_market))
+    }
+}
 
 /// Step kinds whose produced object is identified by `curve_id`.
 const CURVE_ID_KINDS: [&str; 6] = [
