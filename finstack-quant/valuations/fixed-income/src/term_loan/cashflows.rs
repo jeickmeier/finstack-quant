@@ -62,12 +62,64 @@ pub(crate) fn coupon_period_starts(loan: &TermLoan) -> finstack_quant_core::Resu
 /// date. Coupons and balance-based fees accrue on the changed principal from
 /// that date, and later amortization and the maturity redemption are sized
 /// on what remains.
+///
+/// Amortization is capped at the principal outstanding. On a loan that
+/// capitalizes interest that balance includes the capitalized interest, which
+/// depends on the schedule itself, so when a cap binds the schedule is
+/// rebuilt once per amortization date, each pass counting the interest
+/// capitalized up to the date it settles.
 pub(crate) fn generate_cashflows_with_postings(
     loan: &TermLoan,
     market: &MarketContext,
     postings: &[crate::loan_terms::PrincipalPosting],
     elections: &[crate::loan_terms::CouponElection],
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
+    let (mut schedule, mut capped) = build_schedule(loan, market, postings, elections, &[])?;
+    // Settle one amortization date per pass, in date order. Interest
+    // capitalized up to a date is exact once every earlier amortization is
+    // settled; later dates stay capped at the funded balance, which is never
+    // too loose, so every pass is a valid schedule.
+    let mut amortization_dates: Vec<Date> = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.get_kind() == CFKind::Amortization)
+        .map(|flow| flow.get_date())
+        .collect();
+    amortization_dates.sort();
+    amortization_dates.dedup();
+    for settled in amortization_dates {
+        if !capped {
+            break;
+        }
+        let capitalized: Vec<(Date, Decimal)> = schedule
+            .get_flows()
+            .iter()
+            .filter(|flow| flow.get_kind() == CFKind::Pik && flow.get_date() <= settled)
+            .filter_map(|flow| {
+                Some((
+                    flow.get_date(),
+                    flow.get_principal_delta()?.amount_decimal(),
+                ))
+            })
+            .collect();
+        if capitalized.is_empty() {
+            continue;
+        }
+        (schedule, capped) = build_schedule(loan, market, postings, elections, &capitalized)?;
+    }
+    Ok(schedule)
+}
+
+/// One schedule build. `capitalized` is the interest a previous build
+/// capitalized, by date, counted in the balance that caps amortization; the
+/// flag reports whether a cap bound.
+fn build_schedule(
+    loan: &TermLoan,
+    market: &MarketContext,
+    postings: &[crate::loan_terms::PrincipalPosting],
+    elections: &[crate::loan_terms::CouponElection],
+    capitalized: &[(Date, Decimal)],
+) -> finstack_quant_core::Result<(CashFlowSchedule, bool)> {
     let mut principal_events: Vec<PrincipalEventSpec> = Vec::new();
     for posting in postings {
         if posting.delta.currency() != loan.currency {
@@ -290,42 +342,49 @@ pub(crate) fn generate_cashflows_with_postings(
     principal_events.sort_by_key(|e| (e.date, e.kind != CFKind::PrePayment));
 
     // Cap amortization events to prevent negative outstanding balance.
-    // Track running outstanding from funding events and cap each amort at
-    // the remaining balance.  This guards against over-amortization when
+    // Track the running outstanding from funding events, postings and the
+    // interest a previous pass capitalized, and cap each amortization at
+    // what remains. This guards against over-amortization when
     // PercentOfOriginalPerPeriod pct × num_periods > 1 or when cash sweeps
-    // combine with scheduled amortization to exceed the notional.
+    // combine with scheduled amortization to exceed the balance.
     //
-    // This pass sees funded principal only. On a loan that can capitalize
-    // interest the balance a posting repays includes PIK the builder has not
-    // produced yet, so a posting beyond the funded balance is not refused
-    // here: the builder refuses one that takes the full balance negative.
-    // Amortization stays capped at the funded balance, and capitalized
-    // interest left after it is redeemed at maturity.
+    // A posting beyond the funded balance is not refused here on a loan
+    // that can capitalize interest: the builder, which produces that
+    // interest, refuses one that takes the full balance negative.
     let capitalizes = loan.coupon_type != CouponType::Cash
         || !elections.is_empty()
         || loan
             .covenants
             .as_ref()
             .is_some_and(|covenants| !covenants.pik_toggles.is_empty());
+    let mut capped_any = false;
     {
-        let mut running = 0.0_f64;
+        // Exact, so a cap at the balance leaves exactly zero.
+        let mut running = Decimal::ZERO;
+        let mut capitalized = capitalized.iter().peekable();
         for event in &mut principal_events {
+            // Interest capitalized on or before this date is outstanding.
+            while let Some((_, amount)) = capitalized.next_if(|(date, _)| *date <= event.date) {
+                running += amount;
+            }
             match event.kind {
                 CFKind::Notional => {
-                    running += event.delta.amount();
+                    running += event.delta.amount_decimal();
                 }
                 CFKind::Amortization => {
-                    let requested = (-event.delta.amount()).max(0.0);
-                    let capped = requested.min(running.max(0.0));
-                    if (capped - requested).abs() > 1e-10 {
-                        event.delta = Money::new(-capped, event.delta.currency())?;
-                        event.cash = Some(Money::new(capped, event.delta.currency())?);
+                    let requested = (-event.delta.amount_decimal()).max(Decimal::ZERO);
+                    let capped = requested.min(running.max(Decimal::ZERO));
+                    if capped != requested {
+                        capped_any = true;
+                        let currency = event.delta.currency();
+                        event.delta = Money::from_decimal(-capped, currency);
+                        event.cash = Some(Money::from_decimal(capped, currency));
                     }
                     running -= capped;
                 }
                 CFKind::PrePayment => {
-                    running += event.delta.amount();
-                    if running < -1e-9 && !capitalizes {
+                    running += event.delta.amount_decimal();
+                    if running < Decimal::ZERO && !capitalizes {
                         return Err(finstack_quant_core::Error::Validation(format!(
                             "term loan '{}': the principal posting of {} effective {} exceeds \
                              the principal outstanding",
@@ -548,7 +607,7 @@ pub(crate) fn generate_cashflows_with_postings(
 
     // Keep the full engine schedule here; `TermLoan::cashflow_schedule()` applies
     // the public signed canonical schedule projection on top of this internal representation.
-    Ok(schedule)
+    Ok((schedule, capped_any))
 }
 
 fn effective_draw_stop(loan: &TermLoan) -> Option<Date> {

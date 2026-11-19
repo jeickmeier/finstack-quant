@@ -1067,6 +1067,49 @@ fn the_toggle_is_not_exercised_in_actual_periods() {
     assert_close(get("debt_balance", "2025Q4"), 100.0);
 }
 
+/// A historical PIK toggle recorded on the loan is PIK in force for the
+/// forecast exercise: a recovered metric ends it, after its minimum number
+/// of coupon periods counted from the toggle's own date.
+#[test]
+fn a_contractual_toggle_in_force_is_ended_by_a_recovered_metric() {
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+        PikToggle, TermLoanCovenantEvents,
+    };
+    let run = |min_coupon_periods: usize| {
+        let mut loan = quarterly_loan();
+        loan.covenants = Some(TermLoanCovenantEvents {
+            pik_toggles: vec![PikToggle {
+                date: date!(2025 - 01 - 01),
+                enable_pik: true,
+            }],
+            ..Default::default()
+        });
+        // Liquidity is above the threshold in every period: base terms are
+        // requested throughout.
+        let result = evaluate_2025(
+            "2025Q1..2025Q4",
+            FinancialStatementInstrument::TermLoan(loan),
+            pik_toggle(Decimal::ONE, min_coupon_periods),
+            0.0,
+            &[("liquidity", 500.0)],
+        )
+        .expect("evaluation");
+        ["2025Q2", "2025Q3", "2025Q4"]
+            .map(|period| component(&result, "interest_expense_pik", INSTRUMENT, period))
+    };
+    // The January to March coupon was already PIK and capitalizes on 1 April.
+    // With no minimum the first quarter's request restores cash from 1 April.
+    let none = run(0);
+    assert_close(none[0], 2.0);
+    assert_close(none[1], 0.0);
+    assert_close(none[2], 0.0);
+    // A minimum of two coupon periods holds PIK through June.
+    let two = run(2);
+    assert_close(two[0], 2.0);
+    assert_close(two[1], 2.04);
+    assert_close(two[2], 0.0);
+}
+
 // Capital-state orchestration and period snapshots (STATEMENTS-EVALUATION-012)
 
 /// The record's example: 20 of cash interest is due and 12 of cash is

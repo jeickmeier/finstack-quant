@@ -209,6 +209,16 @@ fn a_capitalizing_loan_amortizes_what_remains_after_a_posting() {
     let path = rebuilt.outstanding_by_date().expect("principal path");
     assert_close(path.last().expect("final balance").1.amount(), 0.0);
     assert!(path.iter().all(|(_, balance)| balance.amount() >= -1e-9));
+    // After the posting 50 is left. The first amortization pays its 30; the
+    // second is sized on what is then outstanding, capitalized interest
+    // included, so it pays more than the 20 of funded principal left and
+    // nothing remains for a third.
+    let second = total(&rebuilt, &[CFKind::Amortization], date!(2025 - 07 - 01));
+    assert!(second > 20.0 && second < 30.0, "{second}");
+    assert_close(
+        total(&rebuilt, &[CFKind::Amortization], date!(2025 - 10 - 01)),
+        0.0,
+    );
 }
 
 /// A PIK loan's balance includes its capitalized interest: 100 at 10% is 105
@@ -379,6 +389,28 @@ fn a_revolver_keeps_its_terms_through_a_zero_balance_and_a_redraw() {
     assert_close(coupons[0].1, 100.0 * 0.08 * 90.0 / 360.0);
     assert_close(coupons[1].1, 80.0 * 0.08 * 92.0 / 360.0);
     assert_close(coupons[2].1, 80.0 * 0.08 * 92.0 / 360.0);
+}
+
+/// A scheduled repayment after a sweep repays what is left: 100 drawn, 70
+/// swept, and the facility's own repayment of 50 pays the remaining 30.
+#[test]
+fn a_revolver_repayment_after_a_posting_repays_what_is_left() {
+    let facility = revolver(vec![DrawRepayEvent {
+        date: date!(2025 - 08 - 15),
+        amount: usd(50.0),
+        is_draw: false,
+    }]);
+    let market = MarketContext::new();
+    let as_of = date!(2025 - 01 - 01);
+    let rebuilt = facility
+        .cashflow_schedule_with_postings(&market, as_of, &[posting(date!(2025 - 05 - 15), -70.0)])
+        .expect("the repayment is capped, not refused");
+    assert_close(
+        total(&rebuilt, &[CFKind::Notional], date!(2025 - 08 - 15)),
+        30.0,
+    );
+    let path = rebuilt.outstanding_by_date().expect("principal path");
+    assert!(path.iter().all(|(_, balance)| balance.amount() >= -1e-9));
 }
 
 #[test]

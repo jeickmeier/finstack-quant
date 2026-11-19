@@ -325,10 +325,39 @@ fn settle_postings(
                 .copied()
                 .filter(|made| made.effective_date <= effective)
                 .collect();
-            let in_pik_since = ledger
+            // The loan's own dated toggles and the elections share one
+            // timeline of coupon terms; an election replaces a toggle of its
+            // date, as the schedule builder applies them.
+            let terms = |ledger: &[CouponElection]| -> Vec<(Date, CouponType)> {
+                let mut dated = std::collections::BTreeMap::new();
+                for toggle in loan
+                    .covenants
+                    .iter()
+                    .flat_map(|covenants| &covenants.pik_toggles)
+                    .filter(|toggle| toggle.date <= effective)
+                {
+                    dated.insert(
+                        toggle.date,
+                        if toggle.enable_pik {
+                            CouponType::Pik
+                        } else {
+                            CouponType::Cash
+                        },
+                    );
+                }
+                for made in ledger {
+                    dated.insert(made.effective_date, made.coupon_type);
+                }
+                dated.into_iter().collect()
+            };
+            // PIK is in force since the start of the latest run of terms
+            // other than the loan's base terms, whoever set them.
+            let in_pik_since = terms(&ledger)
+                .iter()
+                .rev()
+                .take_while(|(_, coupon_type)| *coupon_type != loan.coupon_type)
                 .last()
-                .filter(|made| made.coupon_type != loan.coupon_type)
-                .map(|made| made.effective_date);
+                .map(|(date, _)| *date);
             let elected = match (request, in_pik_since) {
                 (true, None) => Some(if election.pik_fraction == Decimal::ONE {
                     CouponType::Pik
@@ -355,9 +384,11 @@ fn settle_postings(
                 // an election that has not started, and an election that
                 // restores the terms already in force is no election.
                 ledger.retain(|made| made.effective_date != effective);
-                let in_force = ledger
-                    .last()
-                    .map_or(loan.coupon_type, |made| made.coupon_type);
+                let in_force = terms(&ledger)
+                    .iter()
+                    .rev()
+                    .find(|(date, _)| *date < effective)
+                    .map_or(loan.coupon_type, |(_, coupon_type)| *coupon_type);
                 if coupon_type != in_force {
                     ledger.push(CouponElection {
                         effective_date: effective,

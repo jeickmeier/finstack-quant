@@ -312,8 +312,47 @@ impl<'a> CashflowEngine<'a> {
         // the facility's events are cash rows. A posting was made at the
         // prior day's close, so it precedes the facility's events of its
         // effective date: postings go first and the date sort is stable.
-        let contract_events = draw_repay_events;
+        let mut contract_events = draw_repay_events;
         let ccy = self.facility.commitment.currency();
+        if !self.postings.is_empty() {
+            // After a posting, a facility repayment repays what is left of
+            // the drawn balance, as a term loan's later amortization does: a
+            // sweep cannot turn a scheduled repayment into an overpayment.
+            // The replay is in date order with a posting ahead of the
+            // facility's events of its date; a posting that itself exceeds
+            // the balance is still refused by the validated replay below.
+            let mut dated: Vec<(finstack_quant_core::dates::Date, bool, usize)> = self
+                .postings
+                .iter()
+                .enumerate()
+                .map(|(index, posting)| (posting.effective_date, false, index))
+                .chain(
+                    contract_events
+                        .iter()
+                        .enumerate()
+                        .map(|(index, event)| (event.date, true, index)),
+                )
+                .collect();
+            dated.sort_by_key(|(date, is_contract, _)| (*date, *is_contract));
+            let mut balance = self.facility.drawn.amount();
+            for (_, is_contract, index) in dated {
+                if !is_contract {
+                    balance += self.postings[index].delta.amount();
+                    continue;
+                }
+                let event = &mut contract_events[index];
+                if event.is_draw {
+                    balance += event.amount.amount();
+                } else {
+                    let capped = event.amount.amount().min(balance.max(0.0));
+                    if capped < event.amount.amount() {
+                        event.amount = Money::new(capped, ccy)?;
+                    }
+                    balance -= capped;
+                }
+            }
+            contract_events.retain(|event| event.is_draw || event.amount.amount() > 0.0);
+        }
         let mut draw_repay_events = Vec::with_capacity(self.postings.len() + contract_events.len());
         for posting in self.postings {
             if posting.delta.currency() != ccy {

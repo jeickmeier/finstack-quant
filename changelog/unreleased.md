@@ -1317,6 +1317,25 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: contractual PIK toggles count in the forecast exercise
+
+- A PIK toggle recorded on a term loan (`covenants.pik_toggles`) that is in
+  force when the forecast begins is PIK in force for the modeled exercise: a
+  metric at or above the threshold ends it at the next coupon period, after
+  the election's minimum number of coupon periods counted from the toggle's
+  date. The exercise used to read only its own elections, so such a loan
+  stayed PIK (STATEMENTS-CAPITAL-008).
+
+### Loans: scheduled principal after a posting
+
+- A revolving credit's contractual repayment dated after a principal posting
+  repays what is left of the drawn balance; it used to fail the rebuild when
+  a sweep had left less than the scheduled repayment.
+- A term loan's amortization is capped at the principal outstanding
+  including capitalized interest, in exact decimal arithmetic. On a loan
+  that capitalizes interest a capped amortization used to stop at the funded
+  balance and leave the capitalized interest to maturity.
+
 ### Statements capital: exact table amounts, typed host lookup
 
 - `CapitalStructureCashflows::to_table` and `to_totals_table` (Python
