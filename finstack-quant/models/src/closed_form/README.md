@@ -249,7 +249,7 @@ beyond. `gl_order` must be one of `{2, 4, 8, 16}`; anything else fails
 validation because there is no node/weight table for it and the strip pricer
 would silently degrade to the slower per-strike path.
 
-`sigma_v < 1e-10` falls back to Black-Scholes evaluated at the *deterministic
+`vol_of_vol < 1e-10` falls back to Black-Scholes evaluated at the *deterministic
 average variance* `v̄(T)`, not at `v0`. A Feller violation (`2κθ ≤ σ_v²`) logs a
 warning but is informational only: the Fourier pricer never simulates the
 variance path.

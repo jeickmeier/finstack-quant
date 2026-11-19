@@ -734,7 +734,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Heston stochastic volatility.\n\nState: `[spot, variance]`; spot starts strictly positive, and the\nstarting variance `initial_state[1]` must equal the `v0` parameter.",
+          "description": "Heston stochastic volatility.\n\nSupply only the strictly positive opening spot in `initial_state`.\nThe process derives variance from its `v0` parameter and returns states\nas `[spot, variance]`.",
           "properties": {
             "kappa": {
               "description": "Mean reversion speed.",
@@ -756,11 +756,6 @@
               "format": "double",
               "type": "number"
             },
-            "sigma_v": {
-              "description": "Vol-of-vol.",
-              "format": "double",
-              "type": "number"
-            },
             "theta": {
               "description": "Long-run variance.",
               "format": "double",
@@ -774,6 +769,11 @@
               "description": "Initial variance.",
               "format": "double",
               "type": "number"
+            },
+            "vol_of_vol": {
+              "description": "Vol-of-vol.",
+              "format": "double",
+              "type": "number"
             }
           },
           "required": [
@@ -783,7 +783,7 @@
             "v0",
             "kappa",
             "theta",
-            "sigma_v",
+            "vol_of_vol",
             "rho"
           ],
           "type": "object"
@@ -1009,7 +1009,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Rough Heston stochastic volatility: a Volterra square-root variance\nwith a power-law kernel, `hurst` in `(0, 0.5)`.\n\nState: `[spot, variance]`; spot starts strictly positive, and the\nstarting variance `initial_state[1]` must equal the `v0` parameter.\nAt most 8,000 steps.",
+          "description": "Rough Heston stochastic volatility: a Volterra square-root variance\nwith a power-law kernel, `hurst` in `(0, 0.5)`.\n\nSupply only the strictly positive opening spot in `initial_state`.\nThe process derives variance from its `v0` parameter and returns states\nas `[spot, variance]`.\nAt most 8,000 steps.",
           "properties": {
             "hurst": {
               "$ref": "#/$defs/HurstExponent",
@@ -1035,11 +1035,6 @@
               "format": "double",
               "type": "number"
             },
-            "sigma_v": {
-              "description": "Volatility of variance — vol-of-vol (σᵥ > 0).",
-              "format": "double",
-              "type": "number"
-            },
             "theta": {
               "description": "Long-run variance level (θ > 0).",
               "format": "double",
@@ -1053,6 +1048,11 @@
               "description": "Initial variance (v₀ > 0).",
               "format": "double",
               "type": "number"
+            },
+            "vol_of_vol": {
+              "description": "Volatility of variance — vol-of-vol (σᵥ > 0).",
+              "format": "double",
+              "type": "number"
             }
           },
           "required": [
@@ -1062,7 +1062,7 @@
             "hurst",
             "kappa",
             "theta",
-            "sigma_v",
+            "vol_of_vol",
             "rho",
             "v0"
           ],
@@ -1188,7 +1188,7 @@
       "description": "Fractional-noise generator for `rough_bergomi` and `cheyette_rough`;\nomitted selects `volterra`, the generator the pricers use. Setting it\nfor any other process is a validation error."
     },
     "initial_state": {
-      "description": "State at time zero, in the layout documented on the [`ProcessSpec`]\nvariant. Its length must equal the process dimension.",
+      "description": "State at time zero, in the layout documented on the [`ProcessSpec`]\nvariant. Heston and rough Heston take only spot here and use their\nown `v0` for the starting variance.",
       "items": {
         "format": "double",
         "type": "number"

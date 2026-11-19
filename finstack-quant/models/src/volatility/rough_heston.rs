@@ -291,7 +291,7 @@ impl FractionalRiccatiSolver {
 /// | v0 | v₀ | > 0 | Initial variance |
 /// | kappa | κ | > 0 | Mean reversion speed |
 /// | theta | θ | > 0 | Long-run variance |
-/// | sigma_v | σᵥ | > 0 | Vol-of-vol |
+/// | vol_of_vol | σᵥ | > 0 | Vol-of-vol |
 /// | rho | ρ | (−1, 1) | Spot-vol correlation |
 /// | hurst | H | (0, 0.5) | Roughness (Hurst exponent) |
 ///
@@ -334,7 +334,7 @@ struct RawRoughHestonFourierParams {
     /// Long-run variance.
     theta: f64,
     /// Vol-of-vol.
-    sigma_v: f64,
+    vol_of_vol: f64,
     /// Spot-vol correlation.
     rho: f64,
     /// Hurst exponent.
@@ -349,7 +349,7 @@ impl TryFrom<RawRoughHestonFourierParams> for RoughHestonFourierParams {
             raw.v0,
             raw.kappa,
             raw.theta,
-            raw.sigma_v,
+            raw.vol_of_vol,
             raw.rho,
             raw.hurst,
         )
@@ -386,7 +386,7 @@ impl RoughHestonFourierParams {
     /// * `v0` - Positive initial variance level.
     /// * `kappa` - Positive annual mean-reversion speed of variance.
     /// * `theta` - Positive long-run variance level.
-    /// * `sigma_v` - Positive annualized volatility of variance.
+    /// * `vol_of_vol` - Positive annualized volatility of variance.
     /// * `rho` - Spot-variance correlation in the open interval `(-1, 1)`.
     /// * `hurst` - Hurst exponent in the open interval `(0, 0.5)`.
     ///
@@ -396,18 +396,18 @@ impl RoughHestonFourierParams {
     /// - `v0 <= 0` or non-finite
     /// - `kappa <= 0` or non-finite
     /// - `theta <= 0` or non-finite
-    /// - `sigma_v <= 0` or non-finite
+    /// - `vol_of_vol <= 0` or non-finite
     /// - `rho` not in `(-1, 1)` or non-finite
     /// - `hurst` not in `(0, 0.5)` or non-finite
     pub fn new(
         v0: f64,
         kappa: f64,
         theta: f64,
-        sigma_v: f64,
+        vol_of_vol: f64,
         rho: f64,
         hurst: f64,
     ) -> finstack_quant_core::Result<Self> {
-        let model = HestonParams::new(v0, kappa, theta, sigma_v, rho)?;
+        let model = HestonParams::new(v0, kappa, theta, vol_of_vol, rho)?;
         if hurst <= 0.0 || hurst >= 0.5 || !hurst.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "RoughHeston hurst must be in (0, 0.5), got {hurst}"
@@ -473,7 +473,7 @@ impl RoughHestonFourierParams {
         solver: &FractionalRiccatiSolver,
         u: Complex64,
     ) -> Option<Complex64> {
-        let trajectory = solver.solve_d(u, self.model.kappa, self.model.sigma_v, self.model.rho);
+        let trajectory = solver.solve_d(u, self.model.kappa, self.model.vol_of_vol, self.model.rho);
         let exponent = solver.solve_c(&trajectory, self.model.kappa, self.model.theta)
             + solver.fractional_integral_d(&trajectory) * self.model.v0;
         if !exponent.is_finite() || exponent.re > EXPONENT_REAL_LIMIT {
@@ -712,7 +712,7 @@ mod tests {
             .expect("valid base parameters");
         let params = RoughHestonFourierParams {
             model: HestonParams {
-                sigma_v: f64::INFINITY,
+                vol_of_vol: f64::INFINITY,
                 ..base.model
             },
             ..base

@@ -102,7 +102,7 @@ mod tests {
             .expect("complete Heston inputs must resolve");
         assert_eq!(params.model.kappa, 1.5);
         assert_eq!(params.model.theta, 0.06);
-        assert_eq!(params.model.sigma_v, 0.4);
+        assert_eq!(params.model.vol_of_vol, 0.4);
         assert_eq!(params.model.rho, -0.5);
         assert_eq!(params.model.v0, 0.05);
     }

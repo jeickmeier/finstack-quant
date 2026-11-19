@@ -65,13 +65,16 @@ def test_forward_greeks_is_typed_with_pandas_exits() -> None:
 
 def test_heston_price_dispatches_put_through_rust() -> None:
     call = heston_price(
-        100.0, 100.0, 1.0, {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7}
+        100.0,
+        100.0,
+        1.0,
+        {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
     )
     put = heston_price(
         100.0,
         100.0,
         1.0,
-        {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7},
+        {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
         is_call=False,
     )
     parity = call - put - (100.0 * math.exp(-0.02) - 100.0 * math.exp(-0.05))

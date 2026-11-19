@@ -62,11 +62,11 @@ def test_path_summary_to_dataframe_has_one_column_per_factor() -> None:
             "q": 0.01,
             "kappa": 2.0,
             "theta": 0.05,
-            "sigma_v": 0.3,
+            "vol_of_vol": 0.3,
             "rho": -0.7,
             "v0": 0.03,
         },
-        "initial_state": [100.0, 0.03],
+        "initial_state": [100.0],
         "antithetic": True,
     })
     df = summary.to_dataframe()

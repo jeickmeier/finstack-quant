@@ -236,7 +236,7 @@ fn bench_rough_heston_step(c: &mut Criterion) {
                     v0: 0.04,
                     kappa: 2.0,
                     theta: 0.04,
-                    sigma_v: 0.3,
+                    vol_of_vol: 0.3,
                     rho: -0.7,
                 },
             });

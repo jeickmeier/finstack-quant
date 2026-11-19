@@ -40,9 +40,9 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
           - ``"cir"`` : ``kappa``, ``theta``, ``sigma``. State ``[short_rate]``.
           - ``"cir_plus_plus"`` : ``params`` (CIR parameters),
             ``shift_curve``, ``shift_times``. State ``[short_rate]``.
-          - ``"heston"`` : ``r``, ``q``, ``kappa``, ``theta``, ``sigma_v``,
-            ``rho``, ``v0``. State ``[spot, variance]``; the starting variance
-            must equal ``v0``.
+          - ``"heston"`` : ``r``, ``q``, ``kappa``, ``theta``, ``vol_of_vol``,
+            ``rho``, ``v0``. Supply ``[spot]``; the process derives variance from
+            ``v0`` and returns ``[spot, variance]``.
           - ``"schwartz_smith"`` : ``kappa``, ``sigma_x``, ``mu_y``,
             ``sigma_y``, ``rho_xy``, optional ``lambda_x``. State ``[x, y]``.
           - ``"local_vol"`` : ``r``, ``q`` and ``surface``, a Dupire local
@@ -66,9 +66,9 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
             "constant_intervals", "times": [...], "values": [...]}``. State
             ``[spot]``.
           - ``"rough_heston"`` : ``r``, ``q``, ``hurst`` (``H`` in
-            ``(0, 0.5)``), ``kappa``, ``theta``, ``sigma_v``, ``rho``, ``v0``.
-            State ``[spot, variance]``; the starting variance must equal
-            ``v0``. At most 8,000 steps.
+            ``(0, 0.5)``), ``kappa``, ``theta``, ``vol_of_vol``, ``rho``, ``v0``.
+            Supply ``[spot]``; the process derives variance from ``v0`` and
+            returns ``[spot, variance]``. At most 8,000 steps.
           - ``"cheyette_rough"`` : ``kappa``, ``sigma_base`` (base volatility
             schedule in decimal rate units per square-root year, e.g.
             ``{"interpolation": "linear", "amplitudes": [[0.0, 0.005]]}``
@@ -87,7 +87,8 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
           ``"lmm"``, ``"rough_bergomi"``, ``"rough_heston"`` and
           ``"cheyette_rough"`` accept ``"default"`` only.
         - ``initial_state`` : list of float, the state at time zero in the
-          process's state layout.
+          process's authored state layout. Heston and rough Heston take the
+          opening spot only and derive variance from the process's ``v0``.
         - ``time_grid`` : ``{"type": "uniform", "expiry": years, "num_steps": n}``
           or ``{"type": "times", "times": [0.0, ...]}`` with strictly
           increasing year fractions.
@@ -147,11 +148,11 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
     ...         "q": 0.01,
     ...         "kappa": 2.0,
     ...         "theta": 0.05,
-    ...         "sigma_v": 0.3,
+    ...         "vol_of_vol": 0.3,
     ...         "rho": -0.7,
     ...         "v0": 0.03,
     ...     },
-    ...     "initial_state": [100.0, 0.03],
+    ...     "initial_state": [100.0],
     ...     "antithetic": True,
     ... })
     >>> (heston.num_simulated_paths, heston.factor_names)
@@ -231,7 +232,7 @@ def price_heston(
         Every key is required: ``r`` (continuously compounded risk-free rate,
         decimal); ``q`` (continuous dividend yield, decimal); ``v0`` (initial
         variance, not volatility); ``kappa`` (mean-reversion speed of
-        variance); ``theta`` (long-run variance level); ``sigma_v``
+        variance); ``theta`` (long-run variance level); ``vol_of_vol``
         (volatility of variance, ``sigma`` in Heston notation); ``rho``
         (correlation between spot and variance Brownian motions in
         ``[-1, 1]``).
@@ -269,7 +270,7 @@ def price_heston(
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import price_heston
-    >>> params = {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7}
+    >>> params = {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7}
     >>> r = price_heston(100, 100, 1.0, params, True, {"num_paths": 5000})
     >>> r.num_paths
     5000

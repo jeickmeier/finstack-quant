@@ -225,7 +225,7 @@ fn heston_price_call_atm_is_reasonable() {
         JsValue::from(100.0),
         JsValue::from(1.0),
         JsValue::from_str(
-            r#"{"r": 0.05, "q": 0.02, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7, "v0": 0.04}"#,
+            r#"{"r": 0.05, "q": 0.02, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7, "v0": 0.04}"#,
         ),
         None,
     )

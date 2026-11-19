@@ -31,7 +31,7 @@
 //! | v0 | v₀ | > 0 | Initial variance |
 //! | kappa | κ | > 0 | Mean reversion speed |
 //! | theta | θ | > 0 | Long-run variance |
-//! | sigma_v | σ | > 0 | Vol-of-vol (smile curvature) |
+//! | vol_of_vol | σ | > 0 | Vol-of-vol (smile curvature) |
 //! | rho | ρ | (-1, 1) | Skew direction |
 //!
 //! # Feller Condition
@@ -83,7 +83,7 @@ pub struct HestonParams {
     /// Long-run variance (θ > 0).
     pub theta: f64,
     /// Vol-of-vol (σ > 0).
-    pub sigma_v: f64,
+    pub vol_of_vol: f64,
     /// Correlation between spot and variance (-1 < ρ < 1).
     pub rho: f64,
 }
@@ -94,7 +94,7 @@ impl Default for HestonParams {
             v0: 0.04,
             kappa: 2.0,
             theta: 0.04,
-            sigma_v: 0.3,
+            vol_of_vol: 0.3,
             rho: -0.5,
         }
     }
@@ -115,7 +115,7 @@ struct RawHestonParams {
     /// Long-run variance.
     theta: f64,
     /// Vol-of-vol.
-    sigma_v: f64,
+    vol_of_vol: f64,
     /// Spot-variance correlation.
     rho: f64,
 }
@@ -124,7 +124,7 @@ impl TryFrom<RawHestonParams> for HestonParams {
     type Error = finstack_quant_core::Error;
 
     fn try_from(raw: RawHestonParams) -> finstack_quant_core::Result<Self> {
-        Self::new(raw.v0, raw.kappa, raw.theta, raw.sigma_v, raw.rho)
+        Self::new(raw.v0, raw.kappa, raw.theta, raw.vol_of_vol, raw.rho)
     }
 }
 
@@ -136,7 +136,7 @@ impl HestonParams {
     /// * `v0` - Positive initial variance level.
     /// * `kappa` - Positive annual mean-reversion speed of variance.
     /// * `theta` - Positive long-run variance level.
-    /// * `sigma_v` - Positive annualized volatility of variance.
+    /// * `vol_of_vol` - Positive annualized volatility of variance.
     /// * `rho` - Instantaneous spot-variance correlation in the open interval
     ///   `(-1, 1)`.
     ///
@@ -146,7 +146,7 @@ impl HestonParams {
     /// - `v0 <= 0` or non-finite
     /// - `kappa <= 0` or non-finite
     /// - `theta <= 0` or non-finite
-    /// - `sigma_v <= 0` or non-finite
+    /// - `vol_of_vol <= 0` or non-finite
     /// - `rho` not in `(-1, 1)` or non-finite
     ///
     /// # Feller Condition
@@ -156,14 +156,14 @@ impl HestonParams {
         v0: f64,
         kappa: f64,
         theta: f64,
-        sigma_v: f64,
+        vol_of_vol: f64,
         rho: f64,
     ) -> finstack_quant_core::Result<Self> {
         let params = Self {
             v0,
             kappa,
             theta,
-            sigma_v,
+            vol_of_vol,
             rho,
         };
         params.validate()?;
@@ -173,11 +173,11 @@ impl HestonParams {
                 v0 = v0,
                 kappa = kappa,
                 theta = theta,
-                sigma_v = sigma_v,
+                vol_of_vol = vol_of_vol,
                 rho = rho,
                 feller_lhs = 2.0 * kappa * theta,
-                feller_rhs = sigma_v * sigma_v,
-                "Heston Feller condition violated (2*kappa*theta <= sigma_v^2). \
+                feller_rhs = vol_of_vol * vol_of_vol,
+                "Heston Feller condition violated (2*kappa*theta <= vol_of_vol^2). \
                  Variance process can reach zero. This is acceptable for Fourier pricing \
                  but may cause issues in Monte Carlo simulation.",
             );
@@ -201,7 +201,7 @@ impl HestonParams {
             v0,
             kappa,
             theta,
-            sigma_v,
+            vol_of_vol,
             rho,
         } = *self;
         if v0 <= 0.0 || !v0.is_finite() {
@@ -219,9 +219,9 @@ impl HestonParams {
                 "Heston theta (long-run variance) must be positive, got {theta}"
             )));
         }
-        if sigma_v <= 0.0 || !sigma_v.is_finite() {
+        if vol_of_vol <= 0.0 || !vol_of_vol.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Heston sigma_v (vol-of-vol) must be positive, got {sigma_v}"
+                "Heston vol_of_vol (vol-of-vol) must be positive, got {vol_of_vol}"
             )));
         }
         if rho <= -1.0 || rho >= 1.0 || !rho.is_finite() {
@@ -243,7 +243,7 @@ impl HestonParams {
         crate::monte_carlo::process::heston::heston_satisfies_feller(
             self.kappa,
             self.theta,
-            self.sigma_v,
+            self.vol_of_vol,
         )
     }
 
@@ -285,12 +285,12 @@ impl HestonParams {
             Ok(self)
         } else {
             Err(finstack_quant_core::Error::Validation(format!(
-                "Heston Feller condition violated: 2*kappa*theta ({:.6}) <= sigma_v^2 ({:.6}). \
+                "Heston Feller condition violated: 2*kappa*theta ({:.6}) <= vol_of_vol^2 ({:.6}). \
                  Variance process can reach zero, causing numerical issues in Monte Carlo. \
                  Use satisfies_feller() to check, or omit require_feller() for \
                  Fourier-only pricing.",
                 2.0 * self.kappa * self.theta,
-                self.sigma_v * self.sigma_v,
+                self.vol_of_vol * self.vol_of_vol,
             )))
         }
     }
@@ -365,7 +365,7 @@ pub fn heston_pj_characteristic_function(
 ) -> (Complex64, HestonCfStatus) {
     let kappa = params.kappa;
     let theta = params.theta;
-    let sigma_v = params.sigma_v;
+    let vol_of_vol = params.vol_of_vol;
     let rho = params.rho;
     let v0 = params.v0;
 
@@ -380,16 +380,16 @@ pub fn heston_pj_characteristic_function(
     // For P₁: u = 0.5, b = κ − ρσ (stock numeraire)
     // For P₂: u = −0.5, b = κ (money market numeraire)
     let (u_j, b_j) = if j == 1 {
-        (0.5, kappa - rho * sigma_v)
+        (0.5, kappa - rho * vol_of_vol)
     } else {
         (-0.5, kappa)
     };
 
     let a = kappa * theta;
-    let sigma_sq = sigma_v * sigma_v;
+    let sigma_sq = vol_of_vol * vol_of_vol;
 
     // d = sqrt((ρσiφ − b)² − σ²(2u_j iφ − φ²))
-    let rsi_phi = Complex64::new(0.0, rho * sigma_v * phi);
+    let rsi_phi = Complex64::new(0.0, rho * vol_of_vol * phi);
     let b = Complex64::new(b_j, 0.0);
     let d_sq = (rsi_phi - b).powi(2) - sigma_sq * (Complex64::new(-phi * phi, 2.0 * u_j * phi));
     let d = d_sq.sqrt();
@@ -492,7 +492,7 @@ mod tests {
         assert!(HestonParams::new(-0.01, 2.0, 0.04, 0.3, -0.5).is_err()); // v0 < 0
         assert!(HestonParams::new(0.04, 0.0, 0.04, 0.3, -0.5).is_err()); // kappa = 0
         assert!(HestonParams::new(0.04, 2.0, 0.0, 0.3, -0.5).is_err()); // theta = 0
-        assert!(HestonParams::new(0.04, 2.0, 0.04, 0.0, -0.5).is_err()); // sigma_v = 0
+        assert!(HestonParams::new(0.04, 2.0, 0.04, 0.0, -0.5).is_err()); // vol_of_vol = 0
         assert!(HestonParams::new(0.04, 2.0, 0.04, 0.3, -1.0).is_err()); // rho = -1
         assert!(HestonParams::new(0.04, 2.0, 0.04, 0.3, 1.0).is_err()); // rho = 1
     }
@@ -625,7 +625,7 @@ mod tests {
     fn black_scholes_limit() {
         let vol = 0.2;
         let var = vol * vol;
-        // sigma_v → 0: Heston degenerates to Black-Scholes
+        // vol_of_vol → 0: Heston degenerates to Black-Scholes
         let p = HestonParams::new(var, 2.0, var, 1e-12, 0.0).expect("valid");
         let heston = crate::closed_form::heston_call_price_fourier(
             100.0,
@@ -761,12 +761,12 @@ mod tests {
         assert_eq!(p, back);
 
         // Out-of-range rho rejected.
-        let bad = r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"sigma_v":0.3,"rho":1.5}"#;
+        let bad = r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"vol_of_vol":0.3,"rho":1.5}"#;
         assert!(serde_json::from_str::<HestonParams>(bad).is_err());
 
         // Unknown field rejected.
         let unknown =
-            r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"sigma_v":0.3,"rho":-0.5,"extra":1.0}"#;
+            r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"vol_of_vol":0.3,"rho":-0.5,"extra":1.0}"#;
         assert!(serde_json::from_str::<HestonParams>(unknown).is_err());
     }
 

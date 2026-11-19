@@ -86,11 +86,11 @@ const PATH_SPECS = {
       q: 0.01,
       kappa: 2.0,
       theta: 0.05,
-      sigma_v: 0.3,
+      vol_of_vol: 0.3,
       rho: -0.7,
       v0: 0.03,
     },
-    initial_state: [100.0, 0.03],
+    initial_state: [100.0],
     antithetic: true,
     ...PATH_GRID,
   },
@@ -143,6 +143,20 @@ const PATH_SPECS = {
     ...PATH_GRID,
   },
 };
+test('Heston paths derive opening variance from the variance dynamics', () => {
+  const spec = PATH_SPECS.heston;
+  const opening = [spec.initial_state[0], spec.process.v0];
+  assert.deepEqual(monteCarlo.simulatePaths(spec).values.slice(0, 2), opening);
+  assert.throws(
+    () => monteCarlo.simulatePaths({ ...spec, initial_state: opening }),
+    /one initial_state value/
+  );
+  const { vol_of_vol, ...rest } = spec.process;
+  assert.throws(() =>
+    monteCarlo.simulatePaths({ ...spec, process: { ...rest, sigma_v: vol_of_vol } })
+  );
+});
+
 const GBM = [100.0, 100.0, 0.05, 0.0, 0.2, 1.0];
 /** `GBM` as the `OptionMarketParams` object of the closed-form and Monte Carlo pricers. */
 const gbmMarket = (optionType) => {
@@ -1023,14 +1037,14 @@ const CASES = {
       v0: 0.04,
       kappa: 2.0,
       theta: 0.04,
-      sigma_v: 0.3,
+      vol_of_vol: 0.3,
       rho: -0.7,
     }),
     models.hestonPrice(
       100.0,
       110.0,
       1.0,
-      { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
+      { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 },
       false
     ),
   ],

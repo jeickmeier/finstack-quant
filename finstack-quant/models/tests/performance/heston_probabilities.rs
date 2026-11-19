@@ -136,7 +136,7 @@ fn original_public_call(
             HestonFourierSettings::for_maturity(time, params.model.v0.min(params.model.theta));
         let c_inf = (1.0 - params.model.rho * params.model.rho).sqrt()
             * (params.model.v0 + params.model.kappa * params.model.theta * time)
-            / params.model.sigma_v;
+            / params.model.vol_of_vol;
         grid.u_max = grid.u_max.max(HESTON_TAIL_LOG_TARGET / c_inf);
         grid.panels = grid.u_max.ceil() as usize;
         grid
@@ -279,7 +279,7 @@ fn record_probe(label: &str, pricer: &HestonStripPricer, strike: f64) -> Value {
         pricer.params.q,
         pricer.params.model.kappa,
         pricer.params.model.theta,
-        pricer.params.model.sigma_v,
+        pricer.params.model.vol_of_vol,
         pricer.params.model.rho,
         pricer.params.model.v0,
     ]
@@ -291,7 +291,7 @@ fn record_probe(label: &str, pricer: &HestonStripPricer, strike: f64) -> Value {
         "strike_bits": bits(strike),
         "fixture_hash": fingerprint([pricer.spot, pricer.time, strike, pricer.params.r,
             pricer.params.q, pricer.params.model.kappa, pricer.params.model.theta,
-            pricer.params.model.sigma_v, pricer.params.model.rho, pricer.params.model.v0]),
+            pricer.params.model.vol_of_vol, pricer.params.model.rho, pricer.params.model.v0]),
         "params_bits": params_bits,
         "grid_nodes": pricer.grid.len(),
         "grid_hash": fingerprint(pricer.grid.iter().flat_map(|&(phi, weight)| [phi, weight])),

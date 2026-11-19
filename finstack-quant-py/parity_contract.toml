@@ -567,6 +567,8 @@ python_package = "finstack_quant.models.monte_carlo"
 # methods (`price_gbm`, `price_asian`, `price_with_lrm_greeks`,
 # `price_american`, `price_american_unbiased`) take the serde form of the Rust
 # `OptionMarketParams` as one `market` argument, and `price_heston` takes
+# Heston and rough Heston simulation specs author `[spot]` and derive the
+# opening variance from the process `v0` in both hosts.
 # `HestonPricingParams` (`params`) and an optional `HestonMcSettings`
 # (`settings`) the same way, mirroring the closed-form `heston_price`.
 public = [

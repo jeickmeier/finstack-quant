@@ -24,7 +24,7 @@
 //! |-----------|-----------|-------|
 //! | Rates (r, q) | Continuously compounded | Decimal (0.05 = 5%) |
 //! | Variance (v0, theta) | Annualized variance | Decimal (0.04 = 20% vol) |
-//! | Vol-of-vol (sigma_v) | Annualized | Decimal |
+//! | Vol-of-vol (vol_of_vol) | Annualized | Decimal |
 //! | Time (T) | ACT/365-style | Years |
 //! | Prices | Per unit of underlying | Currency units |
 //!

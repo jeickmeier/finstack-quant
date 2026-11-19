@@ -1586,7 +1586,7 @@ def heston_price(
         decimal); ``q`` (continuous dividend / foreign yield, decimal);
         ``v0`` (initial instantaneous variance, not volatility; positive);
         ``kappa`` (variance mean-reversion speed per year, positive);
-        ``theta`` (long-run variance, positive); ``sigma_v`` (volatility of
+        ``theta`` (long-run variance, positive); ``vol_of_vol`` (volatility of
         variance, positive); ``rho`` (spot/variance correlation in
         ``[-1, 1]``).
     is_call : bool, default True
@@ -1608,7 +1608,7 @@ def heston_price(
     Examples
     --------
     >>> from finstack_quant.models import heston_price
-    >>> params = {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7}
+    >>> params = {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7}
     >>> p = heston_price(100.0, 100.0, 1.0, params)
     >>> 5.0 < p < 15.0
     True

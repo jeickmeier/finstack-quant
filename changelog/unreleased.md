@@ -245,8 +245,9 @@ the finite-difference Greek `spec` takes the same keys plus optional
 `num_paths, seed, num_steps, bump_size, currency`. Black–Scholes COS uses
 `OptionMarketParams`. Variance Gamma and Merton COS share
 `OptionContractParams` and take model dynamics separately. COS term counts
-are optional arguments. Heston `params` are `r, q, v0, kappa, theta,
-sigma_v, rho`. A non-finite number inside one of these objects is rejected
+are optional arguments. Heston and rough Heston simulations take only opening
+spot in `initial_state`; both derive opening variance from `v0`. Heston `params` are `r, q, v0, kappa, theta,
+vol_of_vol, rho`. A non-finite number inside one of these objects is rejected
 when the object is read (Python `ValueError`, WASM `TypeError`). Prices are
 unchanged. Old → new (WASM: the camelCase twin with the same arguments):
 
@@ -255,7 +256,7 @@ unchanged. Old → new (WASM: the camelCase twin with the same arguments):
 - `asian_option_price(spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging, is_call)` → `asian_option_price(market, num_fixings, averaging)`
 - `lookback_option_price(spot, strike, rate, div_yield, vol, expiry, extremum, strike_type, is_call)` → `lookback_option_price(market, extremum, strike_type)`
 - `quanto_option_price(spot, strike, expiry, rate_domestic, rate_foreign, div_yield, vol_asset, vol_fx, correlation, is_call)` → `quanto_option_price(market, rate_foreign, vol_fx, correlation)`
-- `heston_price(spot, strike, expiry, rate, div_yield, kappa, theta, sigma_v, rho, v0, is_call)` → `heston_price(spot, strike, expiry, params, is_call)`
+- `heston_price(spot, strike, expiry, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, is_call)` → `heston_price(spot, strike, expiry, params, is_call)`
 - `bs_cos_price(spot, strike, rate, div_yield, vol, expiry, is_call, n_terms)` → `bs_cos_price(market, n_terms)`
 - `vg_cos_price(spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms)` → `vg_cos_price(contract, sigma, theta, nu, n_terms)`
 - `merton_jump_cos_price(spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms)` → `merton_jump_cos_price(contract, sigma, mu_jump, sigma_jump, lambda_, n_terms)` (WASM `lambda`)

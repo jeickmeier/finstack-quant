@@ -294,7 +294,7 @@ HESTON_NOTES = {
     "heston_vov0.5_rho-0.9_k120_t1": "passes after Kahl-Jaeckel truncation fix (call rel err ~4.6e-8)",
 }
 
-for sigma_v, rho in ((0.3, -0.5), (0.5, -0.9)):
+for vol_of_vol, rho in ((0.3, -0.5), (0.5, -0.9)):
     for t in (1.0, 5.0, 10.0):
         for strike in (80.0, 100.0, 120.0):
             call = heston_price(
@@ -306,7 +306,7 @@ for sigma_v, rho in ((0.3, -0.5), (0.5, -0.9)):
                 HESTON_V0,
                 HESTON_KAPPA,
                 HESTON_THETA,
-                sigma_v,
+                vol_of_vol,
                 rho,
                 True,
             )
@@ -319,11 +319,11 @@ for sigma_v, rho in ((0.3, -0.5), (0.5, -0.9)):
                 HESTON_V0,
                 HESTON_KAPPA,
                 HESTON_THETA,
-                sigma_v,
+                vol_of_vol,
                 rho,
                 False,
             )
-            cid = f"vov{sigma_v:g}_rho{rho:g}_k{strike:g}_t{t:g}"
+            cid = f"vov{vol_of_vol:g}_rho{rho:g}_k{strike:g}_t{t:g}"
             skip_extra = (
                 {"skip": False, "comment": HESTON_NOTES[f"heston_{cid}"]} if f"heston_{cid}" in HESTON_NOTES else {}
             )
@@ -339,7 +339,7 @@ for sigma_v, rho in ((0.3, -0.5), (0.5, -0.9)):
                 v0=HESTON_V0,
                 kappa=HESTON_KAPPA,
                 theta=HESTON_THETA,
-                sigma=sigma_v,
+                sigma=vol_of_vol,
                 rho=rho,
                 expected={"call": call, "put": put, "tolerance_rel": 1e-6},
             )

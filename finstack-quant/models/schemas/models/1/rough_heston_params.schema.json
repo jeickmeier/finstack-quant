@@ -46,11 +46,6 @@
       "format": "double",
       "type": "number"
     },
-    "sigma_v": {
-      "description": "Volatility of variance — vol-of-vol (σᵥ > 0).",
-      "format": "double",
-      "type": "number"
-    },
     "theta": {
       "description": "Long-run variance level (θ > 0).",
       "format": "double",
@@ -58,6 +53,11 @@
     },
     "v0": {
       "description": "Initial variance (v₀ > 0).",
+      "format": "double",
+      "type": "number"
+    },
+    "vol_of_vol": {
+      "description": "Volatility of variance — vol-of-vol (σᵥ > 0).",
       "format": "double",
       "type": "number"
     }
@@ -68,7 +68,7 @@
     "hurst",
     "kappa",
     "theta",
-    "sigma_v",
+    "vol_of_vol",
     "rho",
     "v0"
   ],

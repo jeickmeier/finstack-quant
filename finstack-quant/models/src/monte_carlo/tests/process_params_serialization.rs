@@ -57,7 +57,7 @@ fn test_heston_params_serialization() {
     assert_eq!(params.q, restored.q);
     assert_eq!(params.model.kappa, restored.model.kappa);
     assert_eq!(params.model.theta, restored.model.theta);
-    assert_eq!(params.model.sigma_v, restored.model.sigma_v);
+    assert_eq!(params.model.vol_of_vol, restored.model.vol_of_vol);
     assert_eq!(params.model.rho, restored.model.rho);
     assert_eq!(params.model.v0, restored.model.v0);
 

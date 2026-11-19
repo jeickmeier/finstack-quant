@@ -762,7 +762,7 @@ pub fn quanto_option_price(
 /// @param spot - Current spot price in the same units as the strike.
 /// @param strike - Option strike price.
 /// @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
-/// @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
+/// @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `vol_of_vol` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
 /// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
@@ -775,7 +775,7 @@ pub fn quanto_option_price(
 /// @example
 /// ```javascript
 /// const price = models.hestonPrice(100, 100, 1.0, {
-///   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7,
+///   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7,
 /// });
 /// // price ≈ 9.24
 /// ```

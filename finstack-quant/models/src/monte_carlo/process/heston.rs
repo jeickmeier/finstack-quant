@@ -113,7 +113,7 @@
 //!
 //! // Check Feller condition
 //! let feller = 2.0 * params.model.kappa * params.model.theta;
-//! let sigma_v_sq = params.model.sigma_v * params.model.sigma_v;
+//! let sigma_v_sq = params.model.vol_of_vol * params.model.vol_of_vol;
 //! println!("Feller satisfied: {}", feller >= sigma_v_sq);
 //! ```
 
@@ -137,7 +137,7 @@ use crate::monte_carlo::traits::ProcessMetadata;
 ///
 /// * `kappa` - Mean-reversion speed of the variance process
 /// * `theta` - Long-run variance level
-/// * `sigma_v` - Volatility of variance (vol-of-vol)
+/// * `vol_of_vol` - Volatility of variance (vol-of-vol)
 ///
 /// # Examples
 ///
@@ -148,8 +148,8 @@ use crate::monte_carlo::traits::ProcessMetadata;
 /// assert!(!heston_satisfies_feller(0.5, 0.04, 0.5)); // 0.04 < 0.25
 /// ```
 #[must_use]
-pub fn heston_satisfies_feller(kappa: f64, theta: f64, sigma_v: f64) -> bool {
-    2.0 * kappa * theta >= sigma_v * sigma_v
+pub fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> bool {
+    2.0 * kappa * theta >= vol_of_vol * vol_of_vol
 }
 
 /// Heston stochastic volatility process.
@@ -244,7 +244,7 @@ impl StochasticProcess for HestonProcess {
         out[0] = sqrt_v * s;
 
         // Diffusion for v: σ_v √v
-        out[1] = self.params.model.sigma_v * sqrt_v;
+        out[1] = self.params.model.vol_of_vol * sqrt_v;
         Ok(())
     }
 
@@ -261,7 +261,7 @@ impl ProcessMetadata for HestonProcess {
         params.add_param("q", self.params.q);
         params.add_param("kappa", self.params.model.kappa);
         params.add_param("theta", self.params.model.theta);
-        params.add_param("sigma_v", self.params.model.sigma_v);
+        params.add_param("vol_of_vol", self.params.model.vol_of_vol);
         params.add_param("rho", self.params.model.rho);
         params.add_param("v0", self.params.model.v0);
 
@@ -285,7 +285,7 @@ mod tests {
             0.02, // q
             2.0,  // kappa
             0.04, // theta
-            0.3,  // sigma_v
+            0.3,  // vol_of_vol
             -0.5, // rho
             0.04, // v0
         )

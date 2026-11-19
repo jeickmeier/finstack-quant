@@ -973,7 +973,7 @@ fn captured_rough_heston_paths_reset_history_and_match_streaming_prices() {
             v0: 0.04,
             kappa: 2.0,
             theta: 0.04,
-            sigma_v: 0.3,
+            vol_of_vol: 0.3,
             rho: -0.7,
         },
     });

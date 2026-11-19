@@ -353,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_params.schema.json",
-      "bytes": 967,
+      "bytes": 973,
       "kind": "input",
       "path": "schemas/models/1/heston_params.schema.json",
       "summary": "Heston stochastic volatility model parameters.",
@@ -362,7 +362,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_pricing_params.schema.json",
-      "bytes": 1314,
+      "bytes": 1320,
       "kind": "input",
       "path": "schemas/models/1/heston_pricing_params.schema.json",
       "summary": "Market inputs for closed-form Heston pricing.",
@@ -659,7 +659,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 44319,
+      "bytes": 44439,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -749,7 +749,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
-      "bytes": 33622,
+      "bytes": 33692,
       "kind": "input",
       "path": "schemas/models/1/process_spec.schema.json",
       "summary": "Stochastic process to simulate, with its parameters.",
@@ -830,7 +830,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_fourier_params.schema.json",
-      "bytes": 1138,
+      "bytes": 1144,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_fourier_params.schema.json",
       "summary": "Rough Heston model parameters for Fourier-based European option pricing.",
@@ -839,7 +839,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
-      "bytes": 2151,
+      "bytes": 2157,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_params.schema.json",
       "summary": "Rough Heston model parameters.",

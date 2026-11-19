@@ -75,7 +75,7 @@ pub struct HestonMcSettings {
 /// * `time` - Time to expiry in years
 /// * `params` - Continuously compounded decimal annual rate `r` and dividend
 ///   yield `q`, plus the Heston model (`v0` initial variance, `kappa` mean
-///   reversion, `theta` long-run variance, `sigma_v` vol of variance, `rho`
+///   reversion, `theta` long-run variance, `vol_of_vol` vol of variance, `rho`
 ///   spot/variance correlation in `[-1, 1]`); see [`HestonPricingParams`].
 /// * `option_type` - Call or put payoff direction
 /// * `settings` - Path count, seed, step count and result currency; each

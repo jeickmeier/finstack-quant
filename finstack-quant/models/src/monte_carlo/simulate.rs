@@ -200,8 +200,9 @@ pub enum ProcessSpec {
     },
     /// Heston stochastic volatility.
     ///
-    /// State: `[spot, variance]`; spot starts strictly positive, and the
-    /// starting variance `initial_state[1]` must equal the `v0` parameter.
+    /// Supply only the strictly positive opening spot in `initial_state`.
+    /// The process derives variance from its `v0` parameter and returns states
+    /// as `[spot, variance]`.
     Heston(HestonPricingParams),
     /// Schwartz-Smith two-factor commodity model.
     ///
@@ -236,8 +237,9 @@ pub enum ProcessSpec {
     /// Rough Heston stochastic volatility: a Volterra square-root variance
     /// with a power-law kernel, `hurst` in `(0, 0.5)`.
     ///
-    /// State: `[spot, variance]`; spot starts strictly positive, and the
-    /// starting variance `initial_state[1]` must equal the `v0` parameter.
+    /// Supply only the strictly positive opening spot in `initial_state`.
+    /// The process derives variance from its `v0` parameter and returns states
+    /// as `[spot, variance]`.
     /// At most 8,000 steps.
     RoughHeston(RoughHestonParams),
     /// Cheyette short-rate model with rough stochastic volatility.
@@ -347,7 +349,8 @@ pub struct PathSimulationSpec {
     #[serde(default)]
     pub scheme: SchemeSpec,
     /// State at time zero, in the layout documented on the [`ProcessSpec`]
-    /// variant. Its length must equal the process dimension.
+    /// variant. Heston and rough Heston take only spot here and use their
+    /// own `v0` for the starting variance.
     pub initial_state: Vec<f64>,
     /// Simulation dates.
     pub time_grid: TimeGridSpec,
@@ -662,18 +665,18 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 p.q,
                 p.model.kappa,
                 p.model.theta,
-                p.model.sigma_v,
+                p.model.vol_of_vol,
                 p.model.rho,
                 p.model.v0,
             )
             .map(HestonProcess::new)?;
-            require_spot_and_v0(spec, x0, p.model.v0)?;
+            let initial = heston_initial_state(spec, p.model.v0)?;
             match spec.scheme {
                 SchemeSpec::Default => {
-                    simulate_with_noise(&process, &QeHeston::new(), spec, x0, parallel, None)
+                    simulate_with_noise(&process, &QeHeston::new(), spec, &initial, parallel, None)
                 }
                 SchemeSpec::Euler => {
-                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
+                    simulate_with_noise(&process, &EulerMaruyama, spec, &initial, parallel, None)
                 }
                 _ => unsupported(),
             }
@@ -762,7 +765,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
         ProcessSpec::RoughHeston(p) => {
             p.validate()?;
             let process = RoughHestonProcess::new(p.clone());
-            require_spot_and_v0(spec, x0, p.model.v0)?;
+            let initial = heston_initial_state(spec, p.model.v0)?;
             if spec.scheme != SchemeSpec::Default {
                 return unsupported();
             }
@@ -778,7 +781,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             }
             let grid = spec.time_grid.build()?;
             let scheme = RoughHestonHybrid::new(grid.times(), p.hurst.get_value())?;
-            simulate_with_noise(&process, &scheme, spec, x0, parallel, None)
+            simulate_with_noise(&process, &scheme, spec, &initial, parallel, None)
         }
         ProcessSpec::CheyetteRough(p) => {
             p.validate()?;
@@ -802,24 +805,20 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
     }
 }
 
-/// A two-factor `[spot, variance]` start must have a strictly positive spot
-/// and a variance equal to the process `v0` parameter (bit for bit).
-fn require_spot_and_v0(spec: &PathSimulationSpec, x0: &[f64], v0: f64) -> Result<()> {
-    if let [spot, variance] = *x0 {
-        let tag = spec.process.tag();
-        if spot.is_nan() || spot <= 0.0 {
-            return Err(Error::Validation(format!(
-                "process '{tag}' needs a strictly positive initial spot, got {spot}"
-            )));
-        }
-        if variance.to_bits() != v0.to_bits() {
-            return Err(Error::Validation(format!(
-                "process '{tag}' needs initial_state[1] to equal the v0 parameter {v0}, \
-                 got {variance}"
-            )));
-        }
+// Heston process parameters own the opening variance. Only spot is authored here.
+fn heston_initial_state(spec: &PathSimulationSpec, v0: f64) -> Result<[f64; 2]> {
+    let tag = spec.process.tag();
+    let [spot] = *spec.initial_state.as_slice() else {
+        return Err(Error::Validation(format!(
+            "process '{tag}' needs one initial_state value (spot); variance comes from v0"
+        )));
+    };
+    if !spot.is_finite() || spot <= 0.0 {
+        return Err(Error::Validation(format!(
+            "process '{tag}' needs a finite strictly positive initial spot, got {spot}"
+        )));
     }
-    Ok(())
+    Ok([spot, v0])
 }
 
 /// Serialized tag of a scheme, used in error messages.

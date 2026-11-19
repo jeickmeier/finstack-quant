@@ -182,11 +182,11 @@ impl QeHeston {
         v_t: f64,
         kappa: f64,
         theta: f64,
-        sigma_v: f64,
+        vol_of_vol: f64,
         dt: f64,
         z_v: f64,
     ) -> f64 {
-        qe_step_variance(v_t, kappa, theta, sigma_v, dt, z_v, self.psi_c).expect("QE sample")
+        qe_step_variance(v_t, kappa, theta, vol_of_vol, dt, z_v, self.psi_c).expect("QE sample")
     }
 
     /// Compute integrated variance for spot evolution.
@@ -298,7 +298,7 @@ impl Discretization<HestonProcess> for QeHeston {
                 v_t,
                 params.model.kappa,
                 params.model.theta,
-                params.model.sigma_v,
+                params.model.vol_of_vol,
                 dt,
                 self.psi_c,
                 c.exp_kappa_dt,
@@ -307,7 +307,7 @@ impl Discretization<HestonProcess> for QeHeston {
                 v_t,
                 params.model.kappa,
                 params.model.theta,
-                params.model.sigma_v,
+                params.model.vol_of_vol,
                 dt,
                 self.psi_c,
             ),
@@ -341,8 +341,8 @@ impl Discretization<HestonProcess> for QeHeston {
         let one_minus_rho2 = (1.0 - rho * rho).max(0.0);
         let orthogonal_diffusion = one_minus_rho2.sqrt() * int_var.sqrt() * z[0];
 
-        let log_increment = if params.model.sigma_v.abs() > 1e-10 {
-            let rho_over_sigma = rho / params.model.sigma_v;
+        let log_increment = if params.model.vol_of_vol.abs() > 1e-10 {
+            let rho_over_sigma = rho / params.model.vol_of_vol;
             let a_pre = -0.5 * c2 + rho_over_sigma * (params.model.kappa * c2 + 1.0);
             let a_coeff = a_pre + 0.5 * one_minus_rho2 * c2;
             match regime.exp_moment(a_coeff) {
@@ -420,7 +420,7 @@ mod tests {
                 0.04,
                 params.model.kappa,
                 params.model.theta,
-                params.model.sigma_v,
+                params.model.vol_of_vol,
                 0.01,
                 z,
             );
@@ -439,7 +439,7 @@ mod tests {
             0.08,
             params.model.kappa,
             params.model.theta,
-            params.model.sigma_v,
+            params.model.vol_of_vol,
             0.1,
             0.0,
         );
@@ -450,7 +450,7 @@ mod tests {
             0.02,
             params.model.kappa,
             params.model.theta,
-            params.model.sigma_v,
+            params.model.vol_of_vol,
             0.1,
             0.0,
         );
@@ -632,7 +632,7 @@ mod tests {
             0.04,
             params.model.kappa,
             params.model.theta,
-            params.model.sigma_v,
+            params.model.vol_of_vol,
             0.1,
             0.0,
         );
@@ -650,7 +650,7 @@ mod tests {
                 0.04,
                 params.model.kappa,
                 params.model.theta,
-                params.model.sigma_v,
+                params.model.vol_of_vol,
                 0.1,
                 z,
             );
@@ -689,7 +689,7 @@ mod tests {
             v_t,
             params.model.kappa,
             params.model.theta,
-            params.model.sigma_v,
+            params.model.vol_of_vol,
             dt,
             1.5,
         );
@@ -698,7 +698,7 @@ mod tests {
         let int_var = c0 + c1 * v_t + c2 * v_next;
         let rho = params.model.rho;
         let one_minus_rho2 = 1.0 - rho * rho;
-        let a_pre = -0.5 * c2 + rho / params.model.sigma_v * (params.model.kappa * c2 + 1.0);
+        let a_pre = -0.5 * c2 + rho / params.model.vol_of_vol * (params.model.kappa * c2 + 1.0);
         let a_coeff = a_pre + 0.5 * one_minus_rho2 * c2;
         let mgf = regime.exp_moment(a_coeff).expect("finite MGF");
         let k0_star = -mgf.ln() - 0.5 * one_minus_rho2 * (c0 + c1 * v_t);
@@ -820,7 +820,7 @@ mod tests {
             model: crate::volatility::heston::HestonParams {
                 kappa: 1.5,
                 theta: 0.04,
-                sigma_v: 1.0e-16,
+                vol_of_vol: 1.0e-16,
                 rho: 1.0 + 1.0e-12,
                 v0: 0.04,
             },

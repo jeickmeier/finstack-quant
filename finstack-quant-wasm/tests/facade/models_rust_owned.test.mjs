@@ -58,7 +58,7 @@ test('forward Greeks are the Rust ForwardGreeks object', () => {
 });
 
 test('hestonPrice dispatches the put through Rust', () => {
-  const params = { r: 0.05, q: 0.02, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 };
+  const params = { r: 0.05, q: 0.02, v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 };
   const call = models.hestonPrice(100, 100, 1, params);
   const put = models.hestonPrice(100, 100, 1, params, false);
   const parity = call - put - (100 * Math.exp(-0.02) - 100 * Math.exp(-0.05));
@@ -66,7 +66,7 @@ test('hestonPrice dispatches the put through Rust', () => {
 });
 
 test('priceHeston defaults numPaths and seed from the Rust registry and returns MoneyEstimate', () => {
-  const params = { r: 0.05, q: 0, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 };
+  const params = { r: 0.05, q: 0, v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 };
   const est = models.monteCarlo.priceHeston(100, 100, 1, params, true, { num_steps: 1 });
   assert.equal(est.num_paths, 100000);
   assert.equal(typeof est.mean.amount, 'string');

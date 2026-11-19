@@ -5837,7 +5837,7 @@ export interface ModelsLiquidityNamespace {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const params = { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 };
+ * const params = { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 };
  * const est = models.monteCarlo.priceHeston(100, 100, 1.0, params, true, {
  *   num_paths: 5000,
  *   seed: 42,
@@ -5863,7 +5863,7 @@ export interface ModelsMonteCarloNamespace {
    *
    * Throws a `validation` error if `params` does not match
    * `HestonPricingParams` (non-finite `r`/`q`, non-positive or non-finite
-   * `kappa`, `theta`, `sigma_v` or `v0`, `rho` outside `[-1, 1]`) or
+   * `kappa`, `theta`, `vol_of_vol` or `v0`, `rho` outside `[-1, 1]`) or
    * `settings` does not match `HestonMcSettings` (unknown currency, a
    * fractional or out-of-range count), if the embedded defaults cannot be
    * loaded, the expiry, step count, path count or computed discount factor
@@ -5875,7 +5875,7 @@ export interface ModelsMonteCarloNamespace {
    * @param spot - Current spot price or exchange rate in the same units as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
    * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield, decimal), `v0` (initial instantaneous variance), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (annualized volatility of variance) and `rho` (asset/variance shock correlation in `[-1, 1]`).
+   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield, decimal), `v0` (initial instantaneous variance), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `vol_of_vol` (annualized volatility of variance) and `rho` (asset/variance shock correlation in `[-1, 1]`).
    * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @param settings - Optional `HestonMcSettings` object or JSON text; every key may be omitted and an omitted key uses the Rust registry European-pricer default: `num_paths` (independent path estimators in `[2, 10000000]`, each antithetic pair counts once; default 100 000), `seed` (Philox root seed, number or BigInt), `num_steps` (positive time steps per path) and `currency` (ISO-4217 code stamped on the estimate).
    *
@@ -5885,7 +5885,7 @@ export interface ModelsMonteCarloNamespace {
    * await init();
    * const estimate = models.monteCarlo.priceHeston(
    *   100, 100, 1.0,
-   *   { r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
+   *   { r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 },
    *   true,
    *   { num_paths: 2000, seed: 42, num_steps: 16 },
    * );
@@ -5913,7 +5913,7 @@ export interface ModelsMonteCarloNamespace {
    * validates every field. For rough Bergomi, `xi.values` contains annual variance
    * rates (0.04 for 20% volatility). Cheyette `sigma_base.amplitudes` contains
    * ordered `[time, rate_volatility]` pairs (0.005 for a 50 basis point amplitude).
-   * @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
+   * @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout (Heston and rough Heston take `[spot]`, using `v0` for variance), `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
    * @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
    *
    * @example
@@ -7174,7 +7174,7 @@ export interface ModelsNamespace {
    * @param spot - Current spot price in the same units as the strike.
    * @param strike - Option strike price.
    * @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
-   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
+   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `vol_of_vol` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
    * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    *
    * # Errors
@@ -7187,7 +7187,7 @@ export interface ModelsNamespace {
    * @example
    * ```javascript
    * const price = models.hestonPrice(100, 100, 1.0, {
-   *   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7,
+   *   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7,
    * });
    * // price ≈ 9.24
    * ```

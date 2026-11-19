@@ -19,7 +19,7 @@ fn resolve_heston_settings(
     // Gaussian short-time bound. Neither bound alone covers both regimes.
     let c_inf = (1.0 - params.model.rho * params.model.rho).sqrt()
         * (params.model.v0 + params.model.kappa * params.model.theta * time)
-        / params.model.sigma_v;
+        / params.model.vol_of_vol;
     settings.u_max = settings.u_max.max(HESTON_TAIL_LOG_TARGET / c_inf);
     settings.panels = settings.u_max.ceil() as usize;
     settings
@@ -60,7 +60,7 @@ fn resolve_heston_settings(
 ///     0.02,  // dividend yield
 ///     2.0,   // kappa (mean reversion)
 ///     0.04,  // theta (long-run variance)
-///     0.3,   // sigma_v (vol-of-vol)
+///     0.3,   // vol_of_vol (vol-of-vol)
 ///     -0.7,  // rho (correlation)
 ///     0.04,  // v0 (initial variance)
 /// )
@@ -93,7 +93,7 @@ pub(super) fn validate_heston_inputs(
         ("v0", params.model.v0),
         ("kappa", params.model.kappa),
         ("theta", params.model.theta),
-        ("sigma_v", params.model.sigma_v),
+        ("vol_of_vol", params.model.vol_of_vol),
     ] {
         if !value.is_finite() || value <= 0.0 {
             return Err(Error::Validation(format!(

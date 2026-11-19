@@ -98,7 +98,7 @@ impl EquityOptionHestonPdePricer {
             q: cf_params.q,
             kappa: cf_params.model.kappa,
             theta_v: cf_params.model.theta,
-            sigma_v: cf_params.model.sigma_v,
+            vol_of_vol: cf_params.model.vol_of_vol,
             rho: cf_params.model.rho,
             strike: inst.strike,
             is_call,
@@ -138,7 +138,7 @@ impl EquityOptionHestonPdePricer {
         // Divide the small exponential factors first: sigma²/kappa can
         // overflow for valid near-zero kappa even though the variance has a
         // finite continuous limit.
-        let variance_bound = cf_params.model.sigma_v.powi(2)
+        let variance_bound = cf_params.model.vol_of_vol.powi(2)
             * (v0 * (initial_variance_factor / cf_params.model.kappa)
                 + 0.5
                     * theta_v

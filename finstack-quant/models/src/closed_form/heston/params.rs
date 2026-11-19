@@ -51,7 +51,7 @@ struct RawHestonPricingParams {
     /// Long-run variance.
     theta: f64,
     /// Vol-of-vol.
-    sigma_v: f64,
+    vol_of_vol: f64,
     /// Spot-variance correlation.
     rho: f64,
 }
@@ -65,7 +65,7 @@ impl TryFrom<RawHestonPricingParams> for HestonPricingParams {
             raw.q,
             raw.kappa,
             raw.theta,
-            raw.sigma_v,
+            raw.vol_of_vol,
             raw.rho,
             raw.v0,
         )
@@ -81,7 +81,7 @@ impl HestonPricingParams {
     /// * `q` - Continuous dividend yield in decimal annual units
     /// * `kappa` - Mean-reversion speed of the stochastic volatility or short-rate factor
     /// * `theta` - Long-run mean level of the mean-reverting stochastic factor
-    /// * `sigma_v` - Volatility-of-variance parameter for the Heston-style variance process
+    /// * `vol_of_vol` - Volatility-of-variance parameter for the Heston-style variance process
     /// * `rho` - Instantaneous correlation between Brownian drivers, in `(-1, 1)`
     /// * `v0` - Initial variance level for the stochastic volatility process at time zero
     pub fn new(
@@ -89,7 +89,7 @@ impl HestonPricingParams {
         q: f64,
         kappa: f64,
         theta: f64,
-        sigma_v: f64,
+        vol_of_vol: f64,
         rho: f64,
         v0: f64,
     ) -> finstack_quant_core::Result<Self> {
@@ -106,7 +106,7 @@ impl HestonPricingParams {
         Ok(Self {
             r,
             q,
-            model: HestonParams::new(v0, kappa, theta, sigma_v, rho)?,
+            model: HestonParams::new(v0, kappa, theta, vol_of_vol, rho)?,
         })
     }
 }

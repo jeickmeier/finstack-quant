@@ -113,10 +113,10 @@ fn validate_heston_controls() {
         option_type: OptionType::Call,
     })
     .expect("valid Black-Scholes limit control");
-    // This is an independent closed-form control, with the O(sigma_v)
+    // This is an independent closed-form control, with the O(vol_of_vol)
     // correction bound used by the model's deterministic-limit regression.
     assert!(
-        heston.is_finite() && (heston - reference).abs() < 20.0 * params.model.sigma_v + 1e-9,
+        heston.is_finite() && (heston - reference).abs() < 20.0 * params.model.vol_of_vol + 1e-9,
         "Heston deterministic-limit disagreement: {heston} vs {reference}"
     );
 }

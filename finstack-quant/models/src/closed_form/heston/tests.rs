@@ -110,13 +110,13 @@ fn test_black_scholes_limit() {
     let vol = 0.2;
     let variance = vol * vol;
 
-    // Heston with very small sigma_v should match Black-Scholes
+    // Heston with very small vol_of_vol should match Black-Scholes
     let params = HestonPricingParams::new(
         0.05,     // r
         0.0,      // q
-        2.0,      // kappa (doesn't matter when sigma_v=0)
+        2.0,      // kappa (doesn't matter when vol_of_vol=0)
         variance, // theta = v0 for consistency
-        1e-12,    // sigma_v ≈ 0
+        1e-12,    // vol_of_vol ≈ 0
         0.0,      // rho
         variance, // v0
     )
@@ -145,7 +145,7 @@ fn test_reference_typical_params() {
         0.0,  // q
         2.0,  // kappa
         0.04, // theta
-        0.3,  // sigma_v
+        0.3,  // vol_of_vol
         -0.5, // rho
         0.04, // v0
     )
@@ -556,7 +556,7 @@ fn long_dated_high_kappa_theta_does_not_fall_back_to_bs() {
     );
 }
 
-/// The sigma_v -> 0 Fourier limit uses the time-averaged variance, not v0.
+/// The vol_of_vol -> 0 Fourier limit uses the time-averaged variance, not v0.
 /// With v0=0.01, theta=0.09, kappa=2, T=1 these differ materially.
 #[test]
 fn small_vol_of_vol_uses_deterministic_avg_variance_not_v0() {
@@ -769,9 +769,9 @@ fn heston_short_expiry_defaults_match_converged_reference_prices() {
 #[test]
 fn heston_small_vol_of_vol_is_continuous_to_deterministic_variance() {
     for (v0, theta) in [(0.04, 0.04), (0.01, 0.09)] {
-        for sigma_v in [1e-5, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12] {
-            let params =
-                HestonPricingParams::new(0.05, 0.0, 2.0, theta, sigma_v, -0.7, v0).expect("valid");
+        for vol_of_vol in [1e-5, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12] {
+            let params = HestonPricingParams::new(0.05, 0.0, 2.0, theta, vol_of_vol, -0.7, v0)
+                .expect("valid");
             let expected = black_scholes_call(
                 100.0,
                 100.0,
@@ -782,11 +782,11 @@ fn heston_small_vol_of_vol_is_continuous_to_deterministic_variance() {
             );
             let actual = heston_call_price_fourier(100.0, 100.0, 1.0, &params, None)
                 .expect("converged near-deterministic Heston price");
-            // Correlation produces a genuine O(sigma_v) correction; the
-            // numerical error must not grow as sigma_v tends to zero.
+            // Correlation produces a genuine O(vol_of_vol) correction; the
+            // numerical error must not grow as vol_of_vol tends to zero.
             assert!(
-                (actual - expected).abs() < 20.0 * sigma_v + 1e-9,
-                "sigma_v={sigma_v}, actual={actual}, expected={expected}"
+                (actual - expected).abs() < 20.0 * vol_of_vol + 1e-9,
+                "vol_of_vol={vol_of_vol}, actual={actual}, expected={expected}"
             );
         }
     }
@@ -813,7 +813,7 @@ fn heston_pricing_params_serde_is_flat_and_strict() {
         json,
         serde_json::json!({
             "r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0,
-            "theta": 0.04, "sigma_v": 0.3, "rho": -0.7
+            "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7
         })
     );
     let back: HestonPricingParams = serde_json::from_value(json).expect("round-trip");
@@ -821,11 +821,10 @@ fn heston_pricing_params_serde_is_flat_and_strict() {
     assert_eq!(back.q, params.q);
     assert_eq!(back.model, params.model);
 
-    let unknown =
-        r#"{"r":0.05,"q":0.02,"v0":0.04,"kappa":2.0,"theta":0.04,"sigma_v":0.3,"rho":-0.7,"x":1}"#;
+    let unknown = r#"{"r":0.05,"q":0.02,"v0":0.04,"kappa":2.0,"theta":0.04,"vol_of_vol":0.3,"rho":-0.7,"x":1}"#;
     assert!(serde_json::from_str::<HestonPricingParams>(unknown).is_err());
 
     let bad_rho =
-        r#"{"r":0.05,"q":0.02,"v0":0.04,"kappa":2.0,"theta":0.04,"sigma_v":0.3,"rho":1.5}"#;
+        r#"{"r":0.05,"q":0.02,"v0":0.04,"kappa":2.0,"theta":0.04,"vol_of_vol":0.3,"rho":1.5}"#;
     assert!(serde_json::from_str::<HestonPricingParams>(bad_rho).is_err());
 }

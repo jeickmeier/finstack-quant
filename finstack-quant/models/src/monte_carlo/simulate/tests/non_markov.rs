@@ -66,7 +66,7 @@ fn rough_heston_params() -> RoughHestonParams {
             v0: 0.04,
             kappa: 2.0,
             theta: 0.04,
-            sigma_v: 0.3,
+            vol_of_vol: 0.3,
             rho: -0.7,
         },
     }
@@ -93,10 +93,7 @@ fn processes() -> Vec<(ProcessSpec, Vec<f64>)> {
             ProcessSpec::RoughBergomi(rough_bergomi_params()),
             vec![100.0],
         ),
-        (
-            ProcessSpec::RoughHeston(rough_heston_params()),
-            vec![100.0, 0.04],
-        ),
+        (ProcessSpec::RoughHeston(rough_heston_params()), vec![100.0]),
         (
             ProcessSpec::CheyetteRough(cheyette_params()),
             vec![0.0, 0.0],
@@ -148,20 +145,25 @@ fn tags_shapes_and_factor_names_follow_the_state_layout() {
     for ((process, x0), (tag, names)) in processes().into_iter().zip(expected) {
         assert_eq!(serde_json::to_value(&process).unwrap()["type"], tag);
         assert_eq!(process.tag(), tag);
+        let mut opening = x0.clone();
+        if let ProcessSpec::RoughHeston(params) = &process {
+            opening.push(params.model.v0);
+        }
         let mut s = spec(process, &x0, STEPS);
+        let dim = opening.len();
         s.num_paths = 5;
         for antithetic in [false, true] {
             s.antithetic = antithetic;
             let out = simulate_paths(&s).unwrap();
             let stored = if antithetic { 10 } else { 5 };
             assert_eq!(out.factor_names, names, "{tag}");
-            assert_eq!(out.dim, x0.len(), "{tag}");
+            assert_eq!(out.dim, dim, "{tag}");
             assert_eq!(out.num_paths, 5);
             assert_eq!(out.num_simulated_paths, stored);
             assert_eq!(out.times.len(), STEPS + 1);
-            assert_eq!(out.values.len(), stored * (STEPS + 1) * x0.len());
-            for path in out.values.chunks((STEPS + 1) * x0.len()) {
-                assert_eq!(path[..x0.len()], x0[..], "{tag}");
+            assert_eq!(out.values.len(), stored * (STEPS + 1) * dim);
+            for path in out.values.chunks((STEPS + 1) * dim) {
+                assert_eq!(path[..dim], opening[..], "{tag}");
             }
         }
     }
@@ -455,11 +457,7 @@ fn lmm_streams_match_the_pricer_loop() {
 /// pricer's `expiry · i / n` kernel times.
 #[test]
 fn rough_heston_streams_match_the_engine() {
-    let mut s = spec(
-        ProcessSpec::RoughHeston(rough_heston_params()),
-        &[100.0, 0.04],
-        6,
-    );
+    let mut s = spec(ProcessSpec::RoughHeston(rough_heston_params()), &[100.0], 6);
     s.num_paths = 8;
     let process = RoughHestonProcess::new(rough_heston_params());
     let times: Vec<f64> = (0..=6).map(|i| 1.0 * i as f64 / 6.0).collect();
@@ -514,7 +512,7 @@ fn rough_bergomi_spot_recovers_the_forward_under_every_generator() {
 fn rough_heston_variance_is_non_negative_and_spot_recovers_the_forward() {
     let mut s = spec(
         ProcessSpec::RoughHeston(rough_heston_params()),
-        &[100.0, 0.04],
+        &[100.0],
         16,
     );
     s.num_paths = N;
@@ -672,12 +670,12 @@ fn initial_states_must_agree_with_the_parameters() {
 
     let mut s = spec(
         ProcessSpec::RoughHeston(rough_heston_params()),
-        &[100.0, 0.05],
+        &[100.0, 0.04],
         STEPS,
     );
     s.num_paths = 2;
     assert!(error_message(&s).contains("v0"));
-    s.initial_state = vec![-1.0, 0.04];
+    s.initial_state = vec![-1.0];
     assert!(error_message(&s).contains("strictly positive"));
 
     let mut s = spec(
@@ -703,11 +701,11 @@ fn out_of_range_parameters_and_grids_are_errors() {
 
     let mut heston = rough_heston_params();
     heston.model.kappa = 0.0;
-    assert!(run(ProcessSpec::RoughHeston(heston), &[100.0, 0.04]).contains("kappa"));
+    assert!(run(ProcessSpec::RoughHeston(heston), &[100.0]).contains("kappa"));
     // The hybrid kernel is defined for rough exponents only.
     let mut heston = rough_heston_params();
     heston.hurst = HurstExponent::new(0.6).unwrap();
-    assert!(run(ProcessSpec::RoughHeston(heston), &[100.0, 0.04]).contains("Hurst"));
+    assert!(run(ProcessSpec::RoughHeston(heston), &[100.0]).contains("Hurst"));
 
     let mut cheyette = cheyette_params();
     cheyette.rho = 1.5;
@@ -728,7 +726,7 @@ fn out_of_range_parameters_and_grids_are_errors() {
     // Quadratic generator and kernel storage is bounded before allocation.
     let mut s = spec(
         ProcessSpec::RoughHeston(rough_heston_params()),
-        &[100.0, 0.04],
+        &[100.0],
         8_001,
     );
     s.num_paths = 1;

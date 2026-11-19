@@ -1506,10 +1506,6 @@ export type ProcessSpec =
        */
       rho: number;
       /**
-       * Vol-of-vol.
-       */
-      sigma_v: number;
-      /**
        * Long-run variance.
        */
       theta: number;
@@ -1518,6 +1514,10 @@ export type ProcessSpec =
        * Initial variance.
        */
       v0: number;
+      /**
+       * Vol-of-vol.
+       */
+      vol_of_vol: number;
     }
   | {
       /**
@@ -1655,10 +1655,6 @@ export type ProcessSpec =
        */
       rho: number;
       /**
-       * Volatility of variance — vol-of-vol (σᵥ > 0).
-       */
-      sigma_v: number;
-      /**
        * Long-run variance level (θ > 0).
        */
       theta: number;
@@ -1667,6 +1663,10 @@ export type ProcessSpec =
        * Initial variance (v₀ > 0).
        */
       v0: number;
+      /**
+       * Volatility of variance — vol-of-vol (σᵥ > 0).
+       */
+      vol_of_vol: number;
     }
   | (CheyetteRoughVolParams & {
       type: "cheyette_rough";
@@ -4198,10 +4198,6 @@ export interface HestonParams {
    */
   rho: number;
   /**
-   * Vol-of-vol.
-   */
-  sigma_v: number;
-  /**
    * Long-run variance.
    */
   theta: number;
@@ -4209,6 +4205,10 @@ export interface HestonParams {
    * Initial variance.
    */
   v0: number;
+  /**
+   * Vol-of-vol.
+   */
+  vol_of_vol: number;
 }
 /**
  * Market inputs for closed-form Heston pricing.
@@ -4231,10 +4231,6 @@ export interface HestonPricingParams {
    */
   rho: number;
   /**
-   * Vol-of-vol.
-   */
-  sigma_v: number;
-  /**
    * Long-run variance.
    */
   theta: number;
@@ -4242,6 +4238,10 @@ export interface HestonPricingParams {
    * Initial variance.
    */
   v0: number;
+  /**
+   * Vol-of-vol.
+   */
+  vol_of_vol: number;
 }
 /**
  * Validated Hull-White one-factor process parameters.
@@ -5326,7 +5326,8 @@ export interface PathSimulationSpec {
   fbm?: FbmSpec | null;
   /**
    * State at time zero, in the layout documented on the [`ProcessSpec`]
-   * variant. Its length must equal the process dimension.
+   * variant. Heston and rough Heston take only spot here and use their
+   * own `v0` for the starting variance.
    */
   initial_state: number[];
   /**
@@ -6097,10 +6098,6 @@ export interface RoughHestonFourierParams {
    */
   rho: number;
   /**
-   * Vol-of-vol.
-   */
-  sigma_v: number;
-  /**
    * Long-run variance.
    */
   theta: number;
@@ -6108,6 +6105,10 @@ export interface RoughHestonFourierParams {
    * Initial variance.
    */
   v0: number;
+  /**
+   * Vol-of-vol.
+   */
+  vol_of_vol: number;
 }
 /**
  * Rough Heston model parameters.
@@ -6134,10 +6135,6 @@ export interface RoughHestonParams {
    */
   rho: number;
   /**
-   * Volatility of variance — vol-of-vol (σᵥ > 0).
-   */
-  sigma_v: number;
-  /**
    * Long-run variance level (θ > 0).
    */
   theta: number;
@@ -6145,6 +6142,10 @@ export interface RoughHestonParams {
    * Initial variance (v₀ > 0).
    */
   v0: number;
+  /**
+   * Volatility of variance — vol-of-vol (σᵥ > 0).
+   */
+  vol_of_vol: number;
 }
 /**
  * Calibrated SABR parameters and deterministic solver diagnostics.

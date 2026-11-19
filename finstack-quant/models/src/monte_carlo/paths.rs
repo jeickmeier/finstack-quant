@@ -582,15 +582,15 @@ mod tests {
         let mut params = ProcessParams::new("Heston");
         params.add_param("theta", 0.04);
         params.add_param("kappa", 2.0);
-        params.add_param("sigma_v", 0.3);
+        params.add_param("vol_of_vol", 0.3);
 
         let json = serde_json::to_string(&params).expect("serialize process params");
 
         let kappa_idx = json.find("\"kappa\"").expect("kappa key present");
-        let sigma_idx = json.find("\"sigma_v\"").expect("sigma_v key present");
+        let vol_of_vol_idx = json.find("\"vol_of_vol\"").expect("vol_of_vol key present");
         let theta_idx = json.find("\"theta\"").expect("theta key present");
-        assert!(kappa_idx < sigma_idx);
-        assert!(sigma_idx < theta_idx);
+        assert!(kappa_idx < theta_idx);
+        assert!(theta_idx < vol_of_vol_idx);
     }
 
     #[test]

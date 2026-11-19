@@ -377,7 +377,7 @@ hc = price_heston(
     100.0,
     100.0,
     1.0,
-    {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.30, "rho": -0.70},
+    {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.30, "rho": -0.70},
     True,
     {"num_paths": 20_000, "seed": 42},
 )
@@ -385,7 +385,7 @@ hp = price_heston(
     100.0,
     100.0,
     1.0,
-    {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.30, "rho": -0.70},
+    {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.30, "rho": -0.70},
     False,
     {"num_paths": 20_000, "seed": 42},
 )
@@ -464,7 +464,7 @@ outside_feller = price_heston(
         "v0": initial_variance,
         "kappa": kappa,
         "theta": theta,
-        "sigma_v": xi,
+        "vol_of_vol": xi,
         "rho": -0.7,
     },
     True,

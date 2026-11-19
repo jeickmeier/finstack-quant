@@ -6,7 +6,7 @@ import * as wasm from '../../pkg/finstack_quant_wasm.js';
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const params = { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 };
+ * const params = { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 };
  * const est = models.monteCarlo.priceHeston(100, 100, 1.0, params, true, {
  *   num_paths: 5000,
  *   seed: 42,
