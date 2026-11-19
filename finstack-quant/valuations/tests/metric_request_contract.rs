@@ -67,8 +67,10 @@ fn market(as_of: Date) -> MarketContext {
     fx.set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("EURUSD quote fixture");
     MarketContext::new()
-        .insert(usd)
-        .insert(eur)
+        .try_insert(usd)
+        .expect("insert market curve")
+        .try_insert(eur)
+        .expect("insert market curve")
         .insert_fx(FxMatrix::new(fx, None))
 }
 

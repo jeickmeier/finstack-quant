@@ -689,6 +689,7 @@ export type MarketDatum =
        * Option expiries in years, strictly increasing. Indexes the first axis.
        */
       expiries: number[];
+      expiry_clock?: VolatilityClock | null;
       /**
        * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
        */
@@ -1721,8 +1722,9 @@ export type SwaptionVolConvention =
   | {
       shifted_lognormal: {
         /**
-         * Finite positive additive shift in decimal rate units, applied to
+         * Finite signed additive shift in decimal rate units, applied to
          * both forwards and strikes and retained in calibrated artifacts.
+         * The effective forward and strikes must be positive.
          */
         shift: number;
         [k: string]: unknown;
@@ -1988,6 +1990,10 @@ export type PriorMarketObject =
        */
       base: valuations.DateWire;
       /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
+      /**
        * Day count convention
        */
       day_count: valuations.DayCount;
@@ -2009,19 +2015,19 @@ export type PriorMarketObject =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
     }
   | {
       /**
        * Base date
        */
       base: valuations.DateWire;
+      /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
       /**
        * Day count convention
        */
@@ -2044,13 +2050,9 @@ export type PriorMarketObject =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
     }
   | {
       /**
@@ -2266,6 +2268,12 @@ export type RateCalibrationCurveRole =
       };
     };
 /**
+ * Level family a [`PriceCurve`] represents.
+ *
+ * The kind determines level validation and the typed market-context lookup.
+ */
+export type PriceCurveKind = "price" | "vol_index";
+/**
  * Semantic meaning of the secondary axis on a [`VolSurface`].
  *
  * Most option surfaces are defined on `expiry × strike`, but some calibration
@@ -2357,25 +2365,6 @@ export type FittedSliceParameters =
       svi: SviParams;
     };
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
-/**
- * Finite JSON number in the closed interval `[0, 1]`.
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
- * Finite JSON number greater than or equal to zero.
- */
-export type NonNegativeF64Wire = number;
-/**
- * Finite correlation coefficient in the closed interval `[-1, 1]`.
- */
-export type CorrelationWire = number;
-/**
  * Units of the residuals in [`CalibrationReport::residuals`],
  * [`CalibrationReport::max_residual`] and [`CalibrationReport::rmse`].
  *
@@ -2393,6 +2382,13 @@ export type ResidualUnits =
  * There is no default mode: every financial rounding names one explicitly.
  */
 export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ */
+export type PositiveF64Wire = number;
 /**
  * Numerical procedure that produced a [`CalibrationReport`].
  *
@@ -2597,6 +2593,10 @@ export type CurveState =
        */
       base: valuations.DateWire;
       /**
+       * Registered holiday calendar for the source clock.
+       */
+      calendar_id?: string | null;
+      /**
        * Day count convention
        */
       day_count: valuations.DayCount;
@@ -2617,13 +2617,9 @@ export type CurveState =
        */
       knot_points: [number, number][];
       /**
-       * Spot index level (volatility index curves)
+       * Native level family.
        */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
+      level_kind: PriceCurveKind;
       type: "price";
     }
   | {
@@ -5526,29 +5522,29 @@ export interface FittedSlice {
   parameters: FittedSliceParameters;
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface SabrParameters {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
-  alpha: PositiveF64Wire;
+  alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
-  beta: ClosedUnitIntervalF64Wire;
+  beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
-  nu: NonNegativeF64Wire;
+  nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
-  rho: CorrelationWire;
+  rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: PositiveF64Wire | null;
+  shift?: number | null;
 }
 /**
  * SVI (Stochastic Volatility Inspired) raw parameterization.
@@ -6041,6 +6037,7 @@ export interface VolCube {
    * Option expiries in years, strictly increasing. Indexes the first axis.
    */
   expiries: number[];
+  expiry_clock?: VolatilityClock | null;
   /**
    * Row-major: forwards[expiry_idx * n_tenors + tenor_idx]
    */

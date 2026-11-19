@@ -369,7 +369,9 @@ fn test_fi_index_trs_sensitivity_to_interest_rates() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    market_shifted = market_shifted.insert(disc_shifted);
+    market_shifted = market_shifted
+        .try_insert(disc_shifted)
+        .expect("insert market curve");
 
     let fwd_shifted =
         finstack_quant_core::market_data::term_structures::ForwardCurve::builder("USD-SOFR-3M")
@@ -390,7 +392,9 @@ fn test_fi_index_trs_sensitivity_to_interest_rates() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    market_shifted = market_shifted.insert(fwd_shifted);
+    market_shifted = market_shifted
+        .try_insert(fwd_shifted)
+        .expect("insert market curve");
     market_shifted = market_shifted.insert_price(
         "HY-INDEX-YIELD",
         MarketScalar::unitless(0.055).expect("valid scalar"),
@@ -600,8 +604,10 @@ fn test_fi_index_trs_analytical_flat_rate_flat_yield() {
     let fwd = ForwardCurve::flat("USD-SOFR-3M", as_of, flat_rate, DayCount::Act360).unwrap();
 
     let market = MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_price(
             "HY-INDEX-YIELD",
             MarketScalar::unitless(index_yield).expect("valid scalar"),
@@ -688,7 +694,7 @@ fn test_fi_index_trs_errors_on_missing_configured_yield() {
 
     // Market context has curves but deliberately omits the yield scalar
     let market = MarketContext::new()
-        .insert(
+        .try_insert(
             finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots(vec![(0.0, 1.0), (1.0, 0.98)])
@@ -698,7 +704,8 @@ fn test_fi_index_trs_errors_on_missing_configured_yield() {
                 .build()
                 .unwrap(),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
                 "USD-SOFR-3M",
                 as_of,
@@ -706,7 +713,8 @@ fn test_fi_index_trs_errors_on_missing_configured_yield() {
                 finstack_quant_core::dates::DayCount::Act365F,
             )
             .unwrap(),
-        );
+        )
+        .expect("insert market curve");
     // NOTE: "MISSING-YIELD" is NOT inserted into the market context
 
     let trs = TestFIIndexTrsBuilder::new()
@@ -916,7 +924,8 @@ fn seasoned_fi_trs(
         .build()
         .expect("curve");
     let market = MarketContext::new()
-        .insert(disc)
+        .try_insert(disc)
+        .expect("insert market curve")
         .insert_price(
             "HY-INDEX-YIELD",
             MarketScalar::unitless(0.05).expect("valid scalar"),

@@ -102,8 +102,10 @@ fn test_missing_fx_matrix() {
             .unwrap();
 
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve);
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve");
     // No FX matrix!
 
     let swap = create_standard_fx_swap(
@@ -146,8 +148,10 @@ fn test_missing_fx_matrix_with_contract_rates() {
             .unwrap();
 
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve);
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve");
 
     let swap = create_fx_swap_with_rates(
         "NO_FX_WITH_RATES",

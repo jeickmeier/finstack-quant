@@ -157,7 +157,7 @@ for name in ["WTI","NG"]:
         carry_rows.append({"commodity":name,"years":t,"net_convenience_yield_y_minus_storage":net_yield})
 print(pd.DataFrame(carry_rows))
 flat_market=tracks.build_market("vol")
-flat_market.insert(PriceCurve("WTI-FORWARD",AS_OF,[(0.,75.),(2.,75.)]))
+flat_market.insert(PriceCurve({"id": "WTI-FORWARD", "base_date": AS_OF, "knots": [(0.,75.),(2.,75.)], "kind": "price", "day_count": "act_365f", "interp": "linear", "extrapolation": "flat"}))
 matched_vanilla=deepcopy(inputs["WTI-CALL"])
 matched_vanilla["instrument"]["spec"]["expiry"]=inputs["WTI-ASIAN"]["instrument"]["spec"]["expiry"]
 vanilla=price_instrument(json.dumps(matched_vanilla),flat_market,AS_OF,model="black76").value.amount
@@ -199,7 +199,7 @@ swaption=instrument_envelope({"type":"commodity_swaption","spec":{
     "calendar_id":"weekends_only","business_day_convention":"modified_following","day_count":"act_365f","attributes":{}}})
 sloped_value=price_instrument(json.dumps(swaption),market,AS_OF,model="black76").value.amount
 flat=tracks.build_market("vol")
-flat.insert(PriceCurve("NG-FORWARD",AS_OF,[(0.,3.2),(2.,3.2)]))
+flat.insert(PriceCurve({"id": "NG-FORWARD", "base_date": AS_OF, "knots": [(0.,3.2),(2.,3.2)], "kind": "price", "day_count": "act_365f", "interp": "linear", "extrapolation": "flat"}))
 flat_value=price_instrument(json.dumps(swaption),flat,AS_OF,model="black76").value.amount
 # Two quarterly settlement quantities, not an annual interest-rate annuity: no tau.
 payments=[date(2025,9,16),date(2025,12,16)]
@@ -281,7 +281,7 @@ ng=market.get_price_curve("NG-FORWARD");front,back=ng.price(front_t),ng.price(ba
 calendar_rows=[]
 for name,f1,f2 in [("seasonal_curve",front,back),("flat_curve",3.2,3.2)]:
     m=tracks.build_market("vol")
-    m.insert(PriceCurve("NG-JUL25",AS_OF,[(0.,f1),(2.,f1)]));m.insert(PriceCurve("NG-JAN26",AS_OF,[(0.,f2),(2.,f2)]))
+    m.insert(PriceCurve({"id": "NG-JUL25", "base_date": AS_OF, "knots": [(0.,f1),(2.,f1)], "kind": "price", "day_count": "act_365f", "interp": "linear", "extrapolation": "flat"}));m.insert(PriceCurve({"id": "NG-JAN26", "base_date": AS_OF, "knots": [(0.,f2),(2.,f2)], "kind": "price", "day_count": "act_365f", "interp": "linear", "extrapolation": "flat"}))
     result=price_instrument(json.dumps(calendar),m,AS_OF,model="black76").value.amount
     calendar_rows.append({"curve":name,"Jul_forward":f1,"Jan_forward":f2,"calendar_call_USD":result})
 print(pd.DataFrame(calendar_rows))
@@ -327,7 +327,7 @@ z=np.random.default_rng(4242).standard_normal((100_000,2));error_rows=[]
 for sig1,sig2,rho,K in [(.8,.2,.99,0.),(.8,.8,.99,-5.),(.3,.28,.99,-74.9)]:
     m=tracks.build_market("vol");F=np.array([70.,75.]);vol=np.array([sig1,sig2])
     for name,f,v in zip(["WTI","BRENT"],F,vol):
-        m.insert(PriceCurve(name+"-FORWARD",AS_OF,[(0.,float(f)),(2.,float(f))]))
+        m.insert(PriceCurve({"id": name+"-FORWARD", "base_date": AS_OF, "knots": [(0.,float(f)),(2.,float(f))], "kind": "price", "day_count": "act_365f", "interp": "linear", "extrapolation": "flat"}))
         m.insert(VolSurface(name+"-VOL",[.25,1.],[1.,100.,200.],[[float(v)]*3]*2,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
     payload=deepcopy(inputs["WTI-BRENT-SPREAD"]);payload["instrument"]["spec"].update(correlation=rho,strike=K)
     approximate=price_instrument(json.dumps(payload),m,AS_OF,model="black76").value.amount

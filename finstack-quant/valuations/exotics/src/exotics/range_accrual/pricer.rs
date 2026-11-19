@@ -521,7 +521,7 @@ pub(crate) fn compute_pv(
                 return Ok((forward - k).max(0.0));
             }
             let (d1, d2) = d1_d2_black76(forward, k, vol, t_obs);
-            Ok(forward * norm_cdf(d1) - k * norm_cdf(d2))
+            Ok(forward * norm_cdf(d1)? - k * norm_cdf(d2)?)
         };
 
         // Digital call probability using finite-width call spread.
@@ -616,7 +616,8 @@ mod tests {
             .expect("surface");
 
         MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "SPX-SPOT",
@@ -703,7 +704,7 @@ mod tests {
         let inst = RangeAccrual::example().expect("example");
         let base_market = market(as_of);
         let no_div_market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -713,6 +714,7 @@ mod tests {
                     .build()
                     .expect("curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("SPX-VOL")
                     .secondary_axis(VolSurfaceAxis::Strike)
@@ -895,7 +897,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let curves = market(as_of).insert(curve);
+        let curves = market(as_of)
+            .try_insert(curve)
+            .expect("insert market curve");
         for (payment, df) in [(date(2026, 1, 1), 0.9), (date(2027, 1, 1), 0.8)] {
             inst.terms.payment_date = Some(payment);
             let expected = 1_000_000.0 * 0.1 * 182.0 / 360.0 * df;
@@ -933,7 +937,10 @@ mod tests {
             .row(&[0.0, 0.0, 0.0])
             .build()
             .expect("surface");
-        let curves = market(as_of).insert(curve).insert_surface(surface);
+        let curves = market(as_of)
+            .try_insert(curve)
+            .expect("insert market curve")
+            .insert_surface(surface);
         let full_coupon = 1_000_000.0 * 0.1 * 182.0 / 360.0;
         for (lower, upper, fraction) in [
             (100.0, 110.0, 1.0),
@@ -1005,7 +1012,9 @@ mod tests {
         let payment_df = curve.df_between_dates(as_of, second).expect("payment DF");
         inst.terms.lower_bound = first_forward - 0.0001;
         inst.terms.upper_bound = first_forward + 0.0001;
-        let curves = market(as_of).insert(curve);
+        let curves = market(as_of)
+            .try_insert(curve)
+            .expect("insert market curve");
         let expected = 1_000_000.0 * 0.1 * (29.0 / 360.0) * 0.5 * payment_df;
         let mc = RangeAccrualMcPricer::new()
             .price_internal(&inst, &curves, as_of)
@@ -1060,8 +1069,10 @@ mod tests {
             .build()
             .expect("FX vol");
         let curves = market(as_of)
-            .insert(payment_curve)
-            .insert(asset_curve)
+            .try_insert(payment_curve)
+            .expect("insert market curve")
+            .try_insert(asset_curve)
+            .expect("insert market curve")
             .insert_surface(fx_surface)
             .insert_price("SPX-DIV", MarketScalar::unitless(q).expect("valid scalar"))
             .insert_price("EURUSD", MarketScalar::unitless(1.1).expect("valid scalar"));
@@ -1093,7 +1104,9 @@ mod tests {
             let z_lower = ((100.0_f64 / forward).ln() + 0.5 * sigma * sigma * t) / std;
             let z_upper = ((120.0_f64 / forward).ln() + 0.5 * sigma * sigma * t) / std;
             let probability = finstack_quant_core::math::special_functions::norm_cdf(z_upper)
-                - finstack_quant_core::math::special_functions::norm_cdf(z_lower);
+                .expect("valid normal variate")
+                - finstack_quant_core::math::special_functions::norm_cdf(z_lower)
+                    .expect("valid normal variate");
             let expected = full_coupon * probability;
             let analytical = compute_pv(&inst, &curves, as_of)
                 .expect("quanto analytical")
@@ -1137,7 +1150,10 @@ mod tests {
             .row(&[0.0; 2])
             .build()
             .expect("zero vol");
-        let curves = market(as_of).insert(curve).insert_surface(zero_surface);
+        let curves = market(as_of)
+            .try_insert(curve)
+            .expect("insert market curve")
+            .insert_surface(zero_surface);
         // S/DF at the observation is exactly 100 / .8 = 125; payment DF is .75.
         let expected = 1_000_000.0 * 0.1 * (182.0 / 360.0) * 0.75;
         for (lower, upper) in [(125.0, 135.0), (115.0, 125.0)] {

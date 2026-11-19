@@ -72,19 +72,25 @@ pub fn usd_curve_at_rate(rate_bp: f64) -> DiscountCurve {
 /// Create a market context with a flat USD discount curve.
 #[allow(dead_code)]
 pub fn market_with_usd() -> MarketContext {
-    MarketContext::new().insert(usd_curve())
+    MarketContext::new()
+        .try_insert(usd_curve())
+        .expect("insert market curve")
 }
 
 /// Create a market context with USD curve at a specific rate level (in basis points).
 #[allow(dead_code)]
 pub fn market_with_usd_at_rate(rate_bp: f64) -> MarketContext {
-    MarketContext::new().insert(usd_curve_at_rate(rate_bp))
+    MarketContext::new()
+        .try_insert(usd_curve_at_rate(rate_bp))
+        .expect("insert market curve")
 }
 
 /// Create a market context with a flat EUR discount curve.
 #[allow(dead_code)]
 pub fn market_with_eur() -> MarketContext {
-    MarketContext::new().insert(eur_curve())
+    MarketContext::new()
+        .try_insert(eur_curve())
+        .expect("insert market curve")
 }
 
 /// Create a market context with EUR curve and an FX matrix at the given rate.

@@ -60,7 +60,10 @@ fn historical_sofr_coupon(start: Date, end: Date) -> f64 {
         finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .unwrap();
-    let market = MarketContext::new().insert(forward).insert_series(fixings);
+    let market = MarketContext::new()
+        .try_insert(forward)
+        .expect("insert market curve")
+        .insert_series(fixings);
     let spec = FloatingCouponSpec {
         rate_spec: FloatingRateSpec::sofr(dec!(0)),
         coupon_type: CouponType::Cash,

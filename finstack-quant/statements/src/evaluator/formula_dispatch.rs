@@ -143,10 +143,7 @@ pub(crate) fn evaluate_function(
             Ok(acc)
         }
 
-        // Element-wise math helpers. Semantics are shared with the core
-        // vector evaluator: `round`/`clamp` delegate to the
-        // `finstack_quant_core::math` helpers, the rest are plain IEEE 754
-        // `f64` operations, so the two layers cannot drift.
+        // Round and clamp share the checked decimal and interval helpers with core.
         Function::Pow => {
             require_args("pow", args, 2, node_id)?;
             let base = evaluate_formula(&args[0], context, node_id)?;
@@ -169,7 +166,11 @@ pub(crate) fn evaluate_function(
             } else {
                 0
             };
-            Ok(finstack_quant_core::math::round_half_away(value, digits))
+            if value.is_nan() {
+                return Ok(f64::NAN);
+            }
+            finstack_quant_core::math::round_half_away(value, digits)
+                .map_err(|error| eval_error(node_id, error.to_string()))
         }
 
         Function::Floor => {
@@ -207,7 +208,14 @@ pub(crate) fn evaluate_function(
             let value = evaluate_formula(&args[0], context, node_id)?;
             let lo = evaluate_formula(&args[1], context, node_id)?;
             let hi = evaluate_formula(&args[2], context, node_id)?;
-            Ok(finstack_quant_core::math::clamp_or_nan(value, lo, hi))
+            if [value, lo, hi].iter().any(|x| x.is_infinite()) {
+                return Err(eval_error(node_id, "clamp received an infinite operand"));
+            }
+            if [value, lo, hi].iter().any(|x| x.is_nan()) {
+                return Ok(f64::NAN);
+            }
+            finstack_quant_core::math::clamp(value, lo, hi)
+                .map_err(|error| eval_error(node_id, error.to_string()))
         }
 
         Function::IsMissing => {

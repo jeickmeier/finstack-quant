@@ -48,7 +48,11 @@ fn market() -> MarketContext {
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard");
-    MarketContext::new().insert(curve).insert(hazard)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
 }
 
 fn bond(id: &str, coupon: f64, maturity: Date) -> Bond {

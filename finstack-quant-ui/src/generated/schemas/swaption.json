@@ -225,12 +225,6 @@
         }
       ]
     },
-    "d_0d1f74f8f487020c0407": {
-      "description": "Finite JSON number greater than or equal to zero.",
-      "format": "double",
-      "minimum": 0,
-      "type": "number"
-    },
     "d_0da16f48ff9941483821": {
       "description": "Volatility convention (Black lognormal or Bachelier normal) used to price\na swaption. Wire values: `black`, `normal`.",
       "oneOf": [
@@ -1478,13 +1472,6 @@
         }
       ]
     },
-    "d_6772ff84bb100f4fa73d": {
-      "description": "Finite JSON number in the closed interval `[0, 1]`.",
-      "format": "double",
-      "maximum": 1,
-      "minimum": 0,
-      "type": "number"
-    },
     "d_69148dfad1155676d8a6": {
       "description": "Unit of a tenor period.",
       "oneOf": [
@@ -1509,12 +1496,6 @@
           "type": "string"
         }
       ]
-    },
-    "d_73b92f56cdc5ce046018": {
-      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
-      "exclusiveMinimum": 0,
-      "format": "double",
-      "type": "number"
     },
     "d_780b68ee5d41351b65ca": {
       "description": "Barrier monitoring type for default determination.",
@@ -1696,7 +1677,7 @@
         },
         "vol_surface_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Volatility surface ID for option pricing"
+          "description": "Volatility source ID for option pricing. A dated SABR cube needs an\nACT/365F expiry clock anchored at the valuation date."
         }
       },
       "required": [
@@ -2677,13 +2658,6 @@
       ],
       "title": "Id",
       "type": "string"
-    },
-    "d_9ce633eb1d1806a74a03": {
-      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
-      "format": "double",
-      "maximum": 1,
-      "minimum": -1,
-      "type": "number"
     },
     "d_ae5d75ed4e313ae3bc25": {
       "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |",
@@ -3865,20 +3839,24 @@
     },
     "d_cdb8fddc0106047270c4": {
       "additionalProperties": false,
-      "description": "A finite, left-continuous piecewise-constant curve.",
+      "description": "A finite, right-continuous piecewise-constant curve.",
       "properties": {
         "times": {
           "items": {
             "format": "double",
+            "minimum": 0,
             "type": "number"
           },
+          "minItems": 1,
           "type": "array"
         },
         "values": {
           "items": {
             "format": "double",
+            "minimum": 0,
             "type": "number"
           },
+          "minItems": 1,
           "type": "array"
         }
       },
@@ -3890,41 +3868,48 @@
     },
     "d_d09956c3320c77551bb5": {
       "additionalProperties": false,
-      "description": "SABR model parameters",
+      "description": "Parameters of a SABR backbone, with an optional signed rate displacement.",
       "properties": {
         "alpha": {
-          "$ref": "#/$defs/d_73b92f56cdc5ce046018",
-          "description": "Initial volatility (alpha)"
+          "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0,
+          "format": "double",
+          "type": "number"
         },
         "beta": {
-          "$ref": "#/$defs/d_6772ff84bb100f4fa73d",
-          "description": "CEV exponent (beta) - typically 0 to 1"
+          "description": "CEV exponent in the closed interval `[0, 1]`.",
+          "format": "double",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
         },
         "nu": {
-          "$ref": "#/$defs/d_0d1f74f8f487020c0407",
-          "description": "Volatility of volatility (nu/volvol)"
+          "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+          "format": "double",
+          "minimum": 0,
+          "type": "number"
         },
         "rho": {
-          "$ref": "#/$defs/d_9ce633eb1d1806a74a03",
-          "description": "Correlation between asset and volatility (rho)"
+          "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": -1,
+          "format": "double",
+          "type": "number"
         },
         "shift": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_73b92f56cdc5ce046018"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Shift parameter for handling negative rates (optional)"
+          "description": "Optional finite displacement applied to forward and strike.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "alpha",
         "beta",
-        "nu",
-        "rho"
+        "rho",
+        "nu"
       ],
       "type": "object"
     },

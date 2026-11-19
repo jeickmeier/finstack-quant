@@ -548,7 +548,7 @@ fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
         swap.fixed_leg.payment_lag_days = lag;
         swap.float_leg.payment_lag_days = lag;
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([
@@ -562,7 +562,8 @@ fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
                     .build()
                     .unwrap(),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat(
                     "USD-SOFR-3M",
                     as_of,
@@ -571,6 +572,7 @@ fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
                 )
                 .unwrap(),
             )
+            .expect("insert market curve")
             .insert_series(
                 ScalarTimeSeries::new(
                     "FIXING:USD-SOFR-3M",

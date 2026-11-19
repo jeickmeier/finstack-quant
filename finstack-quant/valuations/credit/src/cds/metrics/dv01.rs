@@ -47,7 +47,7 @@ pub(crate) fn discount_bumped_market(
             },
             "dv01",
         )?;
-        bumped_market = bumped_market.insert(bumped_discount.as_ref().clone());
+        bumped_market.try_insert_mut(bumped_discount.as_ref().clone())?;
     } else {
         bumped_market.apply_curve_bump_in_place(discount_id, BumpSpec::parallel_bp(bump_bp))?;
     }
@@ -99,7 +99,7 @@ pub(crate) fn rate_bumped_market_with_hazard_replay(
             },
             "dv01",
         )?;
-        bumped_market.insert_mut(Arc::clone(&recalibrated));
+        bumped_market.try_insert_mut(Arc::clone(&recalibrated))?;
         rebuilt.push(recalibrated);
     }
     Ok((bumped_market, rebuilt))

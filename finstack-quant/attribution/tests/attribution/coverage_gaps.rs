@@ -59,7 +59,9 @@ fn coupon_payment_inside_window_keeps_total_return_identity() {
 
     // IDENTICAL markets (the same curve object on both dates): every market
     // factor is zero and the entire P&L is the date roll + the coupon.
-    let market = MarketContext::new().insert(flat_discount("USD-OIS", as_of_t0, 0.04));
+    let market = MarketContext::new()
+        .try_insert(flat_discount("USD-OIS", as_of_t0, 0.04))
+        .expect("insert market curve");
 
     let attribution = attribute_pnl(
         &AttributionMethod::Parallel,
@@ -145,8 +147,12 @@ fn negative_rates_regime_attribution_succeeds() {
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
 
     // -50bp → -40bp: rates rise (less negative).
-    let market_t0 = MarketContext::new().insert(flat_discount("EUR-OIS", as_of_t0, -0.0050));
-    let market_t1 = MarketContext::new().insert(flat_discount("EUR-OIS", as_of_t1, -0.0040));
+    let market_t0 = MarketContext::new()
+        .try_insert(flat_discount("EUR-OIS", as_of_t0, -0.0050))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(flat_discount("EUR-OIS", as_of_t1, -0.0040))
+        .expect("insert market curve");
 
     let attribution = attribute_pnl(
         &AttributionMethod::Parallel,
@@ -201,11 +207,15 @@ fn metrics_based_attributes_forward_curve_basis_move() {
 
     // Discount unchanged; forward +10bp — a pure basis move.
     let market_t0 = MarketContext::new()
-        .insert(flat_discount("USD-OIS", as_of_t0, 0.04))
-        .insert(fwd(as_of_t0, 0.0200));
+        .try_insert(flat_discount("USD-OIS", as_of_t0, 0.04))
+        .expect("insert market curve")
+        .try_insert(fwd(as_of_t0, 0.0200))
+        .expect("insert market curve");
     let market_t1 = MarketContext::new()
-        .insert(flat_discount("USD-OIS", as_of_t1, 0.04))
-        .insert(fwd(as_of_t1, 0.0210));
+        .try_insert(flat_discount("USD-OIS", as_of_t1, 0.04))
+        .expect("insert market curve")
+        .try_insert(fwd(as_of_t1, 0.0210))
+        .expect("insert market curve");
 
     let instrument: Arc<dyn Instrument> = Arc::new(
         TestInstrument::new(

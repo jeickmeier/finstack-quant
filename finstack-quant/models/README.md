@@ -485,7 +485,7 @@ where they apply.
 
 **New discretization** — implement `Discretization<P>`. Prefer an exact scheme
 when an analytical transition exists; otherwise document stability and positivity
-assumptions. Override `work_size()` for scratch space, `prepare()` for
+assumptions. Return model and curve evaluation errors from `step()` so path generation stops before recording an invalid observation. Override `work_size()` for scratch space, `prepare()` for
 grid-dependent precomputation, `applies_correlation_internally()` when the scheme
 handles correlation itself, and `scheme_id()` for dedicated-scheme pairing.
 

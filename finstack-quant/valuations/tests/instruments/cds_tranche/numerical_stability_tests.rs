@@ -35,7 +35,8 @@ fn flat_correlation_market(level: f64) -> finstack_quant_core::market_data::cont
         .build()
         .unwrap();
     standard_market_context()
-        .insert(std::sync::Arc::clone(index.base_correlation_curve()))
+        .try_insert(std::sync::Arc::clone(index.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", index)
         .expect("flat-correlation credit index dependencies should exist")
 }
@@ -180,7 +181,8 @@ fn test_extreme_low_correlation_pricing() {
         .unwrap();
 
     let market = base_market
-        .insert(std::sync::Arc::clone(test_index.base_correlation_curve()))
+        .try_insert(std::sync::Arc::clone(test_index.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", test_index)
         .expect("low-correlation credit index dependencies should exist");
 
@@ -221,7 +223,8 @@ fn test_extreme_high_correlation_pricing() {
         .unwrap();
 
     let market = base_market
-        .insert(std::sync::Arc::clone(test_index.base_correlation_curve()))
+        .try_insert(std::sync::Arc::clone(test_index.base_correlation_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", test_index)
         .expect("high-correlation credit index dependencies should exist");
 
@@ -340,7 +343,8 @@ fn test_pricing_with_near_zero_default_probability() {
             .unwrap();
 
     let market = base_market
-        .insert(std::sync::Arc::clone(low_hazard_index.index_credit_curve()))
+        .try_insert(std::sync::Arc::clone(low_hazard_index.index_credit_curve()))
+        .expect("insert market curve")
         .insert_credit_index("CDX.NA.IG.42", low_hazard_index)
         .expect("low-hazard credit index dependencies should exist");
 

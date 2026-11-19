@@ -103,7 +103,11 @@ fn test_par_rate_upward_sloping_curve() {
     let disc = build_flat_discount_curve(0.05, BASE_DATE, "USD_OIS");
     let fwd = build_upward_forward_curve(BASE_DATE, "USD_LIBOR_3M");
 
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let fra = create_standard_fra();
     let result = fra
@@ -131,7 +135,11 @@ fn test_par_rate_inverted_curve() {
     let disc = build_flat_discount_curve(0.05, BASE_DATE, "USD_OIS");
     let fwd = build_inverted_forward_curve(BASE_DATE, "USD_LIBOR_3M");
 
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let fra = create_standard_fra();
     let result = fra
@@ -252,7 +260,11 @@ fn test_par_rate_different_day_counts() {
 fn test_par_rate_negative_rate_environment() {
     let disc = build_flat_discount_curve(-0.01, BASE_DATE, "USD_OIS");
     let fwd = build_flat_forward_curve(-0.01, BASE_DATE, "USD_LIBOR_3M");
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     let fra = create_standard_fra();
     let result = fra

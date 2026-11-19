@@ -191,9 +191,15 @@ fn test_fx_attribution_parallel_internal_exposure() {
     let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.1 }), None);
     let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.2 }), None);
 
-    let market_t0 = MarketContext::new().insert(curve_t0).insert_fx(fx_t0);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve")
+        .insert_fx(fx_t0);
 
-    let market_t1 = MarketContext::new().insert(curve_t1).insert_fx(fx_t1);
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve")
+        .insert_fx(fx_t1);
 
     let config = FinstackConfig::default();
 
@@ -268,8 +274,12 @@ fn test_waterfall_attribution_sum_equality() {
         .build()
         .unwrap();
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
 
@@ -369,9 +379,15 @@ fn test_fx_attribution_cross_currency_exposure() {
     let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }), None);
     let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.15 }), None); // EUR strengthened
 
-    let market_t0 = MarketContext::new().insert(eur_curve_t0).insert_fx(fx_t0);
+    let market_t0 = MarketContext::new()
+        .try_insert(eur_curve_t0)
+        .expect("insert market curve")
+        .insert_fx(fx_t0);
 
-    let market_t1 = MarketContext::new().insert(eur_curve_t1).insert_fx(fx_t1);
+    let market_t1 = MarketContext::new()
+        .try_insert(eur_curve_t1)
+        .expect("insert market curve")
+        .insert_fx(fx_t1);
 
     let config = FinstackConfig::default();
 
@@ -549,10 +565,14 @@ fn test_fx_attribution_eur_weakening() {
     let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.05 }), None);
 
     let market_t0 = MarketContext::new()
-        .insert(eur_curve.clone())
+        .try_insert(eur_curve.clone())
+        .expect("insert market curve")
         .insert_fx(fx_t0);
 
-    let market_t1 = MarketContext::new().insert(eur_curve).insert_fx(fx_t1);
+    let market_t1 = MarketContext::new()
+        .try_insert(eur_curve)
+        .expect("insert market curve")
+        .insert_fx(fx_t1);
 
     let config = FinstackConfig::default();
 
@@ -620,8 +640,12 @@ fn test_waterfall_factor_ordering_sensitivity() {
         .build()
         .unwrap();
 
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     let config = FinstackConfig::default();
     let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);

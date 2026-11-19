@@ -94,8 +94,10 @@ fn create_market(as_of: Date) -> MarketContext {
     let vol_surface = vol_builder.build().unwrap();
 
     MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
 }
 

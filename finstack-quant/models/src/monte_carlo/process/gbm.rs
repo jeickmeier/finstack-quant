@@ -78,7 +78,7 @@
 //! let mut drift = [0.0];
 //! let mut diffusion = [0.0];
 //! gbm.drift(0.0, &[100.0], &mut drift);
-//! gbm.diffusion(0.0, &[100.0], &mut diffusion);
+//! gbm.diffusion(0.0, &[100.0], &mut diffusion).expect("valid diffusion");
 //!
 //! assert_eq!(gbm.dim(), 1);
 //! assert!((drift[0] - 3.0).abs() < 1e-12);
@@ -345,9 +345,10 @@ impl StochasticProcess for GbmProcess {
         out[0] = self.drift_rate() * x[0];
     }
 
-    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         // σ(S) = σ S
         out[0] = self.params.sigma * x[0];
+        Ok(())
     }
 }
 
@@ -441,10 +442,11 @@ impl StochasticProcess for MultiGbmProcess {
         }
     }
 
-    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         for (i, params) in self.params.iter().enumerate() {
             out[i] = params.sigma * x[i];
         }
+        Ok(())
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
@@ -524,7 +526,8 @@ mod tests {
         let mut diffusion = [0.0];
 
         gbm.drift(0.0, &x, &mut drift);
-        gbm.diffusion(0.0, &x, &mut diffusion);
+        gbm.diffusion(0.0, &x, &mut diffusion)
+            .expect("valid diffusion");
 
         assert!((drift[0] - 3.0).abs() < 1e-10); // 0.03 * 100
         assert!((diffusion[0] - 20.0).abs() < 1e-10); // 0.2 * 100

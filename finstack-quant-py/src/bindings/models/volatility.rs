@@ -166,9 +166,10 @@ impl PySabrParameters {
     }
 
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.implied_vol")]
-    fn implied_vol(&self, forward: f64, strike: f64, t: f64) -> PyResult<f64> {
+    fn implied_vol(&self, forward: f64, strike: f64, t: f64, quote_type: &str) -> PyResult<f64> {
+        let quote_type = finstack_quant_core::wire::serde_parse(quote_type).map_err(core_to_py)?;
         self.inner
-            .implied_vol(forward, strike, t)
+            .implied_vol(forward, strike, t, quote_type)
             .map_err(core_to_py)
     }
 
@@ -273,10 +274,11 @@ pub struct PySabrSmile {
 impl PySabrSmile {
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.__init__")]
     #[new]
-    fn new(params: PySabrParameters, forward: f64, t: f64) -> Self {
-        Self {
-            inner: SabrSmile::new(params.inner, forward, t),
-        }
+    fn new(params: PySabrParameters, forward: f64, t: f64, quote_type: &str) -> PyResult<Self> {
+        let quote_type = finstack_quant_core::wire::serde_parse(quote_type).map_err(core_to_py)?;
+        Ok(Self {
+            inner: SabrSmile::new(params.inner, forward, t, quote_type),
+        })
     }
 
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.atm_vol")]
@@ -427,16 +429,19 @@ impl PySabrCalibrator {
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.calibrate")]
     fn calibrate(
         &self,
-        py: Python<'_>,
         forward: f64,
         strikes: Vec<f64>,
         market_vols: Vec<f64>,
         t: f64,
         beta: f64,
+        quote_type: &str,
     ) -> PyResult<PySabrCalibrationOutcome> {
-        py.detach(|| {
-            self.inner
-                .calibrate(forward, &strikes, &market_vols, t, beta)
+        let quote_type = finstack_quant_core::wire::serde_parse(quote_type).map_err(core_to_py)?;
+        Python::attach(|py| {
+            py.detach(|| {
+                self.inner
+                    .calibrate(forward, &strikes, &market_vols, t, beta, quote_type)
+            })
         })
         .map(|inner| PySabrCalibrationOutcome { inner })
         .map_err(core_to_py)
@@ -565,13 +570,7 @@ fn get_cube_vol_clamped(
     convention: &Bound<'_, PyAny>,
 ) -> PyResult<f64> {
     let convention: VolatilityConvention = py_to_serde(py, convention, "convention")?;
-    Ok(vol::get_cube_vol_clamped(
-        &cube.inner,
-        expiry,
-        tenor,
-        strike,
-        convention,
-    ))
+    vol::get_cube_vol_clamped(&cube.inner, expiry, tenor, strike, convention).map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_tenor_slice")]
@@ -582,9 +581,11 @@ fn materialize_cube_tenor_slice(
     tenor: f64,
     strikes: Vec<f64>,
     convention: &Bound<'_, PyAny>,
+    interpolation_mode: &str,
 ) -> PyResult<PyVolSurface> {
     let convention: VolatilityConvention = py_to_serde(py, convention, "convention")?;
-    vol::materialize_cube_tenor_slice(&cube.inner, tenor, &strikes, convention)
+    let mode = finstack_quant_core::wire::serde_parse(interpolation_mode).map_err(core_to_py)?;
+    vol::materialize_cube_tenor_slice(&cube.inner, tenor, &strikes, convention, mode)
         .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
 }
@@ -647,8 +648,10 @@ fn get_fx_delta_vol(
 fn materialize_fx_delta_surface(
     surface: &PyFxDeltaVolSurface,
     delivery_forwards: Vec<f64>,
+    interpolation_mode: &str,
 ) -> PyResult<PyVolSurface> {
-    vol::materialize_fx_delta_surface(&surface.inner, &delivery_forwards)
+    let mode = finstack_quant_core::wire::serde_parse(interpolation_mode).map_err(core_to_py)?;
+    vol::materialize_fx_delta_surface(&surface.inner, &delivery_forwards, mode)
         .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
 }

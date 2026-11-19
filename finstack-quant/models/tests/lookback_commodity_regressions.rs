@@ -17,7 +17,9 @@ fn simpson_reflected(spot: f64, lower: f64, drift: f64, vol: f64, t: f64, sign: 
     for i in 0..=n {
         let x = lower + i as f64 * h;
         let survival = norm_cdf((drift * t - x) / (vol * t.sqrt()))
-            + (2.0 * drift * x / (vol * vol)).exp() * norm_cdf((-drift * t - x) / (vol * t.sqrt()));
+            .expect("valid Gaussian variate")
+            + (2.0 * drift * x / (vol * vol)).exp()
+                * norm_cdf((-drift * t - x) / (vol * t.sqrt())).expect("valid Gaussian variate");
         let weight = if i == 0 || i == n {
             1.0
         } else if i % 2 == 0 {
@@ -111,9 +113,12 @@ fn schwartz_smith_joint_moments_match_futures_for_any_step_partition() {
                     let mut zero = [0.0; 2];
                     let mut first = [0.0; 2];
                     let mut second = [0.0; 2];
-                    disc.step(&process, 0.0, dt, &mut zero, &[0.0, 0.0], &mut []);
-                    disc.step(&process, 0.0, dt, &mut first, &[1.0, 0.0], &mut []);
-                    disc.step(&process, 0.0, dt, &mut second, &[0.0, 1.0], &mut []);
+                    disc.step(&process, 0.0, dt, &mut zero, &[0.0, 0.0], &mut [])
+                        .expect("valid simulation step");
+                    disc.step(&process, 0.0, dt, &mut first, &[1.0, 0.0], &mut [])
+                        .expect("valid simulation step");
+                    disc.step(&process, 0.0, dt, &mut second, &[0.0, 1.0], &mut [])
+                        .expect("valid simulation step");
                     for i in 0..2 {
                         first[i] -= zero[i];
                         second[i] -= zero[i];
@@ -125,7 +130,8 @@ fn schwartz_smith_joint_moments_match_futures_for_any_step_partition() {
                     vx = decay * decay * vx + first[0].powi(2) + second[0].powi(2);
                     vy += first[1].powi(2) + second[1].powi(2);
                     cov = decay * cov + step_cov;
-                    disc.step(&process, 0.0, dt, &mut mean, &[0.0, 0.0], &mut []);
+                    disc.step(&process, 0.0, dt, &mut mean, &[0.0, 0.0], &mut [])
+                        .expect("valid simulation step");
                 }
                 let expected_spot = (mean[0] + mean[1] + 0.5 * (vx + vy + 2.0 * cov)).exp();
                 assert!((expected_spot / process.futures_price(1.0) - 1.0).abs() < 1e-12);

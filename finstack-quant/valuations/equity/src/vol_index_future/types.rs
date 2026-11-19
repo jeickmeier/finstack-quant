@@ -353,14 +353,20 @@ mod tests {
 
         // Create VIX forward curve - contango structure
         let vix = PriceCurve::builder("VIX")
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .kind(PriceCurveKind::VolIndex)
             .base_date(base_date)
-            .spot_price(18.0)
             .knots([(0.0, 18.0), (0.25, 20.0), (0.5, 21.0), (1.0, 22.0)])
             .build()
             .expect("valid VIX curve");
 
-        MarketContext::new().insert(disc).insert(vix)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(vix)
+            .expect("insert market curve")
     }
 
     /// One VIX contract ($1000/point) settling on 2025-04-01.
@@ -384,6 +390,8 @@ mod tests {
         let mut future = VolatilityIndexFuture::example().unwrap();
         future.terms.settlement_date = Date::from_calendar_date(2026, Month::January, 1).unwrap();
         let curve = PriceCurve::builder(future.vol_index_curve_id.clone())
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
             .kind(PriceCurveKind::VolIndex)
             .base_date(as_of)
             .knots([(0.0, 30.0), (0.25, 20.0)])
@@ -392,7 +400,12 @@ mod tests {
             .unwrap();
         assert!(
             future
-                .fair_price(&MarketContext::new().insert(curve), as_of)
+                .fair_price(
+                    &MarketContext::new()
+                        .try_insert(curve)
+                        .expect("insert market curve"),
+                    as_of
+                )
                 .is_err()
         );
     }
@@ -509,13 +522,19 @@ mod tests {
             .build()
             .expect("disc");
         let vix = PriceCurve::builder("VIX")
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .kind(PriceCurveKind::VolIndex)
             .base_date(base_date)
-            .spot_price(21.5)
             .knots([(0.0, 21.5), (1.0, 21.5)]) // flat futures strip at 21.5
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(disc).insert(vix);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(vix)
+            .expect("insert market curve");
 
         let settlement = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         // Long 1 contract, entry 20.0, $1000/point.

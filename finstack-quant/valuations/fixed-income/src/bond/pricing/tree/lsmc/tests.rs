@@ -115,9 +115,12 @@ fn stochastic_test_market(as_of: Date) -> MarketContext {
     )
     .expect("overnight forward curve");
     MarketContext::new()
-        .insert(discount)
-        .insert(term_forward)
-        .insert(overnight_forward)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(term_forward)
+        .expect("insert market curve")
+        .try_insert(overnight_forward)
+        .expect("insert market curve")
 }
 
 fn stochastic_test_bond(as_of: Date, maturity: Date) -> Bond {
@@ -202,7 +205,9 @@ fn overnight_replay_preserves_index_rates_across_curve_clocks() {
     ] {
         let forward = ForwardCurve::flat("USD-SOFR", as_of, curve_rate, day_count)
             .expect("equivalent forward curve");
-        let market = stochastic_test_market(as_of).insert(forward);
+        let market = stochastic_test_market(as_of)
+            .try_insert(forward)
+            .expect("insert market curve");
         let template =
             ReplayTemplate::new(&tree, &bond, &market, as_of).expect("overnight replay template");
         let FloatingRateModel::Overnight(model) = &template.floating[0].rate_model else {
@@ -1187,8 +1192,10 @@ fn term_reset_base_forward_uses_discount_curve_date_axis() {
         .build()
         .expect("term forward curve");
     let market = MarketContext::new()
-        .insert(discount.clone())
-        .insert(term_forward);
+        .try_insert(discount.clone())
+        .expect("insert market curve")
+        .try_insert(term_forward)
+        .expect("insert market curve");
     let tree = stochastic_test_tree(366);
     let bond = term_pik_test_bond(as_of, maturity);
     let template = ReplayTemplate::new(&tree, &bond, &market, as_of).expect("template");

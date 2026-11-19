@@ -114,7 +114,13 @@ impl HullWhiteStep {
         t: f64,
         dt: f64,
         prepared: Option<Hw1fStepConstants>,
-    ) -> Self {
+    ) -> finstack_quant_core::Result<Self> {
+        let end = t + dt;
+        if !t.is_finite() || t < 0.0 || !end.is_finite() || end <= t {
+            return Err(finstack_quant_core::Error::Validation(
+                "invalid Hull-White simulation interval".into(),
+            ));
+        }
         let theta_contribution = params.theta_mean_contribution(t, dt);
         let constant_sigma =
             (params.model.get_times().len() == 1).then(|| params.model.get_values()[0]);
@@ -128,14 +134,23 @@ impl HullWhiteStep {
             }
             _ => (
                 (-params.model.kappa * dt).exp(),
-                params.sigma_variance_for_step(t, dt).max(0.0).sqrt(),
+                params.sigma_variance(t, dt)?.sqrt(),
             ),
         };
-        Self {
+        if !std_dev.is_finite()
+            || (std_dev == 0.0 && constant_sigma.is_some_and(|s| s > 0.0))
+            || !theta_contribution.is_finite()
+            || !exp_kappa_dt.is_finite()
+        {
+            return Err(finstack_quant_core::Error::Internal(
+                "non-finite Hull-White step coefficients".into(),
+            ));
+        }
+        Ok(Self {
             exp_kappa_dt,
             theta_contribution,
             std_dev,
-        }
+        })
     }
 
     /// Advance the short rate over this interval using its frozen coefficients.
@@ -205,8 +220,10 @@ impl ExactHullWhite1F {
     /// An owned immutable sequence with one transition per grid interval. A
     /// zero-step grid produces an empty sequence. Changing either input requires
     /// preparing a new sequence; no cache is retained across valuations.
-    #[must_use]
-    pub fn prepare_grid(process: &HullWhite1FProcess, grid: &TimeGrid) -> PreparedHullWhiteSteps {
+    pub fn prepare_grid(
+        process: &HullWhite1FProcess,
+        grid: &TimeGrid,
+    ) -> finstack_quant_core::Result<PreparedHullWhiteSteps> {
         let mut disc = Self::new();
         disc.prepare(process, grid);
         let steps = (0..grid.num_steps())
@@ -218,8 +235,8 @@ impl ExactHullWhite1F {
                     disc.prepared,
                 )
             })
-            .collect();
-        PreparedHullWhiteSteps { steps }
+            .collect::<finstack_quant_core::Result<_>>()?;
+        Ok(PreparedHullWhiteSteps { steps })
     }
 }
 
@@ -232,9 +249,10 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         x: &mut [f64],
         z: &[f64],
         _work: &mut [f64],
-    ) {
-        let interval = HullWhiteStep::compute(process.params(), t, dt, self.prepared);
+    ) -> finstack_quant_core::Result<()> {
+        let interval = HullWhiteStep::compute(process.params(), t, dt, self.prepared)?;
         x[0] = interval.apply(x[0], z[0]);
+        Ok(())
     }
 
     fn prepare(&mut self, process: &HullWhite1FProcess, time_grid: &TimeGrid) {
@@ -272,7 +290,8 @@ mod tests {
         let z = vec![0.0]; // No shock
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Should move toward mean (0.03)
         assert!(x[0] < 0.05);
@@ -295,7 +314,8 @@ mod tests {
         let z = vec![2.0]; // Positive shock
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // With positive shock, rate should increase
         assert!(x[0] > 0.03);
@@ -326,7 +346,8 @@ mod tests {
         let z = vec![0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, t1, dt, &mut x1, &z, &mut work);
+        disc.step(&process, t1, dt, &mut x1, &z, &mut work)
+            .expect("valid simulation step");
 
         let expected1: f64 = 0.03 * (-0.1_f64 * 0.1).exp() + 0.02 * (1.0 - (-0.1_f64 * 0.1).exp());
         assert!((x1[0] - expected1).abs() < 1e-10);
@@ -334,7 +355,8 @@ mod tests {
         // Step in second regime (θ = 0.04)
         let t2: f64 = 0.6;
         let mut x2 = vec![0.03];
-        disc.step(&process, t2, dt, &mut x2, &z, &mut work);
+        disc.step(&process, t2, dt, &mut x2, &z, &mut work)
+            .expect("valid simulation step");
 
         let expected2: f64 = 0.03 * (-0.1_f64 * 0.1).exp() + 0.04 * (1.0 - (-0.1_f64 * 0.1).exp());
         assert!((x2[0] - expected2).abs() < 1e-10);
@@ -362,7 +384,8 @@ mod tests {
         let mut x = vec![0.03];
         let z = vec![0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         let decay = (-0.5_f64).exp();
         let expected = (0.03 * decay + 0.02 * (1.0 - decay)) * decay + 0.04 * (1.0 - decay);
@@ -387,10 +410,12 @@ mod tests {
             let process = HullWhite1FProcess::new(params);
             let disc = ExactHullWhite1F::new();
             let mut single = [0.03];
-            disc.step(&process, 0.1, 1.0, &mut single, &[0.0], &mut []);
+            disc.step(&process, 0.1, 1.0, &mut single, &[0.0], &mut [])
+                .expect("valid simulation step");
             let mut composed = [0.03];
             for (start, end) in [(0.1, 0.2), (0.2, 0.5), (0.5, 0.9), (0.9, 1.1)] {
-                disc.step(&process, start, end - start, &mut composed, &[0.0], &mut []);
+                disc.step(&process, start, end - start, &mut composed, &[0.0], &mut [])
+                    .expect("valid simulation step");
             }
             assert!((single[0] - composed[0]).abs() < 1e-14, "κ={kappa}");
         }
@@ -412,13 +437,33 @@ mod tests {
         let mut work = vec![];
         let z = vec![1.0];
 
-        disc.step(&process, 0.0, 2.0, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 2.0, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         let expected_mean = 0.03;
         let first = 0.01_f64.powi(2) * ((-0.2_f64).exp() - (-0.4_f64).exp()) / 0.2;
         let second = 0.02_f64.powi(2) * (1.0 - (-0.2_f64).exp()) / 0.2;
         let expected = expected_mean + (first + second).sqrt();
         assert!((x[0] - expected).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn positive_unrepresentable_scheduled_variance_reaches_the_step_caller() {
+        let params = HullWhite1FParams::with_piecewise_sigma(
+            0.1,
+            vec![0.0, 1.0],
+            vec![1e-250; 2],
+            vec![0.03],
+            vec![0.0],
+        )
+        .unwrap();
+        let process = HullWhite1FProcess::new(params);
+        let mut x = [0.03];
+        let error = ExactHullWhite1F::new()
+            .step(&process, 0.0, 1.0, &mut x, &[1.0], &mut [])
+            .unwrap_err();
+        assert!(matches!(error, finstack_quant_core::Error::Internal(_)));
+        assert_eq!(x, [0.03]);
     }
 
     // Frozen pre-preparation arithmetic. Keep this test oracle independent of
@@ -435,13 +480,13 @@ mod tests {
                 sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
             }
         } else {
-            params.sigma_variance_for_step(t, dt).max(0.0).sqrt()
+            params.sigma_variance(t, dt).unwrap().sqrt()
         };
         [decay, theta, std_dev]
     }
 
     fn assert_prepared_matches_reference(process: &HullWhite1FProcess, grid: &TimeGrid) {
-        let prepared = ExactHullWhite1F::prepare_grid(process, grid);
+        let prepared = ExactHullWhite1F::prepare_grid(process, grid).expect("valid grid");
         assert_eq!(prepared.get_steps().len(), grid.num_steps());
         let direct = ExactHullWhite1F::new();
         for initial_rate in [-0.03, 0.0, 0.07] {
@@ -466,7 +511,9 @@ mod tests {
                 let mean = expected * coefficients[0] + coefficients[1];
                 expected = mean + coefficients[2] * innovation;
                 rate = transition.apply(rate, innovation);
-                direct.step(process, t, dt, &mut direct_rate, &[innovation], &mut []);
+                direct
+                    .step(process, t, dt, &mut direct_rate, &[innovation], &mut [])
+                    .expect("valid simulation step");
                 assert_eq!(rate.to_bits(), expected.to_bits(), "interval {step}");
                 assert_eq!(
                     direct_rate[0].to_bits(),
@@ -548,15 +595,15 @@ mod tests {
             }
             // A previously prepared sequence remains an owned snapshot after
             // constructing a different sequence and passing an empty grid.
-            let original = ExactHullWhite1F::prepare_grid(&process, &grids[0]);
+            let original = ExactHullWhite1F::prepare_grid(&process, &grids[0]).expect("valid grid");
             let original_bits: Vec<_> = original
                 .get_steps()
                 .iter()
                 .map(|step| step.apply(0.03, -0.75).to_bits())
                 .collect();
-            let empty = ExactHullWhite1F::prepare_grid(&process, &grids[2]);
+            let empty = ExactHullWhite1F::prepare_grid(&process, &grids[2]).expect("valid grid");
             assert!(empty.get_steps().is_empty());
-            let rebuilt = ExactHullWhite1F::prepare_grid(&process, &grids[0]);
+            let rebuilt = ExactHullWhite1F::prepare_grid(&process, &grids[0]).expect("valid grid");
             let rebuilt_bits: Vec<_> = rebuilt
                 .get_steps()
                 .iter()
@@ -600,8 +647,11 @@ mod tests {
             for (t, dt) in [(0.0, 0.25), (0.25, 0.25), (0.13, 0.17)] {
                 let mut actual = [-0.02];
                 let mut expected = actual;
-                disc.step(process, t, dt, &mut actual, &[0.7], &mut []);
-                ExactHullWhite1F::new().step(process, t, dt, &mut expected, &[0.7], &mut []);
+                disc.step(process, t, dt, &mut actual, &[0.7], &mut [])
+                    .expect("valid simulation step");
+                ExactHullWhite1F::new()
+                    .step(process, t, dt, &mut expected, &[0.7], &mut [])
+                    .expect("valid simulation step");
                 assert_eq!(actual[0].to_bits(), expected[0].to_bits());
             }
         }
@@ -612,8 +662,11 @@ mod tests {
         assert!(disc.prepared.is_some());
         let mut actual = [0.03];
         let mut expected = actual;
-        disc.step(&processes[2], 0.0, 0.25, &mut actual, &[-1.0], &mut []);
-        ExactHullWhite1F::new().step(&processes[2], 0.0, 0.25, &mut expected, &[-1.0], &mut []);
+        disc.step(&processes[2], 0.0, 0.25, &mut actual, &[-1.0], &mut [])
+            .expect("valid simulation step");
+        ExactHullWhite1F::new()
+            .step(&processes[2], 0.0, 0.25, &mut expected, &[-1.0], &mut [])
+            .expect("valid simulation step");
         assert_eq!(actual[0].to_bits(), expected[0].to_bits());
         disc.prepare(&processes[3], &grid);
         assert!(disc.prepared.is_none());

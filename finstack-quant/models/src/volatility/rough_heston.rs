@@ -75,8 +75,10 @@ const EXPONENT_REAL_LIMIT: f64 = 700.0;
 /// is reformulated as a Volterra integral equation and solved with product
 /// integration weights.
 pub struct FractionalRiccatiSolver {
-    /// Fractional index α = H + 0.5.
-    alpha: f64,
+    /// Integral order 1 − α = 0.5 − H, positive even when α rounds to one.
+    integral_order: f64,
+    /// Reciprocal Gamma normalization of the fractional integral.
+    inv_integral_gamma: f64,
     /// Number of time discretization steps.
     num_steps: usize,
     /// Uniform step size h = T / num_steps.
@@ -96,34 +98,63 @@ impl FractionalRiccatiSolver {
     ///
     /// * `hurst` - Hurst exponent H ∈ (0, 0.5)
     /// * `maturity` - Time to expiry T > 0
-    /// * `num_steps` - Number of time steps (more steps = higher accuracy)
-    pub fn new(hurst: f64, maturity: f64, num_steps: usize) -> Self {
+    /// * `num_steps` - Positive number of equally spaced time steps.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid grid inputs, an unrepresentable time step
+    /// or weight, or a grid too large to allocate.
+    pub fn new(hurst: f64, maturity: f64, num_steps: usize) -> finstack_quant_core::Result<Self> {
+        use finstack_quant_core::Error;
+
+        if !(hurst > 0.0 && hurst < 0.5 && maturity.is_finite() && maturity > 0.0 && num_steps > 0)
+        {
+            return Err(Error::Validation(
+                "Riccati solver requires 0 < H < 0.5, finite positive maturity, and positive steps"
+                    .into(),
+            ));
+        }
         let alpha = hurst + 0.5;
         let step_size = maturity / num_steps as f64;
-        let endpoint_weight = step_size.powf(alpha) / ln_gamma(alpha + 2.0).exp();
-        let history_weights = (0..num_steps)
-            .map(|lag| {
-                let lag = lag as f64;
-                ((lag + 2.0).powf(alpha + 1.0) + lag.powf(alpha + 1.0)
-                    - 2.0 * (lag + 1.0).powf(alpha + 1.0))
-                    * endpoint_weight
-            })
-            .collect();
-        let initial_weights = (0..num_steps)
-            .map(|step| {
-                let step = step as f64;
-                (step.powf(alpha + 1.0) - (step - alpha) * (step + 1.0).powf(alpha))
-                    * endpoint_weight
-            })
-            .collect();
-        Self {
-            alpha,
+        let endpoint_weight = step_size.powf(alpha) / ln_gamma(alpha + 2.0)?.exp();
+        if step_size == 0.0 || endpoint_weight == 0.0 || !endpoint_weight.is_finite() {
+            return Err(Error::Internal(
+                "unrepresentable Riccati grid weight".into(),
+            ));
+        }
+        let integral_order = 0.5 - hurst;
+        let inv_integral_gamma = (-ln_gamma(integral_order)?).exp();
+        let mut history_weights = Vec::new();
+        let mut initial_weights = Vec::new();
+        for weights in [&mut history_weights, &mut initial_weights] {
+            weights
+                .try_reserve_exact(num_steps)
+                .map_err(|err| Error::Internal(format!("Riccati grid allocation failed: {err}")))?;
+        }
+        for index in 0..num_steps {
+            let j = index as f64;
+            let history = ((j + 2.0).powf(alpha + 1.0) + j.powf(alpha + 1.0)
+                - 2.0 * (j + 1.0).powf(alpha + 1.0))
+                * endpoint_weight;
+            let initial =
+                (j.powf(alpha + 1.0) - (j - alpha) * (j + 1.0).powf(alpha)) * endpoint_weight;
+            if !history.is_finite() || !initial.is_finite() {
+                return Err(Error::Internal(
+                    "non-finite Riccati integration weight".into(),
+                ));
+            }
+            history_weights.push(history);
+            initial_weights.push(initial);
+        }
+        Ok(Self {
+            integral_order,
+            inv_integral_gamma,
             num_steps,
             step_size,
             history_weights,
             initial_weights,
             endpoint_weight,
-        }
+        })
     }
 
     /// Solve D(u, t_j) for all time grid points j = 0, ..., num_steps.
@@ -227,12 +258,10 @@ impl FractionalRiccatiSolver {
             return Complex64::new(0.0, 0.0);
         }
         let h = self.step_size;
-        let alpha = self.alpha;
         // 1−α ∈ (0, ½) for H ∈ (0, ½), so both exponents below are positive
         // and the kernel τ^{−α} is integrable.
-        let e0 = 1.0 - alpha;
-        let e1 = 2.0 - alpha;
-        let inv_gamma = 1.0 / ln_gamma(e0).exp();
+        let e0 = self.integral_order;
+        let e1 = 1.0 + e0;
 
         // Segment j spans s ∈ [t_j, t_{j+1}]; substitute τ = T − s so that
         // τ ∈ [(m−1)h, mh] with m = n − j. With D piecewise-linear,
@@ -249,7 +278,7 @@ impl FractionalRiccatiSolver {
             integral += pair[0] * (m0 - c1) + pair[1] * c1;
         }
 
-        integral * inv_gamma
+        integral * self.inv_integral_gamma
     }
 }
 
@@ -421,7 +450,9 @@ impl RoughHestonFourierParams {
         let mut previous: Option<Complex64> = None;
         let mut steps = INITIAL_RICCATI_STEPS;
         while steps <= MAX_CHARACTERISTIC_STEPS {
-            let solver = FractionalRiccatiSolver::new(self.hurst, t, steps);
+            let Ok(solver) = FractionalRiccatiSolver::new(self.hurst, t, steps) else {
+                return Complex64::new(f64::NAN, f64::NAN);
+            };
             let value = self
                 .demeaned_char_func(&solver, u)
                 .map(|value| value * drift.exp());
@@ -559,7 +590,7 @@ impl RoughHestonFourierParams {
 
     /// Integrate the Lewis contour at one time resolution, propagating failed nodes.
     fn lewis_integral(&self, t: f64, x: f64, steps: usize) -> Option<f64> {
-        let solver = FractionalRiccatiSolver::new(self.hurst, t, steps);
+        let solver = FractionalRiccatiSolver::new(self.hurst, t, steps).ok()?;
         // The Lewis denominator has poles at ±i/2. Resolve the origin on
         // short panels: a uniform 12.5-wide first panel leaves a persistent
         // premium bias even when the Riccati time grid has converged.
@@ -633,7 +664,7 @@ mod tests {
 
     #[test]
     fn implicit_riccati_is_finite_across_stiff_lewis_contour() {
-        let solver = FractionalRiccatiSolver::new(0.1, 10.0, 200);
+        let solver = FractionalRiccatiSolver::new(0.1, 10.0, 200).expect("valid Riccati grid");
         for frequency in [0.1, 1.0, 10.0, 50.0, 100.0, 200.0] {
             let trajectory = solver.solve_d(Complex64::new(frequency, -0.5), 10.0, 0.3, -0.7);
             assert!(trajectory.iter().all(|value| value.is_finite()));
@@ -770,8 +801,24 @@ mod tests {
     }
 
     #[test]
+    fn riccati_grid_validates_inputs_and_preserves_positive_integral_order() {
+        for hurst in [0.0, 0.5, f64::NAN, f64::INFINITY] {
+            assert!(FractionalRiccatiSolver::new(hurst, 1.0, 4).is_err());
+        }
+        assert!(FractionalRiccatiSolver::new(0.1, 1.0, 0).is_err());
+        assert!(FractionalRiccatiSolver::new(0.1, f64::NAN, 4).is_err());
+        assert!(FractionalRiccatiSolver::new(0.1, f64::from_bits(1), 4).is_err());
+        assert!(FractionalRiccatiSolver::new(0.1, 1.0, usize::MAX).is_err());
+        let solver = FractionalRiccatiSolver::new(0.5_f64.next_down(), 1.0, 4)
+            .expect("valid near-classical integral order");
+        let constant = Complex64::new(1.0, 0.0);
+        let integral = solver.fractional_integral_d(&[constant; 5]);
+        assert!((integral - constant).norm() < 1e-12);
+    }
+
+    #[test]
     fn riccati_initial_condition() {
-        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 100);
+        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 100).expect("valid Riccati grid");
         let u = Complex64::new(1.0, 0.0);
         let d = solver.solve_d(u, 2.0, 0.3, -0.7);
         assert_eq!(d[0], Complex64::new(0.0, 0.0), "D(0) must be zero");
@@ -780,7 +827,7 @@ mod tests {
     #[test]
     fn riccati_trajectory_length() {
         let n = 50;
-        let solver = FractionalRiccatiSolver::new(0.1, 1.0, n);
+        let solver = FractionalRiccatiSolver::new(0.1, 1.0, n).expect("valid Riccati grid");
         let u = Complex64::new(1.0, 0.0);
         let d = solver.solve_d(u, 2.0, 0.3, -0.7);
         assert_eq!(d.len(), n + 1);
@@ -788,7 +835,7 @@ mod tests {
 
     #[test]
     fn riccati_values_finite() {
-        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 200);
+        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 200).expect("valid Riccati grid");
         let u = Complex64::new(5.0, 0.0);
         let d = solver.solve_d(u, 2.0, 0.3, -0.7);
         for (j, val) in d.iter().enumerate() {
@@ -798,7 +845,7 @@ mod tests {
 
     #[test]
     fn riccati_c_zero_for_zero_d() {
-        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 100);
+        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 100).expect("valid Riccati grid");
         let d_zero = vec![Complex64::new(0.0, 0.0); 101];
         let c = solver.solve_c(&d_zero, 2.0, 0.04);
         assert!(c.norm() < 1e-15, "C should be zero for zero D trajectory");
@@ -809,7 +856,7 @@ mod tests {
     /// condition E[S_T/F] = 1; the old sign error gave a(−i) = 1.
     #[test]
     fn riccati_martingale_condition_d_at_minus_i_is_zero() {
-        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 200);
+        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 200).expect("valid Riccati grid");
         let d = solver.solve_d(Complex64::new(0.0, -1.0), 2.0, 0.3, -0.7);
         for (j, val) in d.iter().enumerate() {
             assert!(
@@ -825,12 +872,15 @@ mod tests {
     fn fractional_integral_constant_trajectory() {
         let hurst = 0.1;
         let t = 1.5;
-        let solver = FractionalRiccatiSolver::new(hurst, t, 200);
+        let solver = FractionalRiccatiSolver::new(hurst, t, 200).expect("valid Riccati grid");
         let c = Complex64::new(0.7, -0.3);
         let traj = vec![c; 201];
 
         let alpha = hurst + 0.5;
-        let expected = c * t.powf(1.0 - alpha) / ln_gamma(2.0 - alpha).exp();
+        let expected = c * t.powf(1.0 - alpha)
+            / ln_gamma(2.0 - alpha)
+                .expect("positive Gamma argument")
+                .exp();
         let actual = solver.fractional_integral_d(&traj);
         assert!(
             (actual - expected).norm() < 1e-12,
@@ -856,7 +906,7 @@ mod tests {
             .expect("valid ordinary parameters");
         let frequency = Complex64::new(10.0, 0.0);
         let actual = params.char_func(frequency, 0.05, 0.0, 1.0);
-        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 6400);
+        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 6400).expect("valid Riccati grid");
         let refined = params
             .demeaned_char_func(&solver, frequency)
             .expect("refined characteristic function")

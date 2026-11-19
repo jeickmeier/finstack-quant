@@ -131,7 +131,9 @@ fn fixture() -> Fixture {
     Fixture {
         as_of,
         swaption,
-        market: MarketContext::new().insert(curve),
+        market: MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve"),
     }
 }
 

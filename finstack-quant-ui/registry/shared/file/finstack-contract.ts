@@ -951,6 +951,8 @@ export interface FxDeltaSampleRequest {
 }
 /** Explicit qualified delivery forwards for models.volatility.materializeFxDeltaSurface. */
 export interface FxStrikeSurfaceRequest {
+  /** Native interpolation of the output strike grid across expiry. */
+  readonly interpolationMode: StoredSurfaceWire["interpolation_mode"];
   readonly surface: MarketContextStateWire["fx_delta_vol_surfaces"][number];
   /** Delivery forward rates (quote currency per unit of base currency) ordered to match `surface.expiries`; Rust rejects empty, mismatched-length, non-finite, or non-positive values. */
   readonly deliveryForwards: readonly number[];
@@ -970,16 +972,25 @@ export interface CubeSampleRequest {
   readonly convention: modelsWire.VolatilityConvention;
 }
 /** One materialized slice of a SABR cube at explicit strikes; off-node values are Rust-interpolated. */
-export interface CubeSliceRequest {
+export type CubeSliceRequest = {
   readonly cube: MarketContextStateWire["vol_cubes"][number];
-  /** "tenor" fixes the underlying tenor (expiry by strike grid); "expiry" fixes the option expiry (tenor by strike grid). */
-  readonly axis: "tenor" | "expiry";
   /** Fixed tenor or expiry in years, within the cube grid. */
   readonly at: number;
   /** Absolute strikes in the stored forwards' rate units; Rust requires them strictly increasing. */
   readonly strikes: readonly number[];
   readonly convention: CubeSampleRequest["convention"];
-}
+} & (
+  | {
+      /** Fix the underlying tenor to produce a stored expiry-by-strike surface. */
+      readonly axis: "tenor";
+      /** Interpolation used by the materialized surface between expiry nodes. */
+      readonly interpolationMode: StoredSurfaceWire["interpolation_mode"];
+    }
+  | {
+      /** Fix the option expiry to produce a tenor-by-strike slice. */
+      readonly axis: "expiry";
+    }
+);
 /** Canonical JSON of the returned slice: a stored surface (tenor axis) or a VolCubeExpirySlice (expiry axis). */
 export type CubeSlice =
   | { readonly axis: "tenor"; readonly surface: StoredSurfaceWire }
@@ -991,6 +1002,8 @@ export interface CubeSmileRequest {
   readonly expiryIndex: number;
   /** Zero-based index into cube.tenors. */
   readonly tenorIndex: number;
+  /** Explicit Normal, Black, or shifted Black quote type for the smile. */
+  readonly quoteType: StoredSurfaceWire["quote_type"];
   /** Absolute strikes in the model domain, strictly increasing. */
   readonly strikes: readonly number[];
   /** Continuously compounded decimal rate discounting the arbitrage-check prices; never defaulted. */
@@ -998,7 +1011,7 @@ export interface CubeSmileRequest {
   /** Repair passes for SabrSmile#repairArbitrage; omitted means no repair is run. */
   readonly repairIterations?: number | null;
 }
-/** Native smile values for one node, in the facade's convention (normal when beta < 1e-4, else Black). */
+/** Native smile values for one node, in the request's explicit annualized quote units. */
 export interface CubeSmile {
   readonly parameters: wire.SabrParameterData;
   readonly forward: number;

@@ -1829,9 +1829,12 @@ class MertonModel:
         float
             Default probability in ``[0, 1]``.
 
-        Notes
-        -----
-        This method does not raise; out-of-domain or non-finite inputs yield ``NaN`` or ``inf`` rather than an exception.
+        Raises
+        ------
+        ValueError
+            If a horizon is non-finite or a Gaussian variate is undefined.
+        RuntimeError
+            If the structural model cannot resolve a finite probability.
 
         Examples
         --------
@@ -1860,9 +1863,12 @@ class MertonModel:
             Float series named ``default_probability`` indexed by the horizon
             labels (``str(horizon)``), in input order.
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ValueError
+            If a horizon is non-finite or a Gaussian variate is undefined.
+        RuntimeError
+            If the structural model cannot resolve a finite probability.
         """
         ...
 
@@ -1893,8 +1899,10 @@ class MertonModel:
         Raises
         ------
         ValueError
-            If ``asset_drift`` is not finite, or the model uses CreditGrades
-            dynamics, which are driftless by construction.
+            If drift or horizon is non-finite, a Gaussian variate is undefined,
+            or the model uses driftless CreditGrades dynamics.
+        RuntimeError
+            If the structural model cannot resolve a finite probability.
 
         Examples
         --------
@@ -3173,9 +3181,10 @@ class ToggleExerciseModel:
         bool
             ``True`` when the coupon is paid in kind.
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        RuntimeError
+            If the nested Monte Carlo model cannot produce a finite normal draw.
         """
         ...
 

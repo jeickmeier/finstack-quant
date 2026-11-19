@@ -42,7 +42,9 @@ fn test_par_loan_pricing() {
         .unwrap();
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let pv = loan.value(&market, as_of);
@@ -84,7 +86,9 @@ fn test_discount_pricing() {
 
     // Market rate higher than coupon rate
     let disc_curve = flat_discount_curve(0.06, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let pv = loan.value(&market, as_of);
@@ -126,7 +130,9 @@ fn test_premium_pricing() {
 
     // Market rate lower than coupon rate
     let disc_curve = flat_discount_curve(0.04, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let pv = loan.value(&market, as_of);
@@ -194,7 +200,9 @@ fn pv_is_discounted_to_as_of_and_includes_flows_before_settlement() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let df = |d: finstack_quant_core::dates::Date| {
         (-0.03 * (d - as_of).whole_days() as f64 / 365.0).exp()

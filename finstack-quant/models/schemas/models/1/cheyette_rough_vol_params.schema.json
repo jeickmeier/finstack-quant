@@ -1,41 +1,81 @@
 {
   "$defs": {
-    "ForwardVarianceCurve": {
-      "description": "Forward variance curve ξ₀(t) for rough volatility models.\n\nRepresents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under\nthe consuming model's pricing measure. Values are supplied or calibrated by\nthe caller. The integral sets the model's expected accumulated variance.\n\nDifferencing ATM implied total variance is an optional proxy, not an exact\nvariance-swap bootstrap. This type interpolates the supplied curve; it does\nnot perform market calibration.",
-      "properties": {
-        "interpolation": {
-          "$ref": "#/$defs/Interpolation",
-          "description": "Interpolation contract used by the constructor."
-        },
-        "times": {
-          "description": "Point times or interval ends (strictly increasing year fractions).",
-          "items": {
-            "format": "double",
-            "type": "number"
+    "BaseVolatility": {
+      "description": "Cheyette base volatility in decimal rate units per square-root model year.\n\nA level of 0.005 is a 50 basis point rate amplitude. The process samples\nthe amplitude at the left endpoint of each step and squares it for the\nvariance-state drift.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "amplitudes": {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "interpolation": {
+              "const": "linear",
+              "type": "string"
+            }
           },
-          "type": "array"
+          "required": [
+            "interpolation",
+            "amplitudes"
+          ],
+          "type": "object"
         },
-        "values": {
-          "description": "Point samples or constant interval variances (all > 0).",
-          "items": {
-            "format": "double",
-            "type": "number"
+        {
+          "additionalProperties": false,
+          "properties": {
+            "amplitudes": {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "interpolation": {
+              "const": "constant_intervals",
+              "type": "string"
+            }
           },
-          "type": "array"
+          "required": [
+            "interpolation",
+            "amplitudes"
+          ],
+          "type": "object"
         }
-      },
-      "required": [
-        "interpolation",
-        "times",
-        "values"
-      ],
-      "type": "object"
+      ]
     },
     "HurstExponent": {
       "additionalProperties": false,
-      "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — smooth (persistent increments)",
+      "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — more regular paths with persistent increments",
       "properties": {
         "h": {
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": 0.0,
           "format": "double",
           "type": "number"
         }
@@ -44,13 +84,6 @@
         "h"
       ],
       "type": "object"
-    },
-    "Interpolation": {
-      "enum": [
-        "linear",
-        "constant_intervals"
-      ],
-      "type": "string"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/cheyette_rough_vol_params.schema.json",
@@ -93,7 +126,7 @@
       "type": "number"
     },
     "sigma_base": {
-      "$ref": "#/$defs/ForwardVarianceCurve",
+      "$ref": "#/$defs/BaseVolatility",
       "description": "Base volatility term structure σ₀(t) for the rate process."
     }
   },

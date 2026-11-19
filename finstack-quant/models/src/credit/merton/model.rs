@@ -307,7 +307,7 @@ mod tests {
             m.barrier_type(),
             MertonBarrierType::FirstPassage { .. }
         ));
-        let pd = m.default_probability(5.0);
+        let pd = m.default_probability(5.0).expect("valid model horizon");
         assert!(pd > 0.0 && pd < 1.0, "PD should be in (0,1), got {pd}");
     }
 }

@@ -46,7 +46,7 @@
         "id": "PRICE",
         "base": "2025-01-01",
         "day_count": "act_365f",
-        "spot_price": 100,
+        "level_kind": "price",
         "knot_points": [
           [0, 100],
           [1, 102],

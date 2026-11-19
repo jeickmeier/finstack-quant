@@ -530,11 +530,12 @@ pub(super) fn apply_generated_effects(
             ScenarioEffect::Warning(w) => sink.warnings.push(w),
             ScenarioEffect::UpdateCurve(storage) => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                match market_target_for_id(op, storage.id()) {
+                let target = market_target_for_id(op, storage.id());
+                ctx.market.try_insert_mut(storage)?;
+                match target {
                     Some(target) => sink.record_market_shock(target, requested_shock(op), None),
                     None => sink.changes.all_dirty = true,
                 }
-                *ctx.market = std::mem::take(ctx.market).insert(storage);
                 *sink.applied += 1;
             }
         }

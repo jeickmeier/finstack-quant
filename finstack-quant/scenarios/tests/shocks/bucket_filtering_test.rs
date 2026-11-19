@@ -269,7 +269,9 @@ fn test_basecorr_bucket_filtering() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(basecorr);
+    let mut market = MarketContext::new()
+        .try_insert(basecorr)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -311,7 +313,9 @@ fn test_basecorr_bucket_filtering() {
     let shocked_curve = market.get_base_correlation("CDX_IG").unwrap();
 
     // 7% should be shocked
-    let shocked_7 = shocked_curve.correlation(7.0);
+    let shocked_7 = shocked_curve
+        .get_correlation(7.0)
+        .expect("valid detachment");
     assert_eq!(shocked_curve.correlations(), &[0.20, 0.25, 0.50, 0.60]);
     let expected = 0.50;
     assert!(
@@ -322,7 +326,9 @@ fn test_basecorr_bucket_filtering() {
     );
 
     // 3% should be unchanged
-    let unchanged_3 = shocked_curve.correlation(3.0);
+    let unchanged_3 = shocked_curve
+        .get_correlation(3.0)
+        .expect("valid detachment");
     assert!(
         (unchanged_3 - 0.25).abs() < 1e-6,
         "3% should be unchanged: expected 0.25, got {}",
@@ -341,7 +347,9 @@ fn test_basecorr_bucket_filtering_uses_tight_detachment_match() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(basecorr);
+    let mut market = MarketContext::new()
+        .try_insert(basecorr)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -379,9 +387,21 @@ fn test_basecorr_bucket_filtering_uses_tight_detachment_match() {
     assert_eq!(report.operations_applied, 1);
 
     let shocked_curve = market.get_base_correlation("CDX_IG").unwrap();
-    assert!((shocked_curve.correlation(3.0) - 0.30).abs() < 1e-6);
     assert!(
-        (shocked_curve.correlation(3.75) - 0.30).abs() < 1e-6,
+        (shocked_curve
+            .get_correlation(3.0)
+            .expect("valid detachment")
+            - 0.30)
+            .abs()
+            < 1e-6
+    );
+    assert!(
+        (shocked_curve
+            .get_correlation(3.75)
+            .expect("valid detachment")
+            - 0.30)
+            .abs()
+            < 1e-6,
         "3.75% bucket must not be shocked by a 3% detachment request"
     );
 }
@@ -393,7 +413,9 @@ fn test_basecorr_bucket_filtering_rejects_excessive_and_unmatched_shocks() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(basecorr);
+    let mut market = MarketContext::new()
+        .try_insert(basecorr)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

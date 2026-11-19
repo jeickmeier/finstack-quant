@@ -116,7 +116,10 @@ pub fn check_rough_first_step(actual: &[f64], dt: f64, z: &[f64]) {
     let noise = 0.3 * initial_variance.sqrt() * z[1] * dt.sqrt();
     let volterra = kernel_integral / dt * noise + 0.3 * initial_variance.sqrt() * bridge_std * z[2];
     let expected_variance = (initial_variance
-        + (-finstack_quant_core::math::special_functions::ln_gamma(alpha)).exp() * volterra)
+        + (-finstack_quant_core::math::special_functions::ln_gamma(alpha)
+            .expect("positive finite shape"))
+        .exp()
+            * volterra)
         .max(0.0);
     let spot_normal = -0.7 * z[1] + (1.0_f64 - 0.7 * 0.7).sqrt() * z[0];
     let expected_spot = 100.0

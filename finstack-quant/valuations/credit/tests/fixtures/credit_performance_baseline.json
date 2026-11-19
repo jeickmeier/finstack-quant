@@ -578,7 +578,7 @@
         0.0
       ]
     ],
-    "delta": 5706.302047889505,
+    "delta": null,
     "fraction_bound": 1e-8,
     "name": "boundary",
     "pv": 1032988.159390626,

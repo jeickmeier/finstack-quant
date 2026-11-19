@@ -548,14 +548,16 @@ mod tests {
         assert_eq!(index.num_constituents(), original.num_constituents());
 
         let missing_index = MarketContext::new()
-            .insert(
+            .try_insert(
                 market
                     .get_discount(&params.discount_curve_id)
                     .expect("discount")
                     .as_ref()
                     .clone(),
             )
-            .insert(original.index_credit_curve().as_ref().clone());
+            .expect("insert market curve")
+            .try_insert(original.index_credit_curve().as_ref().clone())
+            .expect("insert market curve");
         let error =
             BaseCorrelationTarget::solve(&params, &quotes, &missing_index, &envelope.plan.settings)
                 .expect_err("missing index must fail");

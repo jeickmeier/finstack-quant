@@ -232,7 +232,7 @@ pub fn merton_report(request: &MertonReportRequest) -> Result<MertonReport> {
         }
     };
     let horizons = &request.horizons;
-    let default_probabilities = model.default_probabilities(horizons);
+    let default_probabilities = model.default_probabilities(horizons)?;
     let grades = MasterScale::default_calibration()?
         .map_pds(&default_probabilities)
         .map_err(|error| Error::Validation(error.to_string()))?;
@@ -336,7 +336,9 @@ mod tests {
         assert_eq!(report.model, model);
         assert_eq!(
             report.default_probabilities,
-            model.default_probabilities(&[1.0, 5.0])
+            model
+                .default_probabilities(&[1.0, 5.0])
+                .expect("valid model horizon")
         );
         assert_eq!(
             report.distance_to_default,

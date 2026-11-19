@@ -278,7 +278,8 @@ fn application_report_records_the_size_of_each_market_shock() {
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("quote should set");
     let mut market = MarketContext::new()
-        .insert(curve)
+        .try_insert(curve)
+        .expect("insert market curve")
         .insert_fx(FxMatrix::new(provider, None))
         .insert_price("AAPL", MarketScalar::unitless(200.0).expect("valid scalar"));
 

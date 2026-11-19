@@ -279,10 +279,10 @@ pub(crate) fn apply_output(
             context.try_insert_mut(curve)?;
         }
         StepOutput::Surface(surface) => {
-            context.try_insert_surface_mut(surface)?;
+            context.insert_surface_mut(surface);
         }
         StepOutput::VolCube(cube) => {
-            context.try_insert_vol_cube_mut(cube)?;
+            context.insert_vol_cube_mut(cube);
         }
         StepOutput::Scalars(values) => {
             for (key, value) in values {
@@ -732,9 +732,12 @@ mod tests {
             .expect("credit index");
 
         MarketContext::new()
-            .insert(discount)
-            .insert(hazard)
-            .insert(base_corr)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve")
+            .try_insert(base_corr)
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG", credit_index)
             .expect("credit index dependencies")
     }
@@ -936,7 +939,9 @@ mod tests {
             quote_type: VolQuoteType::ShiftedBlackLognormal,
             is_cap: true,
         })];
-        let context = MarketContext::new().insert(discount);
+        let context = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve");
         let error = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
             .err()
             .expect("shifted cap must be rejected before premium conversion");
@@ -1074,8 +1079,9 @@ mod tests {
                 convention: SwaptionConventionId::new("USD"),
             }),
         ];
-        let context =
-            MarketContext::new().insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"));
+        let context = MarketContext::new()
+            .try_insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
+            .expect("insert market curve");
 
         for quote in &mut quotes {
             if let MarketQuote::Vol(vol) = quote {
@@ -1157,8 +1163,9 @@ mod tests {
             quote_type: VolQuoteType::Normal,
             is_cap: true,
         })];
-        let context =
-            MarketContext::new().insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"));
+        let context = MarketContext::new()
+            .try_insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
+            .expect("insert market curve");
 
         let outcome = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
             .expect("cap/floor Hull-White step should calibrate");
@@ -1227,8 +1234,9 @@ mod tests {
             quote_type: VolQuoteType::Normal,
             is_cap: true,
         })];
-        let context =
-            MarketContext::new().insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"));
+        let context = MarketContext::new()
+            .try_insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
+            .expect("insert market curve");
         let outcome = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
             .expect("valid term cap with an earlier adjusted payment");
         assert!(outcome.report.success);
@@ -1282,8 +1290,9 @@ mod tests {
             quote_type: VolQuoteType::Normal,
             is_cap: true,
         })];
-        let context =
-            MarketContext::new().insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"));
+        let context = MarketContext::new()
+            .try_insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
+            .expect("insert market curve");
 
         let outcome = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
             .expect("piecewise cap/floor calibration");
@@ -1403,8 +1412,9 @@ mod tests {
             }),
         ];
 
-        let context =
-            MarketContext::new().insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"));
+        let context = MarketContext::new()
+            .try_insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
+            .expect("insert market curve");
 
         let outcome = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
             .expect("SVI step should build a surface");

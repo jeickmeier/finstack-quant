@@ -92,7 +92,7 @@ test('priceHeston defaults numPaths and seed from the Rust registry and returns 
 
 test('SabrSmile single-strike vol and arbitrage verdict come from Rust', () => {
   const params = new models.volatility.SabrParameters(0.2, 0.5, 0.3, -0.2);
-  const smile = new models.volatility.SabrSmile(params, 100, 1);
+  const smile = new models.volatility.SabrSmile(params, 100, 1, 'black_lognormal');
   const strikes = [80, 90, 100, 110, 120];
   assert.deepEqual(
     strikes.map((k) => smile.impliedVol(k)),

@@ -202,8 +202,10 @@ fn build_fx_market(
         .expect("fx rate should exist");
 
     MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_fx(fx_matrix)
 }

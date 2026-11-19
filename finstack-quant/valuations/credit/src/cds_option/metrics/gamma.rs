@@ -122,7 +122,7 @@ fn price_strike_gamma(
             deal_quote_override: None,
             action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bump_bp)),
         })?;
-        Ok(curves.clone().insert(bumped.as_ref().clone()))
+        curves.clone().try_insert(bumped.as_ref().clone())
     };
     let delta_up = price_strike_delta(
         option,

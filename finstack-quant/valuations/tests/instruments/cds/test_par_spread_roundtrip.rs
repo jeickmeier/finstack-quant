@@ -64,7 +64,9 @@ fn test_cds_par_spread_roundtrip_1y() {
     }];
 
     let disc = create_discount_curve(base);
-    let market_calib = MarketContext::new().insert(disc);
+    let market_calib = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     // Bootstrap hazard curve (v2 step engine)
     let settings = CalibrationConfig::default();
@@ -104,8 +106,10 @@ fn test_cds_par_spread_roundtrip_1y() {
 
     // Price the CDS with calibrated hazard curve
     let market_price = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert((*hazard_curve).clone());
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert((*hazard_curve).clone())
+        .expect("insert market curve");
 
     let npv = cds
         .value(&market_price, base)
@@ -160,7 +164,9 @@ fn test_cds_par_spread_roundtrip_multi_tenor() {
         .collect();
 
     let disc = create_discount_curve(base);
-    let market_calib = MarketContext::new().insert(disc);
+    let market_calib = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let settings = CalibrationConfig::default();
     let params = HazardCurveParams {
@@ -186,8 +192,10 @@ fn test_cds_par_spread_roundtrip_multi_tenor() {
 
     // Reprice each CDS at its quoted spread
     let market_price = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert((*hazard_curve).clone());
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert((*hazard_curve).clone())
+        .expect("insert market curve");
 
     for (maturity, par_spread_bp) in &tenors_and_spreads {
         // Hazard curve ID is "{entity}-{seniority}" per HazardCurveCalibrator
@@ -239,7 +247,9 @@ fn test_cds_par_spread_calculation_consistency() {
     }];
 
     let disc = create_discount_curve(base);
-    let market_calib = MarketContext::new().insert(disc);
+    let market_calib = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let settings = CalibrationConfig::default();
     let params = HazardCurveParams {
@@ -265,8 +275,10 @@ fn test_cds_par_spread_calculation_consistency() {
 
     // Create market with calibrated hazard curve
     let market_price = MarketContext::new()
-        .insert(create_discount_curve(base))
-        .insert((*hazard_curve).clone());
+        .try_insert(create_discount_curve(base))
+        .expect("insert market curve")
+        .try_insert((*hazard_curve).clone())
+        .expect("insert market curve");
 
     // Create CDS with arbitrary spread
     // Hazard curve ID is "{entity}-{seniority}" per HazardCurveCalibrator

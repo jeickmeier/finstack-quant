@@ -33,7 +33,9 @@ fn test_cs01_negative_for_long_bond() {
         .build()
         .unwrap();
 
-    let source = finstack_quant_core::market_data::context::MarketContext::new().insert(disc);
+    let source = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
@@ -42,7 +44,7 @@ fn test_cs01_negative_for_long_bond() {
         "USD-OIS",
     )
     .unwrap();
-    let market = source.insert(hazard);
+    let market = source.try_insert(hazard).expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -118,7 +120,9 @@ fn test_cs01_zspread_fallback_uses_settlement_anchored_basis() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(

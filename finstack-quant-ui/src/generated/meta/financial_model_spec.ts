@@ -132,7 +132,7 @@ export default [
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PiecewiseConstantCurve",
-    "description": "A finite, left-continuous piecewise-constant curve."
+    "description": "A finite, right-continuous piecewise-constant curve."
   },
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f/properties/times",
@@ -141,7 +141,8 @@ export default [
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f/properties/times/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PiecewiseConstantCurve/properties/times/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f/properties/values",
@@ -150,7 +151,8 @@ export default [
   {
     "path": "#/$defs/d_0b91bd9cf7e8361c3a1f/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
-    "format": "double"
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_0c72f5cb09b10476ecb7",
@@ -543,13 +545,6 @@ export default [
     "description": "True if this is a draw, false if it's a repayment."
   },
   {
-    "path": "#/$defs/d_1731f9e7372472775585",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NonNegativeF64Wire",
-    "description": "Finite JSON number greater than or equal to zero.",
-    "format": "double",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_174ce9631272c7d7f4f7",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond",
     "description": "Convertible bond instrument with embedded equity conversion option.\n\nThis fixed income instrument combines debt characteristics (coupons, principal)\nwith equity optionality (conversion rights). Uses the `CashFlowBuilder` for\nrobust schedule generation and tree-based pricing for the hybrid valuation."
@@ -878,13 +873,6 @@ export default [
     "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools."
   },
   {
-    "path": "#/$defs/d_1c91cbdbb3238adf0c02",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PositiveF64Wire",
-    "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
-    "exclusiveMinimum": 0,
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_1dad2782e09a045ad639",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateFallback",
     "description": "Policy for handling floating rate projection failures.\n\nThe cashflow builder consults it whenever projecting a floating coupon\nfails: a missing forward curve, a pre-cutoff observation with no\n`FIXING:{index_id}` series supplied, a reset before the curve base\ndate, or an overnight or day-count projection error. It never fills a gap\nin recorded history: when a curve and a fixing series are both supplied, a\nmissing pre-cutoff observation is an error under every policy.\n\nA non-`Error` policy replaces the index for the whole coupon (every\novernight observation of the period, not only a failing one), logs\n`warn!`, and the coupon still records the substituted index as its\n`projected_index_rate`. The default (`Error`) surfaces failures\nexplicitly; the other variants are explicit opt-in degradation modes. The\nbond LSMC pricer applies the policy per overnight observation instead.\n\n# References\n\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#hull-options-futures`"
@@ -947,50 +935,43 @@ export default [
   {
     "path": "#/$defs/d_1f0a38ebecad19081135",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters",
-    "description": "SABR model parameters"
+    "description": "Parameters of a SABR backbone, with an optional signed rate displacement."
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/alpha",
-    "description": "Initial volatility (alpha)",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PositiveF64Wire"
+    "description": "Initial volatility level, strictly positive.",
+    "exclusiveMinimum": 0,
+    "format": "double"
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/beta",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/beta",
-    "description": "CEV exponent (beta) - typically 0 to 1",
-    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ClosedUnitIntervalF64Wire"
+    "description": "CEV exponent in the closed interval `[0, 1]`.",
+    "format": "double",
+    "maximum": 1,
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/nu",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/nu",
-    "description": "Volatility of volatility (nu/volvol)",
-    "ref": "#/$defs/NonNegativeF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NonNegativeF64Wire"
+    "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+    "format": "double",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/rho",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/rho",
-    "description": "Correlation between asset and volatility (rho)",
-    "ref": "#/$defs/CorrelationWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CorrelationWire"
+    "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+    "exclusiveMaximum": 1,
+    "exclusiveMinimum": -1,
+    "format": "double"
   },
   {
     "path": "#/$defs/d_1f0a38ebecad19081135/properties/shift",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/shift",
-    "description": "Shift parameter for handling negative rates (optional)"
-  },
-  {
-    "path": "#/$defs/d_1f0a38ebecad19081135/properties/shift/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/shift/anyOf/0",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/d_1f0a38ebecad19081135/properties/shift/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SabrParameters/properties/shift/anyOf/1"
+    "description": "Optional finite displacement applied to forward and strike.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_210ab4b44ffb533f1266",
@@ -5478,14 +5459,6 @@ export default [
     "description": "Formula or node for the `VoluntaryPrepayment` rung.\n\nRequired when `VoluntaryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and mandatory prepay buckets."
   },
   {
-    "path": "#/$defs/d_82d2bec48bc64b37bcef",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ClosedUnitIntervalF64Wire",
-    "description": "Finite JSON number in the closed interval `[0, 1]`.",
-    "format": "double",
-    "maximum": 1,
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_85f5d5bd79f75fc47ce3",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ClearingStatus",
     "description": "Clearing status for OTC derivatives.\n\nDetermines whether a trade is cleared through a CCP or remains bilateral\nunder a CSA agreement."
@@ -8281,7 +8254,7 @@ export default [
   {
     "path": "#/$defs/d_dcc2738b179dc9ea48c6/properties/vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Swaption/properties/vol_surface_id",
-    "description": "Volatility surface ID for option pricing",
+    "description": "Volatility source ID for option pricing. A dated SABR cube needs an\nACT/365F expiry clock anchored at the valuation date.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
   },
@@ -8341,14 +8314,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AntiDilutionPolicy/oneOf/2",
     "const": "weighted_average",
     "description": "Broad-based weighted average: conversion price is adjusted based on the\nweighted average of the old and new share prices, factoring in the number\nof shares. Less dilutive to existing shareholders than full ratchet.\n\nFormula:\n```text\nnew_cp = old_cp × (shares_outstanding + new_money / old_cp)\n                 / (shares_outstanding + new_shares_issued)\n```"
-  },
-  {
-    "path": "#/$defs/d_e9d6d028bee91ef1c9e8",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CorrelationWire",
-    "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
-    "format": "double",
-    "maximum": 1,
-    "minimum": -1
   },
   {
     "path": "#/$defs/d_ead8055e75e6ac0353b0",

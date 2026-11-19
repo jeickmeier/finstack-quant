@@ -369,7 +369,7 @@ impl StochasticProcess for LmmProcess {
         self.compute_drift(t, x, out);
     }
 
-    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         let n = self.params.num_forwards;
         let nf = self.params.num_factors;
         let first = self.first_alive(t);
@@ -386,6 +386,7 @@ impl StochasticProcess for LmmProcess {
                 out[i * nf + k] = d_i_shifted * lam[k];
             }
         }
+        Ok(())
     }
 
     fn populate_path_state(&self, x: &[f64], state: &mut super::super::traits::PathState) {
@@ -512,7 +513,9 @@ mod tests {
         let process = LmmProcess::new(p);
         let x = vec![0.03, 0.03, 0.03];
         let mut diff = vec![0.0; 6]; // 3 forwards × 2 factors
-        process.diffusion(0.0, &x, &mut diff);
+        process
+            .diffusion(0.0, &x, &mut diff)
+            .expect("valid diffusion");
 
         // The forward fixing at t=0 is frozen; later forwards diffuse.
         let shifted = 0.03 + 0.005; // = 0.035

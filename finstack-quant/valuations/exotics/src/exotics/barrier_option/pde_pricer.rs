@@ -680,7 +680,8 @@ mod tests {
             .expect("vol surface");
 
         MarketContext::new()
-            .insert(discount)
+            .try_insert(discount)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "SPX",
@@ -923,8 +924,13 @@ mod tests {
             let df = (-rate * t).exp();
             let d1 = ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * t.sqrt());
             let d2 = d1 - vol * t.sqrt();
-            let vanilla = spot * finstack_quant_core::math::special_functions::norm_cdf(d1)
-                - strike * df * finstack_quant_core::math::special_functions::norm_cdf(d2);
+            let vanilla = spot
+                * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                    .expect("valid normal variate")
+                - strike
+                    * df
+                    * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                        .expect("valid normal variate");
             assert!(
                 pv >= -1e-6 && pv <= vanilla + 1e-6,
                 "up-and-out call price {pv:.6} at spot {spot} must lie in \
@@ -1007,8 +1013,13 @@ mod tests {
         let df = (-rate * t).exp();
         let d1 = ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * t.sqrt());
         let d2 = d1 - vol * t.sqrt();
-        let vanilla = spot * finstack_quant_core::math::special_functions::norm_cdf(d1)
-            - strike * df * finstack_quant_core::math::special_functions::norm_cdf(d2);
+        let vanilla = spot
+            * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                .expect("valid normal variate")
+            - strike
+                * df
+                * finstack_quant_core::math::special_functions::norm_cdf(d2)
+                    .expect("valid normal variate");
         let analytical_ko = barrier_price(
             &BarrierParams::new(spot, strike, barrier, t, rate, 0.0, vol),
             BarrierType::DownAndOut,
@@ -1103,7 +1114,7 @@ mod tests {
         let d2 = ((100.0_f64 / 120.0).ln() + (0.05 - 0.5 * 0.25 * 0.25) * t) / (0.25 * t.sqrt());
         let expected = bs_price_unchecked(100.0, 100.0, 0.05, 0.0, 0.25, t, OptionType::Call)
             - bs_price_unchecked(100.0, 120.0, 0.05, 0.0, 0.25, t, OptionType::Call)
-            - 20.0 * (-0.05 * t).exp() * norm_cdf(d2);
+            - 20.0 * (-0.05 * t).exp() * norm_cdf(d2).expect("valid normal variate");
         let pde = BarrierOptionPdePricer {
             space_points: 1_200,
             time_steps: 800,

@@ -164,7 +164,9 @@ fn test_at_maturity_pricing() {
 fn test_missing_credit_index_errors_for_price_tranche() {
     let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
-    let market = MarketContext::new().insert(standard_discount_curve());
+    let market = MarketContext::new()
+        .try_insert(standard_discount_curve())
+        .expect("insert market curve");
     let as_of = base_date();
 
     let err = pricer

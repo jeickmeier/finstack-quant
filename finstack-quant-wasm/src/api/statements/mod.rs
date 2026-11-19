@@ -412,9 +412,8 @@ pub fn parse_formula(
 
 /// Parse and compile a DSL formula, throwing if either step fails.
 ///
-/// Compilation lowers the AST onto the core expression engine and rejects
-/// unsupported functions, wrong arities, and malformed capital-structure
-/// references that a bare parse would accept. Returns `undefined` when the
+/// Compilation produces the shared expression AST for the period-aware statements
+/// evaluator. It checks supported functions, arities and capital-structure references. Returns `undefined` when the
 /// formula is valid; an invalid formula throws a `FinstackError`, so
 /// `if (parseAndCompile(f))` is not a validity check. Mirrors Python
 /// `parse_and_compile`.

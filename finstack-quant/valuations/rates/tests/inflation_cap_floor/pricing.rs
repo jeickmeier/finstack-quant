@@ -51,13 +51,15 @@ fn cap_floor_parity_matches_same_forward_swap_across_quote_volatilities() {
             (ModelKey::Normal, VolQuoteType::Normal, 0.02),
         ] {
             let market = MarketContext::new()
-                .insert(flat_discount_curve_with_day_count(
+                .try_insert(flat_discount_curve_with_day_count(
                     0.03,
                     as_of,
                     "USD-OIS",
                     DayCount::Act365F,
                 ))
-                .insert(flat_inflation_curve("US-CPI", as_of, 300.0, 0.02).unwrap())
+                .expect("insert market curve")
+                .try_insert(flat_inflation_curve("US-CPI", as_of, 300.0, 0.02).unwrap())
+                .expect("insert market curve")
                 .insert_inflation_index(simple_index("US-CPI", as_of, 300.0, Currency::USD))
                 .insert_surface(
                     finstack_quant_valuations_test_support::volatility::relabel_quote_type(
@@ -96,13 +98,14 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
     let as_of = date!(2026 - 01 - 20);
     let last_release = date!(2026 - 03 - 13);
     let market = MarketContext::new()
-        .insert(flat_discount_curve_with_day_count(
+        .try_insert(flat_discount_curve_with_day_count(
             0.0,
             as_of,
             "USD-OIS",
             DayCount::Act365F,
         ))
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             InflationCurve::builder("US-CPI")
                 .base_date(date!(2025 - 12 - 01))
                 .day_count(DayCount::Act365F)
@@ -112,6 +115,7 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
                 .build()
                 .unwrap(),
         )
+        .expect("insert market curve")
         .insert_inflation_index(
             InflationIndex::new("US-CPI", vec![], Currency::USD, as_of)
                 .unwrap()
@@ -212,13 +216,14 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
     }])
     .unwrap();
     let market = MarketContext::new()
-        .insert(flat_discount_curve_with_day_count(
+        .try_insert(flat_discount_curve_with_day_count(
             0.0,
             as_of,
             "USD-OIS",
             DayCount::Act365F,
         ))
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             InflationCurve::builder("US-CPI")
                 .base_date(date!(2025 - 12 - 01))
                 .day_count(DayCount::Act365F)
@@ -228,6 +233,7 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
                 .build()
                 .unwrap(),
         )
+        .expect("insert market curve")
         .insert_inflation_index(index.clone())
         .insert_surface(
             finstack_quant_valuations_test_support::volatility::relabel_quote_type(
@@ -316,8 +322,10 @@ fn test_caplet_intrinsic_after_fixing() {
     let vol_surface = flat_vol_surface("US-CPI-VOL", &[0.25], &[0.02], 0.20);
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(infl_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve")
         .insert_inflation_index(index)
         .insert_surface(vol_surface);
 
@@ -391,8 +399,10 @@ fn test_floor_value_with_negative_forward_normal_model() {
         );
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(infl_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(infl_curve)
+        .expect("insert market curve")
         .insert_inflation_index(index)
         .insert_surface(vol_surface);
 

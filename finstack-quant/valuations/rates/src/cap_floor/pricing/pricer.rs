@@ -55,6 +55,7 @@ pub(crate) fn resolve_caplet_volatility(
             strike,
             convention,
             clamp: true,
+            required_cube_clock: None,
         },
     )
 }

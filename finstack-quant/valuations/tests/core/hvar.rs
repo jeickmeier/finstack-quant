@@ -34,7 +34,9 @@ fn usd_ois_curve(as_of: Date) -> Result<DiscountCurve> {
 }
 
 fn usd_ois_market(as_of: Date) -> Result<MarketContext> {
-    Ok(MarketContext::new().insert(usd_ois_curve(as_of)?))
+    Ok(MarketContext::new()
+        .try_insert(usd_ois_curve(as_of)?)
+        .expect("insert market curve"))
 }
 
 /// Fixed-rate USD bond used by the VaR tests.

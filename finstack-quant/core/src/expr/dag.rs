@@ -2,13 +2,14 @@
 
 use super::ast::*;
 use crate::FxHashMap;
+use smallvec::{SmallVec, smallvec};
 
 /// Scalar operation without recursively owned child expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Operation {
     /// Read a named input column.
     Column(String),
-    /// Literal f64 bits, preserving signed zero and NaN payload identity.
+    /// Literal f64 bits, preserving signed zero identity.
     Literal(u64),
     /// Invoke an elementwise function.
     Call(Function),
@@ -28,7 +29,7 @@ pub(crate) struct DagNode {
     /// Scalar operation applied by this node.
     pub operation: Operation,
     /// Child node indices in the original operand order.
-    pub dependencies: Vec<u64>,
+    pub dependencies: SmallVec<[u64; 3]>,
 }
 
 const MAX_DAG_RECURSION_DEPTH: usize = 512;
@@ -42,67 +43,116 @@ pub(crate) struct ExecutionPlan {
     pub root: u64,
 }
 
-enum Frame {
-    Visit(Expr, usize),
+enum Frame<'a> {
+    Visit(&'a Expr, usize),
     Finish(Operation, usize),
 }
 
-/// Compile by iterative, left-to-right postorder traversal.
-///
-/// Depth and scalar-support validation happen before visiting children; neither
-/// deduplication nor cleanup hashes, clones, or drops a recursive subtree.
+fn allocation_error(error: std::collections::TryReserveError) -> crate::Error {
+    crate::Error::Validation(format!(
+        "could not allocate scalar expression plan: {error}"
+    ))
+}
+
+fn call_operation(function: Function, children: &[Expr]) -> crate::Result<Operation> {
+    if !function.is_scalar_evaluable() {
+        return Err(crate::Error::Validation(format!(
+            "Expression function '{function}' is a statements-layer function"
+        )));
+    }
+    let arity = match function {
+        Function::Pow => 2..=2,
+        Function::Clamp => 3..=3,
+        Function::Round => 1..=2,
+        _ => 1..=1,
+    };
+    if !arity.contains(&children.len()) {
+        return Err(crate::Error::Validation(format!(
+            "{function} received {} arguments, expected {arity:?}",
+            children.len()
+        )));
+    }
+    if function == Function::Round && children.len() == 2 {
+        match children[1].node {
+            ExprNode::Literal(d)
+                if (i32::MIN as f64..=i32::MAX as f64).contains(&d) && d.fract() == 0.0 => {}
+            _ => {
+                return Err(crate::Error::Validation(
+                    "round digits must be a direct integer literal in the i32 range".into(),
+                ));
+            }
+        }
+    }
+    Ok(Operation::Call(function))
+}
+
+/// Drain an owned tree iteratively on both successful compilation and rejection.
 pub(crate) fn build_plan(expr: Expr) -> crate::Result<ExecutionPlan> {
+    let result = build_borrowed_plan(&expr);
+    discard_tree(expr);
+    result
+}
+
+/// Compile a borrowed AST without recursively cloning it.
+pub(crate) fn build_borrowed_plan(expr: &Expr) -> crate::Result<ExecutionPlan> {
     let mut pending = vec![Frame::Visit(expr, 0)];
     let mut results = Vec::new();
     let mut nodes = Vec::new();
     let mut cache = FxHashMap::default();
+    let mut visited = 0;
 
     while let Some(frame) = pending.pop() {
         match frame {
             Frame::Visit(expr, depth) => {
+                visited += 1;
+                if visited > 100_000 {
+                    return Err(crate::Error::Validation(
+                        "expression exceeds 100,000 syntax nodes".into(),
+                    ));
+                }
                 if depth >= MAX_DAG_RECURSION_DEPTH {
-                    pending.push(Frame::Visit(expr, depth));
-                    discard_pending(pending);
                     return Err(crate::Error::Validation(format!(
                         "Execution plan exceeded maximum DAG recursion depth of {MAX_DAG_RECURSION_DEPTH}"
                     )));
                 }
-
-                let (operation, children) = match expr.node {
-                    ExprNode::Column(name) => (Operation::Column(name), Vec::new()),
-                    ExprNode::Literal(value) => (Operation::Literal(value.to_bits()), Vec::new()),
-                    ExprNode::Call(function, children) => {
-                        if !function.is_scalar_evaluable() {
-                            pending
-                                .extend(children.into_iter().map(|child| Frame::Visit(child, 0)));
-                            discard_pending(pending);
-                            return Err(crate::Error::Validation(format!(
-                                "Expression function '{function}' is a statements-layer function; \
-                                 compile it via the statements crate instead of core::expr::CompiledExpr::new"
-                            )));
-                        }
-                        (Operation::Call(function), children)
+                let (operation, children): (_, SmallVec<[&Expr; 3]>) = match &expr.node {
+                    ExprNode::Column(name) => (Operation::Column(name.clone()), smallvec![]),
+                    ExprNode::Literal(value) if value.is_finite() => {
+                        (Operation::Literal(value.to_bits()), smallvec![])
                     }
-                    ExprNode::BinOp { op, left, right } => {
-                        (Operation::BinOp(op), vec![*left, *right])
+                    ExprNode::Literal(_) => {
+                        return Err(crate::Error::Validation(
+                            "scalar expression literal must be finite".into(),
+                        ));
                     }
-                    ExprNode::UnaryOp { op, operand } => (Operation::UnaryOp(op), vec![*operand]),
+                    ExprNode::Call(function, children) => (
+                        call_operation(*function, children)?,
+                        children.iter().collect(),
+                    ),
+                    ExprNode::BinOp { op, left, right } => (
+                        Operation::BinOp(*op),
+                        smallvec![left.as_ref(), right.as_ref()],
+                    ),
+                    ExprNode::UnaryOp { op, operand } => {
+                        (Operation::UnaryOp(*op), smallvec![operand.as_ref()])
+                    }
                     ExprNode::IfThenElse {
                         condition,
                         then_expr,
                         else_expr,
                     } => (
                         Operation::IfThenElse,
-                        vec![*condition, *then_expr, *else_expr],
+                        smallvec![condition.as_ref(), then_expr.as_ref(), else_expr.as_ref()],
                     ),
                     ExprNode::CsRef { .. } => {
-                        discard_pending(pending);
                         return Err(crate::Error::Validation(
-                            "capital-structure references require the statements evaluator"
-                                .to_string(),
+                            "capital-structure references require the statements evaluator".into(),
                         ));
                     }
                 };
+                pending
+                    .try_reserve(1 + children.len())
+                    .map_err(allocation_error)?;
                 pending.push(Frame::Finish(operation, children.len()));
                 pending.extend(
                     children
@@ -112,12 +162,17 @@ pub(crate) fn build_plan(expr: Expr) -> crate::Result<ExecutionPlan> {
                 );
             }
             Frame::Finish(operation, child_count) => {
-                let dependencies = results.split_off(results.len() - child_count);
+                // Scalar operations have at most three inputs. Their IDs stay
+                // inline in both the DAG node and its structural deduplication key.
+                let dependencies: SmallVec<[u64; 3]> =
+                    results.drain(results.len() - child_count..).collect();
                 let key = (operation, dependencies);
                 let id = if let Some(&id) = cache.get(&key) {
                     id
                 } else {
                     let id = nodes.len() as u64;
+                    nodes.try_reserve(1).map_err(allocation_error)?;
+                    cache.try_reserve(1).map_err(allocation_error)?;
                     nodes.push(DagNode {
                         id,
                         operation: key.0.clone(),
@@ -126,11 +181,11 @@ pub(crate) fn build_plan(expr: Expr) -> crate::Result<ExecutionPlan> {
                     cache.insert(key, id);
                     id
                 };
+                results.try_reserve(1).map_err(allocation_error)?;
                 results.push(id);
             }
         }
     }
-
     let root = results[0];
     debug_assert!(
         nodes
@@ -149,28 +204,24 @@ pub(crate) fn build_plan(expr: Expr) -> crate::Result<ExecutionPlan> {
 }
 
 /// Drain rejected owned trees without recursive `Expr` destruction.
-fn discard_pending(mut pending: Vec<Frame>) {
-    while let Some(frame) = pending.pop() {
-        let Frame::Visit(expr, _) = frame else {
-            continue;
-        };
+fn discard_tree(expr: Expr) {
+    let mut pending = vec![expr];
+    while let Some(expr) = pending.pop() {
         match expr.node {
-            ExprNode::Call(_, args) => {
-                pending.extend(args.into_iter().map(|arg| Frame::Visit(arg, 0)))
-            }
+            ExprNode::Call(_, args) => pending.extend(args),
             ExprNode::BinOp { left, right, .. } => {
-                pending.push(Frame::Visit(*left, 0));
-                pending.push(Frame::Visit(*right, 0));
+                pending.push(*left);
+                pending.push(*right);
             }
-            ExprNode::UnaryOp { operand, .. } => pending.push(Frame::Visit(*operand, 0)),
+            ExprNode::UnaryOp { operand, .. } => pending.push(*operand),
             ExprNode::IfThenElse {
                 condition,
                 then_expr,
                 else_expr,
             } => {
-                pending.push(Frame::Visit(*condition, 0));
-                pending.push(Frame::Visit(*then_expr, 0));
-                pending.push(Frame::Visit(*else_expr, 0));
+                pending.push(*condition);
+                pending.push(*then_expr);
+                pending.push(*else_expr);
             }
             ExprNode::Column(_) | ExprNode::Literal(_) | ExprNode::CsRef { .. } => {}
         }
@@ -258,22 +309,16 @@ mod tests {
     }
 
     #[test]
-    fn literal_identity_preserves_zero_sign_and_nan_payloads() {
-        for (left, right) in [
-            (0.0, -0.0),
-            (
-                f64::from_bits(0x7ff8_0000_0000_0001),
-                f64::from_bits(0x7ff8_0000_0000_0002),
-            ),
-        ] {
-            let plan = build_plan(Expr::bin_op(
-                BinOp::Add,
-                Expr::literal(left),
-                Expr::literal(right),
-            ))
-            .expect("valid literals");
-            assert_eq!(plan.nodes.len(), 3);
-            assert_ne!(plan.nodes[0].operation, plan.nodes[1].operation);
+    fn literal_identity_preserves_signed_zero_and_rejects_nonfinite_numbers() {
+        let plan = build_plan(Expr::bin_op(
+            BinOp::Add,
+            Expr::literal(0.0),
+            Expr::literal(-0.0),
+        ))
+        .unwrap();
+        assert_eq!(plan.nodes.len(), 3);
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(build_plan(Expr::literal(invalid)).is_err());
         }
     }
 
@@ -286,6 +331,31 @@ mod tests {
 
         let plan = build_plan(expr).expect("AST below the depth limit should build a plan");
         assert_eq!(plan.nodes.len(), MAX_DAG_RECURSION_DEPTH);
+    }
+
+    #[test]
+    fn occurrence_limit_applies_before_subexpression_deduplication() {
+        fn repeated(leaves: usize) -> Expr {
+            if leaves == 1 {
+                Expr::literal(1.0)
+            } else {
+                Expr::bin_op(
+                    BinOp::Add,
+                    repeated(leaves / 2),
+                    repeated(leaves - leaves / 2),
+                )
+            }
+        }
+        // 50,000 leaves and 49,999 binary operators; the unary root makes 100,000.
+        let admitted = Expr::unary_op(UnaryOp::Neg, repeated(50_000));
+        assert!(build_borrowed_plan(&admitted).is_ok());
+        let rejected = Expr::unary_op(UnaryOp::Neg, admitted);
+        assert!(
+            build_plan(rejected)
+                .unwrap_err()
+                .to_string()
+                .contains("100,000")
+        );
     }
 
     #[test]

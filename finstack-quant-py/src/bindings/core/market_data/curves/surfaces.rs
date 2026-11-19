@@ -363,7 +363,7 @@ impl_repr_html_via_dataframe!(PyVolSurface);
 /// Example
 /// -------
 /// >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-/// >>> surface = FxDeltaVolSurface("EURUSD", "EUR/USD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
+/// >>> surface = FxDeltaVolSurface("EURUSD", "EUR/USD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007], delta_convention="forward_unadjusted", atm_convention="delta_neutral_straddle", butterfly_convention="smile")
 /// >>> len(surface.expiries)
 /// 2
 #[pyclass(
@@ -407,12 +407,12 @@ impl PyFxDeltaVolSurface {
     ///     10-delta risk reversal per expiry; requires ``bf_10d``.
     /// bf_10d : list[float], optional
     ///     10-delta smile butterfly per expiry; requires ``rr_10d``.
-    /// delta_convention : str, default="forward_unadjusted"
-    ///     FX option delta quoting convention.
-    /// atm_convention : str, default="delta_neutral_straddle"
-    ///     FX option ATM quoting convention.
-    /// butterfly_convention : str, default="smile"
-    ///     FX option butterfly quoting convention.
+    /// delta_convention : str
+    ///     Required FX delta convention (``"forward_unadjusted"``).
+    /// atm_convention : str
+    ///     Required ATM convention (``"delta_neutral_straddle"``).
+    /// butterfly_convention : str
+    ///     Required butterfly convention (``"smile"``).
     /// expiry_clock : VolatilityClock, optional
     ///     Calendar/day-count clock for resolving expiry dates to year fractions.
     ///
@@ -422,16 +422,18 @@ impl PyFxDeltaVolSurface {
     ///     If ``pair`` or conventions are invalid, only one of ``rr_10d`` / ``bf_10d``
     ///     is given, any vector is empty or mismatched in length, expiries are not
     ///     strictly increasing and positive, or a quote is non-finite.
+    /// TypeError
+    ///     If a required convention is omitted or an option is unknown.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-    /// >>> FxDeltaVolSurface("EURUSD", "EUR/USD", [1.0], [0.09], [0.015], [0.007]).atm_vols
+    /// >>> FxDeltaVolSurface("EURUSD", "EUR/USD", [1.0], [0.09], [0.015], [0.007], delta_convention="forward_unadjusted", atm_convention="delta_neutral_straddle", butterfly_convention="smile").atm_vols
     /// [0.09]
     #[new]
     #[pyo3(
         signature = (id, pair, expiries, atm_vols, rr_25d, bf_25d, **options),
-        text_signature = "(id, pair, expiries, atm_vols, rr_25d, bf_25d, *, rr_10d=None, bf_10d=None, delta_convention='forward_unadjusted', atm_convention='delta_neutral_straddle', butterfly_convention='smile', expiry_clock=None)"
+        text_signature = "(id, pair, expiries, atm_vols, rr_25d, bf_25d, *, delta_convention, atm_convention, butterfly_convention, rr_10d=None, bf_10d=None, expiry_clock=None)"
     )]
     fn new(
         id: &str,
@@ -442,9 +444,7 @@ impl PyFxDeltaVolSurface {
         bf_25d: Vec<f64>,
         options: Option<&Bound<'_, pyo3::types::PyDict>>,
     ) -> PyResult<Self> {
-        use finstack_quant_core::market_data::surfaces::{
-            FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurfaceParams,
-        };
+        use finstack_quant_core::market_data::surfaces::FxDeltaVolSurfaceParams;
         use finstack_quant_core::money::fx::CurrencyPair;
         use finstack_quant_core::types::CurveId;
 
@@ -468,9 +468,9 @@ impl PyFxDeltaVolSurface {
 
         let mut rr_10d: Option<Vec<f64>> = None;
         let mut bf_10d: Option<Vec<f64>> = None;
-        let mut delta_convention = FxDeltaConvention::ForwardUnadjusted;
-        let mut atm_convention = FxAtmConvention::DeltaNeutralStraddle;
-        let mut butterfly_convention = FxButterflyConvention::Smile;
+        let mut delta_convention = None;
+        let mut atm_convention = None;
+        let mut butterfly_convention = None;
         let mut expiry_clock: Option<finstack_quant_core::dates::VolatilityClock> = None;
 
         if let Some(opts) = options {
@@ -481,15 +481,15 @@ impl PyFxDeltaVolSurface {
                     "bf_10d" => bf_10d = value.extract::<Option<Vec<f64>>>()?,
                     "delta_convention" => {
                         let raw: String = value.extract()?;
-                        delta_convention = raw.parse().map_err(core_to_py)?;
+                        delta_convention = Some(raw.parse().map_err(core_to_py)?);
                     }
                     "atm_convention" => {
                         let raw: String = value.extract()?;
-                        atm_convention = raw.parse().map_err(core_to_py)?;
+                        atm_convention = Some(raw.parse().map_err(core_to_py)?);
                     }
                     "butterfly_convention" => {
                         let raw: String = value.extract()?;
-                        butterfly_convention = raw.parse().map_err(core_to_py)?;
+                        butterfly_convention = Some(raw.parse().map_err(core_to_py)?);
                     }
                     "expiry_clock" => {
                         expiry_clock = value
@@ -510,12 +510,18 @@ impl PyFxDeltaVolSurface {
             }
         }
 
+        let missing = |key: &str| {
+            pyo3::exceptions::PyTypeError::new_err(format!(
+                "FxDeltaVolSurface() missing required keyword-only argument '{key}'"
+            ))
+        };
         let surface = FxDeltaVolSurface::from_params(FxDeltaVolSurfaceParams {
             id: CurveId::from(id),
             pair: parsed_pair,
-            delta_convention,
-            atm_convention,
-            butterfly_convention,
+            delta_convention: delta_convention.ok_or_else(|| missing("delta_convention"))?,
+            atm_convention: atm_convention.ok_or_else(|| missing("atm_convention"))?,
+            butterfly_convention: butterfly_convention
+                .ok_or_else(|| missing("butterfly_convention"))?,
             expiries,
             atm_vols,
             rr_25d,

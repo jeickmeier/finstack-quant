@@ -26,6 +26,7 @@ const values: Record<string, unknown> = {
     [0.25, 0.987654321],
     [2, 0.92],
   ],
+  level_kind: "price",
   recovery_rate: 0.4,
   detachment_points: [0.03, 0.07],
   correlations: [0.2, 0.3],

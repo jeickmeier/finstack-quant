@@ -40,9 +40,8 @@ fn parse_formula(formula: &str) -> PyResult<String> {
 
 /// Parse and compile a formula, raising if either step fails.
 ///
-/// Compilation lowers the AST onto the core expression engine and rejects
-/// unsupported functions, wrong arities, and malformed capital-structure
-/// references that a bare parse would accept.
+/// Compilation produces the shared expression AST for the period-aware statements
+/// evaluator. It checks supported functions, arities and capital-structure references.
 ///
 /// Parameters
 /// ----------

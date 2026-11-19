@@ -4221,8 +4221,8 @@
               "id": "CDX-NA-IG-46_CORR",
               "detachment_points": [3, 7.000000000000001, 10, 15, 30],
               "correlations": [
-                0.20066202917964343, 0.21114989424065894, 0.21967934115491977,
-                0.23177041604877657, 0.24896498909816928
+                0.2006620291796435, 0.21114989424065905, 0.2196793411549211,
+                0.2317704160487788, 0.24896498909818054
               ]
             },
             {
@@ -4471,11 +4471,11 @@
         "report": {
           "success": true,
           "residuals": {
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 6.938893903900001e-13,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 9.154135782729602e-11,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 3.5041414214733333e-12,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 3.4694469519666666e-13,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 9.214417423519802e-11,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 3.4347524824339997e-12,
             "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 1.3010426069749997e-13,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 1.1275702593833333e-12,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 1.1564823173333334e-13,
             "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 6.628812082576374e-8,
             "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.8919327909872052e-8,
             "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000005797814485453134,
@@ -4489,11 +4489,11 @@
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.7284841053187847e-9
           },
           "iterations": 436,
-          "objective_value": 0.0000014546190555132,
-          "max_residual": 9.154135782729602e-14,
-          "rmse": 2.7133161880438533e-14,
+          "objective_value": 0.0000014546190555155337,
+          "max_residual": 9.214417423519803e-14,
+          "rmse": 2.725798460563413e-14,
           "max_residual_ratio": 0.000005797814485453134,
-          "rmse_ratio": 0.0000014546190555132,
+          "rmse_ratio": 0.0000014546190555155337,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -4577,18 +4577,18 @@
           "CDX-NA-IG-46-BASE-CORR-STEP": {
             "success": true,
             "residuals": {
-              "CDX-IG-46-0-3": 6.9388939039e-16,
-              "CDX-IG-46-10-15": 9.154135782729602e-14,
-              "CDX-IG-46-15-30": 3.5041414214733333e-15,
-              "CDX-IG-46-3-7": 1.3010426069749997e-16,
-              "CDX-IG-46-7-10": 1.1275702593833333e-15
+              "CDX-IG-46-0-3": 3.469446951966667e-16,
+              "CDX-IG-46-10-15": 9.214417423519803e-14,
+              "CDX-IG-46-15-30": 3.434752482434e-15,
+              "CDX-IG-46-3-7": -1.3010426069749997e-16,
+              "CDX-IG-46-7-10": 1.1564823173333334e-16
             },
             "iterations": 36,
-            "objective_value": 4.097284228427735e-14,
-            "max_residual": 9.154135782729602e-14,
-            "rmse": 4.097284228427735e-14,
+            "objective_value": 4.123711202874372e-14,
+            "max_residual": 9.214417423519803e-14,
+            "rmse": 4.123711202874372e-14,
             "validation_passed": true,
-            "convergence_reason": "generic bootstrap calibration converged: max_residual (9.15e-14) within tolerance (1.00e-3)",
+            "convergence_reason": "generic bootstrap calibration converged: max_residual (9.21e-14) within tolerance (1.00e-3)",
             "metadata": {
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
@@ -4612,7 +4612,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "CDX-IG-46-10-15",
-            "worst_quote_residual": 9.154135782729602e-14,
+            "worst_quote_residual": 9.214417423519803e-14,
             "success_tolerance": 0.001,
             "solver_method": "sequential_bootstrap",
             "residual_units": "discounted_upfront_fraction"
@@ -5850,8 +5850,8 @@
                   "sabr": {
                     "alpha": 0.3602999968224336,
                     "beta": 1,
-                    "nu": 0.0010000000071288242,
-                    "rho": -0.00019570775029709164
+                    "rho": -0.00019570775029709164,
+                    "nu": 0.0010000000071288242
                   }
                 },
                 "iterations": 627,
@@ -5863,8 +5863,8 @@
                   "sabr": {
                     "alpha": 0.36999998897241193,
                     "beta": 1,
-                    "nu": 0.0010000000000000024,
-                    "rho": -0.00016331994867868627
+                    "rho": -0.00016331994867868627,
+                    "nu": 0.0010000000000000024
                   }
                 },
                 "iterations": 342,
@@ -5876,8 +5876,8 @@
                   "sabr": {
                     "alpha": 0.37999997246642037,
                     "beta": 1,
-                    "nu": 0.001,
-                    "rho": -0.000009423449983780863
+                    "rho": -0.000009423449983780863,
+                    "nu": 0.001
                   }
                 },
                 "iterations": 341,
@@ -7120,7 +7120,18 @@
                 0.0579957607034755, 0.06369644107217762, 0.07733886065762598,
                 0.0702358752534414, 0.07893180395314672, 0.10264113138434476
               ],
-              "interpolation_mode": "vol"
+              "interpolation_mode": "vol",
+              "expiry_clock": {
+                "reference_date": "2026-05-08",
+                "day_count": "act_365f",
+                "context": {
+                  "calendar_id": null,
+                  "frequency": null,
+                  "bus_basis": null,
+                  "coupon_period": null,
+                  "end_is_termination_date": null
+                }
+              }
             }
           ],
           "hierarchy": null
@@ -8204,8 +8215,8 @@
                   "sabr": {
                     "alpha": 3.296927281003191,
                     "beta": 0.5,
-                    "nu": 0.4099276635374178,
-                    "rho": -0.99
+                    "rho": -0.99,
+                    "nu": 0.4099276635374178
                   }
                 },
                 "iterations": 183,
@@ -8217,8 +8228,8 @@
                   "sabr": {
                     "alpha": 3.161298638317383,
                     "beta": 0.5,
-                    "nu": 0.4203054407052673,
-                    "rho": -0.99
+                    "rho": -0.99,
+                    "nu": 0.4203054407052673
                   }
                 },
                 "iterations": 186,
@@ -8230,8 +8241,8 @@
                   "sabr": {
                     "alpha": 3.0199191024776932,
                     "beta": 0.5,
-                    "nu": 0.43703951529368185,
-                    "rho": -0.98999999999999
+                    "rho": -0.98999999999999,
+                    "nu": 0.43703951529368185
                   }
                 },
                 "iterations": 245,

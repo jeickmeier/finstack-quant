@@ -281,7 +281,11 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard");
-        let market = MarketContext::new().insert(disc).insert(hz);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(hz)
+            .expect("insert market curve");
 
         let pv = RevolvingCreditPricer::price(&facility, &market, start)
             .expect("price")
@@ -357,7 +361,11 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard");
-        let market = MarketContext::new().insert(disc).insert(hz);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(hz)
+            .expect("insert market curve");
 
         let pv = RevolvingCreditPricer::price(&facility, &market, as_of)
             .expect("price")
@@ -606,7 +614,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build");
-        let market = MarketContext::new().insert(disc_curve);
+        let market = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve");
 
         let result = RevolvingCreditPricer::price_with_paths(&facility, &market, start)
             .expect("should price");
@@ -726,7 +736,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let result = RevolvingCreditPricer::price_with_paths(&facility, &market, start)
             .expect("should price");
@@ -851,7 +863,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build");
-        let market = MarketContext::new().insert(disc_curve);
+        let market = MarketContext::new()
+            .try_insert(disc_curve)
+            .expect("insert market curve");
 
         let r1 = RevolvingCreditPricer::price_with_paths(&make_facility(), &market, start)
             .expect("first run should price");
@@ -967,7 +981,11 @@ mod tests {
             .knots([(1.0, 0.05), (5.0, 0.05)])
             .build()
             .expect("hazard");
-        let market = MarketContext::new().insert(disc).insert(hz);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(hz)
+            .expect("insert market curve");
 
         let pv_default =
             RevolvingCreditPricer::price_with_paths(&make_facility(None), &market, start)
@@ -1038,16 +1056,18 @@ mod tests {
 
     fn seed_test_market() -> MarketContext {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-        MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(start)
-                .day_count(DayCount::Act365F)
-                .knots([(0.0, 1.0), (5.0, (-0.15f64).exp())])
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("curve"),
-        )
+        MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(start)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 1.0), (5.0, (-0.15f64).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert market curve")
     }
 
     /// The revolver seeds from `model_config.mc_seed_scenario` through

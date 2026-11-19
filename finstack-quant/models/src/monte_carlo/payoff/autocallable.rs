@@ -308,7 +308,6 @@ impl Payoff for AutocallablePayoff {
         // knock-in. The minimum is therefore recorded inside the observation-date
         // loop, one sample per observation date, not once per time step.
         if self.autocalled_at.is_none() {
-            const EPS: f64 = 1e-6;
             // Consume every observation date now due. A single MC time step can
             // jump past multiple observation dates (coarse grid, or final step);
             // each must be evaluated in order so a barrier breach at any of them
@@ -318,7 +317,7 @@ impl Payoff for AutocallablePayoff {
                 let obs_date = self.observation_dates[idx];
                 // Forward-looking check: we're at or past this observation date
                 // (avoids missing dates when MC time steps don't align exactly).
-                if state.time < obs_date - EPS {
+                if state.time < obs_date {
                     break;
                 }
                 self.next_obs_idx = idx + 1;
@@ -357,8 +356,7 @@ impl Payoff for AutocallablePayoff {
         // to a post-observation `expiry` must NOT overwrite it with drifted
         // spot.
         if let Some(&last_date) = self.observation_dates.last() {
-            const EPS: f64 = 1e-6;
-            if self.final_spot <= 0.0 && state.time >= last_date - EPS {
+            if self.final_spot <= 0.0 && state.time >= last_date {
                 self.final_spot = spot;
             }
         } else {
@@ -440,6 +438,11 @@ mod tests {
                 participation_rate: 1.0,
             }, cap_level: 1.2, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0, 1.0] })
         .expect("test fixture is well-formed");
+
+        let mut early = PathState::new(9, 0.25_f64.next_down());
+        early.set(state_keys::SPOT, 106.0);
+        payoff.on_event(&mut early).unwrap();
+        assert!(payoff.autocalled_at.is_none());
 
         // Simulate first observation date with spot above barrier
         let mut state = PathState::new(10, 0.25);

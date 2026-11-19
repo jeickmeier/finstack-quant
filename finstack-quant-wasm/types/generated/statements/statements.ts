@@ -1729,25 +1729,6 @@ export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "
  */
 export type OptionType = "call" | "put";
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
-/**
- * Finite JSON number in the closed interval `[0, 1]`.
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
- * Finite JSON number greater than or equal to zero.
- */
-export type NonNegativeF64Wire = number;
-/**
- * Finite correlation coefficient in the closed interval `[-1, 1]`.
- */
-export type CorrelationWire = number;
-/**
  * Volatility convention (Black lognormal or Bachelier normal) used to price
  * a swaption. Wire values: `black`, `normal`.
  */
@@ -3620,11 +3601,17 @@ export interface ModelConfig {
   vol_surface_extrapolation?: VolSurfaceExtrapolation;
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface PiecewiseConstantCurve {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Configuration for Monte Carlo PIK bond pricing.
@@ -6579,34 +6566,35 @@ export interface Swaption {
    */
   vol_model: VolatilityModel;
   /**
-   * Volatility surface ID for option pricing
+   * Volatility source ID for option pricing. A dated SABR cube needs an
+   * ACT/365F expiry clock anchored at the valuation date.
    */
   vol_surface_id: Id;
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface SabrParameters {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
-  alpha: PositiveF64Wire;
+  alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
-  beta: ClosedUnitIntervalF64Wire;
+  beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
-  nu: NonNegativeF64Wire;
+  nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
-  rho: CorrelationWire;
+  rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: PositiveF64Wire | null;
+  shift?: number | null;
 }
 /**
  * Waterfall specification for dynamic cash flow allocation.

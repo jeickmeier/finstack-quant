@@ -910,23 +910,11 @@ fn standard_error_in_pct_of_par() {
     );
 }
 
-// Antithetic complementary-uniform regression guard (W15)
-//
-// The antithetic path uses sign-flipped normals.  Its Brownian-bridge
-// barrier-crossing test must use the *complementary* uniform `1 - u`
-// (where the base path uses `u`) so that the two legs remain negatively
-// correlated in their default decisions.  Before this fix both legs used
-// the same raw `uniforms[step]`, which partially defeated variance
-// reduction and produced a subtly biased `default_rate`.
-//
-// This test pins the *corrected* `default_rate` and `clean_price_pct` for
-// a fixed seed.  It is a deterministic value-pinning guard: if the
-// complementary-uniform logic is regressed the output changes measurably
-// and this test will fail.
 #[test]
 fn antithetic_bridge_uses_complementary_uniform() {
     let config = MertonMcConfig::new(test_merton(), 0.40)
         .expect("0.40 recovery should be valid")
+        .steps_per_year(12)
         .barrier_crossing(BarrierCrossing::BrownianBridge);
     let config_run = MertonMcRun {
         num_paths: 5000,
@@ -936,30 +924,24 @@ fn antithetic_bridge_uses_complementary_uniform() {
     let result =
         MertonMcEngine::price(100.0, 0.08, 5.0, 2, &config, &config_run, 0.04).expect("ok");
 
-    // Pinned post-fix values (seed=777, 10_000 paths, antithetic=true).
-    // The pre-fix (biased) values were default_rate=0.1889 and
-    // clean_price_pct≈106.197, confirming the fix has an observable effect.
-    let expected_default_rate = 0.1882_f64;
-    let expected_price = 106.109_28_f64;
-
+    // An independent PCG64/reflected Box–Muller calculation evolves
+    // log(V/B), counts the first default month, then discounts each month's
+    // recovery and surviving coupons. Using 1-u on the mirror leg gives
+    // 1,925 defaults. Reusing u gives 1,914 and a price of 105.86241187685.
+    let expected_default_rate = 1_925.0 / 10_000.0;
+    let expected_price = 105.798_557_343_964_09;
+    assert_eq!(result.path_statistics.default_rate, expected_default_rate);
     assert!(
-        (result.path_statistics.default_rate - expected_default_rate).abs() < 1e-9,
-        "Antithetic default_rate should be {expected_default_rate} (complementary uniform), \
-         got {}",
-        result.path_statistics.default_rate
-    );
-    assert!(
-        (result.clean_price_pct - expected_price).abs() < 1e-3,
-        "clean_price_pct should be ≈{expected_price} (complementary uniform), got {}",
+        (result.clean_price_pct - expected_price).abs() < 5e-10,
+        "expected complementary-uniform price {expected_price}, got {}",
         result.clean_price_pct
     );
 
-    // Also verify determinism is preserved with the fixed seed.
-    let result2 =
+    let replay =
         MertonMcEngine::price(100.0, 0.08, 5.0, 2, &config, &config_run, 0.04).expect("ok");
-    assert!(
-        (result.clean_price_pct - result2.clean_price_pct).abs() < 1e-10,
-        "Same seed must give identical results after fix"
+    assert_eq!(
+        result.clean_price_pct.to_bits(),
+        replay.clean_price_pct.to_bits()
     );
 }
 

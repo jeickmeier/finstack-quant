@@ -662,7 +662,7 @@ fn span_len2_cross_year() {
         len: 2,
         offset: 0,
     }];
-    let rules = Calendar::new("span2", "span2", false, &RULES, None);
+    let rules = Calendar::new("span2", "span2", false, &RULES, None, &[]);
 
     let dec31 = Date::from_calendar_date(2024, Month::December, 31).unwrap();
     let jan01 = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -680,7 +680,7 @@ fn span_len3_cross_year() {
         len: 3,
         offset: 0,
     }];
-    let rules = Calendar::new("span3", "span3", false, &RULES, None);
+    let rules = Calendar::new("span3", "span3", false, &RULES, None, &[]);
 
     let dec31 = Date::from_calendar_date(2024, Month::December, 31).unwrap();
     let jan01 = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -797,7 +797,7 @@ fn rule_slice_as_holiday_calendar() {
         Rule::fixed(Month::January, 1),
         Rule::fixed(Month::December, 25),
     ];
-    let rules = Calendar::new("two", "two", false, &RULES, None);
+    let rules = Calendar::new("two", "two", false, &RULES, None, &[]);
 
     assert!(
         rules
@@ -824,7 +824,7 @@ fn rule_multiple_rules_combine() {
         Rule::fixed(Month::December, 25),
         Rule::EasterOffset(-3),
     ];
-    let rules = Calendar::new("four", "four", false, &RULES, None);
+    let rules = Calendar::new("four", "four", false, &RULES, None, &[]);
 
     // New Year
     assert!(
@@ -1008,7 +1008,7 @@ fn builtin_holiday_tables_match_the_golden_digest() {
         ("asx", 407, 0x562f94d9a8395ae3),
         ("auce", 511, 0x93a3ba8008ace0b1),
         ("brbd", 628, 0xfaf34cc79f97c0b0),
-        ("bse", 344, 0x4f6940e3aeb6d601),
+        ("bse", 348, 0x23eb0d140db0b724),
         ("cato", 563, 0x84a81d6ece4493e3),
         ("chzh", 509, 0x69249a421ace77c3),
         ("defr", 611, 0x23d85b00a52ec849),
@@ -1019,11 +1019,11 @@ fn builtin_holiday_tables_match_the_golden_digest() {
         ("jpto", 1024, 0xdfb9b3e2d779fd7c),
         ("jpx", 1024, 0xdfb9b3e2d779fd7c),
         ("nerc", 306, 0x81d04023aa563815),
-        ("nse", 347, 0x97a4d6dfe973c313),
+        ("nse", 348, 0x23eb0d140db0b724),
         ("nyse", 473, 0xe00377d3e1e2227a),
         ("nzau", 579, 0x53401325779bdc60),
         ("sgsi", 376, 0x90955bf6d4c15387),
-        ("sifma", 569, 0x3fc3982ce4b06a5b),
+        ("sifma", 569, 0x99d7ff4cced9f7fc),
         ("six", 611, 0x25cc4746a8b03eec),
         ("sofr", 581, 0x96bc3645207d7542),
         ("sse", 1193, 0xf308f876d59d6a5d),
@@ -1175,7 +1175,7 @@ fn effective_range_gates_the_nominal_year_and_keeps_spillovers() {
 #[test]
 fn reversed_business_day_ranges_are_errors() {
     static RULES: [Rule; 0] = [];
-    let cal = Calendar::new("reversed", "Reversed", false, &RULES, None);
+    let cal = Calendar::new("reversed", "Reversed", false, &RULES, None, &[]);
     let a = make_date(2025, 1, 6);
     let b = make_date(2025, 1, 13);
     assert_eq!(cal.count_business_days(a, a).expect("equal"), 0);

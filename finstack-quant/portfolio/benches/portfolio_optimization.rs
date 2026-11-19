@@ -34,7 +34,9 @@ fn opt_market(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("bench: discount curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 fn bond_book(n_positions: usize, as_of: Date) -> finstack_quant_portfolio::Portfolio {

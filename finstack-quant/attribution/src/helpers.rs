@@ -14,6 +14,7 @@ use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::Compounding;
@@ -31,6 +32,29 @@ use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::metrics::collect_period_cash;
 use std::sync::Arc;
+
+/// Resolve the same contract expiry on the two observed surface clocks.
+/// Numeric-only grids use a shared ACT/365F opening tenor so that an
+/// unchanged grid cannot contribute a market move through passage of time.
+///
+/// # Arguments
+///
+/// * `opening` - Surface observed at the opening attribution endpoint.
+/// * `closing` - Surface observed at the closing attribution endpoint.
+/// * `expiry` - Instrument's contractual option expiry date.
+/// * `as_of_t0` - Opening valuation date for numeric-only surfaces.
+pub(crate) fn volatility_expiry_times(
+    opening: &VolSurface,
+    closing: &VolSurface,
+    expiry: Date,
+    as_of_t0: Date,
+) -> Result<(f64, f64)> {
+    let resolve = |surface: &VolSurface| match surface.expiry_clock() {
+        Some(clock) => clock.expiry_time(expiry),
+        None => Ok((expiry - as_of_t0).whole_days() as f64 / 365.0),
+    };
+    Ok((resolve(opening)?, resolve(closing)?))
+}
 
 /// Families the instrument declares a pricing dependency on.
 ///
@@ -553,7 +577,7 @@ fn build_flat_ytm_market(
         .interp(InterpStyle::LogLinear)
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
-    Ok(market.clone().insert(flat_curve))
+    market.clone().try_insert(flat_curve)
 }
 
 /// Repo/funding cost of carrying `PV(t0)` from `as_of_t0` to `as_of_t1`
@@ -978,8 +1002,10 @@ mod tests {
                 .expect("curve")
         };
         MarketContext::new()
-            .insert(curve("USD-OIS"))
-            .insert(curve("USD-REPO"))
+            .try_insert(curve("USD-OIS"))
+            .expect("insert market curve")
+            .try_insert(curve("USD-REPO"))
+            .expect("insert market curve")
     }
 
     #[test]
@@ -1223,7 +1249,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("base curve");
-        let market = MarketContext::new().insert(base_curve);
+        let market = MarketContext::new()
+            .try_insert(base_curve)
+            .expect("insert market curve");
 
         let flat = build_flat_ytm_market(&bond, &market, 0.05).expect("flat market");
         let curve = flat.get_discount("USD-OIS").expect("flat curve");
@@ -1280,7 +1308,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("base curve");
-        let market = MarketContext::new().insert(base_curve);
+        let market = MarketContext::new()
+            .try_insert(base_curve)
+            .expect("insert market curve");
 
         let flat = build_flat_ytm_market(&bond, &market, 0.05).expect("flat market");
         let curve = flat.get_discount("EUR-OIS").expect("flat curve");
@@ -1330,7 +1360,11 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("repo");
-        let market = MarketContext::new().insert(ois).insert(repo);
+        let market = MarketContext::new()
+            .try_insert(ois)
+            .expect("insert market curve")
+            .try_insert(repo)
+            .expect("insert market curve");
 
         let mut warnings = Vec::new();
         let mut num_repricings = 0;

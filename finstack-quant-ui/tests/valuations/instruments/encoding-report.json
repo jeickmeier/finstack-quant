@@ -4766,10 +4766,11 @@
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
-          "#/$defs/PositiveF64Wire",
-          "#/$defs/ClosedUnitIntervalF64Wire",
-          "#/$defs/NonNegativeF64Wire",
-          "#/$defs/CorrelationWire",
+          "#/$defs/SabrParameters/properties/alpha",
+          "#/$defs/SabrParameters/properties/beta",
+          "#/$defs/SabrParameters/properties/nu",
+          "#/$defs/SabrParameters/properties/rho",
+          "#/$defs/SabrParameters/properties/shift",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/FutureContractSpecs/properties/face_value",
           "#/$defs/FutureContractSpecs/properties/tick_size",
@@ -4853,12 +4854,14 @@
           "#/$defs/QuantoOption/properties/quantity",
           "#/$defs/QuantoOption/properties/strike",
           "#/$defs/CommoditySpotOptionExercise/properties/spot",
+          "#/$defs/PositiveF64Wire",
           "#/$defs/CommoditySpotOption/properties/quoted_forward",
           "#/$defs/CommodityAsianOption/properties/past_fixings/items/prefixItems/1",
           "#/$defs/CommodityForward/properties/contract_price",
           "#/$defs/CommodityForward/properties/quoted_forward",
           "#/$defs/CommoditySwap/properties/fixed_price",
           "#/$defs/CommoditySwap/properties/past_fixings/items/prefixItems/1",
+          "#/$defs/CorrelationWire",
           "#/$defs/CommoditySpreadOption/properties/strike",
           "#/$defs/CommodityFutureFixing/oneOf/0/properties/realized_price",
           "#/$defs/CommodityFutureFixing/oneOf/1/properties/past_fixings/items/prefixItems/1",
@@ -5064,6 +5067,7 @@
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/low_cpr",
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_down",
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_up",
+          "#/$defs/ClosedUnitIntervalF64Wire",
           "#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
           "#/$defs/Tranche/properties/attach_pct",
           "#/$defs/Tranche/properties/detach_pct",
@@ -5569,6 +5573,7 @@
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
+          "#/$defs/SabrParameters/properties/shift",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/ListedFutureTerms/properties/quoted_price",
           "#/$defs/ListedFutureTerms/properties/settlement_price",
@@ -6052,10 +6057,6 @@
           },
           {
             "pointer": "#/$defs/Swaption/properties/sabr_params",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/SabrParameters/properties/shift",
             "keyword": "anyOf"
           },
           {
@@ -16660,10 +16661,11 @@
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
-          "#/$defs/PositiveF64Wire",
-          "#/$defs/ClosedUnitIntervalF64Wire",
-          "#/$defs/NonNegativeF64Wire",
-          "#/$defs/CorrelationWire",
+          "#/$defs/SabrParameters/properties/alpha",
+          "#/$defs/SabrParameters/properties/beta",
+          "#/$defs/SabrParameters/properties/nu",
+          "#/$defs/SabrParameters/properties/rho",
+          "#/$defs/SabrParameters/properties/shift",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/FutureContractSpecs/properties/face_value",
           "#/$defs/FutureContractSpecs/properties/tick_size",
@@ -16747,12 +16749,14 @@
           "#/$defs/QuantoOption/properties/quantity",
           "#/$defs/QuantoOption/properties/strike",
           "#/$defs/CommoditySpotOptionExercise/properties/spot",
+          "#/$defs/PositiveF64Wire",
           "#/$defs/CommoditySpotOption/properties/quoted_forward",
           "#/$defs/CommodityAsianOption/properties/past_fixings/items/prefixItems/1",
           "#/$defs/CommodityForward/properties/contract_price",
           "#/$defs/CommodityForward/properties/quoted_forward",
           "#/$defs/CommoditySwap/properties/fixed_price",
           "#/$defs/CommoditySwap/properties/past_fixings/items/prefixItems/1",
+          "#/$defs/CorrelationWire",
           "#/$defs/CommoditySpreadOption/properties/strike",
           "#/$defs/CommodityFutureFixing/oneOf/0/properties/realized_price",
           "#/$defs/CommodityFutureFixing/oneOf/1/properties/past_fixings/items/prefixItems/1",
@@ -16962,6 +16966,7 @@
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/low_cpr",
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_down",
           "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_up",
+          "#/$defs/ClosedUnitIntervalF64Wire",
           "#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
           "#/$defs/Tranche/properties/attach_pct",
           "#/$defs/Tranche/properties/detach_pct",
@@ -17463,6 +17468,7 @@
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
+          "#/$defs/SabrParameters/properties/shift",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/ListedFutureTerms/properties/quoted_price",
           "#/$defs/ListedFutureTerms/properties/settlement_price",
@@ -17946,10 +17952,6 @@
           },
           {
             "pointer": "#/$defs/Swaption/properties/sabr_params",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/SabrParameters/properties/shift",
             "keyword": "anyOf"
           },
           {
@@ -38896,10 +38898,11 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
-          "#/$defs/d_73b92f56cdc5ce046018",
-          "#/$defs/d_6772ff84bb100f4fa73d",
-          "#/$defs/d_0d1f74f8f487020c0407",
-          "#/$defs/d_9ce633eb1d1806a74a03",
+          "#/$defs/d_d09956c3320c77551bb5/properties/alpha",
+          "#/$defs/d_d09956c3320c77551bb5/properties/beta",
+          "#/$defs/d_d09956c3320c77551bb5/properties/nu",
+          "#/$defs/d_d09956c3320c77551bb5/properties/rho",
+          "#/$defs/d_d09956c3320c77551bb5/properties/shift",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -39116,6 +39119,7 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
+          "#/$defs/d_d09956c3320c77551bb5/properties/shift",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -39181,10 +39185,6 @@
           },
           {
             "pointer": "#/$defs/d_818134538ec82f6d27c9/properties/sabr_params",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/d_d09956c3320c77551bb5/properties/shift",
             "keyword": "anyOf"
           },
           {

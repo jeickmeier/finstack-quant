@@ -40,8 +40,10 @@ fn fx_matrix(spot: f64) -> FxMatrix {
 /// Curves plus an FX matrix; the vol surface is optional.
 fn matrix_market(spot: f64, surface_vol: Option<f64>) -> MarketContext {
     let market = MarketContext::new()
-        .insert(flat_discount_with_tenor("USD-OIS", as_of(), 0.03, 5.0))
-        .insert(flat_discount_with_tenor("EUR-OIS", as_of(), 0.01, 5.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of(), 0.03, 5.0))
+        .expect("insert market curve")
+        .try_insert(flat_discount_with_tenor("EUR-OIS", as_of(), 0.01, 5.0))
+        .expect("insert market curve")
         .insert_fx(fx_matrix(spot));
     match surface_vol {
         Some(vol) => market.insert_surface(flat_vol_surface(

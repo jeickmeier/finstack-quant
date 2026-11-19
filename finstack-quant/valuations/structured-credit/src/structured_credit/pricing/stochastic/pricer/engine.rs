@@ -294,7 +294,7 @@ impl StochasticPricer {
         // properties are required for bit-identical serial/parallel results
         // (the downstream Welford accumulation is order-sensitive).
         let price_factors = |path_index: usize| {
-            let factors = self.monte_carlo_path_factors(instrument, path_index, antithetic);
+            let factors = self.monte_carlo_path_factors(instrument, path_index, antithetic)?;
             let shocks = self.path_shocks_from_factors(
                 instrument,
                 &factors,
@@ -347,15 +347,15 @@ impl StochasticPricer {
         instrument: &StructuredCredit,
         path_index: usize,
         antithetic: bool,
-    ) -> Vec<f64> {
+    ) -> Result<Vec<f64>> {
         let base_rng = PhiloxRng::new(self.config.tree_config.seed);
         if antithetic {
             let mut rng = base_rng.substream((path_index / 2) as u64);
-            let mut factors = self.random_factors(instrument, &mut rng);
+            let mut factors = self.random_factors(instrument, &mut rng)?;
             if path_index % 2 == 1 {
                 factors.iter_mut().for_each(|z| *z = -*z);
             }
-            factors
+            Ok(factors)
         } else {
             let mut rng = base_rng.substream(path_index as u64);
             self.random_factors(instrument, &mut rng)
@@ -585,10 +585,14 @@ impl StochasticPricer {
         })
     }
 
-    fn random_factors(&self, instrument: &StructuredCredit, rng: &mut PhiloxRng) -> Vec<f64> {
+    fn random_factors(
+        &self,
+        instrument: &StructuredCredit,
+        rng: &mut PhiloxRng,
+    ) -> Result<Vec<f64>> {
         let month_count = self.month_count(instrument);
         if !self.has_stochastic_rates() {
-            return vec![0.0; month_count];
+            return Ok(vec![0.0; month_count]);
         }
         (0..month_count).map(|_| rng.next_std_normal()).collect()
     }
@@ -742,29 +746,32 @@ impl StochasticPricer {
         factor_path: &[f64],
         (path_index, antithetic): (usize, bool),
         prepared: &PreparedRun,
-    ) -> Option<Vec<f64>> {
-        let rho = prepared.factor_correlation?;
+    ) -> Result<Option<Vec<f64>>> {
+        let Some(rho) = prepared.factor_correlation else {
+            return Ok(None);
+        };
         let base = PhiloxRng::new(self.config.tree_config.seed ^ PREPAY_FACTOR_SEED_SALT);
         let (mut rng, negate) = if antithetic {
             (base.substream((path_index / 2) as u64), path_index % 2 == 1)
         } else {
             (base.substream(path_index as u64), false)
         };
-        let independent: Vec<f64> = (0..factor_path.len())
-            .map(|_| {
-                let draw = rng.next_std_normal();
-                if negate { -draw } else { draw }
-            })
-            .collect();
+        let mut independent = vec![0.0; factor_path.len()];
+        rng.fill_std_normals(&mut independent)?;
+        if negate {
+            for draw in &mut independent {
+                *draw = -*draw;
+            }
+        }
         let evolved_independent = Self::evolved_factors(&independent, prepared.factor_kappa);
         let scale = (1.0 - rho * rho).max(0.0).sqrt();
-        Some(
+        Ok(Some(
             factor_path
                 .iter()
                 .zip(evolved_independent.iter())
                 .map(|(zc, zi)| rho * zc + scale * zi)
                 .collect(),
-        )
+        ))
     }
 
     fn path_shocks_from_factors(
@@ -779,7 +786,7 @@ impl StochasticPricer {
         // which channels are simulated.
         let evolved_storage = Self::evolved_factors(factors, prepared.factor_kappa);
         let factor_path: &[f64] = &evolved_storage;
-        let prepay_storage = self.prepay_factors(factor_path, path, prepared);
+        let prepay_storage = self.prepay_factors(factor_path, path, prepared)?;
         // SingleFactor: prepayment shares the credit factor, i.e. implied
         // correlation +1.
         let prepay_factors: &[f64] = prepay_storage.as_deref().unwrap_or(factor_path);
@@ -819,7 +826,7 @@ impl StochasticPricer {
                 &mut prepayment,
             )?;
             shock.systematic_z = self.period_systematic_z(prepared, month_slice);
-            shock.per_name = self.copula_period_input(prepared, start as u32, month_slice);
+            shock.per_name = self.copula_period_input(prepared, start as u32, month_slice)?;
             shocks.push(shock);
         }
 
@@ -864,14 +871,14 @@ impl StochasticPricer {
         prepared: &PreparedRun,
         start_month: u32,
         factors: &[f64],
-    ) -> Option<PerNamePeriodInput> {
+    ) -> Result<Option<PerNamePeriodInput>> {
         // Per-name simulation applies only to copula default models; other
         // stochastic specs keep the pool-wide MDR path even though they also
         // carry a built default model.
         let (Some(_), PreparedDefault::Model(model)) =
             (prepared.copula_rho, &prepared.default_model)
         else {
-            return None;
+            return Ok(None);
         };
         let months = factors.len().max(1) as u32;
 
@@ -884,14 +891,14 @@ impl StochasticPricer {
                 .seasoning_months
                 .saturating_add(start_month)
                 .saturating_add(offset + 1);
-            survival *= 1.0 - model.expected_mdr(seasoning).clamp(0.0, 1.0);
+            survival *= 1.0 - model.expected_mdr(seasoning)?.clamp(0.0, 1.0);
         }
         let marginal_pd = (1.0 - survival).clamp(0.0, 1.0);
 
-        Some(PerNamePeriodInput {
+        Ok(Some(PerNamePeriodInput {
             systematic_z: self.period_systematic_z(prepared, factors),
             marginal_pd,
-        })
+        }))
     }
 
     /// Period systematic factor (item 10).
@@ -1039,7 +1046,7 @@ impl StochasticPricer {
                     )
                     .clamp(0.0, 0.50);
                 if model.has_burnout() {
-                    let expected = model.expected_smm(seasoning);
+                    let expected = model.expected_smm(seasoning)?;
                     prepayment.burnout =
                         model.update_burnout(prepayment.burnout, realized, expected);
                 }
@@ -1622,7 +1629,9 @@ mod tests {
     #[test]
     fn monte_carlo_two_estimators_price_waterfall_cashflows() {
         let instrument = test_instrument();
-        let market = MarketContext::new().insert((*test_discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*test_discount_curve()).clone())
+            .expect("insert market curve");
         let config = StochasticPricerConfig::new(
             test_date(),
             test_discount_curve(),
@@ -1887,7 +1896,9 @@ mod tests {
     #[test]
     fn mean_reversion_changes_path_statistics() {
         let instrument = test_instrument();
-        let market = MarketContext::new().insert((*test_discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*test_discount_curve()).clone())
+            .expect("insert market curve");
         let price_with_kappa = |kappa: f64| {
             let mut tree_config = ScenarioTreeConfig::new(24);
             tree_config.factor_spec =
@@ -2239,7 +2250,9 @@ mod per_name_copula_tests {
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
     fn large_granular_pool_per_name_converges_to_lhp() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         // 600 names ⇒ granular: per-name realized fraction ≈ LHP conditional.
         let deal = clo_deal(600);
 
@@ -2283,7 +2296,9 @@ mod per_name_copula_tests {
     /// repeated runs (seeded `PhiloxRng` substreams).
     #[test]
     fn per_name_pricing_is_deterministic() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(80);
 
         let run = || {
@@ -2324,7 +2339,9 @@ mod per_name_copula_tests {
     /// return a price.
     #[test]
     fn per_name_mask_stays_aligned_with_multiple_defaults_per_period() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         // 30 names ⇒ concentrated; high CDR + high correlation drives several
         // simultaneous defaults per period on a meaningful share of paths.
         let deal = clo_deal(30);
@@ -2450,7 +2467,9 @@ mod per_name_copula_tests {
             let mut sum_sq = 0.0_f64;
             for path in 0..PATHS {
                 let mut rng = PhiloxRng::new(20_260_719).substream(path as u64);
-                let innovations: Vec<f64> = (0..MONTHS).map(|_| rng.next_std_normal()).collect();
+                let innovations: Vec<f64> = (0..MONTHS)
+                    .map(|_| rng.next_std_normal().expect("normal draw"))
+                    .collect();
                 let evolved = StochasticPricer::evolved_factors(&innovations, kappa);
                 let z_period: f64 = evolved.iter().sum::<f64>() / scale;
                 sum += z_period;
@@ -2484,7 +2503,9 @@ mod per_name_copula_tests {
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
     fn persistent_systematic_factor_widens_the_loss_distribution() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(60);
 
         let unexpected_loss_for = |kappa: f64| -> f64 {
@@ -2516,7 +2537,9 @@ mod per_name_copula_tests {
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
     fn explicit_correlation_structure_changes_the_price() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(60);
 
         let unexpected_loss_for = |override_rho: Option<f64>| -> f64 {
@@ -2643,12 +2666,12 @@ mod per_name_copula_tests {
             (0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64);
         for path in 0..PATHS as u64 {
             let mut credit_rng = PhiloxRng::new(pricer.config.tree_config.seed).substream(path);
-            let credit = credit_rng.next_std_normal();
+            let credit = credit_rng.next_std_normal().expect("normal draw");
 
             let mut indep_rng =
                 PhiloxRng::new(pricer.config.tree_config.seed ^ PREPAY_FACTOR_SEED_SALT)
                     .substream(path);
-            let indep = indep_rng.next_std_normal();
+            let indep = indep_rng.next_std_normal().expect("normal draw");
 
             let prepay = rho * credit + scale * indep;
 
@@ -2738,9 +2761,11 @@ mod per_name_copula_tests {
         for pair in [0usize, 3] {
             let first = pricer
                 .prepay_factors(&credit, (2 * pair, true), &prepared)
+                .expect("normal draws")
                 .expect("two-factor spec");
             let second = pricer
                 .prepay_factors(&negated, (2 * pair + 1, true), &prepared)
+                .expect("normal draws")
                 .expect("two-factor spec");
             for (a, b) in first.iter().zip(&second) {
                 assert!(a.abs() > 0.0);
@@ -2750,9 +2775,11 @@ mod per_name_copula_tests {
         // Without antithetic pairing, neighbouring paths stay independent.
         let first = pricer
             .prepay_factors(&credit, (0, false), &prepared)
+            .expect("normal draws")
             .expect("two-factor spec");
         let second = pricer
             .prepay_factors(&negated, (1, false), &prepared)
+            .expect("normal draws")
             .expect("two-factor spec");
         assert!(first.iter().zip(&second).any(|(a, b)| (a + b).abs() > 1e-3));
     }
@@ -2887,7 +2914,9 @@ mod per_name_copula_tests {
     /// member negates `εᵢ`), so repeated runs must stay bit-identical.
     #[test]
     fn antithetic_per_name_pricing_is_deterministic() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(60);
 
         let run = || {
@@ -2932,7 +2961,9 @@ mod per_name_copula_tests {
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
     fn concentration_increases_loss_dispersion() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
 
         let granular = StochasticPricer::new(copula_config(
             0.05,
@@ -2970,7 +3001,9 @@ mod per_name_copula_tests {
         config.tree_config.factor_spec =
             LatentFactorSpec::single_factor(1.0, 20.0).expect("factor");
         let pricer = StochasticPricer::new(config);
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(40);
         let prepared = pricer.prepare_run(&deal, &market).expect("prepared");
         let factors = [-1.0, 0.0, 0.4];
@@ -2992,7 +3025,9 @@ mod per_name_copula_tests {
 
     #[test]
     fn stochastic_recovery_is_repeatable_and_serial_parallel_identical() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(80);
         for mut config in [
             copula_config(0.05, 0.3, 36, PoolGranularity::PerName, 128),
@@ -3019,7 +3054,9 @@ mod per_name_copula_tests {
     #[test]
     #[ignore = "slow: stochastic recovery finite-pool/LHP convergence"]
     fn stochastic_recovery_large_pool_converges_to_lhp() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(600);
         for student_t in [false, true] {
             let run = |granularity| {
@@ -3058,7 +3095,9 @@ mod per_name_copula_tests {
     /// low (2%) so the systematic factor does not swamp the channel under test.
     #[test]
     fn per_name_recovery_dispersion_widens_loss_distribution() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(40); // concentrated pool — name-level scatter shows
 
         let mut constant_cfg = copula_config(0.06, 0.02, 36, PoolGranularity::PerName, 4_000);
@@ -3112,7 +3151,9 @@ mod per_name_copula_tests {
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
     fn student_t_large_granular_pool_per_name_converges_to_lhp() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(600);
 
         let per_name = StochasticPricer::new(student_t_copula_config(
@@ -3167,7 +3208,9 @@ mod per_name_copula_tests {
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
     fn student_t_concentration_increases_loss_dispersion() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
 
         let granular = StochasticPricer::new(student_t_copula_config(
             0.05,
@@ -3204,7 +3247,9 @@ mod per_name_copula_tests {
     /// per-path stream.
     #[test]
     fn student_t_per_name_pricing_is_deterministic() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(80);
 
         let run = || {
@@ -3243,7 +3288,9 @@ mod per_name_copula_tests {
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
     fn student_t_lhp_pricing_is_deterministic() {
-        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let market = MarketContext::new()
+            .try_insert((*discount_curve()).clone())
+            .expect("insert market curve");
         let deal = clo_deal(600);
 
         let run = || {

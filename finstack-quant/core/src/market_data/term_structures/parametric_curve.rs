@@ -815,6 +815,9 @@ impl ParametricCurve {
 
     /// Zero rate on calendar date `date > base_date()` under `compounding`.
     ///
+    /// The horizon is the difference between the original source clock's
+    /// coordinates for `date` and `base_date()`.
+    ///
     /// # Arguments
     ///
     /// * `date` - Calendar date strictly after [`base_date`](Self::base_date).
@@ -827,18 +830,19 @@ impl ParametricCurve {
     #[inline]
     #[must_use = "computed zero rate should not be discarded"]
     pub fn zero_rate_on_date(&self, date: Date, compounding: Compounding) -> crate::Result<f64> {
-        let t = signed_curve_year_fraction(
-            self.base_date,
+        let source_t = signed_curve_year_fraction(
+            self.source_base_date,
             date,
             self.day_count,
             self.calendar.as_ref(),
         )?;
+        let t = source_t - self.offset;
         if !t.is_finite() || t <= 0.0 {
             return Err(crate::Error::Validation(format!(
                 "ParametricCurve::zero_rate_on_date requires mapped horizon t > 0, got {t} at {date}"
             )));
         }
-        let df = self.df_on_date(date)?;
+        let (df, _) = self.eval_at_source_time(source_t)?;
         compounding.rate_from_df(df, t)
     }
 
@@ -1232,6 +1236,29 @@ mod tests {
             let restored: ParametricCurve = serde_json::from_value(wire).expect("restore");
             assert!((restored.df(0.5).expect("df") - rolled.df(0.5).expect("df")).abs() < 1e-14);
         }
+    }
+
+    #[test]
+    fn conditioned_zero_rate_on_date_uses_source_clock_horizon() {
+        use time::macros::date;
+
+        let curve = ParametricCurve::builder("30U-360-NS-ROLL")
+            .base_date(date!(2025 - 01 - 15))
+            .day_count(DayCount::Thirty360)
+            .model(NelsonSiegelModel::ns(0.04, 0.0, 0.0, 1.0).expect("flat curve model"))
+            .build()
+            .expect("curve")
+            .condition(date!(2025 - 02 - 28))
+            .expect("condition");
+        let rate = curve
+            .zero_rate_on_date(date!(2025 - 03 - 31), Compounding::Continuous)
+            .expect("dated zero rate");
+        assert!((rate - 0.04).abs() < 1e-13);
+        assert!(
+            curve
+                .zero_rate_on_date(date!(2025 - 02 - 28), Compounding::Continuous)
+                .is_err()
+        );
     }
 
     #[test]

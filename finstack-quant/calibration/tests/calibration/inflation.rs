@@ -104,7 +104,9 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
         index: "USA-CPI-U".to_string(),
         convention: InflationSwapConventionId::new("USD"),
     })];
-    let mut source_market = MarketContext::new().insert(create_discount_curve(base_date));
+    let mut source_market = MarketContext::new()
+        .try_insert(create_discount_curve(base_date))
+        .expect("insert market curve");
     let index = index.unwrap_or_else(|| {
         finstack_quant_valuations_test_support::inflation::simple_index(
             "USD-CPI",
@@ -226,7 +228,8 @@ fn inflation_calibration_preserves_explicit_contract_denominator() {
         convention: InflationSwapConventionId::new("USD"),
     })];
     let source_market = MarketContext::new()
-        .insert(create_discount_curve(base_date))
+        .try_insert(create_discount_curve(base_date))
+        .expect("insert market curve")
         .insert_inflation_index(create_us_cpi_fixings());
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
@@ -353,7 +356,7 @@ fn lag_calibration_params(lag: &str, method: CalibrationMethod) -> InflationCurv
 
 fn lag_calibration_market() -> MarketContext {
     MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("GBP-SONIA")
                 .base_date(time::macros::date!(2025 - 01 - 15))
                 .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
@@ -363,6 +366,7 @@ fn lag_calibration_market() -> MarketContext {
                 .build()
                 .expect("GBP discount curve"),
         )
+        .expect("insert market curve")
         .insert_inflation_index(
             finstack_quant_valuations_test_support::inflation::simple_index(
                 "UK-RPI",
@@ -469,16 +473,18 @@ fn inflation_calibration_rejects_unrepresentable_day_lags() {
 fn inflation_month_lags_preserve_leap_day_and_monthly_anchor_contracts() {
     let base = time::macros::date!(2028 - 02 - 29);
     let maturity = time::macros::date!(2032 - 02 - 29);
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("GBP-SONIA")
-            .base_date(base)
-            .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("GBP-SONIA")
+                .base_date(base)
+                .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount curve"),
+        )
+        .expect("insert market curve");
     let quotes = [MarketQuote::Inflation(InflationQuote::InflationSwap {
         id: QuoteId::new("LEAP-DAY"),
         maturity,

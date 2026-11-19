@@ -152,7 +152,9 @@ fn test_cs_cashflows_populated_on_statement_result() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve should build");
-    let market_ctx = MarketContext::new().insert(disc_curve);
+    let market_ctx = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let mut evaluator = Evaluator::new();
     let result = evaluator
@@ -737,7 +739,9 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(usd_discount);
+    let market = MarketContext::new()
+        .try_insert(usd_discount)
+        .expect("insert market curve");
 
     let net_debt = 50_000.0;
     let with_market = evaluate_dcf(
@@ -852,7 +856,9 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let model = {
         let mut model_builder = ModelBuilder::new("dcf-cs-interest");

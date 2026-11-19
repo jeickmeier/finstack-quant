@@ -1464,7 +1464,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let horizon = DayCount::Act365F
             .year_fraction(as_of, maturity, DayCountContext::default())
             .expect("ACT/365F horizon");
@@ -1577,7 +1579,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         let valuator = BondValuator::new(bond, &market, as_of, 1.0, 4).expect("valuator");
         assert!((valuator.outstanding_principal_vec[0] - 850.0).abs() < 1e-12);
@@ -1656,7 +1660,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         let valuator = BondValuator::new(bond, &market, as_of, 1.0, 1).expect("valuator");
         assert_eq!(valuator.cashflow_vec[0], 250.0);
@@ -1703,7 +1709,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let flows = bond
             .pricing_dated_cashflows(&market, issue)
             .expect("cashflows");
@@ -1781,7 +1789,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
 
         let error = BondValuator::new(bond, &market, as_of, 1.0, 12)
             .err()
@@ -1845,7 +1855,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let discount_curve = market.get_discount("USD-OIS").expect("discount curve");
         let day_count = discount_curve.day_count();
         let time_to_maturity = day_count
@@ -1947,7 +1959,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let discount_curve = market.get_discount("USD-OIS").expect("discount curve");
         let day_count = discount_curve.day_count();
         let time_to_maturity = day_count
@@ -2051,7 +2065,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let discount_curve = market.get_discount("USD-OIS").expect("discount curve");
         let day_count = discount_curve.day_count();
         let time_to_maturity = day_count

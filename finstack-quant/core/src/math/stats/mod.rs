@@ -72,7 +72,7 @@ pub use realized::{RealizedVarMethod, log_returns, realized_variance, realized_v
 
 /// Maximum observation count whose integer conversion to IEEE-754 `f64`
 /// remains exact (`2^53` on 64-bit targets, or `usize::MAX` on 32-bit targets).
-const MAX_EXACT_COUNT: usize = match 1usize.checked_shl(53) {
+pub(crate) const MAX_EXACT_COUNT: usize = match 1usize.checked_shl(53) {
     Some(limit) => limit,
     None => usize::MAX,
 };

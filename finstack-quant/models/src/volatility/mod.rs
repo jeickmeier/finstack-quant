@@ -50,7 +50,7 @@
 //! let div = 0.02;
 //!
 //! let (d1, d2) = d1_d2(spot, strike, rate, vol, time, div);
-//! let call_delta = (-div * time).exp() * norm_cdf(d1);
+//! let call_delta = (-div * time).exp() * norm_cdf(d1).expect("finite standardized moneyness");
 //! ```
 //!
 //! # Academic References

@@ -239,7 +239,8 @@ fn test_npv_at_maturity_recovers_realized_payoff() {
         &prices.iter().map(|(_, p)| *p).collect::<Vec<_>>(),
         Some(252.0),
     )
-    .expect("CloseToClose should succeed");
+    .expect("valid close prices")
+    .expect("observed return");
     let expected = swap.payoff(realized).expect("valid variance payoff");
 
     assert!((pv.amount() - expected.amount()).abs() < LOOSE_EPSILON);
@@ -268,16 +269,18 @@ fn test_npv_at_maturity_without_prices_errors() {
     // Previously this test asserted `pv == 0`, which exercised the silent
     // bug where an empty price series collapsed realised variance to zero.
     let swap = sample_swap(PayReceive::Receive);
-    let ctx = MarketContext::new().insert(
-        finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
-            .base_date(swap.start_date)
-            .knots([(0.0, 1.0), (1.0, 0.95)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .unwrap(),
-    );
+    let ctx = MarketContext::new()
+        .try_insert(
+            finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
+                .base_date(swap.start_date)
+                .knots([(0.0, 1.0), (1.0, 0.95)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .unwrap(),
+        )
+        .expect("insert market curve");
 
     // Act
     let err = swap

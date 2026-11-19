@@ -175,7 +175,7 @@ fn parallel_cs01(
                 action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bp)),
             })?;
             bumped_index = replace_hazard(&bumped_index, Arc::clone(&bumped))?;
-            bumped_market.insert_mut(bumped);
+            bumped_market.try_insert_mut(bumped)?;
         }
         revalue(&bumped_market.insert_credit_index(index_id, bumped_index)?)
     };

@@ -27,7 +27,9 @@ fn test_tenor_exact_match() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -95,7 +97,9 @@ fn test_tenor_exact_not_found() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -157,7 +161,9 @@ fn test_tenor_interpolate_mode() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -238,7 +244,9 @@ fn test_tenor_interpolate_delivers_full_bump_at_requested_tenor() {
         finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
     )
     .unwrap();
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -351,7 +359,9 @@ fn tenor_not_found_error_names_curve() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -415,7 +425,9 @@ fn extrapolation_warning_includes_both_bounds_and_curve_id() {
         .build()
         .unwrap();
 
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -486,7 +498,9 @@ fn interpolate_delivers_overlapping_tenors_and_exact_pillars_together() {
             finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         )
         .unwrap();
-        let mut market = MarketContext::new().insert(curve);
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let spec = regression_scenario(
             "overlapping",
             vec![OperationSpec::CurveNodeBp {

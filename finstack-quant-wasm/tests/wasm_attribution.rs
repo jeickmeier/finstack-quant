@@ -50,7 +50,9 @@ fn market_json(as_of: finstack_quant_core::dates::Date, rate: f64) -> String {
         .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     serde_json::to_string(&MarketContextState::try_from(&market).expect("coherent market snapshot"))
         .expect("market JSON")
 }

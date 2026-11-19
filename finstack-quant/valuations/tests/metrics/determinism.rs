@@ -84,7 +84,8 @@ mod tests {
             .unwrap();
 
         MarketContext::new()
-            .insert(disc_curve)
+            .try_insert(disc_curve)
+            .expect("insert market curve")
             .insert_surface(vol_surface)
             .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"))
     }

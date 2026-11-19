@@ -54,7 +54,9 @@ fn context_with_carry_and_sensitivity(
         "USD-OIS",
     )
     .expect("bond");
-    let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve");
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
     let base_value = instrument.value(&market, as_of).expect("pv");
 
@@ -126,7 +128,9 @@ fn test_missing_sensitivity_returns_error() {
         "USD-OIS",
     )
     .expect("bond");
-    let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve");
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
     let base_value = instrument.value(&market, as_of).expect("pv");
 
@@ -164,7 +168,9 @@ fn test_missing_config_returns_error() {
         "USD-OIS",
     )
     .expect("bond");
-    let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve");
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
     let base_value = instrument.value(&market, as_of).expect("pv");
 
@@ -254,7 +260,9 @@ fn test_breakeven_via_standard_registry() {
             mode: BreakevenMode::Linear,
         });
 
-    let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -321,7 +329,9 @@ fn test_breakeven_is_independent_of_request_order() {
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);
-    let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve");
     let bond = breakeven_bond("ORDER", BreakevenTarget::ZSpread, BreakevenMode::Linear);
 
     let breakeven_for = |ids: &[MetricId]| -> f64 {
@@ -353,7 +363,9 @@ fn test_breakeven_ytm_target_resolves_dv01_dependency_alone() {
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);
-    let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve");
     let bond = breakeven_bond("YTM-DEP", BreakevenTarget::Ytm, BreakevenMode::Linear);
 
     // Requesting Breakeven alone must succeed: the dynamic dependency has to
@@ -412,7 +424,9 @@ fn test_iterative_breakeven_zeroes_the_horizon_pnl() {
     use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2025 - 01 - 15);
-    let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve");
 
     let ids = &[MetricId::Cs01, MetricId::CarryTotal, MetricId::Breakeven];
     let linear = breakeven_bond("BE-LIN", BreakevenTarget::ZSpread, BreakevenMode::Linear)
@@ -517,8 +531,10 @@ fn test_iterative_zspread_rejected_for_credit_curve_instrument() {
         .build()
         .expect("hazard curve");
     let market = MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", 0.04, as_of))
-        .insert(hazard);
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
 
     let err = bond
         .price_with_metrics(
@@ -582,7 +598,9 @@ fn test_breakeven_horizon_matches_carry_horizon() {
             mode: BreakevenMode::Linear,
         });
 
-    let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.04, as_of));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", 0.04, as_of))
+        .expect("insert market curve");
 
     let result_1m = bond_1m
         .price_with_metrics(

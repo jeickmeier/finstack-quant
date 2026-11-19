@@ -12,9 +12,6 @@ use crate::FxHashMap;
 /// Construct it from any ordered iterator of column names; the index of each
 /// name in the iterator becomes its column index in the data arrays passed to
 /// `eval`.
-///
-/// Deserialization is strict (`deny_unknown_fields`): unknown fields on
-/// inbound payloads are rejected rather than silently ignored.
 #[derive(Clone, Debug)]
 pub struct SimpleContext {
     /// Column name to index mapping for O(1) resolution.
@@ -28,6 +25,10 @@ impl SimpleContext {
     ///
     /// Returns [`Error::Validation`](crate::Error::Validation) if any column
     /// name appears more than once.
+    ///
+    /// # Arguments
+    ///
+    /// * `columns` - Unique column names in the same order as the data arrays.
     pub fn new(columns: impl IntoIterator<Item = impl Into<String>>) -> crate::Result<Self> {
         let mut column_indices = FxHashMap::default();
         for (idx, name) in columns.into_iter().enumerate() {
@@ -42,7 +43,14 @@ impl SimpleContext {
         Ok(Self { column_indices })
     }
     /// Find the index of a column by name.
-    pub fn index_of(&self, name: &str) -> Option<usize> {
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Exact, case-sensitive column name. Unknown names return `None`.
+    pub fn get_index(&self, name: &str) -> Option<usize> {
         self.column_indices.get(name).copied()
+    }
+    pub(super) fn column_count(&self) -> usize {
+        self.column_indices.len()
     }
 }

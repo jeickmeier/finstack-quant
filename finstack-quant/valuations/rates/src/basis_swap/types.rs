@@ -866,9 +866,12 @@ mod tests {
 
         // Create context
         let context = MarketContext::new()
-            .insert(discount_curve)
-            .insert(forward_3m)
-            .insert(forward_6m);
+            .try_insert(discount_curve)
+            .expect("insert market curve")
+            .try_insert(forward_3m)
+            .expect("insert market curve")
+            .try_insert(forward_6m)
+            .expect("insert market curve");
 
         // Create basis swap: 3M receives 6M + 5bp
         let primary_leg = FloatLegSpec {
@@ -962,9 +965,12 @@ mod tests {
         .expect("should succeed");
 
         let context = MarketContext::new()
-            .insert(discount_curve)
-            .insert(forward_3m)
-            .insert(forward_6m);
+            .try_insert(discount_curve)
+            .expect("insert market curve")
+            .try_insert(forward_3m)
+            .expect("insert market curve")
+            .try_insert(forward_6m)
+            .expect("insert market curve");
 
         let primary_leg = FloatLegSpec {
             end_of_month: false,
@@ -1052,9 +1058,12 @@ mod tests {
         .expect("should succeed");
 
         let context = MarketContext::new()
-            .insert(discount_curve)
-            .insert(forward_3m)
-            .insert(forward_6m);
+            .try_insert(discount_curve)
+            .expect("insert market curve")
+            .try_insert(forward_3m)
+            .expect("insert market curve")
+            .try_insert(forward_6m)
+            .expect("insert market curve");
 
         let primary_leg_no_lag = FloatLegSpec {
             end_of_month: false,
@@ -1255,7 +1264,11 @@ mod tests {
         )
         .expect("should succeed");
 
-        let context = MarketContext::new().insert(discount_curve).insert(forward);
+        let context = MarketContext::new()
+            .try_insert(discount_curve)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve");
 
         let leg = FloatLegSpec {
             end_of_month: false,
@@ -1344,9 +1357,12 @@ mod tests {
         .expect("should succeed");
 
         let context = MarketContext::new()
-            .insert(discount_curve)
-            .insert(forward_3m)
-            .insert(forward_6m);
+            .try_insert(discount_curve)
+            .expect("insert market curve")
+            .try_insert(forward_3m)
+            .expect("insert market curve")
+            .try_insert(forward_6m)
+            .expect("insert market curve");
 
         // Create swap with zero spread initially
         let primary_leg = FloatLegSpec {
@@ -1565,9 +1581,12 @@ mod tests {
         )
         .expect("should succeed");
         let context = MarketContext::new()
-            .insert(discount_curve)
-            .insert(forward_3m)
-            .insert(forward_6m);
+            .try_insert(discount_curve)
+            .expect("insert market curve")
+            .try_insert(forward_3m)
+            .expect("insert market curve")
+            .try_insert(forward_6m)
+            .expect("insert market curve");
 
         let primary_leg = FloatLegSpec {
             end_of_month: false,
@@ -1645,9 +1664,12 @@ mod tests {
         )
         .expect("term forward");
         let market = MarketContext::new()
-            .insert(disc)
-            .insert(ois.clone())
-            .insert(term);
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(ois.clone())
+            .expect("insert market curve")
+            .try_insert(term)
+            .expect("insert market curve");
 
         let primary = FloatLegSpec {
             end_of_month: false,
@@ -1777,9 +1799,12 @@ mod tests {
         )
         .expect("term forward");
         let market = MarketContext::new()
-            .insert(disc)
-            .insert(ois.clone())
-            .insert(term);
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(ois.clone())
+            .expect("insert market curve")
+            .try_insert(term)
+            .expect("insert market curve");
 
         let primary = FloatLegSpec {
             end_of_month: false,
@@ -1902,7 +1927,13 @@ mod tests {
             finstack_quant_core::dates::DayCount::Act360,
         )
         .expect("term forward");
-        let market = MarketContext::new().insert(disc).insert(ois).insert(term);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(ois)
+            .expect("insert market curve")
+            .try_insert(term)
+            .expect("insert market curve");
         let primary = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,

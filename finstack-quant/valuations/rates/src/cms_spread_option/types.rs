@@ -453,8 +453,10 @@ mod tests {
             .expect("forward curve");
 
         MarketContext::new()
-            .insert(discount)
-            .insert(forward)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve")
             .insert_surface(flat_surface("USD-SWAPTION-VOL-10Y", vol))
             .insert_surface(flat_surface("USD-SWAPTION-VOL-2Y", vol))
     }

@@ -862,10 +862,16 @@ const CASES = {
   ],
   'volatility.cube_slices': () => {
     const strikes = [0.02, 0.03, 0.04];
-    const tenorSlice = volatility.materializeCubeTenorSlice(cube(), 5.0, strikes, 'lognormal');
+    const tenorSlice = volatility.materializeCubeTenorSlice(
+      cube(),
+      5.0,
+      strikes,
+      'lognormal',
+      'vol'
+    );
     return [
       surfaceVols(tenorSlice),
-      surfaceVols(volatility.materializeCubeTenorSlice(cube(), 5.0, strikes, 'normal')),
+      surfaceVols(volatility.materializeCubeTenorSlice(cube(), 5.0, strikes, 'normal', 'vol')),
       surfaceVols(volatility.materializeCubeExpirySlice(cube(), 1.0, strikes, 'lognormal')),
       surfaceVols(volatility.materializeCubeExpirySlice(cube(), 1.0, strikes, 'normal')),
       volatility.getSurfaceVol(tenorSlice, 1.5, 0.025),
@@ -905,16 +911,23 @@ const CASES = {
           [0.5, 1.0],
           [0.1, 0.11],
           [0.01, 0.012],
-          [0.002, 0.003]
+          [0.002, 0.003],
+          {
+            deltaConvention: 'forward_unadjusted',
+            atmConvention: 'delta_neutral_straddle',
+            butterflyConvention: 'smile',
+          }
         ),
-        [1.1 * Math.exp(0.01 * 0.5), 1.1 * Math.exp(0.01 * 1.0)]
+        [1.1 * Math.exp(0.01 * 0.5), 1.1 * Math.exp(0.01 * 1.0)],
+        'vol'
       )
     ),
   'volatility.sabr_smile': () => {
     const smile = new volatility.SabrSmile(
       new volatility.SabrParameters(0.2, 1.0, 0.3, -0.2),
       100.0,
-      1.5
+      1.5,
+      'black_lognormal'
     );
     return [smile.forward, smile.timeToExpiry];
   },

@@ -229,8 +229,10 @@ fn test_delta_rejects_black_model_for_negative_forward() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(-0.005, as_of, "USD_LIBOR_3M"))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(-0.005, as_of, "USD_LIBOR_3M"))
+        .expect("insert market curve")
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_SWAPTION_VOL"));
 
     let result = swaption

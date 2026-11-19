@@ -39,8 +39,9 @@ fn test_interest_on_drawn_amounts() {
         .unwrap();
 
     // Act
-    let market =
-        MarketContext::new().insert(flat_discount_curve(0.03, date!(2025 - 01 - 01), "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.03, date!(2025 - 01 - 01), "USD-OIS"))
+        .expect("insert market curve");
     let cashflows = facility
         .cashflow_schedule(&market, date!(2025 - 01 - 01))
         .unwrap();
@@ -72,8 +73,9 @@ fn test_commitment_fee_on_undrawn() {
         .unwrap();
 
     // Act
-    let market =
-        MarketContext::new().insert(flat_discount_curve(0.03, date!(2025 - 01 - 01), "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.03, date!(2025 - 01 - 01), "USD-OIS"))
+        .expect("insert market curve");
     let cashflows = facility
         .cashflow_schedule(&market, date!(2025 - 01 - 01))
         .unwrap();
@@ -105,8 +107,9 @@ fn test_utilization_fee_at_threshold() {
         .unwrap();
 
     // Act
-    let market =
-        MarketContext::new().insert(flat_discount_curve(0.03, date!(2025 - 01 - 01), "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.03, date!(2025 - 01 - 01), "USD-OIS"))
+        .expect("insert market curve");
     let cashflows = facility
         .cashflow_schedule(&market, date!(2025 - 01 - 01))
         .unwrap();

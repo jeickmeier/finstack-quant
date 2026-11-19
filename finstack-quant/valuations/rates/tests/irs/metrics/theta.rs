@@ -42,8 +42,10 @@ fn build_curves(rate: f64, base_date: Date) -> MarketContext {
     .expect("fixings series");
 
     MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_series(fixings)
 }
 

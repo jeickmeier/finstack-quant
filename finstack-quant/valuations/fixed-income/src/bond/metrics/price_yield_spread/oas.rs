@@ -248,16 +248,18 @@ mod tests {
             .with_hw1f_sigma(0.01)
             .with_hw1f_mean_reversion(0.03)
             .with_tree_steps(16);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (5.0, 0.82), (10.0, 0.65)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("discount curve should build"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (5.0, 0.82), (10.0, 0.65)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("discount curve should build"),
+            )
+            .expect("insert market curve");
         let expected_oas = 0.0025;
         let target_dirty = price_from_oas(&bond, &market, as_of, ModelKey::Tree, expected_oas)
             .expect("target option price");
@@ -310,15 +312,17 @@ mod tests {
             InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
         assert_eq!(bond.default_pricing_model(), ModelKey::Discounting);
 
-        let market = MarketContext::new().insert(
-            DiscountCurve::flat(
-                "USD-OIS",
-                as_of,
-                0.04,
-                finstack_quant_core::dates::DayCount::Act365F,
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::flat(
+                    "USD-OIS",
+                    as_of,
+                    0.04,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("valid discount curve"),
             )
-            .expect("valid discount curve"),
-        );
+            .expect("insert market curve");
         let calls = Arc::new(AtomicUsize::new(0));
         let mut registry = PricerRegistry::new();
         registry

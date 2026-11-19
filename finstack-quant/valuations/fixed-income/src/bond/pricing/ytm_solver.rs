@@ -210,7 +210,7 @@ mod tests {
         let notional = Money::from((1000_i64, Currency::USD));
         let frequency = Tenor::semi_annual();
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("ACT365L-DISC")
                     .base_date(issue)
                     .knots([(0.0, 1.0), (3.0, 0.88)])
@@ -220,7 +220,8 @@ mod tests {
                     .build()
                     .expect("discount curve"),
             )
-            .insert(
+            .expect("insert market curve")
+            .try_insert(
                 ForwardCurve::flat(
                     "ACT365L-FWD",
                     issue,
@@ -228,7 +229,8 @@ mod tests {
                     finstack_quant_core::dates::DayCount::Act365F,
                 )
                 .expect("forward curve"),
-            );
+            )
+            .expect("insert market curve");
         for (maturity, convention, lag, final_time, final_payment) in [
             (
                 date!(2025 - 04 - 15),

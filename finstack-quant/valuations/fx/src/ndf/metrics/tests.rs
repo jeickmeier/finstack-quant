@@ -42,7 +42,11 @@ fn curves(as_of: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("cny curve");
-    MarketContext::new().insert(usd_curve).insert(cny_curve)
+    MarketContext::new()
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(cny_curve)
+        .expect("insert market curve")
 }
 
 fn market_with_quote(as_of: Date, from: Currency, to: Currency, rate: f64) -> MarketContext {

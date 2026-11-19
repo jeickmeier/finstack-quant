@@ -571,7 +571,9 @@ mod tests {
             finstack_quant_core::dates::DayCount::Act365F,
         )
         .expect("curve");
-        let market = MarketContext::new().insert(curve);
+        let market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let as_of = date!(2025 - 02 - 01);
         assert!(
             float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true).is_err()
@@ -631,16 +633,18 @@ mod tests {
         irs.float_leg.stub = StubKind::ShortFront;
         irs.float_leg.reset_lag_days = 0;
         irs.float_leg.payment_lag_days = 2;
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(as_of)
-                .day_count(DayCount::Act365F)
-                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-                .interp(InterpStyle::Linear)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("discount curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                    .interp(InterpStyle::Linear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("discount curve"),
+            )
+            .expect("insert market curve");
 
         for (label, compounding, raw_dates, exported_dates) in [
             (
@@ -910,7 +914,7 @@ mod tests {
         irs.float_leg.compounding =
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         let market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
@@ -920,7 +924,11 @@ mod tests {
                     .build()
                     .expect("discount"),
             )
-            .insert(ForwardCurve::flat("USD-SOFR", as_of, 0.0, DayCount::Act360).expect("forward"));
+            .expect("insert market curve")
+            .try_insert(
+                ForwardCurve::flat("USD-SOFR", as_of, 0.0, DayCount::Act360).expect("forward"),
+            )
+            .expect("insert market curve");
 
         let schedule = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true)
             .expect("compounded schedule");
@@ -1057,7 +1065,9 @@ mod tests {
         let swap_cutoff = build_swap("OIS-CUTOFF-5D", FloatingLegCompounding::rate_cutoff(5));
 
         // Single-curve: only the discount curve is loaded (proj is None).
-        let ctx = MarketContext::new().insert(disc);
+        let ctx = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         let sched_no_cutoff =
             float_leg_schedule_with_curves_as_of(&swap_no_cutoff, Some(&ctx), Some(as_of), true)

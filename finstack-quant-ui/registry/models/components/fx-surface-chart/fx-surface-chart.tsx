@@ -35,6 +35,8 @@ export interface FxSurfaceChartProps extends Omit<
     strike: number;
     forward?: number | null;
   }[];
+  /** Expiry interpolation used to materialize the strike grid. */
+  interpolationMode: FxStrikeSurfaceRequest["interpolationMode"];
   /** Initial qualified delivery forward rates aligned with `surface.expiries` (quote per base). Omitted leaves fields empty. */
   initialDeliveryForwards?: readonly number[];
 }
@@ -70,9 +72,10 @@ function FxStrikeGrid(props: FxSurfaceChartProps) {
     if (parsed.some((value) => value === null)) return null;
     return {
       surface: props.surface,
+      interpolationMode: props.interpolationMode,
       deliveryForwards: parsed as number[],
     };
-  }, [props.surface, alignedInputs]);
+  }, [props.surface, props.interpolationMode, alignedInputs]);
   const query = useFxStrikeSurface(request);
   const grid = query.data;
   const nodes = useMemo(() => (grid ? surfaceNodes(grid) : []), [grid]);

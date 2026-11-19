@@ -59,7 +59,7 @@ impl Monitoring {
     ///
     /// Returns the day-count error for an observation date that cannot be
     /// placed on the clock, the grid builder's error when a required time is
-    /// outside `[0, time_to_maturity]`, and an internal error if a required
+    /// outside `[0, time_to_maturity]`, and a lookup error if a required
     /// time is missing from the built grid.
     pub fn time_grid(
         &self,
@@ -89,30 +89,57 @@ impl Monitoring {
                 .collect::<finstack_quant_core::Result<Vec<_>>>()?,
         };
         let time_grid = config.build_time_grid(time_to_maturity, &required_times)?;
-        let step_for_time = |required: f64| {
-            let tolerance = 1.0e-12 * required.abs().max(1.0);
-            time_grid
-            .times()
-            .iter()
-            .position(|time| (*time - required).abs() <= tolerance)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Internal(format!(
-                    "Barrier required monitoring time {required} is missing from the simulation grid"
-                ))
-            })
-        };
         let monitoring = match self {
             Monitoring::Continuous => McBarrierMonitoring::Continuous {
-                start_step: step_for_time(required_times[0])?,
+                start_step: time_grid.get_index(required_times[0])?,
             },
             Monitoring::Discrete { .. } => McBarrierMonitoring::Discrete {
                 observation_steps: required_times
                     .iter()
                     .copied()
-                    .map(step_for_time)
+                    .map(|time| time_grid.get_index(time))
                     .collect::<finstack_quant_core::Result<Vec<_>>>()?,
             },
         };
         Ok((time_grid, monitoring))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use time::macros::date;
+
+    #[test]
+    fn barrier_observation_selects_the_exact_event_next_to_a_base_knot() {
+        let base = date!(2025 - 01 - 01);
+        let observation = date!(2025 - 04 - 01);
+        let time = DayCount::Act365F
+            .year_fraction(base, observation, DayCountContext::default())
+            .unwrap();
+        let config = PathDependentPricerConfig {
+            min_steps: 2,
+            steps_per_year: 1.0,
+            ..Default::default()
+        };
+        let (grid, monitoring) = Monitoring::Discrete {
+            observation_dates: vec![observation],
+        }
+        .time_grid(
+            base,
+            DayCount::Act365F,
+            None,
+            2.0 * time.next_down(),
+            &config,
+        )
+        .unwrap();
+        assert_eq!(grid.time(1), time.next_down());
+        assert_eq!(grid.time(2), time);
+        assert_eq!(
+            monitoring,
+            McBarrierMonitoring::Discrete {
+                observation_steps: vec![2]
+            }
+        );
     }
 }

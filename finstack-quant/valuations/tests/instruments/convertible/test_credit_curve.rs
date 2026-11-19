@@ -24,7 +24,7 @@ fn calibrated_credit_market() -> finstack_quant_core::market_data::context::Mark
         "USD-OIS",
     )
     .expect("replayable credit curve");
-    market.insert(hazard)
+    market.try_insert(hazard).expect("insert market curve")
 }
 
 #[test]
@@ -144,8 +144,10 @@ fn test_credit_spread_effect_larger_for_otm() {
         .unwrap();
 
         finstack_quant_core::market_data::context::MarketContext::new()
-            .insert(rf_curve)
-            .insert(credit_curve)
+            .try_insert(rf_curve)
+            .expect("insert market curve")
+            .try_insert(credit_curve)
+            .expect("insert market curve")
             .insert_price(
                 "AAPL",
                 MarketScalar::unitless(market_params::SPOT_LOW).expect("valid scalar"),

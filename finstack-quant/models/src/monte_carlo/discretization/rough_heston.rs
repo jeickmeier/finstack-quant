@@ -159,7 +159,7 @@ impl RoughHestonHybrid {
             ));
         }
         let alpha = hurst + 0.5;
-        let gamma_alpha = finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
+        let gamma_alpha = finstack_quant_core::math::special_functions::ln_gamma(alpha)?.exp();
         let inv_gamma_alpha = 1.0 / gamma_alpha;
 
         let num_steps = times.len() - 1;
@@ -222,7 +222,7 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         x: &mut [f64],
         z: &[f64],
         work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let p = process.params();
 
         // The engine zero-initialises `work` before every path
@@ -232,8 +232,9 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         let n = self.num_steps;
         let step = work[2 * n] as usize;
         if step >= n {
-            x.fill(f64::NAN);
-            return;
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "rough Heston step {step} exceeds prepared grid of {n} steps"
+            )));
         }
 
         let v_current = x[1].max(0.0);
@@ -275,6 +276,7 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         x[1] = v_next;
 
         work[2 * n] = (step + 1) as f64;
+        Ok(())
     }
 
     fn work_size(&self, _process: &RoughHestonProcess) -> usize {
@@ -353,7 +355,8 @@ mod tests {
         let z = vec![0.0, 0.0, 0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, 0.0, 0.1, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.1, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert!(x[0] > 0.0, "Spot must remain positive");
         assert!(
@@ -368,7 +371,7 @@ mod tests {
     fn test_single_step_deterministic() {
         let process = make_process();
         let p = process.params();
-        let h = p.hurst.value();
+        let h = p.hurst.get_value();
         let alpha = h + 0.5;
 
         let times = vec![0.0, 0.01];
@@ -384,7 +387,8 @@ mod tests {
         let z = vec![z_indep, z_vol, 0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // With the bridge normal set to zero, conditioning on ΔW leaves the
         // interval-average kernel weight; the drift integral is exact.
@@ -393,7 +397,10 @@ mod tests {
         let noise = p.model.sigma_v * v0.sqrt() * dw_tilde;
         let kernel_int = dt.powf(alpha) / alpha;
         let noise_weight = dt.powf(alpha - 1.0) / alpha;
-        let inv_gamma = 1.0 / finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
+        let inv_gamma = 1.0
+            / finstack_quant_core::math::special_functions::ln_gamma(alpha)
+                .expect("positive finite shape")
+                .exp();
         let expected_v =
             (v0 + inv_gamma * (drift_rate * kernel_int + noise * noise_weight)).max(0.0);
 
@@ -431,7 +438,8 @@ mod tests {
         for i in 0..n {
             let t = times[i];
             let dt_step = times[i + 1] - times[i];
-            disc.step(&process, t, dt_step, &mut x, &z, &mut work);
+            disc.step(&process, t, dt_step, &mut x, &z, &mut work)
+                .expect("valid simulation step");
         }
 
         let step_count = work[2 * n] as usize;
@@ -464,7 +472,8 @@ mod tests {
                 &mut x,
                 &z,
                 &mut work,
-            );
+            )
+            .expect("valid simulation step");
         }
         let step_after_p1 = work[2 * n] as usize;
         assert_eq!(step_after_p1, n);
@@ -475,7 +484,8 @@ mod tests {
         }
         x[0] = 100.0;
         x[1] = 0.04;
-        disc.step(&process, 0.0, times[1] - times[0], &mut x, &z, &mut work);
+        disc.step(&process, 0.0, times[1] - times[0], &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         assert_eq!(
             work[2 * n] as usize,
@@ -490,13 +500,14 @@ mod tests {
     fn near_field_noise_has_exact_variance_and_brownian_covariance() {
         let process = make_process();
         let p = process.params();
-        let alpha = p.hurst.value() + 0.5;
+        let alpha = p.hurst.get_value() + 0.5;
         let dt = 0.01_f64;
-        let disc = RoughHestonHybrid::new(&[0.0, dt], p.hurst.value()).expect("valid");
+        let disc = RoughHestonHybrid::new(&[0.0, dt], p.hurst.get_value()).expect("valid");
         let run = |z: [f64; 3]| {
             let mut x = [100.0, p.model.v0];
             let mut work = vec![0.0; disc.work_size(&process)];
-            disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
+            disc.step(&process, 0.0, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
             x
         };
         let base = run([0.0, 0.0, 0.0]);
@@ -505,7 +516,9 @@ mod tests {
         let b = brownian[1] - base[1];
         let c = bridge[1] - base[1];
         let scale = p.model.sigma_v * p.model.v0.sqrt()
-            / finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
+            / finstack_quant_core::math::special_functions::ln_gamma(alpha)
+                .expect("positive finite shape")
+                .exp();
         let exact_variance = scale * scale * dt.powf(2.0 * alpha - 1.0) / (2.0 * alpha - 1.0);
         let exact_covariance = scale * dt.powf(alpha) / alpha;
         assert!((b * b + c * c - exact_variance).abs() < 1e-14);
@@ -561,7 +574,7 @@ mod tests {
         let mut normals = vec![0.0; 3 * n];
         let mut sum_v = 0.0;
         for _ in 0..num_paths {
-            rng.fill_std_normals(&mut normals);
+            rng.fill_std_normals(&mut normals).expect("normal draws");
             let mut x = vec![100.0, v0];
             let mut work = vec![0.0; disc.work_size(&process)];
             for k in 0..n {
@@ -573,7 +586,8 @@ mod tests {
                     &mut x,
                     &z,
                     &mut work,
-                );
+                )
+                .expect("valid simulation step");
             }
             sum_v += x[1];
         }
@@ -582,7 +596,10 @@ mod tests {
         // Independent reference: product integration of the mean ODE on a
         // 40× finer grid, with exact per-interval kernel integrals.
         let alpha = h + 0.5;
-        let inv_gamma = 1.0 / finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
+        let inv_gamma = 1.0
+            / finstack_quant_core::math::special_functions::ln_gamma(alpha)
+                .expect("positive finite shape")
+                .exp();
         let m = 2_000usize;
         let dtf = t_end / m as f64;
         let mut mean_v = vec![v0; m + 1];
@@ -660,7 +677,7 @@ mod tests {
             let mut sum_payoff = 0.0;
             let mut sum_payoff_squared = 0.0;
             for _ in 0..num_paths {
-                rng.fill_std_normals(&mut normals);
+                rng.fill_std_normals(&mut normals).expect("normal draws");
                 let mut x = vec![s0, v0];
                 let mut work = vec![0.0; disc.work_size(&process)];
                 for k in 0..n {
@@ -672,7 +689,8 @@ mod tests {
                         &mut x,
                         &z,
                         &mut work,
-                    );
+                    )
+                    .expect("valid simulation step");
                 }
                 let payoff = (x[0] - strike).max(0.0);
                 sum_payoff += payoff;
@@ -716,7 +734,8 @@ mod tests {
             let z = vec![z_val, z_val * 0.5, -z_val * 0.25];
             let mut work = vec![0.0; disc.work_size(&process)];
 
-            disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+            disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+                .expect("valid simulation step");
 
             assert!(
                 x[0] > 0.0,

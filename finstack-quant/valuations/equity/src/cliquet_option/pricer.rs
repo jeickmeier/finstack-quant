@@ -5,7 +5,6 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetCallParams;
 use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetCallPayoff;
@@ -210,12 +209,7 @@ impl CliquetOptionMcPricer {
 
         // Uniform grid plus the reset times as required knots, so the
         // simulation visits each exact period boundary.
-        let time_grid = TimeGrid::uniform_with_required_times(
-            t,
-            merged_cfg.steps_per_year,
-            merged_cfg.min_steps,
-            &reset_times,
-        )?;
+        let time_grid = merged_cfg.build_time_grid(t, &reset_times)?;
 
         // Build payoff (consumes reset_times via move). The first simulated
         // period anchors to the last observed level (`sim_anchor`), and the
@@ -350,7 +344,8 @@ mod tests {
             .expect("surface");
 
         MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "SPX-SPOT",
@@ -429,7 +424,7 @@ mod tests {
         assert!(err.amount().is_finite());
 
         let missing_div_market = MarketContext::new()
-            .insert(
+            .try_insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -439,6 +434,7 @@ mod tests {
                     .build()
                     .expect("curve"),
             )
+            .expect("insert market curve")
             .insert_surface(
                 VolSurface::builder("SPX-VOL")
                     .expiries(&[0.25, 0.5, 1.0, 2.0])
@@ -529,7 +525,8 @@ mod tests {
             .build()
             .expect("curve");
         let market = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_surface(inverted_surface)
             .insert_price(
                 "SPX-SPOT",

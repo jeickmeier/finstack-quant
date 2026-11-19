@@ -101,20 +101,22 @@ impl CholeskyFbm {
     /// The time grid must contain at least two monotonically increasing, finite,
     /// non-negative values. The Hurst exponent must lie in (0, 1).
     ///
+    /// # Arguments
+    ///
+    /// * `times` - Elapsed model times, all measured in the same unit.
+    /// * `hurst` - Dimensionless exponent determining increment variance as elapsed time to the power `2H`.
+    ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] if:
-    /// - The Hurst exponent is outside (0, 1)
-    /// - The time grid has fewer than two points
-    /// - The time grid is not strictly increasing
-    /// - The Cholesky decomposition fails (non-positive-definite covariance)
+    /// Returns a validation error for invalid input. An unresolved covariance
+    /// or non-positive-definite factorization gives a computation error.
     pub fn new(times: &[f64], hurst: f64) -> Result<Self> {
         let h = HurstExponent::new(hurst)?;
         validate_time_grid(times)?;
 
-        let cov = fbm_increment_covariance_matrix(times, h.value());
+        let cov = fbm_increment_covariance_matrix(times, h)?;
         let chol = nalgebra::linalg::Cholesky::new(cov).ok_or_else(|| {
-            Error::Validation(
+            Error::Internal(
                 "Cholesky decomposition failed: increment covariance matrix is not \
                  positive-definite"
                     .to_string(),
@@ -123,7 +125,7 @@ impl CholeskyFbm {
 
         let n = times.len() - 1;
         Ok(Self {
-            hurst_val: h.value(),
+            hurst_val: h.get_value(),
             cholesky_factor: chol.l(),
             num_steps: n,
         })
@@ -219,8 +221,8 @@ impl WindowedConditionalFbm {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] if the inputs are invalid or the near-field
-    /// Cholesky decomposition fails.
+    /// Returns a validation error for invalid input. Unresolved covariances,
+    /// factorizations or conditional innovations give computation errors.
     pub fn new(times: &[f64], hurst: f64, config: WindowedConditionalFbmConfig) -> Result<Self> {
         let h = HurstExponent::new(hurst)?;
         validate_time_grid(times)?;
@@ -238,9 +240,9 @@ impl WindowedConditionalFbm {
         }
 
         let near_times = &times[..=b];
-        let near_cov = fbm_increment_covariance_matrix(near_times, h.value());
+        let near_cov = fbm_increment_covariance_matrix(near_times, h)?;
         let near_chol = nalgebra::linalg::Cholesky::new(near_cov).ok_or_else(|| {
-            Error::Validation(
+            Error::Internal(
                 "Near-field Cholesky decomposition failed: covariance not positive-definite"
                     .to_string(),
             )
@@ -257,22 +259,17 @@ impl WindowedConditionalFbm {
             let mut cov_vec = vec![0.0; b];
             for (k, cov_k) in cov_vec.iter_mut().enumerate() {
                 let j = i - b + k;
-                *cov_k = fbm_increment_covariance(
-                    times[j],
-                    times[j + 1],
-                    times[i],
-                    times[i + 1],
-                    h.value(),
-                );
+                *cov_k =
+                    fbm_increment_covariance(times[j], times[j + 1], times[i], times[i + 1], h)?;
             }
 
             // Covariance matrix of the b preceding increments.
             let prev_times = &times[i - b..=i];
-            let prev_cov = fbm_increment_covariance_matrix(prev_times, h.value());
+            let prev_cov = fbm_increment_covariance_matrix(prev_times, h)?;
 
             // Solve prev_cov * w = cov_vec for the conditional mean weights.
             let prev_chol = nalgebra::linalg::Cholesky::new(prev_cov).ok_or_else(|| {
-                Error::Validation(format!(
+                Error::Internal(format!(
                     "Cholesky decomposition failed for conditional block at step {i}"
                 ))
             })?;
@@ -281,35 +278,21 @@ impl WindowedConditionalFbm {
 
             // Conditional variance = var(increment i) - cov_vec . w
             let var_i =
-                fbm_increment_covariance(times[i], times[i + 1], times[i], times[i + 1], h.value());
+                fbm_increment_covariance(times[i], times[i + 1], times[i], times[i + 1], h)?;
             let explained: f64 = cov_vec.iter().zip(w.iter()).map(|(c, wi)| c * wi).sum();
             let raw_cond_var = var_i - explained;
-            // Conditional variance must be non-negative in exact arithmetic;
-            // small negative values arise from floating-point roundoff and are
-            // clamped to zero. Larger negatives indicate the conditional-block
-            // covariance solve is numerically unstable (typically a poorly
-            // conditioned near-field block) and would silently zero the
-            // innovation term, so we surface them via tracing.
-            let abs_var_i = var_i.abs();
-            if raw_cond_var < -1e-9 * abs_var_i.max(1.0) {
-                tracing::warn!(
-                    step = i,
-                    var_i,
-                    explained,
-                    raw_cond_var,
-                    "WindowedConditionalFbm: conditional variance clamped to zero from a significantly negative \
-                     value; near-field Cholesky / linear-solve may be ill-conditioned and the \
-                     innovation term has been suppressed for this step"
-                );
+            if !raw_cond_var.is_finite() || raw_cond_var <= 0.0 {
+                return Err(Error::Internal(format!(
+                    "unresolved conditional fBM innovation at step {i}: variance {var_i}, explained {explained}"
+                )));
             }
-            let cond_var = raw_cond_var.max(0.0);
-            let cond_std = cond_var.sqrt();
+            let cond_std = raw_cond_var.sqrt();
 
             cond_weights.push((w.as_slice().to_vec(), cond_std));
         }
 
         Ok(Self {
-            hurst_val: h.value(),
+            hurst_val: h.get_value(),
             num_steps: n,
             near_field_size: b,
             near_cholesky,
@@ -446,6 +429,22 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn both_generators_propagate_unresolved_covariance() {
+        let times = [0.0, 1.0, 1e8 + 1.0, 1e8 + 2.0];
+        assert!(matches!(
+            CholeskyFbm::new(&times, 0.75),
+            Err(Error::Internal(_))
+        ));
+        let config = WindowedConditionalFbmConfig {
+            near_field_size: Some(2),
+        };
+        assert!(matches!(
+            WindowedConditionalFbm::new(&times, 0.75, config),
+            Err(Error::Internal(_))
+        ));
     }
 
     #[test]
@@ -597,7 +596,8 @@ mod tests {
                 }
             }
 
-            let exact = fbm_increment_covariance_matrix(&times, h);
+            let exact =
+                fbm_increment_covariance_matrix(&times, HurstExponent::new(h).unwrap()).unwrap();
             let mut max_rel_var: f64 = 0.0;
             let mut max_norm_cov: f64 = 0.0;
             for i in 0..n {

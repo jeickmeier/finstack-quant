@@ -63,7 +63,9 @@ fn widening_market_anchored_spread_gives_a_negative_option_cost() {
         },
         32,
     );
-    let market = market().insert(widening_hazard_curve());
+    let market = market()
+        .try_insert(widening_hazard_curve())
+        .expect("insert market curve");
     let result = RevolvingCreditPricer::price_with_paths(&facility, &market, AS_OF)
         .expect("stochastic pricing");
     let cost = result.draw_option_cost.mean.amount();
@@ -105,7 +107,9 @@ fn widening_market_anchored_spread_gives_a_negative_option_cost() {
 /// identical draw option costs on every path.
 #[test]
 fn draw_option_cost_is_independent_of_the_margin_level() {
-    let market = market().insert(widening_hazard_curve());
+    let market = market()
+        .try_insert(widening_hazard_curve())
+        .expect("insert market curve");
     let spread = || CreditSpreadProcessSpec::MarketAnchored {
         credit_curve_id: HAZARD_ID.into(),
         kappa: 0.5,

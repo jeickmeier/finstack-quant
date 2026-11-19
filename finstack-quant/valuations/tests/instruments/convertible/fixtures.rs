@@ -113,7 +113,8 @@ pub fn create_market_context_with_params(spot: f64, vol: f64, div_yield: f64) ->
         .unwrap();
 
     MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
@@ -140,7 +141,8 @@ pub fn create_market_context_with_rate(rate: f64) -> MarketContext {
         .unwrap();
 
     MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price(
             "AAPL",
             MarketScalar::unitless(market_params::SPOT_PRICE).expect("valid scalar"),
@@ -531,8 +533,10 @@ pub fn create_market_context_with_credit(credit_spread_bp: f64) -> MarketContext
     .unwrap();
 
     MarketContext::new()
-        .insert(rf_curve)
-        .insert(credit_curve)
+        .try_insert(rf_curve)
+        .expect("insert market curve")
+        .try_insert(credit_curve)
+        .expect("insert market curve")
         .insert_price(
             "AAPL",
             MarketScalar::unitless(market_params::SPOT_PRICE).expect("valid scalar"),

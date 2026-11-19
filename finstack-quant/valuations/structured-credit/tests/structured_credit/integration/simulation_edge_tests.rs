@@ -118,7 +118,9 @@ fn flat_market() -> MarketContext {
         .build()
         .expect("valid discount curve");
 
-    MarketContext::new().insert(discount)
+    MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve")
 }
 
 /// Run simulation with a shared market context for deterministic comparisons.

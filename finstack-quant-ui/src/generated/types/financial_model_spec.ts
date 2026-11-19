@@ -749,13 +749,6 @@ export type D_8Ef975540682A003034E =
       risk_class: "non_qualifying";
     };
 /**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type D_1C91Cbdbb3238Adf0C02 = number;
-/**
  * Provider-selection purpose of a point-date FX query (record
  * CORE-CONVENTIONS-013 #1/#2).
  *
@@ -4238,11 +4231,17 @@ export interface D_65B0652Ed08913529246 {
   vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
 }
 /**
- * A finite, left-continuous piecewise-constant curve.
+ * A finite, right-continuous piecewise-constant curve.
  */
 export interface D_0B91Bd9Cf7E8361C3A1F {
-  times: number[];
-  values: number[];
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
 }
 /**
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
@@ -15197,29 +15196,29 @@ export interface DD5Bd42D8B6Ec6C31D78628 {
     | "ZWL";
 }
 /**
- * SABR model parameters
+ * Parameters of a SABR backbone, with an optional signed rate displacement.
  */
 export interface D_1F0A38Ebecad19081135 {
   /**
-   * Initial volatility (alpha)
+   * Initial volatility level, strictly positive.
    */
   alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * CEV exponent in the closed interval `[0, 1]`.
    */
   beta: number;
   /**
-   * Volatility of volatility (nu/volvol)
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
    */
   nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
    */
   rho: number;
   /**
-   * Shift parameter for handling negative rates (optional)
+   * Optional finite displacement applied to forward and strike.
    */
-  shift?: D_1C91Cbdbb3238Adf0C02 | null;
+  shift?: number | null;
 }
 /**
  * Scenario-only pricing adjustments.

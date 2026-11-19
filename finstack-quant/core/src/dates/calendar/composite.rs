@@ -298,7 +298,14 @@ mod tests {
         assert_eq!(sgsi_bse.supported_years(), Some((Some(2024), Some(2026))));
 
         static EMPTY_RULES: [Rule; 0] = [];
-        let old_cal = Calendar::new("old", "Old", false, &EMPTY_RULES, Some((None, Some(2023))));
+        let old_cal = Calendar::new(
+            "old",
+            "Old",
+            false,
+            &EMPTY_RULES,
+            Some((None, Some(2023))),
+            &[],
+        );
         let calendars: [&dyn HolidayCalendar; 2] = [&old_cal, &SGSI];
         assert!(
             CompositeCalendar::try_new(&calendars).is_err(),

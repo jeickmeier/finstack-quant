@@ -798,7 +798,11 @@ mod prepared_cds_tests {
             .knots([(1.0, 0.02), (3.0, 0.03), (5.0, 0.04), (10.0, 0.05)])
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()?;
-        let market = MarketContext::new().insert(discount).insert(hazard.clone());
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(hazard.clone())
+            .expect("insert market curve");
         Ok((market, hazard))
     }
 
@@ -824,7 +828,7 @@ mod prepared_cds_tests {
 
         let bumped_hazard = hazard.with_parallel_hazard_rate_bump_bp(1.0)?;
         let mut bumped_market = market.clone();
-        bumped_market.insert_mut(bumped_hazard.clone());
+        bumped_market.try_insert_mut(bumped_hazard.clone())?;
         let bumped_cached = cache.price(&bumped_hazard)?;
         let bumped_full = cds.value(&bumped_market, as_of)?.amount();
         assert_npv_matches(bumped_cached, bumped_full, "bumped hazard");
@@ -915,7 +919,10 @@ mod prepared_cds_tests {
                     .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
                     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()?;
-                let changed = market.clone().insert(replacement);
+                let changed = market
+                    .clone()
+                    .try_insert(replacement)
+                    .expect("insert market curve");
                 assert_eq!(prepared.price(&hazard)?.to_bits(), original.to_bits());
                 assert!(
                     (PreparedCds::new(&cds, &changed, as_of)?.price(&hazard)? - original).abs()
@@ -932,7 +939,9 @@ mod prepared_cds_tests {
         let (market, hazard) = create_test_market()?;
         let cds = create_test_cds(CdsValuationConvention::IsdaDirty)?;
         let discount = market.get_discount("USD-OIS")?;
-        let discount_only = MarketContext::new().insert(discount.as_ref().clone());
+        let discount_only = MarketContext::new()
+            .try_insert(discount.as_ref().clone())
+            .expect("insert market curve");
         let prepared = PreparedCds::new(&cds, &discount_only, date!(2025 - 02 - 15))?;
         assert!(prepared.price(&hazard)?.is_finite());
         assert!(PreparedCds::new(&cds, &MarketContext::new(), date!(2025 - 02 - 15)).is_err());
@@ -1107,7 +1116,9 @@ mod prepared_cds_tests {
                 .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()?;
-            let market = MarketContext::new().insert(discount.clone());
+            let market = MarketContext::new()
+                .try_insert(discount.clone())
+                .expect("insert market curve");
             for delay in [0, 3, 7] {
                 let mut cds = create_test_cds(CdsValuationConvention::BloombergCdswClean)?;
                 cds.protection_leg.settlement_delay = delay;
@@ -1261,8 +1272,10 @@ mod cds_review_regression_tests {
                         expected,
                     );
                     let market = MarketContext::new()
-                        .insert(disc.clone())
-                        .insert(surv.clone());
+                        .try_insert(disc.clone())
+                        .expect("insert market curve")
+                        .try_insert(surv.clone())
+                        .expect("insert market curve");
                     let cached = PreparedCds::new(&cds, &market, as_of)?.price(&surv)?;
                     close(cached, -expected);
                     close(cached, pricer.npv_full(&cds, &disc, &surv, as_of)?);
@@ -1326,7 +1339,11 @@ mod cds_review_regression_tests {
                     pricer.npv_full(&cds, &disc, &surv, as_of)?,
                     -expected_premium,
                 );
-                let market = MarketContext::new().insert(disc).insert(surv.clone());
+                let market = MarketContext::new()
+                    .try_insert(disc)
+                    .expect("insert market curve")
+                    .try_insert(surv.clone())
+                    .expect("insert market curve");
                 close(
                     PreparedCds::new(&cds, &market, as_of)?.price(&surv)?,
                     -expected_premium,
@@ -1380,8 +1397,10 @@ mod cds_review_regression_tests {
                 let npv = pricer.npv_full(&cds, &disc, &surv, as_of)?;
                 close(npv, expected_protection - expected_premium + accrued);
                 let market = MarketContext::new()
-                    .insert(disc.clone())
-                    .insert(surv.clone());
+                    .try_insert(disc.clone())
+                    .expect("insert market curve")
+                    .try_insert(surv.clone())
+                    .expect("insert market curve");
                 close(PreparedCds::new(&cds, &market, as_of)?.price(&surv)?, npv);
                 values.push(npv);
                 denominators.push(pricer.par_spread_denominator(&cds, &disc, &surv, as_of)?);

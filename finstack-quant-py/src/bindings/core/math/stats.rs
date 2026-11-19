@@ -267,12 +267,11 @@ fn quantile(py: Python<'_>, data: &Bound<'_, PyAny>, q: f64) -> PyResult<Option<
 
 /// Log returns ``ln(p_t / p_{t-1})`` of a chronological price series.
 ///
-/// Windows with a non-positive or non-finite price yield ``nan``; fewer than
-/// two prices yield an empty list.
+/// Fewer than two valid prices yield an empty list.
 ///
 /// # Arguments
 ///
-/// * `prices` - One-dimensional chronological prices; invalid windows retain Rust NaN semantics.
+/// * `prices` - Finite positive one-dimensional chronological prices. Invalid levels raise ValueError.
 ///
 /// # Errors
 ///
@@ -281,7 +280,8 @@ fn quantile(py: Python<'_>, data: &Bound<'_, PyAny>, q: f64) -> PyResult<Option<
 #[pyo3(text_signature = "(prices)")]
 fn log_returns(py: Python<'_>, prices: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> {
     let prices = extract_series(prices)?;
-    Ok(py.detach(|| stats::log_returns(&prices)))
+    py.detach(|| stats::log_returns(&prices))
+        .map_err(core_to_py)
 }
 
 /// Annualized realized variance of a close price series (mean of squared log
@@ -289,7 +289,8 @@ fn log_returns(py: Python<'_>, prices: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> 
 ///
 /// The OHLC estimators live in ``realized_variance_ohlc``. ``None`` selects
 /// the Rust default of 252 daily observations per year. Raises ``ValueError``
-/// for non-positive or non-finite prices or annualization factor.
+/// for non-positive or non-finite prices or annualization factor. Fewer than two
+/// valid prices yield ``None``; an unrepresentable variance raises ``RuntimeError``.
 ///
 /// # Arguments
 ///
@@ -307,7 +308,7 @@ fn realized_variance(
     py: Python<'_>,
     prices: &Bound<'_, PyAny>,
     annualization_factor: Option<f64>,
-) -> PyResult<f64> {
+) -> PyResult<Option<f64>> {
     let prices = extract_series(prices)?;
     py.detach(|| stats::realized_variance(&prices, annualization_factor))
         .map_err(core_to_py)

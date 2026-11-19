@@ -128,11 +128,11 @@ impl StochasticDefault for IntensityProcessDefault {
         self.correlation
     }
 
-    fn expected_mdr(&self, _seasoning: u32) -> f64 {
+    fn expected_mdr(&self, _seasoning: u32) -> finstack_quant_core::Result<f64> {
         // Same continuous-compounding conversion as `conditional_mdr`
         // (MDR = 1 − exp(−λ/12)); the shock is compensated to unit mean, so
         // the expected hazard equals the supplied base hazard.
-        (1.0 - (-self.base_hazard / 12.0).exp()).clamp(0.0, 1.0)
+        Ok((1.0 - (-self.base_hazard / 12.0).exp()).clamp(0.0, 1.0))
     }
 }
 
@@ -149,7 +149,7 @@ mod tests {
                 (model.conditional_mdr(month, &[0.0]) - expected).abs() < 1e-14,
                 "base intensity must apply at month {month}"
             );
-            assert!((model.expected_mdr(month) - expected).abs() < 1e-14);
+            assert!((model.expected_mdr(month).unwrap() - expected).abs() < 1e-14);
         }
     }
 

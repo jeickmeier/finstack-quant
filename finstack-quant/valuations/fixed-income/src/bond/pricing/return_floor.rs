@@ -824,7 +824,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve for smoke test");
-        let market = MarketContext::new().insert(disc);
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve");
 
         // A floored bond must route through the base_value hook and return Ok with a
         // positive price. The plain bond (no floor) must also still price correctly.
@@ -882,7 +884,11 @@ mod tests {
 
         // MarketContext must carry BOTH the discount curve and the forward curve so that
         // Bond::full_cashflow_schedule can project the floating coupons.
-        let curves = MarketContext::new().insert(disc).insert(fwd);
+        let curves = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve");
 
         let spec = bond.return_floor.as_ref().unwrap();
         let sched = lower_return_floor(&bond, spec, &curves, as_of).unwrap();
@@ -935,7 +941,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve");
-        MarketContext::new().insert(disc)
+        MarketContext::new()
+            .try_insert(disc)
+            .expect("insert market curve")
     }
 
     /// Build a 5-year 10% annual coupon (semi-annual by Bond::fixed convention),
@@ -1192,7 +1200,11 @@ mod tests {
             )
             .expect("flat forward curve for FRN test");
 
-            let market = MarketContext::new().insert(disc).insert(fwd);
+            let market = MarketContext::new()
+                .try_insert(disc)
+                .expect("insert market curve")
+                .try_insert(fwd)
+                .expect("insert market curve");
 
             let sched = lower_return_floor(&bond, spec, &market, as_of)
                 .unwrap_or_else(|e| panic!("lower_return_floor failed at fwd={fwd_rate}: {e}"));

@@ -95,10 +95,10 @@ impl StochasticPrepayment for FactorCorrelatedPrepay {
         capped_annual_to_monthly(shocked_cpr)
     }
 
-    fn expected_smm(&self, seasoning: u32) -> f64 {
+    fn expected_smm(&self, seasoning: u32) -> finstack_quant_core::Result<f64> {
         let base_cpr = self.base_cpr_at_seasoning(seasoning);
         if base_cpr < 1e-10 {
-            return 0.0;
+            return Ok(0.0);
         }
         expected_shocked_smm(base_cpr, self.factor_loading * self.cpr_volatility)
     }
@@ -123,8 +123,8 @@ mod tests {
                 model.conditional_smm(30, &[z], 0.05, 1.0) * density * step
             })
             .sum();
-        assert!((model.expected_smm(30) - integrated).abs() < 2e-6);
-        assert!(model.expected_smm(30) > 0.08);
+        assert!((model.expected_smm(30).unwrap() - integrated).abs() < 2e-6);
+        assert!(model.expected_smm(30).unwrap() > 0.08);
     }
 
     #[test]

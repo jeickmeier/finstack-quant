@@ -46,7 +46,7 @@
 //!     .knots(vec![(3.0, 0.25), (7.0, 0.45), (10.0, 0.60)])
 //!     .build()
 //!     .expect("BaseCorrelationCurve builder should succeed");
-//! assert!(curve.correlation(5.0) > 0.25);
+//! assert!(curve.get_correlation(5.0).expect("valid detachment") > 0.25);
 //! ```
 //!
 //! # References
@@ -69,7 +69,7 @@
 
 use crate::InputError;
 use crate::Result;
-use crate::market_data::bumps::{BumpSpec, Bumpable};
+use crate::market_data::bumps::{BumpMode, BumpSpec, BumpUnits, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle};
 use crate::types::CurveId;
 
@@ -235,9 +235,19 @@ impl BaseCorrelationCurve {
     /// # Arguments
     ///
     /// * `detachment_pct` - Tranche detachment in percent of portfolio notional;
-    ///   finite out-of-grid coordinates use the nearest boundary correlation.
-    pub fn correlation(&self, detachment_pct: f64) -> f64 {
-        self.interp.interp(detachment_pct).unwrap_or(f64::NAN)
+    ///   must lie in `[0, 100]`. Inside that domain, coordinates outside the
+    ///   quoted grid receive the nearest boundary correlation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an invalid detachment.
+    pub fn get_correlation(&self, detachment_pct: f64) -> Result<f64> {
+        if !(0.0..=100.0).contains(&detachment_pct) {
+            return Err(crate::Error::Validation(format!(
+                "base correlation detachment must be finite and in [0, 100], got {detachment_pct}"
+            )));
+        }
+        self.interp.interp(detachment_pct)
     }
 
     /// Raw detachment points (percent) used to build the curve.
@@ -417,7 +427,7 @@ impl BaseCorrelationCurve {
 ///     .knots([(3.0, 0.25), (7.0, 0.45)])
 ///     .build()
 ///     .expect("BaseCorrelationCurve builder should succeed");
-/// assert!(curve.correlation(5.0) > 0.25);
+/// assert!(curve.get_correlation(5.0).expect("valid detachment") > 0.25);
 /// ```
 pub struct BaseCorrelationCurveBuilder {
     id: CurveId,
@@ -495,29 +505,24 @@ impl Bumpable for BaseCorrelationCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
         spec.validate_parallel("BaseCorrelationCurve")?;
 
-        let (raw_val, is_multiplicative) = spec.resolve_standard_values_or_error(
-            "BaseCorrelationCurve",
-            "only supports Additive/{Percent,Fraction} or Multiplicative/Factor",
-        )?;
-        let (add, mul) = if is_multiplicative {
-            (0.0, raw_val)
-        } else {
-            (raw_val, 1.0)
-        };
-
-        let bumped_id = spec.standard_bump_id(self.id());
-
-        let mut bumped_points = Vec::with_capacity(self.detachment_points().len());
-        for (&d, &c) in self
-            .detachment_points()
-            .iter()
-            .zip(self.correlations().iter())
-        {
-            bumped_points.push((d, c * mul + add));
+        match (spec.mode, spec.units) {
+            (BumpMode::Additive, BumpUnits::Fraction) => self.apply_bucket_bump(None, spec.value),
+            (BumpMode::Multiplicative, BumpUnits::Factor) if spec.value >= 0.0 => {
+                let mut knots = Vec::with_capacity(self.len());
+                for (&detachment, &rho) in self.detachment_points.iter().zip(&self.correlations) {
+                    let bumped = rho * spec.value;
+                    if rho > 0.0 && spec.value > 0.0 && bumped == 0.0 {
+                        return Err(crate::Error::Validation(format!(
+                            "base correlation underflow at detachment {detachment}%"
+                        )));
+                    }
+                    knots.push((detachment, bumped));
+                }
+                Self::builder(self.id.clone()).knots(knots).build()
+            }
+            _ => Err(InputError::UnsupportedBump {
+                reason: "base correlation requires an additive fraction or a nonnegative multiplicative factor".into(),
+            }.into()),
         }
-
-        BaseCorrelationCurve::builder(bumped_id)
-            .knots(bumped_points)
-            .build()
     }
 }

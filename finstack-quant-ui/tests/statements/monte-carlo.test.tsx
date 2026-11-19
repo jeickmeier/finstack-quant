@@ -233,8 +233,11 @@ it("presents the returned percentiles of the chosen metric in Rust's order, with
       .map((cell) => cell.textContent),
   ).toEqual(q4.map(([, value]) => String(value)));
   const readout = screen.getByRole("region", { name: "Breach probability" });
-  expect(readout.textContent).toContain("14%");
-  expect(readout.textContent).toContain("(0.14)");
+  const percentage = new Intl.NumberFormat("en-US", {
+    style: "percent",
+  }).format(breach.probability);
+  expect(readout.textContent).toContain(percentage);
+  expect(readout.textContent).toContain(`(${breach.probability})`);
   fireEvent.click(within(readout).getByRole("button", { name: "Test breach" }));
   expect(onBreach).toHaveBeenLastCalledWith({
     metric: "leverage",

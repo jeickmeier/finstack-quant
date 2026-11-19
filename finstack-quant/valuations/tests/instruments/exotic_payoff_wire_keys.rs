@@ -190,7 +190,7 @@ fn lookback_market(as_of: Date) -> MarketContext {
     let rate: f64 = 0.05;
     let vol = 0.20;
     MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
@@ -200,6 +200,7 @@ fn lookback_market(as_of: Date) -> MarketContext {
                 .build()
                 .expect("discount curve"),
         )
+        .expect("insert market curve")
         .insert_price(
             "SPX-SPOT",
             MarketScalar::price(Money::new(100.0, Currency::USD).expect("spot")),

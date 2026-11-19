@@ -486,9 +486,12 @@ pub(crate) mod tests {
             .build()
             .expect("index");
         let market = MarketContext::new()
-            .insert(discount)
-            .insert(hazard)
-            .insert(correlation)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve")
+            .try_insert(correlation)
+            .expect("insert market curve")
             .insert_credit_index("INDEX", index)
             .expect("credit index dependencies");
         let mut tranche =
@@ -532,7 +535,8 @@ pub(crate) mod tests {
             .build()
             .expect("credit index");
         let market = market
-            .insert(issuer)
+            .try_insert(issuer)
+            .expect("insert market curve")
             .insert_credit_index("INDEX", index)
             .expect("credit index dependencies");
         for key in [

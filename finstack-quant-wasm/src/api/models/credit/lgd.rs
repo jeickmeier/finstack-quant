@@ -39,7 +39,7 @@ impl JsBetaRecovery {
     /// # Errors
     ///
     /// Throws a `validation` error if the moments are non-finite or do not
-    /// define a Beta distribution.
+    /// imply finite, strictly positive Beta shapes.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "number")] mean: JsValue,
@@ -114,7 +114,7 @@ impl JsBetaRecovery {
     /// # Errors
     ///
     /// Throws a `TypeError` if a count is not a safe integer, and a
-    /// `validation` error if sampling fails.
+    /// `computation` error if sampling exhausts the proposal budget or cannot resolve a draw.
     #[wasm_bindgen(js_name = sampleSeeded)]
     pub fn sample_seeded(
         &self,

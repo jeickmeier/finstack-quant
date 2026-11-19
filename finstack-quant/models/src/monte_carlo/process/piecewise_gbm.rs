@@ -62,10 +62,11 @@ impl StochasticProcess for PiecewiseGbmProcess {
         out[0] = (self.rs[idx] - self.qs[idx]) * x[0];
     }
 
-    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         let idx = self.interval(t);
         // σ(S) = σ S
         out[0] = self.sigmas[idx] * x[0];
+        Ok(())
     }
 }
 
@@ -106,7 +107,7 @@ impl Discretization<PiecewiseGbmProcess> for PiecewiseExactGbm {
         x: &mut [f64],
         z: &[f64],
         _work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let idx = process.interval(t);
         let r = process.rs[idx];
         let q = process.qs[idx];
@@ -114,6 +115,7 @@ impl Discretization<PiecewiseGbmProcess> for PiecewiseExactGbm {
 
         let drift = (r - q - 0.5 * sigma * sigma) * dt;
         x[0] *= crate::monte_carlo::discretization::exact::gbm_growth(drift, sigma, dt, z[0]);
+        Ok(())
     }
 
     fn work_size(&self, _process: &PiecewiseGbmProcess) -> usize {
@@ -278,7 +280,8 @@ mod tests {
         // Drift-only step (z = 0) starting exactly at t = 1.0 must use
         // r = 0.02, sigma = 0.20 (interval [1, 2)).
         let mut x = [100.0_f64];
-        disc.step(&p, 1.0, dt, &mut x, &z, &mut work);
+        disc.step(&p, 1.0, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
         let expected = 100.0 * ((0.02 - 0.5 * 0.20 * 0.20) * dt).exp();
         assert!(
             (x[0] - expected).abs() < 1e-12,

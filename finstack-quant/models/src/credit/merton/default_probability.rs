@@ -1,4 +1,4 @@
-use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
+use finstack_quant_core::math::special_functions::{ln_gamma, log_norm_cdf, norm_cdf};
 use finstack_quant_core::{Error, Result};
 
 use super::{AssetDynamics, MertonBarrierType, MertonModel};
@@ -21,26 +21,36 @@ fn credit_grades_default_probability(
     debt_barrier: f64,
     barrier_uncertainty: f64,
     horizon: f64,
-) -> f64 {
+) -> Result<f64> {
     if horizon <= 0.0 {
-        return 0.0;
+        return Ok(0.0);
     }
 
     // `lambda` is the log-barrier volatility (lognormal barrier std dev).
     let lambda = barrier_uncertainty;
     let a_t = (asset_vol.mul_add(asset_vol, lambda * lambda / horizon) * horizon).sqrt();
     if a_t <= 0.0 {
-        return if asset_value <= debt_barrier {
+        return Ok(if asset_value <= debt_barrier {
             1.0
         } else {
             0.0
-        };
+        });
     }
 
     let d = (asset_value / debt_barrier) * (lambda * lambda).exp();
     let ln_d = d.ln();
-    let survival = norm_cdf(-0.5 * a_t + ln_d / a_t) - d * norm_cdf(-0.5 * a_t - ln_d / a_t);
-    (1.0 - survival).clamp(0.0, 1.0)
+    let survival = norm_cdf(-0.5 * a_t + ln_d / a_t)? - d * norm_cdf(-0.5 * a_t - ln_d / a_t)?;
+    checked_probability(1.0 - survival)
+}
+
+fn checked_probability(value: f64) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value.clamp(0.0, 1.0))
+    } else {
+        Err(Error::Internal(
+            "non-finite Merton default probability".into(),
+        ))
+    }
 }
 
 impl MertonModel {
@@ -83,7 +93,7 @@ impl MertonModel {
         &self,
         log_drift: f64,
         horizon: f64,
-    ) -> Vec<(f64, f64, f64)> {
+    ) -> Result<Vec<(f64, f64, f64)>> {
         let sigma = self.asset_vol;
         let diffusion_var = sigma * sigma * horizon;
         let AssetDynamics::JumpDiffusion {
@@ -92,17 +102,23 @@ impl MertonModel {
             jump_vol,
         } = self.dynamics
         else {
-            return vec![(1.0, log_drift * horizon, diffusion_var)];
+            return Ok(vec![(1.0, log_drift * horizon, diffusion_var)]);
         };
 
         let lambda_t = jump_intensity * horizon;
         if lambda_t == 0.0 {
-            return vec![(1.0, log_drift * horizon, diffusion_var)];
+            return Ok(vec![(1.0, log_drift * horizon, diffusion_var)]);
         }
         // Poisson tail beyond mean + 10 standard deviations carries less than
         // 1e-15 of the mass, which is below the accuracy of `norm_cdf`.
         let n_max = (lambda_t + 10.0 * lambda_t.sqrt()).ceil().max(20.0) as usize;
-        let mut components = Vec::with_capacity(n_max + 1);
+        let count = n_max
+            .checked_add(1)
+            .ok_or_else(|| Error::Internal("Poisson mixture exceeds capacity".into()))?;
+        let mut components = Vec::new();
+        components
+            .try_reserve_exact(count)
+            .map_err(|err| Error::Internal(format!("Poisson mixture allocation failed: {err}")))?;
         for n in 0..=n_max {
             components.push((
                 0.0,
@@ -115,8 +131,8 @@ impl MertonModel {
         // ln Γ(mode + 1) = ln(mode!) gives a finite mode probability, anchoring
         // both recurrence directions without building large factorials.
         let mode = lambda_t.floor() as usize;
-        let mode_log_weight = -lambda_t + mode as f64 * lambda_t.ln()
-            - finstack_quant_core::math::special_functions::ln_gamma(mode as f64 + 1.0);
+        let mode_log_weight =
+            -lambda_t + mode as f64 * lambda_t.ln() - ln_gamma(mode as f64 + 1.0)?;
         components[mode].0 = mode_log_weight.exp();
         for n in (1..=mode).rev() {
             components[n - 1].0 = components[n].0 * n as f64 / lambda_t;
@@ -124,23 +140,29 @@ impl MertonModel {
         for n in (mode + 1)..=n_max {
             components[n].0 = components[n - 1].0 * lambda_t / n as f64;
         }
-        components
+        Ok(components)
     }
 
     /// Terminal-barrier default probability for a given diffusion log-drift.
-    fn terminal_pd(&self, log_drift: f64, horizon: f64) -> f64 {
+    fn terminal_pd(&self, log_drift: f64, horizon: f64) -> Result<f64> {
         let log_moneyness = (self.asset_value / self.debt_barrier).ln();
-        self.terminal_log_components(log_drift, horizon)
+        self.terminal_log_components(log_drift, horizon)?
             .into_iter()
             .map(|(weight, mean, variance)| {
-                weight * norm_cdf(-(log_moneyness + mean) / variance.sqrt())
+                Ok(weight * norm_cdf(-(log_moneyness + mean) / variance.sqrt())?)
             })
-            .sum()
+            .sum::<Result<f64>>()
+            .and_then(checked_probability)
     }
 
     /// Black-Cox first-passage default probability for a given diffusion
     /// log-drift and barrier growth rate.
-    fn first_passage_pd(&self, log_drift: f64, barrier_growth_rate: f64, horizon: f64) -> f64 {
+    fn first_passage_pd(
+        &self,
+        log_drift: f64,
+        barrier_growth_rate: f64,
+        horizon: f64,
+    ) -> Result<f64> {
         let sigma = self.asset_vol;
         let sigma_sqrt_t = sigma * horizon.sqrt();
 
@@ -151,7 +173,7 @@ impl MertonModel {
         let nu = log_drift - barrier_growth_rate;
         let x0 = (self.asset_value / self.debt_barrier).ln();
         if x0 <= 0.0 {
-            return 1.0;
+            return Ok(1.0);
         }
 
         let d_plus = (x0 + nu * horizon) / sigma_sqrt_t;
@@ -163,21 +185,18 @@ impl MertonModel {
         // directly in log space; taking ln(norm_cdf(...)) has already lost
         // that probability when the CDF rounds to zero.
         let exponent = -2.0 * nu / (sigma * sigma);
-        let reflection_term = (exponent * x0 + log_norm_cdf(-d_minus)).exp();
+        let reflection_term = (exponent * x0 + log_norm_cdf(-d_minus)?).exp();
 
-        let pd = norm_cdf(-d_plus) + reflection_term;
-        if pd.is_nan() {
-            return 0.0;
-        }
-        pd.clamp(0.0, 1.0)
+        let pd = norm_cdf(-d_plus)? + reflection_term;
+        checked_probability(pd)
     }
 
     /// Default probability for a given diffusion log-drift, dispatching on
     /// the barrier type. Not valid for `CreditGrades` dynamics, which are
     /// driftless and carry their own survival function.
-    fn pd_from_log_drift(&self, log_drift: f64, horizon: f64) -> f64 {
+    fn pd_from_log_drift(&self, log_drift: f64, horizon: f64) -> Result<f64> {
         if horizon <= 0.0 {
-            return 0.0;
+            return Ok(0.0);
         }
         match self.barrier_type {
             MertonBarrierType::Terminal => self.terminal_pd(log_drift, horizon),
@@ -327,8 +346,18 @@ impl MertonModel {
     /// # Arguments
     ///
     /// * `horizon` - Time horizon T in years from the valuation date; a
-    ///   non-positive horizon returns 0
-    pub fn default_probability(&self, horizon: f64) -> f64 {
+    ///   non-positive finite horizon returns 0.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-finite horizon, an undefined Gaussian variate,
+    /// or a structural probability outside the finite numerical range.
+    pub fn default_probability(&self, horizon: f64) -> Result<f64> {
+        if !horizon.is_finite() {
+            return Err(Error::Validation(
+                "default probability horizon must be finite".into(),
+            ));
+        }
         if let AssetDynamics::CreditGrades {
             barrier_uncertainty,
             ..
@@ -355,7 +384,11 @@ impl MertonModel {
     /// * `horizons` - Time horizons in years from the valuation date; a
     ///   non-positive horizon maps to 0. An empty slice returns an empty
     ///   vector.
-    pub fn default_probabilities(&self, horizons: &[f64]) -> Vec<f64> {
+    ///
+    /// # Errors
+    ///
+    /// Propagates the first horizon or numerical error from [`Self::default_probability`].
+    pub fn default_probabilities(&self, horizons: &[f64]) -> Result<Vec<f64>> {
         horizons
             .iter()
             .map(|horizon| self.default_probability(*horizon))
@@ -386,12 +419,17 @@ impl MertonModel {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] if `asset_drift` is not finite, or if
-    /// the model uses `CreditGrades` dynamics, whose survival function is
-    /// driftless by construction.
+    /// Returns a validation error for a non-finite drift or horizon, an undefined
+    /// Gaussian variate, or a driftless CreditGrades specification.
+    /// Numerically unresolved probabilities return a computation error.
     pub fn default_probability_with_drift(&self, asset_drift: f64, horizon: f64) -> Result<f64> {
         self.check_drift_supported(asset_drift, "default_probability_with_drift")?;
-        Ok(self.pd_from_log_drift(self.log_drift(asset_drift), horizon))
+        if !horizon.is_finite() {
+            return Err(Error::Validation(
+                "default probability horizon must be finite".into(),
+            ));
+        }
+        self.pd_from_log_drift(self.log_drift(asset_drift), horizon)
     }
 
     /// Moody's KMV default point: short-term debt plus half of long-term
@@ -449,13 +487,31 @@ mod tests {
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
+    fn default_probability_rejects_nonfinite_horizons() {
+        let model = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
+        for horizon in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(model.default_probability(horizon).is_err());
+            assert!(model.default_probabilities(&[1.0, horizon]).is_err());
+        }
+    }
+
+    #[test]
     fn default_probabilities_match_the_scalar_method_in_order() {
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).unwrap();
         let horizons = [5.0, 0.0, 1.0];
-        let grid = m.default_probabilities(&horizons);
-        let scalar: Vec<f64> = horizons.iter().map(|h| m.default_probability(*h)).collect();
+        let grid = m
+            .default_probabilities(&horizons)
+            .expect("valid model horizon");
+        let scalar: Vec<f64> = horizons
+            .iter()
+            .map(|h| m.default_probability(*h).expect("valid model horizon"))
+            .collect();
         assert_eq!(grid, scalar);
-        assert!(m.default_probabilities(&[]).is_empty());
+        assert!(
+            m.default_probabilities(&[])
+                .expect("valid model horizon")
+                .is_empty()
+        );
     }
 
     #[test]
@@ -478,6 +534,7 @@ mod tests {
             .expect("valid jump model");
             let mass: f64 = jump_model
                 .terminal_log_components(jump_model.log_drift(0.05), 1.0)
+                .unwrap()
                 .iter()
                 .map(|(weight, _, _)| weight)
                 .sum();
@@ -486,7 +543,13 @@ mod tests {
                 "intensity {intensity}: mass {mass}"
             );
             assert!(
-                (jump_model.default_probability(1.0) - diffusion.default_probability(1.0)).abs()
+                (jump_model
+                    .default_probability(1.0)
+                    .expect("valid model horizon")
+                    - diffusion
+                        .default_probability(1.0)
+                        .expect("valid model horizon"))
+                .abs()
                     < 2e-12
             );
             assert!(
@@ -509,7 +572,7 @@ mod tests {
     #[test]
     fn pd_textbook_values() {
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).unwrap();
-        let pd = m.default_probability(1.0);
+        let pd = m.default_probability(1.0).expect("valid model horizon");
         // PD = N(-1.2657) ~ 0.1028
         assert!((pd - 0.1028).abs() < 0.01, "PD={pd}");
     }
@@ -517,7 +580,7 @@ mod tests {
     #[test]
     fn zero_vol_means_no_default_when_solvent() {
         let m = MertonModel::new(100.0, 1e-10, 80.0, 0.05).unwrap();
-        let pd = m.default_probability(1.0);
+        let pd = m.default_probability(1.0).expect("valid model horizon");
         assert!(pd < 1e-6, "Zero vol, solvent -> PD~0, got {pd}");
     }
 
@@ -525,14 +588,24 @@ mod tests {
     fn pd_increases_with_vol() {
         let m_low = MertonModel::new(100.0, 0.10, 80.0, 0.05).unwrap();
         let m_high = MertonModel::new(100.0, 0.40, 80.0, 0.05).unwrap();
-        assert!(m_high.default_probability(1.0) > m_low.default_probability(1.0));
+        assert!(
+            m_high
+                .default_probability(1.0)
+                .expect("valid model horizon")
+                > m_low.default_probability(1.0).expect("valid model horizon")
+        );
     }
 
     #[test]
     fn pd_increases_with_leverage() {
         let m_low = MertonModel::new(100.0, 0.20, 60.0, 0.05).unwrap();
         let m_high = MertonModel::new(100.0, 0.20, 95.0, 0.05).unwrap();
-        assert!(m_high.default_probability(1.0) > m_low.default_probability(1.0));
+        assert!(
+            m_high
+                .default_probability(1.0)
+                .expect("valid model horizon")
+                > m_low.default_probability(1.0).expect("valid model horizon")
+        );
     }
 
     #[test]
@@ -551,7 +624,10 @@ mod tests {
         )
         .unwrap();
         assert!(
-            m_fp.default_probability(5.0) > m_term.default_probability(5.0),
+            m_fp.default_probability(5.0).expect("valid model horizon")
+                > m_term
+                    .default_probability(5.0)
+                    .expect("valid model horizon"),
             "First-passage PD should be higher than terminal PD"
         );
     }
@@ -576,7 +652,7 @@ mod tests {
         // integrate exp(-u - u²/(2*d-²))/d- over u >= 0 and multiply by
         // phi(d+), which evaluates the scaled Mills ratio without overflow.
         let expected = 0.511_960_669_494_607;
-        let actual = model.default_probability(1.0);
+        let actual = model.default_probability(1.0).expect("valid model horizon");
         assert!(
             (actual - expected).abs() < 5e-12,
             "Black-Cox probability {actual} lost the reflection contribution"
@@ -598,7 +674,10 @@ mod tests {
                 AssetDynamics::GeometricBrownian,
             )
             .expect("an initially defaulted model is supported");
-            assert!((model.default_probability(1.0) - 1.0).abs() < f64::EPSILON);
+            assert!(
+                (model.default_probability(1.0).expect("valid model horizon") - 1.0).abs()
+                    < f64::EPSILON
+            );
         }
     }
 
@@ -608,7 +687,7 @@ mod tests {
     fn high_vol_pd_approaches_one() {
         // With very high vol and high leverage, PD should approach 1.
         let m = MertonModel::new(100.0, 2.0, 99.0, 0.01).expect("valid");
-        let pd = m.default_probability(10.0);
+        let pd = m.default_probability(10.0).expect("valid model horizon");
         assert!(
             pd > 0.5,
             "High vol + high leverage PD should be > 0.5, got {pd}"
@@ -619,7 +698,7 @@ mod tests {
     fn very_low_leverage_pd_near_zero() {
         // V >> B should give near-zero PD.
         let m = MertonModel::new(1000.0, 0.20, 10.0, 0.05).expect("valid");
-        let pd = m.default_probability(1.0);
+        let pd = m.default_probability(1.0).expect("valid model horizon");
         assert!(pd < 1e-6, "Very low leverage PD should be ~0, got {pd}");
     }
 
@@ -639,7 +718,7 @@ mod tests {
         .expect("valid");
 
         for &t in &[0.5, 1.0, 5.0, 10.0, 30.0] {
-            let pd = m.default_probability(t);
+            let pd = m.default_probability(t).expect("valid model horizon");
             assert!((0.0..=1.0).contains(&pd), "PD({t}) = {pd} out of [0, 1]");
         }
     }
@@ -664,7 +743,7 @@ mod tests {
             AssetDynamics::GeometricBrownian,
         )
         .expect("valid");
-        let pd = m.default_probability(1.0);
+        let pd = m.default_probability(1.0).expect("valid model horizon");
         assert!(
             pd.is_finite(),
             "first-passage PD must be finite (not NaN from inf*0), got {pd}"
@@ -693,7 +772,7 @@ mod tests {
         )
         .expect("valid");
         for &t in &[0.5, 1.0, 5.0, 30.0] {
-            let pd = m.default_probability(t);
+            let pd = m.default_probability(t).expect("valid model horizon");
             assert!(
                 pd.is_finite() && (0.0..=1.0).contains(&pd),
                 "first-passage PD({t}) must be finite in [0, 1], got {pd}"
@@ -730,8 +809,10 @@ mod tests {
         )
         .expect("valid");
 
-        let pd_low = m_low.default_probability(5.0);
-        let pd_high = m_high.default_probability(5.0);
+        let pd_low = m_low.default_probability(5.0).expect("valid model horizon");
+        let pd_high = m_high
+            .default_probability(5.0)
+            .expect("valid model horizon");
         assert!(
             pd_high > pd_low,
             "Higher barrier growth should increase PD: g=0 -> {pd_low}, g=0.05 -> {pd_high}"
@@ -772,11 +853,11 @@ mod tests {
         )
         .expect("valid model");
 
-        let pd = model.default_probability(t);
+        let pd = model.default_probability(t).expect("valid model horizon");
 
         // When mu = 0, H = B (no barrier growth), d = ln(V/B) / (sigma*sqrt(T)).
         let d = (v / b).ln() / (sigma * t.sqrt());
-        let expected = 2.0 * norm_cdf(-d);
+        let expected = 2.0 * norm_cdf(-d).expect("valid Gaussian variate");
 
         assert!(
             (pd - expected).abs() < 1e-10,
@@ -812,7 +893,7 @@ mod tests {
         )
         .expect("valid model");
 
-        let pd = model.default_probability(t);
+        let pd = model.default_probability(t).expect("valid model horizon");
 
         // Closed-form reference (mu != 0, barrier_growth_rate = 0 => H = B).
         let mu = r - q - 0.5 * sigma * sigma; // = 0.02
@@ -822,7 +903,8 @@ mod tests {
         let d_plus = (log_v_h + mu * t) / sigma_sqrt_t;
         let d_minus = (log_v_h - mu * t) / sigma_sqrt_t;
         let exponent = -2.0 * mu / (sigma * sigma);
-        let expected = norm_cdf(-d_plus) + (v / b).powf(exponent) * norm_cdf(-d_minus);
+        let expected = norm_cdf(-d_plus).expect("valid Gaussian variate")
+            + (v / b).powf(exponent) * norm_cdf(-d_minus).expect("valid Gaussian variate");
 
         assert!(
             (pd - expected).abs() < 1e-10,
@@ -856,7 +938,7 @@ mod tests {
     #[test]
     fn jump_diffusion_pd_matches_monte_carlo() {
         let m = jump_diffusion_model(-0.30);
-        let analytic = m.default_probability(2.0);
+        let analytic = m.default_probability(2.0).expect("valid model horizon");
 
         let paths = m.simulate_paths(200_000, 200, 2.0, 7, true).expect("paths");
         let defaults = paths
@@ -878,10 +960,11 @@ mod tests {
         let jd = jump_diffusion_model(-0.30);
         let gbm = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
         assert!(
-            jd.default_probability(2.0) > gbm.default_probability(2.0) * 1.5,
+            jd.default_probability(2.0).expect("valid model horizon")
+                > gbm.default_probability(2.0).expect("valid model horizon") * 1.5,
             "jump PD {} should materially exceed GBM PD {}",
-            jd.default_probability(2.0),
-            gbm.default_probability(2.0)
+            jd.default_probability(2.0).expect("valid model horizon"),
+            gbm.default_probability(2.0).expect("valid model horizon")
         );
     }
 
@@ -902,7 +985,12 @@ mod tests {
         )
         .expect("valid");
         let gbm = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        assert!((jd.default_probability(3.0) - gbm.default_probability(3.0)).abs() < 1e-12);
+        assert!(
+            (jd.default_probability(3.0).expect("valid model horizon")
+                - gbm.default_probability(3.0).expect("valid model horizon"))
+            .abs()
+                < 1e-12
+        );
     }
 
     // Physical measure (Moody's KMV / EDF)
@@ -923,9 +1011,9 @@ mod tests {
             .default_probability_with_drift(0.11, 5.0)
             .expect("supported");
         assert!(
-            edf < m.default_probability(5.0),
+            edf < m.default_probability(5.0).expect("valid model horizon"),
             "EDF {edf} must be below the risk-neutral PD {}",
-            m.default_probability(5.0)
+            m.default_probability(5.0).expect("valid model horizon")
         );
         assert!(edf > 0.0);
     }
@@ -959,7 +1047,7 @@ mod tests {
             .default_probability_with_drift(0.09, 1.0)
             .expect("supported");
         assert!(dd > 0.0, "a solvent firm should have positive DD, got {dd}");
-        assert!((edf - norm_cdf(-dd)).abs() < 1e-12);
+        assert!((edf - norm_cdf(-dd).expect("valid Gaussian variate")).abs() < 1e-12);
     }
 
     #[test]
@@ -967,7 +1055,12 @@ mod tests {
         // The CreditGrades process is driftless, so the rate must not move PD.
         let low = MertonModel::credit_grades(25.0, 0.50, 80.0, 0.00, 0.30, 0.40).expect("cg");
         let high = MertonModel::credit_grades(25.0, 0.50, 80.0, 0.20, 0.30, 0.40).expect("cg");
-        assert!((low.default_probability(5.0) - high.default_probability(5.0)).abs() < 1e-15);
+        assert!(
+            (low.default_probability(5.0).expect("valid model horizon")
+                - high.default_probability(5.0).expect("valid model horizon"))
+            .abs()
+                < 1e-15
+        );
     }
 
     /// Black-Cox (1976) growing-barrier regression .
@@ -993,7 +1086,7 @@ mod tests {
         )
         .expect("valid");
 
-        let pd = m.default_probability(5.0);
+        let pd = m.default_probability(5.0).expect("valid model horizon");
         let expected = 0.502635;
         assert!(
             (pd - expected).abs() < 1e-3,
@@ -1033,8 +1126,12 @@ mod tests {
         .expect("valid");
 
         for horizon in [0.5, 1.0, 3.0, 5.0, 10.0] {
-            let pd_g = m_growing.default_probability(horizon);
-            let pd_s = m_shifted.default_probability(horizon);
+            let pd_g = m_growing
+                .default_probability(horizon)
+                .expect("valid model horizon");
+            let pd_s = m_shifted
+                .default_probability(horizon)
+                .expect("valid model horizon");
             assert!(
                 (pd_g - pd_s).abs() < 1e-12,
                 "growing-barrier PD must equal drift-shifted flat-barrier PD at T={horizon}: \

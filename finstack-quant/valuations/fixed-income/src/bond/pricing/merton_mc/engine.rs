@@ -208,7 +208,7 @@ impl MertonMcEngine {
         };
 
         // The base-path loop is embarrassingly parallel: every path draws from
-        // an independent per-path RNG stream (`new_with_stream(seed, path_idx)`).
+        // a distinct per-path RNG stream (`Pcg64Rng::new(seed, path_idx)`).
         // We simulate the paths concurrently and collect one small vector of
         // per-leg outcomes per base path. `into_par_iter` over a range is
         // order-preserving, and the outcomes are folded back into the running
@@ -237,13 +237,13 @@ impl MertonMcEngine {
             |(normals, uniforms, toggle_uniforms): &mut (Vec<f64>, Vec<f64>, Vec<f64>),
              path_idx| {
                 // Per-path RNG for determinism
-                let mut rng = Pcg64Rng::new_with_stream(run.seed, path_idx as u64);
+                let mut rng = Pcg64Rng::new(run.seed, path_idx as u64);
 
                 // Fill per-thread buffers with random draws so that antithetic
                 // pairs share identical randomness (normals are sign-flipped;
                 // uniforms are reused).
                 for n in normals.iter_mut() {
-                    *n = rng.normal(0.0, 1.0);
+                    *n = rng.normal(0.0, 1.0)?;
                 }
                 // Brownian-bridge crossing checks
                 for u in uniforms.iter_mut() {
@@ -383,19 +383,16 @@ impl MertonMcEngine {
                                 PikMode::Toggle => {
                                     if let Some(ref toggle) = config.toggle_model {
                                         let leverage = n_current / v;
-                                        let hazard_rate =
-                                            config.endogenous_hazard.as_ref().map_or_else(
-                                                || {
-                                                    let pd =
-                                                        config.merton.default_probability(coupon_t);
-                                                    if coupon_t > 0.0 {
-                                                        -(1.0 - pd).ln() / coupon_t
-                                                    } else {
-                                                        0.0
-                                                    }
-                                                },
-                                                |eh| eh.hazard_at_leverage(leverage),
-                                            );
+                                        let hazard_rate = if let Some(eh) =
+                                            config.endogenous_hazard.as_ref()
+                                        {
+                                            eh.hazard_at_leverage(leverage)
+                                        } else if coupon_t > 0.0 {
+                                            let pd = config.merton.default_probability(coupon_t)?;
+                                            -(-pd).ln_1p() / coupon_t
+                                        } else {
+                                            0.0
+                                        };
                                         let remaining = maturity_years - coupon_t;
                                         let dd = if sigma > 0.0 && remaining > 0.0 {
                                             let sqrt_remaining = remaining.sqrt();
@@ -419,7 +416,7 @@ impl MertonMcEngine {
 
                                         let tu =
                                             toggle_uniforms.get(coupon_idx).copied().unwrap_or(0.5);
-                                        if toggle.should_pik(&state, tu) {
+                                        if toggle.should_pik(&state, tu)? {
                                             n_current += coupon_amount;
                                             path_pik_elections += 1;
                                         } else {
@@ -448,7 +445,7 @@ impl MertonMcEngine {
                     leg.pv = path_pv;
                     legs.push(leg);
                 }
-                legs
+                Ok(legs)
             };
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -457,7 +454,7 @@ impl MertonMcEngine {
             (0..n_base)
                 .into_par_iter()
                 .map_init(init_bufs, simulate_base)
-                .collect()
+                .collect::<Result<_>>()?
         };
 
         #[cfg(target_arch = "wasm32")]
@@ -465,7 +462,7 @@ impl MertonMcEngine {
             let mut bufs = init_bufs();
             (0..n_base)
                 .map(|path_idx| simulate_base(&mut bufs, path_idx))
-                .collect()
+                .collect::<Result<_>>()?
         };
 
         // Serial, order-preserving fold into the running accumulators. This

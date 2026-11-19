@@ -56,7 +56,9 @@ fn test_ytw_is_minimum_of_ytm_and_ytc() {
     });
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let result = loan.price_with_metrics(
@@ -124,7 +126,9 @@ fn test_ytw_callable_amortizing_loan_coupon_on_call_date() {
     });
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Act
     let result = loan
@@ -219,7 +223,9 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
     let loan = noncallable_ddtl_with_future_draws(date!(2025 - 03 - 31));
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
     let schedule = loan.cashflow_schedule(&market, as_of).expect("cashflows");
     let funding: Vec<_> = schedule
         .get_flows()
@@ -262,7 +268,9 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
 fn test_ddtl_yields_reject_draws_after_coupon_receipts() {
     let as_of = date!(2025 - 01 - 01);
     let loan = noncallable_ddtl_with_future_draws(date!(2025 - 09 - 15));
-    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve");
 
     loan.value(&market, as_of)
         .expect("nonconventional funding cashflows still have a model PV");
@@ -327,7 +335,9 @@ fn test_ytw_includes_standing_call_for_seasoned_callable_loan() {
         InstrumentPricingOverrides::default().with_quoted_clean_price_pct(101.0);
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let result = loan
         .price_with_metrics(
@@ -391,7 +401,9 @@ fn test_ytw_uses_quoted_clean_price_pct_when_present() {
     });
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     let base = loan
         .price_with_metrics(
@@ -450,7 +462,9 @@ fn weekend_maturity_loan(convention: BusinessDayConvention) -> TermLoan {
 }
 
 fn yields(loan: &TermLoan, as_of: Date) -> (f64, f64, f64) {
-    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve");
     let result = loan
         .price_with_metrics(
             &market,
@@ -529,7 +543,9 @@ fn test_yt2y_capped_at_weekend_maturity_equals_ytm() {
     // yield and must keep the final payment rolled to Monday.
     let as_of = date!(2028 - 06 - 14);
     let loan = weekend_maturity_loan(BusinessDayConvention::ModifiedFollowing);
-    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve");
     let result = loan
         .price_with_metrics(
             &market,

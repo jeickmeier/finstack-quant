@@ -159,7 +159,9 @@ fn swaption_vol_step_builds_and_inserts_surface() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let currency = Currency::USD;
 
-    let source_market = MarketContext::new().insert(create_test_discount_curve(base_date));
+    let source_market = MarketContext::new()
+        .try_insert(create_test_discount_curve(base_date))
+        .expect("insert market curve");
 
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
@@ -250,7 +252,9 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let currency = Currency::USD;
 
-    let source_market = MarketContext::new().insert(create_test_discount_curve(base_date));
+    let source_market = MarketContext::new()
+        .try_insert(create_test_discount_curve(base_date))
+        .expect("insert market curve");
 
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
@@ -367,7 +371,9 @@ fn swaption_vol_out_of_bounds_targets_error_by_default() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let currency = Currency::USD;
 
-    let source_market = MarketContext::new().insert(create_test_discount_curve(base_date));
+    let source_market = MarketContext::new()
+        .try_insert(create_test_discount_curve(base_date))
+        .expect("insert market curve");
 
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
@@ -423,7 +429,9 @@ fn swaption_vol_out_of_bounds_targets_can_clamp_when_configured() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let currency = Currency::USD;
 
-    let source_market = MarketContext::new().insert(create_test_discount_curve(base_date));
+    let source_market = MarketContext::new()
+        .try_insert(create_test_discount_curve(base_date))
+        .expect("insert market curve");
 
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
@@ -502,7 +510,9 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
     assert!((contractual_tenor - 1.0).abs() < 1.0e-12);
 
     let execute_for_tenor = |target_tenor: f64| {
-        let source_market = MarketContext::new().insert(create_test_discount_curve(base_date));
+        let source_market = MarketContext::new()
+            .try_insert(create_test_discount_curve(base_date))
+            .expect("insert market curve");
         let mut swpt_quotes: Vec<_> = create_test_swaption_quotes().into_iter().take(5).collect();
         for quote in &mut swpt_quotes {
             let MarketQuote::Vol(VolQuote::SwaptionVol {
@@ -586,7 +596,9 @@ fn calibrate_flat_normal_cube(fixed_day_count: DayCount, tenor_years: i32) -> Ma
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let mut quotes = Vec::new();
     for (expiry, maturity, vol) in [
         (

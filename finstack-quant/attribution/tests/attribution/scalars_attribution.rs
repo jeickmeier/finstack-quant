@@ -83,7 +83,7 @@ fn test_equity_price_id_uses_restored_scalar_price() {
         .with_quantity(1.0);
 
     let market_t0 = MarketContext::new()
-        .insert(
+        .try_insert(
             finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD")
                 .base_date(
                     finstack_quant_core::dates::Date::from_calendar_date(
@@ -100,12 +100,13 @@ fn test_equity_price_id_uses_restored_scalar_price() {
                 .build()
                 .unwrap(),
         )
+        .expect("insert market curve")
         .insert_price(
             "AAPL-SPOT",
             MarketScalar::price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
         );
     let market_t1 = MarketContext::new()
-        .insert(
+        .try_insert(
             finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD")
                 .base_date(
                     finstack_quant_core::dates::Date::from_calendar_date(
@@ -122,6 +123,7 @@ fn test_equity_price_id_uses_restored_scalar_price() {
                 .build()
                 .unwrap(),
         )
+        .expect("insert market curve")
         .insert_price(
             "AAPL-SPOT",
             MarketScalar::price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
@@ -164,14 +166,20 @@ fn test_taylor_equity_spot_move_lands_in_market_scalars_pnl() {
             .build()
             .unwrap()
     };
-    let market_t0 = MarketContext::new().insert(discount()).insert_price(
-        "AAPL-SPOT",
-        MarketScalar::price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
-    );
-    let market_t1 = MarketContext::new().insert(discount()).insert_price(
-        "AAPL-SPOT",
-        MarketScalar::price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
-    );
+    let market_t0 = MarketContext::new()
+        .try_insert(discount())
+        .expect("insert market curve")
+        .insert_price(
+            "AAPL-SPOT",
+            MarketScalar::price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
+        );
+    let market_t1 = MarketContext::new()
+        .try_insert(discount())
+        .expect("insert market curve")
+        .insert_price(
+            "AAPL-SPOT",
+            MarketScalar::price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
+        );
 
     let attribution = attribute_pnl(
         &AttributionMethod::Taylor(TaylorAttributionConfig::default()),

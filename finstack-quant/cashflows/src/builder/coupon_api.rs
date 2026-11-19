@@ -599,7 +599,7 @@ impl CashFlowBuilder {
     /// };
     ///
     /// // Projecting the floating leg needs a forward curve for the index.
-    /// let market = MarketContext::new().insert(
+    /// let market = MarketContext::new().try_insert(
     ///     ForwardCurve::builder("USD-SOFR")
     ///         .base_date(issue)
     ///         .day_count(DayCount::Act360)
@@ -607,7 +607,7 @@ impl CashFlowBuilder {
     ///         .interp(InterpStyle::LogLinear)
     ///         .extrapolation(ExtrapolationPolicy::Extend)
     ///         .build()?,
-    /// );
+    /// )?;
     ///
     /// let schedule = CashFlowSchedule::builder()
     ///     .principal(Money::from((10_000_000_i64, Currency::USD)), issue, maturity)

@@ -107,7 +107,8 @@ impl BetaRecovery {
     /// # Arguments
     ///
     /// * `mean` - Finite distribution mean in the same units as the modeled variable.
-    /// * `std_dev` - Non-negative distribution standard deviation in modeled-variable units.
+    /// * `std_dev` - Strictly positive recovery standard deviation in decimal units,
+    ///   small enough for positive shapes and large enough for both shapes to be finite.
     pub fn new(mean: f64, std_dev: f64) -> Result<Self> {
         if !mean.is_finite() || mean <= 0.0 || mean >= 1.0 {
             return Err(finstack_quant_core::Error::Validation(
@@ -124,9 +125,29 @@ impl BetaRecovery {
                 "beta distribution variance must be below mean * (1 - mean)".to_string(),
             ));
         }
-        let common = m1m / variance - 1.0;
-        let alpha = mean * common;
-        let beta_param = (1.0 - mean) * common;
+        // A subnormal squared deviation loses significant bits, and zero
+        // can still correspond to finite shapes when the mean is tiny.
+        let common = if variance.is_normal() {
+            m1m / variance - 1.0
+        } else {
+            (m1m / std_dev) / std_dev - 1.0
+        };
+        let shape = |weight| {
+            if common.is_finite() {
+                weight * common
+            } else {
+                // The concentration can overflow even when both shapes fit.
+                (weight * (m1m / std_dev)) / std_dev - weight
+            }
+        };
+        let alpha = shape(mean);
+        let beta_param = shape(1.0 - mean);
+        if !alpha.is_finite() || !beta_param.is_finite() || alpha <= 0.0 || beta_param <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "recovery mean and standard deviation must imply finite, positive Beta shapes"
+                    .into(),
+            ));
+        }
         Ok(Self {
             mean,
             std_dev,
@@ -163,20 +184,21 @@ impl BetaRecovery {
     /// Mode of the Beta distribution (valid when alpha > 1 and beta > 1).
     pub fn mode(&self) -> Option<f64> {
         if self.alpha > 1.0 && self.beta_param > 1.0 {
-            Some((self.alpha - 1.0) / (self.alpha + self.beta_param - 2.0))
+            let a = self.alpha - 1.0;
+            let b = self.beta_param - 1.0;
+            let scale = a.max(b);
+            Some((a / scale) / (a / scale + b / scale))
         } else {
             None
         }
     }
 
-    /// Sample a single recovery rate draw using the `statrs` Beta distribution.
+    /// Sample a recovery fraction from the Beta distribution using independent Gamma draws.
     ///
     /// # Errors
     ///
-    /// Propagates sampling errors instead of silently falling back to the
-    /// mean (). With the shape
-    /// parameters validated by [`BetaRecovery::new`] this is near-unreachable,
-    /// but a silent mean fallback would corrupt tail statistics undetected.
+    /// Returns a computation error on malformed generator output, unresolved
+    /// sample arithmetic, or rejection-sampler exhaustion.
     ///
     /// # Arguments
     ///
@@ -193,8 +215,13 @@ impl BetaRecovery {
     /// # Errors
     ///
     /// Propagates sampling errors (see [`BetaRecovery::sample`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `n_samples` - Number of independent recovery draws to generate.
+    /// * `seed` - Initial PCG64 seed used to reproduce the vector.
     pub fn sample_seeded(&self, n_samples: usize, seed: u64) -> Result<Vec<f64>> {
-        let mut rng = Pcg64Rng::new(seed);
+        let mut rng = Pcg64Rng::new(seed, 0);
         let mut out = vec![0.0_f64; n_samples];
         for value in &mut out {
             *value = self.sample(&mut rng)?;
@@ -366,6 +393,12 @@ mod tests {
         // std_dev non-positive
         assert!(BetaRecovery::new(0.5, 0.0).is_err());
         assert!(BetaRecovery::new(0.5, -0.1).is_err());
+        assert!(BetaRecovery::new(0.5, 1e-300).is_err());
+        let extreme = BetaRecovery::new(0.5, 3e-155).expect("finite shapes");
+        assert_eq!(extreme.mode(), Some(0.5));
+        assert!((extreme.alpha() / 1.388888888888889e308 - 1.0).abs() < 1e-14);
+        let small_mean = BetaRecovery::new(1e-300, 1e-170).expect("finite dispersed shapes");
+        assert!((small_mean.alpha() / 1e-260 - 1.0).abs() < 1e-14);
 
         // variance >= mean*(1-mean)
         assert!(BetaRecovery::new(0.5, 0.5).is_err()); // variance = 0.25 = mean*(1-mean)
@@ -375,7 +408,7 @@ mod tests {
     #[test]
     fn beta_recovery_sampling_in_range() {
         let br = BetaRecovery::new(0.52, 0.25).expect("valid params");
-        let mut rng = Pcg64Rng::new(42);
+        let mut rng = Pcg64Rng::new(42, 0);
 
         for _ in 0..1000 {
             let s = br

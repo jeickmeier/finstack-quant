@@ -39,7 +39,7 @@ fn test_discount_curve_df_monotonic_after_parallel_shock() {
         .build()
         .unwrap();
 
-    market = market.insert(curve);
+    market = market.try_insert(curve).expect("insert market curve");
 
     // Apply parallel shock
     let scenario = ScenarioSpec {
@@ -115,7 +115,7 @@ fn test_discount_curve_df_monotonic_after_node_shock() {
         .build()
         .unwrap();
 
-    market = market.insert(curve);
+    market = market.try_insert(curve).expect("insert market curve");
 
     // Apply node shock (2Y key-rate bump)
     let scenario = ScenarioSpec {
@@ -216,7 +216,7 @@ fn test_forward_curve_rates_finite_after_parallel_shock() {
 
     let curve = sample_forward_curve(as_of);
 
-    market = market.insert(curve);
+    market = market.try_insert(curve).expect("insert market curve");
 
     // Apply parallel shock
     let scenario = ScenarioSpec {
@@ -264,7 +264,7 @@ fn test_forward_curve_rates_finite_after_node_shock() {
 
     let curve = sample_forward_curve(as_of);
 
-    market = market.insert(curve);
+    market = market.try_insert(curve).expect("insert market curve");
 
     // Apply node shock
     let scenario = ScenarioSpec {
@@ -322,7 +322,7 @@ fn test_base_correlation_bounds_after_parallel_shock() {
         .build()
         .unwrap();
 
-    market = market.insert(curve);
+    market = market.try_insert(curve).expect("insert market curve");
 
     // Apply parallel shock (additive)
     let scenario = ScenarioSpec {
@@ -378,7 +378,9 @@ fn parallel_base_correlation_shock_rejects_invalid_replacement() {
         .knots(vec![(0.03, 0.20), (0.30, 0.70)])
         .build()
         .unwrap();
-    let mut market = MarketContext::new().insert(curve);
+    let mut market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let scenario = ScenarioSpec {
         id: "parallel_clamp".into(),
         name: None,
@@ -425,7 +427,7 @@ fn test_base_correlation_bounds_after_bucket_shock() {
         .build()
         .unwrap();
 
-    market = market.insert(curve);
+    market = market.try_insert(curve).expect("insert market curve");
 
     // Apply bucket shock to 7% and 15% detachment points
     let scenario = ScenarioSpec {

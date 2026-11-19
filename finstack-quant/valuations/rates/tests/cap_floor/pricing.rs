@@ -126,8 +126,10 @@ fn test_cap_pv_positive() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = cap.value(&market, as_of).unwrap();
@@ -149,8 +151,10 @@ fn test_floor_pv_positive() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = floor.value(&market, as_of).unwrap();
@@ -172,8 +176,10 @@ fn test_atm_cap_pricing() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = cap.value(&market, as_of).unwrap().amount();
@@ -199,8 +205,10 @@ fn test_itm_cap_more_valuable_than_atm() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let atm_pv = atm_cap.value(&market, as_of).unwrap().amount();
@@ -228,8 +236,10 @@ fn test_otm_cap_less_valuable_than_atm() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let atm_pv = atm_cap.value(&market, as_of).unwrap().amount();
@@ -258,16 +268,20 @@ fn test_higher_vol_increases_cap_value() {
     let high_vol_surface = build_flat_vol_surface(0.40, as_of, "USD_CAP_VOL");
 
     let low_vol_market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(low_vol_surface);
 
     let disc_curve2 = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve2 = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
 
     let high_vol_market = MarketContext::new()
-        .insert(disc_curve2)
-        .insert(fwd_curve2)
+        .try_insert(disc_curve2)
+        .expect("insert market curve")
+        .try_insert(fwd_curve2)
+        .expect("insert market curve")
         .insert_surface(high_vol_surface);
 
     let low_vol_pv = cap.value(&low_vol_market, as_of).unwrap().amount();
@@ -321,8 +335,10 @@ fn test_caplet_single_period_pricing() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = caplet.value(&market, as_of).unwrap();
@@ -344,16 +360,20 @@ fn test_pricing_with_different_vol_surfaces() {
     // Price with 25% vol surface
     let vol_surface_25 = build_flat_vol_surface(0.25, as_of, "USD_CAP_VOL");
     let market_25 = MarketContext::new()
-        .insert(disc_curve.clone())
-        .insert(fwd_curve.clone())
+        .try_insert(disc_curve.clone())
+        .expect("insert market curve")
+        .try_insert(fwd_curve.clone())
+        .expect("insert market curve")
         .insert_surface(vol_surface_25);
     let pv_25 = cap.value(&market_25, as_of).unwrap();
 
     // Price with 30% vol surface
     let vol_surface_30 = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
     let market_30 = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface_30);
     let pv_30 = cap.value(&market_30, as_of).unwrap();
 
@@ -378,8 +398,10 @@ fn test_zero_notional_cap() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     assert!(cap.value(&market, as_of).is_err());
@@ -397,8 +419,10 @@ fn test_longer_maturity_more_valuable() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let short_pv = short_cap.value(&market, as_of).unwrap().amount();
@@ -464,8 +488,10 @@ fn test_fixing_vs_payment_date_timing() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = caplet.value(&market, as_of).unwrap();
@@ -486,8 +512,10 @@ fn test_fixing_vs_payment_date_timing() {
     let vol_surface2 = build_flat_vol_surface(0.30, as_of_fixing, "USD_CAP_VOL");
 
     let market2 = MarketContext::new()
-        .insert(disc_curve2)
-        .insert(fwd_curve2)
+        .try_insert(disc_curve2)
+        .expect("insert market curve")
+        .try_insert(fwd_curve2)
+        .expect("insert market curve")
         .insert_surface(vol_surface2);
 
     let pv_at_fixing = caplet.value(&market2, as_of_fixing).unwrap();
@@ -554,8 +582,10 @@ fn test_seasoned_caplet_uses_historical_fixing_after_reset() {
     .unwrap();
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_series(fixings);
 
@@ -615,8 +645,10 @@ fn test_single_period_cap_matches_caplet_with_resolved_lags() {
     .expect("valid literal strike");
 
     let market = MarketContext::new()
-        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
-        .insert(build_flat_forward_curve(0.05, as_of, "USD-SOFR-OIS"))
+        .try_insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .expect("insert market curve")
+        .try_insert(build_flat_forward_curve(0.05, as_of, "USD-SOFR-OIS"))
+        .expect("insert market curve")
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"));
 
     let cap_pv = cap.value(&market, as_of).unwrap().amount();
@@ -668,8 +700,10 @@ fn test_caplet_after_payment_date_is_zero() {
     let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
 
     let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
         .insert_surface(vol_surface);
 
     let pv = caplet.value(&market, as_of).unwrap();

@@ -144,7 +144,9 @@ fn test_ecf_sweep_basic() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve should build");
-    let market_ctx = MarketContext::new().insert(disc_curve);
+    let market_ctx = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Evaluate model
     let mut evaluator = Evaluator::new();

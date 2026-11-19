@@ -643,8 +643,9 @@ mod tests {
         assert_eq!(periods[0].accrual_end, end);
         assert_eq!(periods[0].reset_date, start);
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
-            .insert(
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+            .expect("insert market curve")
+            .try_insert(
                 finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
                     "USD-FUND",
                 )
@@ -665,7 +666,8 @@ mod tests {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("sloped forward curve"),
-            );
+            )
+            .expect("insert market curve");
         let flow = &swap
             .funding_leg_flows(&market, as_of, true)
             .expect("no premature fixing required")[0];
@@ -728,8 +730,10 @@ mod tests {
         assert_eq!(periods[1].accrual_start, periods[0].accrual_end);
         assert_ne!(periods[1].accrual_start, periods[0].payment_date);
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 2.0))
-            .insert(flat_forward_with_tenor("USD-FUND", as_of, 0.08, 2.0));
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 2.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-FUND", as_of, 0.08, 2.0))
+            .expect("insert market curve");
         let flows = swap
             .funding_leg_flows(&market, as_of, true)
             .expect("funding flows");
@@ -789,8 +793,9 @@ mod tests {
     fn settled_funding_requires_no_historical_fixings() {
         let as_of = date(2025, 7, 1);
         let swap = floating_leg_swap();
-        let market =
-            MarketContext::new().insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+            .expect("insert market curve");
         let pv = CmsSwapPricer
             .pv_funding_leg(&swap, &market, as_of)
             .expect("all funding payments excluded before projecting coupons");
@@ -802,8 +807,10 @@ mod tests {
         let as_of = date(2025, 1, 1);
         let swap = floating_leg_swap();
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 1.0))
-            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.05, 1.0));
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 1.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.05, 1.0))
+            .expect("insert market curve");
 
         let pv = CmsSwapPricer
             .pv_funding_leg(&swap, &market, as_of)
@@ -845,8 +852,10 @@ mod tests {
             builder = builder.row(&vec![vol; strikes.len()]);
         }
         MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
-            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.03, 1.0))
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.03, 1.0))
+            .expect("insert market curve")
             .insert_surface(builder.build().expect("vol surface"))
     }
 
@@ -963,12 +972,9 @@ mod tests {
     fn cms_swap_log_normal_convexity_rejects_negative_forward_rates() {
         let as_of = date(2025, 1, 1);
         let swap = capped_cms_swap(None);
-        let market = cms_market_with_vol(as_of, 0.25).insert(flat_forward_with_tenor(
-            "USD-LIBOR-3M",
-            as_of,
-            -0.005,
-            2.0,
-        ));
+        let market = cms_market_with_vol(as_of, 0.25)
+            .try_insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, -0.005, 2.0))
+            .expect("insert market curve");
 
         let error = CmsSwapPricer
             .pv_cms_leg(&swap, &market, as_of, 1.0)
@@ -1331,8 +1337,10 @@ mod tests {
         // Negative-rate market: 0% discounting (constant DFs are valid) with a
         // -1% projection curve drives the reference par swap rate negative.
         let market = MarketContext::new()
-            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 1.0))
-            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, -0.01, 1.0));
+            .try_insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 1.0))
+            .expect("insert market curve")
+            .try_insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, -0.01, 1.0))
+            .expect("insert market curve");
 
         let result = CmsSwapReplicationPricer.price_internal(&swap, &market, as_of);
         assert!(

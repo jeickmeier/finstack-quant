@@ -11,12 +11,16 @@
 #[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct SabrParameterData {
     /// Initial volatility level, strictly positive.
+    #[cfg_attr(feature = "json-schema", schemars(extend("exclusiveMinimum" = 0.0)))]
     alpha: f64,
     /// CEV exponent in the closed interval `[0, 1]`.
+    #[cfg_attr(feature = "json-schema", schemars(range(min = 0.0, max = 1.0)))]
     beta: f64,
     /// Forward-volatility correlation in the open interval `(-1, 1)`.
+    #[cfg_attr(feature = "json-schema", schemars(extend("exclusiveMinimum" = -1.0, "exclusiveMaximum" = 1.0)))]
     rho: f64,
     /// Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
+    #[cfg_attr(feature = "json-schema", schemars(range(min = 0.0)))]
     nu: f64,
     /// Optional finite displacement applied to forward and strike.
     #[serde(default, skip_serializing_if = "Option::is_none")]

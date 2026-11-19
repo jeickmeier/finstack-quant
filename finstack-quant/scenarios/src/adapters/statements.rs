@@ -369,7 +369,11 @@ mod tests {
             .add_to_date(start, None, BusinessDayConvention::Unadjusted)
             .expect("end");
         let log_growth = -forward.df_between_dates(start, end).expect("growth").ln();
-        let market = MarketContext::new().insert(discount).insert(forward);
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(forward)
+            .expect("insert market curve");
         let mut binding = RateBindingSpec {
             node_id: "rate".into(),
             curve_id: "DISC".into(),

@@ -416,7 +416,9 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let market = MarketContext::new().insert(discount);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let schedule = loan
         .raw_cashflow_schedule(&market, issue)
         .expect("loan cashflows");
@@ -664,7 +666,9 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let market = MarketContext::new().insert(discount);
+    let market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     for issue in [date!(2024 - 01 - 01), date!(2024 - 01 - 15)] {
         let mut loan = TermLoan::example().expect("canonical term loan");
         loan.id = INSTRUMENT.into();

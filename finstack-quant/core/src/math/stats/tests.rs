@@ -218,14 +218,19 @@ fn confidence_intervals_reject_insufficient_samples_and_invalid_alpha() {
 
 #[test]
 fn test_standard_normal_inv_cdf() {
-    let z_95 = standard_normal_inv_cdf(0.975);
+    let z_95 = standard_normal_inv_cdf(0.975).expect("valid probability");
     assert!((z_95 - 1.96).abs() < 0.01);
 
-    let z_99 = standard_normal_inv_cdf(0.995);
+    let z_99 = standard_normal_inv_cdf(0.995).expect("valid probability");
     assert!((z_99 - 2.576).abs() < 0.01);
 
-    assert!((standard_normal_inv_cdf(0.5)).abs() < 0.01);
-    assert!((standard_normal_inv_cdf(0.25) + standard_normal_inv_cdf(0.75)).abs() < 0.01);
+    assert!((standard_normal_inv_cdf(0.5).expect("valid probability")).abs() < 0.01);
+    assert!(
+        (standard_normal_inv_cdf(0.25).expect("valid probability")
+            + standard_normal_inv_cdf(0.75).expect("valid probability"))
+        .abs()
+            < 0.01
+    );
 }
 
 #[test]
@@ -428,24 +433,30 @@ fn test_constant_series_availability_contracts() {
 
 #[test]
 fn log_returns_empty_and_single_yield_empty() {
-    assert!(super::log_returns(&[]).is_empty());
-    assert!(super::log_returns(&[100.0]).is_empty());
+    assert!(super::log_returns(&[]).unwrap().is_empty());
+    assert!(super::log_returns(&[100.0]).unwrap().is_empty());
 }
 
 #[test]
 fn log_returns_matches_ln_ratio_for_positive_prices() {
-    let lr = super::log_returns(&[100.0, 110.0, 99.0]);
+    let lr = super::log_returns(&[100.0, 110.0, 99.0]).unwrap();
     assert_eq!(lr.len(), 2);
     assert!((lr[0] - 1.1_f64.ln()).abs() < 1e-12);
     assert!((lr[1] - (99.0_f64 / 110.0).ln()).abs() < 1e-12);
 }
 
 #[test]
-fn log_returns_non_positive_or_non_finite_prices_yield_nan() {
-    assert!(super::log_returns(&[100.0, 0.0])[0].is_nan());
-    assert!(super::log_returns(&[0.0, 100.0])[0].is_nan());
-    assert!(super::log_returns(&[100.0, f64::NAN])[0].is_nan());
-    assert!(super::log_returns(&[f64::NAN, 100.0])[0].is_nan());
+fn log_returns_rejects_non_positive_or_non_finite_prices() {
+    assert!(super::log_returns(&[0.0]).is_err());
+    let extremes = super::log_returns(&[1e-300, 1e300, 1e-300]).unwrap();
+    assert!((extremes[0] - 600.0 * f64::ln(10.0)).abs() < 1e-12);
+    assert_eq!(extremes[0], -extremes[1]);
+    let near = super::log_returns(&[1e300, 1e300_f64.next_up()]).unwrap();
+    assert!(near[0] > 0.0);
+    assert!(super::log_returns(&[100.0, 0.0]).is_err());
+    assert!(super::log_returns(&[0.0, 100.0]).is_err());
+    assert!(super::log_returns(&[100.0, f64::NAN]).is_err());
+    assert!(super::log_returns(&[f64::NAN, 100.0]).is_err());
 }
 
 // ── quantile & median tests ──
@@ -683,6 +694,40 @@ fn realized_variance_rejects_invalid_ohlc_and_annualization() {
         .is_err()
     );
     assert!(realized_variance(&close, Some(-1.0)).is_err());
+}
+
+#[test]
+fn ohlc_estimators_support_wide_prices_and_positive_subnormal_variance() {
+    use super::{RealizedVarMethod, realized_variance, realized_variance_ohlc};
+    let smallest = f64::from_bits(1);
+    let tiny = realized_variance(&[1.0, 16.0, 16.0, 16.0, 16.0], Some(smallest)).unwrap();
+    assert_eq!(tiny, Some(f64::from_bits(2)));
+    assert!(realized_variance(&[1.0, 1.0001], Some(smallest)).is_err());
+    let log_body = 600.0 * 10.0_f64.ln();
+    for (method, expected) in [
+        (
+            RealizedVarMethod::GarmanKlass,
+            (1.5 - 2.0 * f64::ln(2.0)) * log_body * log_body,
+        ),
+        (RealizedVarMethod::RogersSatchell, 0.0),
+        (
+            RealizedVarMethod::Parkinson,
+            log_body * log_body / (4.0 * f64::ln(2.0)),
+        ),
+    ] {
+        let value = realized_variance_ohlc(
+            &[1e-300],
+            &[1e300],
+            &[1e-300],
+            &[1e300],
+            Some(method),
+            Some(1.0),
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert!((value - expected).abs() <= 1e-14 * expected);
+    }
 }
 
 #[test]

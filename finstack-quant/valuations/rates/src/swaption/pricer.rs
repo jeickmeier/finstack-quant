@@ -1,7 +1,6 @@
 //! Vanilla swaption pricer implementation.
 
 use crate::swaption::Swaption;
-use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::VolatilityModel;
@@ -155,24 +154,15 @@ fn price_swaption_raw(
                 PricingError::model_failure_with_context(error.to_string(), context.clone())
             })?
     } else {
-        // Use Act/365F for the option time-to-expiry so the vol-surface
-        // pillar lookup is on the same time axis used by both pricing kernels.
-        let time_to_expiry = finstack_quant_core::dates::DayCount::Act365F
-            .year_fraction(as_of, swaption.expiry, DayCountContext::default())
-            .map_err(|error| {
-                PricingError::model_failure_with_context(error.to_string(), context.clone())
-            })?;
         let forward = swaption.forward_swap_rate(market, as_of).map_err(|error| {
             PricingError::model_failure_with_context(error.to_string(), context.clone())
         })?;
-        let vol = swaption
-            .resolve_volatility(market, forward, time_to_expiry)
-            .map_err(|error| {
-                PricingError::missing_market_data_with_context(error.to_string(), context.clone())
-            })?;
+        let (quote, time_to_expiry) = swaption
+            .resolve_volatility_quote_on_date(market, forward, as_of)
+            .map_err(|error| PricingError::from_core(error, context.clone()))?;
 
         swaption
-            .price_with_vol_at_raw(market, as_of, forward, time_to_expiry, vol)
+            .price_quote_at_raw(market, quote, as_of, forward, time_to_expiry)
             .map_err(|error| PricingError::model_failure_with_context(error.to_string(), context))?
     };
 
@@ -209,12 +199,14 @@ mod tests {
             nu: 0.4,
             shift: None,
         });
-        let market = MarketContext::new().insert(flat_discount_with_tenor(
-            black.get_discount_curve_id().as_str(),
-            as_of,
-            0.03,
-            10.0,
-        ));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_with_tenor(
+                black.get_discount_curve_id().as_str(),
+                as_of,
+                0.03,
+                10.0,
+            ))
+            .expect("insert market curve");
         let registry = crate::RATES.pricers();
 
         for (swaption, expected_model) in [
@@ -249,17 +241,143 @@ mod tests {
     }
 
     #[test]
+    fn dated_swaption_requires_cube_clock_agreement() {
+        use finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};
+        use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
+        use finstack_quant_models::volatility::VolatilityConvention;
+
+        let as_of = date(2025, 1, 1);
+        let swaption = Swaption::example().expect("swaption");
+        let discount =
+            flat_discount_with_tenor(swaption.get_discount_curve_id().as_str(), as_of, 0.03, 10.0);
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("insert discount curve");
+        let node = SabrParameterData::new(0.2, 1.0, 0.0, -0.25, Some(0.03)).expect("SABR node");
+        let tail = SabrParameterData::new(0.4, 1.0, 0.0, -0.25, Some(0.03)).expect("SABR node");
+        let cube = VolCube::from_grid(
+            swaption.vol_surface_id.as_str(),
+            &[1.0, 4.0],
+            &[1.0, 10.0],
+            &[node, node, tail, tail],
+            &[0.03; 4],
+        )
+        .expect("cube");
+        let missing = market.clone().insert_vol_cube(cube.clone());
+        assert!(
+            swaption
+                .resolve_volatility(&missing, 0.03, 2.0)
+                .expect("unqualified numeric quote")
+                > 0.0
+        );
+
+        let clock = |reference_date, day_count| {
+            VolatilityClock::try_new(reference_date, day_count, DayCountContextState::default())
+                .expect("volatility clock")
+        };
+        let registry = crate::RATES.pricers();
+        let matching = market.clone().insert_vol_cube(
+            cube.clone()
+                .with_expiry_clock(clock(as_of, DayCount::Act365F)),
+        );
+        let priced = swaption.value_raw(&matching, as_of).expect("dated price");
+        assert!(priced > 0.0);
+        assert_eq!(
+            priced,
+            registry
+                .price_raw(&swaption, ModelKey::Black76, &matching, as_of)
+                .expect("registry price")
+        );
+        assert_eq!(
+            swaption
+                .greek_inputs(&matching, as_of)
+                .expect("Greek inputs")
+                .expect("pre-expiry inputs")
+                .convention,
+            VolatilityConvention::ShiftedLognormal { shift: 0.03 }
+        );
+
+        let horizon = date(2025, 7, 1);
+        let rolled_market = matching.condition(horizon).expect("conditioned rates");
+        assert!(
+            swaption.value_raw(&rolled_market, horizon).is_err(),
+            "an ordinary horizon price must still qualify the source clock"
+        );
+        let held = swaption
+            .theta_observed_state(&matching, as_of, horizon)
+            .expect("theta state")
+            .expect("frozen cube quote");
+        let held = held
+            .as_any()
+            .downcast_ref::<Swaption>()
+            .expect("held swaption");
+        let (opening_quote, opening_time) = swaption
+            .resolve_volatility_quote_on_date(&matching, 0.03, as_of)
+            .expect("opening quote");
+        let (held_quote, held_time) = held
+            .resolve_volatility_quote_on_date(&rolled_market, 0.03, horizon)
+            .expect("held quote");
+        assert_eq!(held_quote.sigma, opening_quote.sigma);
+        assert_eq!(held_quote.convention, opening_quote.convention);
+        assert!(held_time < opening_time);
+
+        let serialized = serde_json::to_value(held).expect("serialized held swaption");
+        assert!(serialized.get("theta_cube_source_date").is_none());
+        let restored: Swaption = serde_json::from_value(serialized).expect("restored swaption");
+        assert!(
+            restored.value_raw(&rolled_market, horizon).is_err(),
+            "restored trades must pass ordinary source-clock admission"
+        );
+
+        let stale_clock = clock(date(2024, 12, 31), DayCount::Act365F);
+        let wrong_basis = clock(as_of, DayCount::Act360);
+        for rejected in [
+            missing,
+            market
+                .clone()
+                .insert_vol_cube(cube.clone().with_expiry_clock(stale_clock)),
+            market.insert_vol_cube(cube.with_expiry_clock(wrong_basis)),
+        ] {
+            let error = swaption
+                .value_raw(&rejected, as_of)
+                .expect_err("incompatible expiry clock");
+            assert!(error.to_string().contains("expiry_clock"), "{error}");
+            assert!(swaption.greek_inputs(&rejected, as_of).is_err());
+            assert!(
+                registry
+                    .price_raw(&swaption, ModelKey::Black76, &rejected, as_of)
+                    .expect_err("registry must reject the expiry clock")
+                    .to_string()
+                    .contains("expiry_clock")
+            );
+            let mut scalar = swaption.clone();
+            scalar.instrument_pricing_overrides =
+                InstrumentPricingOverrides::default().with_implied_volatility(0.2);
+            assert!(scalar.value_raw(&rejected, as_of).is_ok());
+            let after_expiry = swaption.expiry.next_day().expect("next day");
+            assert_eq!(
+                swaption
+                    .value_raw(&rejected, after_expiry)
+                    .expect("expired"),
+                0.0
+            );
+        }
+    }
+
+    #[test]
     fn black76_registry_applies_swaption_scenario_once_for_pv_and_raw() {
         let as_of = date(2025, 1, 1);
         let mut baseline = Swaption::example().expect("example");
         baseline.instrument_pricing_overrides =
             InstrumentPricingOverrides::default().with_implied_volatility(0.20);
-        let market = MarketContext::new().insert(flat_discount_with_tenor(
-            baseline.get_discount_curve_id().as_str(),
-            as_of,
-            0.03,
-            10.0,
-        ));
+        let market = MarketContext::new()
+            .try_insert(flat_discount_with_tenor(
+                baseline.get_discount_curve_id().as_str(),
+                as_of,
+                0.03,
+                10.0,
+            ))
+            .expect("insert market curve");
         let registry = crate::RATES.pricers();
 
         let baseline_result = baseline

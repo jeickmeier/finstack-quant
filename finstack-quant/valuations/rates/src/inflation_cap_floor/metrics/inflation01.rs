@@ -95,8 +95,10 @@ mod tests {
             finstack_quant_core::currency::Currency::USD,
         );
         MarketContext::new()
-            .insert(discount)
-            .insert(inflation)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(inflation)
+            .expect("insert market curve")
             .insert_inflation_index(index)
             .insert_surface(vol_surface)
     }

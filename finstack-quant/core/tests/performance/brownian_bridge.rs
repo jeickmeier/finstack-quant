@@ -79,11 +79,12 @@ fn reference_path(z: &[f64], times: &[f64]) -> Vec<f64> {
             .range(index + 1..)
             .next()
             .expect("right neighbour");
-        let alpha = (times[index] - times[left]) / (times[right] - times[left]);
-        let mean = out[left] + alpha * (out[right] - out[left]);
-        let variance = ((times[index] - times[left]) * (times[right] - times[index]))
-            / (times[right] - times[left]);
-        out[index] = mean + variance.sqrt() * z[shock + 1];
+        let a = times[index] - times[left];
+        let b = times[right] - times[index];
+        let span = times[right] - times[left];
+        let mean = (b / span) * out[left] + (a / span) * out[right];
+        let sd = a.min(b).sqrt() * (a.max(b) / span).sqrt();
+        out[index] = sd.mul_add(z[shock + 1], mean);
         populated.insert(index);
     }
     out
@@ -147,7 +148,7 @@ fn valid_records() -> Vec<Value> {
         for seed in SEEDS {
             let z = shocks(num_steps, seed);
             let expected = reference_path(&z, &case.times);
-            let bridge = BrownianBridge::new(num_steps);
+            let bridge = BrownianBridge::new(num_steps).expect("valid bridge");
             let mut path = vec![f64::NAN; num_steps + 1];
             bridge
                 .construct_path(&z, &mut path, &case.times)
@@ -201,7 +202,7 @@ fn invalid_record(
     times: Vec<f64>,
     output_len: usize,
 ) -> Value {
-    let bridge = BrownianBridge::new(bridge_steps);
+    let bridge = BrownianBridge::new(bridge_steps).expect("valid bridge");
     let mut output = vec![0.125; output_len];
     let before = output.clone();
     let error = bridge
@@ -316,27 +317,22 @@ fn brownian_bridge_grid_constructors_preserve_stored_dt_contract() {
     let uniform = TimeGrid::uniform(1.0, 40).expect("valid uniform grid");
     let rebuilt = TimeGrid::from_times(uniform.times().to_vec()).expect("valid reconstructed grid");
     assert_eq!(bit_values(uniform.times()), bit_values(rebuilt.times()));
-    assert!(
-        uniform
-            .dts()
-            .iter()
-            .zip(rebuilt.dts())
-            .any(|(left, right)| left.to_bits() != right.to_bits()),
-        "fixture must expose dt differences"
-    );
+    assert_eq!(bit_values(uniform.dts()), bit_values(rebuilt.dts()));
     let z = shocks(40, 42);
     let mut uniform_path = vec![f64::NAN; 41];
     let mut rebuilt_path = vec![f64::NAN; 41];
     BrownianBridge::new(40)
+        .expect("valid bridge")
         .construct_path(&z, &mut uniform_path, uniform.times())
         .expect("uniform path");
     BrownianBridge::new(40)
+        .expect("valid bridge")
         .construct_path(&z, &mut rebuilt_path, rebuilt.times())
         .expect("rebuilt path");
     assert_same_bits(
         &uniform_path,
         &rebuilt_path,
-        "identical knots, distinct stored dts",
+        "identical knots and stored intervals",
     );
 }
 
@@ -356,6 +352,7 @@ fn brownian_bridge_reconstruction_uses_changed_grid() {
     for grid in [base, changed] {
         let mut path = vec![f64::NAN; 18];
         BrownianBridge::new(17)
+            .expect("valid bridge")
             .construct_path(&z, &mut path, &grid.times)
             .expect("rebuilt bridge");
         assert_same_bits(&path, &reference_path(&z, &grid.times), &grid.id);

@@ -141,7 +141,8 @@ mod tests {
             .build()
             .expect("surface");
         let mut market = MarketContext::new()
-            .insert(curve)
+            .try_insert(curve)
+            .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
                 "EQUITY-SPOT",

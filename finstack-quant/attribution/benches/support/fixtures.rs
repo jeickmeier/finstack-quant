@@ -106,12 +106,16 @@ impl BondMarkets {
         let as_of_t0 = calendar_date(2025, 1, 15);
         let as_of_t1 = calendar_date(2025, 1, 16);
         Self {
-            market_t0: MarketContext::new().insert(build_flat_curve(USD_OIS, as_of_t0, BASE_RATE)),
-            market_t1: MarketContext::new().insert(build_flat_curve(
-                USD_OIS,
-                as_of_t1,
-                BASE_RATE + shift_bp / 10_000.0,
-            )),
+            market_t0: MarketContext::new()
+                .try_insert(build_flat_curve(USD_OIS, as_of_t0, BASE_RATE))
+                .expect("insert market curve"),
+            market_t1: MarketContext::new()
+                .try_insert(build_flat_curve(
+                    USD_OIS,
+                    as_of_t1,
+                    BASE_RATE + shift_bp / 10_000.0,
+                ))
+                .expect("insert market curve"),
             as_of_t0,
             as_of_t1,
             config: FinstackConfig::default(),
@@ -159,8 +163,10 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
     BondMarkets {
         market_t0: lean
             .market_t0
-            .insert(hazard_t0)
-            .insert(cpi_t0)
+            .try_insert(hazard_t0)
+            .expect("insert market curve")
+            .try_insert(cpi_t0)
+            .expect("insert market curve")
             .insert_fx(fx_t0)
             .insert_price(
                 "AAPL-SPOT",
@@ -168,8 +174,10 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
             ),
         market_t1: lean
             .market_t1
-            .insert(hazard_t1)
-            .insert(cpi_t1)
+            .try_insert(hazard_t1)
+            .expect("insert market curve")
+            .try_insert(cpi_t1)
+            .expect("insert market curve")
             .insert_fx(fx_t1)
             .insert_price(
                 "AAPL-SPOT",
@@ -214,14 +222,16 @@ pub fn eur_fx_markets(shift_bp: f64) -> BondMarkets {
     let fx_t1 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.12 }), None);
     BondMarkets {
         market_t0: MarketContext::new()
-            .insert(build_flat_curve(EUR_OIS, as_of_t0, BASE_RATE))
+            .try_insert(build_flat_curve(EUR_OIS, as_of_t0, BASE_RATE))
+            .expect("insert market curve")
             .insert_fx(fx_t0),
         market_t1: MarketContext::new()
-            .insert(build_flat_curve(
+            .try_insert(build_flat_curve(
                 EUR_OIS,
                 as_of_t1,
                 BASE_RATE + shift_bp / 10_000.0,
             ))
+            .expect("insert market curve")
             .insert_fx(fx_t1),
         as_of_t0,
         as_of_t1,
@@ -243,14 +253,20 @@ pub fn equity_markets() -> BondMarkets {
     let disc_t0 = build_flat_curve(USD_OIS, as_of_t0, BASE_RATE);
     let disc_t1 = build_flat_curve(USD_OIS, as_of_t1, BASE_RATE);
     BondMarkets {
-        market_t0: MarketContext::new().insert(disc_t0).insert_price(
-            "AAPL-SPOT",
-            MarketScalar::price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
-        ),
-        market_t1: MarketContext::new().insert(disc_t1).insert_price(
-            "AAPL-SPOT",
-            MarketScalar::price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
-        ),
+        market_t0: MarketContext::new()
+            .try_insert(disc_t0)
+            .expect("insert market curve")
+            .insert_price(
+                "AAPL-SPOT",
+                MarketScalar::price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
+            ),
+        market_t1: MarketContext::new()
+            .try_insert(disc_t1)
+            .expect("insert market curve")
+            .insert_price(
+                "AAPL-SPOT",
+                MarketScalar::price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
+            ),
         as_of_t0,
         as_of_t1,
         config: FinstackConfig::default(),
@@ -264,8 +280,10 @@ pub fn multi_curve_market(n: usize) -> (MarketContext, MarketContext, Date) {
     let mut t1 = MarketContext::new();
     for i in 0..n {
         let id = format!("USD-OIS-{i}");
-        t0.insert_mut(build_flat_curve(&id, as_of, BASE_RATE));
-        t1.insert_mut(build_flat_curve(&id, as_of, BASE_RATE + 0.0001));
+        t0.try_insert_mut(build_flat_curve(&id, as_of, BASE_RATE))
+            .expect("insert market curve");
+        t1.try_insert_mut(build_flat_curve(&id, as_of, BASE_RATE + 0.0001))
+            .expect("insert market curve");
     }
     (t0, t1, as_of)
 }

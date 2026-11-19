@@ -77,7 +77,8 @@ fn equity_market(as_of: Date, spot: f64, vol: f64, rate: f64, div_yield: f64) ->
     let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
 
     MarketContext::new()
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, rate, 5.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, rate, 5.0))
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface("EQUITY-VOL", &expiries, &strikes, vol))
         .insert_price(
             "EQUITY-SPOT",
@@ -235,8 +236,10 @@ fn fx_market(as_of: Date, spot: f64, vol: f64, r_d: f64, r_f: f64) -> MarketCont
     let fx = FxMatrix::new(Arc::new(TestFx { spot }), None);
     MarketContext::new()
         .insert_fx(fx)
-        .insert(flat_discount_with_tenor("USD-OIS", as_of, r_d, 5.0))
-        .insert(flat_discount_with_tenor("EUR-OIS", as_of, r_f, 5.0))
+        .try_insert(flat_discount_with_tenor("USD-OIS", as_of, r_d, 5.0))
+        .expect("insert market curve")
+        .try_insert(flat_discount_with_tenor("EUR-OIS", as_of, r_f, 5.0))
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface("EURUSD-VOL", &expiries, &strikes, vol))
 }
 

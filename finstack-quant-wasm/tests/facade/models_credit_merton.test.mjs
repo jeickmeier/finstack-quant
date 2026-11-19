@@ -159,7 +159,7 @@ test('hazard-curve export returns a core.HazardCurve with the requested day coun
 
 // Same cases as finstack-quant-py/tests/test_models_credit_rust_owned.py.
 const SEEDED_FIRST_PATH = [
-  100.0, 106.3619193858413, 173.31551865077458, 179.24766644780442, 171.48303098644598,
+  100.0, 104.47500656048219, 97.35290598039487, 96.15907125715671, 94.90238477603307,
 ];
 
 test('Merton path simulation is seeded in Rust (PCG64), like Python', () => {

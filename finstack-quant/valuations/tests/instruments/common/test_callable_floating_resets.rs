@@ -77,9 +77,12 @@ fn hazard_curve() -> HazardCurve {
 
 fn market() -> MarketContext {
     MarketContext::new()
-        .insert(discount_curve())
-        .insert(index_curve())
-        .insert(hazard_curve())
+        .try_insert(discount_curve())
+        .expect("insert market curve")
+        .try_insert(index_curve())
+        .expect("insert market curve")
+        .try_insert(hazard_curve())
+        .expect("insert market curve")
 }
 
 /// Quarterly USD-SOFR-3M + 200 bp floater on the rates-credit path.

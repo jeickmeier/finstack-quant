@@ -126,7 +126,9 @@ fn test_coupon_amounts_reflect_inflation_adjustment() {
             ])
             .build()
             .unwrap();
-    ctx = ctx.insert(inflation_curve);
+    ctx = ctx
+        .try_insert(inflation_curve)
+        .expect("insert market curve");
 
     let as_of = d(2024, 1, 1);
 

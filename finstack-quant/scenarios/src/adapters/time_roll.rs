@@ -200,7 +200,7 @@ pub(crate) fn apply_time_roll_forward(
             deal_quote_override: None,
             action: HazardRecalibrationAction::TimeRollReplay,
         })?;
-        rolled_market = rolled_market.insert(rebuilt.as_ref().clone());
+        rolled_market.try_insert_mut(rebuilt.as_ref().clone())?;
     }
 
     // Carry uses PV(t0) and cashflows on the pre-roll market, and PV(t1) on
@@ -502,16 +502,19 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        let mut market = MarketContext::new().insert(curve).insert_series(
-            ScalarTimeSeries::new(
-                "FIXING:USD-SOFR",
-                vec![(origin, 0.035)],
-                Some(Currency::USD),
-                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
-                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
-            )
-            .unwrap(),
-        );
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve")
+            .insert_series(
+                ScalarTimeSeries::new(
+                    "FIXING:USD-SOFR",
+                    vec![(origin, 0.035)],
+                    Some(Currency::USD),
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                )
+                .unwrap(),
+            );
         let before = serde_json::to_value(
             MarketContextState::try_from(&market).expect("coherent market snapshot"),
         )
@@ -601,7 +604,9 @@ mod tests {
             .build()
             .expect("valid discount curve");
 
-        let mut market = MarketContext::new().insert(curve);
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -708,7 +713,9 @@ mod tests {
             .build()
             .expect("valid discount curve");
 
-        let mut market = MarketContext::new().insert(curve);
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -939,7 +946,9 @@ mod tests {
             .expect("valid discount curve");
         let old_curve = curve.clone();
 
-        let mut market = MarketContext::new().insert(curve);
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
         let mut model = FinancialModelSpec::new(
             "test",
             finstack_quant_core::dates::PeriodPlan::try_new(

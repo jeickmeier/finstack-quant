@@ -18,7 +18,7 @@
 //! - Hull, J. C., *Options, Futures, and Other Derivatives*. `docs/REFERENCES.md#hull-options-futures`
 //!
 
-use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
+use crate::gaussian::{norm_cdf_or_nan, norm_pdf_or_nan};
 
 #[derive(Clone, Copy, Debug)]
 struct BachelierState {
@@ -73,7 +73,9 @@ pub fn bachelier_call(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
         return f64::NAN;
     }
     match bachelier_state(forward, strike, sigma_n, t) {
-        Some(state) => (forward - strike) * norm_cdf(state.d) + state.st * norm_pdf(state.d),
+        Some(state) => {
+            (forward - strike) * norm_cdf_or_nan(state.d) + state.st * norm_pdf_or_nan(state.d)
+        }
         None => (forward - strike).max(0.0),
     }
 }
@@ -97,7 +99,9 @@ pub fn bachelier_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
         return f64::NAN;
     }
     match bachelier_state(forward, strike, sigma_n, t) {
-        Some(state) => (strike - forward) * norm_cdf(-state.d) + state.st * norm_pdf(state.d),
+        Some(state) => {
+            (strike - forward) * norm_cdf_or_nan(-state.d) + state.st * norm_pdf_or_nan(state.d)
+        }
         None => (strike - forward).max(0.0),
     }
 }
@@ -122,7 +126,7 @@ pub fn bachelier_vega(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
         return f64::NAN;
     }
     match bachelier_state(forward, strike, sigma_n, t) {
-        Some(state) => t.sqrt() * norm_pdf(state.d),
+        Some(state) => t.sqrt() * norm_pdf_or_nan(state.d),
         None => 0.0,
     }
 }
@@ -148,7 +152,7 @@ pub fn bachelier_delta_call(forward: f64, strike: f64, sigma_n: f64, t: f64) -> 
         return f64::NAN;
     }
     match bachelier_state(forward, strike, sigma_n, t) {
-        Some(state) => norm_cdf(state.d),
+        Some(state) => norm_cdf_or_nan(state.d),
         None => {
             if forward >= strike {
                 1.0
@@ -179,7 +183,7 @@ pub fn bachelier_delta_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f
         return f64::NAN;
     }
     match bachelier_state(forward, strike, sigma_n, t) {
-        Some(state) => -norm_cdf(-state.d),
+        Some(state) => -norm_cdf_or_nan(-state.d),
         None => bachelier_delta_call(forward, strike, sigma_n, t) - 1.0,
     }
 }
@@ -204,7 +208,7 @@ pub fn bachelier_gamma(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
         return f64::NAN;
     }
     match bachelier_state(forward, strike, sigma_n, t) {
-        Some(state) => norm_pdf(state.d) / state.st,
+        Some(state) => norm_pdf_or_nan(state.d) / state.st,
         None => 0.0,
     }
 }

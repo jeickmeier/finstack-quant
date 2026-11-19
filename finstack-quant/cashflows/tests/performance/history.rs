@@ -249,7 +249,9 @@ fn short_builder(
 fn short_market(observations: Vec<(Date, f64)>) -> MarketContext {
     let forward =
         ForwardCurve::flat("CCM-SHORT", d(2025, Month::June, 9), 0.09, DayCount::Act360).unwrap();
-    let market = MarketContext::new().insert(forward);
+    let market = MarketContext::new()
+        .try_insert(forward)
+        .expect("insert market curve");
     if observations.is_empty() {
         market
     } else {
@@ -357,16 +359,19 @@ fn holiday_record() -> Value {
     let start = d(2025, Month::April, 17);
     let end = d(2025, Month::April, 21);
     let forward = ForwardCurve::flat("USD-SOFR", end, 0.07, DayCount::Act360).unwrap();
-    let market = MarketContext::new().insert(forward).insert_series(
-        ScalarTimeSeries::new(
-            "FIXING:USD-SOFR",
-            vec![(start, 0.05)],
-            None,
-            SeriesInterpolation::Step,
-            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
-        )
-        .unwrap(),
-    );
+    let market = MarketContext::new()
+        .try_insert(forward)
+        .expect("insert market curve")
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR",
+                vec![(start, 0.05)],
+                None,
+                SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .unwrap(),
+        );
     let mut builder = CashFlowSchedule::builder();
     let output = builder
         .principal(Money::new(1_000_000.0, Currency::USD).unwrap(), start, end)

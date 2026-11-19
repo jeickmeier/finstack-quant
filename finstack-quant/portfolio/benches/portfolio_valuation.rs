@@ -106,16 +106,18 @@ fn create_selective_benchmark_market() -> MarketContext {
     ]
     .into_iter()
     .fold(create_market_context(), |market, curve_id| {
-        market.insert(
-            DiscountCurve::builder(curve_id)
-                .base_date(base_date())
-                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-                .interp(InterpStyle::Linear)
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .unwrap(),
-        )
+        market
+            .try_insert(
+                DiscountCurve::builder(curve_id)
+                    .base_date(base_date())
+                    .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                    .interp(InterpStyle::Linear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .unwrap(),
+            )
+            .expect("insert market curve")
     })
 }
 

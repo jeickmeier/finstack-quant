@@ -126,7 +126,7 @@ pub(super) fn price_strike_delta(
             deal_quote_override: None,
             action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bump_bp)),
         })?;
-        Ok(curves.clone().insert(bumped.as_ref().clone()))
+        curves.clone().try_insert(bumped.as_ref().clone())
     };
     let up_market = bumped_market(PRICE_DELTA_SPREAD_BUMP_BP)?;
     let down_market = bumped_market(-PRICE_DELTA_SPREAD_BUMP_BP)?;

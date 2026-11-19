@@ -328,7 +328,7 @@ pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
         .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new().try_insert(curve)?;
     example(&quote_conversions::bond_workout_ladder(
         &bond, &market, as_of,
     )?)
@@ -351,7 +351,7 @@ pub(super) fn bond_quote_set() -> Result<Vec<Value>> {
         .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new().try_insert(curve)?;
     example(&quote_conversions::compute_quotes(
         &bond,
         &market,

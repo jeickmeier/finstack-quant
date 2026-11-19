@@ -48,16 +48,18 @@ fn maturity() -> Date {
 }
 
 fn market() -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(close())
-            .knots(vec![(0.0, 1.0), (1.0, 0.97), (3.0, 0.91), (5.0, 0.85)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount curve"),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(close())
+                .knots(vec![(0.0, 1.0), (1.0, 0.97), (3.0, 0.91), (5.0, 0.85)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount curve"),
+        )
+        .expect("insert market curve")
 }
 
 /// CLO-style deal: `n_assets` identical fixed-rate loans summing to $100M,

@@ -295,7 +295,11 @@ mod tests {
                 .build()
                 .expect("curve");
             assert!(hazard.sp_on_date(as_of).expect("survival") < 1e-12);
-            let market = Arc::new(MarketContext::new().insert(hazard));
+            let market = Arc::new(
+                MarketContext::new()
+                    .try_insert(hazard)
+                    .expect("insert market curve"),
+            );
             let mut context = MetricContext::new(
                 Arc::new(cds.clone()),
                 Arc::clone(&market),

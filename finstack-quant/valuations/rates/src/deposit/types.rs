@@ -505,16 +505,18 @@ mod tests {
 
         let maturity = date!(2025 - 01 - 15);
         let after_maturity = date!(2025 - 01 - 16);
-        let market = MarketContext::new().insert(
-            DiscountCurve::builder("DISC")
-                .base_date(date!(2025 - 01 - 06))
-                .knots([(0.0, 1.0), (1.0, 0.95)])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("discount curve"),
-        );
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("DISC")
+                    .base_date(date!(2025 - 01 - 06))
+                    .knots([(0.0, 1.0), (1.0, 0.95)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("discount curve"),
+            )
+            .expect("insert market curve");
         for currency in [Currency::USD, Currency::EUR] {
             let deposit = Deposit::builder()
                 .id("SETTLED-DEPOSIT".into())

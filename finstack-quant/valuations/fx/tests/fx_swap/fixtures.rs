@@ -78,8 +78,10 @@ pub fn setup_standard_market(as_of: Date) -> MarketContext {
     let fx_matrix = eurusd_matrix(1.1);
 
     MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve")
         .insert_fx(fx_matrix)
 }
 
@@ -111,8 +113,10 @@ pub fn setup_steep_curve_market(as_of: Date) -> MarketContext {
     let fx_matrix = eurusd_matrix(1.2);
 
     MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve")
         .insert_fx(fx_matrix)
 }
 
@@ -142,8 +146,10 @@ pub fn setup_inverted_curve_market(as_of: Date) -> MarketContext {
     let fx_matrix = eurusd_matrix(1.1);
 
     MarketContext::new()
-        .insert(usd_curve)
-        .insert(eur_curve)
+        .try_insert(usd_curve)
+        .expect("insert market curve")
+        .try_insert(eur_curve)
+        .expect("insert market curve")
         .insert_fx(fx_matrix)
 }
 

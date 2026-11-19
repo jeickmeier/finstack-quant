@@ -53,8 +53,10 @@ fn market_at(recovery: f64) -> MarketContext {
         .build()
         .expect("discount curve");
     MarketContext::new()
-        .insert(discount)
-        .insert(hazard_curve(recovery))
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(hazard_curve(recovery))
+        .expect("insert market curve")
 }
 
 fn market() -> MarketContext {

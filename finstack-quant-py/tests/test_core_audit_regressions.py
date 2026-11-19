@@ -69,7 +69,15 @@ def test_eom_rejects_incompatible_schedules() -> None:
 
 def test_market_condition_keeps_price_and_cpi_frozen_on_original_clock() -> None:
     cpi = cpi_curve()
-    price = PriceCurve("PRICE", "2025-01-01", [(0.0, 100.0), (1.0, 110.0), (2.0, 120.0)])
+    price = PriceCurve({
+        "id": "PRICE",
+        "base_date": "2025-01-01",
+        "knots": [(0.0, 100.0), (1.0, 110.0), (2.0, 120.0)],
+        "kind": "price",
+        "day_count": "act_365f",
+        "interp": "linear",
+        "extrapolation": "flat",
+    })
     market = MarketContext()
     market.insert(cpi)
     market.insert(price)
@@ -110,7 +118,14 @@ def test_curve_constructors_accept_daycount_objects_and_normalized_names(day_cou
             ).day_count
             == "act_360"
         )
-        fwd = ForwardCurve("F", "2025-01-01", [(1.0, 0.965)], interp="log_linear", extrapolation="extend", day_count=dc)
+        fwd = ForwardCurve({
+            "id": "F",
+            "base_date": "2025-01-01",
+            "knots": [(1.0, 0.965)],
+            "interp": "log_linear",
+            "extrapolation": "extend",
+            "day_count": dc,
+        })
         assert fwd.day_count == "act_360"
         hz = HazardCurve("H", "2025-01-01", [(1.0, 0.02)], recovery_rate=0.4, day_count=dc)
         assert hz.day_count == "act_360"
@@ -118,7 +133,15 @@ def test_curve_constructors_accept_daycount_objects_and_normalized_names(day_cou
             "CPI", "2025-01-01", [(0.0, 300.0), (1.0, 306.0)], day_count=dc, interp="log_linear", extrapolation="error"
         )
         assert cpi.day_count == "act_360"
-        price = PriceCurve("P", "2025-01-01", [(0.0, 100.0), (1.0, 101.0)], day_count=dc)
+        price = PriceCurve({
+            "id": "P",
+            "base_date": "2025-01-01",
+            "knots": [(0.0, 100.0), (1.0, 101.0)],
+            "day_count": dc,
+            "kind": "price",
+            "interp": "linear",
+            "extrapolation": "flat",
+        })
         assert price.day_count == "act_360"
         merton = MertonModel(100.0, 0.2, 80.0, 0.03)
         assert merton.to_hazard_curve("M", "2025-01-01", [1.0, 2.0], 0.4, dc).day_count == "act_360"

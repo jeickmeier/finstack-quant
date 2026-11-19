@@ -51,7 +51,14 @@ test('core log-normal CDF preserves underflowed tail probabilities', () => {
   assert.ok(Math.abs(core.logNormCdf(-40) + 804.6084420137538) < 1e-12);
   assert.equal(core.logNormCdf(-Infinity), -Infinity);
   assert.ok(core.logNormCdf(Infinity) === 0);
-  assert.ok(Number.isNaN(core.logNormCdf(NaN)));
+  for (const evaluate of [core.normCdf, core.normPdf, core.logNormCdf, core.erf]) {
+    assert.throws(() => evaluate(NaN), { kind: 'validation' });
+  }
+  assert.throws(() => core.logNormCdf(-Number.MAX_VALUE), { kind: 'computation' });
+  assert.throws(() => core.normPdfWithParams(0, 0, Number.MIN_VALUE), { kind: 'computation' });
+  assert.throws(() => core.lnGamma(-1), { kind: 'validation' });
+  const cauchyTail = core.studentTCdf(-1e200, 1);
+  assert.ok(Math.abs(cauchyTail * 1e200 * Math.PI - 1) < 1e-12);
 });
 
 test('core.Money amount and lossless amountDecimal', () => {
@@ -366,11 +373,32 @@ test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
     [0.25, 0.5, 1.0],
     [0.1, 0.11, 0.12],
     [-0.01, -0.012, -0.015],
-    [0.002, 0.0025, 0.003]
+    [0.002, 0.0025, 0.003],
+    {
+      deltaConvention: 'forward_unadjusted',
+      atmConvention: 'delta_neutral_straddle',
+      butterflyConvention: 'smile',
+    }
   );
   assert.equal(surface.id, 'EURUSD-VOL');
   assert.equal(surface.pair, 'EUR/USD');
   assert.equal(surface.expiries.length, 3);
+});
+
+test('core FX delta surfaces require all three quote conventions', () => {
+  const fields = {
+    deltaConvention: 'forward_unadjusted',
+    atmConvention: 'delta_neutral_straddle',
+    butterflyConvention: 'smile',
+  };
+  for (const key of Object.keys(fields)) {
+    const partial = { ...fields };
+    delete partial[key];
+    assert.throws(
+      () => new core.FxDeltaVolSurface('FX', 'EUR/USD', [1], [0.1], [0.01], [0.002], partial)
+    );
+  }
+  assert.throws(() => new core.FxDeltaVolSurface('FX', 'EUR/USD', [1], [0.1], [0.01], [0.002]));
 });
 
 test('core FX delta surface validates options, currency pair, and absent wings', () => {
@@ -381,7 +409,11 @@ test('core FX delta surface validates options, currency pair, and absent wings',
     [0.1],
     [0],
     [0],
-    null
+    {
+      deltaConvention: 'forward_unadjusted',
+      atmConvention: 'delta_neutral_straddle',
+      butterflyConvention: 'smile',
+    }
   );
   try {
     assert.equal(surface.pair, 'EUR/USD');
@@ -392,6 +424,9 @@ test('core FX delta surface validates options, currency pair, and absent wings',
   assert.throws(
     () =>
       new core.FxDeltaVolSurface('EURUSD', 'EUR/USD', [1], [0.1], [0], [0], {
+        deltaConvention: 'forward_unadjusted',
+        atmConvention: 'delta_neutral_straddle',
+        butterflyConvention: 'smile',
         rr10d: [],
         bf10d: [],
       })
@@ -399,16 +434,29 @@ test('core FX delta surface validates options, currency pair, and absent wings',
   assert.throws(
     () =>
       new core.FxDeltaVolSurface('EURUSD', 'EUR/USD', [1], [0.1], [0], [0], {
+        deltaConvention: 'forward_unadjusted',
+        atmConvention: 'delta_neutral_straddle',
+        butterflyConvention: 'smile',
         rr10d: [0],
       })
   );
   assert.throws(
     () =>
       new core.FxDeltaVolSurface('EURUSD', 'EUR/USD', [1], [0.1], [0], [0], {
+        deltaConvention: 'forward_unadjusted',
+        atmConvention: 'delta_neutral_straddle',
+        butterflyConvention: 'smile',
         unknownKey: true,
       })
   );
-  assert.throws(() => new core.FxDeltaVolSurface('EURUSD', 'EUR/EUR', [1], [0.1], [0], [0]));
+  assert.throws(
+    () =>
+      new core.FxDeltaVolSurface('EURUSD', 'EUR/EUR', [1], [0.1], [0], [0], {
+        deltaConvention: 'forward_unadjusted',
+        atmConvention: 'delta_neutral_straddle',
+        butterflyConvention: 'smile',
+      })
+  );
 });
 
 test('core FX pair convention keeps the supplied order and explicit pip size', () => {

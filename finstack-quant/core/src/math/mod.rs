@@ -49,82 +49,74 @@
 /// but small enough to catch actual zeros vs meaningful small values).
 pub const ZERO_TOLERANCE: f64 = 1e-10;
 
-/// Round to `digits` decimal places with ties rounding half away from zero
-/// (Excel convention): `round_half_away(2.5, 0)` is 3.0 and
-/// `round_half_away(-2.5, 0)` is -3.0.
-///
-/// This is the shared implementation behind the expression-language `round`
-/// function; the core vector evaluator and the statements scalar evaluator
-/// both delegate here so their semantics cannot drift.
+/// Quantize a finite binary64 number to decimal places, rounding ties away from zero.
+/// The decimal target is converted once to the nearest binary64 value.
+/// Returns an error if that conversion overflows.
 ///
 /// # Arguments
 ///
-/// * `x` - Value to round; non-finite inputs (NaN, ±inf) pass through
-///   unchanged.
-/// * `digits` - Number of decimal places to keep. `0` rounds to an integer;
-///   negative values round to the left of the decimal point
-///   (`round_half_away(1234.0, -2)` is 1200.0).
+/// * `x` - Finite input as represented in binary64. A rounded zero retains its sign.
+/// * `digits` - Decimal places to retain. Negative values round to multiples of ten.
 ///
 /// # Examples
 ///
-/// ```rust
-/// use finstack_quant_core::math::round_half_away;
-///
-/// assert_eq!(round_half_away(2.5, 0), 3.0);
-/// assert_eq!(round_half_away(-2.5, 0), -3.0);
-/// assert_eq!(round_half_away(3.14159, 2), 3.14);
-/// assert_eq!(round_half_away(1234.0, -2), 1200.0);
 /// ```
-#[must_use]
-pub fn round_half_away(x: f64, digits: i32) -> f64 {
+/// use finstack_quant_core::math::round_half_away;
+/// assert_eq!(round_half_away(-2.5, 0)?, -3.0);
+/// assert_eq!(round_half_away(2.675, 2)?, 2.67);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn round_half_away(x: f64, digits: i32) -> crate::Result<f64> {
+    use num_bigint::BigInt;
+    use num_rational::BigRational;
+    use num_traits::ToPrimitive;
+
     if !x.is_finite() {
-        return x;
+        return Err(crate::Error::Validation(
+            "round requires a finite value".into(),
+        ));
     }
     if digits == 0 {
-        return x.round();
+        return Ok(x.round());
     }
-    let scale = 10f64.powi(digits);
-    let scaled = x * scale;
-    if !scaled.is_finite() {
-        // Scaling overflowed (huge x with large positive digits); the input
-        // is already exact at this precision.
-        return x;
+    if digits >= 324 || (digits > 0 && x.fract() == 0.0) {
+        return Ok(x);
     }
-    scaled.round() / scale
+    if digits <= -309 {
+        return Ok(0.0_f64.copysign(x));
+    }
+    let magnitude = BigRational::from_float(x.abs())
+        .ok_or_else(|| crate::Error::Validation("round requires a finite value".into()))?;
+    let power = BigInt::from(10u8).pow(digits.unsigned_abs());
+    let rounded = if digits > 0 {
+        (magnitude * &power).round() / power
+    } else {
+        (magnitude / &power).round() * power
+    };
+    rounded
+        .to_f64()
+        .filter(|v| v.is_finite())
+        .map(|v| v.copysign(x))
+        .ok_or_else(|| crate::Error::Validation("rounded result exceeds binary64 range".into()))
 }
 
-/// Clamp `x` to the inclusive range `[lo, hi]`, returning NaN instead of
-/// panicking on invalid input.
-///
-/// This is the shared implementation behind the expression-language `clamp`
-/// function. Unlike [`f64::clamp`], which panics when `lo > hi`, this
-/// returns NaN for an inverted range and propagates NaN from any argument,
-/// so untrusted formula input can never abort the process.
+/// Clamp a finite value to an inclusive, ordered interval.
 ///
 /// # Arguments
 ///
-/// * `x` - Value to restrict to the range; returned unchanged when already
-///   inside `[lo, hi]`, otherwise replaced by the nearer bound.
-/// * `lo` - Inclusive lower bound; must be `<= hi` for a non-NaN result.
-/// * `hi` - Inclusive upper bound; must be `>= lo` for a non-NaN result.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::clamp_or_nan;
-///
-/// assert_eq!(clamp_or_nan(5.0, 0.0, 10.0), 5.0);
-/// assert_eq!(clamp_or_nan(-1.0, 0.0, 10.0), 0.0);
-/// assert_eq!(clamp_or_nan(11.0, 0.0, 10.0), 10.0);
-/// assert!(clamp_or_nan(5.0, 10.0, 0.0).is_nan()); // inverted range
-/// assert!(clamp_or_nan(f64::NAN, 0.0, 10.0).is_nan());
-/// ```
-#[must_use]
-pub fn clamp_or_nan(x: f64, lo: f64, hi: f64) -> f64 {
-    if x.is_nan() || lo.is_nan() || hi.is_nan() || lo > hi {
-        return f64::NAN;
+/// * `x` - Finite value to restrict. An in-range value retains its zero sign.
+/// * `lo` - Finite inclusive lower bound.
+/// * `hi` - Finite inclusive upper bound, at least `lo`.
+pub fn clamp(x: f64, lo: f64, hi: f64) -> crate::Result<f64> {
+    if !x.is_finite() || !lo.is_finite() || !hi.is_finite() || lo > hi {
+        return Err(crate::Error::Validation(
+            "clamp requires finite values and ordered bounds".into(),
+        ));
     }
-    x.min(hi).max(lo)
+    if (lo..=hi).contains(&x) {
+        return Ok(x);
+    }
+    Ok(if x < lo { lo } else { hi })
 }
 
 mod compounding;
@@ -133,6 +125,7 @@ pub mod fractional;
 pub mod integration;
 pub mod interp;
 pub mod linalg;
+pub(crate) mod log_ratio;
 pub mod piecewise;
 pub mod probability;
 pub mod random;

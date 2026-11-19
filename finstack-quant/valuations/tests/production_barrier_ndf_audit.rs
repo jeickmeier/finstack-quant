@@ -20,7 +20,7 @@ use time::macros::date;
 
 fn market(as_of: Date) -> MarketContext {
     MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (2.0, 1.0)])
@@ -30,6 +30,7 @@ fn market(as_of: Date) -> MarketContext {
                 .build()
                 .expect("zero discount curve"),
         )
+        .expect("insert market curve")
         .insert_price(
             "SPX-SPOT",
             MarketScalar::unitless(100.0).expect("valid scalar"),
@@ -134,7 +135,7 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
     let as_of = date!(2025 - 01 - 02);
     let expiry = date!(2026 - 01 - 02);
     let market = market(as_of)
-        .insert(
+        .try_insert(
             DiscountCurve::builder("EUR-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (2.0, (-0.2_f64).exp())])
@@ -144,6 +145,7 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
                 .build()
                 .expect("asset financing curve"),
         )
+        .expect("insert market curve")
         .insert_price(
             "SPX-SPOT",
             MarketScalar::price(Money::from((100_i64, Currency::EUR))),
@@ -184,9 +186,11 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
     let log_mean = 0.1 - 0.5 * 0.2 * 0.1 - 0.5 * 0.2 * 0.2;
     let probability =
         finstack_quant_core::math::special_functions::norm_cdf(((1.2_f64).ln() - log_mean) / 0.2)
+            .expect("valid normal variate")
             - finstack_quant_core::math::special_functions::norm_cdf(
                 ((0.8_f64).ln() - log_mean) / 0.2,
-            );
+            )
+            .expect("valid normal variate");
     let expected = 100_000.0 * 0.08 * probability;
     let value = note.value(&market, as_of).expect("quanto range accrual");
     assert_eq!(value.currency(), Currency::USD);
@@ -222,9 +226,12 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
     let expected_override = 8_000.0
         * (finstack_quant_core::math::special_functions::norm_cdf(
             ((1.2_f64).ln() - log_mean) / 0.4,
-        ) - finstack_quant_core::math::special_functions::norm_cdf(
-            ((0.8_f64).ln() - log_mean) / 0.4,
-        ));
+        )
+        .expect("valid normal variate")
+            - finstack_quant_core::math::special_functions::norm_cdf(
+                ((0.8_f64).ln() - log_mean) / 0.4,
+            )
+            .expect("valid normal variate"));
     let overridden = note
         .value(&market, as_of)
         .expect("active quanto volatility")

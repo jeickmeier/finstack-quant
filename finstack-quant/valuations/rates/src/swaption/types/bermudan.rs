@@ -539,6 +539,7 @@ impl BermudanSwaption {
             scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
             sabr_params: None,
             attributes: self.attributes.clone(),
+            theta_cube_source_date: None,
         })
     }
 }

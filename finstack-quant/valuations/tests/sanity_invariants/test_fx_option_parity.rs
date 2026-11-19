@@ -114,8 +114,10 @@ fn create_market(as_of: Date) -> MarketContext {
     let fx = FxMatrix::new(Arc::new(StaticFxProvider { rate: SPOT }), None);
 
     MarketContext::new()
-        .insert(domestic_disc)
-        .insert(foreign_disc)
+        .try_insert(domestic_disc)
+        .expect("insert market curve")
+        .try_insert(foreign_disc)
+        .expect("insert market curve")
         .insert_surface(vol_surface)
         .insert_fx(fx)
 }

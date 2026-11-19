@@ -102,13 +102,13 @@ impl JsHullWhiteParams {
     ///
     /// # Errors
     ///
-    /// Throws a `TypeError` if `t` is not a number.
+    /// Throws a `TypeError` if `t` is not a number, or a validation error for a negative or non-finite time.
     #[wasm_bindgen(js_name = getSigma)]
     pub fn get_sigma(
         &self,
         #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
     ) -> Result<f64, JsValue> {
-        Ok(self.inner.get_sigma(js_f64(&t, "t")?))
+        self.inner.get_sigma(js_f64(&t, "t")?).map_err(to_js_err)
     }
 
     /// Variance of the short-rate state variable at a time.
@@ -117,7 +117,8 @@ impl JsHullWhiteParams {
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if `t` is negative or non-finite.
+    /// @throws `TypeError` for a non-number, a validation error for a negative or non-finite model time,
+    /// or a computation error when the integrated state variance is outside the representable range.
     #[wasm_bindgen(js_name = stateVariance)]
     pub fn state_variance(
         &self,
@@ -135,7 +136,8 @@ impl JsHullWhiteParams {
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if a time is negative or non-finite.
+    /// @throws `TypeError` for a non-number, a validation error for a negative or non-finite model time,
+    /// or a computation error when the integrated state variance is outside the representable range.
     #[wasm_bindgen(js_name = stateCovariance)]
     pub fn state_covariance(
         &self,
@@ -158,7 +160,8 @@ impl JsHullWhiteParams {
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if the times are out of order or non-finite.
+    /// @throws `TypeError` for a non-number, a validation error for negative, non-finite or unordered times,
+    /// or a computation error when the integrated state variance is outside the representable range.
     #[wasm_bindgen(js_name = bondVol)]
     pub fn bond_vol(
         &self,

@@ -23,7 +23,7 @@ fn par(value: f64) -> BumpSpec {
 /// Parallel relative shock; `fraction = 0.1` scales every level by 1.1.
 fn pct(fraction: f64) -> BumpSpec {
     BumpSpec {
-        mode: BumpMode::Additive,
+        mode: BumpMode::Multiplicative,
         units: BumpUnits::Percent,
         value: fraction * 100.0,
         bump_type: BumpType::Parallel,
@@ -37,6 +37,10 @@ fn base() -> Date {
 #[test]
 fn signed_price_shocks_preserve_zero_identity_and_native_units() {
     let curve = PriceCurve::builder("POWER")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(base())
         .knots([(0.0, -10.0), (1.0, -5.0), (2.0, 5.0)])
         .build()
@@ -62,6 +66,9 @@ fn signed_price_shocks_preserve_zero_identity_and_native_units() {
         assert!(curve.apply_bump(pct(invalid)).is_err());
     }
     let vol_index = PriceCurve::builder("VIX")
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .kind(PriceCurveKind::VolIndex)
         .base_date(base())
         .knots([(0.0, 10.0), (1.0, 15.0)])
@@ -76,6 +83,9 @@ fn price_and_cpi_condition_keeps_original_clocks_and_levels() {
     use finstack_quant_core::market_data::context::MarketContext;
 
     let price = PriceCurve::builder("PRICE")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(base())
         .day_count(DayCount::Act365F)
         .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 120.0)])
@@ -90,8 +100,10 @@ fn price_and_cpi_condition_keeps_original_clocks_and_levels() {
         .build()
         .unwrap();
     let context = MarketContext::new()
-        .insert(price.clone())
-        .insert(cpi.clone());
+        .try_insert(price.clone())
+        .expect("insert market curve")
+        .try_insert(cpi.clone())
+        .expect("insert market curve");
     for days in [0, 183, 365, 548] {
         let horizon = base() + time::Duration::days(i64::from(days));
         let conditioned = context.condition(horizon).unwrap();
@@ -222,6 +234,10 @@ fn backward_roll_is_rejected_across_context_and_curves() {
         .build()
         .expect("inflation curve");
     let price = PriceCurve::builder("PRICE")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(base())
         .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 120.0)])
         .build()
@@ -233,11 +249,16 @@ fn backward_roll_is_rejected_across_context_and_curves() {
     assert!(hazard.condition(back_date).is_err());
 
     let context = MarketContext::new()
-        .insert(discount)
-        .insert(forward)
-        .insert(hazard)
-        .insert(inflation)
-        .insert(price);
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(inflation)
+        .expect("insert market curve")
+        .try_insert(price)
+        .expect("insert market curve");
     assert!(context.condition(back_date).is_err());
 }
 

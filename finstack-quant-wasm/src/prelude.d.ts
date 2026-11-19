@@ -1037,29 +1037,29 @@ export interface PriceCurveOptions {
    */
   baseDate: string;
   /**
-   * Flat `[t0, p0, t1, p1, …]` pairs: `t` in years, `p` the forward price or index level; even length.
+   * At least two ordered `[t0, p0, t1, p1, …]` pairs. Times are finite nonnegative years, and levels are native signed prices or nonnegative index points.
    */
   knots: NumericArray;
   /**
-   * Level family: `"price"` (the default, any finite level) or `"vol_index"` (non-negative levels).
+   * Level family: `"price"` (any finite level) or `"vol_index"` (non-negative levels).
    */
-  kind?: 'price' | 'vol_index';
+  kind: 'price' | 'vol_index';
   /**
-   * Spot level at `t = 0`; omitted uses the Rust builder default.
+   * Registered holiday calendar for the source clock, required for Bus/252.
    */
-  spotPrice?: number;
+  calendarId?: string;
   /**
-   * Extrapolation policy beyond the pillar range; omitted uses the Rust builder default.
+   * Extrapolation policy beyond the pillar range.
    */
-  extrapolation?: string;
+  extrapolation: string;
   /**
-   * Interpolation style between pillars; omitted uses the Rust builder default.
+   * Interpolation style between pillars.
    */
-  interp?: string;
+  interp: string;
   /**
-   * Day-count convention for the time axis; omitted uses the Rust builder default.
+   * Day-count convention for the time axis.
    */
-  dayCount?: string;
+  dayCount: string;
 }
 
 /**
@@ -1089,7 +1089,7 @@ export interface VolSurfaceOptions {
 }
 
 /**
- * Optional keys of the `FxDeltaVolSurface` constructor; every omitted key takes the Rust default.
+ * FX quote convention declarations and optional 10-delta wings and expiry clock.
  */
 export interface FxDeltaVolSurfaceOptions {
   /**
@@ -1101,17 +1101,17 @@ export interface FxDeltaVolSurfaceOptions {
    */
   bf10d?: NumericArray | null;
   /**
-   * FX delta convention; defaults to `"forward_unadjusted"`.
+   * FX delta convention; specify `"forward_unadjusted"`.
    */
-  deltaConvention?: 'forward_unadjusted' | null;
+  deltaConvention: 'forward_unadjusted';
   /**
-   * ATM quote convention; defaults to `"delta_neutral_straddle"`.
+   * ATM quote convention; specify `"delta_neutral_straddle"`.
    */
-  atmConvention?: 'delta_neutral_straddle' | null;
+  atmConvention: 'delta_neutral_straddle';
   /**
-   * Butterfly quote convention; defaults to `"smile"`.
+   * Butterfly quote convention; specify `"smile"`.
    */
-  butterflyConvention?: 'smile' | null;
+  butterflyConvention: 'smile';
   /**
    * Optional volatility expiry clock mapping expiry dates to option expiry times.
    */

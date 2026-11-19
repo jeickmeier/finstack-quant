@@ -913,8 +913,10 @@ mod cases {
             .build()
             .expect("6M curve");
         let context = MarketContext::new()
-            .insert(curve_3m.clone())
-            .insert(curve_6m.clone());
+            .try_insert(curve_3m.clone())
+            .expect("insert market curve")
+            .try_insert(curve_6m.clone())
+            .expect("insert market curve");
         let mut pool = AssetPool::new("MIXED", DealType::Clo, Currency::USD);
         pool.assets.push(PoolAsset::floating_rate_loan(
             "A-3M",
@@ -985,7 +987,9 @@ mod cases {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("3M curve");
-        let context = MarketContext::new().insert(curve.clone());
+        let context = MarketContext::new()
+            .try_insert(curve.clone())
+            .expect("insert market curve");
         let mut pool = AssetPool::new("LAGS", DealType::Clo, Currency::USD);
         for (id, lag) in [("LAG-0", 0), ("LAG-5", 5)] {
             pool.assets.push(PoolAsset::floating_rate_loan(
@@ -1161,7 +1165,9 @@ mod cases {
     #[test]
     fn cleanup_call_redemption_includes_accrued_interest() {
         let instrument = cleanup_call_deal();
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
 
         let results = simulate_with_source(
             &instrument,
@@ -1306,7 +1312,9 @@ mod cases {
             instrument
         };
 
-        let market = MarketContext::new().insert(cc_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cc_discount_curve())
+            .expect("insert market curve");
 
         let with_reinvest = simulate_with_source(
             &build_deal(true),
@@ -1415,7 +1423,9 @@ mod cases {
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.30);
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
 
-        let market = MarketContext::new().insert(cc_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cc_discount_curve())
+            .expect("insert market curve");
         let results = simulate_with_source(
             &instrument,
             &market,
@@ -1510,7 +1520,9 @@ mod cases {
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 6);
 
-        let market = MarketContext::new().insert(cc_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cc_discount_curve())
+            .expect("insert market curve");
         // The per-period cash-conservation debug assertion fires inside
         // simulate_period; reaching `finalize` without a panic is the test.
         let results = simulate_with_source(
@@ -1597,7 +1609,9 @@ mod cases {
         .expect("tranche");
         let tranches = TrancheStructure::new(vec![tranche]).expect("structure");
 
-        let market = MarketContext::new().insert(cc_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cc_discount_curve())
+            .expect("insert market curve");
         let mut state = SimulationState::new(&pool, &tranches, closing, closing, 0).expect("state");
 
         let months_per_period = 3.0_f64;
@@ -1756,7 +1770,9 @@ mod cases {
     ) -> (f64, f64, usize) {
         use finstack_quant_core::dates::DateExt;
 
-        let market = MarketContext::new().insert(cc_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cc_discount_curve())
+            .expect("insert market curve");
         let mut state = SimulationState::new(pool, tranches, closing, closing, 0).expect("state");
         let rates = PoolFlowRates {
             smm,
@@ -1857,7 +1873,9 @@ mod cases {
         let (pool, tranches) = level_pay_pool_and_tranches(maturity, rate, 100.0);
 
         use finstack_quant_core::dates::DateExt;
-        let market = MarketContext::new().insert(cc_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cc_discount_curve())
+            .expect("insert market curve");
         let mut state = SimulationState::new(&pool, &tranches, closing, closing, 0).expect("state");
         let rates = PoolFlowRates {
             smm: 0.005,
@@ -1998,7 +2016,9 @@ mod cases {
 
     /// Total cash distributed to every tranche over the life of a deal.
     fn total_distributed(instrument: &StructuredCredit) -> f64 {
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
         let results = instrument
             .run_simulation(&market, cleanup_test_date())
             .map(|run| run.tranches)
@@ -2119,7 +2139,9 @@ mod cases {
     /// fee tier needed and the notes deferred despite ample excess spread.
     #[test]
     fn fee_aware_capture_does_not_starve_note_interest() {
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
         let results = (excess_spread_deal(true))
             .run_simulation(&market, cleanup_test_date())
             .map(|run| run.tranches)
@@ -2176,7 +2198,9 @@ mod cases {
         fn first_period_interest(reserve: f64) -> f64 {
             let mut deal = reserve_account_deal(reserve);
             deal.tranches.tranches[0].coupon = RateSpec::Fixed { rate: 0.09 };
-            let market = MarketContext::new().insert(cleanup_discount_curve());
+            let market = MarketContext::new()
+                .try_insert(cleanup_discount_curve())
+                .expect("insert market curve");
             let results = deal
                 .run_simulation(&market, cleanup_test_date())
                 .map(|run| run.tranches)
@@ -2343,7 +2367,9 @@ mod cases {
         // Assert timing: excess cure cash returns to CLASS_B, so lifetime totals
         // can converge while the trap still delays subordinated interest.
         let interest_wal = |deal: &StructuredCredit, tranche: &str| -> f64 {
-            let market = MarketContext::new().insert(cleanup_discount_curve());
+            let market = MarketContext::new()
+                .try_insert(cleanup_discount_curve())
+                .expect("insert market curve");
             let results = deal
                 .run_simulation(&market, cleanup_test_date())
                 .map(|run| run.tranches)
@@ -2375,7 +2401,9 @@ mod cases {
         // Faster delevering reduces lifetime interest, so measure the senior
         // benefit through earlier principal rather than nominal cash.
         let senior_principal_wal = |deal: &StructuredCredit| -> f64 {
-            let market = MarketContext::new().insert(cleanup_discount_curve());
+            let market = MarketContext::new()
+                .try_insert(cleanup_discount_curve())
+                .expect("insert market curve");
             let results = deal
                 .run_simulation(&market, cleanup_test_date())
                 .map(|run| run.tranches)
@@ -2461,7 +2489,9 @@ mod cases {
             "deal trigger must reach the executing waterfall"
         );
 
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
         let ccy = Currency::USD;
         let pay = Date::from_calendar_date(2024, Month::April, 1).expect("date");
         let result = execute_waterfall(
@@ -2517,7 +2547,9 @@ mod cases {
         use crate::structured_credit::pricing::waterfall::execute_waterfall;
 
         let deal = oc_trigger_deal(vec![]);
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
         let ccy = Currency::USD;
         let result = execute_waterfall(
             &deal
@@ -2621,7 +2653,9 @@ mod cases {
         assert_eq!(fee_tiers(&with_fees), 1, "fees must build a fee tier");
 
         // Execute one period and confirm the service providers are paid.
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
         let ccy = Currency::USD;
         let run = |deal: &StructuredCredit| {
             execute_waterfall(
@@ -2778,8 +2812,11 @@ mod cases {
     fn cleanup_call_redemption_includes_pending_recovery_queue() {
         let instrument = cleanup_with_large_recovery_queue_deal();
         let start = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
-        let market = MarketContext::new().insert(
-            finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+        let market = MarketContext::new()
+            .try_insert(
+                finstack_quant_core::market_data::term_structures::DiscountCurve::builder(
+                    "USD-OIS",
+                )
                 .base_date(start)
                 .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.88), (15.0, 0.70)])
                 .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -2787,7 +2824,8 @@ mod cases {
                 .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
-        );
+            )
+            .expect("insert market curve");
 
         let results = simulate_with_source(
             &instrument,
@@ -2859,7 +2897,9 @@ mod cases {
         let rate = 0.08_f64;
         let balance = 1_000_000.0_f64;
         let months_per_period = 3.0_f64;
-        let market = MarketContext::new().insert(cc_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cc_discount_curve())
+            .expect("insert market curve");
 
         // Build a single non-amortizing bond pool with an optional MDR override.
         let build_pool = |mdr_override: Option<f64>| {
@@ -3036,7 +3076,9 @@ mod cases {
             instrument
         };
 
-        let market = MarketContext::new().insert(cc_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cc_discount_curve())
+            .expect("insert market curve");
         let run = |lag: u32| {
             simulate_with_source(
                 &build_deal(lag),
@@ -3190,7 +3232,9 @@ mod cases {
     }
 
     fn run_reconciled(deal: &StructuredCredit) -> SimulationRun {
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
         let run = deal
             .run_simulation(&market, deal.closing_date)
             .expect("simulation");
@@ -3578,7 +3622,9 @@ mod cases {
                 rounding: None,
             },
         );
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
         let message = deal
             .run_simulation(&market, deal.closing_date)
             .expect_err("rejected")
@@ -3614,7 +3660,9 @@ mod cases {
     #[test]
     fn simulation_rejects_carryover_with_no_balance_behind_it() {
         use crate::structured_credit::types::PaymentCalculation;
-        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let market = MarketContext::new()
+            .try_insert(cleanup_discount_curve())
+            .expect("insert market curve");
         for recipient_id in ["b_extra", "net_wac_carryover_CLASS_B"] {
             let deal = deal_paying_class_b(
                 recipient_id,

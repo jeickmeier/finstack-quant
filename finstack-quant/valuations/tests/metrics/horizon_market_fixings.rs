@@ -130,8 +130,10 @@ fn sofr_market(as_of: Date, fixings_from: Date) -> MarketContext {
         .expect("forward");
     let history_end = as_of.previous_day().expect("previous day");
     MarketContext::new()
-        .insert(discount)
-        .insert(forward)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
         .insert_series(sofr_fixings(fixings_from, history_end))
 }
 

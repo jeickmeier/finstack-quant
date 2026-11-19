@@ -62,10 +62,14 @@ fn build_test_curves() -> MarketContext {
         ForwardCurve::flat("USD_LIBOR_3M", as_of, 0.05, DayCount::Act360).unwrap();
 
     MarketContext::new()
-        .insert(disc_curve_usd_ois)
-        .insert(disc_curve_manual)
-        .insert(fwd_curve_sofr)
-        .insert(fwd_curve_libor)
+        .try_insert(disc_curve_usd_ois)
+        .expect("insert market curve")
+        .try_insert(disc_curve_manual)
+        .expect("insert market curve")
+        .try_insert(fwd_curve_sofr)
+        .expect("insert market curve")
+        .try_insert(fwd_curve_libor)
+        .expect("insert market curve")
 }
 
 #[test]

@@ -641,7 +641,11 @@ fn test_npv_full_discounts_dated_upfront() {
         "dated upfront should be discounted from its payment date"
     );
 
-    let market = MarketContext::new().insert(disc).insert(credit);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(credit)
+        .expect("insert market curve");
     let npv_via_value_raw = cds.value_raw(&market, as_of).expect("value_raw npv");
     assert!(
         (npv_via_value_raw - npv_with_upfront).abs() < 1e-12,

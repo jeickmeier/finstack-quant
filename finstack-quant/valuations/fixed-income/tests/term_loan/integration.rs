@@ -71,7 +71,9 @@ fn test_term_loan_yields_with_callability() {
     });
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Compute YTM, YTC, YTW
     let result = loan
@@ -104,7 +106,9 @@ fn test_term_loan_yields_to_horizons() {
     let loan = build_simple_term_loan(as_of, maturity);
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    let market = MarketContext::new().insert(disc_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve");
 
     // Compute YT2Y, YT3Y, YT4Y and YTM for ordering checks
     let result = loan
@@ -147,7 +151,9 @@ fn test_term_loan_yields_to_horizons() {
 fn horizon_yields_use_quoted_clean_price_pct() {
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
-    let market = MarketContext::new().insert(build_flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let market = MarketContext::new()
+        .try_insert(build_flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .expect("insert market curve");
 
     let yield_at = |clean_price: f64| {
         let mut loan = build_simple_term_loan(as_of, maturity);
@@ -235,7 +241,11 @@ fn test_floating_rate_term_loan_yield_and_dm() {
     )
     .expect("forward curve");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve");
 
     // Act: compute PV, YTM, and Discount Margin
     let result = loan

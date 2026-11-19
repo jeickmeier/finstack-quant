@@ -102,8 +102,8 @@ impl StochasticDefault for CopulaBasedDefault {
         self.correlation
     }
 
-    fn expected_mdr(&self, _seasoning: u32) -> f64 {
-        capped_annual_to_monthly(self.base_cdr)
+    fn expected_mdr(&self, _seasoning: u32) -> finstack_quant_core::Result<f64> {
+        finstack_quant_cashflows::builder::annual_to_monthly(self.base_cdr)
     }
 }
 
@@ -125,7 +125,7 @@ mod tests {
         let model = CopulaBasedDefault::new(0.02, CopulaSpec::Gaussian, 0.20)
             .expect("valid Gaussian copula");
         let mdr = model.conditional_mdr(12, &[0.0]);
-        let expected = model.expected_mdr(12);
+        let expected = model.expected_mdr(12).unwrap();
 
         // At Z=0 with correlation, conditional differs from unconditional
         // The relationship depends on how correlation affects the copula formula

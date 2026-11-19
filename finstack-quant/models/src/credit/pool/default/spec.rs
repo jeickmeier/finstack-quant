@@ -290,7 +290,7 @@ mod tests {
         assert!(format!("{model:?}").starts_with("FactorCorrelatedDefault"));
         // Canonical convention: low factor = stress, so a negative factor
         // realization must raise the conditional MDR above its expectation.
-        assert!(model.conditional_mdr(12, &[-2.0]) > model.expected_mdr(12));
+        assert!(model.conditional_mdr(12, &[-2.0]) > model.expected_mdr(12).unwrap());
     }
 
     #[test]

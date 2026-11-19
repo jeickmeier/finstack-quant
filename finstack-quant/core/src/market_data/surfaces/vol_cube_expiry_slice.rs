@@ -1,7 +1,7 @@
 //! Observed volatility by tenor and strike at one fixed option expiry.
 
 use super::{VolQuoteType, VolSurfaceAxis};
-use crate::{Error, Result, types::CurveId};
+use crate::{Error, Result, dates::VolatilityClock, types::CurveId};
 
 /// A fixed-expiry slice of a volatility cube with truthful tenor and strike axes.
 ///
@@ -20,6 +20,7 @@ pub struct VolCubeExpirySlice {
     vols: Box<[f64]>,
     quote_type: VolQuoteType,
     displacements: Option<Box<[f64]>>,
+    expiry_clock: Option<VolatilityClock>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -34,6 +35,8 @@ struct VolCubeExpirySliceWire {
     quote_type: VolQuoteType,
     #[serde(skip_serializing_if = "Option::is_none")]
     displacements: Option<Vec<f64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    expiry_clock: Option<VolatilityClock>,
 }
 
 impl From<VolCubeExpirySlice> for VolCubeExpirySliceWire {
@@ -46,6 +49,7 @@ impl From<VolCubeExpirySlice> for VolCubeExpirySliceWire {
             vols_row_major: slice.vols.into_vec(),
             quote_type: slice.quote_type,
             displacements: slice.displacements.map(Vec::from),
+            expiry_clock: slice.expiry_clock,
         }
     }
 }
@@ -53,7 +57,7 @@ impl From<VolCubeExpirySlice> for VolCubeExpirySliceWire {
 impl TryFrom<VolCubeExpirySliceWire> for VolCubeExpirySlice {
     type Error = Error;
     fn try_from(raw: VolCubeExpirySliceWire) -> Result<Self> {
-        Self::from_grid(
+        let mut slice = Self::from_grid(
             raw.id,
             raw.expiry,
             &raw.tenors,
@@ -61,7 +65,9 @@ impl TryFrom<VolCubeExpirySliceWire> for VolCubeExpirySlice {
             &raw.vols_row_major,
             raw.quote_type,
             raw.displacements.as_deref(),
-        )
+        )?;
+        slice.expiry_clock = raw.expiry_clock;
+        Ok(slice)
     }
 }
 
@@ -114,7 +120,23 @@ impl VolCubeExpirySlice {
             vols: vols_row_major.into(),
             quote_type,
             displacements: displacements.map(Into::into),
+            expiry_clock: None,
         })
+    }
+
+    /// Source clock used to measure option expiry, when available.
+    pub const fn expiry_clock(&self) -> Option<&VolatilityClock> {
+        self.expiry_clock.as_ref()
+    }
+
+    /// Attach the source clock without transforming existing expiry coordinates.
+    ///
+    /// # Arguments
+    ///
+    /// * `clock` - Origin and day count originally used for the stored option expiry.
+    pub fn with_expiry_clock(mut self, clock: VolatilityClock) -> Self {
+        self.expiry_clock = Some(clock);
+        self
     }
 
     /// Identifier carried by the source cube.

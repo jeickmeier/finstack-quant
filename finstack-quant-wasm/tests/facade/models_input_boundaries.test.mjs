@@ -189,7 +189,11 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
 });
 
 test('stored expiry and hierarchy indices cannot silently select another grid row', () => {
-  const surface = new facade.core.FxDeltaVolSurface('FX', 'EUR/USD', [1], [0.12], [0.01], [0.002]);
+  const surface = new facade.core.FxDeltaVolSurface('FX', 'EUR/USD', [1], [0.12], [0.01], [0.002], {
+    deltaConvention: 'forward_unadjusted',
+    atmConvention: 'delta_neutral_straddle',
+    butterflyConvention: 'smile',
+  });
   const levels = models.factor.credit.LevelsAtDate.fromJson(
     JSON.stringify({
       date: '2025-01-01',
@@ -274,4 +278,30 @@ test('risk budget rejects invalid finite-share and threshold inputs', () => {
     assert.throws(() => risk.evaluateRiskBudget('["A"]', '[1]', '[1]', 1, invalid));
   }
   assert.throws(() => risk.evaluateRiskBudget('["A"]', '[1]', '[1]', 1, 0));
+});
+
+test('Cheyette consumes decimal rate amplitudes supplied by the caller', () => {
+  const process = {
+    type: 'cheyette_rough',
+    kappa: 0.03,
+    sigma_base: { interpolation: 'linear', amplitudes: [[0, 0.005]] },
+    hurst: { h: 0.1 },
+    eta: 1.2,
+    rho: -0.3,
+    phi_times: [0],
+    phi_values: [0.02],
+  };
+  const spec = {
+    process,
+    initial_state: [0, 0],
+    time_grid: { type: 'uniform', expiry: 1, num_steps: 2 },
+    num_paths: 1,
+    seed: 7,
+  };
+  const summary = models.monteCarlo.simulatePaths(spec);
+  assert.equal(summary.values[3], 0.005 ** 2 * 0.5);
+  const variance = { interpolation: 'linear', times: [0], values: [0.04] };
+  assert.throws(() =>
+    models.monteCarlo.simulatePaths({ ...spec, process: { ...process, sigma_base: variance } })
+  );
 });

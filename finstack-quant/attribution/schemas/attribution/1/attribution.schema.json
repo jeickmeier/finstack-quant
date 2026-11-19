@@ -6850,7 +6850,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional spot price ID (for delta calculations)."
+          "description": "Optional observed spot identifier. At maturity the scalar is the delivery\nobservation. After maturity use the exact delivery observation in the\ncorresponding `FIXING:{spot_id}` series. Before maturity an explicitly\nidentified spot can supply the cost-of-carry input if the forward curve is absent."
         },
         "underlying_ticker": {
           "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
@@ -8979,6 +8979,7 @@
           "additionalProperties": {
             "type": "string"
           },
+          "default": null,
           "description": "Optional map of issuer ID → hazard curve ID",
           "type": [
             "object",
@@ -8990,6 +8991,7 @@
             "format": "double",
             "type": "number"
           },
+          "default": null,
           "description": "Optional map of issuer ID → recovery rate",
           "type": [
             "object",
@@ -9001,6 +9003,7 @@
             "format": "double",
             "type": "number"
           },
+          "default": null,
           "description": "Optional map of issuer ID → weight",
           "type": [
             "object",
@@ -10651,6 +10654,13 @@
               "$ref": "#/$defs/DateWire",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar for the source clock.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "day_count": {
               "$ref": "#/$defs/DayCount",
               "description": "Day count convention"
@@ -10686,21 +10696,9 @@
               },
               "type": "array"
             },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
+            "level_kind": {
+              "$ref": "#/$defs/PriceCurveKind",
+              "description": "Native level family."
             },
             "type": {
               "const": "price",
@@ -10712,6 +10710,7 @@
             "id",
             "base",
             "day_count",
+            "level_kind",
             "knot_points",
             "interp_style",
             "extrapolation"
@@ -14897,12 +14896,12 @@
         },
         {
           "const": "pow",
-          "description": "Exponentiation (`pow(base, exp)`), computed as `base^exp` with IEEE 754\nsemantics: `pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf, and overflow\nsaturates to ±inf.",
+          "description": "Exponentiation (`pow(base, exponent)`). Core rejects domain and overflow errors.",
           "type": "string"
         },
         {
           "const": "round",
-          "description": "Round to a number of decimal digits (`round(expr[, digits])`).\n\nTies round half away from zero (Excel convention): `round(2.5)` is 3,\n`round(-2.5)` is -3. `digits` defaults to 0 and may be negative to\nround to tens/hundreds (`round(1234, -2)` is 1200). Non-finite inputs\npass through unchanged.",
+          "description": "Quantize the represented value to a decimal place, with ties away from zero.\nDigits default to zero. Core requires a direct, integral i32 literal.",
           "type": "string"
         },
         {
@@ -14917,32 +14916,32 @@
         },
         {
           "const": "ln",
-          "description": "Natural logarithm (`ln(expr)`), IEEE semantics: `ln(0)` is -inf and\n`ln(x)` for `x < 0` is NaN.",
+          "description": "Natural logarithm of a positive operand (`ln(expr)`).",
           "type": "string"
         },
         {
           "const": "exp",
-          "description": "Natural exponential (`exp(expr)`); overflow saturates to +inf.",
+          "description": "Natural exponential (`exp(expr)`).",
           "type": "string"
         },
         {
           "const": "log10",
-          "description": "Base-10 logarithm (`log10(expr)`), IEEE semantics: `log10(0)` is -inf\nand `log10(x)` for `x < 0` is NaN.",
+          "description": "Base-10 logarithm of a positive operand (`log10(expr)`).",
           "type": "string"
         },
         {
           "const": "sqrt",
-          "description": "Square root (`sqrt(expr)`), IEEE semantics: `sqrt(x)` for `x < 0` is\nNaN.",
+          "description": "Square root of a nonnegative operand (`sqrt(expr)`).",
           "type": "string"
         },
         {
           "const": "clamp",
-          "description": "Clamp a value to an inclusive range (`clamp(expr, lo, hi)`),\nequivalent to `min(max(expr, lo), hi)`. Returns NaN when any argument\nis NaN or when `lo > hi`; it never panics on an inverted range.",
+          "description": "Restrict a value to ordered, inclusive finite bounds (`clamp(expr, lo, hi)`).\nMissing operands propagate and infinite operands fail.",
           "type": "string"
         },
         {
           "const": "is_missing",
-          "description": "Missing-value predicate (`is_missing(expr)`), returning 1 when the\nvalue is non-finite (NaN or ±inf) and 0 otherwise — the same\n\"finite\" convention used by `coalesce`.",
+          "description": "Missing-value predicate (`is_missing(expr)`); core admits NaN as its missing sentinel.",
           "type": "string"
         }
       ]
@@ -22462,12 +22461,6 @@
         }
       ]
     },
-    "NonNegativeF64Wire": {
-      "description": "Finite JSON number greater than or equal to zero.",
-      "format": "double",
-      "minimum": 0.0,
-      "type": "number"
-    },
     "Notional": {
       "additionalProperties": false,
       "description": "Notional amount with an optional amortisation rule.\n\nCombines initial principal with amortization behavior for complete\nnotional lifecycle management.",
@@ -23427,20 +23420,24 @@
     },
     "PiecewiseConstantCurve": {
       "additionalProperties": false,
-      "description": "A finite, left-continuous piecewise-constant curve.",
+      "description": "A finite, right-continuous piecewise-constant curve.",
       "properties": {
         "times": {
           "items": {
             "format": "double",
+            "minimum": 0.0,
             "type": "number"
           },
+          "minItems": 1,
           "type": "array"
         },
         "values": {
           "items": {
             "format": "double",
+            "minimum": 0.0,
             "type": "number"
           },
+          "minItems": 1,
           "type": "array"
         }
       },
@@ -24252,6 +24249,21 @@
             "kind"
           ],
           "type": "object"
+        }
+      ]
+    },
+    "PriceCurveKind": {
+      "description": "Level family a [`PriceCurve`] represents.\n\nThe kind determines level validation and the typed market-context lookup.",
+      "oneOf": [
+        {
+          "const": "price",
+          "description": "Signed, finite forward prices, for example in USD per barrel.",
+          "type": "string"
+        },
+        {
+          "const": "vol_index",
+          "description": "Nonnegative volatility-index levels in index points.",
+          "type": "string"
         }
       ]
     },
@@ -27327,21 +27339,27 @@
       "properties": {
         "alpha": {
           "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0.0,
           "format": "double",
           "type": "number"
         },
         "beta": {
           "description": "CEV exponent in the closed interval `[0, 1]`.",
           "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
           "type": "number"
         },
         "nu": {
           "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
           "format": "double",
+          "minimum": 0.0,
           "type": "number"
         },
         "rho": {
           "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": -1.0,
           "format": "double",
           "type": "number"
         },
@@ -27364,41 +27382,48 @@
     },
     "SabrParameters": {
       "additionalProperties": false,
-      "description": "SABR model parameters",
+      "description": "Parameters of a SABR backbone, with an optional signed rate displacement.",
       "properties": {
         "alpha": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Initial volatility (alpha)"
+          "description": "Initial volatility level, strictly positive.",
+          "exclusiveMinimum": 0.0,
+          "format": "double",
+          "type": "number"
         },
         "beta": {
-          "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
-          "description": "CEV exponent (beta) - typically 0 to 1"
+          "description": "CEV exponent in the closed interval `[0, 1]`.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
         },
         "nu": {
-          "$ref": "#/$defs/NonNegativeF64Wire",
-          "description": "Volatility of volatility (nu/volvol)"
+          "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
+          "format": "double",
+          "minimum": 0.0,
+          "type": "number"
         },
         "rho": {
-          "$ref": "#/$defs/CorrelationWire",
-          "description": "Correlation between asset and volatility (rho)"
+          "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": -1.0,
+          "format": "double",
+          "type": "number"
         },
         "shift": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/PositiveF64Wire"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Shift parameter for handling negative rates (optional)"
+          "description": "Optional finite displacement applied to forward and strike.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "alpha",
         "beta",
-        "nu",
-        "rho"
+        "rho",
+        "nu"
       ],
       "type": "object"
     },
@@ -29206,7 +29231,7 @@
         },
         "vol_surface_id": {
           "$ref": "#/$defs/Id",
-          "description": "Volatility surface ID for option pricing"
+          "description": "Volatility source ID for option pricing. A dated SABR cube needs an\nACT/365F expiry clock anchored at the valuation date."
         }
       },
       "required": [
@@ -30558,6 +30583,16 @@
             "type": "number"
           },
           "type": "array"
+        },
+        "expiry_clock": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VolatilityClock"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "forwards": {
           "description": "Row-major: forwards[expiry_idx * n_tenors + tenor_idx]",

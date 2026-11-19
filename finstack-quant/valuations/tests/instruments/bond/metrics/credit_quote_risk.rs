@@ -48,7 +48,9 @@ fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
-    let source = MarketContext::new().insert(disc);
+    let source = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
@@ -57,7 +59,7 @@ fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
         "USD-OIS",
     )
     .expect("hazard calibration should succeed");
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 #[test]
@@ -322,9 +324,14 @@ fn cross_credit_rates_recalibrates_after_discount_shock_and_converges() {
                 action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(spread)),
             })
             .unwrap();
-        bond.value(&rate_market.insert(rebuilt.as_ref().clone()), as_of)
-            .unwrap()
-            .amount()
+        bond.value(
+            &rate_market
+                .try_insert(rebuilt.as_ref().clone())
+                .expect("insert market curve"),
+            as_of,
+        )
+        .unwrap()
+        .amount()
     };
     let derivative =
         |h: f64| (corner(h, h) - corner(h, -h) - corner(-h, h) + corner(-h, -h)) / (4.0 * h * h);
@@ -344,7 +351,10 @@ fn cross_credit_rates_recalibrates_after_discount_shock_and_converges() {
                 action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(spread)),
             })
             .unwrap();
-        let credit_market = market.clone().insert(credit.as_ref().clone());
+        let credit_market = market
+            .clone()
+            .try_insert(credit.as_ref().clone())
+            .expect("insert market curve");
         let rate_market = credit_market
             .bump([MarketBump::DiscountCurve {
                 id: "USD-OIS".into(),
@@ -363,9 +373,14 @@ fn cross_credit_rates_recalibrates_after_discount_shock_and_converges() {
                 action: HazardRecalibrationAction::DependencyMarketReplay,
             })
             .unwrap();
-        bond.value(&rate_market.insert(rebuilt.as_ref().clone()), as_of)
-            .unwrap()
-            .amount()
+        bond.value(
+            &rate_market
+                .try_insert(rebuilt.as_ref().clone())
+                .expect("insert market curve"),
+            as_of,
+        )
+        .unwrap()
+        .amount()
     };
     let expected = derivative(1.0);
     let fine = derivative(0.5);

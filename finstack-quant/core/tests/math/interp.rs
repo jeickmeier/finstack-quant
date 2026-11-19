@@ -1584,7 +1584,7 @@ mod monotone_convex_interval_averages {
     #[test]
     fn stressed_curves_build_and_preserve_positive_dfs_and_integrals() {
         for seed in [7_u64, 42, 1234, 987_654] {
-            let mut rng = Pcg64Rng::new(seed);
+            let mut rng = Pcg64Rng::new(seed, 0);
             for curve_idx in 0..50 {
                 let n = 4 + (rng.uniform() * 7.0) as usize;
                 let mut knots = Vec::with_capacity(n);
@@ -1721,7 +1721,7 @@ mod monotone_convex_negative_rates {
     #[test]
     fn negative_rate_curves_interpolate_faithfully() {
         for seed in [7_u64, 42, 1234, 987_654] {
-            let mut rng = Pcg64Rng::new(seed);
+            let mut rng = Pcg64Rng::new(seed, 0);
 
             for curve_idx in 0..50 {
                 let n = 4 + (rng.uniform() * 7.0) as usize;

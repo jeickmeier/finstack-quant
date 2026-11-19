@@ -110,7 +110,9 @@ fn default_count_matches_subsets_at_transition_sizes_and_correlation_wings() {
                     1 => 1.0,
                     _ => 0.01 + 0.4 * i as f64 / n as f64,
                 };
-                let threshold = pricer.default_threshold_for_copula(marginal);
+                let threshold = pricer
+                    .default_threshold_for_copula(marginal)
+                    .expect("valid marginal probability");
                 pricer.conditional_default_prob_copula(
                     pricer.copula(),
                     threshold,
@@ -263,11 +265,17 @@ fn capped(index: &CreditIndexData, exposure: PoolExposure) -> f64 {
 fn count_pricing_preserves_explicit_common_weight_and_zero_weight_exclusion() {
     let pds = [0.05, 0.6];
     let normal = index(&pds, &[0.5; 2], &[0.4; 2]).expect("normal weights");
-    let actual_weight = 0.5 + 2e-10;
-    let explicit = index(&pds, &[actual_weight; 2], &[0.4; 2]).expect("accepted total");
+    let actual_weight = 0.5_f64.next_up();
+    let explicit = index(&pds, &[actual_weight; 2], &[0.4; 2]).expect("one-ulp total");
+    assert_eq!(
+        explicit
+            .get_issuer_weight("NAME-00000")
+            .expect("named member"),
+        actual_weight
+    );
     let mut padded_pds = vec![0.05, 0.6];
     padded_pds.extend(std::iter::repeat_n(0.9, 16));
-    let mut padded_weights = vec![0.5, 0.5];
+    let mut padded_weights = vec![actual_weight; 2];
     padded_weights.extend(std::iter::repeat_n(0.0, 16));
     let mut padded_recoveries = vec![0.4, 0.4];
     padded_recoveries.extend(std::iter::repeat_n(0.8, 16));
@@ -277,8 +285,7 @@ fn count_pricing_preserves_explicit_common_weight_and_zero_weight_exclusion() {
         let baseline = capped(&normal, exposure);
         let actual = capped(&explicit, exposure);
         assert!((actual * 0.5 / actual_weight - baseline).abs() < 1e-13);
-        assert!((actual - baseline).abs() > 1e-11);
-        assert_eq!(capped(&padded, exposure), baseline);
+        assert_eq!(capped(&padded, exposure), actual);
         assert!((capped(&reversed, exposure) - baseline).abs() < 1e-13);
     }
 }
@@ -304,6 +311,7 @@ fn count_candidate_preserves_invalid_input_and_old_work_rejections() {
     for weights in [
         vec![0.5],
         vec![0.0, 0.0],
+        vec![0.5 + 2e-10; 2],
         vec![-0.1, 1.1],
         vec![f64::NAN, 0.5],
         vec![f64::INFINITY, 0.5],

@@ -41,12 +41,18 @@ pub fn standard_market(as_of: Date) -> MarketContext {
     let disc = flat_discount("USD-OIS", as_of, 0.03);
     let credit = flat_hazard("HZ-SN", as_of, STANDARD_RECOVERY_SENIOR, 0.02);
 
-    MarketContext::new().insert(disc).insert(credit)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(credit)
+        .expect("insert market curve")
 }
 
 /// Standard market whose hazard curve retains lossless quote replay inputs.
 pub fn replayable_standard_market(as_of: Date) -> MarketContext {
-    let source = MarketContext::new().insert(flat_discount("USD-OIS", as_of, 0.03));
+    let source = MarketContext::new()
+        .try_insert(flat_discount("USD-OIS", as_of, 0.03))
+        .expect("insert market curve");
     let pillars = [
         (as_of.add_months(12).expect("valid date shift"), 500.0),
         (as_of.add_months(36).expect("valid date shift"), 500.0),
@@ -67,7 +73,7 @@ pub fn replayable_standard_market(as_of: Date) -> MarketContext {
         },
     )
     .expect("hazard calibration should succeed");
-    source.insert(hazard)
+    source.try_insert(hazard).expect("insert market curve")
 }
 
 /// Clone `market` with the named hazard curve's `recovery_rate` metadata
@@ -84,7 +90,10 @@ pub fn frozen_market_with_recovery(
 ) -> MarketContext {
     let hazard = market.get_hazard(hazard_id).unwrap();
     let realigned = hazard.with_recovery_rate(recovery).unwrap();
-    market.clone().insert(realigned)
+    market
+        .clone()
+        .try_insert(realigned)
+        .expect("insert market curve")
 }
 
 /// Convert basis points (f64) to a Decimal rate.

@@ -210,8 +210,8 @@
         "description": "Change notional.amount from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "102574.9852619932", "currency": "USD" },
-        "edited": { "amount": "112832.4837881925", "currency": "USD" }
+        "baseline": { "amount": "102491.20441292501", "currency": "USD" },
+        "edited": { "amount": "112740.3248542175", "currency": "USD" }
       }
     },
     {
@@ -463,8 +463,8 @@
         "description": "Change range_accrual.notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "931476.795406835", "currency": "USD" },
-        "edited": { "amount": "1024624.474947518", "currency": "USD" }
+        "baseline": { "amount": "925866.5614962792", "currency": "USD" },
+        "edited": { "amount": "1018453.2176459072", "currency": "USD" }
       }
     },
     {
@@ -625,8 +625,8 @@
         "description": "Change notional.amount from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "7707.57358918795", "currency": "USD" },
-        "edited": { "amount": "8478.33094810675", "currency": "USD" }
+        "baseline": { "amount": "7694.045978050126", "currency": "USD" },
+        "edited": { "amount": "8463.450575855139", "currency": "USD" }
       }
     },
     {
@@ -2129,8 +2129,8 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "1003218.3915453077", "currency": "USD" },
-        "edited": { "amount": "1103540.2306998384", "currency": "USD" }
+        "baseline": { "amount": "1004420.6591497143", "currency": "USD" },
+        "edited": { "amount": "1104862.7250646858", "currency": "USD" }
       }
     },
     {
@@ -2246,8 +2246,8 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "886354.6098896886", "currency": "USD" },
-        "edited": { "amount": "974990.0708786575", "currency": "USD" }
+        "baseline": { "amount": "886590.455175258", "currency": "USD" },
+        "edited": { "amount": "975249.5006927839", "currency": "USD" }
       }
     },
     {

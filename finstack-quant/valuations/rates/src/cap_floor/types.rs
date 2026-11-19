@@ -981,8 +981,10 @@ mod tests {
             .expect("vol surface should build");
 
         MarketContext::new()
-            .insert(disc)
-            .insert(fwd)
+            .try_insert(disc)
+            .expect("insert market curve")
+            .try_insert(fwd)
+            .expect("insert market curve")
             .insert_surface(vol_surface)
     }
 
@@ -1202,7 +1204,7 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("negative forward curve should build");
-        ctx = ctx.insert(neg_fwd);
+        ctx = ctx.try_insert(neg_fwd).expect("insert market curve");
 
         // Build a flat vol surface at 50bp normal vol for the normal model test
         let normal_vol = 0.005;
@@ -1478,8 +1480,10 @@ mod tests {
                 .build()
                 .expect("zero volatility");
             let market = MarketContext::new()
-                .insert(discount)
-                .insert(forward)
+                .try_insert(discount)
+                .expect("insert market curve")
+                .try_insert(forward)
+                .expect("insert market curve")
                 .insert_surface(vol);
             let periods = cap.pricing_periods().expect("adjusted overnight periods");
             assert_eq!(periods.len(), 1);

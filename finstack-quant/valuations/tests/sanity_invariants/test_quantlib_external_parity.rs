@@ -140,10 +140,12 @@ fn external_quantlib_parity_vanilla_bond_npv_and_dv01() {
     .expect("Bond::fixed");
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
 
-    let market_t0 =
-        MarketContext::new().insert(flat_discount_curve("USD-OIS", t0, fixture.scenario.rate_t0));
-    let market_t1 =
-        MarketContext::new().insert(flat_discount_curve("USD-OIS", t1, fixture.scenario.rate_t1));
+    let market_t0 = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", t0, fixture.scenario.rate_t0))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(flat_discount_curve("USD-OIS", t1, fixture.scenario.rate_t1))
+        .expect("insert market curve");
 
     // NPV parity at both dates.
     let pv_t0 = instrument.value(&market_t0, t0).expect("value t0");
@@ -173,16 +175,20 @@ fn external_quantlib_parity_vanilla_bond_npv_and_dv01() {
     // compare the raw sensitivity QL also computes.
     if let Some(ql_dv01) = fixture.quantlib.t0.dv01 {
         let bump_bp = 1.0_f64;
-        let market_up = MarketContext::new().insert(flat_discount_curve(
-            "USD-OIS",
-            t0,
-            fixture.scenario.rate_t0 + bump_bp * 1e-4,
-        ));
-        let market_dn = MarketContext::new().insert(flat_discount_curve(
-            "USD-OIS",
-            t0,
-            fixture.scenario.rate_t0 - bump_bp * 1e-4,
-        ));
+        let market_up = MarketContext::new()
+            .try_insert(flat_discount_curve(
+                "USD-OIS",
+                t0,
+                fixture.scenario.rate_t0 + bump_bp * 1e-4,
+            ))
+            .expect("insert market curve");
+        let market_dn = MarketContext::new()
+            .try_insert(flat_discount_curve(
+                "USD-OIS",
+                t0,
+                fixture.scenario.rate_t0 - bump_bp * 1e-4,
+            ))
+            .expect("insert market curve");
         let pv_up = instrument.value(&market_up, t0).expect("value up");
         let pv_dn = instrument.value(&market_dn, t0).expect("value dn");
         let finstack_dv01 = (pv_up.amount() - pv_dn.amount()) / (2.0 * bump_bp);
@@ -256,8 +262,10 @@ fn flat_forward_curve(id: &str, base: Date, rate: f64) -> ForwardCurve {
 
 fn irs_market(as_of: Date, rate: f64) -> MarketContext {
     MarketContext::new()
-        .insert(flat_irs_discount_curve("USD-OIS", as_of, rate))
-        .insert(flat_forward_curve("USD-SOFR-3M", as_of, rate))
+        .try_insert(flat_irs_discount_curve("USD-OIS", as_of, rate))
+        .expect("insert market curve")
+        .try_insert(flat_forward_curve("USD-SOFR-3M", as_of, rate))
+        .expect("insert market curve")
 }
 
 /// IRS NPV tolerance (USD on a $10M notional, ≈0.15% of notional).
@@ -415,8 +423,10 @@ impl FxProvider for FixedEurUsd {
 
 fn fx_market(as_of: Date, usd_rate: f64, eur_rate: f64, spot_eur_usd: f64) -> MarketContext {
     MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, usd_rate))
-        .insert(flat_discount_curve("EUR-OIS", as_of, eur_rate))
+        .try_insert(flat_discount_curve("USD-OIS", as_of, usd_rate))
+        .expect("insert market curve")
+        .try_insert(flat_discount_curve("EUR-OIS", as_of, eur_rate))
+        .expect("insert market curve")
         .insert_fx(FxMatrix::new(Arc::new(FixedEurUsd(spot_eur_usd)), None))
 }
 

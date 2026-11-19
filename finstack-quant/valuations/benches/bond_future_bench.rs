@@ -151,7 +151,9 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(disc)
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
 }
 
 /// Benchmark conversion factor calculation

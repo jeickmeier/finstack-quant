@@ -25,7 +25,9 @@ fn create_curve(base_date: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 #[test]
@@ -142,7 +144,11 @@ fn test_accrued_frn_uses_forward_rate() {
         .build()
         .unwrap();
     let fwd = ForwardCurve::flat("USD-SOFR-3M", issue, 0.05, DayCount::Act360).unwrap();
-    let market = MarketContext::new().insert(disc).insert(fwd);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve");
 
     // Floating-rate bond with SOFR 3M (using new CashflowSpec)
     use finstack_quant_core::dates::Tenor;
@@ -203,7 +209,9 @@ fn test_clean_dirty_ex_coupon_parity() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let bond = Bond::fixed(
         "B",

@@ -127,15 +127,20 @@ fn commodity_swaption_market(
         .expect("discount curve");
     let price_curve =
         finstack_quant_core::market_data::term_structures::PriceCurve::builder("NG-FORWARD")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .base_date(as_of)
-            .spot_price(flat_fwd)
             .knots([(0.0, flat_fwd), (2.0, flat_fwd)])
             .build()
             .expect("price curve");
 
     finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(disc)
-        .insert(price_curve)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
         .insert_surface(flat_vol_surface("NG-VOL", vol))
 }
 
@@ -237,7 +242,9 @@ fn metric_attachment_preserves_the_model_result_envelope() {
     use time::macros::date;
 
     let instrument = fixed_test_bond();
-    let market = Market::new().insert(flat_discount_curve("USD-TREASURY", date!(2025 - 01 - 15)));
+    let market = Market::new()
+        .try_insert(flat_discount_curve("USD-TREASURY", date!(2025 - 01 - 15)))
+        .expect("insert market curve");
     let mut registry = PricerRegistry::new();
     registry
         .register(RichBondPricer)
@@ -321,7 +328,9 @@ fn bond_discounting_parity_instrument_vs_registry() {
     let as_of: Date = date!(2025 - 01 - 15);
     let bond = fixed_test_bond();
     let disc = flat_discount_curve("USD-TREASURY", as_of);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let registry = STANDARD.pricers();
 
     let trait_result = bond
@@ -409,7 +418,8 @@ fn instrument_can_compose_custom_pricer_and_metric_registries() {
     let as_of = date!(2025 - 01 - 15);
     let bond = fixed_test_bond();
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(flat_discount_curve("USD-TREASURY", as_of));
+        .try_insert(flat_discount_curve("USD-TREASURY", as_of))
+        .expect("insert market curve");
     let mut pricers = PricerRegistry::new();
     pricers
         .register(FixedBondPricer {
@@ -455,8 +465,10 @@ fn non_discounting_risk_only_metrics_preserve_config_metadata() {
     ));
 
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(flat_discount_curve("USD-TREASURY", as_of))
-        .insert(flat_hazard_curve("USD-CREDIT", as_of));
+        .try_insert(flat_discount_curve("USD-TREASURY", as_of))
+        .expect("insert market curve")
+        .try_insert(flat_hazard_curve("USD-CREDIT", as_of))
+        .expect("insert market curve");
     let registry = STANDARD.pricers();
 
     let mut cfg = FinstackConfig::default();
@@ -502,7 +514,9 @@ fn structured_credit_parity_instrument_vs_registry() {
     let clo = finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit::example()
         .expect("example");
     let disc = multi_knot_discount_curve("USD-OIS", as_of);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let registry = STANDARD.pricers();
 
     let trait_result = clo.price_with_metrics(
@@ -661,7 +675,9 @@ fn fx_policy_propagates_from_curve_to_non_fx_instrument_result() {
     let as_of: Date = date!(2025 - 01 - 15);
     let bond = fixed_test_bond();
     let disc = flat_discount_curve_with_fx_policy("USD-TREASURY", as_of, "xccy_basis::USD/EUR");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let registry = STANDARD.pricers();
 
     let result = registry
@@ -691,7 +707,9 @@ fn fx_policy_pricer_stamp_takes_precedence_over_curve_stamp() {
     let as_of: Date = date!(2025 - 01 - 15);
     let bond = fixed_test_bond();
     let disc = flat_discount_curve_with_fx_policy("USD-TREASURY", as_of, "curve::xccy_basis");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     /// Stamps its own FX policy and parallel flag, as a model pricer may.
     struct PolicyStampingPricer;
@@ -766,7 +784,11 @@ fn bond_hazard_rate_registry_path_succeeds() {
     bond_with_credit.credit_curve_id = Some(finstack_quant_core::types::CurveId::new(
         "USD-CREDIT".to_string(),
     ));
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let registry = STANDARD.pricers();
 
     let result = registry
@@ -814,7 +836,11 @@ fn bond_hazard_rate_instrument_override_matches_registry() {
     bond_with_credit.credit_curve_id = Some(finstack_quant_core::types::CurveId::new(
         "USD-CREDIT".to_string(),
     ));
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve");
     let registry = STANDARD.pricers();
 
     let instrument_result = bond_with_credit
@@ -858,7 +884,8 @@ fn instrument_can_use_custom_registry_override() {
     let as_of = date!(2025 - 01 - 15);
     let bond = fixed_test_bond();
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(flat_discount_curve("USD-TREASURY", as_of));
+        .try_insert(flat_discount_curve("USD-TREASURY", as_of))
+        .expect("insert market curve");
 
     let default_result = bond
         .price_with_metrics(
@@ -914,7 +941,8 @@ fn instrument_model_override_controls_metric_repricing() {
     let as_of = date!(2025 - 01 - 15);
     let bond = fixed_test_bond();
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(flat_discount_curve("USD-TREASURY", as_of));
+        .try_insert(flat_discount_curve("USD-TREASURY", as_of))
+        .expect("insert market curve");
 
     let default_result = bond
         .price_with_metrics(
@@ -975,7 +1003,9 @@ fn empty_metrics_does_not_alter_pv() {
     let as_of: Date = date!(2025 - 01 - 15);
     let bond = fixed_test_bond();
     let disc = flat_discount_curve("USD-TREASURY", as_of);
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
     let registry = STANDARD.pricers();
 
     let baseline = bond

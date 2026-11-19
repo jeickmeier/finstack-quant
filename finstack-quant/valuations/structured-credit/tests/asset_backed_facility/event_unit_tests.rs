@@ -19,7 +19,9 @@ fn market(base: finstack_quant_core::dates::Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    MarketContext::new().insert(curve)
+    MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve")
 }
 
 /// `CumulativeLoss { max_cumulative_loss }` is the decimal fraction of the

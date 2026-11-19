@@ -205,9 +205,6 @@ impl RangeAccrualPayoff {
     fn is_in_range(&self, spot: f64) -> bool {
         spot >= self.lower_bound && spot <= self.upper_bound
     }
-
-    /// Tolerance for matching observation dates (in years).
-    const TIME_TOLERANCE: f64 = 1e-6;
 }
 
 impl Payoff for RangeAccrualPayoff {
@@ -224,7 +221,7 @@ impl Payoff for RangeAccrualPayoff {
             let target_date = self.observation_dates[self.next_obs_idx];
 
             // Check if we've reached or passed this observation date
-            if state.time >= target_date - Self::TIME_TOLERANCE {
+            if state.time >= target_date {
                 if let Some(spot) = state.spot() {
                     let observed_spot = spot * self.observation_multipliers[self.next_obs_idx];
                     if self.is_in_range(observed_spot) {
@@ -291,6 +288,11 @@ mod tests {
         let observation_dates = vec![0.25, 0.5];
         let mut accrual = RangeAccrualPayoff::new(observation_dates, 95.0, 105.0, 0.08, 100_000.0)
             .expect("valid range accrual inputs");
+
+        let mut early = PathState::new(9, 0.25_f64.next_down());
+        early.set(state_keys::SPOT, 120.0);
+        accrual.on_event(&mut early).unwrap();
+        assert_eq!(accrual.total_observations, 0);
 
         // Both observations in range
         let mut state1 = PathState::new(10, 0.25);

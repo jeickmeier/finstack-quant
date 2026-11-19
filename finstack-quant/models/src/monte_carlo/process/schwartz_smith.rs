@@ -281,11 +281,12 @@ impl StochasticProcess for SchwartzSmithProcess {
         out[1] = self.params.mu_y;
     }
 
-    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
+    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) -> finstack_quant_core::Result<()> {
         // Diffusion matrix (diagonal elements)
         // For correlated factors, the discretization will apply Cholesky
         out[0] = self.params.sigma_x;
         out[1] = self.params.sigma_y;
+        Ok(())
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
@@ -439,7 +440,9 @@ mod tests {
         let x = [0.1, 4.5];
         let mut diffusion = [0.0; 2];
 
-        process.diffusion(0.0, &x, &mut diffusion);
+        process
+            .diffusion(0.0, &x, &mut diffusion)
+            .expect("valid diffusion");
 
         assert!((diffusion[0] - 0.30).abs() < 1e-10);
         assert!((diffusion[1] - 0.15).abs() < 1e-10);

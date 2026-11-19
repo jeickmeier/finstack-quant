@@ -287,8 +287,10 @@ fn market_context_roundtrip() {
         .expect("valid FxConfig");
 
     let ctx = MarketContext::new()
-        .insert(discount)
-        .insert(forward)
+        .try_insert(discount)
+        .expect("insert market curve")
+        .try_insert(forward)
+        .expect("insert market curve")
         .insert_surface(surface)
         .insert_dividends(dividends)
         .insert_fx(fx);
@@ -326,7 +328,9 @@ fn market_context_roundtrip_preserves_hierarchy() {
         .build()
         .unwrap();
 
-    let mut ctx = MarketContext::new().insert(discount);
+    let mut ctx = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     ctx.set_hierarchy(hierarchy);
 
     let json = serde_json::to_string_pretty(&ctx).unwrap();
@@ -353,8 +357,12 @@ fn market_context_requires_hierarchy_key_and_accepts_explicit_null() {
         .build()
         .unwrap();
 
-    let state = MarketContextState::try_from(&MarketContext::new().insert(discount))
-        .expect("coherent market snapshot");
+    let state = MarketContextState::try_from(
+        &MarketContext::new()
+            .try_insert(discount)
+            .expect("insert market curve"),
+    )
+    .expect("coherent market snapshot");
     let mut json = serde_json::to_value(state).unwrap();
     let object = json
         .as_object_mut()
@@ -845,11 +853,16 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
     };
 
     let ctx = MarketContext::new()
-        .insert(discount_b)
-        .insert(discount_a)
-        .insert(hazard)
-        .insert(issuer2_haz)
-        .insert(base_corr)
+        .try_insert(discount_b)
+        .expect("insert market curve")
+        .try_insert(discount_a)
+        .expect("insert market curve")
+        .try_insert(hazard)
+        .expect("insert market curve")
+        .try_insert(issuer2_haz)
+        .expect("insert market curve")
+        .try_insert(base_corr)
+        .expect("insert market curve")
         .insert_credit_index("CDX", credit_index)
         .expect("canonical credit index")
         .insert_series(series)
@@ -1164,12 +1177,18 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
     };
 
     let ctx = MarketContext::new()
-        .insert(disc)
-        .insert(fwd)
-        .insert(haz)
-        .insert(issuer_haz)
-        .insert(inf)
-        .insert(bc)
+        .try_insert(disc)
+        .expect("insert market curve")
+        .try_insert(fwd)
+        .expect("insert market curve")
+        .try_insert(haz)
+        .expect("insert market curve")
+        .try_insert(issuer_haz)
+        .expect("insert market curve")
+        .try_insert(inf)
+        .expect("insert market curve")
+        .try_insert(bc)
+        .expect("insert market curve")
         .insert_credit_index("CDX", credit_index)
         .expect("canonical credit index")
         .insert_inflation_index(idx)
@@ -1280,8 +1299,11 @@ fn inflation_curve_rejects_unknown_fields() {
 fn price_curve_rejects_unknown_fields() {
     use finstack_quant_core::market_data::term_structures::PriceCurve;
     let curve = PriceCurve::builder("WTI")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(test_date())
-        .spot_price(70.0)
         .knots([(0.0, 70.0), (1.0, 72.0)])
         .build()
         .unwrap();
@@ -1292,9 +1314,11 @@ fn price_curve_rejects_unknown_fields() {
 fn volatility_index_curve_rejects_unknown_fields() {
     use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKind};
     let curve = PriceCurve::builder("VIX")
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .kind(PriceCurveKind::VolIndex)
         .base_date(test_date())
-        .spot_price(15.0)
         .knots([(0.0, 15.0), (1.0, 18.0)])
         .build()
         .unwrap();
@@ -1309,13 +1333,17 @@ fn volatility_index_kind_is_carried_by_price_curve_snapshot() {
     use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKind};
 
     let curve = PriceCurve::builder("VIX")
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .kind(PriceCurveKind::VolIndex)
         .base_date(test_date())
-        .spot_price(15.0)
         .knots([(0.0, 15.0), (1.0, 18.0)])
         .build()
         .unwrap();
-    let context = MarketContext::new().insert(curve);
+    let context = MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     assert_eq!(
         context.get_vol_index_curve("VIX").unwrap().kind(),
         PriceCurveKind::VolIndex
@@ -1335,7 +1363,7 @@ fn volatility_index_kind_is_carried_by_price_curve_snapshot() {
     ));
     let wire = serde_json::to_value(state).unwrap();
     assert_eq!(wire["curves"][0]["type"], "price");
-    assert_eq!(wire["curves"][0]["spot_level"], 15.0);
+    assert_eq!(wire["curves"][0]["level_kind"], "vol_index");
 }
 
 #[test]

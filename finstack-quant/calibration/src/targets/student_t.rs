@@ -195,7 +195,7 @@ impl StudentTTarget {
         // the context, so install the requested flat-correlation override first.
         let pricing_context = context
             .clone()
-            .insert(flat_base_correlation)
+            .try_insert(flat_base_correlation)?
             .insert_credit_index(&index_id, rebound_credit_index)?;
 
         let discount_curve_id = Self::resolve_discount_curve_id(params, &pricing_context)?;
@@ -422,9 +422,12 @@ mod tests {
             .build()
             .expect("credit index");
         MarketContext::new()
-            .insert(discount)
-            .insert(hazard)
-            .insert(correlation)
+            .try_insert(discount)
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve")
+            .try_insert(correlation)
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG", index)
             .expect("credit-index dependencies")
     }

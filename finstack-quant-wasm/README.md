@@ -142,7 +142,7 @@ import init, { core, valuations } from 'finstack-quant-wasm';
 await init();
 
 const market = new core.MarketContext();
-market.insert(core.DiscountCurve.flat('USD-OIS', '2025-06-15', 0.03));
+market.insert(core.DiscountCurve.flat('USD-OIS', '2025-06-15', 0.03, 'act_365f'));
 
 const usd = new core.Currency('USD');
 const instruments = ['2030-01-01', '2035-01-01'].map((maturity) =>

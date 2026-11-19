@@ -210,12 +210,15 @@ impl MarketContext {
     /// # use time::Month;
     /// # let base = Date::from_calendar_date(2024, Month::January, 1).expect("Valid date");
     /// # let curve = PriceCurve::builder("WTI-FORWARD")
+    /// #     .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+    /// #     .day_count(finstack_quant_core::dates::DayCount::Act365F)
+    /// #     .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+    /// #     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
     /// #     .base_date(base)
-    /// #     .spot_price(75.0)
     /// #     .knots([(0.0, 75.0), (0.5, 77.0)])
     /// #     .build()
     /// #     .expect("PriceCurve builder should succeed");
-    /// # let ctx = MarketContext::new().insert(curve);
+    /// # let ctx = MarketContext::new().try_insert(curve).expect("insert market curve");
     /// let price_curve = ctx.get_price_curve("WTI-FORWARD").expect("Price curve should exist");
     /// assert!(price_curve.price(0.25).expect("valid pillar") > 0.0);
     /// ```
@@ -442,7 +445,7 @@ impl MarketContext {
     /// #     .base_correlation_curve(Arc::clone(&base_corr))
     /// #     .build()
     /// #     .expect("... builder should succeed");
-    /// # let ctx = MarketContext::new().insert(hazard).insert(base_corr)
+    /// # let ctx = MarketContext::new().try_insert(hazard).expect("insert market curve").try_insert(base_corr).expect("insert market curve")
     /// #     .insert_credit_index("CDX-IG", data).expect("index dependencies are present");
     /// let idx = ctx.get_credit_index("CDX-IG").expect("Credit index should exist");
     /// assert_eq!(idx.num_constituents(), 125);

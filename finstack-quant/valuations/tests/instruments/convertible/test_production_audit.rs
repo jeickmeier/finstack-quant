@@ -17,7 +17,7 @@ use time::macros::date;
 
 fn market(as_of: Date, rate: f64, spot: f64, vol: f64) -> MarketContext {
     MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 // Flat continuous rate; three pillars let theta roll one day.
@@ -32,6 +32,7 @@ fn market(as_of: Date, rate: f64, spot: f64, vol: f64) -> MarketContext {
                 .build()
                 .expect("discount"),
         )
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
@@ -170,16 +171,18 @@ fn production_convertible_make_whole_reference_and_floor_pay_accrued_once() {
         puts: vec![],
     });
     for (reference_rate, expected) in [(0.0_f64, 1050.0), (0.3, 1000.0 + 50.0 * 90.0 / 365.0)] {
-        let ctx = market(as_of, 0.0, 1.0, 0.2).insert(
-            DiscountCurve::builder("REFERENCE")
-                .base_date(as_of)
-                .knots([(0.0, 1.0), (2.0, (-reference_rate * 2.0).exp())])
-                .day_count(finstack_quant_core::dates::DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-                .build()
-                .expect("reference discount"),
-        );
+        let ctx = market(as_of, 0.0, 1.0, 0.2)
+            .try_insert(
+                DiscountCurve::builder("REFERENCE")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (2.0, (-reference_rate * 2.0).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("reference discount"),
+            )
+            .expect("insert market curve");
         let actual = bond.value(&ctx, as_of).expect("make-whole call").amount();
         assert!(
             (actual - expected).abs() < 1e-8,
@@ -262,16 +265,18 @@ fn production_convertible_cross_credit_requires_replayable_issuer_curve() {
     let mut bond = create_standard_convertible();
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
-    let market = market(as_of, 0.03, 90.0, 0.4).insert(
-        HazardCurve::flat(
-            "CREDIT",
-            as_of,
-            0.05,
-            0.4,
-            finstack_quant_core::dates::DayCount::Act365F,
+    let market = market(as_of, 0.03, 90.0, 0.4)
+        .try_insert(
+            HazardCurve::flat(
+                "CREDIT",
+                as_of,
+                0.05,
+                0.4,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .unwrap(),
         )
-        .unwrap(),
-    );
+        .expect("insert market curve");
     let error = bond
         .price_with_metrics(
             &market,
@@ -289,13 +294,14 @@ fn production_convertible_surface_uses_conversion_strike() {
     let bond = create_standard_convertible();
     let reference = market(as_of, 0.03, 80.0, 0.4);
     let surface = MarketContext::new()
-        .insert(
+        .try_insert(
             reference
                 .get_discount("USD-OIS")
                 .expect("discount")
                 .as_ref()
                 .clone(),
         )
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(80.0).expect("valid scalar"))
         .insert_price(
             "AAPL-DIVYIELD",
@@ -366,17 +372,19 @@ fn production_convertible_floating_coupons_use_the_forward_curve() {
     };
     floating.rate_spec.reset_lag_days = 0;
     floating.rate_spec.fallback = finstack_quant_cashflows::builder::FloatingRateFallback::Error;
-    let ctx = market(as_of, 0.0, 0.001, 0.2).insert(simple_quarterly_forward_curve(
-        "USD-SOFR-3M",
-        as_of,
-        &[
-            date!(2025 - 04 - 01),
-            date!(2025 - 07 - 01),
-            date!(2025 - 10 - 01),
-            date!(2026 - 01 - 01),
-        ],
-        0.04,
-    ));
+    let ctx = market(as_of, 0.0, 0.001, 0.2)
+        .try_insert(simple_quarterly_forward_curve(
+            "USD-SOFR-3M",
+            as_of,
+            &[
+                date!(2025 - 04 - 01),
+                date!(2025 - 07 - 01),
+                date!(2025 - 10 - 01),
+                date!(2026 - 01 - 01),
+            ],
+            0.04,
+        ))
+        .expect("insert market curve");
     let expected = 1000.0 + 1000.0 * 0.04 * 365.0 / 360.0;
     let actual = bond
         .value(&ctx, as_of)
@@ -398,16 +406,18 @@ fn production_convertible_seasoned_floater_uses_fixings_and_current_accrual() {
     };
     floating.rate_spec.reset_lag_days = 0;
     floating.rate_spec.fallback = finstack_quant_cashflows::builder::FloatingRateFallback::Error;
-    let ctx = market(as_of, 0.0, 0.001, 0.2).insert(simple_quarterly_forward_curve(
-        "USD-SOFR-3M",
-        as_of,
-        &[
-            date!(2025 - 07 - 01),
-            date!(2025 - 10 - 01),
-            date!(2026 - 01 - 01),
-        ],
-        0.07,
-    ));
+    let ctx = market(as_of, 0.0, 0.001, 0.2)
+        .try_insert(simple_quarterly_forward_curve(
+            "USD-SOFR-3M",
+            as_of,
+            &[
+                date!(2025 - 07 - 01),
+                date!(2025 - 10 - 01),
+                date!(2026 - 01 - 01),
+            ],
+            0.07,
+        ))
+        .expect("insert market curve");
     assert!(
         bond.value(&ctx, as_of).is_err(),
         "past fixings must be supplied"
@@ -441,16 +451,18 @@ fn production_convertible_bond_floor_uses_fractional_recovery_of_principal() {
     bond.recovery_rate = Some(0.4);
     bond.metric_pricing_overrides = bond.metric_pricing_overrides.with_rate_bump_bp(1.0);
     // 5% hazard over the 3% risk-free curve: the zero-recovery risky rate is 8%.
-    let ctx = market(as_of, 0.03, 0.001, 0.2).insert(
-        HazardCurve::flat(
-            "CREDIT",
-            as_of,
-            0.05,
-            0.0,
-            finstack_quant_core::dates::DayCount::Act365F,
+    let ctx = market(as_of, 0.03, 0.001, 0.2)
+        .try_insert(
+            HazardCurve::flat(
+                "CREDIT",
+                as_of,
+                0.05,
+                0.0,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .expect("issuer hazard"),
         )
-        .expect("issuer hazard"),
-    );
+        .expect("insert market curve");
     let result = bond
         .price_with_metrics(
             &ctx,

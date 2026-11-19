@@ -82,7 +82,9 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                     .knots([(0.0, 0.015), (5.0, 0.015), (10.0, 0.015)])
                     .build()
                     .unwrap();
-                let market = fixtures::make_discount_market(base).insert(hazard);
+                let market = fixtures::make_discount_market(base)
+                    .try_insert(hazard)
+                    .expect("insert market curve");
                 let disc_id = CurveId::from("USD-OIS");
                 let credit_id = CurveId::from("BENCH-CREDIT");
                 let schedule = fixtures::make_fixed_schedule(base, 5, Tenor::quarterly());

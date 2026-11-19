@@ -30,17 +30,21 @@ pub struct Calendar {
 
     /// Optional inclusive `(from_year, to_year)` coverage bounds.
     pub(crate) supported_years: Option<(Option<i32>, Option<i32>)>,
+
+    /// Exceptional trading dates on otherwise closed weekends.
+    pub(super) open_dates: &'static [Date],
 }
 
 impl Calendar {
     /// Create a new calendar with the given parameters; weekends are
-    /// Saturday and Sunday.
+    /// Saturday and Sunday unless an exceptional opening is listed.
     pub(crate) const fn new(
         id: &'static str,
         name: &'static str,
         ignore_weekends: bool,
         rules: &'static [Rule],
         supported_years: Option<(Option<i32>, Option<i32>)>,
+        open_dates: &'static [Date],
     ) -> Self {
         Self {
             id,
@@ -48,6 +52,7 @@ impl Calendar {
             ignore_weekends,
             rules,
             supported_years,
+            open_dates,
         }
     }
 
@@ -70,6 +75,10 @@ impl Calendar {
             }
         }
         Ok(())
+    }
+
+    pub(super) fn is_closed_weekend(&self, date: Date) -> bool {
+        date.is_weekend() && !self.open_dates.contains(&date)
     }
 
     /// Evaluates the raw holiday rules without the cache or weekend overrides.
@@ -97,7 +106,7 @@ impl HolidayCalendar for Calendar {
 
     fn is_business_day(&self, date: Date) -> crate::Result<bool> {
         self.check_supported_year(date.year())?;
-        if date.is_weekend() {
+        if self.is_closed_weekend(date) {
             return Ok(false);
         }
         let holiday = if (BASE_YEAR..=END_YEAR).contains(&date.year()) {
@@ -133,7 +142,7 @@ mod tests {
             calendar.is_business_day(date).expect("calendar lookup")
         }
 
-        let calendar = Calendar::new("borrowed", "Borrowed calendar", true, &[], None);
+        let calendar = Calendar::new("borrowed", "Borrowed calendar", true, &[], None, &[]);
         let borrowed = &calendar;
         let object: &dyn HolidayCalendar = &borrowed;
         for day in 1..=7 {
@@ -159,8 +168,76 @@ mod tests {
     }
 
     #[test]
+    fn indian_exchange_calendars_count_exceptional_trading_days() {
+        use crate::dates::calendar::business_days::resolve_calendar;
+        use time::macros::date;
+
+        for id in ["bse", "nse"] {
+            let calendar = resolve_calendar(id).expect("exchange calendar");
+            for date in [
+                date!(2024 - 01 - 20),
+                date!(2024 - 03 - 02),
+                date!(2024 - 05 - 18),
+                date!(2025 - 02 - 01),
+                date!(2026 - 02 - 01),
+            ] {
+                assert!(
+                    calendar.is_business_day(date).expect("trading day"),
+                    "{id} {date}"
+                );
+                assert!(
+                    !calendar.is_holiday(date).expect("holiday lookup"),
+                    "{id} {date}"
+                );
+                assert_eq!(
+                    calendar
+                        .count_business_days(date, date.next_day().expect("next date"))
+                        .expect("business-day count"),
+                    1,
+                    "{id} {date}"
+                );
+            }
+            for date in [
+                date!(2024 - 01 - 21),
+                date!(2024 - 01 - 22),
+                date!(2024 - 05 - 20),
+                date!(2024 - 11 - 20),
+                date!(2026 - 01 - 15),
+            ] {
+                assert!(
+                    !calendar.is_business_day(date).expect("business-day lookup"),
+                    "{id} {date}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sifma_veterans_day_observes_sunday_only() {
+        use crate::dates::calendar::business_days::resolve_calendar;
+        use time::macros::date;
+
+        let calendar = resolve_calendar("sifma").expect("bond market calendar");
+        assert!(
+            calendar
+                .is_business_day(date!(2023 - 11 - 10))
+                .expect("trading day")
+        );
+        assert!(
+            calendar
+                .is_business_day(date!(2028 - 11 - 10))
+                .expect("trading day")
+        );
+        assert!(
+            !calendar
+                .is_business_day(date!(2029 - 11 - 12))
+                .expect("observed holiday")
+        );
+    }
+
+    #[test]
     fn calendar_weekends_are_saturday_and_sunday() {
-        let cal = Calendar::new("weekend_test", "Weekend Test", true, &[], None);
+        let cal = Calendar::new("weekend_test", "Weekend Test", true, &[], None, &[]);
 
         let saturday = Date::from_calendar_date(2025, Month::January, 4).expect("Valid test date");
         let sunday = Date::from_calendar_date(2025, Month::January, 5).expect("Valid test date");

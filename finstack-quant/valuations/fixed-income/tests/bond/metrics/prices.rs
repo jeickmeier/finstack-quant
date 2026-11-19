@@ -34,7 +34,9 @@ fn test_clean_price_from_quoted() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
 
     let result = bond
         .price_with_metrics(
@@ -73,7 +75,9 @@ fn model_price_metrics_are_settlement_anchored() {
     let settlement_df = curve
         .df_between_dates(as_of, date!(2025 - 01 - 02))
         .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(curve)
+        .expect("insert market curve");
     let pv_as_of = bond.value(&market, as_of).unwrap().amount();
 
     let result = bond

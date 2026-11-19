@@ -245,11 +245,13 @@ def log_returns(prices: Sequence[float] | npt.NDArray[np.float64]) -> list[float
     Returns
     -------
     list[float]
-        ``len(prices) - 1`` returns; invalid windows yield ``nan``, and
+        Adjacent log returns in chronological order;
         fewer than two prices yield an empty list.
 
     Raises
     ------
+    ValueError
+        If any price is nonpositive or nonfinite.
     TypeError
         If a series is not one-dimensional or contains values that cannot
         be converted to float.
@@ -266,7 +268,7 @@ def log_returns(prices: Sequence[float] | npt.NDArray[np.float64]) -> list[float
 def realized_variance(
     prices: Sequence[float] | npt.NDArray[np.float64],
     annualization_factor: float | None = None,
-) -> float:
+) -> float | None:
     """
     Annualized realized variance of a close price series.
 
@@ -283,14 +285,16 @@ def realized_variance(
 
     Returns
     -------
-    float
-        Annualized variance (not volatility).
+    float or None
+        Annualized decimal variance, or None for fewer than two valid closes.
 
     Raises
     ------
     ValueError
         If a price is non-positive or non-finite, or *annualization_factor*
-        is not positive.
+        is not positive or finite.
+    RuntimeError
+        If the annualized variance is outside the representable range.
     TypeError
         If a series is not one-dimensional or contains values that cannot
         be converted to float.
@@ -298,7 +302,9 @@ def realized_variance(
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> round(stats.realized_variance([100.0, 101.0, 100.0], annualization_factor=1.0), 8)
+    >>> v = stats.realized_variance([100.0, 101.0, 100.0], annualization_factor=1.0)
+    >>> assert v is not None
+    >>> round(v, 8)
     9.901e-05
 
     """
@@ -347,6 +353,8 @@ def realized_variance_ohlc(
 
     Raises
     ------
+    RuntimeError
+        If the annual variance cannot be represented as a finite float.
     ValueError
         If the four series differ in length, *method* is unknown, prices
         are invalid, the preceding close is missing or inappropriate, or *annualization_factor* is not positive.

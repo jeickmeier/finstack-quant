@@ -70,7 +70,9 @@ fn forward_only_envelope(
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let source_market = MarketContext::new().insert(discount);
+    let source_market = MarketContext::new()
+        .try_insert(discount)
+        .expect("insert market curve");
     let (prior_market, mut market_data) = cal_utils::split_market_context(&source_market);
     let quotes = vec![MarketQuote::Rates(quote)];
     cal_utils::extend_market_data(&mut market_data, &quotes);

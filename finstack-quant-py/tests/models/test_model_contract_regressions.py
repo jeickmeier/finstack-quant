@@ -49,7 +49,7 @@ def test_cube_materialization_retains_expiry_tenor_and_displacement() -> None:
     assert normal.quote_type == "normal"
     assert normal.displacements is None
     assert get_cube_expiry_slice_vol(normal, 5.0, -0.01) == pytest.approx(get_cube_vol(cube, 1.0, 5.0, -0.01, "normal"))
-    surface = materialize_cube_tenor_slice(cube, 5.0, strikes, "lognormal")
+    surface = materialize_cube_tenor_slice(cube, 5.0, strikes, "lognormal", "vol")
     assert surface.quote_type == "shifted_black_lognormal"
     assert surface.displacements == [0.03, 0.03]
     assert VolSurface.from_json(surface.to_json()).displacements == [0.03, 0.03]

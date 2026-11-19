@@ -66,9 +66,9 @@ impl MetricCalculator for OasCalculator {
         > {
             let spread_bp = spread * 10_000.0;
             match &hazard {
-                Some(curve) => Ok(base_market
+                Some(curve) => base_market
                     .clone()
-                    .insert(curve.with_parallel_hazard_rate_bump_bp(spread_bp)?)),
+                    .try_insert(curve.with_parallel_hazard_rate_bump_bp(spread_bp)?),
                 None => bump_discount_curve_parallel(base_market, curve_to_bump, spread_bp),
             }
         };
@@ -222,7 +222,8 @@ mod tests {
             .expect("should succeed");
 
         finstack_quant_core::market_data::context::MarketContext::new()
-            .insert(discount_curve)
+            .try_insert(discount_curve)
+            .expect("insert market curve")
             .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
             .insert_price(
                 "AAPL-VOL",
@@ -293,7 +294,9 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        let market = make_market(as_of).insert(curve);
+        let market = make_market(as_of)
+            .try_insert(curve)
+            .expect("insert market curve");
         for expected_spread in [-0.01, 0.05] {
             let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
             let bumped = super::bump_discount_curve_parallel(
@@ -325,7 +328,9 @@ mod tests {
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
         let hazard = HazardCurve::flat("CREDIT", as_of, 0.005, 0.4, DayCount::Act365F).unwrap();
-        let market = make_market(as_of).insert(hazard);
+        let market = make_market(as_of)
+            .try_insert(hazard)
+            .expect("insert market curve");
         let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
         bond.credit_curve_id = Some("CREDIT".into());
         bond.recovery_rate = Some(0.4);
@@ -367,18 +372,23 @@ mod tests {
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
         let hazard = HazardCurve::flat("CREDIT", as_of, 0.02, 0.4, DayCount::Act365F).unwrap();
-        let market = make_market(as_of).insert(hazard.clone());
+        let market = make_market(as_of)
+            .try_insert(hazard.clone())
+            .expect("insert market curve");
         // Spreads down to -λ are admissible; each target is priced on the
         // hazard curve shifted by exactly that spread.
         for expected_spread in [-0.01, 0.0, 0.05] {
             let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
             bond.credit_curve_id = Some("CREDIT".into());
             bond.recovery_rate = Some(0.4);
-            let shifted = market.clone().insert(
-                hazard
-                    .with_parallel_hazard_rate_bump_bp(expected_spread * 10_000.0)
-                    .unwrap(),
-            );
+            let shifted = market
+                .clone()
+                .try_insert(
+                    hazard
+                        .with_parallel_hazard_rate_bump_bp(expected_spread * 10_000.0)
+                        .unwrap(),
+                )
+                .expect("insert market curve");
             let target = super::price_convertible_bond(&bond, &shifted, as_of).unwrap();
             bond.instrument_pricing_overrides
                 .market_quotes

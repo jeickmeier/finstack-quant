@@ -36,7 +36,8 @@ fn test_currency_safety_mismatch() {
         .unwrap();
 
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price(
             "AAPL",
             MarketScalar::price(Money::new(150.0, Currency::EUR).expect("valid money fixture")),
@@ -451,7 +452,8 @@ fn test_missing_volatility_data() {
 
     // Market without volatility
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(discount_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
         .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
         // Missing volatility
         .insert_price(

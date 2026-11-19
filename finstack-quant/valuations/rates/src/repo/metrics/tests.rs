@@ -43,10 +43,13 @@ fn create_test_context() -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should succeed");
-    MarketContext::new().insert(disc).insert_price(
-        "BOND_ABC_PRICE",
-        MarketScalar::price(Money::new(1.02, Currency::USD).expect("valid test amount")),
-    )
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .insert_price(
+            "BOND_ABC_PRICE",
+            MarketScalar::price(Money::new(1.02, Currency::USD).expect("valid test amount")),
+        )
 }
 
 #[test]
@@ -114,7 +117,9 @@ fn test_dv01_negative_when_rates_rise_price_falls() {
         .build()
         .expect("should succeed");
     let repo = create_test_repo();
-    let ctx = create_test_context().insert(disc);
+    let ctx = create_test_context()
+        .try_insert(disc)
+        .expect("insert market curve");
     let pv = repo.value(&ctx, as_of).expect("should succeed");
     let reg = crate::RATES.metrics();
     let mut mctx = finstack_quant_valuations_core::metrics::MetricContext::new(

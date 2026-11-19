@@ -77,7 +77,9 @@ def norm_pdf_with_params(x: float, mean: float, std_dev: float) -> float:
     ------
     ValueError
         If *std_dev* is not finite and strictly positive, *mean* is non-finite,
-        *x* is ``nan``, or the resulting density overflows ``float64``.
+        or *x* is ``nan``.
+    RuntimeError
+        If the density exceeds the finite output range.
 
     Examples
     --------
@@ -99,7 +101,7 @@ def norm_cdf(x: float) -> float:
     Parameters
     ----------
     x : float
-        Input value.
+        Standardized threshold; either infinity is accepted.
 
     Returns
     -------
@@ -108,8 +110,8 @@ def norm_cdf(x: float) -> float:
 
     Raises
     ------
-    None
-        This pure function returns a floating-point result for every ``float`` input.
+    ValueError
+        If ``x`` is NaN.
 
     Examples
     --------
@@ -125,7 +127,7 @@ def log_norm_cdf(x: float) -> float:
     Parameters
     ----------
     x : float
-        Threshold in standard-deviation units; infinities are accepted and NaN propagates.
+        Standardized threshold; either infinity is accepted.
 
     Returns
     -------
@@ -135,8 +137,10 @@ def log_norm_cdf(x: float) -> float:
 
     Raises
     ------
-    None
-        This scalar function returns a floating-point result for every float input.
+    ValueError
+        If ``x`` is NaN.
+    RuntimeError
+        If the logarithm for a finite negative input exceeds the finite output range.
 
     Examples
     --------
@@ -154,7 +158,7 @@ def norm_pdf(x: float) -> float:
     Parameters
     ----------
     x : float
-        Input value.
+        Standardized point; either infinity gives zero density.
 
     Returns
     -------
@@ -163,8 +167,8 @@ def norm_pdf(x: float) -> float:
 
     Raises
     ------
-    None
-        This pure function returns a floating-point result for every ``float`` input.
+    ValueError
+        If ``x`` is NaN.
 
     Examples
     --------
@@ -188,13 +192,14 @@ def standard_normal_inv_cdf(p: float) -> float:
     -------
     float
         Quantile *x* such that ``Phi(x) = p`` (``-inf`` at ``0.0``, ``+inf`` at
-        ``1.0``, and ``nan`` outside ``[0, 1]``).
+        ``1.0``).
 
     Raises
     ------
-    None
-        Exact domain boundaries ``0.0`` and ``1.0`` return signed infinity;
-        probabilities outside ``[0, 1]`` and ``nan`` return ``nan``.
+    ValueError
+        If the probability is NaN or outside ``[0, 1]``.
+    RuntimeError
+        If an interior quantile cannot be resolved.
 
     Examples
     --------
@@ -219,8 +224,8 @@ def erf(x: float) -> float:
 
     Raises
     ------
-    None
-        This pure function delegates to the error-function approximation without validation.
+    ValueError
+        If ``x`` is NaN.
 
     Examples
     --------
@@ -233,8 +238,6 @@ def erf(x: float) -> float:
 def ln_gamma(x: float) -> float:
     r"""Natural logarithm of the Gamma function :math:`\ln(\Gamma(x))`.
 
-    Returns ``float('inf')`` for :math:`x \le 0`.
-
     Parameters
     ----------
     x : float
@@ -243,20 +246,20 @@ def ln_gamma(x: float) -> float:
     Returns
     -------
     float
-        Natural logarithm of the gamma function for ``x > 0``. Returns positive
-        infinity at ``x = 0``; negative inputs are outside the supported domain
-        and can return ``nan``.
+        Natural logarithm of the gamma function for finite positive ``x``.
 
     Raises
     ------
-    None
-        This pure function returns a floating-point result for every ``float`` input.
+    ValueError
+        If ``x`` is non-finite or nonpositive.
+    RuntimeError
+        If the logarithm exceeds the finite output range.
 
     Examples
     --------
     >>> from finstack_quant.core.math import special_functions
     >>> round(special_functions.ln_gamma(1.0), 10)
-    -0.0
+    0.0
     """
     ...
 
@@ -280,7 +283,9 @@ def student_t_cdf(x: float, df: float) -> float:
     Raises
     ------
     ValueError
-        If ``df`` is non-finite or not positive.
+        If ``x`` is NaN or ``df`` is non-finite or nonpositive.
+    RuntimeError
+        If the incomplete beta calculation fails to converge or resolve the tail.
 
     Examples
     --------
@@ -312,6 +317,8 @@ def student_t_inv_cdf(p: float, df: float) -> float:
     ValueError
         If ``df`` is non-finite or not positive, or ``p`` is non-finite or
         outside ``[0, 1]``.
+    RuntimeError
+        If the interior quantile cannot be resolved or represented.
 
     Examples
     --------

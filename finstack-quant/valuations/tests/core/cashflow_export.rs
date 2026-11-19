@@ -90,7 +90,7 @@ fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconcil
         .build()
         .expect("facility");
     let market = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 1.0)])
@@ -100,7 +100,8 @@ fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconcil
                 .build()
                 .expect("discount curve"),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             HazardCurve::builder("USD-HZ")
                 .base_date(as_of)
                 .recovery_rate(0.4)
@@ -108,7 +109,8 @@ fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconcil
                 .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard curve"),
-        );
+        )
+        .expect("insert market curve");
     let json = serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::RevolvingCredit(
         facility,
     )))
@@ -150,7 +152,7 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("fx quote");
     let market = MarketContext::new()
-        .insert(
+        .try_insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 0.95)])
@@ -160,7 +162,8 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
                 .build()
                 .expect("usd curve"),
         )
-        .insert(
+        .expect("insert market curve")
+        .try_insert(
             DiscountCurve::builder("EUR-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 0.97)])
@@ -170,6 +173,7 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
                 .build()
                 .expect("eur curve"),
         )
+        .expect("insert market curve")
         .insert_fx(FxMatrix::new(provider, None));
     let instrument = InstrumentEnvelope {
         schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
@@ -232,7 +236,9 @@ fn discounting_reconciles_with_schedule_pv_for_fixed_bond() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let market = MarketContext::new().insert(disc);
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
 
     let json = serialize_bond(&bond);
     let payload = instrument_cashflows_json(&json, &market, "2025-07-01", "discounting")
@@ -316,16 +322,18 @@ fn explained_price_carries_reconciling_trace_and_provenance() {
         ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
     bond.metric_pricing_overrides.bump_config.rate_bump_bp = Some(5.0);
     let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("date");
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(issue)
-            .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(issue)
+                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount curve"),
+        )
+        .expect("insert market curve");
 
     let plain = bond
         .price_with_metrics(&market, as_of, &[], PricingOptions::default())
@@ -431,16 +439,18 @@ fn scenario_price_shock_scales_cashflow_rows_and_total_once() {
     )
     .expect("bond");
     let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("date");
-    let market = MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(issue)
-            .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("discount curve"),
-    );
+    let market = MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(issue)
+                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("discount curve"),
+        )
+        .expect("insert market curve");
 
     let baseline: InstrumentCashflowEnvelope = serde_json::from_str(
         &instrument_cashflows_json(&serialize_bond(&bond), &market, "2025-07-01", "discounting")
@@ -499,7 +509,9 @@ fn seasoned_instrument_discount_factors_use_correct_time_origin() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let market = MarketContext::new().insert(disc.clone());
+    let market = MarketContext::new()
+        .try_insert(disc.clone())
+        .expect("insert market curve");
 
     // base_value: the canonical price from Instrument::value, which the
     // discounting kernel computes via df_between_dates(as_of, date).
@@ -636,16 +648,18 @@ fn assert_balances_roll(envelope: &InstrumentCashflowEnvelope, opening: f64, clo
 }
 
 fn balance_market(as_of: Date) -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (1.0, 0.97), (10.0, 0.70)])
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("curve"),
-    )
+    MarketContext::new()
+        .try_insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (1.0, 0.97), (10.0, 0.70)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve"),
+        )
+        .expect("insert market curve")
 }
 
 fn balance_bond(id: &str) -> Bond {

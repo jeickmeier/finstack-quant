@@ -26,7 +26,9 @@ fn create_test_market(base_date: Date) -> MarketContext {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Valid curve");
-    MarketContext::new().insert(discount_curve)
+    MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert market curve")
 }
 
 /// Test that PV is computed from as_of, not settlement date.

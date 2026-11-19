@@ -58,7 +58,8 @@ fn price_and_surface_shocks_preserve_their_collection_with_colliding_ids() {
         .build()
         .expect("surface");
     let mut market = MarketContext::new()
-        .insert(discount)
+        .try_insert(discount)
+        .expect("insert market curve")
         .insert_surface(surface)
         .insert_price(
             "AAPL",
@@ -341,15 +342,17 @@ fn vol_index_interpolated_shocks_deliver_all_overlapping_tenors_on_native_interp
         InterpStyle::CubicHermite,
     ] {
         let base = PriceCurve::builder("VIX")
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .kind(PriceCurveKind::VolIndex)
             .base_date(as_of)
             .day_count(DayCount::Thirty360)
-            .spot_price(20.0)
             .interp(interp)
             .knots([(0.0, 20.0), (1.0, 20.0), (3.0, 20.0), (5.0, 20.0)])
             .build()
             .expect("vol index");
-        let mut market = MarketContext::new().insert(base);
+        let mut market = MarketContext::new()
+            .try_insert(base)
+            .expect("insert market curve");
         let mut ctx = ExecutionContext {
             market: &mut market,
             model: None,

@@ -347,7 +347,9 @@ impl PyDiscountCurve {
     /// ----------
     /// t : float | datetime.date | str
     ///     Strictly positive year fraction from ``base_date``, or a date
-    ///     strictly after ``base_date`` converted with the curve day count.
+    ///     strictly after ``base_date``. For a date, the horizon is the
+    ///     difference between its source-clock year fraction and the base
+    ///     date’s source-clock year fraction.
     /// compounding : str
     ///     ``"continuous"``, ``"simple"``, ``"periodic(1)"``, ``"semi_annual"``,
     ///     ``"quarterly"`` or ``"monthly"``.

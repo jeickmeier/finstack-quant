@@ -30,8 +30,11 @@ fn create_test_market() -> MarketContext {
 
     // Create a price curve for NG forward prices (slight contango)
     let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .base_date(base_date)
-        .spot_price(3.50)
         .knots([
             (0.0, 3.50),
             (0.25, 3.55),
@@ -43,8 +46,10 @@ fn create_test_market() -> MarketContext {
         .expect("price curve should build");
 
     MarketContext::new()
-        .insert(discount_curve)
-        .insert(price_curve)
+        .try_insert(discount_curve)
+        .expect("insert market curve")
+        .try_insert(price_curve)
+        .expect("insert market curve")
 }
 
 #[test]

@@ -76,12 +76,16 @@ fn test_default_metrics_attribute_long_bond_curve_twist() {
             .build()
             .expect("discount curve")
     };
-    let market_t0 = MarketContext::new().insert(curve(&[0.03; 9]));
+    let market_t0 = MarketContext::new()
+        .try_insert(curve(&[0.03; 9]))
+        .expect("insert market curve");
     // Short rates fall and long rates rise, with a zero average knot move.
     // Aggregate DV01 times an average shift misses this long bond's loss.
-    let market_t1 = MarketContext::new().insert(curve(&[
-        0.029, 0.029, 0.029, 0.0295, 0.030, 0.0305, 0.031, 0.031, 0.031,
-    ]));
+    let market_t1 = MarketContext::new()
+        .try_insert(curve(&[
+            0.029, 0.029, 0.029, 0.0295, 0.030, 0.0305, 0.031, 0.031, 0.031,
+        ]))
+        .expect("insert market curve");
     let opening = bond
         .price_with_metrics(&market_t0, as_of, &[], PricingOptions::default())
         .expect("opening price");
@@ -346,8 +350,12 @@ fn test_metrics_based_convexity_reduces_residual() {
 
     let curve_t0 = build_flat_curve("USD-OIS", as_of_t0, 0.04);
     let curve_t1 = build_flat_curve("USD-OIS", as_of_t1, 0.05); // ~100bp shift
-    let market_t0 = MarketContext::new().insert(curve_t0);
-    let market_t1 = MarketContext::new().insert(curve_t1);
+    let market_t0 = MarketContext::new()
+        .try_insert(curve_t0)
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(curve_t1)
+        .expect("insert market curve");
 
     // Measure the actual shift from the curves (may differ slightly from 100bp
     // due to interpolation artifacts and tenor sampling)
@@ -480,8 +488,12 @@ fn test_metrics_based_ir_convexity_uses_dollar_convention() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
 
-    let market_t0 = MarketContext::new().insert(build_flat_curve("USD-OIS", as_of_t0, 0.04));
-    let market_t1 = MarketContext::new().insert(build_flat_curve("USD-OIS", as_of_t1, 0.05));
+    let market_t0 = MarketContext::new()
+        .try_insert(build_flat_curve("USD-OIS", as_of_t0, 0.04))
+        .expect("insert market curve");
+    let market_t1 = MarketContext::new()
+        .try_insert(build_flat_curve("USD-OIS", as_of_t1, 0.05))
+        .expect("insert market curve");
 
     let measured_shift_bp = measure_discount_curve_shift_bp("USD-OIS", &market_t0, &market_t1);
 

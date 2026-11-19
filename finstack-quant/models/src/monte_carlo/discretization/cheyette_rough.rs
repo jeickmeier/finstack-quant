@@ -105,9 +105,9 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
         x: &mut [f64],
         z: &[f64],
         work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let p = process.params();
-        let h = p.hurst.value();
+        let h = p.hurst.get_value();
         let eta = p.eta;
         let rho = p.rho;
 
@@ -126,16 +126,7 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
         // (which depends on ΔỸ_k, hence on Z̃_k) would correlate the diffusion
         // coefficient with the step's own noise and add a spurious
         // ρ-proportional drift to x.
-        let two_h = 2.0 * h;
-        let y_t = work[0];
-        let sigma_base = p.sigma_base_value(t);
-        let exponent = 0.5 * eta * y_t - 0.25 * eta * eta * t.powf(two_h);
-        let raw_sigma = sigma_base * exponent.exp();
-        let sigma_t = if raw_sigma.is_finite() {
-            raw_sigma.max(0.0)
-        } else {
-            raw_sigma
-        };
+        let sigma_t = super::rough_level(p.sigma_base.get_value(t)?, eta, work[0], t, h, 0.5)?;
 
         // Correlate the rate noise with the Volterra driver: dW·dW̃ = ρ dt,
         // so the correlated rate normal is built from the
@@ -146,14 +137,23 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
         let y_cur = x[1];
 
         // Euler step for x: dx = [y − κ·x] dt + σ(t) · √dt · Z_corr
-        x[0] += (y_cur - p.kappa * x_cur) * dt + sigma_t * dt.sqrt() * z_correlated;
+        let next_x = x_cur + ((y_cur - p.kappa * x_cur) * dt + sigma_t * dt.sqrt() * z_correlated);
 
         // Deterministic step for y: dy = [σ(t)² − 2κ·y] dt
-        x[1] += (sigma_t * sigma_t - 2.0 * p.kappa * y_cur) * dt;
+        let next_y = y_cur + (sigma_t * sigma_t - 2.0 * p.kappa * y_cur) * dt;
 
         // Accumulate the Volterra process for the next step:
         //   Ỹ_{t+dt} = Ỹ_t + ΔỸ.
-        work[0] += d_y;
+        let next_history = work[0] + d_y;
+        if !next_x.is_finite() || !next_y.is_finite() || !next_history.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "non-finite Cheyette rough step".into(),
+            ));
+        }
+        x[0] = next_x;
+        x[1] = next_y;
+        work[0] = next_history;
+        Ok(())
     }
 
     fn work_size(&self, _process: &CheyetteRoughVolProcess) -> usize {
@@ -175,11 +175,11 @@ mod tests {
         CheyetteRoughVolParams, CheyetteRoughVolProcess,
     };
     use super::*;
-    use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
+    use crate::monte_carlo::process::cheyette_rough::BaseVolatility;
     use finstack_quant_core::math::fractional::HurstExponent;
 
     fn make_process() -> CheyetteRoughVolProcess {
-        let sigma_base = ForwardVarianceCurve::flat(0.005).expect("valid flat curve");
+        let sigma_base = BaseVolatility::flat(0.005).expect("valid flat curve");
         let hurst = HurstExponent::new(0.1).expect("valid hurst");
         let phi_points = vec![(0.0, 0.02), (10.0, 0.03)];
         let params = CheyetteRoughVolParams::new(0.03, sigma_base, hurst, 1.5, -0.3, &phi_points)
@@ -196,7 +196,8 @@ mod tests {
         let z = vec![0.0, 0.0, 0.0]; // No shocks
         let mut work = vec![0.0];
 
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // With x=0, y=0, and zero shocks:
         // dx = [0 - 0.03*0]*dt + sigma(t)*0 = 0
@@ -220,7 +221,7 @@ mod tests {
         let p = process.params();
 
         let dt = 0.01_f64;
-        let h = p.hurst.value();
+        let h = p.hurst.get_value();
         let eta = p.eta;
         let kappa = p.kappa;
         let rho = p.rho;
@@ -237,12 +238,13 @@ mod tests {
         let z = vec![z_indep, d_y, z_drive];
         let mut work = vec![y_accum];
 
-        disc.step(&process, t, dt, &mut x, &z, &mut work);
+        disc.step(&process, t, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Manually compute expected result (left-point scheme, variance-
         // lognormal convention): σ(t) from Ỹ_t (before adding ΔỸ).
         let two_h = 2.0 * h;
-        let sigma_base = p.sigma_base_value(t);
+        let sigma_base = p.sigma_base.get_value(t).unwrap();
         let exponent = 0.5 * eta * y_accum - 0.25 * eta * eta * t.powf(two_h);
         let sigma_t = (sigma_base * exponent.exp()).max(0.0);
 
@@ -327,11 +329,13 @@ mod tests {
 
         let mut x1 = vec![0.001, 0.0001];
         let mut work1 = vec![y_accum];
-        disc.step(&process, t, dt, &mut x1, &[0.5, 0.04, -0.7], &mut work1);
+        disc.step(&process, t, dt, &mut x1, &[0.5, 0.04, -0.7], &mut work1)
+            .expect("valid simulation step");
 
         let mut x2 = vec![0.001, 0.0001];
         let mut work2 = vec![y_accum];
-        disc.step(&process, t, dt, &mut x2, &[0.5, -0.09, -0.7], &mut work2);
+        disc.step(&process, t, dt, &mut x2, &[0.5, -0.09, -0.7], &mut work2)
+            .expect("valid simulation step");
 
         assert!(
             (x1[0] - x2[0]).abs() < 1e-16 && (x1[1] - x2[1]).abs() < 1e-16,
@@ -363,11 +367,13 @@ mod tests {
 
         let mut x1 = vec![0.0, y0];
         let mut work1 = vec![y_accum];
-        disc.step(&process, 0.5, dt, &mut x1, &[0.5, 0.01, -0.3], &mut work1);
+        disc.step(&process, 0.5, dt, &mut x1, &[0.5, 0.01, -0.3], &mut work1)
+            .expect("valid simulation step");
 
         let mut x2 = vec![0.0, y0];
         let mut work2 = vec![y_accum];
-        disc.step(&process, 0.5, dt, &mut x2, &[-1.5, 0.01, 0.8], &mut work2);
+        disc.step(&process, 0.5, dt, &mut x2, &[-1.5, 0.01, 0.8], &mut work2)
+            .expect("valid simulation step");
 
         // y should be identical because it depends only on sigma(t) (via the
         // accumulated Volterra level) and y
@@ -395,8 +401,10 @@ mod tests {
         let mut work = vec![0.0];
 
         // Simulate a few steps of path 1
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
-        disc.step(&process, 0.01, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
+        disc.step(&process, 0.01, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         let w_h_after_path1 = work[0];
         assert!(
@@ -408,7 +416,8 @@ mod tests {
         x[0] = 0.0;
         x[1] = 0.0;
         work[0] = 0.0;
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // After a single step from t=0, work[0] should be exactly the single
         // Volterra increment (accumulator was zeroed by engine before path)
@@ -439,7 +448,8 @@ mod tests {
         for (i, &(z0, z1, z2)) in shocks.iter().enumerate() {
             let t = i as f64 * dt;
             let z = vec![z0, z1, z2];
-            disc.step(&process, t, dt, &mut x, &z, &mut work);
+            disc.step(&process, t, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
 
             assert!(
                 x[0].is_finite(),
@@ -486,7 +496,8 @@ mod tests {
         let check_steps = [10usize, 25, 49];
         let mut sums = [0.0_f64; 3];
         for _ in 0..num_paths {
-            rng.fill_std_normals(&mut vol_normals);
+            rng.fill_std_normals(&mut vol_normals)
+                .expect("normal draws");
             r#gen.generate(&vol_normals, &mut increments);
 
             let mut y_accum = 0.0;
@@ -537,7 +548,7 @@ mod tests {
         let n = 50usize;
 
         // ρ = 1 maximizes the bias of the pre-fix look-ahead scheme.
-        let sigma_base = ForwardVarianceCurve::flat(0.005).expect("valid flat curve");
+        let sigma_base = BaseVolatility::flat(0.005).expect("valid flat curve");
         let hurst = HurstExponent::new(h).expect("valid hurst");
         let params = CheyetteRoughVolParams::new(0.03, sigma_base, hurst, eta, 1.0, &[(0.0, 0.0)])
             .expect("valid");
@@ -558,8 +569,10 @@ mod tests {
         let mut sum_m = 0.0; // Σ over paths of M_T
         let mut sum_m_sq = 0.0; // Σ over paths of M_T² (for the MC standard error)
         for _ in 0..num_paths {
-            rng.fill_std_normals(&mut vol_normals);
-            rng.fill_std_normals(&mut rate_normals);
+            rng.fill_std_normals(&mut vol_normals)
+                .expect("normal draws");
+            rng.fill_std_normals(&mut rate_normals)
+                .expect("normal draws");
             r#gen.generate(&vol_normals, &mut increments);
             r#gen.driving_normals_into(&vol_normals, &mut driving);
 
@@ -570,7 +583,7 @@ mod tests {
                 // Recompute σ(t_k) exactly as the discretization does, from
                 // the pre-step Volterra level (variance-lognormal convention).
                 let exponent = 0.5 * eta * work[0] - 0.25 * eta * eta * t.powf(2.0 * h);
-                let sigma_t = (p.sigma_base_value(t) * exponent.exp()).max(0.0);
+                let sigma_t = (p.sigma_base.get_value(t).unwrap() * exponent.exp()).max(0.0);
                 // ρ = 1 ⇒ Z_corr = Z̃ (driving normal).
                 m_t += sigma_t * dt.sqrt() * driving[k];
 
@@ -578,7 +591,8 @@ mod tests {
                 // so this test exercises the production step() ordering.
                 let mut x = [0.0, 0.0];
                 let z = [rate_normals[k], increments[k], driving[k]];
-                disc.step(&process, t, dt, &mut x, &z, &mut work);
+                disc.step(&process, t, dt, &mut x, &z, &mut work)
+                    .expect("valid simulation step");
             }
             sum_m += m_t;
             sum_m_sq += m_t * m_t;

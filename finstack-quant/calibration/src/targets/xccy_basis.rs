@@ -350,10 +350,14 @@ mod xccy_quote_calibration_tests {
         let fx = FxMatrix::new(provider, None);
 
         MarketContext::new()
-            .insert(usd_disc)
-            .insert(eur_disc_seed)
-            .insert(usd_fwd)
-            .insert(eur_fwd)
+            .try_insert(usd_disc)
+            .expect("insert market curve")
+            .try_insert(eur_disc_seed)
+            .expect("insert market curve")
+            .try_insert(usd_fwd)
+            .expect("insert market curve")
+            .try_insert(eur_fwd)
+            .expect("insert market curve")
             .insert_fx(fx)
     }
 

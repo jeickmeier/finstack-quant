@@ -24,7 +24,7 @@ from finstack_quant.models.credit import (
 )
 
 # First path of MertonModel(100, 0.25, 80, 0.05).simulate_paths(2, 4, 1.0, 7, True).
-SEEDED_FIRST_PATH = [100.0, 106.3619193858413, 173.31551865077458, 179.24766644780442, 171.48303098644598]
+SEEDED_FIRST_PATH = [100.0, 104.47500656048219, 97.35290598039487, 96.15907125715671, 94.90238477603307]
 
 
 def test_simulate_paths_is_seeded_in_rust() -> None:

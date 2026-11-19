@@ -832,7 +832,8 @@ mod tests {
         let expiries = [0.25, 0.5, 1.0, 2.0];
         let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
         MarketContext::new()
-            .insert(flat_discount_with_tenor(DISC_ID, as_of, rate, 5.0))
+            .try_insert(flat_discount_with_tenor(DISC_ID, as_of, rate, 5.0))
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, vol))
             .insert_price(SPOT_ID, MarketScalar::unitless(spot).expect("valid scalar"))
             .insert_price(
@@ -1194,7 +1195,8 @@ mod tests {
         let expiries = [0.25, 0.5, 1.0, 2.0];
         let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
         let curves = MarketContext::new()
-            .insert(act360_curve)
+            .try_insert(act360_curve)
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, 0.20))
             .insert_price(
                 SPOT_ID,
@@ -1294,7 +1296,8 @@ mod tests {
         let expiries = [0.25, 0.5, 1.0, 2.0];
         let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
         let curves = MarketContext::new()
-            .insert(flat_discount_with_tenor(DISC_ID, as_of, 0.03, 5.0))
+            .try_insert(flat_discount_with_tenor(DISC_ID, as_of, 0.03, 5.0))
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, 0.25))
             .insert_price(
                 SPOT_ID,
@@ -1332,7 +1335,8 @@ mod tests {
         let expiries = [0.25, 0.5, 1.0, 2.0];
         let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
         let curves = MarketContext::new()
-            .insert(flat_discount_with_tenor(DISC_ID, as_of, 0.03, 5.0))
+            .try_insert(flat_discount_with_tenor(DISC_ID, as_of, 0.03, 5.0))
+            .expect("insert market curve")
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, 0.25))
             .insert_price(
                 SPOT_ID,

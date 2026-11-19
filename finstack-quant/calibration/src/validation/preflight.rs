@@ -300,10 +300,10 @@ fn validate_swaption_vol_step(
 ) -> Result<()> {
     let _ = context.get_discount(&p.discount_curve_id)?;
     if let crate::api::schema::SwaptionVolConvention::ShiftedLognormal { shift } = p.vol_convention
-        && (!shift.is_finite() || shift <= 0.0)
+        && !shift.is_finite()
     {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "Shifted lognormal convention requires a finite, positive shift; got {}",
+            "Shifted lognormal convention requires a finite shift; got {}",
             shift
         )));
     }
@@ -480,9 +480,12 @@ mod tests {
             .build()
             .expect("credit index");
         let ctx = MarketContext::new()
-            .insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
-            .insert(hazard)
-            .insert(base_corr)
+            .try_insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve")
+            .try_insert(base_corr)
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG", credit_index)
             .expect("credit index dependencies");
         let quotes = vec![MarketQuote::CdsTranche(CdsTrancheQuote {
@@ -539,10 +542,14 @@ mod tests {
             .build()
             .expect("credit index");
         let ctx = MarketContext::new()
-            .insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
-            .insert(build_flat_discount_curve(0.025, base_date, "USD-ALT"))
-            .insert(hazard)
-            .insert(base_corr)
+            .try_insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
+            .expect("insert market curve")
+            .try_insert(build_flat_discount_curve(0.025, base_date, "USD-ALT"))
+            .expect("insert market curve")
+            .try_insert(hazard)
+            .expect("insert market curve")
+            .try_insert(base_corr)
+            .expect("insert market curve")
             .insert_credit_index("CDX.NA.IG", credit_index)
             .expect("credit index dependencies");
         let quotes = vec![MarketQuote::CdsTranche(CdsTrancheQuote {

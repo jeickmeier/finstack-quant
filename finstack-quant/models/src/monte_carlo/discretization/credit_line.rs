@@ -123,7 +123,7 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
         x: &mut [f64],
         z: &[f64],
         work: &mut [f64],
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         // x[0] = utilization, x[1] = short_rate, x[2] = credit_spread
         // z = independent standard normals
 
@@ -131,9 +131,11 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
         let z_corr = if let Some(ref chol) = self.cholesky_factor {
             // Split work buffer: [z_corr | ...]
             let z_corr_buf = &mut work[0..3];
-            // Dimensions are guaranteed by construction: cholesky_factor is 3×3 and
-            // z_corr_buf has length 3 matching the 3-factor process.
-            let _ = chol.apply(z, z_corr_buf);
+            chol.apply(z, z_corr_buf).map_err(|err| {
+                finstack_quant_core::Error::Validation(format!(
+                    "correlating credit-line shocks: {err}"
+                ))
+            })?;
             z_corr_buf
         } else {
             // No correlation, use original shocks
@@ -198,8 +200,7 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
                 let mean = x[1] * exp_kappa_dt + theta_contribution;
 
                 let std_dev = params
-                    .sigma_variance_for_step(process.get_params().time_offset + t, dt)
-                    .max(0.0)
+                    .sigma_variance(process.get_params().time_offset + t, dt)?
                     .sqrt();
 
                 x[1] = mean + std_dev * z_corr[1];
@@ -218,7 +219,8 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
 
         // Step 3: Credit spread (CIR process): Andersen QE with ψ_c = 1.5.
         let cir = &process.get_params().credit_spread.cir;
-        x[2] = qe_step_variance(x[2], cir.kappa, cir.theta, cir.sigma, dt, z_corr[2], 1.5);
+        x[2] = qe_step_variance(x[2], cir.kappa, cir.theta, cir.sigma, dt, z_corr[2], 1.5)?;
+        Ok(())
     }
 
     fn work_size(&self, _process: &CreditLineProcess) -> usize {
@@ -268,7 +270,8 @@ mod tests {
         let mut x = [0.5, 0.015, 0.015];
         let mut work = vec![0.0; disc.work_size(&process)];
         // Path time 0.1 maps to curve time 0.3; the half-year step crosses 0.4 and 0.7.
-        disc.step(&process, 0.1, 0.5, &mut x, &[0.0; 3], &mut work);
+        disc.step(&process, 0.1, 0.5, &mut x, &[0.0; 3], &mut work)
+            .expect("valid simulation step");
         let weighted_segment = |level: f64, start: f64, end: f64| {
             level * ((-kappa * (0.8 - end)).exp() - (-kappa * (0.8 - start)).exp())
         };
@@ -325,7 +328,8 @@ mod tests {
         let z = [0.0, 0.0, 0.0]; // No shocks
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Utilization should drift toward mean
         assert!(x[0] > 0.5 && x[0] < 0.6);
@@ -355,7 +359,8 @@ mod tests {
 
         let mut step = |z: f64| {
             let mut x = [0.5, 0.05, 0.001];
-            disc.step(&process, 0.0, 0.25, &mut x, &[0.0, 0.0, z], &mut work);
+            disc.step(&process, 0.0, 0.25, &mut x, &[0.0, 0.0, z], &mut work)
+                .expect("valid simulation step");
             x[2]
         };
         // Below the atom probability p ≈ 0.97 the draw is exactly zero.
@@ -394,7 +399,8 @@ mod tests {
         let mut x = [u0, 0.05, 0.015];
         let z = [0.0, 0.0, 0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
-        disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, dt, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // Exact OU conditional mean.
         let exact_mean = theta + (u0 - theta) * (-kappa * dt).exp();
@@ -438,14 +444,15 @@ mod tests {
         let n = 20_000usize;
         let mut rng = PhiloxRng::new(20240517);
         let mut normals = vec![0.0f64; n];
-        rng.fill_std_normals(&mut normals);
+        rng.fill_std_normals(&mut normals).expect("normal draws");
 
         let mut sum = 0.0;
         let mut work = vec![0.0; disc.work_size(&process)];
         for &z0 in &normals {
             let mut x = [u0, 0.05, 0.015];
             let z = [z0, 0.0, 0.0];
-            disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
+            disc.step(&process, 0.0, dt, &mut x, &z, &mut work)
+                .expect("valid simulation step");
             sum += x[0];
         }
         let mean = sum / n as f64;
@@ -484,7 +491,8 @@ mod tests {
         let z = [0.0, 0.0, 0.0]; // No shocks
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
+        disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work)
+            .expect("valid simulation step");
 
         // A constant theta has the exact OU mean, without step-size bias.
         let expected = 0.03 + (0.04 - 0.03) * (-0.1_f64 * 0.01).exp();

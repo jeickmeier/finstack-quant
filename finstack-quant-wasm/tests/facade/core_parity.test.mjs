@@ -55,7 +55,10 @@ const price = () =>
     id: 'WTI',
     baseDate: '2025-01-02',
     knots: [0.0, 72.0, 1.0, 70.5],
-    spotPrice: 72.0,
+    kind: 'price',
+    dayCount: 'act_365f',
+    interp: 'linear',
+    extrapolation: 'flat',
   });
 const baseCorrelation = () => new core.BaseCorrelationCurve('CDX-IG', [3.0, 0.25, 7.0, 0.45]);
 const surface = () =>
@@ -424,7 +427,7 @@ const CASES = {
   price_curve: () => JSON.parse(price().toJson()),
   price_curve_queries: () => [price().price(0.5), price().price('2025-07-02'), price().kind],
   base_correlation_curve: () => JSON.parse(baseCorrelation().toJson()),
-  base_correlation: () => baseCorrelation().correlation(5.0),
+  base_correlation: () => baseCorrelation().getCorrelation(5.0),
   vol_surface: () => JSON.parse(surface().toJson()),
   vol_surface_queries: () => [
     models.volatility.getSurfaceVol(surface(), 0.75, 100.0),
@@ -643,7 +646,15 @@ test('unknown names carry the Rust error kind', () => {
   assert.throws(() => market().getDiscount('missing'), kind('not_found'));
   assert.throws(
     () =>
-      new core.PriceCurve({ id: 'X', baseDate: '2025-01-02', knots: [0, 1, 1, 2], kind: 'Price' }),
+      new core.PriceCurve({
+        id: 'X',
+        baseDate: '2025-01-02',
+        knots: [0, 1, 1, 2],
+        kind: 'Price',
+        dayCount: 'act_365f',
+        interp: 'linear',
+        extrapolation: 'flat',
+      }),
     kind('validation', /price curve kind/)
   );
   assert.throws(() => core.PeriodId.month(2025, 13), kind('validation'));
@@ -653,7 +664,7 @@ test('unknown names carry the Rust error kind', () => {
   assert.throws(() => core.studentTInvCdf(1.1, 5.0), kind('validation'));
   assert.equal(core.studentTInvCdf(0.0, 5.0), -Infinity);
   assert.equal(core.studentTInvCdf(1.0, 5.0), Infinity);
-  assert.ok(Number.isNaN(core.standardNormalInvCdf(-0.1)));
+  assert.throws(() => core.standardNormalInvCdf(-0.1), kind('validation'));
   assert.throws(() => core.choleskyDecomposition([1.0, 0.5, 0.4, 1.0], 2), kind('validation'));
   assert.throws(() => core.symmetricEigen([1.0, 0.5, 0.4, 1.0], 2), kind('validation'));
   assert.throws(() => core.thirdWednesday(13, 2025), kind('validation'));
@@ -723,6 +734,13 @@ test('handles round-trip through their JSON wire form', () => {
     core.CreditRating.fromJson(core.CreditRating.bbbMinus().toJson()).toString(),
     'BBB-'
   );
+});
+
+test('base-correlation lookup rejects detachments outside the financial domain', () => {
+  const curve = baseCorrelation();
+  for (const invalid of [-1, 300, NaN, Infinity]) {
+    assert.throws(() => curve.getCorrelation(invalid), /detachment/i);
+  }
 });
 
 test('ScheduleBuilder setters update the builder in place and round-trip its spec', () => {
@@ -802,11 +820,11 @@ test('MarketContext inserts change the context in place and share curve data', (
   );
   assert.deepEqual(market().getPrice('SPX'), { unitless: 5900.0 });
   assert.deepEqual(market().getPrice('ACME'), { price: { amount: '12.5', currency: 'USD' } });
-  assert.equal(market().getPriceCurve('WTI').spotPrice, 72.0);
+  assert.equal(market().getPriceCurve('WTI').price(0), 72.0);
   assert.equal(market().getInflationCurve('US-CPI').baseCpi, 300.0);
   assert.equal(
-    market().getBaseCorrelation('CDX-IG').correlation(5.0),
-    baseCorrelation().correlation(5.0)
+    market().getBaseCorrelation('CDX-IG').getCorrelation(5.0),
+    baseCorrelation().getCorrelation(5.0)
   );
   assert.equal(market().getCreditIndex('CDX-IG-43').indexCreditCurve.id, 'CDX-IG-HZD');
 
@@ -844,7 +862,13 @@ test('MarketContext keeps volatility registries namespace-local, rejects cross-f
   );
   assert.equal(context.getDiscount('SHARED').id, 'SHARED');
   assert.equal(context.getSeries('SHARED').id, 'SHARED');
-  context.insert(new core.FxDeltaVolSurface('SHARED', 'EUR/USD', [1.0], [0.12], [0.01], [0.002]));
+  context.insert(
+    new core.FxDeltaVolSurface('SHARED', 'EUR/USD', [1.0], [0.12], [0.01], [0.002], {
+      deltaConvention: 'forward_unadjusted',
+      atmConvention: 'delta_neutral_straddle',
+      butterflyConvention: 'smile',
+    })
+  );
   assert.equal(context.getFxDeltaVolSurface('SHARED').id, 'SHARED');
   assert.throws(
     () => context.insert(core.ForwardCurve.flat('SHARED', '2025-01-02', 0.04, 'act_360')),

@@ -90,7 +90,8 @@ fn test_valuation_with_negative_rates() {
             .build()
             .unwrap();
     let ctx = MarketContext::new()
-        .insert(disc_curve)
+        .try_insert(disc_curve)
+        .expect("insert market curve")
         .insert_price(
             UNDERLYING_ID,
             finstack_quant_core::market_data::scalars::MarketScalar::unitless(5_000.0)

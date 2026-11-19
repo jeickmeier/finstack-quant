@@ -29,7 +29,9 @@ fn zero_coupon_maturity_and_amortization_preserve_principal_without_income() {
     let t0 = date!(2025 - 07 - 14);
     let t1 = date!(2025 - 07 - 16);
     let payment = date!(2025 - 07 - 15);
-    let market = MarketContext::new().insert(flat_disc("USD-OIS", t0, 0.04));
+    let market = MarketContext::new()
+        .try_insert(flat_disc("USD-OIS", t0, 0.04))
+        .expect("insert market curve");
     for amortizing in [false, true] {
         let mut spec =
             CashflowSpec::fixed(0.0, Tenor::semi_annual(), DayCount::Act365F).expect("zero coupon");
@@ -139,7 +141,9 @@ fn inter_coupon_window_coupon_income_is_accrued_and_roll_down_small() {
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
 
     // Same market at both dates → total P&L is pure carry (no MtM).
-    let market = MarketContext::new().insert(flat_disc("USD-OIS", t0, 0.04));
+    let market = MarketContext::new()
+        .try_insert(flat_disc("USD-OIS", t0, 0.04))
+        .expect("insert market curve");
 
     // Expected coupon earned = Δaccrued (accrued is curve-independent).
     let accrued = |as_of: finstack_quant_core::dates::Date| -> f64 {

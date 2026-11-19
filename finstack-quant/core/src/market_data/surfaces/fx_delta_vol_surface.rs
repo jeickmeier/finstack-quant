@@ -709,9 +709,9 @@ pub fn fx_option_delta_to_strike(
     }
 
     let z_q = if delta_abs <= 0.5 {
-        standard_normal_inv_cdf(delta_abs)
+        standard_normal_inv_cdf(delta_abs)?
     } else {
-        -standard_normal_inv_cdf(1.0 - delta_abs)
+        -standard_normal_inv_cdf(1.0 - delta_abs)?
     };
     if !z_q.is_finite() {
         return Err(crate::Error::Validation(
@@ -730,9 +730,9 @@ pub fn fx_option_delta_to_strike(
     }
     let z_actual = if is_call { d1_actual } else { -d1_actual };
     let (log_p_target, log_p_actual) = if delta_abs <= 0.5 {
-        (delta_abs.ln(), log_norm_cdf(z_actual))
+        (delta_abs.ln(), log_norm_cdf(z_actual)?)
     } else {
-        ((1.0 - delta_abs).ln(), log_norm_cdf(-z_actual))
+        ((1.0 - delta_abs).ln(), log_norm_cdf(-z_actual)?)
     };
     if !log_p_actual.is_finite() {
         return Err(crate::Error::Validation(

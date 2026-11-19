@@ -218,10 +218,13 @@ fn test_equity_trs_discrete_dividends_preserve_small_amounts_after_large_amounts
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(disc).insert_price(
-        "SPX-SPOT",
-        MarketScalar::unitless(100.0).expect("valid scalar"),
-    );
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .insert_price(
+            "SPX-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        );
 
     let mut trs = TestEquityTrsBuilder::new()
         .notional(Money::new(1.0, USD).expect("valid money fixture"))
@@ -462,7 +465,9 @@ fn test_equity_trs_sensitivity_to_interest_rates() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    market_shifted = market_shifted.insert(disc_shifted);
+    market_shifted = market_shifted
+        .try_insert(disc_shifted)
+        .expect("insert market curve");
 
     let fwd_shifted =
         finstack_quant_core::market_data::term_structures::ForwardCurve::builder("USD-SOFR-3M")
@@ -491,7 +496,9 @@ fn test_equity_trs_sensitivity_to_interest_rates() {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-    market_shifted = market_shifted.insert(fwd_shifted);
+    market_shifted = market_shifted
+        .try_insert(fwd_shifted)
+        .expect("insert market curve");
     market_shifted = market_shifted.insert_price(
         "SPX-SPOT",
         MarketScalar::unitless(5000.0).expect("valid scalar"),
