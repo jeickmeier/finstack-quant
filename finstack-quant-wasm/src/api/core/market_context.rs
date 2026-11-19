@@ -333,6 +333,7 @@ impl JsMarketContext {
     /// @param series - Dated observations. Rate fixings are decimal rates. A copy
     ///   is stored under the derived key, replacing any existing series there.
     /// @throws Error with kind `validation` for an empty, untrimmed, or prefixed index name.
+    /// @returns The same MarketContext with the input stored, for chaining in the public facade.
     #[wasm_bindgen(js_name = insertFixing)]
     pub fn insert_fixing(
         &mut self,
@@ -351,6 +352,7 @@ impl JsMarketContext {
     /// @param id - Identifier configured on the instrument's dividend-yield input.
     /// @param yieldRate - Finite annualized continuous decimal rate (0.02 is 2%).
     /// @throws Error with kind `validation` if the yield is not finite.
+    /// @returns The same MarketContext with the input stored, for chaining in the public facade.
     #[wasm_bindgen(js_name = insertDividendYield)]
     pub fn insert_dividend_yield(
         &mut self,

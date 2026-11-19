@@ -124,6 +124,26 @@ pub fn apply_lower_triangular(
         .map_err(to_js_err)
 }
 
+/// Apply a shared lower-triangular factor to each row of independent observations.
+/// @param l - Row-major square factor containing n × n numbers; the upper triangle is ignored.
+/// @param n - Number of variables per observation row and dimension of the factor.
+/// @param z - Row-major observations containing n finite inputs per row in factor order.
+/// @returns Row-major Float64Array with the same shape and row order as the input observations.
+/// @throws If inputs have invalid types, incompatible dimensions, non-finite data or overflow.
+#[wasm_bindgen(js_name = applyLowerTriangularMany)]
+pub fn apply_lower_triangular_many(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] l: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] z: JsValue,
+) -> Result<Box<[f64]>, JsValue> {
+    let factor = js_f64_seq(&l, "l")?;
+    let draws = js_f64_seq(&z, "z")?;
+    let n = js_uint(&n, "n")?;
+    linalg::apply_lower_triangular_many(&factor, n, &draws)
+        .map(Vec::into_boxed_slice)
+        .map_err(to_js_err)
+}
+
 /// Arithmetic mean over a typed numeric array.
 /// @param data - Finite numeric observations in input order; empty series returns `undefined`.
 /// @returns Arithmetic mean of `data`, or `undefined` when `data` is empty.

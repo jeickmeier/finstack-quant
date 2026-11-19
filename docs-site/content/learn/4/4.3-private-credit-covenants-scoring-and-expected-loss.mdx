@@ -412,7 +412,7 @@ print("Constant EAD, EIR and conditional annual PD are controlled impairment ass
 
 <ExecutedOutput lesson="4.3" block="staged-borrower-ecl" />
 
-The Stage 1 bucket sum reconciles to about USD 13,266. Constant-EAD lifetime loss is about USD 55,086. The native probability-weighted calculation holds LGD fixed because it takes one exposure; a second explicit weighted sum allows scenario-specific LGD and therefore shows the additional joint PD/LGD stress. The Stage 3 allowance deducts the present value of the approved dated cash recovery from the carrying amount and floors the signed shortfall at zero.
+The Stage 1 bucket sum reconciles to about USD 13,266. Constant-EAD lifetime loss is about USD 55,086. Both weighted calculations use the same exposure and policy. The first holds LGD fixed across scenarios. The second supplies scenario LGDs alongside their PD schedules, so its allowance includes joint PD and LGD stress. The Stage 3 allowance deducts the present value of the approved dated cash recovery from the carrying amount and floors the signed shortfall at zero.
 
 Now carry the held loan's USD 25,000 quarterly amortization into EAD. The native schedule interpolates linearly, so pin each integration midpoint to the pre-payment balance and disclose the approximation between knots. The final quarter begins with USD 525,000 before the last amortization and balloon redemption. A hand sum reconciles the native result, which must be below the constant-EAD comparator. Invalid decreasing cumulative PD is rejected with `ValueError`.
 

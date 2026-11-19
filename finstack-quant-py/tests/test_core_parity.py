@@ -1492,3 +1492,17 @@ def test_dated_hazard_and_inflation_use_the_native_act365f_clock() -> None:
     )
     assert inflation.cpi(366.0 / 365.0) == pytest.approx(306.0)
     assert inflation.cpi("2025-01-01") == pytest.approx(306.0)
+
+
+def test_apply_lower_triangular_many_keeps_non_square_draw_axes() -> None:
+    import numpy as np
+
+    from finstack_quant.core.math import linalg
+
+    lower = [[2.0, 999.0], [1.0, 3.0]]
+    draws = np.array([[1.0, 2.0], [-1.0, 1.0], [0.5, 0.0]])[::-1]
+    result = linalg.apply_lower_triangular_many(lower, draws)
+    assert result.shape == (3, 2)
+    np.testing.assert_allclose(result, [[1.0, 0.5], [-2.0, 2.0], [2.0, 7.0]])
+    with pytest.raises(ValueError, match="row"):
+        linalg.apply_lower_triangular_many(lower, np.ones((2, 3)))

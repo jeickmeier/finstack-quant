@@ -1071,27 +1071,52 @@ pub fn cholesky_decomposition_into(
 ///
 /// - [`CorrelationFactor::apply`] for the pivoted, rank-aware, allocation-free factor.
 pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>> {
-    if square_len(n) != Some(l.len()) {
-        return Err(crate::Error::Validation(format!(
-            "lower-triangular factor has {} entries but a {n}x{n} factor needs {}",
-            l.len(),
-            square_len_label(n)
-        )));
-    }
+    validate_lower_factor(l, n)?;
     if z.len() != n {
         return Err(crate::Error::Validation(format!(
             "vector has length {} but the factor is {n}x{n}",
             z.len()
         )));
     }
-    for &value in z {
-        if !value.is_finite() {
-            return Err(crate::Error::Input(
-                crate::error::InputError::NonFiniteValue {
-                    kind: crate::error::NonFiniteKind::classify(value),
-                },
-            ));
-        }
+    let mut out = vec![0.0; n];
+    apply_lower_row(l, n, z, &mut out)?;
+    Ok(out)
+}
+
+/// Apply one lower-triangular factor to consecutive rows of observations.
+///
+/// # Arguments
+/// * `l` - Square row-major factor with `n * n` elements, typically a Cholesky factor.
+///   The upper triangle is ignored.
+/// * `n` - Number of variables per row and factor dimension.
+/// * `z` - Row-major independent observations with `n` finite values per row.
+///
+/// # Errors
+/// Rejects incompatible dimensions, non-finite input, or multiplication overflow.
+pub fn apply_lower_triangular_many(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>> {
+    validate_lower_factor(l, n)?;
+    if n == 0 && z.is_empty() {
+        return Ok(Vec::new());
+    }
+    if n == 0 || !z.len().is_multiple_of(n) {
+        return Err(crate::Error::Validation(format!(
+            "each observation row must have {n} entries"
+        )));
+    }
+    let mut out = vec![0.0; z.len()];
+    for (row, transformed) in z.chunks_exact(n).zip(out.chunks_exact_mut(n)) {
+        apply_lower_row(l, n, row, transformed)?;
+    }
+    Ok(out)
+}
+
+fn validate_lower_factor(l: &[f64], n: usize) -> Result<()> {
+    if square_len(n) != Some(l.len()) {
+        return Err(crate::Error::Validation(format!(
+            "lower-triangular factor has {} entries but a {n}x{n} factor needs {}",
+            l.len(),
+            square_len_label(n)
+        )));
     }
     for i in 0..n {
         let row = i * n;
@@ -1106,13 +1131,25 @@ pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>
         }
     }
 
-    let mut out = vec![0.0; n];
-    lower_triangular_mul(l, n, z, &mut out).map_err(|(row, value)| {
+    Ok(())
+}
+
+fn apply_lower_row(l: &[f64], n: usize, z: &[f64], out: &mut [f64]) -> Result<()> {
+    for &value in z {
+        if !value.is_finite() {
+            return Err(crate::Error::Input(
+                crate::error::InputError::NonFiniteValue {
+                    kind: crate::error::NonFiniteKind::classify(value),
+                },
+            ));
+        }
+    }
+    lower_triangular_mul(l, n, z, out).map_err(|(row, value)| {
         crate::Error::Internal(format!(
             "lower-triangular product produced non-finite value at row {row}: {value}"
         ))
     })?;
-    Ok(out)
+    Ok(())
 }
 
 /// `out = L z` for a row-major `n × n` lower-triangular `l`, reading only the
@@ -2246,6 +2283,18 @@ mod tests {
         // Upper triangle is ignored: the first output depends only on z[0].
         assert!((e0[0] - 1.0).abs() < 1e-12);
         assert!((e1[0] - 0.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn apply_lower_triangular_many_keeps_consecutive_observation_rows() {
+        let factor = [2.0, f64::NAN, 1.0, 3.0];
+        let rows = [1.0, 2.0, -1.0, 1.0, 0.5, 0.0];
+        assert_eq!(
+            apply_lower_triangular_many(&factor, 2, &rows).expect("three valid draws"),
+            [2.0, 7.0, -2.0, 2.0, 1.0, 0.5],
+        );
+        assert!(apply_lower_triangular_many(&factor, 2, &rows[..5]).is_err());
+        assert!(apply_lower_triangular_many(&factor, 2, &[1.0, f64::INFINITY]).is_err());
     }
 
     #[test]

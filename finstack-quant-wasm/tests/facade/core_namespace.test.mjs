@@ -686,3 +686,10 @@ test('FxMatrix.direct uses reciprocal quotes and requires an explicit pivot for 
   assert.equal(fx.rate('USD', 'EUR', '2025-01-02', policy).rate, 1 / 1.1);
   assert.throws(() => fx.rate('EUR', 'GBP', '2025-01-02', policy));
 });
+
+test('applyLowerTriangularMany transforms non-square draws in row-major order', () => {
+  const factor = new Float64Array([2, 999, 1, 3]);
+  const draws = new Float64Array([1, 2, -1, 1, 0.5, 0]);
+  assert.deepEqual([...core.applyLowerTriangularMany(factor, 2, draws)], [2, 7, -2, 2, 1, 0.5]);
+  assert.throws(() => core.applyLowerTriangularMany(factor, 2, [1, 2, 3]), /row/);
+});

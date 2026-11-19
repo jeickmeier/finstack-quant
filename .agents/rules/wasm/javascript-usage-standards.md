@@ -130,7 +130,15 @@ const bond = valuations.instruments.Bond.fixed(
 );
 
 // Models (closed-form kernels; Monte Carlo lives under models.monteCarlo)
-const price = models.bsPrice(100, 100, 0.03, 0, 0.2, 1, true);
+const price = models.bsPrice({
+  spot: 100,
+  strike: 100,
+  rate: 0.03,
+  dividend_yield: 0,
+  volatility: 0.2,
+  time_to_expiry: 1,
+  option_type: "call",
+});
 ```
 
 ### Do NOT import flat from pkg/

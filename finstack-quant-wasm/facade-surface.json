@@ -749,6 +749,7 @@
       "addWeekdays",
       "adjust",
       "applyLowerTriangular",
+      "applyLowerTriangularMany",
       "availableCalendars",
       "buildFiscalPeriods",
       "buildPeriods",
@@ -1687,6 +1688,9 @@
     "kind": "function"
   },
   "core.applyLowerTriangular": {
+    "kind": "function"
+  },
+  "core.applyLowerTriangularMany": {
     "kind": "function"
   },
   "core.choleskyDecomposition": {

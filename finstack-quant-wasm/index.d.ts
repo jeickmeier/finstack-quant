@@ -220,6 +220,7 @@ declare module './pkg/finstack_quant_wasm.js' {
      * @param id - Identifier configured on the instrument's dividend-yield input.
      * @param yieldRate - Finite annualized continuous decimal rate (0.02 is 2%).
      * @throws Error with kind `validation` if the yield is not finite.
+     * @returns The same MarketContext with the input stored, for chaining in the public facade.
      */
     insertDividendYield(id: string, yieldRate: number): this;
     /**
@@ -229,6 +230,7 @@ declare module './pkg/finstack_quant_wasm.js' {
      * @param series - Dated observations. Rate fixings are decimal rates. A copy
      *   is stored under the derived key, replacing any existing series there.
      * @throws Error with kind `validation` for an empty, untrimmed, or prefixed index name.
+     * @returns The same MarketContext with the input stored, for chaining in the public facade.
      */
     insertFixing(indexId: string, series: ScalarTimeSeries): this;
     /**
@@ -1154,6 +1156,15 @@ export interface CoreNamespace {
    * @returns Transformed vector `L z` as a `Float64Array` of length `n`.
    */
   readonly applyLowerTriangular: typeof wasm.applyLowerTriangular;
+  /**
+   * Apply a shared lower-triangular factor to each row of independent observations.
+   * @param l - Row-major square factor containing n × n numbers; the upper triangle is ignored.
+   * @param n - Number of variables per observation row and dimension of the factor.
+   * @param z - Row-major observations containing n finite inputs per row in factor order.
+   * @returns Row-major Float64Array with the same shape and row order as the input observations.
+   * @throws If inputs have invalid types, incompatible dimensions, non-finite data or overflow.
+   */
+  readonly applyLowerTriangularMany: typeof wasm.applyLowerTriangularMany;
   /**
    * Cholesky decomposition for a flat row-major matrix.
    *

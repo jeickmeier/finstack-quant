@@ -229,6 +229,7 @@ export const core = {
   FxPairConvention: wasm.FxPairConvention,
   invertFxRate: wasm.invertFxRate,
   applyLowerTriangular: wasm.applyLowerTriangular,
+  applyLowerTriangularMany: wasm.applyLowerTriangularMany,
   choleskyDecomposition: wasm.choleskyDecomposition,
   choleskySolve: wasm.choleskySolve,
   symmetricEigen: wasm.symmetricEigen,
