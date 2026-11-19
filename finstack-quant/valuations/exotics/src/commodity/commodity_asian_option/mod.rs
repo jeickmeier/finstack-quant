@@ -12,4 +12,4 @@ mod types;
 pub(crate) mod metrics;
 
 pub use pricer::CommodityAsianOptionAnalyticalPricer;
-pub use types::CommodityAsianOption;
+pub use types::{CommodityAsianOption, CommodityAsianOptionBuilder};

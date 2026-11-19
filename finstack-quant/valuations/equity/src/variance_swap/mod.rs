@@ -74,4 +74,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::{EquityPriceSeriesPolicy, VarianceSwap};
+pub use types::{EquityPriceSeriesPolicy, VarianceSwap, VarianceSwapBuilder};

@@ -25,6 +25,14 @@ use crate::bindings::valuations::convert::serialize_typed_instrument_json;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
 use crate::bindings::valuations::typed_bond_future::PyBondFuture;
+use crate::bindings::valuations::typed_commodity_asian_option::PyCommodityAsianOption;
+use crate::bindings::valuations::typed_commodity_forward::PyCommodityForward;
+use crate::bindings::valuations::typed_commodity_future::PyCommodityFuture;
+use crate::bindings::valuations::typed_commodity_future_option::PyCommodityFutureOption;
+use crate::bindings::valuations::typed_commodity_spot_option::PyCommoditySpotOption;
+use crate::bindings::valuations::typed_commodity_spread_option::PyCommoditySpreadOption;
+use crate::bindings::valuations::typed_commodity_swap::PyCommoditySwap;
+use crate::bindings::valuations::typed_commodity_swaption::PyCommoditySwaption;
 use crate::bindings::valuations::typed_convertible::PyConvertibleBond;
 use crate::bindings::valuations::typed_credit::{
     PyCdsIndex, PyCdsOption, PyCdsTranche, PyCreditDefaultSwap,
@@ -33,14 +41,20 @@ use crate::bindings::valuations::typed_deposit::PyDeposit;
 use crate::bindings::valuations::typed_equity::PyEquityOption;
 use crate::bindings::valuations::typed_equity_future::PyEquityFuture;
 use crate::bindings::valuations::typed_equity_future_option::PyEquityFutureOption;
+use crate::bindings::valuations::typed_equity_spot::PyEquity;
+use crate::bindings::valuations::typed_equity_total_return_future::PyEquityTotalReturnFuture;
+use crate::bindings::valuations::typed_equity_total_return_swap::PyEquityTotalReturnSwap;
+use crate::bindings::valuations::typed_fi_index_total_return_swap::PyFiIndexTotalReturnSwap;
 use crate::bindings::valuations::typed_fra::PyForwardRateAgreement;
 use crate::bindings::valuations::typed_fx::{PyFxForward, PyFxOption};
 use crate::bindings::valuations::typed_fx_barrier_option::PyFxBarrierOption;
 use crate::bindings::valuations::typed_fx_digital_option::PyFxDigitalOption;
 use crate::bindings::valuations::typed_fx_future::PyFxFuture;
 use crate::bindings::valuations::typed_fx_future_option::PyFxFutureOption;
+use crate::bindings::valuations::typed_fx_spot::PyFxSpot;
 use crate::bindings::valuations::typed_fx_swap::PyFxSwap;
 use crate::bindings::valuations::typed_fx_touch_option::PyFxTouchOption;
+use crate::bindings::valuations::typed_fx_variance_swap::PyFxVarianceSwap;
 use crate::bindings::valuations::typed_inflation_bond::PyInflationLinkedBond;
 use crate::bindings::valuations::typed_interest_rate_future::PyInterestRateFuture;
 use crate::bindings::valuations::typed_interest_rate_future_option::PyInterestRateFutureOption;
@@ -52,6 +66,7 @@ use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::bindings::valuations::typed_structured_credit::{
     PyStructuredCredit, PyStructuredCreditTranche,
 };
+use crate::bindings::valuations::typed_variance_swap::PyVarianceSwap;
 use crate::bindings::valuations::typed_volatility_index_future::PyVolatilityIndexFuture;
 use crate::bindings::valuations::typed_volatility_index_future_option::PyVolatilityIndexFutureOption;
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
@@ -171,7 +186,22 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyCdsOption,
         PyCdsTranche,
         PyConvertibleBond,
+        PyEquity,
         PyEquityOption,
+        PyCommodityFutureOption,
+        PyFxSpot,
+        PyCommodityForward,
+        PyCommodityFuture,
+        PyCommodityAsianOption,
+        PyCommoditySpotOption,
+        PyCommoditySpreadOption,
+        PyCommoditySwap,
+        PyCommoditySwaption,
+        PyFxVarianceSwap,
+        PyVarianceSwap,
+        PyEquityTotalReturnSwap,
+        PyEquityTotalReturnFuture,
+        PyFiIndexTotalReturnSwap,
         PyRepo,
         PyFxSwap,
         PyNdf,

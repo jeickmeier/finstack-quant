@@ -257,6 +257,33 @@ pub struct CommodityForward {
 }
 
 impl CommodityForward {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> CommodityForwardBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .underlying(self.underlying.clone())
+            .quantity(self.quantity)
+            .multiplier(self.multiplier)
+            .maturity(self.maturity)
+            .settlement(self.settlement)
+            .position(self.position)
+            .contract_price_opt(self.contract_price)
+            .quoted_forward_opt(self.quoted_forward)
+            .forward_curve_id(self.forward_curve_id.clone())
+            .spot_id_opt(self.spot_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .exchange_opt(self.exchange.clone())
+            .contract_month_opt(self.contract_month.clone())
+            .convention_opt(self.convention)
+            .settlement_days_opt(self.settlement_days)
+            .settlement_calendar_id_opt(self.settlement_calendar_id.clone())
+            .settlement_business_day_convention_opt(self.settlement_business_day_convention)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     fn validate(&self) -> Result<()> {
         use finstack_quant_core::validation;
 

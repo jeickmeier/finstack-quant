@@ -45,4 +45,4 @@
 mod types;
 
 pub(crate) mod metrics;
-pub use types::FxSpot;
+pub use types::{FxSpot, FxSpotBuilder};

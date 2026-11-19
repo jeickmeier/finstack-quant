@@ -149,6 +149,24 @@ pub struct FiIndexTotalReturnSwap {
 }
 
 impl FiIndexTotalReturnSwap {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> FiIndexTotalReturnSwapBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .notional(self.notional)
+            .underlying(self.underlying.clone())
+            .financing_leg(self.financing_leg.clone())
+            .schedule(self.schedule.clone())
+            .side(self.side)
+            .initial_level_opt(self.initial_level)
+            .fixing_series_id_opt(self.fixing_series_id.clone())
+            .margin_spec_opt(self.margin_spec.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Resolve the supplied index duration used by both risk metrics and margin.
     ///
     /// # Arguments

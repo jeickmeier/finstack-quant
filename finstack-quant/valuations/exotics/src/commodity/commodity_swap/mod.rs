@@ -29,7 +29,7 @@
 
 mod types;
 
-pub use types::CommoditySwap;
+pub use types::{CommoditySwap, CommoditySwapBuilder};
 
 /// Metrics submodule for commodity swap risk measures.
 pub(crate) mod metrics;

@@ -181,6 +181,66 @@ from finstack_quant.valuations.instruments._typed_fx_barrier_option import (
     FxBarrierOption as FxBarrierOption,
     FxBarrierOptionBuilder as FxBarrierOptionBuilder,
 )
+from finstack_quant.valuations.instruments._typed_equity_spot import (
+    Equity as Equity,
+    EquityBuilder as EquityBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_spot import (
+    FxSpot as FxSpot,
+    FxSpotBuilder as FxSpotBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_forward import (
+    CommodityForward as CommodityForward,
+    CommodityForwardBuilder as CommodityForwardBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_future import (
+    CommodityFuture as CommodityFuture,
+    CommodityFutureBuilder as CommodityFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_asian_option import (
+    CommodityAsianOption as CommodityAsianOption,
+    CommodityAsianOptionBuilder as CommodityAsianOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_spot_option import (
+    CommoditySpotOption as CommoditySpotOption,
+    CommoditySpotOptionBuilder as CommoditySpotOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_spread_option import (
+    CommoditySpreadOption as CommoditySpreadOption,
+    CommoditySpreadOptionBuilder as CommoditySpreadOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_swap import (
+    CommoditySwap as CommoditySwap,
+    CommoditySwapBuilder as CommoditySwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_swaption import (
+    CommoditySwaption as CommoditySwaption,
+    CommoditySwaptionBuilder as CommoditySwaptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_variance_swap import (
+    FxVarianceSwap as FxVarianceSwap,
+    FxVarianceSwapBuilder as FxVarianceSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_variance_swap import (
+    VarianceSwap as VarianceSwap,
+    VarianceSwapBuilder as VarianceSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_total_return_swap import (
+    EquityTotalReturnSwap as EquityTotalReturnSwap,
+    EquityTotalReturnSwapBuilder as EquityTotalReturnSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_total_return_future import (
+    EquityTotalReturnFuture as EquityTotalReturnFuture,
+    EquityTotalReturnFutureBuilder as EquityTotalReturnFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fi_index_total_return_swap import (
+    FiIndexTotalReturnSwap as FiIndexTotalReturnSwap,
+    FiIndexTotalReturnSwapBuilder as FiIndexTotalReturnSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_future_option import (
+    CommodityFutureOption as CommodityFutureOption,
+    CommodityFutureOptionBuilder as CommodityFutureOptionBuilder,
+)
 from finstack_quant.valuations.instruments._typed_equity import (
     EquityOption as EquityOption,
     EquityOptionBuilder as EquityOptionBuilder,
@@ -368,7 +428,37 @@ __all__ = [
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
     "EquityMetrics",
+    "Equity",
+    "EquityBuilder",
     "EquityOption",
+    "CommodityFutureOption",
+    "CommodityFutureOptionBuilder",
+    "FxSpot",
+    "FxSpotBuilder",
+    "CommodityForward",
+    "CommodityForwardBuilder",
+    "CommodityFuture",
+    "CommodityFutureBuilder",
+    "CommodityAsianOption",
+    "CommodityAsianOptionBuilder",
+    "CommoditySpotOption",
+    "CommoditySpotOptionBuilder",
+    "CommoditySpreadOption",
+    "CommoditySpreadOptionBuilder",
+    "CommoditySwap",
+    "CommoditySwapBuilder",
+    "CommoditySwaption",
+    "CommoditySwaptionBuilder",
+    "FxVarianceSwap",
+    "FxVarianceSwapBuilder",
+    "VarianceSwap",
+    "VarianceSwapBuilder",
+    "EquityTotalReturnSwap",
+    "EquityTotalReturnSwapBuilder",
+    "EquityTotalReturnFuture",
+    "EquityTotalReturnFutureBuilder",
+    "FiIndexTotalReturnSwap",
+    "FiIndexTotalReturnSwapBuilder",
     "Repo",
     "RepoBuilder",
     "FxSwap",

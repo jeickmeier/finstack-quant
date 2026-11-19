@@ -26,16 +26,30 @@ pub(crate) mod typed_interest_rate_future_option;
 pub(crate) mod typed_volatility_index_future;
 pub(crate) mod typed_volatility_index_future_option;
 
+pub(crate) mod typed_commodity_asian_option;
+pub(crate) mod typed_commodity_forward;
+pub(crate) mod typed_commodity_future;
+pub(crate) mod typed_commodity_future_option;
+pub(crate) mod typed_commodity_spot_option;
+pub(crate) mod typed_commodity_spread_option;
+pub(crate) mod typed_commodity_swap;
+pub(crate) mod typed_commodity_swaption;
 pub(crate) mod typed_convertible;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_deposit;
 pub(crate) mod typed_equity;
+pub(crate) mod typed_equity_spot;
+pub(crate) mod typed_equity_total_return_future;
+pub(crate) mod typed_equity_total_return_swap;
+pub(crate) mod typed_fi_index_total_return_swap;
 pub(crate) mod typed_fra;
 pub(crate) mod typed_fx;
 pub(crate) mod typed_fx_barrier_option;
 pub(crate) mod typed_fx_digital_option;
+pub(crate) mod typed_fx_spot;
 pub(crate) mod typed_fx_swap;
 pub(crate) mod typed_fx_touch_option;
+pub(crate) mod typed_fx_variance_swap;
 pub(crate) mod typed_inflation_bond;
 mod typed_legs;
 pub(crate) mod typed_listed;
@@ -46,6 +60,7 @@ pub(crate) mod typed_rates;
 pub(crate) mod typed_repo;
 pub(crate) mod typed_revolving_credit;
 pub(crate) mod typed_structured_credit;
+pub(crate) mod typed_variance_swap;
 mod var;
 
 use crate::bindings::pandas_utils::{
@@ -437,6 +452,21 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_convertible::register(py, &m)?;
     convertible_spot_ladder::register(&m)?;
     typed_equity::register(py, &m)?;
+    typed_commodity_future_option::register(&m)?;
+    typed_fx_spot::register(&m)?;
+    typed_commodity_forward::register(&m)?;
+    typed_commodity_future::register(&m)?;
+    typed_commodity_asian_option::register(&m)?;
+    typed_commodity_spot_option::register(&m)?;
+    typed_commodity_spread_option::register(&m)?;
+    typed_commodity_swap::register(&m)?;
+    typed_commodity_swaption::register(&m)?;
+    typed_fx_variance_swap::register(&m)?;
+    typed_variance_swap::register(&m)?;
+    typed_equity_total_return_swap::register(&m)?;
+    typed_equity_total_return_future::register(&m)?;
+    typed_fi_index_total_return_swap::register(&m)?;
+    typed_equity_spot::register(&m)?;
     typed_repo::register(&m)?;
     typed_fx_swap::register(&m)?;
     typed_ndf::register(&m)?;
@@ -497,6 +527,36 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_convertible::EXPORTS);
     exports.extend_from_slice(convertible_spot_ladder::EXPORTS);
     exports.extend_from_slice(typed_equity::EXPORTS);
+    exports.extend_from_slice(&["CommodityFutureOption", "CommodityFutureOptionBuilder"]);
+    exports.extend_from_slice(&[
+        "FxSpot",
+        "FxSpotBuilder",
+        "CommodityForward",
+        "CommodityForwardBuilder",
+        "CommodityFuture",
+        "CommodityFutureBuilder",
+        "CommodityAsianOption",
+        "CommodityAsianOptionBuilder",
+        "CommoditySpotOption",
+        "CommoditySpotOptionBuilder",
+        "CommoditySpreadOption",
+        "CommoditySpreadOptionBuilder",
+        "CommoditySwap",
+        "CommoditySwapBuilder",
+        "CommoditySwaption",
+        "CommoditySwaptionBuilder",
+        "FxVarianceSwap",
+        "FxVarianceSwapBuilder",
+        "VarianceSwap",
+        "VarianceSwapBuilder",
+        "EquityTotalReturnSwap",
+        "EquityTotalReturnSwapBuilder",
+        "EquityTotalReturnFuture",
+        "EquityTotalReturnFutureBuilder",
+        "FiIndexTotalReturnSwap",
+        "FiIndexTotalReturnSwapBuilder",
+    ]);
+    exports.extend_from_slice(&["Equity", "EquityBuilder"]);
     exports.extend_from_slice(&[
         "Repo",
         "RepoBuilder",
