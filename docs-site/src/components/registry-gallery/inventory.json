@@ -1357,6 +1357,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-structured-credit-tranche",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-structured-credit",
       "type": "registry:lib"
     },
@@ -1832,19 +1836,19 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-      "sha256": "7e2853476a9c75b2d81678ace0f624d147bd3565466bdcfd5fd6d3e1e45e5f68"
+      "sha256": "149ae2d75f3ee7c255003387eeaabceb156e911553cebdf4ef48f289b15e153b"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "ee07483240389b6904228429fc6c1afafed211c740e81a23ebeebc0b8daed8e0"
+      "sha256": "18738c2ee83fc47de8296fcd24e48e376d17ce7e6595d4c99ebf11804a711504"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/exposures/cases.json",
-      "sha256": "a8e12d7cf48f746ec271331cbd8e174f15b78592371839733fe24cf365ce51da"
+      "sha256": "6e2f796ec6a1e6858862e18ef5bd6c22cfdf00014eba31c61d14dfc5fdc533e1"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "c24fae872b813535ce80d3416945c5c41ab6a0b905348a71ee69a413cdb12308"
+      "sha256": "6a95d601c8f7dc2433d9f125198e5528459f92cfb574bf10b4ff30b2e0ebb29d"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",

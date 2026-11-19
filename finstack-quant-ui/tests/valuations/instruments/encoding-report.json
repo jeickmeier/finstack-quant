@@ -1,5 +1,5 @@
 {
-  "instrumentCount": 78,
+  "instrumentCount": 79,
   "instruments": [
     {
       "type": "agency_cmo",
@@ -18890,7 +18890,7 @@
             "ref": "#/$defs/ReserveTarget"
           },
           {
-            "pointer": "#/$defs/InstrumentJson/oneOf/77/properties/spec",
+            "pointer": "#/$defs/InstrumentJson/oneOf/78/properties/spec",
             "ref": "#/$defs/CompositeInstrument"
           },
           {
@@ -37207,6 +37207,1626 @@
       "schema": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
       "fixtures": [
         "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json"
+      ],
+      "constructs": {
+        "array": [
+          "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags",
+          "#/$defs/CorrelationStructure/oneOf/2/properties/correlations",
+          "#/$defs/CorrelationStructure/oneOf/2/properties/labels",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct",
+          "#/$defs/DelinquencyModel/properties/cure_rates",
+          "#/$defs/DelinquencyModel/properties/roll_rates",
+          "#/$defs/d_cdb8fddc0106047270c4/properties/times",
+          "#/$defs/d_cdb8fddc0106047270c4/properties/values",
+          "#/$defs/StepUpCouponSpec/properties/step_schedule",
+          "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule",
+          "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items",
+          "#/$defs/CashFlowAccrual/properties/nominal_dates",
+          "#/$defs/CashFlowMeta/properties/calendar_ids",
+          "#/$defs/McConfig/properties/correlation_matrix",
+          "#/$defs/McConfig/properties/correlation_matrix/items",
+          "#/$defs/TermLoanCovenantEvents/properties/draw_stop_dates",
+          "#/$defs/ReinvestmentPeriod/properties/amortizing_tranches",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr",
+          "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr",
+          "#/$defs/AfcSpec/properties/capped_tranches",
+          "#/$defs/ShiftingInterestSpec/properties/triggers",
+          "#/$defs/StepDownSpec/properties/triggers"
+        ],
+        "business_day_convention": [
+          "#/$defs/d_01cd6b2e4ad257352fdb",
+          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/0",
+          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/1",
+          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/2",
+          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/3",
+          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/4",
+          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/5",
+          "#/$defs/StructuredCredit/properties/business_day_convention/anyOf/1"
+        ],
+        "calendar-id": [
+          "#/$defs/StructuredCredit/properties/calendar_id",
+          "#/$defs/FixedLegSpec/properties/calendar_id",
+          "#/$defs/FloatLegSpec/properties/calendar_id",
+          "#/$defs/FloatLegSpec/properties/fixing_calendar_id",
+          "#/$defs/CsaSpec/properties/calendar_id",
+          "#/$defs/FloatingRateSpec/properties/fixing_calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
+          "#/$defs/Bond/properties/ex_coupon_calendar_id",
+          "#/$defs/RevolvingCredit/properties/calendar_id",
+          "#/$defs/TermLoan/properties/calendar_id"
+        ],
+        "currency": [
+          "#/$defs/d_be98333e68c25ab5ae57",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/0",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/1",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/2",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/3",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/4",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/5",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/6",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/7",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/8",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/9",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/10",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/11",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/12",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/13",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/14",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/15",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/16",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/17",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/18",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/19",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/20",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/21",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/22",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/23",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/24",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/25",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/26",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/27",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/28",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/29",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/30",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/31",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/32",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/33",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/34",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/35",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/36",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/37",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/38",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/39",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/40",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/41",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/42",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/43",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/44",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/45",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/46",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/47",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/48",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/49",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/50",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/51",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/52",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/53",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/54",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/55",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/56",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/57",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/58",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/59",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/60",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/61",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/62",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/63",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/64",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/65",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/66",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/67",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/68",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/69",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/70",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/71",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/72",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/73",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/74",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/75",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/76",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/77",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/78",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/79",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/80",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/81",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/82",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/83",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/84",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/85",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/86",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/87",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/88",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/89",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/90",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/91",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/92",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/93",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/94",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/95",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/96",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/97",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/98",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/99",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/100",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/101",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/102",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/103",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/104",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/105",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/106",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/107",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/108",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/109",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/110",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/111",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/112",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/113",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/114",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/115",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/116",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/117",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/118",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/119",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/120",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/121",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/122",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/123",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/124",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/125",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/126",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/127",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/128",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/129",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/130",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/131",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/132",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/133",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/134",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/135",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/136",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/137",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/138",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/139",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/140",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/141",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/142",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/143",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/144",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/145",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/146",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/147",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/148",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/149",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/150",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/151",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/152",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/153",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/154",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
+        ],
+        "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
+        "day_count": [
+          "#/$defs/d_c0401254ec268b317b65",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/0",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/1",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/2",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/3",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/4",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/5",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/6",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/7",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/8",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/9",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/10",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/11",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
+          "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/day_count/anyOf/1",
+          "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
+        ],
+        "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
+        "double": [
+          "#/$defs/CallAssumption/properties/price_pct",
+          "#/$defs/CardPortfolioSpec/properties/charge_off_rate",
+          "#/$defs/CardPortfolioSpec/properties/fixed_allocation_decimal",
+          "#/$defs/CardPortfolioSpec/properties/monthly_payment_rate",
+          "#/$defs/CardPortfolioSpec/properties/portfolio_yield",
+          "#/$defs/StructuredCredit/properties/cleanup_call_decimal",
+          "#/$defs/CorrelationStructure/oneOf/0/properties/asset_correlation",
+          "#/$defs/CorrelationStructure/oneOf/0/properties/prepay_default_correlation",
+          "#/$defs/CorrelationStructure/oneOf/1/properties/inter_sector",
+          "#/$defs/CorrelationStructure/oneOf/1/properties/intra_sector",
+          "#/$defs/CorrelationStructure/oneOf/1/properties/prepay_default",
+          "#/$defs/CorrelationStructure/oneOf/2/properties/correlations/items",
+          "#/$defs/AdvanceRate/properties/rate",
+          "#/$defs/ConcentrationLimit/properties/max_pct",
+          "#/$defs/CccBucketRule/properties/threshold_pct",
+          "#/$defs/DefaultedValuation/oneOf/1/properties/market_value/properties/pct",
+          "#/$defs/DiscountObligationRule/properties/price_threshold_pct",
+          "#/$defs/CoverageRules/properties/rating_haircuts/additionalProperties",
+          "#/$defs/CoverageTestSpec/properties/divert_pct",
+          "#/$defs/CoverageTestSpec/properties/trigger_level",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/0/properties/cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/severity",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/AdvancingPolicy/oneOf/1/properties/recoverability_cap_pct",
+          "#/$defs/DelinquencyModel/properties/cure_rates/items",
+          "#/$defs/ModificationSpec/properties/rate_reduction_bp",
+          "#/$defs/ModificationSpec/properties/share_of_delinquent",
+          "#/$defs/DelinquencyModel/properties/roll_rates/items",
+          "#/$defs/IncentiveFeeSpec/properties/hurdle_irr",
+          "#/$defs/IncentiveFeeSpec/properties/share",
+          "#/$defs/DealFees/properties/liquidation_fee_pct",
+          "#/$defs/DealFees/properties/master_servicer_fee_bp",
+          "#/$defs/DealFees/properties/senior_mgmt_fee_bp",
+          "#/$defs/DealFees/properties/servicing_fee_bp",
+          "#/$defs/DealFees/properties/special_servicer_fee_bp",
+          "#/$defs/DealFees/properties/subordinated_mgmt_fee_bp",
+          "#/$defs/DealFees/properties/workout_fee_pct",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_asw_market",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_clean_price_pct",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_dirty_price_currency",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_discount_margin",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_i_spread",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_japanese_simple_yield",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_oas",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_premium",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_ytm",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_ytw",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_z_spread",
+          "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
+          "#/$defs/d_572ad1befb7d94914652/properties/bk_mean_reversion",
+          "#/$defs/d_572ad1befb7d94914652/properties/bk_sigma",
+          "#/$defs/d_572ad1befb7d94914652/properties/call_friction_cents",
+          "#/$defs/d_572ad1befb7d94914652/properties/hazard_mean_reversion",
+          "#/$defs/d_572ad1befb7d94914652/properties/hazard_sigma",
+          "#/$defs/d_572ad1befb7d94914652/properties/hw1f_mean_reversion",
+          "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma",
+          "#/$defs/d_cdb8fddc0106047270c4/properties/times/items",
+          "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
+          "#/$defs/d_572ad1befb7d94914652/properties/lmm_base_vol",
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_target_ci_half_width",
+          "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
+          "#/$defs/EligibleCollateralSchedule/properties/default_haircut",
+          "#/$defs/CollateralEligibility/properties/concentration_limit",
+          "#/$defs/CollateralEligibility/properties/fx_haircut_addon",
+          "#/$defs/CollateralEligibility/properties/haircut",
+          "#/$defs/MaturityConstraints/properties/max_remaining_years",
+          "#/$defs/MaturityConstraints/properties/min_remaining_years",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/credit_spread_bump_bp",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/rate_bump_bp",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
+          "#/$defs/d_7e19cc4df9954b864180",
+          "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
+          "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
+          "#/$defs/StructuredCredit/properties/liquidation_price_pct",
+          "#/$defs/MarketConditions/properties/refi_rate",
+          "#/$defs/AssetType/oneOf/9/properties/ltv",
+          "#/$defs/AssetType/oneOf/10/properties/ltv",
+          "#/$defs/AssetType/oneOf/11/properties/ltv",
+          "#/$defs/AssetType/oneOf/12/properties/ltv",
+          "#/$defs/AssetType/oneOf/13/properties/ltv",
+          "#/$defs/AssetType/oneOf/14/properties/ltv",
+          "#/$defs/AssetType/oneOf/15/properties/ltv",
+          "#/$defs/AssetType/oneOf/16/properties/ltv",
+          "#/$defs/AssetType/oneOf/17/properties/ltv",
+          "#/$defs/AssetType/oneOf/18/properties/ltv",
+          "#/$defs/AssetType/oneOf/19/properties/ltv",
+          "#/$defs/AssetType/oneOf/20/properties/ltv",
+          "#/$defs/BalloonSpec/properties/extension_prob",
+          "#/$defs/BalloonSpec/properties/extension_rate",
+          "#/$defs/BalloonSpec/properties/loss_prob",
+          "#/$defs/BalloonSpec/properties/severity_pct",
+          "#/$defs/PoolAsset/properties/index_floor_bp",
+          "#/$defs/LiquidationSpec/properties/carry_cost_pct",
+          "#/$defs/LiquidationSpec/properties/modified_rate",
+          "#/$defs/LiquidationSpec/properties/proceeds_pct",
+          "#/$defs/LiquidationSpec/properties/reperformance_prob",
+          "#/$defs/PoolAsset/properties/market_price_pct",
+          "#/$defs/PoolAsset/properties/mdr_override",
+          "#/$defs/PrepaymentPenalty/oneOf/1/properties/pct",
+          "#/$defs/PenaltyStep/properties/pct",
+          "#/$defs/PrepaymentPenalty/oneOf/3/properties/floor_pct",
+          "#/$defs/PrepaymentPenalty/oneOf/3/properties/reinvestment_rate",
+          "#/$defs/PoolAsset/properties/rate",
+          "#/$defs/PoolAsset/properties/recovery_rate",
+          "#/$defs/PoolAsset/properties/smm_override",
+          "#/$defs/SpecialServicingSpec/properties/appraisal_reduction_pct",
+          "#/$defs/PoolAsset/properties/spread_bp",
+          "#/$defs/MakeWholeSpec/properties/spread_bp",
+          "#/$defs/CallPut/properties/price_pct_of_par",
+          "#/$defs/AmortizationSpec/oneOf/3/properties/percent_of_original_per_period/properties/pct",
+          "#/$defs/AmortizationSpec/oneOf/4/properties/percent_of_remaining_per_period/properties/pct",
+          "#/$defs/CashFlowAccrual/properties/projected_index_rate",
+          "#/$defs/CashFlow/properties/accrual_factor",
+          "#/$defs/CashFlow/properties/rate",
+          "#/$defs/ProjectedFixing/properties/value",
+          "#/$defs/IssuePrice/oneOf/2/properties/pct_of_par",
+          "#/$defs/ReturnFloorKind/oneOf/0/properties/moic",
+          "#/$defs/ReturnFloorKind/oneOf/1/properties/xirr",
+          "#/$defs/CallExercisePolicy/oneOf/3/properties/threshold_bp",
+          "#/$defs/PutExercisePolicy/oneOf/2/properties/threshold_bp",
+          "#/$defs/McConfig/properties/correlation_matrix/items/items",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/0/properties/cir/properties/initial",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/0/properties/cir/properties/kappa",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/0/properties/cir/properties/sigma",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/0/properties/cir/properties/theta",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/1/properties/constant",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/2/properties/market_anchored/properties/implied_vol",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/2/properties/market_anchored/properties/kappa",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/2/properties/market_anchored/properties/tenor_years",
+          "#/$defs/InterestRateProcessSpec/properties/hull_white_1f/properties/hw1f_mean_reversion",
+          "#/$defs/InterestRateProcessSpec/properties/hull_white_1f/properties/hw1f_sigma",
+          "#/$defs/InterestRateProcessSpec/properties/hull_white_1f/properties/initial",
+          "#/$defs/InterestRateProcessSpec/properties/hull_white_1f/properties/theta",
+          "#/$defs/McConfig/properties/util_credit_corr",
+          "#/$defs/UtilizationProcess/properties/mean_reverting/properties/kappa",
+          "#/$defs/UtilizationProcess/properties/mean_reverting/properties/sigma",
+          "#/$defs/UtilizationProcess/properties/mean_reverting/properties/spread_sensitivity",
+          "#/$defs/UtilizationProcess/properties/mean_reverting/properties/theta",
+          "#/$defs/RevolvingCreditFees/properties/facility_fee_bp",
+          "#/$defs/FeeStep/properties/commitment_delta_bp",
+          "#/$defs/FeeStep/properties/facility_delta_bp",
+          "#/$defs/FeeStep/properties/usage_delta_bp",
+          "#/$defs/UpfrontFee/oneOf/1/properties/fraction_of_commitment",
+          "#/$defs/LetterOfCreditSpec/properties/fee_bp",
+          "#/$defs/LetterOfCreditSpec/properties/fronting_fee_bp",
+          "#/$defs/LetterOfCreditSpec/properties/leq",
+          "#/$defs/RevolvingCredit/properties/leq",
+          "#/$defs/RateSpec/oneOf/0/properties/fixed/properties/rate",
+          "#/$defs/RevolvingCredit/properties/recovery_rate",
+          "#/$defs/LoanCall/properties/price_pct_of_par",
+          "#/$defs/ReinvestmentAssumptions/properties/all_in_floor_bp",
+          "#/$defs/ReinvestmentAssumptions/properties/price_pct",
+          "#/$defs/ReinvestmentAssumptions/properties/spread_bp",
+          "#/$defs/ReinvestmentCriteria/properties/max_price_pct",
+          "#/$defs/ReinvestmentCriteria/properties/min_yield",
+          "#/$defs/RepLine/properties/cdr",
+          "#/$defs/RepLine/properties/cpr",
+          "#/$defs/RepLine/properties/index_floor_bp",
+          "#/$defs/RepLine/properties/rate",
+          "#/$defs/RepLine/properties/recovery_rate",
+          "#/$defs/RepLine/properties/spread_bp",
+          "#/$defs/AssetPool/properties/reserve_account_rate",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_6f4088f89d6bfc98e242/properties/rate",
+          "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/severity",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/StochasticDefaultSpec/oneOf/1/properties/base_cdr",
+          "#/$defs/CopulaSpec/oneOf/1/properties/degrees_of_freedom",
+          "#/$defs/CopulaSpec/oneOf/2/properties/loading_volatility",
+          "#/$defs/StochasticDefaultSpec/oneOf/1/properties/correlation",
+          "#/$defs/StochasticDefaultSpec/oneOf/2/properties/base_hazard",
+          "#/$defs/StochasticDefaultSpec/oneOf/2/properties/correlation",
+          "#/$defs/StochasticDefaultSpec/oneOf/2/properties/factor_loading",
+          "#/$defs/StochasticDefaultSpec/oneOf/2/properties/mean_reversion",
+          "#/$defs/StochasticDefaultSpec/oneOf/2/properties/volatility",
+          "#/$defs/StochasticDefaultSpec/oneOf/3/properties/cdr_volatility",
+          "#/$defs/StochasticDefaultSpec/oneOf/3/properties/factor_loading",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/speed",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/StochasticPrepaySpec/oneOf/1/properties/cpr_volatility",
+          "#/$defs/StochasticPrepaySpec/oneOf/1/properties/factor_loading",
+          "#/$defs/StochasticPrepaySpec/oneOf/2/properties/base_cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/2/properties/burnout_rate",
+          "#/$defs/StochasticPrepaySpec/oneOf/2/properties/cpr_volatility",
+          "#/$defs/StochasticPrepaySpec/oneOf/2/properties/factor_loading",
+          "#/$defs/StochasticPrepaySpec/oneOf/2/properties/pool_coupon",
+          "#/$defs/StochasticPrepaySpec/oneOf/2/properties/refi_sensitivity",
+          "#/$defs/StochasticPrepaySpec/oneOf/3/properties/cpr_volatility",
+          "#/$defs/StochasticPrepaySpec/oneOf/3/properties/factor_loading",
+          "#/$defs/StochasticPrepaySpec/oneOf/3/properties/high_cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/3/properties/low_cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_down",
+          "#/$defs/StochasticPrepaySpec/oneOf/3/properties/transition_up",
+          "#/$defs/ClosedUnitIntervalF64Wire",
+          "#/$defs/CorrelationWire",
+          "#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
+          "#/$defs/Tranche/properties/attach_pct",
+          "#/$defs/Tranche/properties/detach_pct",
+          "#/$defs/CoverageTrigger/properties/cure_level",
+          "#/$defs/CoverageTrigger/properties/trigger_level",
+          "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/rate",
+          "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/rate",
+          "#/$defs/PaymentCalculation/oneOf/7/properties/capped_tranche_interest/properties/cap_rate",
+          "#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee/properties/hurdle_irr",
+          "#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee/properties/share",
+          "#/$defs/Recipient/properties/weight",
+          "#/$defs/AfcSpec/properties/net_wac_fee_bp",
+          "#/$defs/EarlyAmortizationSpec/properties/max_cumulative_loss",
+          "#/$defs/EarlyAmortizationSpec/properties/min_excess_spread_3m",
+          "#/$defs/ExcessSpreadSpec/properties/trap_loss_decimal",
+          "#/$defs/ReserveTarget/oneOf/1/properties/fraction_of_current",
+          "#/$defs/ReserveTarget/oneOf/2/properties/fraction_of_original",
+          "#/$defs/ShiftingInterestStep/properties/senior_decimal",
+          "#/$defs/StepDownTrigger/oneOf/0/properties/max_cumulative_loss",
+          "#/$defs/StepDownTrigger/oneOf/1/properties/min_oc_ratio",
+          "#/$defs/StepDownTrigger/oneOf/2/properties/min_credit_enhancement",
+          "#/$defs/StepDownTrigger/oneOf/3/properties/max_delinquency",
+          "#/$defs/TargetOcSpec/properties/floor_fraction_of_original",
+          "#/$defs/TargetOcSpec/properties/fraction_of_current"
+        ],
+        "external-union": [
+          { "pointer": "#/$defs/CashflowSpec", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ReturnFloorKind", "keyword": "oneOf" },
+          { "pointer": "#/$defs/DrawRepaySpec", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CreditSpreadProcessSpec", "keyword": "oneOf" },
+          { "pointer": "#/$defs/UpfrontFee", "keyword": "oneOf" },
+          { "pointer": "#/$defs/RateSpec", "keyword": "oneOf" },
+          { "pointer": "#/$defs/OidPolicy", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ReserveTarget", "keyword": "oneOf" },
+          { "pointer": "#/$defs/StepDownTrigger", "keyword": "oneOf" }
+        ],
+        "int32": [
+          "#/$defs/FixedLegSpec/properties/payment_lag_days",
+          "#/$defs/FloatLegSpec/properties/payment_lag_days",
+          "#/$defs/FloatLegSpec/properties/reset_lag_days",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
+          "#/$defs/d_67346ed55fd8e55563e7/properties/payment_lag_days",
+          "#/$defs/FloatingCouponSpec/properties/payment_lag_days",
+          "#/$defs/FloatingRateSpec/properties/reset_lag_days",
+          "#/$defs/StepUpCouponSpec/properties/payment_lag_days",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
+          "#/$defs/RepLine/properties/reset_lag_days"
+        ],
+        "internal-union": [
+          {
+            "pointer": "#/$defs/CorrelationStructure",
+            "keyword": "oneOf",
+            "discriminators": ["structure"]
+          },
+          {
+            "pointer": "#/$defs/CoveragePlacement",
+            "keyword": "oneOf",
+            "discriminators": ["kind"]
+          },
+          {
+            "pointer": "#/$defs/d_c367978e081b7093ec11",
+            "keyword": "oneOf",
+            "discriminators": ["curve"]
+          },
+          {
+            "pointer": "#/$defs/AdvancingPolicy",
+            "keyword": "oneOf",
+            "discriminators": ["policy"]
+          },
+          {
+            "pointer": "#/$defs/SimmCreditClassification",
+            "keyword": "oneOf",
+            "discriminators": ["risk_class"]
+          },
+          {
+            "pointer": "#/$defs/AssetType",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          },
+          {
+            "pointer": "#/$defs/PrepaymentPenalty",
+            "keyword": "oneOf",
+            "discriminators": ["kind"]
+          },
+          {
+            "pointer": "#/$defs/CallExercisePolicy",
+            "keyword": "oneOf",
+            "discriminators": ["policy"]
+          },
+          {
+            "pointer": "#/$defs/PutExercisePolicy",
+            "keyword": "oneOf",
+            "discriminators": ["policy"]
+          },
+          {
+            "pointer": "#/$defs/ReserveInterestDestination",
+            "keyword": "oneOf",
+            "discriminators": ["kind"]
+          },
+          {
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
+            "keyword": "oneOf",
+            "discriminators": ["curve"]
+          },
+          {
+            "pointer": "#/$defs/StochasticDefaultSpec",
+            "keyword": "oneOf",
+            "discriminators": ["model"]
+          },
+          {
+            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0",
+            "keyword": "oneOf",
+            "discriminators": ["curve"]
+          },
+          {
+            "pointer": "#/$defs/CopulaSpec",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          },
+          {
+            "pointer": "#/$defs/StochasticPrepaySpec",
+            "keyword": "oneOf",
+            "discriminators": ["model"]
+          },
+          {
+            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0",
+            "keyword": "oneOf",
+            "discriminators": ["curve"]
+          },
+          {
+            "pointer": "#/$defs/RecoverySpec",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          }
+        ],
+        "map": [
+          "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/meta",
+          "#/$defs/CoverageRules/properties/rating_haircuts"
+        ],
+        "mixed-unit-external-union": [
+          { "pointer": "#/$defs/CallScope", "keyword": "oneOf" },
+          { "pointer": "#/$defs/DefaultedValuation", "keyword": "oneOf" },
+          { "pointer": "#/$defs/SwapNotional", "keyword": "oneOf" },
+          { "pointer": "#/$defs/FloatingLegCompounding", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_5c13df5a55f1da604df2", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ClearingStatus", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_a561434dff1275f40d83", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CouponType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/FloatingRateFallback", "keyword": "oneOf" },
+          { "pointer": "#/$defs/AmortizationSpec", "keyword": "oneOf" },
+          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" },
+          { "pointer": "#/$defs/IssuePrice", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ProtectionWindow", "keyword": "oneOf" },
+          { "pointer": "#/$defs/LoanCallType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/PaymentCalculation", "keyword": "oneOf" },
+          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" }
+        ],
+        "money": [
+          "#/$defs/d_4ba43030fede59fe5993",
+          "#/$defs/d_bdf84b73c34f6ec51af5",
+          "#/$defs/d_9bbbe0cc70b45831cb71",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/0",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/1",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/2",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/3",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/4",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/5",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/6",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/7",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/8",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/9",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/10",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/11",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/12",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/13",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/14",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/15",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/16",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/17",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/18",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/19",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/20",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/21",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/22",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/23",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/24",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/25",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/26",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/27",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/28",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/29",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/30",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/31",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/32",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/33",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/34",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/35",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/36",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/37",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/38",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/39",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/40",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/41",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/42",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/43",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/44",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/45",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/46",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/47",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/48",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/49",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/50",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/51",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/52",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/53",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/54",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/55",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/56",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/57",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/58",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/59",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/60",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/61",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/62",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/63",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/64",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/65",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/66",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/67",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/68",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/69",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/70",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/71",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/72",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/73",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/74",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/75",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/76",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/77",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/78",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/79",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/80",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/81",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/82",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/83",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/84",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/85",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/86",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/87",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/88",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/89",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/90",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/91",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/92",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/93",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/94",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/95",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/96",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/97",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/98",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/99",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/100",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/101",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/102",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/103",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/104",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/105",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/106",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/107",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/108",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/109",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/110",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/111",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/112",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/113",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/114",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/115",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/116",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/117",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/118",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/119",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/120",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/121",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/122",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/123",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/124",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/125",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/126",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/127",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/128",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/129",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/130",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/131",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/132",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/133",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/134",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/135",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/136",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/137",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/138",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/139",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/140",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/141",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/142",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/143",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/144",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/145",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/146",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/147",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/148",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/149",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/150",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/151",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/152",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/153",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/154",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
+        ],
+        "nullable-array": [
+          "#/$defs/PoolAsset/properties/delinquency_buckets",
+          "#/$defs/DayCountContextState/properties/coupon_period",
+          "#/$defs/McConfig/properties/correlation_matrix",
+          "#/$defs/AssetPool/properties/rep_lines",
+          "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector"
+        ],
+        "nullable-boolean": [
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
+          "#/$defs/DayCountContextState/properties/end_is_termination_date",
+          "#/$defs/StructuredCredit/properties/principal_covers_senior_interest",
+          "#/$defs/Tranche/properties/non_deferrable"
+        ],
+        "nullable-integer": [
+          "#/$defs/CallAssumption/properties/after_early_amortization_months",
+          "#/$defs/EligibilityRule/properties/max_days_past_due",
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
+          "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
+          "#/$defs/PoolAsset/properties/amortization_term_months",
+          "#/$defs/PoolAsset/properties/io_months",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
+          "#/$defs/DayCountContextState/properties/bus_basis",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
+          "#/$defs/RepLine/properties/amortization_term_months",
+          "#/$defs/RepLine/properties/io_months",
+          "#/$defs/RepLine/properties/reset_lag_days"
+        ],
+        "nullable-number": [
+          "#/$defs/CardPortfolioSpec/properties/fixed_allocation_decimal",
+          "#/$defs/StructuredCredit/properties/cleanup_call_decimal",
+          "#/$defs/CoverageTestSpec/properties/divert_pct",
+          "#/$defs/DealFees/properties/liquidation_fee_pct",
+          "#/$defs/DealFees/properties/master_servicer_fee_bp",
+          "#/$defs/DealFees/properties/special_servicer_fee_bp",
+          "#/$defs/DealFees/properties/workout_fee_pct",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_asw_market",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_clean_price_pct",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_dirty_price_currency",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_discount_margin",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_i_spread",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_japanese_simple_yield",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_oas",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_premium",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_ytm",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_ytw",
+          "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_z_spread",
+          "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
+          "#/$defs/d_572ad1befb7d94914652/properties/bk_mean_reversion",
+          "#/$defs/d_572ad1befb7d94914652/properties/bk_sigma",
+          "#/$defs/d_572ad1befb7d94914652/properties/call_friction_cents",
+          "#/$defs/d_572ad1befb7d94914652/properties/hazard_mean_reversion",
+          "#/$defs/d_572ad1befb7d94914652/properties/hazard_sigma",
+          "#/$defs/d_572ad1befb7d94914652/properties/hw1f_mean_reversion",
+          "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma",
+          "#/$defs/d_572ad1befb7d94914652/properties/lmm_base_vol",
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_target_ci_half_width",
+          "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
+          "#/$defs/EligibleCollateralSchedule/properties/default_haircut",
+          "#/$defs/CollateralEligibility/properties/concentration_limit",
+          "#/$defs/MaturityConstraints/properties/max_remaining_years",
+          "#/$defs/MaturityConstraints/properties/min_remaining_years",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/credit_spread_bump_bp",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/rate_bump_bp",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
+          "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
+          "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
+          "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
+          "#/$defs/StructuredCredit/properties/liquidation_price_pct",
+          "#/$defs/AssetType/oneOf/9/properties/ltv",
+          "#/$defs/AssetType/oneOf/10/properties/ltv",
+          "#/$defs/AssetType/oneOf/11/properties/ltv",
+          "#/$defs/AssetType/oneOf/12/properties/ltv",
+          "#/$defs/AssetType/oneOf/13/properties/ltv",
+          "#/$defs/AssetType/oneOf/14/properties/ltv",
+          "#/$defs/AssetType/oneOf/15/properties/ltv",
+          "#/$defs/AssetType/oneOf/16/properties/ltv",
+          "#/$defs/AssetType/oneOf/17/properties/ltv",
+          "#/$defs/AssetType/oneOf/18/properties/ltv",
+          "#/$defs/AssetType/oneOf/19/properties/ltv",
+          "#/$defs/AssetType/oneOf/20/properties/ltv",
+          "#/$defs/BalloonSpec/properties/extension_rate",
+          "#/$defs/PoolAsset/properties/index_floor_bp",
+          "#/$defs/LiquidationSpec/properties/modified_rate",
+          "#/$defs/PoolAsset/properties/market_price_pct",
+          "#/$defs/PoolAsset/properties/mdr_override",
+          "#/$defs/PrepaymentPenalty/oneOf/3/properties/floor_pct",
+          "#/$defs/PrepaymentPenalty/oneOf/3/properties/reinvestment_rate",
+          "#/$defs/PoolAsset/properties/recovery_rate",
+          "#/$defs/PoolAsset/properties/smm_override",
+          "#/$defs/PoolAsset/properties/spread_bp",
+          "#/$defs/CashFlowAccrual/properties/projected_index_rate",
+          "#/$defs/CashFlow/properties/rate",
+          "#/$defs/ProjectedFixing/properties/value",
+          "#/$defs/CreditSpreadProcessSpec/oneOf/2/properties/market_anchored/properties/tenor_years",
+          "#/$defs/McConfig/properties/util_credit_corr",
+          "#/$defs/LetterOfCreditSpec/properties/fee_bp",
+          "#/$defs/ReinvestmentAssumptions/properties/all_in_floor_bp",
+          "#/$defs/RepLine/properties/cdr",
+          "#/$defs/RepLine/properties/cpr",
+          "#/$defs/RepLine/properties/index_floor_bp",
+          "#/$defs/RepLine/properties/recovery_rate",
+          "#/$defs/RepLine/properties/spread_bp",
+          "#/$defs/Tranche/properties/attach_pct",
+          "#/$defs/Tranche/properties/detach_pct",
+          "#/$defs/CoverageTrigger/properties/cure_level",
+          "#/$defs/Recipient/properties/weight",
+          "#/$defs/AfcSpec/properties/net_wac_fee_bp",
+          "#/$defs/EarlyAmortizationSpec/properties/max_cumulative_loss",
+          "#/$defs/EarlyAmortizationSpec/properties/min_excess_spread_3m",
+          "#/$defs/ExcessSpreadSpec/properties/trap_loss_decimal"
+        ],
+        "nullable-string": [
+          "#/$defs/Metadata/properties/manager_id",
+          "#/$defs/Metadata/properties/master_servicer_id",
+          "#/$defs/Metadata/properties/servicer_id",
+          "#/$defs/Metadata/properties/special_servicer_id",
+          "#/$defs/Metadata/properties/trustee_id",
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
+          "#/$defs/CollateralEligibility/properties/min_rating",
+          "#/$defs/PoolAsset/properties/forward_curve_id",
+          "#/$defs/PoolAsset/properties/industry",
+          "#/$defs/PoolAsset/properties/obligor_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
+          "#/$defs/ReinvestmentAssumptions/properties/forward_curve_id",
+          "#/$defs/RepLine/properties/forward_curve_id"
+        ],
+        "nullable-union": [
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/business_day_convention",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/call_assumption",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/card",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CardPortfolioSpec/properties/seller_interest",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/correlation_structure",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/coverage_rules",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CoverageRules/properties/borrowing_base",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/EligibilityRule/properties/max_maturity",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CoverageRules/properties/ccc_bucket",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CoverageRules/properties/discount_obligation",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CoverageTestSpec/properties/placement",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/delinquency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DelinquencyModel/properties/modification",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/fees",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DealFees/properties/incentive_fee",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FixedLegSpec/properties/calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatLegSpec/properties/calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatLegSpec/properties/fixing_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/merton_mc_config",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/structured_credit_pool_granularity",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/tree_discount_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/InterestRateSwap/properties/margin_spec",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CollateralEligibility/properties/maturity_constraints",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CsaSpec/properties/im_params",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/OtcMarginSpec/properties/simm_credit_classification",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_00292b2cd9779815232f/properties/bond_risk_basis",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_00292b2cd9779815232f/properties/breakeven_config",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_00292b2cd9779815232f/properties/theta_day_basis",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_00292b2cd9779815232f/properties/theta_period",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_00292b2cd9779815232f/properties/var_config",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/loss_allocation",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/loss_recognition",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/acquisition_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/balloon",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/commitment",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/contractual_payment",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/default_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/liquidation",
+            "keyword": "anyOf"
+          },
+          { "pointer": "#/$defs/PoolAsset/properties/noi", "keyword": "anyOf" },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/origination_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/prepayment_penalty",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PrepaymentPenalty/oneOf/0/properties/through",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PrepaymentPenalty/oneOf/1/properties/through",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PrepaymentPenalty/oneOf/3/properties/discount_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PrepaymentPenalty/oneOf/3/properties/through",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/purchase_price",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/rating",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/recovery_amount",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PoolAsset/properties/special_servicing",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/AssetPool/properties/instruments",
+            "keyword": "anyOf"
+          },
+          { "pointer": "#/$defs/Bond/properties/call_put", "keyword": "anyOf" },
+          {
+            "pointer": "#/$defs/CallPut/properties/make_whole",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatingRateSpec/properties/all_in_cap_bp",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatingRateSpec/properties/all_in_floor_bp",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatingRateSpec/properties/compounding",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatingRateSpec/properties/fixing_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatingRateSpec/properties/index_cap_bp",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatingRateSpec/properties/index_floor_bp",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatingRateSpec/properties/index_tenor",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FloatingRateSpec/properties/overnight_basis",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Bond/properties/credit_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Bond/properties/custom_cashflows",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CashFlow/properties/accrual",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DayCountContextState/properties/frequency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CashFlow/properties/principal_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CashFlow/properties/principal_delta",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CashFlow/properties/reset_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CashFlowMeta/properties/commitment",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CashFlowMeta/properties/issue_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CashFlowMeta/properties/maturity",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Bond/properties/ex_coupon_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Bond/properties/repo_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Bond/properties/return_floor",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/InstrumentExerciseOverride/properties/call",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/InstrumentExerciseOverride/properties/put",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/RevolvingCredit/properties/calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/RevolvingCredit/properties/credit_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StochasticUtilizationSpec/properties/mc_config",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/McConfig/properties/interest_rate_process",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/RevolvingCreditFees/properties/upfront_fee",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/RevolvingCredit/properties/lc",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/RevolvingCredit/properties/oid_eir",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/TermLoan/properties/calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/TermLoan/properties/call_schedule",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/TermLoan/properties/covenants",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/TermLoan/properties/credit_curve_id",
+            "keyword": "anyOf"
+          },
+          { "pointer": "#/$defs/TermLoan/properties/ddtl", "keyword": "anyOf" },
+          {
+            "pointer": "#/$defs/DdtlSpec/properties/oid_policy",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/TermLoan/properties/oid_eir",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/TermLoan/properties/upfront_fee",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/AssetPool/properties/original_balance",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/AssetPool/properties/reinvestment_period",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/ReinvestmentPeriod/properties/assumptions",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/RepLine/properties/contractual_payment",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/AssetPool/properties/reserve_target",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/quote_settlement_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/stochastic_default_spec",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/stochastic_prepay_spec",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/stochastic_recovery_spec",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/tranche_readvance",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Tranche/properties/ic_trigger",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CoverageTrigger/properties/breach_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Tranche/properties/oc_trigger",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Tranche/properties/rating",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/waterfall",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Waterfall/properties/coverage_rules",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallTier/properties/funding",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/0/properties/fixed_amount/properties/rounding",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/day_count",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/rounding",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/rounding",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/3/properties/tranche_interest/properties/rounding",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/4/properties/tranche_principal/properties/rounding",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/4/properties/tranche_principal/properties/target_balance",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/PaymentCalculation/oneOf/7/properties/capped_tranche_interest/properties/rounding",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/StructuredCredit/properties/waterfall_rules",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallRules/properties/afc",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallRules/properties/controlled_accumulation",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallRules/properties/early_amortization",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallRules/properties/excess_spread",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallRules/properties/reserve",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallRules/properties/shifting_interest",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallRules/properties/step_down",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/WaterfallRules/properties/target_oc",
+            "keyword": "anyOf"
+          }
+        ],
+        "object-array": [
+          "#/$defs/BorrowingBaseRules/properties/advance_rates",
+          "#/$defs/BorrowingBaseRules/properties/concentration_limits",
+          "#/$defs/StructuredCredit/properties/coverage_triggers",
+          "#/$defs/StructuredCredit/properties/hedge_swaps",
+          "#/$defs/EligibleCollateralSchedule/properties/eligible",
+          "#/$defs/AssetPool/properties/assets",
+          "#/$defs/PoolAsset/properties/delinquency_buckets",
+          "#/$defs/PrepaymentPenalty/oneOf/2/properties/schedule",
+          "#/$defs/InstrumentCollateral/properties/bonds",
+          "#/$defs/CallPutSchedule/properties/calls",
+          "#/$defs/CallPutSchedule/properties/puts",
+          "#/$defs/CashFlowSchedule/properties/flows",
+          "#/$defs/CashFlowMeta/properties/projected_fixings",
+          "#/$defs/InstrumentCollateral/properties/overrides",
+          "#/$defs/InstrumentCollateral/properties/revolvers",
+          "#/$defs/RevolvingCredit/properties/commitment_steps",
+          "#/$defs/DrawRepaySpec/oneOf/0/properties/deterministic",
+          "#/$defs/RevolvingCreditFees/properties/commitment_fee_tiers",
+          "#/$defs/RevolvingCreditFees/properties/steps",
+          "#/$defs/RevolvingCreditFees/properties/usage_fee_tiers",
+          "#/$defs/LetterOfCreditSpec/properties/events",
+          "#/$defs/RevolvingCredit/properties/margin_steps",
+          "#/$defs/RevolvingCredit/properties/scheduled_fees",
+          "#/$defs/InstrumentCollateral/properties/term_loans",
+          "#/$defs/LoanCallSchedule/properties/calls",
+          "#/$defs/TermLoanCovenantEvents/properties/cash_sweeps",
+          "#/$defs/TermLoanCovenantEvents/properties/margin_steps",
+          "#/$defs/TermLoanCovenantEvents/properties/pik_toggles",
+          "#/$defs/DdtlSpec/properties/commitment_steps",
+          "#/$defs/DdtlSpec/properties/draws",
+          "#/$defs/AssetPool/properties/rep_lines",
+          "#/$defs/StructuredCredit/properties/tranche_draws",
+          "#/$defs/TrancheStructure/properties/tranches",
+          "#/$defs/Waterfall/properties/tiers",
+          "#/$defs/WaterfallTier/properties/recipients",
+          "#/$defs/WaterfallTier/properties/tests",
+          "#/$defs/ShiftingInterestSpec/properties/schedule"
+        ],
+        "optional-property-record": [
+          "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "#/$defs/CoverageRules",
+          "#/$defs/EligibilityRule",
+          "#/$defs/Metadata",
+          "#/$defs/d_c08279a20372931820e0",
+          "#/$defs/d_b0a5fc543381da6a5722",
+          "#/$defs/d_572ad1befb7d94914652",
+          "#/$defs/MaturityConstraints",
+          "#/$defs/d_00292b2cd9779815232f",
+          "#/$defs/d_1d0c1815f8dd0715bd12",
+          "#/$defs/d_e49387f97c0f9d510642",
+          "#/$defs/d_f80c8a31d359e1cb5dd4",
+          "#/$defs/InstrumentCollateral",
+          "#/$defs/DayCountContextState",
+          "#/$defs/OidEirSpec",
+          "#/$defs/WaterfallRules",
+          "#/$defs/EarlyAmortizationSpec"
+        ],
+        "recursive-reference": [
+          {
+            "pointer": "#/$defs/CashflowSpec/oneOf/3/properties/amortizing/properties/base",
+            "ref": "#/$defs/CashflowSpec"
+          },
+          {
+            "pointer": "#/$defs/ReserveTarget/oneOf/3/properties/max/prefixItems/0",
+            "ref": "#/$defs/ReserveTarget"
+          },
+          {
+            "pointer": "#/$defs/ReserveTarget/oneOf/3/properties/max/prefixItems/1",
+            "ref": "#/$defs/ReserveTarget"
+          }
+        ],
+        "tenor": [
+          "#/$defs/d_47e5e74524615b78a19f",
+          "#/$defs/d_47e5e74524615b78a19f/properties/count",
+          "#/$defs/d_69148dfad1155676d8a6",
+          "#/$defs/d_69148dfad1155676d8a6/oneOf/0",
+          "#/$defs/d_69148dfad1155676d8a6/oneOf/1",
+          "#/$defs/d_69148dfad1155676d8a6/oneOf/2",
+          "#/$defs/d_69148dfad1155676d8a6/oneOf/3"
+        ],
+        "tuple": [
+          "#/$defs/StepUpCouponSpec/properties/step_schedule/items",
+          "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule/items",
+          "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items/items",
+          "#/$defs/DayCountContextState/properties/coupon_period",
+          "#/$defs/ReserveTarget/oneOf/3/properties/max"
+        ],
+        "uint": [
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
+          "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
+          "#/$defs/WaterfallTier/properties/priority"
+        ],
+        "uint16": ["#/$defs/DayCountContextState/properties/bus_basis"],
+        "uint32": [
+          "#/$defs/CallAssumption/properties/after_early_amortization_months",
+          "#/$defs/EligibilityRule/properties/max_days_past_due",
+          "#/$defs/ModificationSpec/properties/term_extension_months",
+          "#/$defs/d_47e5e74524615b78a19f/properties/count",
+          "#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
+          "#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
+          "#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
+          "#/$defs/ImParameters/properties/mpor_days",
+          "#/$defs/VmParameters/properties/settlement_lag",
+          "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
+          "#/$defs/PoolAsset/properties/amortization_term_months",
+          "#/$defs/BalloonSpec/properties/extension_months",
+          "#/$defs/BalloonSpec/properties/workout_months",
+          "#/$defs/PoolAsset/properties/io_months",
+          "#/$defs/LiquidationSpec/properties/months_to_resolution",
+          "#/$defs/Bond/properties/ex_coupon_days",
+          "#/$defs/Compounding/oneOf/1/properties/periodic",
+          "#/$defs/Bond/properties/settlement_days",
+          "#/$defs/RevolvingCredit/properties/payment_lag_days",
+          "#/$defs/RevolvingCredit/properties/settlement_days",
+          "#/$defs/TermLoan/properties/settlement_days",
+          "#/$defs/ReinvestmentAssumptions/properties/maturity_months",
+          "#/$defs/RepLine/properties/amortization_term_months",
+          "#/$defs/RepLine/properties/io_months",
+          "#/$defs/RepLine/properties/seasoning_months",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
+          "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
+          "#/$defs/ShiftingInterestStep/properties/months_from_closing"
+        ],
+        "uint8": [
+          "#/$defs/MarginCallTiming/properties/delivery_grace_days",
+          "#/$defs/MarginCallTiming/properties/dispute_resolution_days",
+          "#/$defs/MarginCallTiming/properties/notification_deadline_hours",
+          "#/$defs/MarginCallTiming/properties/response_deadline_hours"
+        ],
+        "unit-union": [
+          { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_9bbbe0cc70b45831cb71", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ConcentrationScope", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CoverageTestAction", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CoverageTestType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/DealType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
+          { "pointer": "#/$defs/SwapPriority", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
+          { "pointer": "#/$defs/StubKind", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_948cdc4db846a21357a4", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_4ac4dad3ab3a5d25d3f9", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CollateralAssetClass", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ImMethodology", "keyword": "oneOf" },
+          { "pointer": "#/$defs/MarginTenor", "keyword": "oneOf" },
+          { "pointer": "#/$defs/SimmCreditSector", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_fd618cd5743ec18a168f", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_ed218c734e46de57eeb9", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_ae5d75ed4e313ae3bc25", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_d30540ea90ce7eca3dee", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_ec4e993309e09fe83294", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
+          { "pointer": "#/$defs/PayReceive", "keyword": "oneOf" },
+          { "pointer": "#/$defs/LossAllocationPolicy", "keyword": "oneOf" },
+          { "pointer": "#/$defs/LossRecognition", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CreditRating", "keyword": "oneOf" },
+          { "pointer": "#/$defs/AccrualMethod", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_41e4cae128a1dd3269e5", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_8e27f171215cebb9cdba", "keyword": "oneOf" },
+          {
+            "pointer": "#/$defs/OvernightIndexConstraintApplication",
+            "keyword": "oneOf"
+          },
+          { "pointer": "#/$defs/RollRule", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CFKind", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CashflowRepresentation", "keyword": "oneOf" },
+          { "pointer": "#/$defs/YieldBasis", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CommitmentFeeBase", "keyword": "oneOf" },
+          { "pointer": "#/$defs/TriggerConsequence", "keyword": "oneOf" },
+          { "pointer": "#/$defs/TrancheSeniority", "keyword": "oneOf" },
+          { "pointer": "#/$defs/AllocationMode", "keyword": "oneOf" },
+          { "pointer": "#/$defs/FundingSource", "keyword": "oneOf" },
+          { "pointer": "#/$defs/PaymentType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/RoundingConvention", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ManagementFeeType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ShiftMode", "keyword": "oneOf" }
+        ]
+      }
+    },
+    {
+      "type": "structured_credit_tranche",
+      "schema": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json",
+      "fixtures": [
+        "finstack-quant/valuations/tests/instruments/json_examples/structured_credit_tranche.json"
       ],
       "constructs": {
         "array": [

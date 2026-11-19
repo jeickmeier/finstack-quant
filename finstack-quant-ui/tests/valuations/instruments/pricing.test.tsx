@@ -124,7 +124,7 @@ it("records exactly one price-changing case per canonical instrument whose sourc
   expect(manifest.cases.map((c) => c.type).sort()).toEqual(
     instruments.map((i) => i.type).sort(),
   );
-  expect(manifest.cases).toHaveLength(78);
+  expect(manifest.cases).toHaveLength(79);
   for (const source of [
     ...manifest.marketProvenance,
     ...manifest.instrumentDependencies,

@@ -4691,6 +4691,7 @@
       "RevolvingCreditBuilder",
       "StructuredCredit",
       "StructuredCreditBuilder",
+      "StructuredCreditTranche",
       "Swaption",
       "SwaptionBuilder",
       "TermLoan",
@@ -5934,6 +5935,13 @@
       "waterfall",
       "waterfallRules"
     ]
+  },
+  "valuations.instruments.StructuredCreditTranche": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["example", "fromDeal", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "getters": ["attributes", "defaultModel", "id", "trancheId"]
   },
   "valuations.instruments.FxSpot": {
     "kind": "class",

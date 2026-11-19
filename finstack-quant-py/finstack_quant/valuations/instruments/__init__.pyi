@@ -157,6 +157,9 @@ from finstack_quant.valuations.instruments._typed_equity import (
     EquityOption as EquityOption,
     EquityOptionBuilder as EquityOptionBuilder,
 )
+from finstack_quant.valuations.instruments._typed_structured_credit.structured_credit_tranche import (
+    StructuredCreditTranche as StructuredCreditTranche,
+)
 from finstack_quant.valuations.instruments._typed_structured_credit.rep_line import RepLine as RepLine
 from finstack_quant.valuations.instruments._typed_structured_credit.asset_pool import AssetPool as AssetPool
 from finstack_quant.valuations.instruments._typed_structured_credit.tranche import (
@@ -372,6 +375,7 @@ __all__ = [
     "SimulationRun",
     "StandardDealParams",
     "StructuredCredit",
+    "StructuredCreditTranche",
     "StructuredCreditBuilder",
     "Swaption",
     "SwaptionBuilder",

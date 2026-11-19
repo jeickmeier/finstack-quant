@@ -2612,6 +2612,12 @@ export default [
     "description": "Asset-backed facility (warehouse line against a collateral pool)."
   },
   {
+    "path": "#/$defs/d_fb65f54b2b8a66e8c994/oneOf/78",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/InstrumentType/oneOf/78",
+    "const": "structured_credit_tranche",
+    "description": "Single note owned by a structured-credit waterfall."
+  },
+  {
     "path": "#/$defs/d_fb65f54b2b8a66e8c994/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/InstrumentType/oneOf/8",
     "const": "bermudan_swaption",

@@ -3423,6 +3423,10 @@ export type InstrumentJson =
       type: "structured_credit";
     }
   | {
+      spec: StructuredCreditTranche;
+      type: "structured_credit_tranche";
+    }
+  | {
       spec: AssetBackedFacility;
       type: "asset_backed_facility";
     }
@@ -17071,6 +17075,7 @@ export interface SharedDefs {
   StochasticPrepaySpec?: StochasticPrepaySpec;
   StochasticUtilizationSpec?: StochasticUtilizationSpec;
   StructuredCredit?: StructuredCredit;
+  StructuredCreditTranche?: StructuredCreditTranche;
   StubKind?: StubKind;
   SwapNotional?: SwapNotional;
   SwapPriority?: SwapPriority;
@@ -55349,6 +55354,17 @@ export interface TargetOcSpec {
   fraction_of_current: number;
 }
 /**
+ * An independently held note priced through its originating deal's waterfall.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "StructuredCreditTranche".
+ */
+export interface StructuredCreditTranche {
+  deal: StructuredCredit;
+  id: Id9;
+  tranche_id: string;
+}
+/**
  * Levered real estate equity = unlevered asset + financing.
  *
  * Value convention:
@@ -56276,6 +56292,10 @@ export interface CompositeLegSpec {
     | {
         spec: StructuredCredit;
         type: "structured_credit";
+      }
+    | {
+        spec: StructuredCreditTranche;
+        type: "structured_credit_tranche";
       }
     | {
         spec: AssetBackedFacility;

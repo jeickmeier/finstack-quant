@@ -1092,6 +1092,7 @@ public = [
     "StochasticPricingResult",
     "StructuredCredit",
     "StructuredCreditBuilder",
+    "StructuredCreditTranche",
     "Swaption",
     "SwaptionBuilder",
     "TermLoan",

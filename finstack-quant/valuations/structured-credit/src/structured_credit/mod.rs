@@ -47,10 +47,11 @@ pub use types::{
     RepLine, ReserveAccountSpec, ReserveInterestDestination, ReserveTarget, RoundingConvention,
     ShiftMode, ShiftingInterestSpec, ShiftingInterestStep, SpecialServicingSpec,
     StandardDealFamily, StandardDealParams, StepDownSpec, StepDownTrigger, StructuredCredit,
-    StructuredCreditBuilder, SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche,
-    TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance,
-    TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution,
-    WaterfallRules, WaterfallTier, calculate_pool_stats, pool_report, standard_deal_families,
+    StructuredCreditBuilder, StructuredCreditTranche, SwapNotional, SwapPriority, TargetOcSpec,
+    TemplateFees, Tranche, TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheDraw,
+    TrancheReadvance, TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder,
+    WaterfallDistribution, WaterfallRules, WaterfallTier, calculate_pool_stats, pool_report,
+    standard_deal_families,
 };
 
 pub use pricing::execute_waterfall;

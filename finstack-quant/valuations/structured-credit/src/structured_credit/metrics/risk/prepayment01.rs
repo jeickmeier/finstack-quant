@@ -17,7 +17,6 @@
 //! the attribution layer's PSA ≈ 6% terminal-CPR convention). `CmbsLockout`
 //! and `Constant` read `cpr` directly.
 
-use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
@@ -111,9 +110,8 @@ pub(crate) struct Prepayment01Calculator;
 
 impl MetricCalculator for Prepayment01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let instrument =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let as_of = context.as_of;
 
         let (prepayment_up, prepayment_down, achieved_bump) =

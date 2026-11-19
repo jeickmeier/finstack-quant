@@ -46,8 +46,10 @@ impl SettlementQuote {
     }
 
     pub(crate) fn from_context(context: &mut MetricContext) -> Result<Self> {
-        let settlement =
-            settlement_date(context.instrument_as::<StructuredCredit>()?, context.as_of)?;
+        let settlement = settlement_date(
+            crate::structured_credit::metrics::metric_deal(context)?,
+            context.as_of,
+        )?;
         let notional = quote_notional(context)?;
         let accrued = accrued_at(context, settlement)?;
         Self::new(settlement, notional, accrued)

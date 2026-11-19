@@ -72882,7 +72882,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-        "sha256": "8e5be364d8ad95ad981df79bd9994e4643a195df2c753e0fe2823480be01b3cb"
+        "sha256": "2a1555d3aa619a6547cfc0e329d29ef671f568bd30bdbef54f2fc5d61f8e7ccf"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -73304,7 +73304,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-        "sha256": "7e2853476a9c75b2d81678ace0f624d147bd3565466bdcfd5fd6d3e1e45e5f68"
+        "sha256": "149ae2d75f3ee7c255003387eeaabceb156e911553cebdf4ef48f289b15e153b"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -74792,7 +74792,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "ee07483240389b6904228429fc6c1afafed211c740e81a23ebeebc0b8daed8e0"
+        "sha256": "18738c2ee83fc47de8296fcd24e48e376d17ce7e6595d4c99ebf11804a711504"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -75061,7 +75061,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "ee07483240389b6904228429fc6c1afafed211c740e81a23ebeebc0b8daed8e0"
+        "sha256": "18738c2ee83fc47de8296fcd24e48e376d17ce7e6595d4c99ebf11804a711504"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -137762,6 +137762,165 @@
             }
           },
           "type": "structured_credit"
+        },
+        "schema": "finstack_quant.instrument/1"
+      },
+      "request": {
+        "asOf": "2023-12-28",
+        "model": "discounting",
+        "metrics": [],
+        "metricPricingOverrides": null,
+        "marketHistory": null
+      }
+    },
+    "structured_credit_tranche": {
+      "instrument": {
+        "instrument": {
+          "spec": {
+            "deal": {
+              "attributes": {},
+              "calendar_id": "nyse",
+              "closing_date": "2024-01-01",
+              "deal_metadata": {
+                "manager_id": null,
+                "master_servicer_id": null,
+                "servicer_id": null,
+                "special_servicer_id": null,
+                "trustee_id": null
+              },
+              "deal_type": "clo",
+              "default_spec": {
+                "cdr": 0.02,
+                "curve": "constant"
+              },
+              "discount_curve_id": "USD-OIS",
+              "first_payment_date": "2024-04-01",
+              "frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "hedge_swaps": [],
+              "id": "CLO-EXAMPLE",
+              "market_conditions": {
+                "refi_rate": 0.04
+              },
+              "maturity": "2034-01-01",
+              "pool": {
+                "assets": [
+                  {
+                    "acquisition_date": null,
+                    "asset_type": {
+                      "type": "high_yield_bond"
+                    },
+                    "balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "contractual_payment": null,
+                    "day_count": "act_360",
+                    "default_date": null,
+                    "defaulted": false,
+                    "forward_curve_id": null,
+                    "id": "COLLATERAL-1",
+                    "industry": null,
+                    "maturity": "2034-01-01",
+                    "mdr_override": null,
+                    "obligor_id": null,
+                    "origination_date": null,
+                    "purchase_price": null,
+                    "rate": 0.07,
+                    "rating": null,
+                    "recovery_amount": null,
+                    "recovery_rate": null,
+                    "smm_override": null,
+                    "spread_bp": null
+                  }
+                ],
+                "collection_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_defaults": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_prepayments": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_scheduled_amortization": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "currency": "USD",
+                "deal_type": "clo",
+                "excess_spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "id": "POOL-1",
+                "reinvestment_period": null,
+                "rep_lines": null,
+                "reserve_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              },
+              "prepayment_spec": {
+                "cpr": 0.2,
+                "curve": "constant"
+              },
+              "recovery_spec": {
+                "rate": 0.6,
+                "recovery_lag": 12
+              },
+              "tranches": {
+                "tranches": [
+                  {
+                    "attach_pct": 0,
+                    "attributes": {},
+                    "coupon": {
+                      "fixed": {
+                        "rate": 0.06
+                      }
+                    },
+                    "current_balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "day_count": "act_360",
+                    "deferred_interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "detach_pct": 100,
+                    "frequency": {
+                      "count": 3,
+                      "unit": "months"
+                    },
+                    "ic_trigger": null,
+                    "id": "CLONOTES-A",
+                    "maturity": "2034-01-01",
+                    "oc_trigger": null,
+                    "original_balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "pik_enabled": false,
+                    "rating": null,
+                    "seniority": "senior"
+                  }
+                ]
+              }
+            },
+            "id": "STRUCTURED-CREDIT-NOTE-EXAMPLE",
+            "tranche_id": "CLONOTES-A"
+          },
+          "type": "structured_credit_tranche"
         },
         "schema": "finstack_quant.instrument/1"
       },

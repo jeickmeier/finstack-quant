@@ -82,6 +82,7 @@ export const instruments = {
   ConvertibleBond: wasm.ConvertibleBond,
   EquityOption: wasm.EquityOption,
   StructuredCredit: wasm.StructuredCredit,
+  StructuredCreditTranche: wasm.StructuredCreditTranche,
   FxSpot: wasm.FxSpot,
   FxForward: wasm.FxForward,
   FxSwap: wasm.FxSwap,

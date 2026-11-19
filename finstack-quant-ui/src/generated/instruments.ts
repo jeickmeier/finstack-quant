@@ -46,6 +46,7 @@ export const instruments = [
   { type: "dollar_roll", title: "dollar_roll", group: "fixed_income", loader: () => import("./instrument/dollar_roll") },
   { type: "inflation_linked_bond", title: "inflation_linked_bond", group: "fixed_income", loader: () => import("./instrument/inflation_linked_bond") },
   { type: "revolving_credit", title: "revolving_credit", group: "fixed_income", loader: () => import("./instrument/revolving_credit") },
+  { type: "structured_credit_tranche", title: "structured_credit_tranche", group: "fixed_income", loader: () => import("./instrument/structured_credit_tranche") },
   { type: "structured_credit", title: "structured_credit", group: "fixed_income", loader: () => import("./instrument/structured_credit") },
   { type: "term_loan", title: "term_loan", group: "fixed_income", loader: () => import("./instrument/term_loan") },
   { type: "trs_fixed_income_index", title: "trs_fixed_income_index", group: "fixed_income", loader: () => import("./instrument/trs_fixed_income_index") },

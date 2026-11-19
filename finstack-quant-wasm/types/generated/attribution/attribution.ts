@@ -2818,6 +2818,10 @@ export type InstrumentJson =
       type: "structured_credit";
     }
   | {
+      spec: StructuredCreditTranche;
+      type: "structured_credit_tranche";
+    }
+  | {
       spec: AssetBackedFacility;
       type: "asset_backed_facility";
     }
@@ -19548,6 +19552,14 @@ export interface TargetOcSpec {
    * pool balance (after the period's collections).
    */
   fraction_of_current: number;
+}
+/**
+ * An independently held note priced through its originating deal's waterfall.
+ */
+export interface StructuredCreditTranche {
+  deal: StructuredCredit;
+  id: Id;
+  tranche_id: string;
 }
 /**
  * Levered real estate equity = unlevered asset + financing.

@@ -458,6 +458,13 @@ no_market_dependencies = false
 rationale = "StructuredCredit.pool: AssetPool lacks PartialEq across heterogeneous collateral assets and runtime-calibrated assumptions."
 
 [[instrument]]
+tag = "structured_credit_tranche"
+partial_eq_blocker = "StructuredCreditTranche.deal: StructuredCredit"
+required_keys = ["id", "deal", "tranche_id"]
+no_market_dependencies = false
+rationale = "StructuredCreditTranche.deal: StructuredCredit lacks PartialEq for its embedded waterfall, collateral and assumptions."
+
+[[instrument]]
 tag = "basket"
 partial_eq_blocker = "Basket.constituents: Vec<BasketConstituent>"
 required_keys = ["id"]

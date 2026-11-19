@@ -33,7 +33,7 @@ it("covers the exact canonical instrument inventory and its source fixtures", ()
   expect(instruments.map((i) => i.type).sort()).toEqual(
     report.instruments.map((i) => i.type).sort(),
   );
-  expect(report.instrumentCount).toBe(78);
+  expect(report.instrumentCount).toBe(79);
   expect(report.instruments.every((i) => i.fixtures.length > 0)).toBe(true);
 });
 it.each(instruments)(

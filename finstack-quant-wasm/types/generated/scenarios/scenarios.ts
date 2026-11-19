@@ -1224,6 +1224,10 @@ export type InstrumentJson =
       type: "structured_credit";
     }
   | {
+      spec: StructuredCreditTranche;
+      type: "structured_credit_tranche";
+    }
+  | {
       spec: AssetBackedFacility;
       type: "asset_backed_facility";
     }
@@ -4494,7 +4498,8 @@ export type InstrumentType =
   | "fx_future_option"
   | "commodity_future_option"
   | "volatility_index_future_option"
-  | "asset_backed_facility";
+  | "asset_backed_facility"
+  | "structured_credit_tranche";
 /**
  * Asset class categories affected by a stress template.
  *
@@ -18482,6 +18487,14 @@ export interface TargetOcSpec {
    * pool balance (after the period's collections).
    */
   fraction_of_current: number;
+}
+/**
+ * An independently held note priced through its originating deal's waterfall.
+ */
+export interface StructuredCreditTranche {
+  deal: StructuredCredit;
+  id: Id;
+  tranche_id: string;
 }
 /**
  * Committed asset-backed facility (warehouse line) against a collateral pool.

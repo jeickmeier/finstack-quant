@@ -25,7 +25,7 @@ const Z_SPREAD_MAX: f64 = 0.50;
 const RELATIVE_BASE_PV_EPSILON: f64 = 1e-12;
 
 fn quoted_target_value(context: &mut MetricContext) -> Result<(f64, f64)> {
-    let deal = context.instrument_as::<StructuredCredit>()?;
+    let deal = crate::structured_credit::metrics::metric_deal(context)?;
     let quotes = &deal.instrument_pricing_overrides.market_quotes;
     if quotes.quoted_clean_price_pct.is_none() && quotes.quoted_dirty_price_currency.is_none() {
         return Err(finstack_quant_core::Error::Validation(
@@ -34,7 +34,7 @@ fn quoted_target_value(context: &mut MetricContext) -> Result<(f64, f64)> {
     }
     let quote = super::super::quote::SettlementQuote::from_context(context)?;
     let target = quote
-        .external_target(context.instrument_as::<StructuredCredit>()?)?
+        .external_target(crate::structured_credit::metrics::metric_deal(context)?)?
         .ok_or_else(|| {
             finstack_quant_core::Error::Validation("missing structured-credit quote target".into())
         })?;
@@ -69,7 +69,7 @@ pub(crate) struct ZSpreadCalculator;
 impl MetricCalculator for ZSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let (target, _) = quoted_target_value(context)?;
-        let deal = context.instrument_as::<StructuredCredit>()?;
+        let deal = crate::structured_credit::metrics::metric_deal(context)?;
         let settlement = super::super::quote::settlement_date(deal, context.as_of)?;
         let flows = context.cashflows.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
@@ -147,7 +147,7 @@ impl MetricCalculator for Cs01Calculator {
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
         let as_of = super::super::quote::settlement_date(
-            context.instrument_as::<StructuredCredit>()?,
+            crate::structured_credit::metrics::metric_deal(context)?,
             context.as_of,
         )?;
         calculate_tranche_cs01(flows, disc.as_ref(), base_spread, as_of)
@@ -538,7 +538,7 @@ impl MetricCalculator for BucketedCs01Calculator {
         let base_spread = context.computed_metric(&MetricId::ZSpread)?;
         let bumped_spread = base_spread + ONE_BASIS_POINT;
         let as_of = super::super::quote::settlement_date(
-            context.instrument_as::<StructuredCredit>()?,
+            crate::structured_credit::metrics::metric_deal(context)?,
             context.as_of,
         )?;
 
@@ -630,8 +630,7 @@ mod zspread_quote_tests {
 
     fn context_with_quote(quoted_price_pct: f64) -> MetricContext {
         let mut context = context_without_quote();
-        let mut deal = context
-            .instrument_as::<StructuredCredit>()
+        let mut deal = crate::structured_credit::metrics::metric_deal(&context)
             .expect("deal")
             .clone();
         deal.instrument_pricing_overrides

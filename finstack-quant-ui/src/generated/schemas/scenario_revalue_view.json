@@ -2906,6 +2906,11 @@
           "const": "asset_backed_facility",
           "description": "Asset-backed facility (warehouse line against a collateral pool).",
           "type": "string"
+        },
+        {
+          "const": "structured_credit_tranche",
+          "description": "Single note owned by a structured-credit waterfall.",
+          "type": "string"
         }
       ]
     },

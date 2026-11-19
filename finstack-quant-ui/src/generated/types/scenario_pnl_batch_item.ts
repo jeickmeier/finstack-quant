@@ -591,7 +591,8 @@ export type D_9F32C296492D66417E76 =
         | "fx_future_option"
         | "commodity_future_option"
         | "volatility_index_future_option"
-        | "asset_backed_facility";
+        | "asset_backed_facility"
+        | "structured_credit_tranche";
       kind: "instrument_shock_fallback";
       /**
        * Instrument label (id / name / unidentified).

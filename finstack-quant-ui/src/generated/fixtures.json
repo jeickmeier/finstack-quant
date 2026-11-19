@@ -341,6 +341,11 @@
   },
   {
     "kind": "instrument",
+    "source": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit_tranche.json",
+    "schema": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json"
+  },
+  {
+    "kind": "instrument",
     "source": "finstack-quant/valuations/tests/instruments/json_examples/swaption.json",
     "schema": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json"
   },

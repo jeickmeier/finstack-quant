@@ -1,52 +1,136 @@
-//! One note of a structured-credit deal priced as an instrument.
-//!
-//! The metric registry reprices "the instrument" for every bump (Default01,
-//! Prepayment01, Recovery01, Severity01, DV01, theta, ...) through
-//! [`Instrument::base_value`]. When a caller asks for one tranche's metrics,
-//! placing the whole deal in the metric context makes every sensitivity a
-//! deal-level number that the senior and the equity share. This view makes
-//! the tranche the priced instrument: `base_value` is the tranche's PV and
-//! nothing else changes.
-//!
-//! The deal's own metric calculators downcast the context instrument to
-//! [`StructuredCredit`]; the view keeps that working by exposing the deal
-//! through `as_any`, so calculators reading deal fields (prices, accrued,
-//! yield, WAL, pool metrics) see the deal while every reprice sees the
-//! tranche.
+//! One selected note with its own identity and its originating deal.
 
 use super::StructuredCredit;
+use super::TrancheCashflows;
 use finstack_quant_cashflows::{ScheduleBuildOpts, schedule_from_classified_flows};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::Attributes;
+use finstack_quant_core::types::{Attributes, InstrumentId};
+use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_valuations_core::metrics::{MetricContext, MetricSeed};
+use serde::{Deserialize, Serialize};
 
-/// A deal plus the identifier of the note the metrics are computed for.
-///
-/// Built by [`tranche_metrics`](crate::structured_credit::tranche_metrics)
-/// for its registry `metrics` pass.
-#[derive(Clone, Debug)]
-pub(crate) struct StructuredCreditTranche {
-    /// The deal that owns the note.
-    pub(crate) deal: StructuredCredit,
-    /// Identifier of the priced note.
-    pub(crate) tranche_id: String,
+/// An independently held note priced through its originating deal's waterfall.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct StructuredCreditTranche {
+    id: InstrumentId,
+    deal: StructuredCredit,
+    tranche_id: String,
 }
 
 impl StructuredCreditTranche {
-    /// Pair a deal with the note whose metrics are wanted.
+    /// Create a position instrument for an explicit note drawn from the deal.
     ///
     /// # Arguments
+    /// * `id` - Stable standalone instrument identifier for portfolio positions and metrics.
+    /// * `deal` - Originating deal with the note, collateral assumptions and waterfall.
+    /// * `tranche_id` - Exact identifier of a note issued by this deal.
     ///
-    /// * `deal` - The structured-credit deal the note belongs to.
-    /// * `tranche_id` - Exact identifier of one of `deal.tranches`.
-    pub(crate) fn new(deal: StructuredCredit, tranche_id: impl Into<String>) -> Self {
-        Self {
+    /// # Errors
+    /// Rejects a blank position instrument ID, an invalid deal, or a missing note.
+    pub fn new(
+        id: InstrumentId,
+        deal: StructuredCredit,
+        tranche_id: impl Into<String>,
+    ) -> Result<Self> {
+        let note = Self {
+            id,
             deal,
             tranche_id: tranche_id.into(),
-        }
+        };
+        note.validate_invariants()?;
+        Ok(note)
+    }
+
+    /// Create a note with a stable identifier derived from the deal and note IDs.
+    ///
+    /// # Arguments
+    /// * `deal` - Originating deal with its unmodified waterfall and collateral.
+    /// * `tranche_id` - Exact identifier of one note issued by the deal.
+    ///
+    /// # Errors
+    /// Rejects invalid deals and unknown notes.
+    pub fn from_deal(deal: StructuredCredit, tranche_id: &str) -> Result<Self> {
+        Self::new(
+            InstrumentId::new(format!("{}::{tranche_id}", deal.id)),
+            deal,
+            tranche_id,
+        )
+    }
+
+    /// Stable standalone instrument identifier.
+    pub fn id(&self) -> &str {
+        self.id.as_str()
+    }
+
+    /// Construct the first note of the canonical example structured-credit deal.
+    pub fn example() -> Result<Self> {
+        let deal = StructuredCredit::example()?;
+        let tranche_id = deal
+            .tranches
+            .tranches
+            .first()
+            .ok_or_else(|| {
+                Error::Validation("Structured-credit example has no issued note".into())
+            })?
+            .id
+            .to_string();
+        Self::new(
+            InstrumentId::new("STRUCTURED-CREDIT-NOTE-EXAMPLE"),
+            deal,
+            tranche_id,
+        )
+    }
+
+    /// Contractual identifier of the selected note within the originating deal.
+    pub fn tranche_id(&self) -> &str {
+        &self.tranche_id
+    }
+
+    /// Originating collateral and waterfall for the selected note.
+    pub fn deal(&self) -> &StructuredCredit {
+        &self.deal
+    }
+
+    /// Apply a collateral correlation change to the note's originating deal.
+    /// The note identifier, tranche selection and outstanding balance are preserved.
+    ///
+    /// # Arguments
+    /// * `correlation` - Replacement calibrated collateral correlation assumptions.
+    pub fn set_correlation(&mut self, correlation: super::CorrelationStructure) {
+        self.deal.credit_model.correlation_structure = Some(correlation);
+    }
+
+    pub(crate) fn pricing_inputs(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<(Money, TrancheMetricSeed)> {
+        let flows = self
+            .deal
+            .tranche_cashflows(&self.tranche_id, market, as_of)?;
+        let value = self.deal.value_tranche_cashflows_raw(
+            &flows,
+            market,
+            self.deal.resolve_pricing_as_of(market, as_of),
+        )?;
+        Ok((value, TrancheMetricSeed(flows)))
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct TrancheMetricSeed(pub(crate) TrancheCashflows);
+
+impl MetricSeed for TrancheMetricSeed {
+    fn seed(&self, context: &mut MetricContext) {
+        context.cashflows = Some(self.0.cashflows.clone());
+        context.tagged_cashflows = Some(self.0.detailed_flows.clone());
+        context.set_ext(self.0.clone());
     }
 }
 
@@ -87,25 +171,23 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
 
 impl Instrument for StructuredCreditTranche {
     fn id(&self) -> &str {
-        self.deal.id.as_str()
+        self.id.as_str()
     }
 
     fn key(&self) -> finstack_quant_valuations_core::pricer::InstrumentType {
-        finstack_quant_valuations_core::pricer::InstrumentType::StructuredCredit
+        finstack_quant_valuations_core::pricer::InstrumentType::StructuredCreditTranche
     }
 
     fn family(&self) -> &'static finstack_quant_valuations_core::pricer::Family {
         &crate::STRUCTURED_CREDIT
     }
 
-    /// The deal, not the view: the deal's metric calculators downcast the
-    /// context instrument to `StructuredCredit`.
     fn as_any(&self) -> &dyn std::any::Any {
-        self.deal.as_any()
+        self
     }
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self.deal.as_any_mut()
+        self
     }
 
     fn attributes(&self) -> &Attributes {
@@ -128,6 +210,12 @@ impl Instrument for StructuredCreditTranche {
     }
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        if self.id.as_str().trim().is_empty() {
+            return Err(Error::Validation(
+                "Structured-credit note ID must be nonempty".into(),
+            ));
+        }
+        self.deal.tranches.require(&self.tranche_id)?;
         self.deal.validate_invariants()
     }
 
@@ -138,7 +226,22 @@ impl Instrument for StructuredCreditTranche {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        self.deal.value_tranche(&self.tranche_id, market, as_of)
+        self.pricing_inputs(market, as_of).map(|(value, _)| value)
+    }
+
+    fn seed_metric_context(
+        &self,
+        context: &mut MetricContext,
+        _market: &MarketContext,
+        _as_of: Date,
+    ) {
+        context.discount_curve_id = Some(self.deal.discount_curve_id.clone());
+        context.notional = self
+            .deal
+            .tranches
+            .require(&self.tranche_id)
+            .ok()
+            .map(|note| note.current_balance);
     }
 
     fn model_params_snapshot(&self) -> ModelParamsSnapshot {
@@ -159,10 +262,11 @@ impl Instrument for StructuredCreditTranche {
                     "structured-credit model parameters must produce a StructuredCredit".into(),
                 )
             })?;
-        Ok(Box::new(Self {
+        Ok(Box::new(Self::new(
+            self.id.clone(),
             deal,
-            tranche_id: self.tranche_id.clone(),
-        }))
+            self.tranche_id.clone(),
+        )?))
     }
 
     fn get_instrument_pricing_overrides(

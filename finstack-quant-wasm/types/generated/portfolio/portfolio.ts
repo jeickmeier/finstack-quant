@@ -681,7 +681,8 @@ export type InstrumentType =
   | "fx_future_option"
   | "commodity_future_option"
   | "volatility_index_future_option"
-  | "asset_backed_facility";
+  | "asset_backed_facility"
+  | "structured_credit_tranche";
 /**
  * Comparison operator for attribute-based filtering.
  *

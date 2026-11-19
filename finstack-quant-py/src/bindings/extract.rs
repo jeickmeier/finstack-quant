@@ -42,7 +42,9 @@ use crate::bindings::valuations::typed_interest_rate_future::PyInterestRateFutur
 use crate::bindings::valuations::typed_interest_rate_future_option::PyInterestRateFutureOption;
 use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, PySwaption};
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
-use crate::bindings::valuations::typed_structured_credit::PyStructuredCredit;
+use crate::bindings::valuations::typed_structured_credit::{
+    PyStructuredCredit, PyStructuredCreditTranche,
+};
 use crate::bindings::valuations::typed_volatility_index_future::PyVolatilityIndexFuture;
 use crate::bindings::valuations::typed_volatility_index_future_option::PyVolatilityIndexFutureOption;
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
@@ -164,6 +166,7 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyConvertibleBond,
         PyEquityOption,
         PyStructuredCredit,
+        PyStructuredCreditTranche,
     );
     envelope_json_text(obj).map(InstrumentArg::Envelope).map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(

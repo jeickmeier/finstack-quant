@@ -6,7 +6,7 @@ use crate::structured_credit::utils::amortization::{
     level_payment_per_unit, remaining_schedule_periods,
 };
 use crate::structured_credit::utils::months::ClampedMonths;
-use crate::structured_credit::{DealType, PoolAsset, StructuredCredit};
+use crate::structured_credit::{DealType, PoolAsset};
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -98,9 +98,8 @@ impl Default for CmbsDscrCalculator {
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for CmbsDscrCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let cmbs = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let cmbs =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
 
         if cmbs.deal_type != DealType::Cmbs {
             return Err(finstack_quant_core::Error::Validation(

@@ -8999,6 +8999,7 @@
       "callable_range_accrual",
       "bond_future",
       "structured_credit",
+      "structured_credit_tranche",
       "asset_backed_facility",
       "levered_real_estate_equity",
       "composite"
@@ -9353,6 +9354,7 @@
         "StochasticPrepaySpec",
         "StochasticUtilizationSpec",
         "StructuredCredit",
+        "StructuredCreditTranche",
         "StubKind",
         "SwapNotional",
         "SwapPriority",

@@ -75,6 +75,7 @@ finstack-quant-ui/src/generated/examples/repo.json
 finstack-quant-ui/src/generated/examples/revolving_credit.json
 finstack-quant-ui/src/generated/examples/snowball.json
 finstack-quant-ui/src/generated/examples/structured_credit.json
+finstack-quant-ui/src/generated/examples/structured_credit_tranche.json
 finstack-quant-ui/src/generated/examples/swaption.json
 finstack-quant-ui/src/generated/examples/tarn.json
 finstack-quant-ui/src/generated/examples/term_loan.json
@@ -154,6 +155,7 @@ finstack-quant-ui/src/generated/instrument/repo.ts
 finstack-quant-ui/src/generated/instrument/revolving_credit.ts
 finstack-quant-ui/src/generated/instrument/snowball.ts
 finstack-quant-ui/src/generated/instrument/structured_credit.ts
+finstack-quant-ui/src/generated/instrument/structured_credit_tranche.ts
 finstack-quant-ui/src/generated/instrument/swaption.ts
 finstack-quant-ui/src/generated/instrument/tarn.ts
 finstack-quant-ui/src/generated/instrument/term_loan.ts
@@ -285,6 +287,7 @@ finstack-quant-ui/src/generated/meta/snowball.ts
 finstack-quant-ui/src/generated/meta/standard_deal_params.ts
 finstack-quant-ui/src/generated/meta/statement_result.ts
 finstack-quant-ui/src/generated/meta/structured_credit.ts
+finstack-quant-ui/src/generated/meta/structured_credit_tranche.ts
 finstack-quant-ui/src/generated/meta/swaption.ts
 finstack-quant-ui/src/generated/meta/table_envelope.ts
 finstack-quant-ui/src/generated/meta/tarn.ts
@@ -422,6 +425,7 @@ finstack-quant-ui/src/generated/schemas/snowball.json
 finstack-quant-ui/src/generated/schemas/standard_deal_params.json
 finstack-quant-ui/src/generated/schemas/statement_result.json
 finstack-quant-ui/src/generated/schemas/structured_credit.json
+finstack-quant-ui/src/generated/schemas/structured_credit_tranche.json
 finstack-quant-ui/src/generated/schemas/swaption.json
 finstack-quant-ui/src/generated/schemas/table_envelope.json
 finstack-quant-ui/src/generated/schemas/tarn.json
@@ -558,6 +562,7 @@ finstack-quant-ui/src/generated/types/snowball.ts
 finstack-quant-ui/src/generated/types/standard_deal_params.ts
 finstack-quant-ui/src/generated/types/statement_result.ts
 finstack-quant-ui/src/generated/types/structured_credit.ts
+finstack-quant-ui/src/generated/types/structured_credit_tranche.ts
 finstack-quant-ui/src/generated/types/swaption.ts
 finstack-quant-ui/src/generated/types/table_envelope.ts
 finstack-quant-ui/src/generated/types/tarn.ts
@@ -678,6 +683,7 @@ finstack-quant/valuations/tests/instruments/json_examples/repo.json
 finstack-quant/valuations/tests/instruments/json_examples/revolving_credit.json
 finstack-quant/valuations/tests/instruments/json_examples/snowball.json
 finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json
+finstack-quant/valuations/tests/instruments/json_examples/structured_credit_tranche.json
 finstack-quant/valuations/tests/instruments/json_examples/swaption.json
 finstack-quant/valuations/tests/instruments/json_examples/tarn.json
 finstack-quant/valuations/tests/instruments/json_examples/term_loan.json

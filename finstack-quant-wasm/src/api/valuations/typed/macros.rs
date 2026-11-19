@@ -50,7 +50,7 @@ macro_rules! instrument_class {
             /// @returns Stable instrument identifier used in metric keys.
             #[wasm_bindgen(getter)]
             pub fn id(&self) -> String {
-                self.inner.id.to_string()
+                finstack_quant_valuations::instruments::Instrument::id(&self.inner).to_string()
             }
         }
     };

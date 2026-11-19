@@ -200,7 +200,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1018873,
+      "bytes": 1019855,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -281,7 +281,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
-      "bytes": 10786,
+      "bytes": 10785,
       "kind": "input",
       "path": "schemas/common/1/price_extras.schema.json",
       "summary": "Metric-pricing override patch, market history and step-trace flag of one price call.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1026720,
+      "bytes": 1027774,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1025697,
+      "bytes": 1026751,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -784,6 +784,15 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json",
+      "bytes": 407379,
+      "kind": "input",
+      "path": "schemas/instruments/1/fixed_income/structured_credit_tranche.schema.json",
+      "summary": "Individual note priced on its originating collateral waterfall.",
+      "title": "structured_credit_tranche",
+      "type_name": "SingleInstrumentEnvelope"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
       "bytes": 70518,
       "kind": "input",
@@ -911,7 +920,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1117630,
+      "bytes": 1123410,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -1118,7 +1127,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1028328,
+      "bytes": 1029382,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -1199,7 +1208,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
-      "bytes": 17465,
+      "bytes": 17641,
       "kind": "output",
       "path": "schemas/results/1/listed_product_coverage.schema.json",
       "summary": "Listed-product catalog coverage for one exchange product.",

@@ -22225,49 +22225,65 @@ export default [
   {
     "path": "#/$defs/InstrumentJson/oneOf/75",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/75",
-    "description": "Canonical `asset_backed_facility` instrument payload."
+    "description": "Canonical `structured_credit_tranche` instrument payload."
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/75/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/75/properties/spec",
-    "ref": "#/$defs/AssetBackedFacility",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetBackedFacility"
+    "ref": "#/$defs/StructuredCreditTranche",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/75/properties/type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/75/properties/type",
-    "const": "asset_backed_facility"
+    "const": "structured_credit_tranche"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/76",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/76",
-    "description": "Canonical `levered_real_estate_equity` instrument payload."
+    "description": "Canonical `asset_backed_facility` instrument payload."
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/76/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/76/properties/spec",
-    "ref": "#/$defs/LeveredRealEstateEquity",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LeveredRealEstateEquity"
+    "ref": "#/$defs/AssetBackedFacility",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetBackedFacility"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/76/properties/type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/76/properties/type",
-    "const": "levered_real_estate_equity"
+    "const": "asset_backed_facility"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/77",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/77",
-    "description": "Canonical `composite` instrument payload."
+    "description": "Canonical `levered_real_estate_equity` instrument payload."
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/77/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/77/properties/spec",
-    "ref": "#/$defs/CompositeInstrument",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CompositeInstrument"
+    "ref": "#/$defs/LeveredRealEstateEquity",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LeveredRealEstateEquity"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/77/properties/type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/77/properties/type",
+    "const": "levered_real_estate_equity"
+  },
+  {
+    "path": "#/$defs/InstrumentJson/oneOf/78",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/78",
+    "description": "Canonical `composite` instrument payload."
+  },
+  {
+    "path": "#/$defs/InstrumentJson/oneOf/78/properties/spec",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/78/properties/spec",
+    "ref": "#/$defs/CompositeInstrument",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CompositeInstrument"
+  },
+  {
+    "path": "#/$defs/InstrumentJson/oneOf/78/properties/type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/78/properties/type",
     "const": "composite"
   },
   {
@@ -29560,6 +29576,27 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/waterfall/anyOf/1"
   },
   {
+    "path": "#/$defs/StructuredCreditTranche",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche",
+    "description": "An independently held note priced through its originating deal's waterfall."
+  },
+  {
+    "path": "#/$defs/StructuredCreditTranche/properties/deal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche/properties/deal",
+    "ref": "#/$defs/StructuredCredit",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit"
+  },
+  {
+    "path": "#/$defs/StructuredCreditTranche/properties/id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche/properties/id",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/StructuredCreditTranche/properties/tranche_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche/properties/tranche_id"
+  },
+  {
     "path": "#/$defs/StubKind",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind",
     "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = Schedule::builder(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .grid(GridMode::Natural)\n    .unadjusted()\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior"
@@ -33801,6 +33838,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/StructuredCredit",
     "ref": "#/$defs/StructuredCredit",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit"
+  },
+  {
+    "path": "#/properties/StructuredCreditTranche",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/StructuredCreditTranche",
+    "ref": "#/$defs/StructuredCreditTranche",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche"
   },
   {
     "path": "#/properties/StubKind",

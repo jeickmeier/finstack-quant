@@ -2350,6 +2350,10 @@ export type InstrumentJson =
       type: "structured_credit";
     }
   | {
+      spec: StructuredCreditTranche;
+      type: "structured_credit_tranche";
+    }
+  | {
       spec: AssetBackedFacility;
       type: "asset_backed_facility";
     }
@@ -4128,7 +4132,8 @@ export type InstrumentType =
   | "fx_future_option"
   | "commodity_future_option"
   | "volatility_index_future_option"
-  | "asset_backed_facility";
+  | "asset_backed_facility"
+  | "structured_credit_tranche";
 /**
  * Rule for deriving an interest-rate future's reference period from its expiry.
  */
@@ -17625,6 +17630,14 @@ export interface TargetOcSpec {
   fraction_of_current: number;
 }
 /**
+ * An independently held note priced through its originating deal's waterfall.
+ */
+export interface StructuredCreditTranche {
+  deal: StructuredCredit;
+  id: Id;
+  tranche_id: string;
+}
+/**
  * Levered real estate equity = unlevered asset + financing.
  *
  * Value convention:
@@ -21523,7 +21536,7 @@ export interface PriceExtras {
    */
   market_history?: MarketHistory | null;
   /**
-   * JSON object patch merged into `instrument.spec.metric_pricing_overrides`
+   * JSON object patch merged into the instrument’s stored metric controls
    * before validation, in the shape of [`MetricPricingOverrides`]. Only the
    * keys present replace stored controls (an explicit `null` clears an
    * optional control) and `bump_config` keys merge into the stored bump

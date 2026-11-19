@@ -285,7 +285,7 @@ pub fn validate_typed_instrument_json(
 ///
 /// * `json` - Required canonical v1 instrument envelope.
 /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
-///   into `instrument.spec.metric_pricing_overrides` by the
+///   into the instrument’s stored metric controls by the
 ///   canonical pricing path before instrument validation; `None` retains the
 ///   envelope configuration. Only supplied fields replace stored values;
 ///   omitted fields, including individual `bump_config` fields, are retained.
@@ -312,7 +312,7 @@ pub fn validate_instrument_json(
 ///
 /// * `instrument_json` - Required canonical v1 instrument envelope.
 /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
-///   into `instrument.spec.metric_pricing_overrides` before validation. Only
+///   into the instrument’s stored metric controls before validation. Only
 ///   supplied fields replace stored values; omitted fields, including individual
 ///   `bump_config` fields, are retained. Explicit `null` clears optional fields.
 ///
@@ -436,7 +436,7 @@ fn resolve_model_key(
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PriceExtras {
-    /// JSON object patch merged into `instrument.spec.metric_pricing_overrides`
+    /// JSON object patch merged into the instrument’s stored metric controls
     /// before validation, in the shape of [`MetricPricingOverrides`]. Only the
     /// keys present replace stored controls (an explicit `null` clears an
     /// optional control) and `bump_config` keys merge into the stored bump
@@ -777,11 +777,20 @@ fn pricing_document(
         let id = instrument_id.as_deref();
         let spec = document
             .get_mut("instrument")
-            .and_then(|v| v.get_mut("spec"))
+            .and_then(|instrument| {
+                let embedded_deal =
+                    instrument.get("type").and_then(Value::as_str) == Some("structured_credit_tranche");
+                let spec = instrument.get_mut("spec")?;
+                if embedded_deal {
+                    spec.get_mut("deal")
+                } else {
+                    Some(spec)
+                }
+            })
             .and_then(Value::as_object_mut)
             .ok_or_else(|| {
                 Error::Validation(with_id_suffix(
-                    "instrument envelope must contain an object instrument.spec".into(),
+                    "instrument envelope must contain an object instrument.spec (and an object deal for a structured credit tranche)".into(),
                     id,
                 ))
             })?;

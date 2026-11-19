@@ -1004,6 +1004,9 @@
     "StructuredCredit": {
       "$ref": "#/$defs/StructuredCredit"
     },
+    "StructuredCreditTranche": {
+      "$ref": "#/$defs/StructuredCreditTranche"
+    },
     "StubKind": {
       "$ref": "#/$defs/StubKind"
     },
@@ -21109,6 +21112,24 @@
         },
         {
           "additionalProperties": false,
+          "description": "Canonical `structured_credit_tranche` instrument payload.",
+          "properties": {
+            "spec": {
+              "$ref": "#/$defs/StructuredCreditTranche"
+            },
+            "type": {
+              "const": "structured_credit_tranche",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "spec"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Canonical `asset_backed_facility` instrument payload.",
           "properties": {
             "spec": {
@@ -27937,6 +27958,27 @@
         "discount_curve_id",
         "attributes",
         "market_conditions"
+      ],
+      "type": "object"
+    },
+    "StructuredCreditTranche": {
+      "additionalProperties": false,
+      "description": "An independently held note priced through its originating deal's waterfall.",
+      "properties": {
+        "deal": {
+          "$ref": "#/$defs/StructuredCredit"
+        },
+        "id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+        },
+        "tranche_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "deal",
+        "tranche_id"
       ],
       "type": "object"
     },

@@ -1425,7 +1425,8 @@ export type DFb65F54B2B8A66E8C994 =
   | "fx_future_option"
   | "commodity_future_option"
   | "volatility_index_future_option"
-  | "asset_backed_facility";
+  | "asset_backed_facility"
+  | "structured_credit_tranche";
 /**
  * A predicate for filtering nodes by their tags.
  */

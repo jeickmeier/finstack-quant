@@ -280,6 +280,11 @@
     "schema": "schemas/revolving_credit.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit_tranche.schema.json",
+    "schema": "schemas/structured_credit_tranche.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
     "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
     "schema": "schemas/structured_credit.json"
