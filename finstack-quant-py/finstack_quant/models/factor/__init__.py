@@ -23,10 +23,14 @@ schema = _models.factor.schema
 
 FactorCovarianceMatrix = _models.factor.FactorCovarianceMatrix
 FactorModelConfig = _models.factor.FactorModelConfig
+FactorDefinition = _models.factor.FactorDefinition
+MarketMapping = _models.factor.MarketMapping
 
 __all__: list[str] = [
     "FactorCovarianceMatrix",
+    "FactorDefinition",
     "FactorModelConfig",
+    "MarketMapping",
     "credit",
     "risk",
     "schema",

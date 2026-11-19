@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from finstack_quant.models.factor import FactorDefinition
+
 import datetime
 from typing import Any
 import pandas as pd
@@ -441,7 +443,7 @@ class FactorPnlProfile:
 
 def compute_factor_sensitivities(
     portfolio: Portfolio | str,
-    factors: str | list[Any] | pd.DataFrame,
+    factors: list[FactorDefinition] | str | list[dict[str, Any]] | pd.DataFrame,
     market: MarketContext | str,
     as_of: datetime.date | str,
     bump_config: str | dict[str, Any] | None = None,
@@ -503,7 +505,7 @@ def compute_factor_sensitivities(
 
 def compute_pnl_profiles(
     portfolio: Portfolio | str,
-    factors: str | list[Any] | pd.DataFrame,
+    factors: list[FactorDefinition] | str | list[dict[str, Any]] | pd.DataFrame,
     market: MarketContext | str,
     as_of: datetime.date | str,
     bump_config: str | dict[str, Any] | None = None,

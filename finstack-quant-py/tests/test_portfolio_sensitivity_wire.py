@@ -87,3 +87,16 @@ def test_typed_tail_measure_matches_its_canonical_wire() -> None:
     assert typed.to_json() == wire.to_json()
     with pytest.raises(ValueError, match="confidence"):
         RiskMeasure.var(1.0)
+
+
+def test_typed_factor_inputs_match_their_canonical_serialization() -> None:
+    from finstack_quant.core.market_data import DiscountCurve
+    from finstack_quant.models.factor import FactorDefinition, MarketMapping
+
+    book = Portfolio.builder("book", "USD", "2025-01-15").build()
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-15", 0.04, "act_365f"))
+    factor = FactorDefinition("usd_rates", "rates", MarketMapping.curve_parallel(["USD-OIS"], "rate_bp"))
+    matrix = compute_factor_sensitivities(book, [factor], market, "2025-01-15")
+    rebuilt = compute_factor_sensitivities(book, [json.loads(factor.to_json())], market, "2025-01-15")
+    assert matrix.factor_ids == ["usd_rates"]
+    assert matrix.to_json() == rebuilt.to_json()

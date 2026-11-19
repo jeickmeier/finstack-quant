@@ -153,7 +153,7 @@ python_package = "finstack_quant.models.factor"
 visibility = "pub"
 status = "exists"
 note = "Generic factor-model types are exported at the Rust crate root. Credit hierarchy and forecast APIs live under finstack_quant.models.factor.credit; pure covariance, decomposition, position-risk, stress-attribution, and risk-budget kernels live under finstack_quant.models.factor.risk."
-public = ["FactorCovarianceMatrix", "FactorModelConfig", "credit", "risk", "schema"]
+public = ["FactorCovarianceMatrix", "FactorDefinition", "FactorModelConfig", "MarketMapping", "credit", "risk", "schema"]
 
 [crates.models.factor.modules]
 matching           = { python = "finstack_quant.models.factor.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned. The crate-root matching re-exports (CascadeMatcher, HierarchicalMatcher, MappingTableMatcher, FactorMatcher trait family, MappingRule, AttributeFilter, DependencyFilter) are Rust-only." }
@@ -162,14 +162,16 @@ risk               = { python = "finstack_quant.models.factor.risk", status = "e
 schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # The remaining crate-root `pub use` surface (BumpSizeConfig,
-# RiskMeasure, UnmatchedPolicy, SensitivityMatrix, envelope types,
-# and primitive factor/dependency types) remains Rust-owned. Hosts consume these
+# UnmatchedPolicy, SensitivityMatrix and envelope/dependency types)
+# remains Rust-owned. Hosts consume these
 # inside FactorModelConfig or through explicit JSON inputs rather than parallel
 # constructor APIs.
 [crates.models.factor.symbols]
 public = [
     "FactorCovarianceMatrix",
     "FactorModelConfig",
+    "FactorDefinition",
+    "MarketMapping",
 ]
 
 [crates.models.factor.module_symbols.credit]
@@ -2229,7 +2231,7 @@ types = { AltmanZDoublePrimeInput = "AltmanZDoublePrimeInput", AltmanZPrimeInput
 
 [parity.modules."finstack_quant.models.factor"]
 js = "models.factor"
-types = { FactorCovarianceMatrix = "FactorCovarianceMatrix", FactorModelConfig = "FactorModelConfig" }
+types = { FactorDefinition = "FactorDefinition", MarketMapping = "MarketMapping", FactorCovarianceMatrix = "FactorCovarianceMatrix", FactorModelConfig = "FactorModelConfig" }
 
 [parity.modules."finstack_quant.models.factor.credit"]
 js = "models.factor.credit"
@@ -2614,6 +2616,13 @@ renames = { deposit = { js = "calibration.rateQuoteDeposit", reason = "WASM quot
 
 [parity.members."finstack_quant.calibration.VolQuote"]
 renames = { cap_floor_vol = { js = "calibration.volQuoteCapFloorVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::cap_floor_vol)" }, option_vol = { js = "calibration.volQuoteOptionVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::option_vol)" }, swaption_vol = { js = "calibration.volQuoteSwaptionVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::swaption_vol)" } }
+
+[parity.members."finstack_quant.models.factor.MarketMapping".excluded]
+curve_parallel = "literal"
+curve_bucketed = "literal"
+equity_spot = "literal"
+fx_rate = "literal"
+vol_shift = "literal"
 
 [parity.members."finstack_quant.models.factor.risk.RiskMeasure"]
 renames = { var = { js = "models.factor.risk.riskMeasureVar", reason = "Rust RiskMeasure::var returns a validated literal in WASM" }, expected_shortfall = { js = "models.factor.risk.riskMeasureExpectedShortfall", reason = "Rust RiskMeasure::expected_shortfall returns a validated literal in WASM" } }

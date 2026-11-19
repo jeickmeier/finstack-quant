@@ -27,6 +27,11 @@ from finstack_quant.models.factor import credit as credit
 from finstack_quant.models.factor import risk as risk
 from finstack_quant.models.factor import schema as schema
 
+from finstack_quant.models.factor._definitions import (
+    FactorDefinition as FactorDefinition,
+    MarketMapping as MarketMapping,
+)
+
 class FactorCovarianceMatrix:
     """
     Validated factor covariance matrix with deterministic row-major storage.
@@ -486,6 +491,8 @@ class FactorModelConfig:
 __all__ = [
     "FactorCovarianceMatrix",
     "FactorModelConfig",
+    "FactorDefinition",
+    "MarketMapping",
     "credit",
     "risk",
     "schema",

@@ -283,6 +283,9 @@ fn extract_factors(
     py: Python<'_>,
     factors: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<finstack_quant_factor::FactorDefinition>> {
+    if let Ok(typed) = factors.extract::<Vec<PyRef<'_, crate::bindings::models::factor::definitions::PyFactorDefinition>>>() {
+        return Ok(typed.into_iter().map(|factor| factor.inner.clone()).collect());
+    }
     let json = extract_records_json(py, factors, "factors")?;
     serde_json::from_str(&json).map_err(|e| serde_json_to_py(e, "invalid factors JSON"))
 }
