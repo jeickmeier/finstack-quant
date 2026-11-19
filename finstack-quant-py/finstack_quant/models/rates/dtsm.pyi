@@ -27,6 +27,8 @@ from __future__ import annotations
 import datetime
 from typing import Any, Sequence
 
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 __all__ = [
@@ -78,9 +80,10 @@ class YieldPanel:
     def from_dataframe(cls, df: pd.DataFrame) -> YieldPanel:
         """Build a panel from a DataFrame with tenor columns.
 
-        Column labels are parsed as tenors in years (``float(label)``); the
-        index supplies observation dates when it is date-like (otherwise the
-        panel is unlabeled); values are decimal zero rates.
+        Numeric column labels are years. Tenor labels such as 6M or 2Y use
+        the native approximate year convention. Values are decimal zero rates.
+        A pandas RangeIndex represents an undated panel. Any other index must
+        contain valid observation dates.
 
         Parameters
         ----------
@@ -95,9 +98,9 @@ class YieldPanel:
         Raises
         ------
         TypeError
-            If ``df`` is not a ``pandas.DataFrame``.
+            If df is not a pandas DataFrame or a column or date has an incompatible type.
         ValueError
-            If a column label is not numeric or the panel fails validation.
+            If a tenor, date, or yield is invalid or the panel fails validation.
 
         Examples
         --------
@@ -208,6 +211,22 @@ class YieldPanel:
         >>> from finstack_quant.models.rates.dtsm import YieldPanel
         >>> YieldPanel([1.0], [[0.01], [0.012]]).yield_changes()
         [[0.002]]
+        """
+        ...
+
+    def to_numpy(self) -> npt.NDArray[np.float64]:
+        """Copy the yield grid into a NumPy array with date rows and tenor columns.
+
+        Returns
+        -------
+        numpy.ndarray
+            A writable float64 array of shape (num_dates, num_tenors), with
+            the same decimal zero rates and axis order as the panel. Editing
+            the array leaves the panel unchanged.
+
+        Notes
+        -----
+        This method does not raise.
         """
         ...
 

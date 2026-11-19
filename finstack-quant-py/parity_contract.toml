@@ -2027,6 +2027,7 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.rates.dtsm.FactorTimeSeries.level" = "column 0 of the Rust `factors` matrix"
 "finstack_quant.models.rates.dtsm.FactorTimeSeries.slope" = "column 1 of the Rust `factors` matrix"
 "finstack_quant.models.rates.dtsm.FactorTimeSeries.curvature" = "column 2 of the Rust `factors` matrix"
+"finstack_quant.models.rates.dtsm.YieldPanel.to_numpy" = "Python NumPy copy of the native yield matrix, with date rows and tenor columns"
 "finstack_quant.models.rates.dtsm.YieldPcaView.num_components" = "length of the Rust `eigenvalues` field"
 "finstack_quant.models.volatility.ArbitrageReport.by_severity" = "Rust `counts_by_severity` field"
 "finstack_quant.models.volatility.ArbitrageReport.by_type" = "Rust `counts_by_type` field"
@@ -2650,6 +2651,9 @@ ci_upper = "literal"
 [parity.members."finstack_quant.models.monte_carlo.MoneyEstimate".excluded]
 ci_lower = "literal"
 ci_upper = "literal"
+
+[parity.members."finstack_quant.models.rates.dtsm.YieldPanel".excluded]
+to_numpy = "pure-python"
 
 [parity.members."finstack_quant.models.rates.dtsm.FactorTimeSeries".excluded]
 curvature = "literal"
