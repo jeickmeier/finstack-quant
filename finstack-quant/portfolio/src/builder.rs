@@ -87,6 +87,20 @@ impl PortfolioBuilder {
         }
     }
 
+    pub(crate) fn from_portfolio(portfolio: &Portfolio) -> Self {
+        Self {
+            id: portfolio.id.clone(),
+            name: portfolio.name.clone(),
+            base_currency: Some(portfolio.base_currency),
+            as_of: Some(portfolio.as_of),
+            entities: portfolio.entities.clone(),
+            positions: portfolio.positions.clone(),
+            books: portfolio.books.clone(),
+            tags: portfolio.tags.clone(),
+            meta: portfolio.meta.clone(),
+        }
+    }
+
     /// Set the portfolio's human-readable name.
     ///
     /// # Arguments

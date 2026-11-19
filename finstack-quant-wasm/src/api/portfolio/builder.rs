@@ -28,7 +28,7 @@ use wasm_bindgen::prelude::*;
 /// ```
 #[wasm_bindgen(js_name = PortfolioBuilder)]
 pub struct JsPortfolioBuilder {
-    inner: PortfolioBuilder,
+    pub(super) inner: PortfolioBuilder,
 }
 
 impl JsPortfolioBuilder {
@@ -88,6 +88,16 @@ impl JsPortfolioBuilder {
         Ok(Self {
             inner: self.inner.entity(entity),
         })
+    }
+
+    /// Append a preconstructed position.
+    /// @param position - Holding validated with the rest of the portfolio by build.
+    /// @returns The builder, for chaining.
+    #[wasm_bindgen(js_name = addPosition)]
+    pub fn add_position(self, position: &super::position::JsPosition) -> JsPortfolioBuilder {
+        Self {
+            inner: self.inner.position(position.inner.clone()),
+        }
     }
 
     /// Add a position from its serializable specification.

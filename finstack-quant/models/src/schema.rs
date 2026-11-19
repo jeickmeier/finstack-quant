@@ -14,6 +14,7 @@ use finstack_quant_core::schema::SchemaArtifact;
 use crate::closed_form::{
     BsGreeks, ForwardGreeks, HestonPricingParams, OptionCalculation, OptionCalculationResult,
 };
+use crate::monte_carlo::pricer::lsmc::LsmcResult;
 use crate::monte_carlo::simulate::{
     FbmSpec, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec,
 };
@@ -65,6 +66,13 @@ use crate::{
 
 /// The crate's complete schema registry.
 pub const ARTIFACTS: &[SchemaArtifact] = &[
+    finstack_quant_core::schema_artifact!(
+        LsmcResult,
+        "models",
+        "lsmc_result",
+        Output,
+        "Least-squares Monte Carlo price estimate and fitted exercise diagnostics."
+    ),
     finstack_quant_core::schema_artifact!(
         AlmgrenChrissModel,
         "models",

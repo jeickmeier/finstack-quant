@@ -524,7 +524,7 @@ impl JsPathDependentPricer {
 /// const put = pricer.priceAmerican(
 ///   { spot: 100, strike: 100, rate: 0.05, dividend_yield: 0.0, volatility: 0.2, time_to_expiry: 1.0, option_type: "put" },
 /// );
-/// console.log(put.mean.amount, pricer.basis, pricer.basisDegree);
+/// console.log(put.estimate.mean.amount, put.exercise_boundary.length);
 /// pricer.free();
 /// ```
 #[wasm_bindgen(js_name = LsmcPricer)]
@@ -623,7 +623,7 @@ impl JsLsmcPricer {
     ///
     /// # Returns
     ///
-    /// The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+    /// The `LsmcResult` object with the price estimate and diagnostics of the fitted training policy.
     ///
     /// # Errors
     ///
@@ -633,8 +633,8 @@ impl JsLsmcPricer {
     /// @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
     /// @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
     /// @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
-    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-    #[wasm_bindgen(js_name = priceAmerican, unchecked_return_type = "MoneyEstimate")]
+    /// @returns The `LsmcResult` object with the price estimate and diagnostics of the fitted training policy.
+    #[wasm_bindgen(js_name = priceAmerican, unchecked_return_type = "generated.models.LsmcResult")]
     pub fn price_american(
         &self,
         #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
@@ -673,7 +673,7 @@ impl JsLsmcPricer {
     ///
     /// # Returns
     ///
-    /// The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+    /// The `LsmcResult` object with the price estimate and diagnostics of the fitted training policy.
     ///
     /// # Errors
     ///
@@ -684,8 +684,8 @@ impl JsLsmcPricer {
     /// @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
     /// @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
     /// @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
-    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-    #[wasm_bindgen(js_name = priceAmericanUnbiased, unchecked_return_type = "MoneyEstimate")]
+    /// @returns The `LsmcResult` object with the price estimate and diagnostics of the fitted training policy.
+    #[wasm_bindgen(js_name = priceAmericanUnbiased, unchecked_return_type = "generated.models.LsmcResult")]
     pub fn price_american_unbiased(
         &self,
         #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]

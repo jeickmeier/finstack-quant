@@ -22,6 +22,7 @@ from finstack_quant.portfolio._container import (
     Portfolio as Portfolio,
     PortfolioBuilder as PortfolioBuilder,
     parse_portfolio_spec_json as parse_portfolio_spec_json,
+    Position as Position,
 )
 from finstack_quant.portfolio._valuation import (
     PortfolioValuation as PortfolioValuation,
@@ -208,6 +209,7 @@ __all__ = [
     "PortfolioValuation",
     "PositionAssignment",
     "PositionFilter",
+    "Position",
     "PositionValue",
     "PositionVolContribution",
     "ReconciliationReport",

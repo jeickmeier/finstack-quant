@@ -5,6 +5,7 @@ use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_models::monte_carlo::greeks::lrm::LrmGreeks;
+use finstack_quant_models::monte_carlo::pricer::lsmc::{ExerciseBoundaryPoint, LsmcResult};
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::simulate::PathSummary;
 use numpy::{PyArray1, PyArray3, PyArrayMethods};
@@ -476,10 +477,99 @@ wire_methods!(
 );
 impl_repr_html_via_dataframe!(PyLrmGreeks);
 
+#[doc = pydoc!("finstack_quant.models.monte_carlo._results", "ExerciseBoundaryPoint")]
+#[pyclass(
+    name = "ExerciseBoundaryPoint",
+    module = "finstack_quant.models.monte_carlo",
+    frozen,
+    skip_from_py_object
+)]
+pub(super) struct PyExerciseBoundaryPoint {
+    inner: ExerciseBoundaryPoint,
+}
+
+#[pymethods]
+impl PyExerciseBoundaryPoint {
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "ExerciseBoundaryPoint.step")]
+    #[getter]
+    fn step(&self) -> usize {
+        self.inner.step
+    }
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "ExerciseBoundaryPoint.time")]
+    #[getter]
+    fn time(&self) -> f64 {
+        self.inner.time
+    }
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "ExerciseBoundaryPoint.critical_spot")]
+    #[getter]
+    fn critical_spot(&self) -> Option<f64> {
+        self.inner.critical_spot
+    }
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "ExerciseBoundaryPoint.itm_paths")]
+    #[getter]
+    fn itm_paths(&self) -> usize {
+        self.inner.itm_paths
+    }
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "ExerciseBoundaryPoint.exercised_paths")]
+    #[getter]
+    fn exercised_paths(&self) -> usize {
+        self.inner.exercised_paths
+    }
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "ExerciseBoundaryPoint.continuation_coeffs")]
+    #[getter]
+    fn continuation_coeffs(&self) -> Vec<f64> {
+        self.inner.continuation_coeffs.clone()
+    }
+}
+
+#[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LsmcResult")]
+#[pyclass(
+    name = "LsmcResult",
+    module = "finstack_quant.models.monte_carlo",
+    frozen,
+    skip_from_py_object
+)]
+pub(super) struct PyLsmcResult {
+    inner: LsmcResult,
+}
+
+impl PyLsmcResult {
+    pub(super) fn from_inner(inner: LsmcResult) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyLsmcResult {
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LsmcResult.estimate")]
+    #[getter]
+    fn estimate(&self) -> PyMoneyEstimate {
+        PyMoneyEstimate::from_inner(self.inner.estimate.clone())
+    }
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LsmcResult.exercise_boundary")]
+    #[getter]
+    fn exercise_boundary(&self) -> Vec<PyExerciseBoundaryPoint> {
+        self.inner
+            .exercise_boundary
+            .iter()
+            .cloned()
+            .map(|inner| PyExerciseBoundaryPoint { inner })
+            .collect()
+    }
+}
+
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPathSummary>()?;
     m.add_class::<PyLrmGreeks>()?;
     m.add_class::<PyMoneyEstimate>()?;
+    m.add_class::<PyExerciseBoundaryPoint>()?;
+    m.add_class::<PyLsmcResult>()?;
     m.add_class::<PyEstimate>()?;
     Ok(())
 }

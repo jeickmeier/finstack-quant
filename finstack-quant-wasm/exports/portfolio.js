@@ -45,6 +45,7 @@ wasm.Portfolio.validateMaterialization = withCache(
 export const portfolio = {
   InstrumentArtifactCache: wasm.InstrumentArtifactCache,
   Portfolio: wasm.Portfolio,
+  Position: wasm.Position,
   FactorModel: wasm.FactorModel,
   portfolioMargin: wasm.portfolioMargin,
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,

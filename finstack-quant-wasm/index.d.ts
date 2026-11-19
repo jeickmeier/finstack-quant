@@ -11348,6 +11348,7 @@ export interface PortfolioSchemaNamespace {
 export interface PortfolioNamespace {
   readonly InstrumentArtifactCache: typeof wasm.InstrumentArtifactCache;
   readonly Portfolio: typeof wasm.Portfolio;
+  readonly Position: typeof wasm.Position;
   readonly FactorModel: typeof wasm.FactorModel;
   /**
    * Calculate portfolio margin requirements by netting set (Rust

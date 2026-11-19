@@ -75,6 +75,26 @@ class PortfolioBuilder:
         """
         ...
 
+    def add_position(self, position: Position) -> PortfolioBuilder:
+        """Append an already constructed holding to this builder.
+
+        Parameters
+        ----------
+        position : Position
+            Holding to add, validated with the rest of the portfolio by build.
+
+        Returns
+        -------
+        PortfolioBuilder
+            This builder for chaining.
+
+        Raises
+        ------
+        ValueError
+            If this builder has been consumed.
+        """
+        ...
+
     def position(
         self,
         position_id: str,
@@ -206,6 +226,219 @@ class PortfolioBuilder:
         """
         ...
 
+class Position:
+    """Signed holding of an instrument, with owner and position metadata.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import Position
+    >>> from finstack_quant.valuations.instruments import Deposit
+    >>> Position("DEP-LOT", Deposit.example(), 2.0).quantity
+    2.0
+    """
+
+    def __init__(
+        self,
+        position_id: str,
+        instrument: object,
+        quantity: float,
+        entity_id: str | None = None,
+        unit: str | dict[str, str | None] | None = None,
+        attributes: dict[str, str | float] | None = None,
+    ) -> None:
+        """Bind the specified instrument and quantity to a position identifier.
+
+        Parameters
+        ----------
+        position_id : str
+            Identifier unique within the containing portfolio.
+        instrument : object
+            Typed instrument or canonical instrument envelope (dictionary or
+            JSON text). Its instrument identifier is copied to the position.
+        quantity : float
+            Finite signed holding in the selected unit. A percentage
+            quantity must be between -100 and 100 inclusive.
+        entity_id : str | None
+            Owner identifier, or None to use the standalone entity.
+        unit : str | dict[str, str | None] | None
+            Units, face_value, percentage, or {"notional": currency_or_none}
+            for a lot multiple. None uses units.
+        attributes : dict[str, str | float] | None
+            Optional position-level labels and numeric values for grouping.
+
+        Raises
+        ------
+        TypeError
+            If the instrument, arguments or attributes have incompatible types.
+        ValueError
+            If instrument decoding or holding validation fails.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> Position:
+        """Load one position from a canonical PositionSpec document.
+
+        Parameters
+        ----------
+        json : str
+            JSON specifying the owner, instrument, quantity and optional attributes.
+
+        Returns
+        -------
+        Position
+            Holding linked to the validated instrument embedded in the document.
+
+        Raises
+        ------
+        ValueError
+            If the JSON, instrument definition or quantity is invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.portfolio import Position
+        >>> from finstack_quant.valuations.instruments import Deposit
+        >>> item = Position("DEP-LOT", Deposit.example(), -2)
+        >>> Position.from_json(item.to_json()).quantity
+        -2.0
+        """
+        ...
+
+    def to_json(self) -> str:
+        """Encode the holding as one canonical PositionSpec document.
+
+        Returns
+        -------
+        str
+            JSON carrying the embedded instrument and the position metadata.
+
+        Raises
+        ------
+        ValueError
+            If the position cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Encode this holding for reconstruction by pickle.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The position loader and its canonical JSON argument.
+
+        Raises
+        ------
+        ValueError
+            If the holding cannot be serialized.
+        """
+        ...
+
+    @property
+    def position_id(self) -> str:
+        """Read the position's position id.
+
+        Returns
+        -------
+        str
+            Identifier unique within the originating portfolio.
+
+        Notes
+        -----
+        This accessor does not raise for a valid position.
+        """
+        ...
+
+    @property
+    def instrument_id(self) -> str:
+        """Read the position's instrument id.
+
+        Returns
+        -------
+        str
+            Identifier of the instrument carried by this holding.
+
+        Notes
+        -----
+        This accessor does not raise for a valid position.
+        """
+        ...
+
+    @property
+    def entity_id(self) -> str:
+        """Read the position's entity id.
+
+        Returns
+        -------
+        str
+            Identifier of the entity that owns this holding.
+
+        Notes
+        -----
+        This accessor does not raise for a valid position.
+        """
+        ...
+
+    @property
+    def quantity(self) -> float:
+        """Read the position's quantity.
+
+        Returns
+        -------
+        float
+            Signed quantity, interpreted in the selected unit.
+
+        Notes
+        -----
+        This accessor does not raise for a valid position.
+        """
+        ...
+
+    @property
+    def book_id(self) -> str | None:
+        """Read the position's book id.
+
+        Returns
+        -------
+        str | None
+            Book identifier when assigned, otherwise None.
+
+        Notes
+        -----
+        This accessor does not raise for a valid position.
+        """
+        ...
+
+    @property
+    def unit(self) -> str | dict[str, str | None]:
+        """Read the position's unit.
+
+        Returns
+        -------
+        str | dict[str, str | None]
+            Quantity convention, as a label or notional lot specification.
+
+        Notes
+        -----
+        This accessor does not raise for a valid position.
+        """
+        ...
+
+    @property
+    def attributes(self) -> dict[str, str | float]:
+        """Read the position's attributes.
+
+        Returns
+        -------
+        dict[str, str | float]
+            Position-level grouping labels and numeric attributes.
+
+        Notes
+        -----
+        This accessor does not raise for a valid position.
+        """
+        ...
+
 class Portfolio:
     """
     Built runtime portfolio. Cheap to clone; pass directly to pipeline functions.
@@ -223,6 +456,55 @@ class Portfolio:
     >>> (pf.id, pf.base_currency, pf.as_of, len(pf))
     ('book', 'USD', datetime.date(2025, 1, 1), 0)
     """
+
+    @property
+    def positions(self) -> list[Position]:
+        """Read holdings in insertion order.
+
+        Returns
+        -------
+        list[Position]
+            Immutable position handles in a new list.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    def to_builder(self) -> PortfolioBuilder:
+        """Copy this portfolio's holdings and metadata into a fluent builder.
+
+        Returns
+        -------
+        PortfolioBuilder
+            Builder with the same currency, valuation date, entities and positions.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    def with_position(self, position: Position) -> Portfolio:
+        """Build a portfolio copy with the additional holding.
+
+        Parameters
+        ----------
+        position : Position
+            Holding with a unique identifier and valid owner and book references.
+
+        Returns
+        -------
+        Portfolio
+            A validated portfolio that includes the new position.
+
+        Raises
+        ------
+        PortfolioError
+            If the identifier is duplicated or the owner or book is unknown.
+        """
+        ...
 
     @staticmethod
     def builder(

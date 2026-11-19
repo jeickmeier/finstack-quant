@@ -99,17 +99,19 @@ def test_maturity_only_lsmc_counts_pairs_and_uses_pair_mean_standard_error() -> 
     ]
     results = []
     for antithetic, count, payoffs in ((True, pairs, paired_payoffs), (False, 2 * pairs, plain_payoffs)):
-        result = LsmcPricer(
-            num_paths=count, seed=seed, use_parallel=False, num_steps=1, antithetic=antithetic
-        ).price_american({
-            "spot": spot,
-            "strike": strike,
-            "rate": rate,
-            "dividend_yield": 0.0,
-            "volatility": vol,
-            "time_to_expiry": expiry,
-            "option_type": "put",
-        })
+        result = (
+            LsmcPricer(num_paths=count, seed=seed, use_parallel=False, num_steps=1, antithetic=antithetic)
+            .price_american({
+                "spot": spot,
+                "strike": strike,
+                "rate": rate,
+                "dividend_yield": 0.0,
+                "volatility": vol,
+                "time_to_expiry": expiry,
+                "option_type": "put",
+            })
+            .estimate
+        )
         assert result.num_paths == count
         assert result.num_simulated_paths == 2 * pairs
         assert result.mean.amount == pytest.approx(statistics.mean(payoffs), abs=1e-12)
@@ -249,12 +251,20 @@ def test_lsmc_holdout_seed_is_independent_and_replayable() -> None:
     pricer = LsmcPricer(2048, 17, False, 20, "polynomial", 3, True)
     with pytest.raises(ValueError, match="pricing_seed"):
         pricer.price_american_unbiased(put, pricing_seed=17)
-    first = pricer.price_american_unbiased(put, pricing_seed=1017)
-    second = pricer.price_american_unbiased(put, pricing_seed=1017)
+    result = pricer.price_american_unbiased(put, pricing_seed=1017)
+    first = result.estimate
+    second = pricer.price_american_unbiased(put, pricing_seed=1017).estimate
     assert first.mean.amount == second.mean.amount
     assert first.stderr == second.stderr
     assert first.num_paths == 2048
     assert first.num_simulated_paths == 4096
+    points = result.exercise_boundary
+    assert [point.step for point in points] == list(range(1, 20))
+    assert all(point.itm_paths >= point.exercised_paths for point in points)
+    assert all(point.critical_spot is None or 0 < point.critical_spot < put["strike"] for point in points)
+    # The independent pricing sample cannot alter the training diagnostics.
+    same_policy = pricer.price_american_unbiased(put, pricing_seed=2017).exercise_boundary
+    assert [point.critical_spot for point in same_policy] == [point.critical_spot for point in points]
     assert 0 < first.mean.amount < 100
     assert math.isfinite(first.stderr)
     assert first.stderr > 0

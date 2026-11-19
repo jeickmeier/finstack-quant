@@ -293,7 +293,7 @@ for antithetic, count, payoffs in [(True, pairs, pair_payoffs), (False, 2 * pair
             "time_to_expiry": 1.0,
             "option_type": "put",
         },
-    )
+    ).estimate
     manual_mean = statistics.mean(payoffs)
     manual_se = statistics.stdev(payoffs) / math.sqrt(count)
     print(f"{'antithetic' if antithetic else 'plain':10s} | {count:10d} | "

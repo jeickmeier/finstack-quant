@@ -49,6 +49,7 @@ pub mod materialization;
 pub mod metrics;
 pub mod optimization;
 pub mod performance;
+pub mod position;
 pub mod primitive;
 pub mod replay;
 pub mod results;
@@ -79,6 +80,39 @@ pub struct JsPortfolio {
 
 #[wasm_bindgen(js_class = Portfolio)]
 impl JsPortfolio {
+    /// Read immutable holdings in insertion order.
+    /// @returns An array of position handles for all holdings.
+    #[wasm_bindgen(getter)]
+    pub fn positions(&self) -> Vec<position::JsPosition> {
+        self.inner
+            .positions()
+            .iter()
+            .cloned()
+            .map(|inner| position::JsPosition { inner })
+            .collect()
+    }
+
+    /// Copy holdings and metadata into a fluent builder.
+    /// @returns New builder seeded with this portfolio's data.
+    #[wasm_bindgen(js_name = toBuilder)]
+    pub fn to_builder(&self) -> builder::JsPortfolioBuilder {
+        builder::JsPortfolioBuilder {
+            inner: self.inner.to_builder(),
+        }
+    }
+
+    /// Build a portfolio copy with the additional holding.
+    /// @param position - Holding with a unique identifier and valid entity and book references.
+    /// @returns New validated portfolio including the new holding.
+    /// @throws FinstackError on a duplicate ID or unknown entity or book.
+    #[wasm_bindgen(js_name = withPosition)]
+    pub fn with_position(&self, position: &position::JsPosition) -> Result<JsPortfolio, JsValue> {
+        self.inner
+            .with_position(position.inner.clone())
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
     /// Start a fluent portfolio builder (Rust `PortfolioBuilder`).
     /// @param id - Portfolio identifier.
     /// @param baseCurrency - ISO-4217 reporting currency used for every base-currency rollup.

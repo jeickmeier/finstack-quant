@@ -3557,6 +3557,7 @@
       "InstrumentArtifactCache",
       "Portfolio",
       "PortfolioBuilder",
+      "Position",
       "aggregateFullCashflows",
       "aggregateMetrics",
       "allocateWeights",
@@ -3624,8 +3625,33 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "fromMaterialization", "fromSpec", "validateMaterialization"],
-    "methods": ["free", "numPositions", "toJson", "toSpec"],
-    "getters": ["asOf", "baseCurrency", "entityIds", "id", "meta", "name", "positionIds", "tags"]
+    "methods": ["free", "numPositions", "toBuilder", "toJson", "toSpec", "withPosition"],
+    "getters": [
+      "asOf",
+      "baseCurrency",
+      "entityIds",
+      "id",
+      "meta",
+      "name",
+      "positionIds",
+      "positions",
+      "tags"
+    ]
+  },
+  "portfolio.Position": {
+    "kind": "class",
+    "constructor": true,
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson"],
+    "getters": [
+      "attributes",
+      "bookId",
+      "entityId",
+      "instrumentId",
+      "positionId",
+      "quantity",
+      "unit"
+    ]
   },
   "portfolio.FactorModel": {
     "kind": "class",
@@ -3736,7 +3762,7 @@
     "kind": "class",
     "constructor": false,
     "statics": [],
-    "methods": ["build", "entity", "free", "meta", "name", "position", "tag"],
+    "methods": ["addPosition", "build", "entity", "free", "meta", "name", "position", "tag"],
     "getters": []
   },
   "portfolio.allocateWeights": {

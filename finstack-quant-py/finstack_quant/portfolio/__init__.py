@@ -60,6 +60,7 @@ ContractLimitExceededError = _portfolio.ContractLimitExceededError
 
 Portfolio = _portfolio.Portfolio
 PortfolioBuilder = _portfolio.PortfolioBuilder
+Position = _portfolio.Position
 PositionValue = _portfolio.PositionValue
 ReconciliationReport = _portfolio.ReconciliationReport
 InstrumentArtifactCache = _portfolio.InstrumentArtifactCache
@@ -206,6 +207,7 @@ __all__ = [
     "PortfolioPrimitiveExposureReport",
     "PortfolioResult",
     "PortfolioValuation",
+    "Position",
     "PositionAssignment",
     "PositionFilter",
     "PositionValue",

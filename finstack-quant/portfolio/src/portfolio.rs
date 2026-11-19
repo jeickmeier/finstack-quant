@@ -133,6 +133,24 @@ impl Portfolio {
         crate::PortfolioBuilder::new(id)
     }
 
+    /// Copy the portfolio into a builder with its holdings and metadata.
+    #[must_use]
+    pub fn to_builder(&self) -> crate::PortfolioBuilder {
+        crate::PortfolioBuilder::from_portfolio(self)
+    }
+
+    /// Make a copy of this portfolio with one additional position.
+    ///
+    /// # Arguments
+    /// * `position` - Validated holding. Its ID must be unique and its
+    ///   entity and book must belong to the portfolio, if provided.
+    ///
+    /// # Errors
+    /// Returns an error on duplicate IDs or unknown entities or books.
+    pub fn with_position(&self, position: Position) -> Result<Self> {
+        self.to_builder().position(position).build()
+    }
+
     /// Rebuild both derived caches: the position-ID lookup and the
     /// market-factor dependency index.
     ///

@@ -741,11 +741,18 @@ const CASES = {
   },
   'monte_carlo.lsmc': () => {
     const lsmc = new monteCarlo.LsmcPricer(2000, 42, false, 20);
+    const diagnostics = lsmc.priceAmericanUnbiased(gbmMarket('put'), 99).exercise_boundary;
+    assert.ok(diagnostics.length > 0);
+    assert.ok(diagnostics.every((point) => point.exercised_paths <= point.itm_paths));
+    assert.deepEqual(
+      lsmc.priceAmericanUnbiased(gbmMarket('put'), 100).exercise_boundary,
+      diagnostics
+    );
     return [
-      money(lsmc.priceAmerican(gbmMarket('put'))),
-      money(lsmc.priceAmerican(gbmMarket('call'), undefined, 10, 'polynomial', 2)),
-      money(lsmc.priceAmericanUnbiased(gbmMarket('put'), 99)),
-      money(lsmc.priceAmericanUnbiased(gbmMarket('call'), 99)),
+      money(lsmc.priceAmerican(gbmMarket('put')).estimate),
+      money(lsmc.priceAmerican(gbmMarket('call'), undefined, 10, 'polynomial', 2).estimate),
+      money(lsmc.priceAmericanUnbiased(gbmMarket('put'), 99).estimate),
+      money(lsmc.priceAmericanUnbiased(gbmMarket('call'), 99).estimate),
       lsmc.basis,
       lsmc.basisDegree,
     ];

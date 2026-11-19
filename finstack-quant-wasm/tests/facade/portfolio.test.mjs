@@ -32,6 +32,7 @@ const EXPORTED_KEYS = [
   'InstrumentArtifactCache',
   'Portfolio',
   'PortfolioBuilder',
+  'Position',
   'aggregateFullCashflows',
   'aggregateMetrics',
   'allocateWeights',
@@ -1385,4 +1386,27 @@ test('portfolio.portfolioMargin returns a plain PortfolioMarginResult', () => {
     market.free();
     book.free();
   }
+});
+
+test('typed positions round-trip and append to a copied portfolio', () => {
+  const deposit = facade.valuations.instruments.Deposit.example();
+  const position = new portfolio.Position('DEP-LOT', deposit.toJson(), -2, null, {
+    notional: 'USD',
+  });
+  const loaded = portfolio.Position.fromJson(position.toJson());
+  const empty = portfolio.Portfolio.builder('book', 'USD', '2025-01-01')
+    .tag('desk', 'rates')
+    .build();
+  const built = empty.withPosition(loaded);
+  assert.deepEqual(empty.positions, []);
+  const [holding] = built.positions;
+  assert.equal(holding.positionId, 'DEP-LOT');
+  assert.equal(holding.quantity, -2);
+  assert.deepEqual(holding.unit, { notional: 'USD' });
+  assert.throws(() => built.withPosition(loaded), /Duplicate position ID/i);
+  const extra = new portfolio.Position('DEP-LOT-2', deposit.toJson(), 1, null, 'units');
+  const expanded = built.toBuilder().addPosition(extra).build();
+  assert.deepEqual(expanded.positionIds, ['DEP-LOT', 'DEP-LOT-2']);
+  for (const handle of [expanded, extra, holding, built, empty, loaded, position, deposit])
+    handle.free();
 });

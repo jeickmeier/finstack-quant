@@ -373,3 +373,26 @@ def test_factor_model_handle_matches_the_shared_host_parity_fixture() -> None:
         FactorModel.from_config(json.dumps(bad))
     with pytest.raises(ValueError, match="invalid FactorModelConfig JSON"):
         FactorModel.from_config("{")
+
+
+def test_typed_position_authoring_copies_portfolio_and_preserves_units() -> None:
+    import pytest
+
+    from finstack_quant.portfolio import Portfolio, PortfolioError, Position
+    from finstack_quant.valuations.instruments import Deposit
+
+    empty = Portfolio.builder("book", "USD", "2025-01-01").tag("desk", "rates").build()
+    deposit = Deposit.example()
+    position = Position("DEP-LOT", deposit, -2, unit={"notional": "USD"}, attributes={"sector": "cash"})
+    loaded = Position.from_json(position.to_json())
+    assert (loaded.position_id, loaded.instrument_id, loaded.quantity) == ("DEP-LOT", deposit.id, -2)
+    assert loaded.unit == {"notional": "USD"}
+    assert loaded.attributes == {"sector": "cash"}
+    book = empty.with_position(loaded)
+    assert not empty.positions
+    assert book.positions[0].to_json() == loaded.to_json()
+    assert book.tags == empty.tags
+    extra = Position("DEP-LOT-2", deposit, 1)
+    assert book.to_builder().add_position(extra).build().position_ids == ["DEP-LOT", "DEP-LOT-2"]
+    with pytest.raises(PortfolioError, match="Duplicate position ID"):
+        book.with_position(loaded)

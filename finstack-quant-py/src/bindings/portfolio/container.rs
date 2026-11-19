@@ -29,6 +29,134 @@ use pyo3::types::PyModule;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+fn position_from_py(
+    instrument: &Bound<'_, PyAny>,
+    position_id: &str,
+    quantity: f64,
+    entity_id: Option<&str>,
+    unit: Option<&Bound<'_, PyAny>>,
+    attributes: Option<&Bound<'_, PyDict>>,
+) -> PyResult<Position> {
+    let py = instrument.py();
+    let boxed = extract_position_instrument(instrument)?;
+    let instrument_id = boxed.id().to_owned();
+    let unit = extract_position_unit(py, unit)?;
+    let attributes: IndexMap<String, AttributeValue> = match attributes {
+        Some(dict) => py_to_serde(py, dict.as_any(), "position attributes")?,
+        None => IndexMap::new(),
+    };
+    let mut position = Position::new(
+        position_id,
+        entity_id.unwrap_or(DUMMY_ENTITY_ID),
+        instrument_id,
+        Arc::from(boxed),
+        quantity,
+        unit,
+    )
+    .map_err(portfolio_to_py)?;
+    position.attributes = attributes;
+    Ok(position)
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position")]
+#[pyclass(
+    name = "Position",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+pub struct PyPosition {
+    inner: Position,
+}
+
+#[pymethods]
+impl PyPosition {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.__init__")]
+    #[new]
+    #[pyo3(signature = (position_id, instrument, quantity, entity_id=None, unit=None, attributes=None))]
+    fn new(
+        position_id: &str,
+        instrument: &Bound<'_, PyAny>,
+        quantity: f64,
+        entity_id: Option<&str>,
+        unit: Option<&Bound<'_, PyAny>>,
+        attributes: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: position_from_py(
+                instrument,
+                position_id,
+                quantity,
+                entity_id,
+                unit,
+                attributes,
+            )?,
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.from_json")]
+    #[staticmethod]
+    fn from_json(json: &str) -> PyResult<Self> {
+        let spec = serde_json::from_str(json).map_err(display_to_py)?;
+        Position::from_spec(spec)
+            .map(|inner| Self { inner })
+            .map_err(portfolio_to_py)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.to_json")]
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner.to_spec()).map_err(display_to_py)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.__reduce__")]
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.position_id")]
+    #[getter]
+    fn position_id(&self) -> &str {
+        self.inner.position_id.as_str()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.instrument_id")]
+    #[getter]
+    fn instrument_id(&self) -> &str {
+        &self.inner.instrument_id
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.entity_id")]
+    #[getter]
+    fn entity_id(&self) -> &str {
+        self.inner.entity_id.as_str()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.quantity")]
+    #[getter]
+    fn quantity(&self) -> f64 {
+        self.inner.quantity
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.book_id")]
+    #[getter]
+    fn book_id(&self) -> Option<&str> {
+        self.inner.book_id.as_ref().map(|id| id.as_str())
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.unit")]
+    #[getter]
+    fn unit<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.unit)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Position.attributes")]
+    #[getter]
+    fn attributes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.attributes)
+    }
+}
+
 /// Built runtime portfolio: entities, positions with live instruments, and
 /// the derived lookup indices.
 ///
@@ -67,6 +195,32 @@ impl PyPortfolio {
 
 #[pymethods]
 impl PyPortfolio {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Portfolio.positions")]
+    #[getter]
+    fn positions(&self) -> Vec<PyPosition> {
+        self.inner
+            .positions()
+            .iter()
+            .cloned()
+            .map(|inner| PyPosition { inner })
+            .collect()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Portfolio.to_builder")]
+    fn to_builder(&self) -> PyPortfolioBuilder {
+        PyPortfolioBuilder {
+            inner: Some(self.inner.to_builder()),
+        }
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "Portfolio.with_position")]
+    fn with_position(&self, position: PyRef<'_, PyPosition>) -> PyResult<Self> {
+        self.inner
+            .with_position(position.inner.clone())
+            .map(Self::from_inner)
+            .map_err(portfolio_to_py)
+    }
+
     /// Start a typed portfolio builder.
     ///
     /// Parameters
@@ -363,6 +517,16 @@ impl PyPortfolioBuilder {
 
 #[pymethods]
 impl PyPortfolioBuilder {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._container", "PortfolioBuilder.add_position")]
+    fn add_position<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        position: PyRef<'_, PyPosition>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let builder = slf.take()?;
+        slf.inner = Some(builder.position(position.inner.clone()));
+        Ok(slf)
+    }
+
     /// Set the human-readable portfolio name.
     #[pyo3(text_signature = "(self, name)")]
     fn name<'py>(mut slf: PyRefMut<'py, Self>, name: &str) -> PyResult<PyRefMut<'py, Self>> {
@@ -443,24 +607,14 @@ impl PyPortfolioBuilder {
         unit: Option<&Bound<'py, PyAny>>,
         attributes: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let py = slf.py();
-        let boxed = extract_position_instrument(instrument)?;
-        let instrument_id = boxed.id().to_owned();
-        let unit = extract_position_unit(py, unit)?;
-        let attributes: IndexMap<String, AttributeValue> = match attributes {
-            Some(dict) => py_to_serde(py, dict.as_any(), "position attributes")?,
-            None => IndexMap::new(),
-        };
-        let mut position = Position::new(
+        let position = position_from_py(
+            instrument,
             position_id,
-            entity_id.unwrap_or(DUMMY_ENTITY_ID),
-            instrument_id,
-            Arc::from(boxed),
             quantity,
+            entity_id,
             unit,
-        )
-        .map_err(portfolio_to_py)?;
-        position.attributes = attributes;
+            attributes,
+        )?;
         let builder = slf.take()?;
         slf.inner = Some(builder.position(position));
         Ok(slf)
@@ -532,6 +686,7 @@ pub fn parse_portfolio_spec_json(py: Python<'_>, json_str: &str) -> PyResult<Str
 /// Register the container bindings on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPortfolio>()?;
+    m.add_class::<PyPosition>()?;
     m.add_class::<PyPortfolioBuilder>()?;
     m.add_function(pyo3::wrap_pyfunction!(parse_portfolio_spec_json, m)?)?;
     Ok(())

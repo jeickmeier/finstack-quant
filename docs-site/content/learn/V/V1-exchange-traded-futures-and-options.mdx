@@ -296,7 +296,7 @@ american_mc=lsmc.price_american_unbiased(
     },
     pricing_seed=20250116,
     currency="USD",
-)
+).estimate
 mc_position=american_mc.mean.amount*2*50
 mc_stderr=american_mc.stderr*2*50
 print({"native_American":american,"native_European":european,

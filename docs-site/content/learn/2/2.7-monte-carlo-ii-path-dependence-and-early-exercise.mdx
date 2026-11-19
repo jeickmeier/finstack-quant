@@ -40,7 +40,7 @@ At an exercise date, compare immediate exercise with conditional expected contin
 
 Reusing those paths to value their fitted policy creates training optimism. `price_american_unbiased` evaluates that learned policy on independent pricing paths. Its name refers to the policy-evaluation sampling step; the policy can remain suboptimal and the grid finite. The true American put value is at least the corresponding European value because waiting to maturity remains feasible. A finite simulated estimate can lie below it because of sampling or policy error. A finite exercise grid is economically Bermudan. [Glasserman, chapter 8](/references.html#glasserman-2004-monte-carlo) provides the regression and policy-estimation framework.
 
-The wrapper exposes prices, errors and path counts, but no exercise-boundary object. The computed spot-price plot compares held-out policy values with European and intrinsic values. A separate, explicitly illustrative policy schematic explains exercise and continuation regions without claiming to export an engine boundary. The executable path-count study changes training and independent pricing samples while keeping the grid fixed. A small interval around a weak learned policy does not certify an accurate American price.
+The pricer returns a discounted price estimate and time-indexed diagnostics from policy training. Held-out paths estimate the fitted policy value. The path-count study changes the training and pricing samples while holding the exercise grid fixed.
 
 For a Bermudan swaption, the state process is an interest-rate model and exercise delivers an underlying swap. A Hull–White 1F tree and Hull–White Monte Carlo share model assumptions but use different numerical methods. The fixture specifies mean reversion and volatility directly; it is not a calibrated market cube. [Hull–White](/references.html#hull-white-1990-pricing-ird) and [Brigo–Mercurio](/references.html#brigo-mercurio-2006-interest-rate-models) supply the rates context.
 
@@ -176,15 +176,15 @@ print("basis degree | in-sample | held-out seed | policy value | SE | gap to BS 
 european_put = bs_price(put)
 for degree in (1, 3, 6):
     trained = LsmcPricer(2048, 17, False, 20, "polynomial", degree, True)
-    in_sample = trained.price_american(put)
+    in_sample = trained.price_american(put).estimate
     for pricing_seed in (1017, 2017):
-        held_out = trained.price_american_unbiased(put, pricing_seed=pricing_seed)
+        held_out = trained.price_american_unbiased(put, pricing_seed=pricing_seed).estimate
         print(f"{degree:12d} | {in_sample.mean.amount:.6f} | {pricing_seed:13d} | "
               f"{held_out.mean.amount:.6f} | {held_out.stderr:.6f} | "
               f"{held_out.mean.amount-european_put:.6f}")
 seed_reuse_error = None
 try:
-    trained.price_american_unbiased(put, pricing_seed=17)
+    trained.price_american_unbiased(put, pricing_seed=17).estimate
 except ValueError as error:
     seed_reuse_error = str(error)
 print("Training-seed reuse rejected:", seed_reuse_error)
@@ -220,7 +220,7 @@ for spot in spot_grid:
             "option_type": "put",
         },
         pricing_seed=1017,
-    )
+    ).estimate
     european=bs_price(dict(spot=float(spot), strike=100., rate=.05, dividend_yield=0., volatility=.30, time_to_expiry=1., option_type="put"))
     intrinsic=max(100.-float(spot),0.)
     # Zero sampling error occurs only when the trained policy exercises at time zero.
@@ -234,7 +234,7 @@ ax.errorbar(price_grid[:,0],price_grid[:,1],yerr=1.96*price_grid[:,2],color="#0f
 ax.set(xlabel="Initial spot (USD)",ylabel="Put value per unit (USD)",
        title="Computed put values across spot — held-out LSMC, European and intrinsic")
 ax.grid(alpha=.2);ax.legend(loc="upper right",fontsize=9)
-fig.text(.5,.005,"K=100, r=5%, q=0%, σ=30%, T=1 year · 40 exercise steps · degree 3 · 4,096 antithetic pairs\nSampling bars exclude policy and exercise-grid error; no engine boundary is extracted.",
+fig.text(.5,.005,"K=100, r=5%, q=0%, σ=30%, T=1 year · 40 exercise steps · degree 3 · 4,096 antithetic pairs\nSampling bars exclude policy and exercise-grid error.",
          ha="center",fontsize=9,color="#334155")
 fig.tight_layout(rect=(0,.065,1,1))
 fig.savefig("lsmc-held-out-price-comparison.png",dpi=144,bbox_inches="tight")
@@ -248,34 +248,42 @@ for row in price_rows:print(" | ".join(f"{value:.6f}" for value in row))
 
 <ExecutedOutput lesson="2.7" block="lsmc-held-out-price-plot" />
 
-### Illustrative exercise-policy schematic — not engine output
+### Fitted exercise boundary
 
-The Python wrapper exposes no boundary or exercise-decision object. The following prescribed curve is deliberately independent of all LSMC results. It illustrates how a put exercise region can lie below a time-dependent threshold and meet the strike at expiry; none of its coordinates estimate the optimal or learned boundary. The title, plot label, formula and caption all state this limitation.
+The fitted put policy compares immediate exercise with continuation on each grid date. The plotted points are strike-adjacent crossings within the observed in-the-money training spots. A gap means the training sample did not establish a crossing. The boundary describes the fitted policy on this grid; changing the basis, grid, or training seed can move it.
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="lsmc-policy-schematic" role="build" */}
 ```python exec id=lsmc-policy-schematic role=build
-# This prescribed curve is a drawing aid, never a model output or fitted policy.
-illustrative_time=np.linspace(0.,1.,101)
-illustrative_threshold=68.+32.*illustrative_time**1.8
-fig,ax=plt.subplots(figsize=(9,5.2))
-ax.fill_between(illustrative_time,40.,illustrative_threshold,color="#ccfbf1",alpha=.9,label="Illustrative exercise region")
-ax.fill_between(illustrative_time,illustrative_threshold,140.,color="#dbeafe",alpha=.7,label="Illustrative continuation region")
-ax.plot(illustrative_time,illustrative_threshold,color="#0f766e",linewidth=2.5,label="Prescribed curve: 68 + 32 t^1.8")
-ax.axhline(100.,color="#475569",linestyle="--",linewidth=1.5,label="Strike 100; terminal put exercise below strike")
-ax.text(.5,132.,"ILLUSTRATION — NOT LSMC OUTPUT",ha="center",va="center",weight="bold",fontsize=12,color="#7c2d12")
-ax.text(.65,62.,"Exercise if spot ≤ drawn curve",ha="center",color="#115e59")
-ax.text(.28,112.,"Continue if spot > drawn curve",ha="center",color="#1e40af")
-ax.set(xlim=(0.,1.),ylim=(40.,140.),xlabel="Elapsed time in years (expiry at 1)",ylabel="Spot (USD)",
-       title="Schematic exercise policy — chosen for illustration, not calibrated or estimated")
-ax.legend(loc="lower left",fontsize=8);ax.grid(alpha=.15)
-fig.text(.5,.01,"The supported Python API returns policy prices and sampling diagnostics, not exercise decisions or a boundary.\nNo point on this prescribed curve was obtained from LsmcPricer; do not use it to exercise a contract.",
-         ha="center",fontsize=9,color="#334155")
-fig.tight_layout(rect=(0,.07,1,1))
-fig.savefig("lsmc-illustrative-policy-schematic.png",dpi=144,bbox_inches="tight")
+import pandas as pd
+
+put_market = {
+    "spot": 100.0, "strike": 100.0, "rate": 0.05, "dividend_yield": 0.0,
+    "volatility": 0.3, "time_to_expiry": 1.0, "option_type": "put",
+}
+result = LsmcPricer(4096, 17, False, 40, "normalized_polynomial", 3, True).price_american_unbiased(
+    put_market, pricing_seed=1017
+)
+boundary = pd.DataFrame(
+    {"step": point.step, "years": point.time, "spot": point.critical_spot,
+     "in_the_money": point.itm_paths, "exercised": point.exercised_paths}
+    for point in result.exercise_boundary
+)
+assert boundary.step.tolist() == list(range(1, 40))
+assert (boundary.exercised <= boundary.in_the_money).all()
+assert boundary.spot.notna().any()
+fig, ax = plt.subplots(figsize=(9, 5.2))
+ax.plot(boundary.years, boundary.spot, "o-", color="#0f766e", label="Fitted crossings")
+ax.axhline(put_market["strike"], color="#475569", linestyle="--", label="Strike")
+ax.set(xlim=(0, 1), xlabel="Elapsed time (years)", ylabel="Spot (USD)",
+       title="Least-squares Monte Carlo put exercise boundary")
+ax.legend()
+ax.grid(alpha=.15)
+fig.tight_layout()
+fig.savefig("lsmc-exercise-boundary.png", dpi=144, bbox_inches="tight")
 plt.close(fig)
 if get_ipython() is not None:
-    display(Image(filename="lsmc-illustrative-policy-schematic.png"))
-print("Schematic only: the time-dependent threshold is prescribed as 68 + 32*t**1.8. It teaches the comparison of exercise and continuation regions and is not an engine boundary export.")
+    display(Image(filename="lsmc-exercise-boundary.png"))
+print(boundary.tail().to_string(index=False))
 ```
 {/* /notebook-block */}
 
@@ -304,7 +312,7 @@ for pairs in (256,1024,4096):
                 "option_type": "put",
             },
             pricing_seed=pricing_seed,
-        )
+        ).estimate
         path_count_rows.append((pairs,pricing_seed,estimate.mean.amount,estimate.stderr,estimate.num_simulated_paths))
 fig,ax=plt.subplots(figsize=(9,5.2))
 for pricing_seed,color in [(1017,"#0f766e"),(2017,"#c2410c")]:
@@ -443,7 +451,7 @@ for degree in (1, 6):
                 "time_to_expiry": 1,
                 "option_type": "put",
             },
-        )
+        ).estimate
         testing = fitted.price_american_unbiased(
             {
                 "spot": 100,
@@ -455,7 +463,7 @@ for degree in (1, 6):
                 "option_type": "put",
             },
             pricing_seed=1000+seed,
-        )
+        ).estimate
         observations.append((training.mean.amount, testing.mean.amount))
     train_mean = statistics.mean(a for a, b in observations)
     test_mean = statistics.mean(b for a, b in observations)

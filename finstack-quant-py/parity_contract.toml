@@ -558,8 +558,10 @@ python_package = "finstack_quant.models.monte_carlo"
 public = [
     "Estimate",
     "EuropeanPricer",
+    "ExerciseBoundaryPoint",
     "LrmGreeks",
     "LsmcPricer",
+    "LsmcResult",
     "MoneyEstimate",
     "PathDependentPricer",
     "PathSummary",
@@ -1641,7 +1643,7 @@ optimization = { python = "finstack_quant.portfolio",              status = "fla
 performance  = { python = "finstack_quant.portfolio",              status = "flattened", note = "TWRR/MWRR performance helpers are exported flat on finstack_quant.portfolio" }
 materialization = { python = "finstack_quant.portfolio",           status = "flattened", note = "InstrumentArtifactCache, MaterializationReport, Portfolio.from_materialization, and Portfolio.validate_materialization (typed twin of the WASM Portfolio.validateMaterialization; diagnostics returned, not raised) are exported flat on finstack_quant.portfolio; envelope types (PortfolioMaterializationEnvelope, MaterializedPosition, InstrumentArtifact, PortfolioHeader, MaterializerInfo) remain Rust-only" }
 portfolio    = { python = "finstack_quant.portfolio.portfolio",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
-position     = { python = "finstack_quant.portfolio.position",     status = "missing", note = "Position/PositionUnit are Rust-only as types; Python adds positions through PortfolioBuilder.position(position_id, instrument, quantity, entity_id, unit, attributes) and reads them via Portfolio.positions_to_dataframe(); PositionValue (valuation module) is bound" }
+position     = { python = "finstack_quant.portfolio",               status = "flattened", note = "Position handles wrap the Rust holding; the unit is expressed as a wire label or a notional lot object." }
 primitive    = { python = "finstack_quant.portfolio",              status = "flattened", note = "primitive::primitive_exposures is bound flat as Python primitive_exposures(portfolio, market, metrics) -> PortfolioPrimitiveExposureReport (base_currency/path_count/aggregate_count getters, to_json/from_json, to_dataframe of aggregates, to_paths_dataframe of paths) and WASM portfolio.primitiveExposures (plain PortfolioPrimitiveExposureReport object); metrics are required (pass [] for value only). PortfolioPrimitivePath/PortfolioPrimitiveAggregate are carried on the report wire form." }
 replay       = { python = "finstack_quant.portfolio",              status = "flattened", note = "replay_portfolio is exported flat on finstack_quant.portfolio; the replay configuration surface (ReplayTimeline, ReplayConfig, snapshot/step types) remains Rust-only; ReplayResult is Python-bound, and WASM returns it as a plain object" }
 results      = { python = "finstack_quant.portfolio.results",      status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
@@ -1712,6 +1714,7 @@ public = [
     "PortfolioPrimitiveExposureReport",
     "PortfolioResult",
     "PortfolioValuation",
+    "Position",
     "PositionAssignment",
     "PositionFilter",
     "PositionValue",
@@ -2231,7 +2234,7 @@ types = { ExecutionTrajectory = "ExecutionTrajectory", ImpactEstimate = "ImpactE
 # `MoneyEstimate.relative_stderr` is the free function `relativeStderr`.
 [parity.modules."finstack_quant.models.monte_carlo"]
 js = "models.monteCarlo"
-types = { Estimate = "Estimate", LrmGreeks = "LrmGreeks", MoneyEstimate = "MoneyEstimate", PathSummary = "PathSummary" }
+types = { Estimate = "Estimate", ExerciseBoundaryPoint = "ExerciseBoundaryPoint", LrmGreeks = "LrmGreeks", LsmcResult = "LsmcResult", MoneyEstimate = "MoneyEstimate", PathSummary = "PathSummary" }
 
 [parity.modules."finstack_quant.models.rates.dtsm"]
 js = "models.rates.dtsm"

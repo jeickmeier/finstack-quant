@@ -94,6 +94,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "ContractLimitExceededError",
         "Portfolio",
         "PortfolioBuilder",
+        "Position",
         "PositionValue",
         "ReconciliationReport",
         "InstrumentArtifactCache",

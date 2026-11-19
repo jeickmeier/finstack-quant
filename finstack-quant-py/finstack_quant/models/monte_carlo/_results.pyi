@@ -8,6 +8,164 @@ from numpy.typing import NDArray
 import pandas as pd
 from finstack_quant.core.money import Money
 
+class ExerciseBoundaryPoint:
+    """Interior Longstaff–Schwartz exercise diagnostics for one date.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.monte_carlo import LsmcPricer
+    >>> result = LsmcPricer(128, 0, num_steps=4).price_american({
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "put",
+    ... })
+    >>> result.exercise_boundary[0].step
+    1
+    """
+
+    @property
+    def step(self) -> int:
+        """Read the exercise step.
+
+        Returns
+        -------
+        int
+            Interior step index on the simulation grid.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def time(self) -> float:
+        """Read exercise time.
+
+        Returns
+        -------
+        float
+            Elapsed model years at this exercise step.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def critical_spot(self) -> float | None:
+        """Read the estimated exercise threshold.
+
+        Returns
+        -------
+        float | None
+            Strike-adjacent crossing in spot units, or None without a bracket.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def itm_paths(self) -> int:
+        """Read the in-the-money sample size.
+
+        Returns
+        -------
+        int
+            Number of training paths in the money at this step.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def exercised_paths(self) -> int:
+        """Read the immediate-exercise sample size.
+
+        Returns
+        -------
+        int
+            Number of training paths exercised at this backward step, before earlier dates are considered.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def continuation_coeffs(self) -> list[float]:
+        """Read continuation regression weights.
+
+        Returns
+        -------
+        list[float]
+            Weights in basis order, empty when the fit was skipped.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+class LsmcResult:
+    """Longstaff–Schwartz value and training-path exercise diagnostics.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.monte_carlo import LsmcPricer
+    >>> result = LsmcPricer(128, 0, num_steps=4).price_american({
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "put",
+    ... })
+    >>> result.estimate.num_paths
+    128
+    """
+
+    @property
+    def estimate(self) -> MoneyEstimate:
+        """Read the discounted Monte Carlo price estimate.
+
+        Returns
+        -------
+        MoneyEstimate
+            Money estimate, sampling errors and confidence interval.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def exercise_boundary(self) -> list[ExerciseBoundaryPoint]:
+        """Read the diagnostics of the fitted policy.
+
+        Returns
+        -------
+        list[ExerciseBoundaryPoint]
+            Interior-date diagnostics in ascending exercise-step order.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
 class MoneyEstimate:
     """
     Discounted Monte Carlo estimate with money units and confidence bands.

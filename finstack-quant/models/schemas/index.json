@@ -505,6 +505,15 @@
       "type_name": "LrmGreeks"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/lsmc_result.schema.json",
+      "bytes": 27264,
+      "kind": "output",
+      "path": "schemas/models/1/lsmc_result.schema.json",
+      "summary": "Least-squares Monte Carlo price estimate and fitted exercise diagnostics.",
+      "title": "LsmcResult",
+      "type_name": "LsmcResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/lvar_bangia_scalar.schema.json",
       "bytes": 1085,
       "kind": "component",

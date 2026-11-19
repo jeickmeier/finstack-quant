@@ -3967,6 +3967,37 @@ export interface ExecutionTrajectory {
   time_points: number[];
 }
 /**
+ * Continuation-regression diagnostics for one interior exercise date.
+ */
+export interface ExerciseBoundaryPoint {
+  /**
+   * Fitted weights in basis order, empty when the regression was skipped.
+   */
+  continuation_coeffs: number[];
+  /**
+   * Strike-adjacent exercise boundary within the observed in-the-money spots.
+   * Absent if a crossing cannot be established or the fit was skipped.
+   */
+  critical_spot?: number | null;
+  /**
+   * Number of those paths selected for immediate exercise at this step by
+   * the backward regression, before any decision at an earlier step.
+   */
+  exercised_paths: number;
+  /**
+   * Number of training paths in the money before this regression.
+   */
+  itm_paths: number;
+  /**
+   * Index on the uniform simulation grid, excluding inception and expiry.
+   */
+  step: number;
+  /**
+   * Years from simulation inception.
+   */
+  time: number;
+}
+/**
  * Contribution of a single factor to portfolio risk.
  *
  * See [`RiskDecomposition`] for the sign convention applied to each field.
@@ -4750,6 +4781,19 @@ export interface Money {
    * requires this to match; there is no implicit conversion.
    */
   currency: Currency;
+}
+/**
+ * Least-squares Monte Carlo price estimate and fitted exercise diagnostics.
+ */
+export interface LsmcResult {
+  /**
+   * Price in the specified currency, with sampling error and confidence interval.
+   */
+  estimate: MoneyEstimate;
+  /**
+   * Diagnostics from the training paths, ordered by ascending step.
+   */
+  exercise_boundary: ExerciseBoundaryPoint[];
 }
 /**
  * Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known.

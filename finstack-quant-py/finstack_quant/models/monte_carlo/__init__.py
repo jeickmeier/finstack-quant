@@ -5,6 +5,8 @@ from finstack_quant.finstack_quant import models as _models
 
 _mc = _models.monte_carlo
 
+ExerciseBoundaryPoint = _mc.ExerciseBoundaryPoint
+LsmcResult = _mc.LsmcResult
 MoneyEstimate = _mc.MoneyEstimate
 Estimate = _mc.Estimate
 PathSummary = _mc.PathSummary
@@ -29,8 +31,10 @@ finite_diff_gamma = _mc.finite_diff_gamma
 __all__: list[str] = [
     "Estimate",
     "EuropeanPricer",
+    "ExerciseBoundaryPoint",
     "LrmGreeks",
     "LsmcPricer",
+    "LsmcResult",
     "MoneyEstimate",
     "PathDependentPricer",
     "PathSummary",
