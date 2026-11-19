@@ -38,6 +38,7 @@ const EXPORTED_KEYS = [
   'allocateWeights',
   'applyScenarioAndRevalue',
   'attributePortfolioPnl',
+  'attributeScenarioPnl',
   'brinsonFachler',
   'brinsonLinked',
   'buildCreditVolReport',

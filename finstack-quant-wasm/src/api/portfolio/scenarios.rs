@@ -63,6 +63,45 @@ pub fn apply_scenario_and_revalue(
     .map_err(to_js_err)?;
     to_js_value_with_bigints(&out)
 }
+/// Attribute scenario P&L with the original contracts repriced before contract changes.
+/// @param portfolio - Opening holdings, quantities and valuation date.
+/// @param scenario - Ordered shocks, including any market, clock or instrument changes.
+/// @param market - Opening market snapshot used for base valuation and the shock.
+/// @param method - Optional native factor attribution method. The default is parallel.
+/// @returns Stressed revaluation, market attribution, contract increment, and marked and economic total P&L.
+/// @throws `TypeError` for invalid host shapes or `FinstackError` if scenario execution, pricing or reconciliation fails.
+#[wasm_bindgen(js_name = attributeScenarioPnl, unchecked_return_type = "ScenarioAttributionView")]
+pub fn attribute_scenario_pnl(
+    portfolio: &JsPortfolio,
+    #[wasm_bindgen(unchecked_param_type = "generated.scenarios.ScenarioSpec | string")]
+    scenario: JsValue,
+    market: &JsMarketContext,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.attribution.AttributionMethod | null"
+    )]
+    method: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let scenario =
+        finstack_quant_scenarios::ScenarioSpec::from_json(&json_text(&scenario, "scenario")?)
+            .map_err(to_js_err)?;
+    let method = method
+        .as_ref()
+        .filter(|value| !value.is_null())
+        .map(|value| crate::utils::wire::js_wire(value, "method"))
+        .transpose()?
+        .unwrap_or_default();
+    let config = finstack_quant_core::config::FinstackConfig::default();
+    let result = finstack_quant_portfolio::scenarios::attribute_scenario_pnl(
+        &portfolio.inner,
+        &scenario,
+        market.inner(),
+        &config,
+        &method,
+    )
+    .map_err(to_js_err)?;
+    to_js_value_with_bigints(&result)
+}
+
 /// Compute the profit and loss attributable to a scenario for an already-built
 /// `Portfolio` handle.
 ///

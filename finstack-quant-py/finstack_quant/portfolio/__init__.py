@@ -66,6 +66,7 @@ ReconciliationReport = _portfolio.ReconciliationReport
 InstrumentArtifactCache = _portfolio.InstrumentArtifactCache
 MaterializationReport = _portfolio.MaterializationReport
 PortfolioValuation = _portfolio.PortfolioValuation
+ScenarioAttributionView = _portfolio.ScenarioAttributionView
 ScenarioPnl = _portfolio.ScenarioPnl
 ScenarioPnlBatchItem = _portfolio.ScenarioPnlBatchItem
 PortfolioResult = _portfolio.PortfolioResult
@@ -100,6 +101,7 @@ aggregate_full_cashflows = _portfolio.aggregate_full_cashflows
 net_in_currency_by_date = _portfolio.net_in_currency_by_date
 ScenarioRevalueView = _portfolio.ScenarioRevalueView
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
+attribute_scenario_pnl = _portfolio.attribute_scenario_pnl
 scenario_pnl = _portfolio.scenario_pnl
 scenario_pnl_batch = _portfolio.scenario_pnl_batch
 attribute_portfolio_pnl = _portfolio.attribute_portfolio_pnl
@@ -219,6 +221,7 @@ __all__ = [
     "ReplayResult",
     "ReplayStep",
     "ReplaySummary",
+    "ScenarioAttributionView",
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
     "ScenarioRevalueView",
@@ -241,6 +244,7 @@ __all__ = [
     "allocate_weights",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
+    "attribute_scenario_pnl",
     "brinson_fachler",
     "brinson_linked",
     "build_credit_vol_report",

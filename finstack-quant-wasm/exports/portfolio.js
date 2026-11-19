@@ -71,6 +71,7 @@ export const portfolio = {
   netInCurrencyByDate: wasm.netInCurrencyByDate,
   collapseToBaseByDateKind: wasm.collapseToBaseByDateKind,
   applyScenarioAndRevalue: wasm.applyScenarioAndRevalue,
+  attributeScenarioPnl: wasm.attributeScenarioPnl,
   scenarioPnl: wasm.scenarioPnl,
   optimizePortfolio: wasm.optimizePortfolio,
   rebalanceFromSpec: wasm.rebalanceFromSpec,

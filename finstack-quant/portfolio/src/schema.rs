@@ -21,7 +21,8 @@ use crate::{
     optimization::PortfolioOptimizationResult, optimization::PortfolioOptimizationSpec,
     performance::DatedCashflow, performance::LinkedReturn, performance::TwrrPeriod,
     primitive::PortfolioPrimitiveExposureReport, replay::ReplayConfig, replay::ReplayResult,
-    scenarios::ScenarioPnlBatchItem, scenarios::ScenarioRevalueView, sensitivity::FactorPnlProfile,
+    scenarios::ScenarioAttributionView, scenarios::ScenarioPnlBatchItem,
+    scenarios::ScenarioRevalueView, sensitivity::FactorPnlProfile,
     sensitivity::SensitivityMatrixJson,
 };
 use finstack_quant_core::Result;
@@ -485,6 +486,15 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::scenario_pnl_batch_item),
+    finstack_quant_core::schema_artifact!(
+        ScenarioAttributionView,
+        "portfolio",
+        "scenario_attribution_view",
+        Output,
+        "Ordered portfolio scenario attribution and stressed revaluation."
+    )
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::scenario_attribution_view),
     finstack_quant_core::schema_artifact!(
         ScenarioRevalueView,
         "portfolio",

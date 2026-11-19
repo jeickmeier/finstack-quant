@@ -667,3 +667,22 @@ def test_rate_shocks_reject_the_commodity_curve_kind() -> None:
         OperationSpec.curve_node_bp(commodity, "WTI", [("2Y", 15)]).validate()
     with pytest.raises(ValueError, match="commodity_curve_parallel_pct"):
         parallel_bp_many(commodity, [], 15)
+
+
+def test_scenario_attribution_keeps_contract_effects_separate_from_market_moves() -> None:
+    from finstack_quant.portfolio import Portfolio, attribute_scenario_pnl, scenario_pnl
+
+    market = _market()
+    original_market = market.to_json()
+    book = Portfolio.builder("deposit", "USD", AS_OF).position("DEP", _deposit_json(), -3).build()
+    contract = OperationSpec.instrument_price_pct_by_type(["deposit"], -5.0)
+    mixed = ScenarioSpec("mixed", [*_up_25().operations, contract])
+    market_only = attribute_scenario_pnl(book, _up_25(), market, method="parallel")
+    both = attribute_scenario_pnl(book, mixed, market)
+    assert both.revaluation.report.operations_applied == 2
+    assert market_only.contract_pnl.total == 0.0
+    assert both.contract_pnl.total > 0.0
+    assert both.market_attribution.total_pnl == market_only.market_attribution.total_pnl
+    assert both.mark_pnl.total == pytest.approx(scenario_pnl(book, mixed, market).pnl.total)
+    assert both.total_pnl.amount == pytest.approx(both.market_attribution.total_pnl.amount + both.contract_pnl.total)
+    assert market.to_json() == original_market

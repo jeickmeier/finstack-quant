@@ -280,6 +280,15 @@
       "type_name": "ReplayResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_attribution_view.schema.json",
+      "bytes": 152972,
+      "kind": "output",
+      "path": "schemas/portfolio/1/scenario_attribution_view.schema.json",
+      "summary": "Ordered portfolio scenario attribution and stressed revaluation.",
+      "title": "ScenarioAttributionView",
+      "type_name": "ScenarioAttributionView"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
       "bytes": 81987,
       "kind": "output",

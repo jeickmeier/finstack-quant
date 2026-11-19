@@ -3599,6 +3599,7 @@
       "allocateWeights",
       "applyScenarioAndRevalue",
       "attributePortfolioPnl",
+      "attributeScenarioPnl",
       "brinsonFachler",
       "brinsonLinked",
       "buildCreditVolReport",
@@ -3774,6 +3775,9 @@
     "kind": "function"
   },
   "portfolio.applyScenarioAndRevalue": {
+    "kind": "function"
+  },
+  "portfolio.attributeScenarioPnl": {
     "kind": "function"
   },
   "portfolio.scenarioPnl": {

@@ -11999,6 +11999,16 @@ export interface PortfolioNamespace {
    */
   readonly applyScenarioAndRevalue: typeof wasm.applyScenarioAndRevalue;
   /**
+   * Attribute scenario P&L with the original contracts repriced before contract changes.
+   * @param portfolio - Opening holdings, quantities and valuation date.
+   * @param scenario - Ordered shocks, including any market, clock or instrument changes.
+   * @param market - Opening market snapshot used for base valuation and the shock.
+   * @param method - Optional native factor attribution method. The default is parallel.
+   * @returns Stressed revaluation, market attribution, contract increment, and marked and economic total P&L.
+   * @throws `TypeError` for invalid host shapes or `FinstackError` if scenario execution, pricing or reconciliation fails.
+   */
+  readonly attributeScenarioPnl: typeof wasm.attributeScenarioPnl;
+  /**
    * Compute the profit and loss attributable to a scenario for an already-built
    * `Portfolio` handle.
    *

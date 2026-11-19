@@ -51,10 +51,12 @@ from finstack_quant.portfolio._metrics import (
     aggregate_metrics as aggregate_metrics,
 )
 from finstack_quant.portfolio._scenarios import (
+    ScenarioAttributionView as ScenarioAttributionView,
     ScenarioPnl as ScenarioPnl,
     ScenarioPnlBatchItem as ScenarioPnlBatchItem,
     ScenarioRevalueView as ScenarioRevalueView,
     apply_scenario_and_revalue as apply_scenario_and_revalue,
+    attribute_scenario_pnl as attribute_scenario_pnl,
     scenario_pnl as scenario_pnl,
     scenario_pnl_batch as scenario_pnl_batch,
 )
@@ -219,6 +221,7 @@ __all__ = [
     "ReplayResult",
     "ReplayStep",
     "ReplaySummary",
+    "ScenarioAttributionView",
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
     "ScenarioRevalueView",
@@ -241,6 +244,7 @@ __all__ = [
     "allocate_weights",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
+    "attribute_scenario_pnl",
     "brinson_fachler",
     "brinson_linked",
     "build_credit_vol_report",

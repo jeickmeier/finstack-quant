@@ -8,6 +8,139 @@ from finstack_quant.scenarios import ApplicationReport, ScenarioSpec
 from finstack_quant.portfolio._container import Portfolio
 from finstack_quant.portfolio._valuation import PortfolioValuation
 
+from finstack_quant.core.money import Money
+from finstack_quant.portfolio._attribution import PortfolioAttribution
+
+class ScenarioAttributionView:
+    """Market, carry, and contract attribution for one applied scenario.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, ScenarioAttributionView, attribute_scenario_pnl
+    >>> from finstack_quant.scenarios import ScenarioSpec
+    >>> book = Portfolio.builder("book", "USD", "2025-01-02").build()
+    >>> isinstance(attribute_scenario_pnl(book, ScenarioSpec("base", []), MarketContext()), ScenarioAttributionView)
+    True
+    """
+
+    @property
+    def revaluation(self) -> ScenarioRevalueView:
+        """Read the stressed book and application report.
+
+        Returns
+        -------
+        ScenarioRevalueView
+            Final valuation on the stressed market and effective date with its provenance.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def market_attribution(self) -> PortfolioAttribution:
+        """Read the market and carry attribution.
+
+        Returns
+        -------
+        PortfolioAttribution
+            Factor attribution holding the original contracts fixed through the scenario date.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def contract_pnl(self) -> ScenarioPnl:
+        """Read the increment from changes to contracts.
+
+        Returns
+        -------
+        ScenarioPnl
+            Marked PV change from applying the contract changes on the stressed market.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def mark_pnl(self) -> ScenarioPnl:
+        """Read the total change in marked portfolio value.
+
+        Returns
+        -------
+        ScenarioPnl
+            Opening-to-stressed PV difference in the portfolio base currency.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def total_pnl(self) -> Money:
+        """Read economic P&L under the selected attribution method.
+
+        Returns
+        -------
+        Money
+            Market attribution including carry plus the contract increment.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+def attribute_scenario_pnl(
+    portfolio: Portfolio | str,
+    scenario: ScenarioSpec | str,
+    market: MarketContext | str,
+    *,
+    method: str | dict[str, object] | None = None,
+) -> ScenarioAttributionView:
+    """Attribute a stressed portfolio under a market-then-contract sequence.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Opening holdings and valuation date, or their canonical JSON document.
+    scenario : ScenarioSpec or str
+        Ordered shocks, including any explicit date or instrument changes.
+    market : MarketContext or str
+        Unshocked inputs, or their canonical JSON document.
+    method : str or dict or None
+        Native factor method, defaulting to parallel attribution.
+
+    Returns
+    -------
+    ScenarioAttributionView
+        Marked revaluation with provenance, market and carry attribution,
+        and a separate contract leg measured on the stressed market.
+
+    Raises
+    ------
+    ValueError
+        If an input is invalid or the scenario, valuation or reconciliation fails.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, attribute_scenario_pnl
+    >>> from finstack_quant.scenarios import ScenarioSpec
+    >>> book = Portfolio.builder("book", "USD", "2025-01-02").build()
+    >>> attribute_scenario_pnl(book, ScenarioSpec("base", []), MarketContext()).mark_pnl.total
+    0.0
+    """
+    ...
+
 class ScenarioPnl:
     """
     Scenario-attributable profit and loss, in the portfolio base currency.

@@ -2113,6 +2113,13 @@
             "bytes": 102417
           },
           {
+            "path": "schemas/portfolio/1/scenario_attribution_view.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_attribution_view.schema.json",
+            "type_name": "ScenarioAttributionView",
+            "kind": "output",
+            "bytes": 152972
+          },
+          {
             "path": "schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
             "type_name": "ScenarioPnlBatchItem",
@@ -5056,6 +5063,14 @@
             "type_name": "ReplayResult",
             "kind": "output",
             "bytes": 102417
+          },
+          {
+            "domain": "portfolio",
+            "path": "schemas/portfolio/1/scenario_attribution_view.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_attribution_view.schema.json",
+            "type_name": "ScenarioAttributionView",
+            "kind": "output",
+            "bytes": 152972
           },
           {
             "domain": "portfolio",

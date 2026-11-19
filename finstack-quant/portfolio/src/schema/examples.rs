@@ -534,6 +534,27 @@ pub(super) fn scenario_pnl_batch_item() -> Result<Vec<Value>> {
     }))
 }
 
+pub(super) fn scenario_attribution_view() -> Result<Vec<Value>> {
+    use finstack_quant_core::config::FinstackConfig;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::context::MarketContext;
+    let date = time::macros::date!(2025 - 01 - 02);
+    let book = crate::Portfolio::builder("empty")
+        .base_currency(Currency::USD)
+        .as_of(date)
+        .build()?;
+    let scenario =
+        finstack_quant_scenarios::ScenarioSpec::from_json(r#"{"id":"base","operations":[]}"#)?;
+    let view = crate::scenarios::attribute_scenario_pnl(
+        &book,
+        &scenario,
+        &MarketContext::new(),
+        &FinstackConfig::default(),
+        &finstack_quant_attribution::AttributionMethod::Parallel,
+    )?;
+    example(&view)
+}
+
 pub(super) fn scenario_revalue_view() -> Result<Vec<Value>> {
     example_from_json::<crate::scenarios::ScenarioRevalueView>(json!({
         "valuation": valuation(),

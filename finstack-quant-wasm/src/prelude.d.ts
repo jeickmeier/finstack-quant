@@ -679,6 +679,14 @@ export type ScenarioRevalueView = WithFields<
 >;
 
 /**
+ * Market-then-contract scenario attribution with revaluation in host form.
+ */
+export type ScenarioAttributionView = WithFields<
+  generated.portfolio.ScenarioAttributionView,
+  { revaluation: ScenarioRevalueView }
+>;
+
+/**
  * One historical replay step (Rust `ReplayStep`), with its valuation in host form.
  */
 export type ReplayStep = WithFields<

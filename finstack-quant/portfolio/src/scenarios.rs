@@ -387,6 +387,121 @@ fn diff_valuations(
     Ok(ScenarioPnl { total, by_position })
 }
 
+/// Attribution of a stressed portfolio under a market-then-contract sequence.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct ScenarioAttributionView {
+    /// Stressed portfolio valuation and complete scenario application report.
+    pub revaluation: ScenarioRevalueView,
+    /// Factor attribution of the original contracts on the stressed market and date.
+    pub market_attribution: crate::attribution::PortfolioAttribution,
+    /// Incremental mark from changes to the positions or contracts, measured on the stressed market.
+    pub contract_pnl: ScenarioPnl,
+    /// Change in marked PV from opening to the fully stressed portfolio.
+    pub mark_pnl: ScenarioPnl,
+    /// Economic attribution including the selected market method's carry and the contract change.
+    pub total_pnl: Money,
+}
+
+/// Apply a scenario and attribute its P&L under a market-then-contract sequence.
+///
+/// The original portfolio is repriced on the stressed market and effective
+/// date to explain the market and carry move. The final portfolio is valued
+/// on that same endpoint; its difference from the unchanged contracts
+/// measures the contract leg. Each portfolio leg uses the same valuation
+/// policy and registered pricing path. Opening and closing market inputs
+/// stay immutable.
+///
+/// # Arguments
+/// * `portfolio` - Opening portfolio, including native amounts and base currency.
+/// * `scenario` - Ordered market, clock and contract shocks to apply.
+/// * `market` - Opening market snapshot for unshocked valuation and scenario application.
+/// * `config` - Common pricing and scenario policy for every leg.
+/// * `method` - Method used to attribute unchanged contracts between the two markets.
+///
+/// # Errors
+/// Propagates scenario, pricing, attribution and currency reconciliation errors.
+pub fn attribute_scenario_pnl(
+    portfolio: &Portfolio,
+    scenario: &ScenarioSpec,
+    market: &MarketContext,
+    config: &finstack_quant_core::config::FinstackConfig,
+    method: &finstack_quant_attribution::AttributionMethod,
+) -> Result<ScenarioAttributionView> {
+    use crate::attribution::{attribution_endpoint_profile, reduce_prepared};
+    use crate::evaluation::{PortfolioEvaluationPlan, PositionExecution};
+
+    let AppliedScenarioState {
+        portfolio: stressed_book,
+        market: stressed_market,
+        as_of,
+        report,
+    } = apply_scenario(portfolio, scenario, market, config, None)?;
+    let mut plan = PortfolioEvaluationPlan::new(config);
+    let original = plan.register_portfolio(portfolio);
+    let opening_market = plan.register_market(market, portfolio.as_of);
+    let closing_market = plan.register_market(&stressed_market, as_of);
+    let profile = attribution_endpoint_profile(method);
+    let opening_job = plan.register_evaluation(
+        opening_market,
+        original,
+        profile.clone(),
+        PositionExecution::Auto,
+    )?;
+    let market_only_job = plan.register_evaluation(
+        closing_market,
+        original,
+        profile.clone(),
+        PositionExecution::Auto,
+    )?;
+    let contract_job = match &stressed_book {
+        Cow::Borrowed(_) => None,
+        Cow::Owned(edited) => {
+            let edited = plan.register_portfolio(edited);
+            Some(plan.register_evaluation(
+                closing_market,
+                edited,
+                profile,
+                PositionExecution::Auto,
+            )?)
+        }
+    };
+    let mut valued = plan.execute();
+    let opening = valued.take_valuation(opening_job)?;
+    let market_only = valued.take_valuation(market_only_job)?;
+    let market_attribution = reduce_prepared(
+        portfolio,
+        (market, &stressed_market),
+        (portfolio.as_of, as_of),
+        config,
+        method,
+        &opening,
+        &market_only,
+    )?;
+    let (valuation, contract_pnl) = match contract_job {
+        Some(job) => {
+            let edited = valued.take_valuation(job)?;
+            let contract_pnl = diff_valuations(&market_only, &edited)?;
+            (edited, contract_pnl)
+        }
+        None => {
+            let contract_pnl = diff_valuations(&market_only, &market_only)?;
+            (market_only, contract_pnl)
+        }
+    };
+    let mark_pnl = diff_valuations(&opening, &valuation)?;
+    let total_pnl = market_attribution
+        .total_pnl
+        .checked_add(contract_pnl.total)?;
+    Ok(ScenarioAttributionView {
+        revaluation: ScenarioRevalueView { valuation, report },
+        market_attribution,
+        contract_pnl,
+        mark_pnl,
+        total_pnl,
+    })
+}
+
 /// Compute the profit and loss attributable to a scenario.
 ///
 /// Registers an unstressed state and the scenario-applied state with the

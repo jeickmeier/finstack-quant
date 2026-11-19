@@ -5734,6 +5734,32 @@ export interface RiskDecomposition {
   total_risk: number;
 }
 /**
+ * Ordered portfolio scenario attribution and stressed revaluation.
+ */
+export interface ScenarioAttributionView {
+  /**
+   * Incremental mark from changes to the positions or contracts, measured on the stressed market.
+   */
+  contract_pnl: ScenarioPnl;
+  /**
+   * Change in marked PV from opening to the fully stressed portfolio.
+   */
+  mark_pnl: ScenarioPnl;
+  /**
+   * Factor attribution of the original contracts on the stressed market and date.
+   */
+  market_attribution: PortfolioAttribution;
+  /**
+   * Stressed portfolio valuation and complete scenario application report.
+   */
+  revaluation: ScenarioRevalueView;
+  /**
+   * Economic attribution including the selected market method's carry and the contract change.
+   */
+  total_pnl: Money;
+  [k: string]: unknown;
+}
+/**
  * Scenario-attributable profit and loss, in the portfolio base currency.
  *
  * Produced by [`scenario_pnl`] as the difference between the stressed and the
@@ -5769,6 +5795,23 @@ export interface ScenarioPnl {
   [k: string]: unknown;
 }
 /**
+ * Scenario-and-revalue view returned by binding surfaces.
+ *
+ * This pre-1.0 API intentionally has no alias under its former
+ * persistence-implying name:
+ */
+export interface ScenarioRevalueView {
+  /**
+   * Scenario application report.
+   */
+  report: ApplicationReport;
+  /**
+   * Stressed portfolio valuation.
+   */
+  valuation: PortfolioValuation;
+  [k: string]: unknown;
+}
+/**
  * One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.
  */
 export interface ScenarioPnlBatchItem {
@@ -5784,20 +5827,6 @@ export interface ScenarioPnlBatchItem {
    * Identifier copied from the input scenario.
    */
   scenario_id: string;
-  [k: string]: unknown;
-}
-/**
- * Scenario-and-revalue view returned by binding surfaces.
- */
-export interface ScenarioRevalueView {
-  /**
-   * Scenario application report.
-   */
-  report: ApplicationReport;
-  /**
-   * Stressed portfolio valuation.
-   */
-  valuation: PortfolioValuation;
   [k: string]: unknown;
 }
 /**
