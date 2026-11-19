@@ -617,6 +617,72 @@ impl Default for ResultsMeta {
 }
 
 impl FinstackConfig {
+    /// Copy this configuration with a different rounding mode.
+    ///
+    /// # Arguments
+    /// * `mode` - Explicit policy, or `None` to clear the mode.
+    #[must_use]
+    pub fn with_rounding_mode(&self, mode: Option<RoundingMode>) -> Self {
+        let mut next = self.clone();
+        next.rounding.mode = mode;
+        next
+    }
+
+    /// Copy this configuration with one output scale override.
+    ///
+    /// # Arguments
+    /// * `currency` - Currency whose display decimal places are overridden.
+    /// * `scale` - Number of decimal places in `0..=28`.
+    ///
+    /// # Errors
+    /// Rejects unsupported scales.
+    pub fn with_output_scale(
+        &self,
+        currency: crate::currency::Currency,
+        scale: u32,
+    ) -> crate::Result<Self> {
+        let mut next = self.clone();
+        next.rounding.output_scale.set_scale(currency, scale)?;
+        Ok(next)
+    }
+
+    /// Copy this configuration with one ingest scale override.
+    ///
+    /// # Arguments
+    /// * `currency` - Currency whose input values are rounded using this scale.
+    /// * `scale` - Number of decimal places in `0..=28`.
+    ///
+    /// # Errors
+    /// Rejects unsupported scales. Applying this ingest override later requires
+    /// that the completed configuration selects a rounding mode.
+    pub fn with_ingest_scale(
+        &self,
+        currency: crate::currency::Currency,
+        scale: u32,
+    ) -> crate::Result<Self> {
+        let mut next = self.clone();
+        next.rounding.ingest_scale.set_scale(currency, scale)?;
+        Ok(next)
+    }
+
+    /// Update a versioned section with JSON merge-patch semantics.
+    ///
+    /// # Arguments
+    /// * `key` - Versioned extension namespace, for example `core.rating_scales.v1`.
+    /// * `patch` - Object members to merge recursively. A null member removes the
+    ///   member. A non-object patch replaces the section value. An absent
+    ///   section starts as null.
+    ///
+    /// # Errors
+    /// Rejects an invalid extension key. The owning module validates its
+    /// configuration schema when it consumes the section.
+    pub fn patch_extension(&mut self, key: &str, patch: JsonValue) -> crate::Result<()> {
+        let current = self.extensions.get(key).cloned().unwrap_or(JsonValue::Null);
+        self.extensions
+            .insert(key, merge_extension_patch(current, patch))?;
+        Ok(())
+    }
+
     /// Effective output scale for a currency. Falls back to ISO-4217 `Currency::decimals()`.
     pub fn output_scale(&self, ccy: crate::currency::Currency) -> u32 {
         output_scale_from_map(&self.rounding.output_scale.overrides, ccy)
@@ -657,6 +723,23 @@ impl FinstackConfig {
         })?;
         Ok(Some((scale, mode)))
     }
+}
+
+fn merge_extension_patch(current: JsonValue, patch: JsonValue) -> JsonValue {
+    let JsonValue::Object(patch) = patch else {
+        return patch;
+    };
+    let mut fields = match current {
+        JsonValue::Object(fields) => fields,
+        _ => serde_json::Map::new(),
+    };
+    for (key, value) in patch {
+        let current = fields.remove(&key).unwrap_or(JsonValue::Null);
+        if !value.is_null() {
+            fields.insert(key, merge_extension_patch(current, value));
+        }
+    }
+    JsonValue::Object(fields)
 }
 
 impl From<&FinstackConfig> for RoundingContext {
@@ -704,6 +787,43 @@ pub fn results_meta(cfg: &FinstackConfig) -> ResultsMeta {
 #[cfg(test)]
 mod tests {
     use super::{ConfigExtensions, RoundingMode, ToleranceConfig};
+
+    #[test]
+    fn patch_extension_merges_members_and_copy_keeps_source_configuration() {
+        use crate::currency::Currency;
+        use serde_json::json;
+
+        let original = super::FinstackConfig::default();
+        let mut next = original
+            .with_rounding_mode(Some(RoundingMode::Bankers))
+            .with_output_scale(Currency::JPY, 3)
+            .expect("valid scale")
+            .with_ingest_scale(Currency::JPY, 2)
+            .expect("valid scale");
+        assert_eq!(next.output_scale(Currency::JPY), 3);
+        assert_eq!(next.ingest_scale(Currency::JPY), Some(2));
+        assert_eq!(original.ingest_scale(Currency::JPY), None);
+        let key = "core.example.v1";
+        next.patch_extension(
+            key,
+            json!({"options": {"keep": 1, "remove": 2}, "array": [1]}),
+        )
+        .expect("initial patch");
+        next.patch_extension(
+            key,
+            json!({"options": {"remove": null, "add": "null"}, "array": [2, 3]}),
+        )
+        .expect("revision");
+        assert_eq!(
+            next.extensions.get(key),
+            Some(&json!({"options": {"keep": 1, "add": "null"}, "array": [2, 3]}))
+        );
+        assert!(
+            next.patch_extension("invalid", json!({"value": true}))
+                .is_err()
+        );
+        assert!(original.extensions.get(key).is_none());
+    }
 
     #[test]
     fn config_extensions_accept_valid_versioned_keys() {

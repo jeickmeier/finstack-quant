@@ -1127,11 +1127,15 @@
       "ingestScaleOverrides",
       "outputScale",
       "outputScaleOverrides",
+      "patchExtension",
       "removeExtension",
       "setExtension",
       "setIngestScale",
       "setOutputScale",
-      "toJson"
+      "toJson",
+      "withIngestScale",
+      "withOutputScale",
+      "withRoundingMode"
     ],
     "getters": ["roundingMode", "tolerances"]
   },

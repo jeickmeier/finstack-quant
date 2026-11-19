@@ -888,6 +888,30 @@ test('MarketContext keeps volatility registries namespace-local, rejects cross-f
   assert.throws(() => context.condition('not-a-date'), kind('validation', /.+/));
 });
 
+test('FinstackConfig derives scale policies and merges native JSON patches', () => {
+  const source = new core.FinstackConfig();
+  const rounded = source.withRoundingMode('bankers');
+  const output = rounded.withOutputScale('JPY', 2);
+  const configured = output.withIngestScale('JPY', 3);
+  const key = 'core.example.v1';
+  try {
+    assert.equal(source.outputScale('JPY'), 0);
+    assert.equal(output.ingestScale('JPY'), undefined);
+    assert.equal(configured.ingestScale('JPY'), 3);
+    assert.equal(configured.outputScale('JPY'), 2);
+    configured.setExtension(key, { opts: { keep: 1, drop: 2 }, list: [1] });
+    configured.patchExtension(key, { opts: { drop: null, add: 'null' }, list: [2] });
+    assert.deepEqual(configured.getExtension(key), { opts: { keep: 1, add: 'null' }, list: [2] });
+    assert.throws(() => configured.patchExtension(key, { invalid: Infinity }));
+    assert.deepEqual(configured.getExtension(key), { opts: { keep: 1, add: 'null' }, list: [2] });
+  } finally {
+    configured.free();
+    output.free();
+    rounded.free();
+    source.free();
+  }
+});
+
 test('FinstackConfig extensions hold JSON values, not JSON text', () => {
   const cfg = new core.FinstackConfig(null, { generic_epsilon: 1e-9 });
   assert.deepEqual(cfg.tolerances, { generic_epsilon: 1e-9 });
