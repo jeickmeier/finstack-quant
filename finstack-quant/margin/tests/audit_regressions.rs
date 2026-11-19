@@ -279,24 +279,24 @@ fn saccr_categories_mpor_and_unmargined_cap_match_prescribed_stages() {
     };
     let engine = SaCcrEngine::default();
     let power = engine
-        .calculate_ead(&config, std::slice::from_ref(&trade))
+        .calculate_ead(std::slice::from_ref(&trade), &config)
         .expect("power");
     assert!((power.add_on_aggregate - 400_000.0).abs() < 1e-8);
     trade.asset_class = SaCcrAssetClass::Credit;
     trade.supervisory_category = Some(SaCcrSupervisoryCategory::CreditBbb);
     let credit = engine
-        .calculate_ead(&config, std::slice::from_ref(&trade))
+        .calculate_ead(std::slice::from_ref(&trade), &config)
         .expect("credit");
     let expected = 1e6 * 0.0054 * (1.0 - (-0.05_f64).exp()) / 0.05;
     assert!((credit.add_on_aggregate - expected).abs() < 1e-8);
     let mut margined =
         SaCcrNettingSetConfig::margined(config.netting_set_id, 0.0, 1e6, 0.0, 0.0, 10, as_of);
     assert_eq!(
-        engine.calculate_ead(&margined, &[]).expect("empty").ead,
+        engine.calculate_ead(&[], &margined).expect("empty").ead,
         0.0
     );
     margined.mpor_days = 1;
-    assert!(engine.calculate_ead(&margined, &[trade]).is_err());
+    assert!(engine.calculate_ead(&[trade], &margined).is_err());
 }
 
 #[test]

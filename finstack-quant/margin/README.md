@@ -249,7 +249,7 @@ is desk cash received, including returns in either direction.
 correlation scenario, per-scenario charges, and stamped `ResultsMeta`.
 
 `SaCcrEngine::default()` (or `SaCcrEngine::with_alpha(alpha)`) plus
-`calculate_ead(&SaCcrNettingSetConfig, &[SaCcrTrade])` returns an `EadResult`
+`calculate_ead(&[SaCcrTrade], &SaCcrNettingSetConfig)` returns an `EadResult`
 with replacement cost, PFE, multiplier, add-on breakdown, alpha, and a reporting
 maturity factor. Note that `EadResult::maturity_factor` is a **reporting summary
 only** for unmargined sets — a tenor-weighted average, not the per-trade factors

@@ -709,7 +709,7 @@ test('SA-CCR configuration twins, SaCcrEngine and saccrEad match Python', () => 
     expected.engine_alpha
   );
   close(
-    wire(new margin.SaCcrEngine(1.5).calculateEad(unmargined, JSON.stringify(trades))),
+    wire(new margin.SaCcrEngine(1.5).calculateEad(JSON.stringify(trades), unmargined)),
     expected.engine_ead,
     'engine_ead'
   );

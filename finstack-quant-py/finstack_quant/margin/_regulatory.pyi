@@ -1367,7 +1367,7 @@ class EadResult:
     --------
     >>> from finstack_quant.margin import NettingSetId, SaCcrEngine, SaCcrNettingSetConfig
     >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-15")
-    >>> SaCcrEngine().calculate_ead(config, []).ead
+    >>> SaCcrEngine().calculate_ead([], config).ead
     0.0
     """
 
@@ -1566,7 +1566,7 @@ class EadResult:
         Examples
         --------
         >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-15")
-        >>> result = SaCcrEngine().calculate_ead(config, [])
+        >>> result = SaCcrEngine().calculate_ead([], config)
         >>> "numeric_mode" in result.meta
         True
         """
@@ -2702,7 +2702,7 @@ class SaCcrEngine:
     --------
     >>> from finstack_quant.margin import NettingSetId, SaCcrEngine, SaCcrNettingSetConfig
     >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-15")
-    >>> SaCcrEngine().calculate_ead(config, []).ead
+    >>> SaCcrEngine().calculate_ead([], config).ead
     0.0
     """
 
@@ -2744,7 +2744,7 @@ class SaCcrEngine:
         """
         ...
 
-    def calculate_ead(self, config: SaCcrNettingSetConfig, trades: list[SaCcrTrade]) -> EadResult:
+    def calculate_ead(self, trades: list[SaCcrTrade], config: SaCcrNettingSetConfig) -> EadResult:
         """
         Calculate SA-CCR EAD for a netting set and trade list.
 
@@ -2785,7 +2785,7 @@ class SaCcrEngine:
         ...     mtm=0.0,
         ...     is_option=False,
         ... )
-        >>> round(SaCcrEngine().calculate_ead(config, [trade]).ead, 2)
+        >>> round(SaCcrEngine().calculate_ead([trade], config).ead, 2)
         30982.83
         """
         ...

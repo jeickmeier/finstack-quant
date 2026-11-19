@@ -186,7 +186,7 @@ def test_ead_result_wire_and_frame_surfaces() -> None:
 def test_sa_ccr_engine_calculate_ead_returns_typed_result() -> None:
     config = unmargined_config()
 
-    result = SaCcrEngine(alpha=1.5).calculate_ead(config, [])
+    result = SaCcrEngine(alpha=1.5).calculate_ead([], config)
 
     assert isinstance(result, EadResult)
     assert result.alpha == pytest.approx(1.5)
@@ -262,7 +262,7 @@ def test_saccr_ead_is_a_thin_engine_wrapper() -> None:
     assert "mpor_days=5" in repr(config)
 
     via_function = saccr_ead([trade], config, alpha=1.5)
-    via_engine = SaCcrEngine(alpha=1.5).calculate_ead(config, [trade])
+    via_engine = SaCcrEngine(alpha=1.5).calculate_ead([trade], config)
     assert via_function.to_json() == via_engine.to_json()
     assert SaCcrEngine(alpha=1.5).alpha == 1.5
     assert via_function.meta["numeric_mode"] is not None

@@ -124,11 +124,11 @@ pub fn sa_ccr_netting_set_config_validate(
 /// await init();
 /// const config = margin.saCcrNettingSetConfigUnmargined(
 ///   margin.nettingSetIdBilateral("CPTY", "CSA"), 0, "2025-01-15");
-/// new margin.SaCcrEngine().calculateEad(config, [{
+/// new margin.SaCcrEngine().calculateEad([{
 ///   trade_id: "t1", asset_class: "interest_rate", notional: 1_000_000,
 ///   start_date: "2025-01-15", end_date: "2030-01-15", underlier: "USD",
 ///   hedging_set: "USD", direction: 1, supervisory_delta: 1, mtm: 0, is_option: false,
-/// }]).ead;
+/// }], config).ead;
 /// ```
 #[wasm_bindgen(js_name = SaCcrEngine)]
 pub struct JsSaCcrEngine {
@@ -173,15 +173,15 @@ impl JsSaCcrEngine {
     #[wasm_bindgen(js_name = calculateEad, unchecked_return_type = "EadResult")]
     pub fn calculate_ead(
         &self,
-        #[wasm_bindgen(unchecked_param_type = "SaCcrNettingSetConfig | string")] config: JsValue,
         #[wasm_bindgen(unchecked_param_type = "readonly SaCcrTrade[] | string")] trades: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "SaCcrNettingSetConfig | string")] config: JsValue,
     ) -> Result<JsValue, JsValue> {
         let config: SaCcrNettingSetConfig = from_js_json(&config, "config")?;
         let trades: Vec<SaCcrTrade> = from_js_json(&trades, "trades")?;
         to_js_value(
             &self
                 .inner
-                .calculate_ead(&config, &trades)
+                .calculate_ead(&trades, &config)
                 .map_err(to_js_err)?,
         )
     }

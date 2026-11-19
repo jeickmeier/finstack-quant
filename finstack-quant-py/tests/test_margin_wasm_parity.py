@@ -454,7 +454,7 @@ def compute() -> dict[str, Any]:
         "ead_margined": _wire(saccr_ead(trades, margined)),
         "ead_alpha": _wire(saccr_ead(trades, unmargined, 1.5)),
         "engine_alpha": [SaCcrEngine().alpha, SaCcrEngine(1.5).alpha],
-        "engine_ead": _wire(SaCcrEngine(1.5).calculate_ead(unmargined, trades)),
+        "engine_ead": _wire(SaCcrEngine(1.5).calculate_ead(trades, unmargined)),
     }
     return out
 

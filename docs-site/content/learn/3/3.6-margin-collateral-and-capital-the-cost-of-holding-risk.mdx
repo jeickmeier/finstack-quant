@@ -254,7 +254,7 @@ print("FRTB BCBSd457 embedded parameter vintage; two-trade delta-only charge:",c
 trades=[margin_api.SaCcrTrade(trade_id=terms["position"],asset_class=terms["asset_class"],notional=terms["notional_usd"],start_date=terms["start"],end_date=terms["end"],underlier="USD" if terms["asset_class"]=="interest_rate" else "ACME",hedging_set="USD-IRS" if terms["asset_class"]=="interest_rate" else "ACME",direction=1.,supervisory_delta=1.,mtm=swap_pv if terms["asset_class"]=="interest_rate" else cds_base,is_option=False,supervisory_category=None if terms["asset_class"]=="interest_rate" else "credit_bbb") for terms in trade_terms]
 
 config=margin_api.SaCcrNettingSetConfig.unmargined(margin_api.NettingSetId.bilateral("ACME-DEALER","CSA-ANALYST"),collateral=0.,as_of=AS_OF)
-ead=margin_api.SaCcrEngine().calculate_ead(config,trades)
+ead=margin_api.SaCcrEngine().calculate_ead(trades, config)
 print({"SA_CCR_EAD_USD":ead.ead,"replacement_cost":ead.rc,"PFE":ead.pfe,"alpha":ead.alpha})
 longest_maturity=max(row["maturity_years"] for row in schedule_rows)
 times=[.5,1.,2.,3.,longest_maturity]

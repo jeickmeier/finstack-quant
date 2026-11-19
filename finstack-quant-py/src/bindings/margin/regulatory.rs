@@ -1162,12 +1162,12 @@ impl PySaCcrEngine {
     fn calculate_ead(
         &self,
         py: Python<'_>,
-        config: &PySaCcrNettingSetConfig,
         trades: Vec<PyRef<'_, PySaCcrTrade>>,
+        config: &PySaCcrNettingSetConfig,
     ) -> PyResult<PyEadResult> {
         let trade_vec: Vec<SaCcrTrade> = trades.iter().map(|t| t.inner.clone()).collect();
         let result = py
-            .detach(|| self.inner.calculate_ead(&config.inner, &trade_vec))
+            .detach(|| self.inner.calculate_ead(&trade_vec, &config.inner))
             .map_err(core_to_py)?;
         Ok(PyEadResult::from_inner(result))
     }
