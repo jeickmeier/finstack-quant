@@ -2079,6 +2079,20 @@
             "bytes": 55964
           },
           {
+            "path": "schemas/portfolio/1/portfolio_frtb_config.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_frtb_config.schema.json",
+            "type_name": "PortfolioFrtbConfig",
+            "kind": "input",
+            "bytes": 28868
+          },
+          {
+            "path": "schemas/portfolio/1/portfolio_frtb_sensitivities_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_frtb_sensitivities_result.schema.json",
+            "type_name": "PortfolioFrtbSensitivitiesResult",
+            "kind": "output",
+            "bytes": 59172
+          },
+          {
             "path": "schemas/portfolio/1/portfolio_margin_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
             "type_name": "PortfolioMarginResult",
@@ -5080,6 +5094,22 @@
             "type_name": "PortfolioCashflows",
             "kind": "component",
             "bytes": 55964
+          },
+          {
+            "domain": "portfolio",
+            "path": "schemas/portfolio/1/portfolio_frtb_config.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_frtb_config.schema.json",
+            "type_name": "PortfolioFrtbConfig",
+            "kind": "input",
+            "bytes": 28868
+          },
+          {
+            "domain": "portfolio",
+            "path": "schemas/portfolio/1/portfolio_frtb_sensitivities_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_frtb_sensitivities_result.schema.json",
+            "type_name": "PortfolioFrtbSensitivitiesResult",
+            "kind": "output",
+            "bytes": 59172
           },
           {
             "domain": "portfolio",

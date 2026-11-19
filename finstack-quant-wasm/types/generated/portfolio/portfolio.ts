@@ -1157,6 +1157,10 @@ export type MarketDependency =
       };
     };
 /**
+ * Availability reason for a position that contributes no supported ordinary quote rows.
+ */
+export type OrdinaryDeltaStatus = "unsupported_instrument" | "zero_quantity";
+/**
  * The held and rebuilt views of an ordinary GIRR yield curve.
  */
 export type GirrQuoteSource =
@@ -3721,6 +3725,20 @@ export interface FiLinkedSectorEffect {
   [k: string]: unknown;
 }
 /**
+ * Position reported outside the admitted ordinary delta grids.
+ */
+export interface FrtbUnmappedPosition {
+  /**
+   * Original position identifier in the portfolio.
+   */
+  position_id: Id;
+  /**
+   * Classification of why this position supplies no rows.
+   */
+  reason: OrdinaryDeltaStatus;
+  [k: string]: unknown;
+}
+/**
  * Detailed attribution for FX rate changes.
  *
  * Provides per-currency-pair breakdown.
@@ -5204,6 +5222,45 @@ export interface PortfolioCashflows {
   position_summaries: {
     [k: string]: PortfolioCashflowPositionSummary;
   };
+  [k: string]: unknown;
+}
+/**
+ * Exact sources for ordinary portfolio GIRR yield and single-name CDS CSR delta.
+ */
+export interface PortfolioFrtbConfig {
+  /**
+   * Admitted single-name CDS issuer classifications and their original spread quotes.
+   */
+  csr_sources: CsrQuoteSource[];
+  /**
+   * One admitted rate quote coordinate per required ordinary GIRR vertex and curve role.
+   */
+  girr_targets: GirrQuoteTarget[];
+}
+/**
+ * Qualified ordinary portfolio delta grids, evidence and position coverage.
+ */
+export interface PortfolioFrtbSensitivitiesResult {
+  /**
+   * Exact single-name spread reprices and the dated issuer classification.
+   */
+  csr: CsrQuoteDelta;
+  /**
+   * Exact rate reprices and the unchanged pricing and FX basis.
+   */
+  girr: GirrQuoteDelta;
+  /**
+   * Active positions considered for at least one supported ordinary delta family.
+   */
+  positions_mapped: number;
+  /**
+   * Positions that were outside this workflow in portfolio order.
+   */
+  positions_unmapped: FrtbUnmappedPosition[];
+  /**
+   * Ordinary GIRR and non-securitisation CSR deltas in reporting currency per percentage point.
+   */
+  sensitivities: FrtbSensitivities;
   [k: string]: unknown;
 }
 /**

@@ -66,6 +66,7 @@ const EXPORTED_KEYS = [
   'portfolioAttributionExplainText',
   'portfolioAttributionPctOfTotalByBucket',
   'portfolioAttributionReconciliationCheck',
+  'portfolioFrtbSensitivities',
   'portfolioMargin',
   'portfolioMetricsGetMetric',
   'portfolioMetricsGetPositionMetrics',
@@ -1482,6 +1483,27 @@ test('ordinary CSR uses the executed CDS quote and signed book position', () => 
   const discountId = 'USD-OIS';
   const creditId = 'CORP-HAZARD';
   const vertices = ['0.5Y', '1Y', '3Y', '5Y', '10Y'];
+  const rateTenors = {
+    '0.25Y': [3, 'months'],
+    '0.5Y': [6, 'months'],
+    '1Y': [1, 'years'],
+    '2Y': [2, 'years'],
+    '3Y': [3, 'years'],
+    '5Y': [5, 'years'],
+    '10Y': [10, 'years'],
+    '15Y': [15, 'years'],
+    '20Y': [20, 'years'],
+    '30Y': [30, 'years'],
+  };
+  const rateQuotes = Object.entries(rateTenors).map(([vertex, [count, unit]]) => ({
+    kind: 'rate_quote',
+    type: 'deposit',
+    id: `usd-${vertex}`,
+    index: 'USD-SOFR-OIS',
+    pillar: { tenor: { count, unit } },
+    rate: 0.04,
+  }));
+
   const fit = (bump5y) => {
     const quotes = vertices.map((vertex, index) => ({
       kind: 'cds_quote',
@@ -1502,7 +1524,7 @@ test('ordinary CSR uses the executed CDS quote and signed book position', () => 
       schema: 'finstack_quant.calibration/1',
       plan: {
         id: 'usd-credit',
-        quote_sets: { rates: ['usd-dep'], credit: vertices },
+        quote_sets: { rates: rateQuotes.map(({ id }) => id), credit: vertices },
         steps: [
           {
             id: discountId,
@@ -1533,17 +1555,7 @@ test('ordinary CSR uses the executed CDS quote and signed book position', () => 
         ],
         settings: {},
       },
-      market_data: [
-        {
-          kind: 'rate_quote',
-          type: 'deposit',
-          id: 'usd-dep',
-          index: 'USD-SOFR-OIS',
-          pillar: { tenor: { count: 1, unit: 'years' } },
-          rate: 0.04,
-        },
-        ...quotes,
-      ],
+      market_data: [...rateQuotes, ...quotes],
     });
     return core.MarketContext.fromJson(calibration.result.final_market);
   };
@@ -1587,6 +1599,33 @@ test('ordinary CSR uses the executed CDS quote and signed book position', () => 
         Number(cds.price(market.toJson(), asOf).value.amount));
     assert.ok(Math.abs(expected) > 1);
     assert.ok(Math.abs(row.pnl_base_per_pp - 100 * expected) < 2);
+    const rateCurve = market.getDiscount(discountId);
+    const girrTargets = rateCurve.rateCalibration.execution.bindings.map(
+      ({ quote_id, pillar_date }) => ({
+        risk_currency: 'USD',
+        risk_curve_id: discountId,
+        vertex: quote_id.slice('usd-'.length),
+        source: { kind: 'discount', curve_id: discountId },
+        quote: { quote_id, pillar_date },
+      })
+    );
+    rateCurve.free();
+    const combined = portfolio.portfolioFrtbSensitivities(book, market, pricing, {
+      girr_targets: girrTargets,
+      csr_sources: [source],
+    });
+    assert.equal(combined.positions_mapped, 1);
+    assert.deepEqual(combined.positions_unmapped, []);
+    assert.equal(combined.girr.quote_risk.length, 10);
+    assert.deepEqual(combined.csr.quote_risk, result.quote_risk);
+    assert.throws(
+      () =>
+        portfolio.portfolioFrtbSensitivities(book, market, pricing, {
+          girr_targets: [],
+          csr_sources: [source],
+        }),
+      /Missing GIRR delta source/
+    );
     [source.vertices['3Y'], source.vertices['5Y']] = [source.vertices['5Y'], source.vertices['3Y']];
     assert.throws(
       () => portfolio.csrQuoteDelta(book, market, pricing, [source]),

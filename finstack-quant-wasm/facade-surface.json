@@ -3697,6 +3697,7 @@
       "portfolioAttributionExplainText",
       "portfolioAttributionPctOfTotalByBucket",
       "portfolioAttributionReconciliationCheck",
+      "portfolioFrtbSensitivities",
       "portfolioMargin",
       "portfolioMetricsGetMetric",
       "portfolioMetricsGetPositionMetrics",
@@ -3781,6 +3782,9 @@
     "kind": "function"
   },
   "portfolio.csrQuoteDelta": {
+    "kind": "function"
+  },
+  "portfolio.portfolioFrtbSensitivities": {
     "kind": "function"
   },
   "portfolio.portfolioMargin": {

@@ -197,7 +197,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         // portfolio margin aggregation
         "CsrQuoteClassification",
         "CsrQuoteSource",
+        "PortfolioFrtbConfig",
+        "PortfolioFrtbSensitivitiesResult",
         "CsrQuoteDelta",
+        "portfolio_frtb_sensitivities",
         "csr_quote_delta",
         "GirrQuoteDelta",
         "GirrQuoteTarget",

@@ -1084,3 +1084,166 @@ def csr_quote_delta(
     >>> csr_quote_delta(book, MarketContext(), FinstackConfig(), []).as_of.isoformat()
     '2025-01-02'
     """
+
+class PortfolioFrtbConfig:
+    """Admitted quote coordinates for both ordinary portfolio delta grids.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import PortfolioFrtbConfig
+    >>> config = PortfolioFrtbConfig(girr_targets=[], csr_sources=[])
+    """
+
+    def __init__(self, *, girr_targets: Sequence[GirrQuoteTarget], csr_sources: Sequence[CsrQuoteSource]) -> None:
+        """Collect the exact sources for the selected portfolio.
+
+        Parameters
+        ----------
+        girr_targets : sequence of GirrQuoteTarget
+            Complete regulatory yield vertices for each ordinary discount
+            or projection curve.
+        csr_sources : sequence of CsrQuoteSource
+            Dated issuer classifications and spread grids for live
+            single-name CDS exposures.
+
+        Raises
+        ------
+        TypeError
+            If the sequences contain objects of the wrong native type.
+        """
+
+class _FrtbUnmappedPosition(TypedDict):
+    position_id: str
+    reason: Literal["unsupported_instrument", "zero_quantity"]
+
+class PortfolioFrtbSensitivitiesResult:
+    """Ordinary GIRR and single-name CDS CSR results from one portfolio.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.config import FinstackConfig
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, PortfolioFrtbConfig, portfolio_frtb_sensitivities
+    >>> portfolio = Portfolio.builder("empty-book", "USD", "2025-01-02").build()
+    >>> config = PortfolioFrtbConfig(girr_targets=[], csr_sources=[])
+    >>> portfolio_frtb_sensitivities(portfolio, MarketContext(), FinstackConfig(), config).positions_mapped
+    0
+    """
+
+    @property
+    def sensitivities(self) -> FrtbSensitivities:
+        """Get the admitted ordinary delta amounts.
+
+        Returns
+        -------
+        FrtbSensitivities
+            Yield and issuer spread deltas in the portfolio reporting
+            currency per percentage point.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def girr(self) -> GirrQuoteDelta:
+        """Get the yield-curve repricing evidence.
+
+        Returns
+        -------
+        GirrQuoteDelta
+            Exact rate factors and signed position reprices.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def csr(self) -> CsrQuoteDelta:
+        """Get the single-name CDS repricing evidence.
+
+        Returns
+        -------
+        CsrQuoteDelta
+            Sourced spread factors and signed position reprices.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def positions_mapped(self) -> int:
+        """Get the count of active positions admitted to the workflow.
+
+        Returns
+        -------
+        int
+            Number of positions considered for ordinary GIRR or CDS CSR risk.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def positions_unmapped(self) -> list[_FrtbUnmappedPosition]:
+        """Get the positions outside the two-grid workflow.
+
+        Returns
+        -------
+        list
+            Portfolio-order position IDs with typed availability reasons.
+
+        Raises
+        ------
+        ValueError
+            If the coverage evidence cannot be converted to Python.
+        """
+
+def portfolio_frtb_sensitivities(
+    portfolio: Portfolio, market: MarketContext, pricing: FinstackConfig, config: PortfolioFrtbConfig
+) -> PortfolioFrtbSensitivitiesResult:
+    """Extract ordinary yield and single-name CDS spread deltas for a trading book.
+
+    Parameters
+    ----------
+    portfolio : Portfolio
+        Trading book with its stored valuation date, reporting currency,
+        and signed quantities.
+    market : MarketContext
+        Held pricing and FX observations with original executed calibrations.
+    pricing : FinstackConfig
+        Shared pricing and conversion basis for all center and bumped marks.
+    config : PortfolioFrtbConfig
+        Exact rate bindings and dated issuer classifications and spread grids.
+
+    Returns
+    -------
+    PortfolioFrtbSensitivitiesResult
+        Signed regulatory delta inputs, reprices and availability by position.
+        Additional risk families require their own qualified inputs.
+
+    Raises
+    ------
+    PortfolioError
+        If a required factor mapping is incomplete or inconsistent.
+    KeyError
+        If a required market input or FX rate is missing.
+    ValueError
+        If a calibration replay cannot use the declared binding.
+    RuntimeError
+        If an admitted position or calibration fails to reprice.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.config import FinstackConfig
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, PortfolioFrtbConfig, portfolio_frtb_sensitivities
+    >>> empty = Portfolio.builder("empty", "USD", "2025-01-02").build()
+    >>> portfolio_frtb_sensitivities(
+    ...     empty, MarketContext(), FinstackConfig(), PortfolioFrtbConfig(girr_targets=[], csr_sources=[])
+    ... ).positions_unmapped
+    []
+    """

@@ -671,7 +671,120 @@ fn csr_quote_delta(
     Ok(PyCsrQuoteDelta { inner })
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbConfig")]
+#[pyclass(
+    name = "PortfolioFrtbConfig",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyPortfolioFrtbConfig {
+    inner: finstack_quant_portfolio::margin::PortfolioFrtbConfig,
+}
+
+#[pymethods]
+impl PyPortfolioFrtbConfig {
+    #[new]
+    #[pyo3(signature = (*, girr_targets, csr_sources))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbConfig.__init__")]
+    fn new(
+        py: Python<'_>,
+        girr_targets: Vec<Py<PyGirrQuoteTarget>>,
+        csr_sources: Vec<Py<PyCsrQuoteSource>>,
+    ) -> Self {
+        Self {
+            inner: finstack_quant_portfolio::margin::PortfolioFrtbConfig {
+                girr_targets: girr_targets
+                    .iter()
+                    .map(|target| target.borrow(py).inner.clone())
+                    .collect(),
+                csr_sources: csr_sources
+                    .iter()
+                    .map(|source| source.borrow(py).inner.clone())
+                    .collect(),
+            },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult")]
+#[pyclass(
+    name = "PortfolioFrtbSensitivitiesResult",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyPortfolioFrtbSensitivitiesResult {
+    inner: finstack_quant_portfolio::margin::PortfolioFrtbSensitivitiesResult,
+}
+
+#[pymethods]
+impl PyPortfolioFrtbSensitivitiesResult {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.sensitivities")]
+    fn sensitivities(&self) -> PyFrtbSensitivities {
+        PyFrtbSensitivities::from_inner(self.inner.sensitivities.clone())
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.girr")]
+    fn girr(&self) -> PyGirrQuoteDelta {
+        PyGirrQuoteDelta {
+            inner: self.inner.girr.clone(),
+        }
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.csr")]
+    fn csr(&self) -> PyCsrQuoteDelta {
+        PyCsrQuoteDelta {
+            inner: self.inner.csr.clone(),
+        }
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.positions_mapped")]
+    fn positions_mapped(&self) -> usize {
+        self.inner.positions_mapped
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.positions_unmapped")]
+    fn positions_unmapped<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.positions_unmapped)
+    }
+}
+
+#[pyfunction]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "portfolio_frtb_sensitivities")]
+fn portfolio_frtb_sensitivities(
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    pricing: &PyFinstackConfig,
+    config: &PyPortfolioFrtbConfig,
+) -> PyResult<PyPortfolioFrtbSensitivitiesResult> {
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let inner = py
+        .detach(|| {
+            finstack_quant_portfolio::margin::portfolio_frtb_sensitivities(
+                portfolio_ref,
+                market_ref,
+                &pricing.inner,
+                &config.inner,
+            )
+        })
+        .map_err(portfolio_to_py)?;
+    Ok(PyPortfolioFrtbSensitivitiesResult { inner })
+}
+
 pub(super) fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyPortfolioFrtbConfig>()?;
+    m.add_class::<PyPortfolioFrtbSensitivitiesResult>()?;
+    m.add_function(wrap_pyfunction!(portfolio_frtb_sensitivities, m)?)?;
     m.add_class::<PyCsrQuoteClassification>()?;
     m.add_class::<PyCsrQuoteSource>()?;
     m.add_class::<PyCsrQuoteDelta>()?;

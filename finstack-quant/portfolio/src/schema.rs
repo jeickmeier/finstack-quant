@@ -9,6 +9,7 @@ use crate::fi_attribution::FiPositionSnapshot;
 use crate::margin::{
     CsrQuoteClassification, CsrQuoteDelta, CsrQuoteSource, GirrQuoteDelta, GirrQuoteTarget,
 };
+use crate::margin::{PortfolioFrtbConfig, PortfolioFrtbSensitivitiesResult};
 use crate::{
     PortfolioResult, allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
     attribution::ReconciliationReport, brinson::CarinoLinkedAttribution, brinson::SectorPeriod,
@@ -410,6 +411,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_packager(package_materialization_schema)
     .with_examples(examples::portfolio_cashflows),
 
+    finstack_quant_core::schema_artifact!(
+        PortfolioFrtbConfig, "portfolio", "portfolio_frtb_config", Input,
+        "Exact sources for ordinary portfolio GIRR yield and single-name CDS CSR delta."
+    ),
+    finstack_quant_core::schema_artifact!(
+        PortfolioFrtbSensitivitiesResult, "portfolio", "portfolio_frtb_sensitivities_result", Output,
+        "Qualified ordinary portfolio delta grids, evidence and position coverage."
+    ),
     finstack_quant_core::schema_artifact!(
         CsrQuoteClassification, "portfolio", "csr_quote_classification", Input,
         "Dated issuer identity and approved ordinary CSR risk bucket."

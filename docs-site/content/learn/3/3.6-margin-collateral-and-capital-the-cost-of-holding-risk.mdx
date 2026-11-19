@@ -39,7 +39,7 @@ A single SIMM sensitivity below concentration thresholds has IM equal to absolut
 
 SA-CCR estimates exposure at default, $EAD=\alpha(RC+PFE)$. FRTB estimates market-risk capital and has separate delta, vega, curvature, default-risk and residual-risk concepts. The executable book case below covers the two trades' GIRR/credit delta; the regulatory-capital lab supplies the remaining explicit illustrative components. XVA uses exposure, hazard, discounting and funding assumptions: CVA is counterparty loss, DVA own-default benefit, FVA funding, and MVA funding of segregated IM. These illustrative profiles are assumptions, not a simulated exposure forecast.
 
-The native SIMM example aggregates OIS and SOFR by currency and tenor. The FRTB calculation preserves the curve identifier, so offsetting rows on separate curves retain within-currency basis risk. The IR example uses direct zero and forward-curve shocks to illustrate the units and curve coordinates.
+The native SIMM example aggregates OIS and SOFR by currency and tenor. The FRTB calculation preserves the curve identifier, so offsetting rows on separate curves retain within-currency basis risk. The SIMM teaching stencil uses direct curve shocks. The separate FRTB workflow replays the executed market quotes.
 
 Schedule residual maturity and SA-CCR start/end dates are derived from the same priced contracts: the IRS runs from 15 April 2025 to 15 April 2028, and the CDS ends on 20 March 2030. The IM profile uses an assumed linear decay to the longest actual maturity; it does not claim to reprice future margin on each date.
 
@@ -63,7 +63,7 @@ import pandas as pd
 
 from _shared.analyst_book import build_market, instruments
 from finstack_quant.core.market_data import MarketContext
-from finstack_quant.margin import FrtbSbaEngine, FrtbSensitivities, SimmCalculator, SimmSensitivities
+from finstack_quant.margin import FrtbSbaEngine, SimmCalculator, SimmSensitivities
 from finstack_quant.valuations.instruments import price_instrument
 AS_OF = date(2025, 1, 15)
 
@@ -72,27 +72,27 @@ swap = json.dumps(instruments("rates")["USD-PAYER-IRS"])
 original_market = json.loads(market.to_json())
 quantity = 1.0  # One position unit already contains USD 2m contractual notional.
 grid_simm = dict(zip(["2W", "1M", "3M", "6M", "1Y", "2Y", "3Y", "5Y", "10Y", "15Y", "20Y", "30Y"], [14/365, 1/12, .25, .5, 1, 2, 3, 5, 10, 15, 20, 30]))
-grid_frtb = dict(zip(["0.25Y", "0.5Y", "1Y", "2Y", "3Y", "5Y", "10Y", "15Y", "20Y", "30Y"], [.25, .5, 1, 2, 3, 5, 10, 15, 20, 30]))
 
 
 def target_market(curve_id, grid, selected, bump_decimal):
-    """Apply a disclosed nodal triangular rate shock directly on the target grid."""
+    """Apply a disclosed nodal triangular zero-rate shock directly on the target grid."""
     payload = copy.deepcopy(original_market)
     target = next(curve for curve in payload["curves"] if curve["id"] == curve_id)
     # Preserve every original interpolation breakpoint, adding target-grid nodes.
     times = sorted(set([knot[0] for knot in target["knot_points"]] + list(grid.values())))
     original = market.get_discount(curve_id) if target["type"] == "discount" else market.get_forward(curve_id)
+    assert target["interp_style"] in {"log_linear", "linear"}, "This proof requires exact knot insertion for the source interpolation."
     weights = [float(label == selected) for label in grid]
     knots = []
     for time in times:
         weight = float(np.interp(time, list(grid.values()), weights))
-        value = original.df(time) * math.exp(-bump_decimal * time * weight) if target["type"] == "discount" else original.rate(time) + bump_decimal * weight
+        # Discount and projection curves both store factors: shift the zero rate by the nodal weight.
+        value = original.df(time) * math.exp(-bump_decimal * time * weight)
         knots.append([time, value])
     target["knot_points"] = knots
     # These are curve-space sensitivity markets, not recalibrated quote scenarios.
     target["rate_calibration"] = None
     return MarketContext.from_json(json.dumps(payload))
-
 ```
 {/* /notebook-block */}
 
@@ -101,20 +101,32 @@ def target_market(curve_id, grid, selected, bump_decimal):
 ```python exec id=margin-proof-2 role=build
 base_pv = price_instrument(swap, market, AS_OF, model="discounting").value.amount
 rows = []
-for framework, grid in [("SIMM", grid_simm), ("FRTB", grid_frtb)]:
-    for curve_id in ["USD-OIS", "USD-SOFR-3M"]:
-        zero = price_instrument(swap, target_market(curve_id, grid, next(iter(grid)), 0.0), AS_OF, model="discounting").value.amount
-        assert abs(zero - base_pv) < 1e-6, "USD: inserting grid points must preserve the base price."
-        for tenor in grid:
-            up = price_instrument(swap, target_market(curve_id, grid, tenor, .0001), AS_OF, model="discounting").value.amount
-            if framework == "SIMM":
-                down = price_instrument(swap, target_market(curve_id, grid, tenor, -.0001), AS_OF, model="discounting").value.amount
-                amount = float(quantity * (up - down) / 2)
-                quote_basis, units = "centered", "USD/bp"
-            else:
-                amount = float(100 * quantity * (up - base_pv))
-                quote_basis, units = "up-minus-base", "USD/percentage-point"
-            rows.append(dict(framework=framework, position="USD-PAYER-IRS", quantity=quantity, contractual_notional_usd=2_000_000, currency="USD", factor=curve_id, tenor=tenor, bump_decimal=.0001, quote_basis=quote_basis, units=units, amount=amount))
+for curve_id in ["USD-OIS", "USD-SOFR-3M"]:
+    zero = price_instrument(
+        swap, target_market(curve_id, grid_simm, next(iter(grid_simm)), 0.0),
+        AS_OF, model="discounting",
+    ).value.amount
+    assert abs(zero - base_pv) < 1e-6, "USD: inserting grid points must preserve the base price."
+    for tenor in grid_simm:
+        values = [
+            price_instrument(
+                swap, target_market(curve_id, grid_simm, tenor, shock),
+                AS_OF, model="discounting",
+            ).value.amount
+            for shock in (0.0001, -0.0001)
+        ]
+        rows.append({
+            "framework": "SIMM",
+            "position": "USD-PAYER-IRS",
+            "quantity": quantity,
+            "contractual_notional_usd": 2_000_000,
+            "currency": "USD",
+            "factor": curve_id,
+            "tenor": tenor,
+            "bump_decimal": 0.0001,
+            "units": "USD/bp",
+            "amount": quantity * (values[0] - values[1]) / 2,
+        })
 mapping = pd.DataFrame(rows)
 assert np.isfinite(mapping.amount).all()
 print(mapping.to_string(index=False))
@@ -138,11 +150,7 @@ from finstack_quant.valuations.instruments import InterestRateSwap
 native_simm = calculate_simm([InterestRateSwap.from_json(swap)], market, AS_OF, version="v2_6")
 assert native_simm.amount > 0 and native_simm.approximation
 print("Instrument-derived SIMM estimate (USD):", native_simm.amount)
-frtb = FrtbSensitivities("USD")
-for row in mapping[mapping.framework == "FRTB"].itertuples():
-    frtb.add_girr_delta(row.currency, row.factor, row.tenor, row.amount)
-capital = FrtbSbaEngine().calculate(frtb)
-assert simm_result.amount > 0 and capital.total > 0
+assert simm_result.amount > 0
 
 # Independently reconcile one 5Y IR bucket, below the concentration threshold.
 one_bucket = SimmSensitivities("USD")
@@ -159,7 +167,7 @@ except ValueError as error:
     invalid_bucket_error = str(error)
 assert invalid_bucket_error is not None
 print("Invalid 7Y SIMM bucket rejected:", invalid_bucket_error)
-print({"simm_v2_6_2023_usd": simm_result.amount, "frtb_bcbs_d457_usd": capital.total, "single_bucket_manual_usd": manual})
+print({"simm_v2_6_2023_usd": simm_result.amount, "single_bucket_manual_usd": manual})
 ```
 {/* /notebook-block */}
 
@@ -189,6 +197,7 @@ credit_plan["market_data"].append(quote);credit_plan["plan"]["quote_sets"]["issu
 grid_credit=calibrate(credit_plan).market
 grid_pv=price_instrument(cds,grid_credit,AS_OF).value.amount
 # Quote construction/calibration approximation is separate from finite-difference error.
+assert abs(grid_pv-cds_base)<.10, "USD on1m CDS: added quote's base-price drift must remain below10c."
 print({"synthetic_2Y_spread_bp":synthetic_2y,"maturity":two_year["instrument"]["spec"]["premium_leg"]["end"],"grid_base_drift_usd":grid_pv-cds_base})
 credit_rows=[]
 for year in [1,2,3,5,10]:
@@ -196,20 +205,25 @@ for year in [1,2,3,5,10]:
  for bp in [1.,-1.]:
   shocked=copy.deepcopy(credit_plan)
   selected=[q for q in shocked["market_data"] if q["kind"]=="cds_quote" and q["pillar"]["tenor"]["count"]==year]
+  assert len(selected)==1
   selected[0]["spread_bp"]+=bp
   values.append(price_instrument(cds,calibrate(shocked).market,AS_OF).value.amount)
  credit_rows.append({"framework":"SIMM","position":"ACME-CDS","quantity":1.,"contractual_notional_usd":1_000_000,"currency":"USD","factor":"ACME-HZD par CDS","tenor":f"{year}Y","bump_decimal":.0001,"derivative_sign":"up-minus-down","units":"USD/bp","amount":(values[0]-values[1])/2})
 # CDS discount risk on both required IR grids; the credit curve is held fixed for IR delta.
-for framework,grid in [("SIMM",grid_simm),("FRTB",grid_frtb)]:
- for tenor in grid:
-  values=[]
-  for bump in [.0001,-.0001]:
-   bumped=target_market("USD-OIS",grid,tenor,bump)
-   bumped.insert(credit_market.get_hazard("ACME-HZD"))
-   values.append(price_instrument(cds,bumped,AS_OF).value.amount)
-  per_bp=(values[0]-values[1])/2
-  credit_rows.append({"framework":framework,"position":"ACME-CDS","quantity":1.,"contractual_notional_usd":1_000_000,"currency":"USD","factor":"USD-OIS","tenor":tenor,"bump_decimal":.0001,"derivative_sign":"up-minus-down","units":"USD/bp" if framework=="SIMM" else "USD/percentage-point","amount":per_bp if framework=="SIMM" else 100*per_bp})
+for tenor in grid_simm:
+    values = []
+    for bump in [0.0001, -0.0001]:
+        bumped = target_market("USD-OIS", grid_simm, tenor, bump)
+        bumped.insert(credit_market.get_hazard("ACME-HZD"))
+        values.append(price_instrument(cds, bumped, AS_OF).value.amount)
+    credit_rows.append({
+        "framework": "SIMM", "position": "ACME-CDS", "quantity": 1.0,
+        "contractual_notional_usd": 1_000_000, "currency": "USD", "factor": "USD-OIS",
+        "tenor": tenor, "bump_decimal": 0.0001, "derivative_sign": "up-minus-down",
+        "units": "USD/bp", "amount": (values[0] - values[1]) / 2,
+    })
 full_mapping=pd.concat([mapping,pd.DataFrame(credit_rows)],ignore_index=True)
+assert np.isfinite(full_mapping.amount).all()
 print(full_mapping.to_string(index=False))
 def netting_sensitivities(keep):
  sens=SimmSensitivities("USD")
@@ -220,6 +234,7 @@ def netting_sensitivities(keep):
 netting_ids=["USD-PAYER-IRS","ACME-CDS"]
 netting_sens=netting_sensitivities(netting_ids)
 netting_im=SimmCalculator("v2_6").calculate_from_sensitivities(netting_sens,"USD",AS_OF)
+assert netting_im.amount>0
 print("Bilateral teaching netting set ACME-DEALER/CSA-ANALYST, residual credit sector; SIMM2.6(2023):",netting_im.amount)
 ```
 {/* /notebook-block */}
@@ -230,6 +245,96 @@ print("Bilateral teaching netting set ACME-DEALER/CSA-ANALYST, residual credit s
 
 The comparison keeps the same two trades, currencies and notionals. NGR uses signed MTMs in the numerator and gross positive replacement cost in the denominator. CSA VM is then tested for a controlled USD 50,000 mark increase. The FRTB result pins the embedded BCBS d457 parameter set and labels its delta-only scope; no omitted vega/curvature is reported as measured zero. The same trade records enter the SA-CCR example.
 
+The FRTB example calibrates complete OIS, projection and CDS teaching quote strips. The admitted quote bindings supply each regulatory vertex. The portfolio repricer retains the signed position changes and feeds the ordinary GIRR and CSR delta inputs to the SBA engine.
+
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="ordinary-frtb-book" role="build" */}
+```python exec id=ordinary-frtb-book role=build
+from finstack_quant.calibration import (
+    CalibrationEnvelope, CalibrationStep, CdsQuote, DiscountCurveParams,
+    ForwardCurveParams, HazardCurveParams, RateQuote, StepWithQuotes, calibrate,
+)
+from finstack_quant.core.config import FinstackConfig
+from finstack_quant.portfolio import (
+    CsrQuoteClassification, CsrQuoteSource, GirrQuoteTarget, Portfolio,
+    PortfolioFrtbConfig, portfolio_frtb_sensitivities,
+)
+from finstack_quant.valuations.instruments import CreditDefaultSwap, InterestRateSwap
+
+quote_tenors = {
+    "0.25Y": "3M", "0.5Y": "6M", "1Y": "1Y", "2Y": "2Y", "3Y": "3Y",
+    "5Y": "5Y", "10Y": "10Y", "15Y": "15Y", "20Y": "20Y", "30Y": "30Y",
+}
+ois_id = "USD-OIS"
+forward_id = "USD-SOFR-3M"
+hazard_id = "ACME-HZD"
+discount_params = DiscountCurveParams(
+    curve_id=ois_id, currency="USD", base_date=AS_OF, extrapolation="extend",
+    conventions={"curve_day_count": "act_365f"},
+)
+forward_params = ForwardCurveParams(
+    curve_id=forward_id, currency="USD", base_date=AS_OF, discount_curve_id=ois_id,
+    extrapolation="extend",
+)
+hazard_params = HazardCurveParams(
+    curve_id=hazard_id, entity="ACME", seniority="senior", currency="USD",
+    base_date=AS_OF, discount_curve_id=ois_id, recovery_rate=0.4,
+)
+discount_quotes = [RateQuote.deposit(f"ois-{vertex}", "USD-SOFR-OIS", tenor, 0.043) for vertex, tenor in quote_tenors.items()]
+projection_quotes = [RateQuote.deposit(f"projection-{vertex}", "USD-SOFR-3M", tenor, 0.046) for vertex, tenor in quote_tenors.items()]
+credit_quotes = [
+    CdsQuote.par_spread(vertex, "ACME", "USD", "isda_na", maturity, spread, 0.4)
+    for vertex, maturity, spread in [
+        ("0.5Y", "6M", 80.0), ("1Y", "1Y", 85.0), ("3Y", "3Y", 95.0),
+        ("5Y", "5Y", 105.0), ("10Y", "10Y", 115.0),
+    ]
+]
+capital_market = calibrate(CalibrationEnvelope.from_steps("capital-teaching-strip", [
+    StepWithQuotes(CalibrationStep.discount(ois_id, discount_params), discount_quotes),
+    StepWithQuotes(CalibrationStep.forward(forward_id, forward_params), projection_quotes),
+    StepWithQuotes(CalibrationStep.hazard(hazard_id, hazard_params), credit_quotes),
+])).market
+
+rate_sources = []
+for curve_id, kind, recipe in [
+    (ois_id, "discount", capital_market.get_discount(ois_id).rate_calibration),
+    (forward_id, "projection", capital_market.get_forward(forward_id).rate_calibration),
+]:
+    for row in recipe["execution"]["bindings"]:
+        rate_sources.append(GirrQuoteTarget(
+            risk_currency="USD", risk_curve_id=curve_id, vertex=row["quote_id"].split("-",1)[1],
+            source={"kind": kind, "curve_id": curve_id},
+            quote={"quote_id": row["quote_id"], "pillar_date": row["pillar_date"]},
+        ))
+credit_source = CsrQuoteSource(
+    curve_id=hazard_id,
+    classification=CsrQuoteClassification(
+        issuer="ACME", seniority="senior", currency="USD", bucket=16,
+        source_id="analyst-teaching-issuer", as_of=AS_OF,
+    ),
+    vertices={
+        row["quote"]["id"]: {"quote_id": row["quote"]["id"], "pillar_date": row["pillar_date"]}
+        for row in capital_market.get_hazard(hazard_id).hazard_calibration["spread_risk_inputs"]
+    },
+)
+capital_book = (
+    Portfolio.builder("two-trade-capital", "USD", AS_OF)
+    .position("USD-PAYER-IRS", InterestRateSwap.from_json(swap), 1)
+    .position("ACME-CDS", CreditDefaultSwap.from_json(cds), 1)
+    .build()
+)
+qualified = portfolio_frtb_sensitivities(
+    capital_book, capital_market, FinstackConfig(),
+    PortfolioFrtbConfig(girr_targets=rate_sources, csr_sources=[credit_source]),
+)
+assert qualified.positions_mapped == 2 and not qualified.positions_unmapped
+assert len(qualified.girr.to_dict()["quote_risk"]) == 20
+assert len(qualified.csr.to_dict()["quote_risk"]) == 5
+capital_result = FrtbSbaEngine().calculate(qualified.sensitivities)
+assert capital_result.total > 0
+print("Two-trade ordinary GIRR and CSR delta charge:", capital_result.total, capital_result.binding_scenario)
+```
+{/* /notebook-block */}
+
 ### Session 3: exposure and funding assumptions
 
 A deterministic linear-to-maturity decay transforms current SIMM into an assumed future IM profile. Funding spreads are in bp. The printed XVA identity must reconcile within USD 1e-8, while the standalone MVA intentionally uses its stated discount/survival assumptions. Different exposure or funding assumptions legitimately change these values.
@@ -238,6 +343,7 @@ A deterministic linear-to-maturity decay transforms current SIMM into an assumed
 ```python exec id=netting-margin-capital-xva role=build
 import finstack_quant.margin as margin_api
 from finstack_quant.core.market_data import HazardCurve, DiscountCurve
+from finstack_quant.core.money import Money
 swap_pv=price_instrument(swap,market,AS_OF,model="discounting").value.amount
 net_mtm=swap_pv+cds_base
 gross_positive=max(swap_pv,0)+max(cds_base,0)
@@ -247,29 +353,27 @@ swap_contract=json.loads(swap)["instrument"]["spec"]
 cds_contract=json.loads(cds)["instrument"]["spec"]
 trade_terms=[{"position":"USD-PAYER-IRS","asset_class":"interest_rate","notional_usd":float(swap_contract["notional"]["amount"]),"start":swap_contract["fixed_leg"]["start"],"end":swap_contract["fixed_leg"]["end"]},{"position":"ACME-CDS","asset_class":"credit","notional_usd":float(cds_contract["notional"]["amount"]),"start":cds_contract["premium_leg"]["start"],"end":cds_contract["premium_leg"]["end"]}]
 schedule_rows=[{**terms,"maturity_years":(date.fromisoformat(terms["end"])-AS_OF).days/365} for terms in trade_terms]
+assert trade_terms[0]["start"]=="2025-04-15" and trade_terms[0]["end"]=="2028-04-15"
+assert trade_terms[1]["end"]=="2030-03-20"
 
 for row in schedule_rows:row["gross_schedule_im_usd"]=schedule.calculate_for_notional(row["notional_usd"],"USD",row["asset_class"],row["maturity_years"],AS_OF).amount
 gross_schedule=sum(r["gross_schedule_im_usd"] for r in schedule_rows)
 # Apply the same netting-set NGR once to the trade-specific gross amounts.
 # The credit trade below elects a BBB supervisory category for this example.
 schedule_net=gross_schedule*(.4+.6*ngr)
+assert 0<=ngr<=1 and .4*gross_schedule<=schedule_net<=gross_schedule
 print(pd.DataFrame(schedule_rows).to_string(index=False))
 print({"net_mtm_usd":net_mtm,"NGR":ngr,"schedule_net_usd":schedule_net,"SIMM_net_usd":netting_im.amount})
-csa=margin_api.CsaSpec.usd_regulatory().with_vm_threshold(0.,0.)
+csa=margin_api.CsaSpec.usd_regulatory().to_builder().vm_threshold(Money(0, "USD"), Money(0, "USD")).build()
 initial_vm=margin_api.VmCalculator(csa).calculate(net_mtm,0.,"USD",AS_OF)
 next_vm=margin_api.VmCalculator(csa).calculate(net_mtm+50_000.,net_mtm,"USD",AS_OF)
+assert abs(next_vm.collect_amount-50_000.)<.01
 print("VM initial and controlled+50k mark move:",initial_vm.to_json(),next_vm.to_json())
-# Preserve the OIS and SOFR curve identifiers in the ordinary GIRR delta inputs.
-# Capital is distinct from IM. Explicit two-trade GIRR and credit-spread delta scope.
-capital_sens=FrtbSensitivities("USD")
-for row in full_mapping[full_mapping.framework=="FRTB"].itertuples():capital_sens.add_girr_delta(row.currency,row.factor,row.tenor,row.amount)
-for row in full_mapping[(full_mapping.framework=="SIMM") & (full_mapping.factor=="ACME-HZD par CDS")].itertuples():capital_sens.add_csr_nonsec_delta("ACME",16,row.tenor,"cds",100*row.amount)
-capital_result=FrtbSbaEngine().calculate(capital_sens)
-print("FRTB BCBSd457 embedded parameter vintage; two-trade delta-only charge:",capital_result.total,capital_result.binding_scenario)
 trades=[margin_api.SaCcrTrade(trade_id=terms["position"],asset_class=terms["asset_class"],notional=terms["notional_usd"],start_date=terms["start"],end_date=terms["end"],underlier="USD" if terms["asset_class"]=="interest_rate" else "ACME",hedging_set="USD-IRS" if terms["asset_class"]=="interest_rate" else "ACME",direction=1.,supervisory_delta=1.,mtm=swap_pv if terms["asset_class"]=="interest_rate" else cds_base,is_option=False,supervisory_category=None if terms["asset_class"]=="interest_rate" else "credit_bbb") for terms in trade_terms]
 
 config=margin_api.SaCcrNettingSetConfig.unmargined(margin_api.NettingSetId.bilateral("ACME-DEALER","CSA-ANALYST"),collateral=0.,as_of=AS_OF)
 ead=margin_api.SaCcrEngine().calculate_ead(trades, config)
+assert abs(ead.ead-ead.alpha*(ead.rc+ead.pfe))<1e-6
 print({"SA_CCR_EAD_USD":ead.ead,"replacement_cost":ead.rc,"PFE":ead.pfe,"alpha":ead.alpha})
 longest_maturity=max(row["maturity_years"] for row in schedule_rows)
 times=[.5,1.,2.,3.,longest_maturity]
@@ -278,9 +382,11 @@ mva=margin_api.compute_mva(im_profile,[(0.,50.)],credit_market.get_discount("USD
 # The linear IM decay ends at the longest actual trade maturity; it is assumed, not future repricing.
 # Explicit assumed exposure profile; not a simulated future portfolio exposure claim.
 exposure=margin_api.ExposureProfile(times,[net_mtm]*5,[max(net_mtm,0)+50_000*(1-t/6) for t in times],[20_000*(1-t/6) for t in times])
-cpty=HazardCurve("DEALER",AS_OF,[(0.,.02),(30.,.02)],recovery_rate=.4)
-own=HazardCurve("SELF",AS_OF,[(0.,.01),(30.,.01)],recovery_rate=.4)
+cpty=HazardCurve("DEALER",AS_OF,[(30.,.02)],recovery_rate=.4,day_count="act_365f")
+own=HazardCurve("SELF",AS_OF,[(30.,.01)],recovery_rate=.4,day_count="act_365f")
 xva=margin_api.compute_bilateral_xva(exposure,cpty,own,credit_market.get_discount("USD-OIS"),.4,.4,margin_api.FundingConfig(50.,30.,im_profile))
+assert abs(xva.total_xva-(xva.cva-xva.dva+xva.fva+xva.mva))<1e-8
+assert mva.mva>0
 print({"CVA_USD":xva.cva,"DVA_USD":xva.dva,"FVA_USD":xva.fva,"MVA_USD":xva.mva,"total_XVA_USD":xva.total_xva,"standalone_MVA_USD":mva.mva})
 ```
 {/* /notebook-block */}
@@ -334,7 +440,7 @@ A threshold changes the amount to be collateralized. MTA determines whether a sm
 
 {/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="exercise-why-mva" role="exercise" */}
 ```python exec id=exercise-why-mva role=exercise
-flat=DiscountCurve.flat("MVA-FLAT",AS_OF,0.0)
+flat=DiscountCurve.flat("MVA-FLAT",AS_OF,0.0,"act_365f")
 constant=margin_api.ImProfile([1.,2.],[1_000_000.,1_000_000.])
 funding_cost=margin_api.compute_mva(constant,[(0.,50.)],flat)
 manual=1_000_000*.005*2

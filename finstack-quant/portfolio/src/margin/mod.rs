@@ -61,6 +61,7 @@
 
 mod aggregator;
 mod csr_quotes;
+mod frtb;
 mod girr_quotes;
 mod netting_set;
 mod regulatory_quotes;
@@ -76,3 +77,8 @@ pub use girr_quotes::{
 };
 pub use regulatory_quotes::RegulatoryQuoteReprice;
 pub use results::{NettingSetMargin, PortfolioMarginResult};
+
+pub use frtb::{
+    FrtbUnmappedPosition, OrdinaryDeltaStatus, PortfolioFrtbConfig,
+    PortfolioFrtbSensitivitiesResult, portfolio_frtb_sensitivities,
+};

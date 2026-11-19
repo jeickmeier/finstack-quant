@@ -169,6 +169,9 @@ TradeUniverse = _portfolio.TradeUniverse
 NettingSetMargin = _portfolio.NettingSetMargin
 CsrQuoteClassification = _portfolio.CsrQuoteClassification
 CsrQuoteSource = _portfolio.CsrQuoteSource
+PortfolioFrtbConfig = _portfolio.PortfolioFrtbConfig
+PortfolioFrtbSensitivitiesResult = _portfolio.PortfolioFrtbSensitivitiesResult
+portfolio_frtb_sensitivities = _portfolio.portfolio_frtb_sensitivities
 CsrQuoteDelta = _portfolio.CsrQuoteDelta
 csr_quote_delta = _portfolio.csr_quote_delta
 GirrQuoteDelta = _portfolio.GirrQuoteDelta
@@ -226,6 +229,8 @@ __all__ = [
     "PortfolioCashflowPositionSummary",
     "PortfolioCashflows",
     "PortfolioError",
+    "PortfolioFrtbConfig",
+    "PortfolioFrtbSensitivitiesResult",
     "PortfolioMarginResult",
     "PortfolioMetrics",
     "PortfolioOptimizationResult",
@@ -287,6 +292,7 @@ __all__ = [
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
+    "portfolio_frtb_sensitivities",
     "portfolio_margin",
     "primitive_exposures",
     "rebalance_from_spec",

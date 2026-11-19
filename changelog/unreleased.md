@@ -2,6 +2,12 @@
 
 ## Itemized changes
 
+### Portfolio: ordinary FRTB delta grids
+
+`portfolio_frtb_sensitivities` / `portfolioFrtbSensitivities` combine the
+qualified GIRR and single-name CDS CSR quote grids. Each result preserves
+its exact repricing evidence and identifies positions outside those grids.
+
 ### Portfolio: exact ordinary CDS spread delta
 
 `csr_quote_delta` / `csrQuoteDelta` rebuild the original single-name CDS

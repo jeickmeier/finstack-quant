@@ -235,6 +235,24 @@
       "type_name": "PortfolioCashflows"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_frtb_config.schema.json",
+      "bytes": 28868,
+      "kind": "input",
+      "path": "schemas/portfolio/1/portfolio_frtb_config.schema.json",
+      "summary": "Exact sources for ordinary portfolio GIRR yield and single-name CDS CSR delta.",
+      "title": "PortfolioFrtbConfig",
+      "type_name": "PortfolioFrtbConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_frtb_sensitivities_result.schema.json",
+      "bytes": 59172,
+      "kind": "output",
+      "path": "schemas/portfolio/1/portfolio_frtb_sensitivities_result.schema.json",
+      "summary": "Qualified ordinary portfolio delta grids, evidence and position coverage.",
+      "title": "PortfolioFrtbSensitivitiesResult",
+      "type_name": "PortfolioFrtbSensitivitiesResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
       "bytes": 44913,
       "kind": "output",

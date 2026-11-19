@@ -11675,6 +11675,31 @@ export interface PortfolioNamespace {
    */
   readonly csrQuoteDelta: typeof wasm.csrQuoteDelta;
   /**
+   * Map a trading book onto the admitted ordinary GIRR and single-name CDS CSR grids.
+   * @param portfolio - Trading book dates, unsigned and signed position amounts, and reporting currency.
+   * @param market - Held pricing, FX and executed quote calibration evidence.
+   * @param pricing - Shared pricing configuration for each valuation on the grids.
+   * @param config - Exact rate quote and single-name credit spread mappings.
+   * @returns Ordinary GIRR and single-name CDS CSR inputs, repricing evidence and positions outside these grids.
+   * @throws FinstackError when required finance inputs, calibration evidence or repricing fail on admitted positions.
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("trading-book", "USD", "2025-01-02").build();
+   * const market = new core.MarketContext();
+   * const pricing = new core.FinstackConfig();
+   * const result = portfolio.portfolioFrtbSensitivities(book, market, pricing, {
+   *   girr_targets: [], csr_sources: [],
+   * });
+   * console.log(result.positions_mapped);
+   * pricing.free();
+   * market.free();
+   * book.free();
+   * ```
+   */
+  readonly portfolioFrtbSensitivities: typeof wasm.portfolioFrtbSensitivities;
+  /**
    * Calculate portfolio margin requirements by netting set (Rust
    * `margin::portfolio_margin`).
    *

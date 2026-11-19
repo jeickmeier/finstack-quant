@@ -152,3 +152,44 @@ pub fn csr_quote_delta(
     .map_err(to_js_err)?;
     to_js_value(&result)
 }
+
+/// Map a trading book onto the admitted ordinary GIRR and single-name CDS CSR grids.
+/// @param portfolio - Trading book dates, unsigned and signed position amounts, and reporting currency.
+/// @param market - Held pricing, FX and executed quote calibration evidence.
+/// @param pricing - Shared pricing configuration for each valuation on the grids.
+/// @param config - Exact rate quote and single-name credit spread mappings.
+/// @returns Ordinary GIRR and single-name CDS CSR inputs, repricing evidence and positions outside these grids.
+/// @throws FinstackError when required finance inputs, calibration evidence or repricing fail on admitted positions.
+/// @example
+/// ```typescript
+/// import init, { core, portfolio } from "finstack-quant-wasm";
+/// await init();
+/// const book = portfolio.Portfolio.builder("trading-book", "USD", "2025-01-02").build();
+/// const market = new core.MarketContext();
+/// const pricing = new core.FinstackConfig();
+/// const result = portfolio.portfolioFrtbSensitivities(book, market, pricing, {
+///   girr_targets: [], csr_sources: [],
+/// });
+/// console.log(result.positions_mapped);
+/// pricing.free();
+/// market.free();
+/// book.free();
+/// ```
+#[wasm_bindgen(js_name = portfolioFrtbSensitivities, unchecked_return_type = "generated.portfolio.PortfolioFrtbSensitivitiesResult")]
+pub fn portfolio_frtb_sensitivities(
+    portfolio: &JsPortfolio,
+    market: &JsMarketContext,
+    pricing: &crate::api::core::config::JsFinstackConfig,
+    #[wasm_bindgen(unchecked_param_type = "generated.portfolio.PortfolioFrtbConfig")]
+    config: JsValue,
+) -> Result<JsValue, JsValue> {
+    let config = from_js_json(&config, "config")?;
+    let result = finstack_quant_portfolio::margin::portfolio_frtb_sensitivities(
+        &portfolio.inner,
+        market.inner(),
+        &pricing.inner,
+        &config,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&result)
+}
