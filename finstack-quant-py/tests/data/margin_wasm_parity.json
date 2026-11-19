@@ -1447,52 +1447,229 @@
   },
   "mva": {
     "profile": {
+      "as_of": "2025-01-01",
+      "basis": {
+        "decay": {
+          "linear_to_maturity": {
+            "maturity_years": 5.0
+          }
+        },
+        "kind": "simm_decay",
+        "netting_set": {
+          "counterparty_id": "bank",
+          "csa_id": "agreement",
+          "kind": "bilateral"
+        },
+        "source_id": "sha256:c5c79925f7ac1780fe9f084820b7e3a8c444b7621f182b3a8f277b0e2da14444",
+        "version": "v2_6"
+      },
+      "currency": "USD",
+      "dates": [
+        "2025-01-01",
+        "2026-01-01",
+        "2027-01-01",
+        "2028-12-31"
+      ],
       "im_values": [
+        3176639.578644629,
         2541311.6629157034,
         1905983.7471867774,
         635327.9157289257
-      ],
-      "times": [
-        1.0,
-        2.0,
-        4.0
       ]
     },
     "with_survival": {
-      "average_im": 1826567.7577206618,
-      "im_profile": [
-        [
-          1.0,
-          2541311.6629157034
+      "average_im": 1905983.7471867774,
+      "im_profile": {
+        "as_of": "2025-01-01",
+        "basis": {
+          "decay": {
+            "linear_to_maturity": {
+              "maturity_years": 5.0
+            }
+          },
+          "kind": "simm_decay",
+          "netting_set": {
+            "counterparty_id": "bank",
+            "csa_id": "agreement",
+            "kind": "bilateral"
+          },
+          "source_id": "sha256:c5c79925f7ac1780fe9f084820b7e3a8c444b7621f182b3a8f277b0e2da14444",
+          "version": "v2_6"
+        },
+        "currency": "USD",
+        "dates": [
+          "2025-01-01",
+          "2026-01-01",
+          "2027-01-01",
+          "2028-12-31"
         ],
-        [
-          2.0,
-          1905983.7471867774
-        ],
-        [
-          4.0,
+        "im_values": [
+          3176639.578644629,
+          2541311.6629157034,
+          1905983.7471867774,
           635327.9157289257
         ]
+      },
+      "intervals": [
+        {
+          "contribution": 14756.87879922762,
+          "end": {
+            "counterparty_survival": 1.0,
+            "date": "2026-01-01",
+            "discount_factor": 0.9704455335485082,
+            "expected_im": 2541311.6629157034,
+            "own_survival": 0.9801986733067553,
+            "spread_bp": 55.99671412924425
+          },
+          "start": {
+            "counterparty_survival": 1.0,
+            "date": "2025-01-01",
+            "discount_factor": 1.0,
+            "expected_im": 3176639.578644629,
+            "own_survival": 1.0,
+            "spread_bp": 50.0
+          },
+          "years": 1.0
+        },
+        {
+          "contribution": 12152.992874391446,
+          "end": {
+            "counterparty_survival": 1.0,
+            "date": "2027-01-01",
+            "discount_factor": 0.9417645335842487,
+            "expected_im": 1905983.7471867774,
+            "own_survival": 0.9607894391523232,
+            "spread_bp": 61.99342825848851
+          },
+          "start": {
+            "counterparty_survival": 1.0,
+            "date": "2026-01-01",
+            "discount_factor": 0.9704455335485082,
+            "expected_im": 2541311.6629157034,
+            "own_survival": 0.9801986733067553,
+            "spread_bp": 55.99671412924425
+          },
+          "years": 1.0
+        },
+        {
+          "contribution": 14767.59044497453,
+          "end": {
+            "counterparty_survival": 1.0,
+            "date": "2028-12-31",
+            "discount_factor": 0.8869204367171574,
+            "expected_im": 635327.9157289257,
+            "own_survival": 0.9231163463866358,
+            "spread_bp": 73.986856516977
+          },
+          "start": {
+            "counterparty_survival": 1.0,
+            "date": "2027-01-01",
+            "discount_factor": 0.9417645335842487,
+            "expected_im": 1905983.7471867774,
+            "own_survival": 0.9607894391523232,
+            "spread_bp": 61.99342825848851
+          },
+          "years": 2.0
+        }
       ],
-      "mva": 40195.56054945817
+      "mva": 41677.4621185936
     },
     "without_survival": {
-      "average_im": 1826567.7577206618,
-      "im_profile": [
-        [
-          1.0,
-          2541311.6629157034
+      "average_im": 1905983.7471867774,
+      "im_profile": {
+        "as_of": "2025-01-01",
+        "basis": {
+          "decay": {
+            "linear_to_maturity": {
+              "maturity_years": 5.0
+            }
+          },
+          "kind": "simm_decay",
+          "netting_set": {
+            "counterparty_id": "bank",
+            "csa_id": "agreement",
+            "kind": "bilateral"
+          },
+          "source_id": "sha256:c5c79925f7ac1780fe9f084820b7e3a8c444b7621f182b3a8f277b0e2da14444",
+          "version": "v2_6"
+        },
+        "currency": "USD",
+        "dates": [
+          "2025-01-01",
+          "2026-01-01",
+          "2027-01-01",
+          "2028-12-31"
         ],
-        [
-          2.0,
-          1905983.7471867774
-        ],
-        [
-          4.0,
+        "im_values": [
+          3176639.578644629,
+          2541311.6629157034,
+          1905983.7471867774,
           635327.9157289257
         ]
+      },
+      "intervals": [
+        {
+          "contribution": 14900.985469111085,
+          "end": {
+            "counterparty_survival": 1.0,
+            "date": "2026-01-01",
+            "discount_factor": 0.9704455335485082,
+            "expected_im": 2541311.6629157034,
+            "own_survival": 1.0,
+            "spread_bp": 55.99671412924425
+          },
+          "start": {
+            "counterparty_survival": 1.0,
+            "date": "2025-01-01",
+            "discount_factor": 1.0,
+            "expected_im": 3176639.578644629,
+            "own_survival": 1.0,
+            "spread_bp": 50.0
+          },
+          "years": 1.0
+        },
+        {
+          "contribution": 12518.008490818354,
+          "end": {
+            "counterparty_survival": 1.0,
+            "date": "2027-01-01",
+            "discount_factor": 0.9417645335842487,
+            "expected_im": 1905983.7471867774,
+            "own_survival": 1.0,
+            "spread_bp": 61.99342825848851
+          },
+          "start": {
+            "counterparty_survival": 1.0,
+            "date": "2026-01-01",
+            "discount_factor": 0.9704455335485082,
+            "expected_im": 2541311.6629157034,
+            "own_survival": 1.0,
+            "spread_bp": 55.99671412924425
+          },
+          "years": 1.0
+        },
+        {
+          "contribution": 15631.190782606236,
+          "end": {
+            "counterparty_survival": 1.0,
+            "date": "2028-12-31",
+            "discount_factor": 0.8869204367171574,
+            "expected_im": 635327.9157289257,
+            "own_survival": 1.0,
+            "spread_bp": 73.986856516977
+          },
+          "start": {
+            "counterparty_survival": 1.0,
+            "date": "2027-01-01",
+            "discount_factor": 0.9417645335842487,
+            "expected_im": 1905983.7471867774,
+            "own_survival": 1.0,
+            "spread_bp": 61.99342825848851
+          },
+          "years": 2.0
+        }
       ],
-      "mva": 41614.23718250572
+      "mva": 43050.184742535675
     }
   },
   "netting_set_id": {
@@ -2457,16 +2634,13 @@
     },
     "funding": {
       "effective_benefit_bp": 20.0,
-      "effective_margin_spread_bp": 35.0,
       "symmetric_benefit_bp": 50.0,
-      "symmetric_margin_spread_bp": 50.0,
       "symmetric_wire": {
         "funding_spread_bp": 50.0
       },
       "wire": {
         "funding_benefit_bp": 20.0,
-        "funding_spread_bp": 50.0,
-        "margin_funding_spread_bp": 35.0
+        "funding_spread_bp": 50.0
       }
     }
   }

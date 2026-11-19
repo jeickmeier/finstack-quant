@@ -375,16 +375,25 @@ config=margin_api.SaCcrNettingSetConfig.unmargined(margin_api.NettingSetId.bilat
 ead=margin_api.SaCcrEngine().calculate_ead(trades, config)
 assert abs(ead.ead-ead.alpha*(ead.rc+ead.pfe))<1e-6
 print({"SA_CCR_EAD_USD":ead.ead,"replacement_cost":ead.rc,"PFE":ead.pfe,"alpha":ead.alpha})
-longest_maturity=max(row["maturity_years"] for row in schedule_rows)
-times=[.5,1.,2.,3.,longest_maturity]
-im_profile=margin_api.im_profile_from_simm(SimmCalculator("v2_6"),netting_sens,"USD",margin_api.ImDecayProfile.linear_to_maturity(longest_maturity),times)
-mva=margin_api.compute_mva(im_profile,[(0.,50.)],credit_market.get_discount("USD-OIS"))
-# The linear IM decay ends at the longest actual trade maturity; it is assumed, not future repricing.
-# A complete external grid on a named valuation basis.
 from datetime import timedelta
 
-grid = [0.0, *times]
-dates = [AS_OF + timedelta(days=round(365*t)) for t in grid]
+# The elected linear runoff reaches zero on the latest contractual maturity.
+longest_maturity_date = max(date.fromisoformat(row["end"]) for row in schedule_rows)
+longest_maturity = (longest_maturity_date - AS_OF).days / 365
+dates = [AS_OF + timedelta(days=round(365*t)) for t in (0.0, 0.5, 1.0, 2.0, 3.0)]
+dates.append(longest_maturity_date)
+grid = [(day - AS_OF).days / 365 for day in dates]
+im_run = margin_api.ImProjectionSpec(
+    as_of=AS_OF, currency="USD",
+    netting_set=margin_api.NettingSetId.bilateral("ACME-DEALER", "CSA-ANALYST"),
+    scope_source="analyst-teaching-risk-run", dates=dates,
+    decay=margin_api.ImDecayProfile.linear_to_maturity(longest_maturity),
+)
+im_profile = margin_api.im_profile_from_simm(SimmCalculator("v2_6"), netting_sens, im_run)
+margin_spread = margin_api.MarginFundingSpread.flat(50.0)
+mva = margin_api.compute_mva(im_profile, margin_spread, credit_market.get_discount("USD-OIS"), None)
+assert im_profile.im_values[0] > 0 and im_profile.im_values[-1] == 0
+# Complete external exposure observations for the same analyst case.
 exposure = margin_api.ExposureProfile(
     as_of=AS_OF, currency="USD",
     basis={"kind": "external", "source_id": "analyst-exposure-grid", "policy_id": "scenario-exercise"},
@@ -396,7 +405,7 @@ exposure = margin_api.ExposureProfile(
 )
 cpty=HazardCurve("DEALER",AS_OF,[(30.,.02)],recovery_rate=.4,day_count="act_365f")
 own=HazardCurve("SELF",AS_OF,[(30.,.01)],recovery_rate=.4,day_count="act_365f")
-xva=margin_api.compute_bilateral_xva(exposure,cpty,own,credit_market.get_discount("USD-OIS"),.4,.4,margin_api.FundingConfig(50.,30.,im_profile))
+xva=margin_api.compute_bilateral_xva(exposure,cpty,own,credit_market.get_discount("USD-OIS"),.4,.4,margin_api.FundingConfig(50., 30., im_profile, margin_spread))
 assert abs(xva.total_xva-(xva.cva-xva.dva+xva.fva+xva.mva))<1e-8
 assert mva.mva>0
 print({"CVA_USD":xva.cva,"DVA_USD":xva.dva,"FVA_USD":xva.fva,"MVA_USD":xva.mva,"total_XVA_USD":xva.total_xva,"standalone_MVA_USD":mva.mva})
@@ -453,8 +462,13 @@ A threshold changes the amount to be collateralized. MTA determines whether a sm
 {/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="exercise-why-mva" role="exercise" */}
 ```python exec id=exercise-why-mva role=exercise
 flat=DiscountCurve.flat("MVA-FLAT",AS_OF,0.0,"act_365f")
-constant=margin_api.ImProfile([1.,2.],[1_000_000.,1_000_000.])
-funding_cost=margin_api.compute_mva(constant,[(0.,50.)],flat)
+constant = margin_api.ImProfile(
+    as_of=AS_OF, currency="USD",
+    netting_set=margin_api.NettingSetId.bilateral("TEACHING-DEALER", "MVA-EXERCISE"),
+    source_id="flat-expected-IM", dates=[AS_OF, AS_OF + timedelta(days=730)],
+    im_values=[1_000_000.0, 1_000_000.0],
+)
+funding_cost = margin_api.compute_mva(constant, margin_api.MarginFundingSpread.flat(50.0), flat, None)
 manual=1_000_000*.005*2
 print({"expected_MVA_USD":manual,"native_MVA_USD":funding_cost.mva})
 ```
@@ -462,7 +476,7 @@ print({"expected_MVA_USD":manual,"native_MVA_USD":funding_cost.mva})
 
 <ExecutedOutput lesson="3.6" block="exercise-why-mva" />
 
-The IM principal is collateral, not an immediate expense. Funding it costs USD 5,000 per year under these assumptions, or USD 10,000 over two years. Segregation limits reuse of the posted collateral. A zero funding spread gives zero MVA even when the IM requirement remains positive; larger IM and greater financing cost are different drivers.
+Posting the IM principal ties up collateral and incurs funding cost. Funding it costs USD 5,000 per year under these assumptions, or USD 10,000 over two years. Segregation limits reuse of the posted collateral. A zero funding spread gives zero MVA even when the IM requirement remains positive; larger IM and greater financing cost are different drivers.
 
 </Exercise>
 

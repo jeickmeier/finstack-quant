@@ -7316,8 +7316,8 @@ export interface MarginNamespace {
    * Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
    *
    * All legs are weighted by joint (first-to-default) survival. MVA is computed
-   * only when `fundingJson` carries an `im_profile`; that posted IM also reduces
-   * ENE for bilateral DVA.
+   * only when `fundingJson` carries an `im_profile`. Bilateral DVA uses the
+   * supplied ENE measured under the elected collateral and close-out terms.
    *
    * The returned object reports the required all-in amount as
    * `total_xva = CVA - DVA + FVA + MVA`. Optional funding legs are absent from
@@ -7411,18 +7411,15 @@ export interface MarginNamespace {
    */
   readonly constants: typeof wasm.marginConstants;
   /**
-   * Margin valuation adjustment over an expected-IM profile.
-   *
-   * `MVA = sum_i s(t_i) * IM(t_i) * DF(t_i) * S(t_i) * dt_i` on the profile
-   * grid with a `t = 0` bucket edge; IM is flat before the first grid point.
-   * @param imProfile - `ImProfile` (object or JSON) of expected IM, for example from `imProfileFromSimm`.
-   * @param fundingSpreadCurve - Array of `[timeYears, spreadBp]` pairs, linearly interpolated with flat extrapolation; one pair is a flat spread.
-   * @param discountCurve - Risk-free discount curve handle.
-   * @param survivalCurve - The bank's own hazard curve handle; omitted treats survival as 1 for all times.
-   * @returns The `MvaResult` (`mva`, `average_im`, `im_profile`) as a plain object.
-   * @throws Error - Throws if the profile or spread curve is malformed or invalid, or a curve evaluation is non-finite.
+   * Integrate dated posted-margin funding costs through the horizon.
+   * @param imProfile - Complete dated expected posted margin.
+   * @param fundingSpread - Flat or dated basis-point spread covering the IM horizon.
+   * @param discountCurve - Risk-free curve normalized at the valuation cut.
+   * @param ownSurvival - Own hazard curve, or null to omit survival weighting.
+   * @returns The MVA cost, average IM and complete contribution intervals.
+   * @throws Error if profile, funding spread, the chosen survival or a curve sample is invalid.
    */
-  readonly computeMva: (imProfile: ImProfile | string, fundingSpreadCurve: readonly (readonly [number, number])[] | string, discountCurve: DiscountCurve, survivalCurve?: HazardCurve | null) => MvaResult;
+  readonly computeMva: (imProfile: ImProfile | string, fundingSpread: generated.margin.MarginFundingSpread | string, discountCurve: DiscountCurve, ownSurvival: HazardCurve | null) => MvaResult;
   /**
    * Cleared status through a named central counterparty.
    * @param ccp - CCP identifier, for example `"LCH"`, `"CME"`, `"ICE"` or `"JSCC"`.
@@ -7754,19 +7751,6 @@ export interface MarginNamespace {
    */
   readonly fundingConfigEffectiveBenefitBp: typeof wasm.fundingConfigEffectiveBenefitBp;
   /**
-   * Funding spread applied to posted initial margin (the MVA spread).
-   *
-   * The configured `margin_funding_spread_bp`, or the funding spread when no
-   * separate margin spread is set.
-   * @param funding - `FundingConfig` (object or JSON).
-   * @returns The margin funding spread in basis points.
-   *
-   * # Errors
-   *
-   * Throws if `funding` is malformed, has unknown fields, or fails validation.
-   */
-  readonly fundingConfigEffectiveMarginSpreadBp: typeof wasm.fundingConfigEffectiveMarginSpreadBp;
-  /**
    * Haircut01: PV change for a one basis point increase in the haircut.
    * @param collateralValue - Collateral market value, in major units of `currency`.
    * @param currentHaircut - Current haircut as a decimal fraction (0.02 is 2%).
@@ -7831,30 +7815,21 @@ export interface MarginNamespace {
    */
   readonly imMethodologyFromStr: typeof wasm.imMethodologyFromStr;
   /**
-   * Expected initial-margin profile from today's SIMM margin and a decay profile.
-   *
-   * `IM(t) = SIMM(sensitivities) * decay.factor(t)` on `time_grid`.
-   * @param calculator - SIMM calculator handle.
-   * @param sensitivities - SIMM sensitivities handle.
-   * @param currency - ISO-4217 currency the IM is reported in.
-   * @param decay - `ImDecayProfile` (object or JSON) shaping IM over time.
-   * @param timeGrid - Strictly increasing positive times in years.
-   * @returns The `ImProfile` (`times`, `im_values`) as a plain object.
-   *
-   * # Errors
-   *
-   * Throws for an unknown currency, an invalid decay profile or time grid, or
-   * sensitivities the SIMM calculator rejects.
+   * Project the opening historical SIMM value over a dated runoff schedule.
+   * @param calculator - Elected SIMM parameter version and MPOR.
+   * @param sensitivities - Signed risk of the admitted netting set.
+   * @param spec - Dated legal scope, risk snapshot, currency and elected runoff.
+   * @returns Complete expected IM at each date, including the opening SIMM.
+   * @throws Error if the scope, date grid, decay or sensitivities fail validation.
    */
   readonly imProfileFromSimm: typeof wasm.imProfileFromSimm;
   /**
    * Validate an expected initial-margin profile.
-   * @param imProfile - `ImProfile` (object or JSON) with `times` (years) and `im_values`.
+   * @param imProfile - `ImProfile` (object or JSON) with currency, scope, valuation date, calendar observations and expected IM.
    *
    * # Errors
    *
-   * Throws if the profile is malformed, empty, has mismatched lengths, a
-   * non-positive or non-increasing time, or a negative or non-finite IM value.
+   * Throws for incomplete scope, unanchored or unordered dates and non-finite or negative amounts.
    */
   readonly imProfileValidate: typeof wasm.imProfileValidate;
   /**

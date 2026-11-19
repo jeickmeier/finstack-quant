@@ -1,5 +1,7 @@
 //! Python wrappers for XVA types (CVA/DVA/FVA configuration and results).
 
+use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::module_utils::parse_currency;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema, serde_to_py,
 };
@@ -39,9 +41,9 @@ impl PyFundingConfig {
     /// im_profile : ImProfile | None
     ///     Valid expected initial-margin profile driving MVA. If ``None``, MVA
     ///     is not computed.
-    /// margin_funding_spread_bp : float | None
-    ///     Non-negative finite spread applied to posted IM. If ``None``, uses
-    ///     ``funding_spread_bp``.
+    /// margin_funding_spread : MarginFundingSpread | None
+    ///     Dated or flat funding spread applied to expected posted IM. Required
+    ///     when ``im_profile`` is present.
     ///
     /// Raises
     /// ------
@@ -52,19 +54,19 @@ impl PyFundingConfig {
         funding_spread_bp,
         funding_benefit_bp=None,
         im_profile=None,
-        margin_funding_spread_bp=None,
+        margin_funding_spread=None,
     ))]
     fn new(
         funding_spread_bp: f64,
         funding_benefit_bp: Option<f64>,
         im_profile: Option<&PyImProfile>,
-        margin_funding_spread_bp: Option<f64>,
+        margin_funding_spread: Option<&PyMarginFundingSpread>,
     ) -> PyResult<Self> {
         let inner = xva::FundingConfig {
             funding_spread_bp,
             funding_benefit_bp,
             im_profile: im_profile.map(|p| p.inner.clone()),
-            margin_funding_spread_bp,
+            margin_funding_spread: margin_funding_spread.map(|spread| spread.inner.clone()),
         };
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -110,10 +112,13 @@ impl PyFundingConfig {
         })
     }
 
-    /// IM funding spread in basis points (or None).
+    /// Elected funding spread for expected posted IM, if configured.
     #[getter]
-    fn margin_funding_spread_bp(&self) -> Option<f64> {
-        self.inner.margin_funding_spread_bp
+    fn margin_funding_spread(&self) -> Option<PyMarginFundingSpread> {
+        self.inner
+            .margin_funding_spread
+            .clone()
+            .map(|inner| PyMarginFundingSpread { inner })
     }
 
     /// Effective funding benefit spread in basis points.
@@ -121,22 +126,14 @@ impl PyFundingConfig {
         self.inner.effective_benefit_bp()
     }
 
-    /// Effective IM funding spread in basis points (falls back to
-    /// ``funding_spread_bp``).
-    fn effective_margin_spread_bp(&self) -> f64 {
-        self.inner.effective_margin_spread_bp()
-    }
-
     fn __repr__(&self) -> String {
         format!(
-            "FundingConfig(funding_spread_bp={}, funding_benefit_bp={}, margin_funding_spread_bp={}, im_profile={})",
+            "FundingConfig(funding_spread_bp={}, funding_benefit_bp={}, margin_funding_spread={:?}, im_profile={})",
             self.inner.funding_spread_bp,
             self.inner
                 .funding_benefit_bp
                 .map_or("None".to_string(), |v| v.to_string()),
-            self.inner
-                .margin_funding_spread_bp
-                .map_or("None".to_string(), |v| v.to_string()),
+            self.inner.margin_funding_spread,
             if self.inner.im_profile.is_some() {
                 "ImProfile(...)"
             } else {
@@ -475,6 +472,15 @@ impl PyXvaResult {
         self.inner.mva
     }
 
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "XvaResult.mva_detail")]
+    fn mva_detail(&self) -> Option<PyMvaResult> {
+        self.inner
+            .mva_detail
+            .clone()
+            .map(|inner| PyMvaResult { inner })
+    }
+
     /// All-in adjustment = CVA - DVA + FVA + MVA.
     ///
     /// Uncomputed legs contribute zero. This is the quantity subtracted from
@@ -711,6 +717,75 @@ impl PyImDecayProfile {
     }
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProjectionSpec")]
+#[pyclass(
+    name = "ImProjectionSpec",
+    module = "finstack_quant.margin",
+    frozen,
+    skip_from_py_object
+)]
+struct PyImProjectionSpec {
+    inner: mva::ImProjectionSpec,
+}
+
+#[pymethods]
+impl PyImProjectionSpec {
+    #[new]
+    #[pyo3(signature = (*, as_of, currency, netting_set, scope_source, dates, decay))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProjectionSpec.__init__")]
+    fn new(
+        as_of: &Bound<'_, PyAny>,
+        currency: &str,
+        netting_set: &super::types::PyNettingSetId,
+        scope_source: String,
+        dates: Vec<Bound<'_, PyAny>>,
+        decay: &PyImDecayProfile,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: mva::ImProjectionSpec {
+                as_of: py_to_date(as_of)?,
+                currency: parse_currency(currency)?,
+                netting_set: netting_set.inner.clone(),
+                scope_source,
+                dates: dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?,
+                decay: decay.inner.clone(),
+            },
+        })
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "MarginFundingSpread")]
+#[pyclass(
+    name = "MarginFundingSpread",
+    module = "finstack_quant.margin",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+struct PyMarginFundingSpread {
+    inner: mva::MarginFundingSpread,
+}
+
+#[pymethods]
+impl PyMarginFundingSpread {
+    #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "MarginFundingSpread.flat")]
+    fn flat(spread_bp: f64) -> Self {
+        Self {
+            inner: mva::MarginFundingSpread::Flat { spread_bp },
+        }
+    }
+
+    #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "MarginFundingSpread.dated")]
+    fn dated(knots: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let knots = super::frame::dated_pairs_from_series_or_list(knots)?;
+        Ok(Self {
+            inner: mva::MarginFundingSpread::Dated { knots },
+        })
+    }
+}
+
 /// Expected initial-margin profile E[IM(t)] on a time grid.
 #[pyclass(
     name = "ImProfile",
@@ -724,16 +799,29 @@ pub struct PyImProfile {
 
 #[pymethods]
 impl PyImProfile {
-    /// Construct from time and IM vectors.
-    ///
-    /// Values are stored as given; call ``validate()`` explicitly or rely
-    /// on downstream functions (``compute_mva``, ``im_profile_from_simm``)
-    /// to reject an inconsistent profile.
     #[new]
-    fn new(times: Vec<f64>, im_values: Vec<f64>) -> Self {
-        Self {
-            inner: mva::ImProfile { times, im_values },
-        }
+    #[pyo3(signature = (*, as_of, currency, netting_set, source_id, dates, im_values))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProfile.__init__")]
+    fn new(
+        as_of: &Bound<'_, PyAny>,
+        currency: &str,
+        netting_set: &super::types::PyNettingSetId,
+        source_id: String,
+        dates: Vec<Bound<'_, PyAny>>,
+        im_values: Vec<f64>,
+    ) -> PyResult<Self> {
+        let inner = mva::ImProfile {
+            as_of: py_to_date(as_of)?,
+            currency: parse_currency(currency)?,
+            basis: mva::ImProjectionBasis::External {
+                source_id,
+                netting_set: netting_set.inner.clone(),
+            },
+            dates: dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?,
+            im_values,
+        };
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
@@ -750,6 +838,7 @@ impl PyImProfile {
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         let inner: mva::ImProfile = serde_json::from_str(json).map_err(display_to_py)?;
+        inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -763,10 +852,38 @@ impl PyImProfile {
         self.inner.validate().map_err(core_to_py)
     }
 
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProfile.as_of")]
+    fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.as_of)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProfile.currency")]
+    fn currency(&self) -> String {
+        self.inner.currency.to_string()
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProfile.basis")]
+    fn basis<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.basis)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProfile.dates")]
+    fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
+        self.inner
+            .dates
+            .iter()
+            .map(|&date| date_to_py(py, date))
+            .collect()
+    }
+
     /// Time points in years.
     #[getter]
     fn times(&self) -> Vec<f64> {
-        self.inner.times.clone()
+        self.inner.times()
     }
 
     /// Expected IM at each time point.
@@ -777,21 +894,22 @@ impl PyImProfile {
 
     /// Number of time points.
     fn __len__(&self) -> usize {
-        self.inner.times.len()
+        self.inner.dates.len()
     }
 
     /// Export as a pandas ``DataFrame`` with time (years) as index.
     ///
-    /// Columns: ``im``.
+    /// Columns: ``date`` and ``im``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
+        data.set_item("date", self.dates(py)?)?;
         data.set_item("im", &self.inner.im_values)?;
-        let idx = self.inner.times.clone().into_pyobject(py)?.into_any();
+        let idx = self.inner.times().into_pyobject(py)?.into_any();
         dict_to_dataframe(py, &data, Some(idx))
     }
 
     fn __repr__(&self) -> String {
-        format!("ImProfile(points={})", self.inner.times.len())
+        format!("ImProfile(points={})", self.inner.dates.len())
     }
 
     /// Render as an HTML table in Jupyter notebooks.
@@ -853,20 +971,23 @@ impl PyMvaResult {
         self.inner.average_im
     }
 
-    /// IM profile used, as ``(time, value)`` tuples.
     #[getter]
-    fn im_profile(&self) -> Vec<(f64, f64)> {
-        self.inner.im_profile.clone()
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "MvaResult.im_profile")]
+    fn im_profile(&self) -> PyImProfile {
+        PyImProfile {
+            inner: self.inner.im_profile.clone(),
+        }
     }
 
-    /// Export the IM profile as a pandas ``DataFrame`` (column ``im``,
-    /// indexed by time in years).
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "MvaResult.intervals")]
+    fn intervals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.intervals)
+    }
+
+    /// Export the observation profile with dates and IM indexed by time in years.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        let (times, im_vals): (Vec<f64>, Vec<f64>) = self.inner.im_profile.iter().copied().unzip();
-        data.set_item("im", im_vals)?;
-        let idx = times.into_pyobject(py)?.into_any();
-        dict_to_dataframe(py, &data, Some(idx))
+        self.im_profile().to_dataframe(py)
     }
 
     fn __repr__(&self) -> String {
@@ -888,57 +1009,32 @@ impl PyMvaResult {
     }
 }
 
-/// Build a deterministic IM profile from SIMM sensitivities:
-/// ``IM(t) = SIMM(sensitivities) * decay(t)``.
 #[pyfunction]
-#[pyo3(signature = (calculator, sensitivities, currency, decay, time_grid))]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "im_profile_from_simm")]
 fn im_profile_from_simm(
     calculator: &PySimmCalculator,
     sensitivities: &PySimmSensitivities,
-    currency: &str,
-    decay: &PyImDecayProfile,
-    time_grid: Vec<f64>,
+    spec: &PyImProjectionSpec,
 ) -> PyResult<PyImProfile> {
-    let ccy: finstack_quant_core::currency::Currency =
-        currency.parse().map_err(crate::errors::core_to_py)?;
-    let inner = mva::im_profile_from_simm(
-        &calculator.inner,
-        &sensitivities.inner,
-        ccy,
-        &decay.inner,
-        &time_grid,
-    )
-    .map_err(core_to_py)?;
+    let inner = mva::im_profile_from_simm(&calculator.inner, &sensitivities.inner, &spec.inner)
+        .map_err(core_to_py)?;
     Ok(PyImProfile { inner })
 }
 
-/// Compute MVA: ``∫ spread(t) · IM(t) · DF(t) · S(t) dt`` (trapezoid).
-///
-/// Parameters
-/// ----------
-/// im_profile : ImProfile
-///     Expected IM profile.
-/// funding_spread_curve : list[tuple[float, float]] | pandas.Series
-///     ``(time_years, spread_bp)`` pairs, or a ``Series`` of spreads in bp
-///     indexed by time in years; a single pair means a flat spread.
-/// discount_curve : DiscountCurve
-///     Risk-free discount curve.
-/// survival_curve : HazardCurve | None
-///     Optional bank (own) hazard curve; ``None`` means no survival weighting.
 #[pyfunction]
-#[pyo3(signature = (im_profile, funding_spread_curve, discount_curve, survival_curve=None))]
+#[pyo3(signature = (im_profile, funding_spread, discount_curve, own_survival))]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "compute_mva")]
 fn compute_mva(
     im_profile: &PyImProfile,
-    funding_spread_curve: &Bound<'_, PyAny>,
+    funding_spread: &PyMarginFundingSpread,
     discount_curve: &PyDiscountCurve,
-    survival_curve: Option<&PyHazardCurve>,
+    own_survival: Option<&PyHazardCurve>,
 ) -> PyResult<PyMvaResult> {
-    let funding_spread_curve = super::frame::pairs_from_series_or_list(funding_spread_curve)?;
     let inner = mva::compute_mva(
         &im_profile.inner,
-        &funding_spread_curve,
+        &funding_spread.inner,
         &discount_curve.inner,
-        survival_curve.map(|c| c.inner.as_ref()),
+        own_survival.map(|curve| curve.inner.as_ref()),
     )
     .map_err(core_to_py)?;
     Ok(PyMvaResult { inner })
@@ -947,8 +1043,8 @@ fn compute_mva(
 /// Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
 ///
 /// All legs are weighted by joint (first-to-default) survival. MVA is computed
-/// only when ``funding`` carries an ``im_profile``; that posted IM also reduces
-/// ENE for bilateral DVA.
+/// only when ``funding`` carries an ``im_profile``. Bilateral DVA uses the
+/// supplied ENE measured under the elected collateral and close-out terms.
 ///
 /// The result reports ``total_xva = CVA - DVA + FVA + MVA``. Uncomputed
 /// optional legs contribute zero.
@@ -1020,6 +1116,8 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExposureProfile>()?;
     m.add_class::<PyXvaResult>()?;
     m.add_class::<PyImDecayProfile>()?;
+    m.add_class::<PyImProjectionSpec>()?;
+    m.add_class::<PyMarginFundingSpread>()?;
     m.add_class::<PyImProfile>()?;
     m.add_class::<PyMvaResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(im_profile_from_simm, m)?)?;

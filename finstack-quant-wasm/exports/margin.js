@@ -5,23 +5,22 @@ import { schema } from './margin/schema.js';
 // borrow an optional handle, so the two raw exports are one Rust call each and
 // the published function picks between them.
 /**
- * Margin valuation adjustment over an expected-IM profile.
- *
- * `MVA = sum_i s(t_i) * IM(t_i) * DF(t_i) * S(t_i) * dt_i` on the profile
- * grid with a `t = 0` bucket edge; IM is flat before the first grid point.
- * @param imProfile - `ImProfile` (object or JSON) of expected IM, for example from `imProfileFromSimm`.
- * @param fundingSpreadCurve - Array of `[timeYears, spreadBp]` pairs, linearly interpolated with flat extrapolation; one pair is a flat spread.
- * @param discountCurve - Risk-free discount curve handle.
- * @param survivalCurve - The bank's own hazard curve handle; omitted treats survival as 1 for all times.
- * @returns The `MvaResult` (`mva`, `average_im`, `im_profile`) as a plain object.
- * @throws Error - Throws if the profile or spread curve is malformed or invalid, or a curve evaluation is non-finite.
- *
- * @facadeType (imProfile: ImProfile | string, fundingSpreadCurve: readonly (readonly [number, number])[] | string, discountCurve: DiscountCurve, survivalCurve?: HazardCurve | null) => MvaResult
+ * Integrate dated posted-margin funding costs through the horizon.
+ * @param imProfile - Complete dated expected posted margin.
+ * @param fundingSpread - Flat or dated basis-point spread covering the IM horizon.
+ * @param discountCurve - Risk-free curve normalized at the valuation cut.
+ * @param ownSurvival - Own hazard curve, or null to omit survival weighting.
+ * @returns The MVA cost, average IM and complete contribution intervals.
+ * @throws Error if profile, funding spread, the chosen survival or a curve sample is invalid.
+ * @facadeType (imProfile: ImProfile | string, fundingSpread: generated.margin.MarginFundingSpread | string, discountCurve: DiscountCurve, ownSurvival: HazardCurve | null) => MvaResult
  */
-const computeMva = (imProfile, fundingSpreadCurve, discountCurve, survivalCurve = undefined) =>
-  survivalCurve === undefined || survivalCurve === null
-    ? wasm.computeMvaWithoutSurvival(imProfile, fundingSpreadCurve, discountCurve)
-    : wasm.computeMvaWithSurvival(imProfile, fundingSpreadCurve, discountCurve, survivalCurve);
+const computeMva = (imProfile, fundingSpread, discountCurve, ownSurvival) => {
+  if (ownSurvival === undefined)
+    throw new TypeError('Choose a hazard curve or null for own survival');
+  return ownSurvival === null
+    ? wasm.computeMvaWithoutSurvival(imProfile, fundingSpread, discountCurve)
+    : wasm.computeMvaWithSurvival(imProfile, fundingSpread, discountCurve, ownSurvival);
+};
 
 /**
  * Namespaced TypeScript entry points for margin calculations and types.
@@ -82,7 +81,6 @@ export const margin = {
   exposureProfileValidate: wasm.exposureProfileValidate,
   frtbSbaCharge: wasm.frtbSbaCharge,
   fundingConfigEffectiveBenefitBp: wasm.fundingConfigEffectiveBenefitBp,
-  fundingConfigEffectiveMarginSpreadBp: wasm.fundingConfigEffectiveMarginSpreadBp,
   haircut01: wasm.haircut01,
   haircut01HaircutBp: wasm.haircut01HaircutBp,
   imDecayProfileFactor: wasm.imDecayProfileFactor,

@@ -62,6 +62,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "ImDecayProfile",
             "ImMethodology",
             "ImProfile",
+            "ImProjectionSpec",
+            "MarginFundingSpread",
             "ImResult",
             "MarginCallType",
             "MarginFundingCost",

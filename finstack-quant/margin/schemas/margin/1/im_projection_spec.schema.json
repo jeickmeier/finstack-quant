@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "ImDecayProfile": {
+      "description": "Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.\n\n`IM(t) = IM(0) × factor(t)`. This is the standard first-order practitioner\napproximation for MVA (Green 2015, ch. 10): IM shrinks as the portfolio's\nremaining risk runs off.\n\n# Variants\n\n| Variant | `factor(t)` | Use case |\n|---|---|---|\n| `Constant` | `1` | Evergreen / constantly re-hedged books |\n| `LinearToMaturity` | `max(1 − t/T, 0)` | Amortizing linear-risk books |\n| `SqrtTime` | `sqrt(max(1 − t/T, 0))` | DV01-style risk ∝ √(remaining time) |",
+      "oneOf": [
+        {
+          "const": "constant",
+          "description": "IM stays at today's level for the whole horizon.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "IM decays linearly to zero at `maturity_years`.",
+          "properties": {
+            "linear_to_maturity": {
+              "additionalProperties": false,
+              "properties": {
+                "maturity_years": {
+                  "description": "Portfolio maturity `T` in years (must be positive and finite).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "maturity_years"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_to_maturity"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "IM decays like the square root of remaining time to `maturity_years`.",
+          "properties": {
+            "sqrt_time": {
+              "additionalProperties": false,
+              "properties": {
+                "maturity_years": {
+                  "description": "Portfolio maturity `T` in years (must be positive and finite).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "maturity_years"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "sqrt_time"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NettingSetId": {
+      "description": "Identifies a margin netting set.\n\nInstruments in the same netting set can offset each other for margin\ncalculation purposes. The netting set is typically defined by the\nCSA agreement (bilateral) or by CCP membership (cleared) — these two\nshapes are mutually exclusive, so the type encodes them as enum\nvariants rather than as a struct with two `Option<String>` fields\nthat could in principle both be set or both be unset.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A bilateral netting set scoped by counterparty + CSA.",
+          "properties": {
+            "counterparty_id": {
+              "description": "Counterparty identifier",
+              "type": "string"
+            },
+            "csa_id": {
+              "description": "CSA identifier",
+              "type": "string"
+            },
+            "kind": {
+              "const": "bilateral",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "counterparty_id",
+            "csa_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A cleared netting set scoped by CCP membership.",
+          "properties": {
+            "ccp_id": {
+              "description": "CCP identifier (also used as the counterparty id)",
+              "type": "string"
+            },
+            "kind": {
+              "const": "cleared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "ccp_id"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/im_projection_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Dated admitted SIMM netting scope and deterministic projection election.",
+  "properties": {
+    "as_of": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Day on which opening SIMM and the projected profile are measured."
+    },
+    "currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Currency for aggregation and all values in the projection."
+    },
+    "dates": {
+      "description": "Dated projection grid, including valuation and horizon and any within-horizon runoff date.",
+      "items": {
+        "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+      },
+      "type": "array"
+    },
+    "decay": {
+      "$ref": "#/$defs/ImDecayProfile",
+      "description": "Explicitly elected deterministic margin runoff approximation."
+    },
+    "netting_set": {
+      "$ref": "#/$defs/NettingSetId",
+      "description": "Distinct, qualified bilateral netting scope with legal agreement identity."
+    },
+    "scope_source": {
+      "description": "Identity of the admitted margin run or snapshot.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "as_of",
+    "currency",
+    "netting_set",
+    "scope_source",
+    "dates",
+    "decay"
+  ],
+  "title": "ImProjectionSpec",
+  "type": "object"
+}

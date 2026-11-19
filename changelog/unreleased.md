@@ -2,6 +2,13 @@
 
 ## Itemized changes
 
+### Margin: dated posted-IM funding
+
+Initial-margin projections include the opening date and amount, reporting
+currency, and netting evidence. MVA merges the IM and funding spread dates,
+samples each curve on its own clock, and reports the contribution of each
+interval. Bilateral DVA uses the supplied collateral-aware ENE.
+
 ### Portfolio: dated Monte Carlo exposure
 
 The portfolio and standalone instrument exposure APIs reprice admitted

@@ -1544,7 +1544,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/funding_config.schema.json",
             "type_name": "FundingConfig",
             "kind": "input",
-            "bytes": 3272
+            "bytes": 11548
           },
           {
             "path": "schemas/margin/1/haircut01.schema.json",
@@ -1566,6 +1566,13 @@
             "type_name": "ImDecayProfile",
             "kind": "input",
             "bytes": 1840
+          },
+          {
+            "path": "schemas/margin/1/im_projection_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/margin/1/im_projection_spec.schema.json",
+            "type_name": "ImProjectionSpec",
+            "kind": "input",
+            "bytes": 5566
           },
           {
             "path": "schemas/margin/1/im_result.schema.json",
@@ -1596,6 +1603,13 @@
             "bytes": 1246
           },
           {
+            "path": "schemas/margin/1/margin_funding_spread.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_spread.schema.json",
+            "type_name": "MarginFundingSpread",
+            "kind": "input",
+            "bytes": 1738
+          },
+          {
             "path": "schemas/margin/1/margin_utilization.schema.json",
             "$id": "https://finstack_quant.dev/schemas/margin/1/margin_utilization.schema.json",
             "type_name": "MarginUtilization",
@@ -1607,7 +1621,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/mva_result.schema.json",
             "type_name": "MvaResult",
             "kind": "output",
-            "bytes": 1436
+            "bytes": 12193
           },
           {
             "path": "schemas/margin/1/repo_margin_spec.schema.json",
@@ -1663,7 +1677,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/xva_result.schema.json",
             "type_name": "XvaResult",
             "kind": "output",
-            "bytes": 19956
+            "bytes": 31237
           }
         ]
       },
@@ -4763,7 +4777,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/funding_config.schema.json",
             "type_name": "FundingConfig",
             "kind": "input",
-            "bytes": 3272
+            "bytes": 11548
           },
           {
             "domain": "margin",
@@ -4788,6 +4802,14 @@
             "type_name": "ImDecayProfile",
             "kind": "input",
             "bytes": 1840
+          },
+          {
+            "domain": "margin",
+            "path": "schemas/margin/1/im_projection_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/margin/1/im_projection_spec.schema.json",
+            "type_name": "ImProjectionSpec",
+            "kind": "input",
+            "bytes": 5566
           },
           {
             "domain": "margin",
@@ -4823,6 +4845,14 @@
           },
           {
             "domain": "margin",
+            "path": "schemas/margin/1/margin_funding_spread.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_spread.schema.json",
+            "type_name": "MarginFundingSpread",
+            "kind": "input",
+            "bytes": 1738
+          },
+          {
+            "domain": "margin",
             "path": "schemas/margin/1/margin_utilization.schema.json",
             "$id": "https://finstack_quant.dev/schemas/margin/1/margin_utilization.schema.json",
             "type_name": "MarginUtilization",
@@ -4835,7 +4865,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/mva_result.schema.json",
             "type_name": "MvaResult",
             "kind": "output",
-            "bytes": 1436
+            "bytes": 12193
           },
           {
             "domain": "margin",
@@ -4899,7 +4929,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/xva_result.schema.json",
             "type_name": "XvaResult",
             "kind": "output",
-            "bytes": 19956
+            "bytes": 31237
           },
           {
             "domain": "portfolio",

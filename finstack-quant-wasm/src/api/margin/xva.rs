@@ -7,10 +7,9 @@
 //! the twins of that Python class's factories and methods.
 
 use super::im::{JsSimmCalculator, JsSimmSensitivities};
-use super::js_currency;
 use crate::api::core::market_discount::JsDiscountCurve;
 use crate::api::core::market_hazard::JsHazardCurve;
-use crate::utils::input::{from_js_json, js_f64, js_f64_seq};
+use crate::utils::input::{from_js_json, js_f64};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::xva::{mva, types as xva};
 use wasm_bindgen::prelude::*;
@@ -42,23 +41,6 @@ pub fn funding_config_effective_benefit_bp(
     Ok(parse_funding(&funding, "funding")?.effective_benefit_bp())
 }
 
-/// Funding spread applied to posted initial margin (the MVA spread).
-///
-/// The configured `margin_funding_spread_bp`, or the funding spread when no
-/// separate margin spread is set.
-/// @param funding - `FundingConfig` (object or JSON).
-/// @returns The margin funding spread in basis points.
-///
-/// # Errors
-///
-/// Throws if `funding` is malformed, has unknown fields, or fails validation.
-#[wasm_bindgen(js_name = fundingConfigEffectiveMarginSpreadBp)]
-pub fn funding_config_effective_margin_spread_bp(
-    #[wasm_bindgen(unchecked_param_type = "FundingConfig | string")] funding: JsValue,
-) -> Result<f64, JsValue> {
-    Ok(parse_funding(&funding, "funding")?.effective_margin_spread_bp())
-}
-
 // ---------------------------------------------------------------------------
 // ExposureProfile / ImProfile
 // ---------------------------------------------------------------------------
@@ -83,12 +65,11 @@ pub fn exposure_profile_validate(
 }
 
 /// Validate an expected initial-margin profile.
-/// @param imProfile - `ImProfile` (object or JSON) with `times` (years) and `im_values`.
+/// @param imProfile - `ImProfile` (object or JSON) with currency, scope, valuation date, calendar observations and expected IM.
 ///
 /// # Errors
 ///
-/// Throws if the profile is malformed, empty, has mismatched lengths, a
-/// non-positive or non-increasing time, or a negative or non-finite IM value.
+/// Throws for incomplete scope, unanchored or unordered dates and non-finite or negative amounts.
 #[wasm_bindgen(js_name = imProfileValidate)]
 pub fn im_profile_validate(
     #[wasm_bindgen(js_name = "imProfile", unchecked_param_type = "ImProfile | string")] im_profile: JsValue,
@@ -170,58 +151,36 @@ fn parse_decay(decay: &JsValue, label: &str) -> Result<mva::ImDecayProfile, JsVa
 // IM profile and MVA
 // ---------------------------------------------------------------------------
 
-/// Expected initial-margin profile from today's SIMM margin and a decay profile.
-///
-/// `IM(t) = SIMM(sensitivities) * decay.factor(t)` on `time_grid`.
-/// @param calculator - SIMM calculator handle.
-/// @param sensitivities - SIMM sensitivities handle.
-/// @param currency - ISO-4217 currency the IM is reported in.
-/// @param decay - `ImDecayProfile` (object or JSON) shaping IM over time.
-/// @param timeGrid - Strictly increasing positive times in years.
-/// @returns The `ImProfile` (`times`, `im_values`) as a plain object.
-///
-/// # Errors
-///
-/// Throws for an unknown currency, an invalid decay profile or time grid, or
-/// sensitivities the SIMM calculator rejects.
+/// Project the opening historical SIMM value over a dated runoff schedule.
+/// @param calculator - Elected SIMM parameter version and MPOR.
+/// @param sensitivities - Signed risk of the admitted netting set.
+/// @param spec - Dated legal scope, risk snapshot, currency and elected runoff.
+/// @returns Complete expected IM at each date, including the opening SIMM.
+/// @throws Error if the scope, date grid, decay or sensitivities fail validation.
 #[wasm_bindgen(js_name = imProfileFromSimm, unchecked_return_type = "ImProfile")]
 pub fn im_profile_from_simm(
     calculator: &JsSimmCalculator,
     sensitivities: &JsSimmSensitivities,
-    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "ImDecayProfile | string")] decay: JsValue,
-    #[wasm_bindgen(
-        js_name = "timeGrid",
-        unchecked_param_type = "readonly number[] | Float64Array"
-    )]
-    time_grid: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.margin.ImProjectionSpec | string")]
+    spec: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let currency = js_currency(&currency, "currency")?;
-    let decay = parse_decay(&decay, "decay")?;
-    let time_grid = js_f64_seq(&time_grid, "timeGrid")?;
-    let profile = mva::im_profile_from_simm(
-        &calculator.inner,
-        &sensitivities.inner,
-        currency,
-        &decay,
-        &time_grid,
-    )
-    .map_err(to_js_err)?;
+    let spec = from_js_json(&spec, "spec")?;
+    let profile = mva::im_profile_from_simm(&calculator.inner, &sensitivities.inner, &spec)
+        .map_err(to_js_err)?;
     to_js_value(&profile)
 }
 
 fn compute_mva_inner(
     im_profile: &JsValue,
-    funding_spread_curve: &JsValue,
+    funding_spread: &JsValue,
     discount_curve: &JsDiscountCurve,
     survival_curve: Option<&JsHazardCurve>,
 ) -> Result<JsValue, JsValue> {
     let im_profile: mva::ImProfile = from_js_json(im_profile, "imProfile")?;
-    let funding_spread_curve: Vec<(f64, f64)> =
-        from_js_json(funding_spread_curve, "fundingSpreadCurve")?;
+    let funding_spread: mva::MarginFundingSpread = from_js_json(funding_spread, "fundingSpread")?;
     let result = mva::compute_mva(
         &im_profile,
-        &funding_spread_curve,
+        &funding_spread,
         &discount_curve.inner,
         survival_curve.map(|curve| curve.inner.as_ref()),
     )
@@ -232,12 +191,11 @@ fn compute_mva_inner(
 /// Margin valuation adjustment over an expected-IM profile, without
 /// own-default weighting.
 ///
-/// `MVA = sum_i s(t_i) * IM(t_i) * DF(t_i) * dt_i` on the profile grid. The
-/// published `margin.computeMva` calls this when no survival curve is given.
+/// Sample each curve on its own calendar clock and integrate the full product.
 /// @param imProfile - `ImProfile` (object or JSON) of expected IM.
-/// @param fundingSpreadCurve - Array of `[timeYears, spreadBp]` pairs, linearly interpolated with flat extrapolation; one pair is a flat spread.
+/// @param fundingSpread - Explicit flat or dated basis-point funding spread covering the posted-margin horizon.
 /// @param discountCurve - Risk-free discount curve handle.
-/// @returns The `MvaResult` (`mva`, `average_im`, `im_profile`) as a plain object.
+/// @returns MVA, expected IM weighted only by time, and complete interval evidence.
 ///
 /// # Errors
 ///
@@ -247,25 +205,23 @@ fn compute_mva_inner(
 pub fn compute_mva_without_survival(
     #[wasm_bindgen(js_name = "imProfile", unchecked_param_type = "ImProfile | string")] im_profile: JsValue,
     #[wasm_bindgen(
-        js_name = "fundingSpreadCurve",
-        unchecked_param_type = "readonly (readonly [number, number])[] | string"
+        js_name = "fundingSpread",
+        unchecked_param_type = "generated.margin.MarginFundingSpread | string"
     )]
-    funding_spread_curve: JsValue,
+    funding_spread: JsValue,
     #[wasm_bindgen(js_name = "discountCurve")] discount_curve: &JsDiscountCurve,
 ) -> Result<JsValue, JsValue> {
-    compute_mva_inner(&im_profile, &funding_spread_curve, discount_curve, None)
+    compute_mva_inner(&im_profile, &funding_spread, discount_curve, None)
 }
 
 /// Margin valuation adjustment weighted by the bank's own survival probability.
 ///
-/// `MVA = sum_i s(t_i) * IM(t_i) * DF(t_i) * S(t_i) * dt_i` on the profile
-/// grid. The published `margin.computeMva` calls this when a survival curve
-/// is given.
+/// Sample each curve on its own calendar clock and integrate the full product.
 /// @param imProfile - `ImProfile` (object or JSON) of expected IM.
-/// @param fundingSpreadCurve - Array of `[timeYears, spreadBp]` pairs, linearly interpolated with flat extrapolation; one pair is a flat spread.
+/// @param fundingSpread - Explicit flat or dated basis-point funding spread covering the posted-margin horizon.
 /// @param discountCurve - Risk-free discount curve handle.
 /// @param survivalCurve - The bank's own hazard curve handle.
-/// @returns The `MvaResult` (`mva`, `average_im`, `im_profile`) as a plain object.
+/// @returns MVA, expected IM weighted only by time, and complete interval evidence.
 ///
 /// # Errors
 ///
@@ -275,16 +231,16 @@ pub fn compute_mva_without_survival(
 pub fn compute_mva_with_survival(
     #[wasm_bindgen(js_name = "imProfile", unchecked_param_type = "ImProfile | string")] im_profile: JsValue,
     #[wasm_bindgen(
-        js_name = "fundingSpreadCurve",
-        unchecked_param_type = "readonly (readonly [number, number])[] | string"
+        js_name = "fundingSpread",
+        unchecked_param_type = "generated.margin.MarginFundingSpread | string"
     )]
-    funding_spread_curve: JsValue,
+    funding_spread: JsValue,
     #[wasm_bindgen(js_name = "discountCurve")] discount_curve: &JsDiscountCurve,
     #[wasm_bindgen(js_name = "survivalCurve")] survival_curve: &JsHazardCurve,
 ) -> Result<JsValue, JsValue> {
     compute_mva_inner(
         &im_profile,
-        &funding_spread_curve,
+        &funding_spread,
         discount_curve,
         Some(survival_curve),
     )

@@ -75,7 +75,11 @@ use tracing::debug;
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
 )]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    feature = "json-schema",
+    derive(schemars::JsonSchema),
+    schemars(inline)
+)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SimmVersion {

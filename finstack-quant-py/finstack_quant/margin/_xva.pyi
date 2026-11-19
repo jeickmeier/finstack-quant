@@ -8,6 +8,7 @@ from typing import Any, Literal, TypedDict, Unpack
 import pandas as pd
 from finstack_quant.core.market_data import DiscountCurve, HazardCurve
 from finstack_quant.margin._im import SimmCalculator, SimmSensitivities
+from finstack_quant.margin._types import NettingSetId
 
 class FundingConfig:
     """
@@ -26,9 +27,8 @@ class FundingConfig:
         spread; ``None`` for symmetric funding.
     im_profile : ImProfile | None, optional
         Valid expected initial-margin profile driving MVA; ``None`` disables MVA.
-    margin_funding_spread_bp : float | None, optional
-        Non-negative finite spread applied to posted IM; ``None`` reuses
-        ``funding_spread_bp``.
+    margin_funding_spread : MarginFundingSpread or None, optional
+        Flat or dated spread applied to posted IM. Required with an IM profile.
 
     Returns
     -------
@@ -52,7 +52,7 @@ class FundingConfig:
         funding_spread_bp: float,
         funding_benefit_bp: float | None = None,
         im_profile: ImProfile | None = None,
-        margin_funding_spread_bp: float | None = None,
+        margin_funding_spread: MarginFundingSpread | None = None,
     ) -> None:
         """
         Initialize FVA and MVA funding parameters.
@@ -66,9 +66,8 @@ class FundingConfig:
             than the cost spread; ``None`` uses the funding cost spread.
         im_profile : ImProfile | None
             Valid expected initial-margin profile driving MVA, or ``None``.
-        margin_funding_spread_bp : float | None
-            Non-negative finite IM funding spread in bp, or ``None`` to reuse
-            ``funding_spread_bp``.
+        margin_funding_spread : MarginFundingSpread or None
+            Explicit spread applied to posted IM. Required with an IM profile.
 
         Raises
         ------
@@ -195,48 +194,18 @@ class FundingConfig:
         ...
 
     @property
-    def margin_funding_spread_bp(self) -> float | None:
-        """
-        IM funding spread in basis points (or None).
+    def margin_funding_spread(self) -> MarginFundingSpread | None:
+        """Get the separately elected spread for posted IM.
 
         Returns
         -------
-        float or None
-            Explicit IM funding spread, when overridden.
+        MarginFundingSpread or None
+            Flat or dated funding spread if MVA is configured.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> FundingConfig(10.0, None, None, 6.0).margin_funding_spread_bp
-        6.0
+        This member does not raise for typed arguments.
         """
-        ...
-
-    def effective_margin_spread_bp(self) -> float:
-        """
-        Effective IM funding spread in basis points.
-
-        Falls back to ``funding_spread_bp`` when
-        ``margin_funding_spread_bp`` is ``None``.
-
-        Returns
-        -------
-        float
-            Effective IM funding spread in bp.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-
-        Examples
-        --------
-        >>> FundingConfig(10.0).effective_margin_spread_bp()
-        10.0
-        """
-        ...
 
     def effective_benefit_bp(self) -> float:
         """
@@ -889,6 +858,20 @@ class XvaResult:
         ...
 
     @property
+    def mva_detail(self) -> MvaResult | None:
+        """Get the admitted posted IM and dated funding contributions.
+
+        Returns
+        -------
+        MvaResult or None
+            Replayable funding detail when MVA was computed.
+
+        Notes
+        -----
+        This property does not raise.
+        """
+
+    @property
     def total_xva(self) -> float:
         """
         All-in adjustment = CVA − DVA + FVA + MVA.
@@ -1333,209 +1316,350 @@ class ImDecayProfile:
 
     def __repr__(self) -> str: ...
 
-class ImProfile:
-    """
-    Expected initial-margin profile ``E[IM(t)]`` on a time grid.
-
-    Values are in the aggregation currency chosen when the profile was
-    built (e.g. the ``currency`` argument of :func:`im_profile_from_simm`).
-
-    Parameters
-    ----------
-    times : list[float]
-        Time points in years from the valuation date; strictly increasing
-        and positive.
-    im_values : list[float]
-        Expected IM at each time point; non-negative and finite.
-
-    Returns
-    -------
-    ImProfile
-        IM profile as constructed; not validated until ``validate()`` is
-        called or the profile is passed to ``compute_mva`` or
-        ``im_profile_from_simm``.
+class ImProjectionSpec:
+    """Dated runoff and the qualifying scope of historical SIMM margin.
 
     Examples
     --------
-    >>> ImProfile([1.0, 2.0], [100.0, 50.0]).times
-    [1.0, 2.0]
+    >>> from finstack_quant.margin import ImDecayProfile, ImProjectionSpec, NettingSetId
+    >>> spec = ImProjectionSpec(
+    ...     as_of="2025-01-01",
+    ...     currency="USD",
+    ...     netting_set=NettingSetId.bilateral("bank", "csa"),
+    ...     scope_source="admitted-risk",
+    ...     dates=["2025-01-01", "2026-01-01"],
+    ...     decay=ImDecayProfile.constant(),
+    ... )
     """
 
-    def __init__(self, times: list[float], im_values: list[float]) -> None:
-        """
-        Construct from time and IM vectors.
-
-        Values are stored as given and are not validated at construction
-        time. Call ``validate()`` explicitly, or rely on downstream
-        functions (``compute_mva``, ``im_profile_from_simm``) to reject an
-        inconsistent profile when it is used.
-
-        Parameters
-        ----------
-        times : list[float]
-            Time points in years; strictly increasing and positive.
-        im_values : list[float]
-            Expected IM at each time point; non-negative and finite.
-
-        Raises
-        ------
-        (None)
-            Construction never raises; values are stored unchecked and
-            validated only by ``validate()`` or downstream consumers.
-
-        Examples
-        --------
-        >>> ImProfile([1.0, 2.0], [100.0, 50.0]).times
-        [1.0, 2.0]
-        """
-        ...
-
-    @staticmethod
-    def from_json(json: str) -> ImProfile:
-        """
-        Parse this object from a JSON object or JSON string.
+    def __init__(
+        self,
+        *,
+        as_of: date | str,
+        currency: str,
+        netting_set: NettingSetId,
+        scope_source: str,
+        dates: Sequence[date | str],
+        decay: ImDecayProfile,
+    ) -> None:
+        """Author the dated runoff specification.
 
         Parameters
         ----------
-        json : str
-            JSON representation produced by ``to_json``.
-
-        Returns
-        -------
-        ImProfile
-            Parsed IM profile.
+        as_of : date or str
+            Opening margin valuation date.
+        currency : str
+            ISO 4217 margin currency.
+        netting_set : NettingSetId
+            Bilateral counterparty and agreement admitting the original risk.
+        scope_source : str
+            Evidence identifier for the risk snapshot and legal scope.
+        dates : sequence of date or str
+            Strictly increasing observations beginning on the valuation date.
+            Include the runoff date whenever it occurs within the horizon.
+        decay : ImDecayProfile
+            Constant or explicit maturity-based deterministic runoff, measured
+            from valuation on ACT/365 Fixed.
 
         Raises
         ------
         ValueError
-            If the payload is not valid JSON or does not match the schema.
+            If a date or currency cannot be decoded. The calculation checks
+            scope and projection coverage.
+        TypeError
+            If an argument does not have the expected Python type.
+        """
+
+class MarginFundingSpread:
+    """An explicit flat or dated IM funding spread in basis points.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import MarginFundingSpread
+    >>> isinstance(MarginFundingSpread.flat(50.0), MarginFundingSpread)
+    True
+    """
+
+    @staticmethod
+    def flat(spread_bp: float) -> MarginFundingSpread:
+        """Author one spread over the full admitted margin horizon.
+
+        Parameters
+        ----------
+        spread_bp : float
+            Nonnegative finite spread in basis points. The calculation checks
+            this range when it uses the spread.
+
+        Returns
+        -------
+        MarginFundingSpread
+            Flat funding-spread election.
+
+        Notes
+        -----
+        This member does not raise for typed arguments.
 
         Examples
         --------
-        >>> ImProfile.from_json(ImProfile([1.0], [1.0]).to_json()).times
-        [1.0]
+        >>> from finstack_quant.margin import MarginFundingSpread
+        >>> spread = MarginFundingSpread.flat(50.0)
         """
-        ...
 
-    def to_json(self) -> str:
+    @staticmethod
+    def dated(knots: Sequence[tuple[date | str, float]] | pd.Series) -> MarginFundingSpread:
+        """Author linear interpolation across calendar spread observations.
+
+        Parameters
+        ----------
+        knots : sequence or pandas.Series
+            Strictly ordered calendar dates and nonnegative finite basis-point
+            spreads. A Series supplies date objects or ISO strings as its
+            index. The dates must cover the full IM horizon.
+
+        Returns
+        -------
+        MarginFundingSpread
+            Dated funding-spread election. The calculation checks coverage.
+
+        Raises
+        ------
+        ValueError
+            If a calendar date cannot be decoded.
+        TypeError
+            If a knot cannot be read as a date and numeric spread pair.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import MarginFundingSpread
+        >>> spread = MarginFundingSpread.dated([("2025-01-01", 35), ("2026-01-01", 50)])
         """
-        Serialize this object to a JSON-compatible dict.
+
+class ImProfile:
+    """Expected posted IM on a complete dated grid.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import ImProfile, NettingSetId
+    >>> profile = ImProfile(
+    ...     as_of="2025-01-01",
+    ...     currency="USD",
+    ...     netting_set=NettingSetId.bilateral("bank", "csa"),
+    ...     source_id="supplied-risk-run",
+    ...     dates=["2025-01-01", "2026-01-01"],
+    ...     im_values=[100, 0],
+    ... )
+    >>> profile.times
+    [0.0, 1.0]
+    """
+
+    def __init__(
+        self,
+        *,
+        as_of: date | str,
+        currency: str,
+        netting_set: NettingSetId,
+        source_id: str,
+        dates: Sequence[date | str],
+        im_values: Sequence[float],
+    ) -> None:
+        """Admit a complete externally supplied expected posted-margin profile.
+
+        Parameters
+        ----------
+        as_of : date or str
+            Valuation date matching the first observation.
+        currency : str
+            ISO 4217 currency shared by the expected amounts.
+        netting_set : NettingSetId
+            Legal bilateral counterparty and agreement measured by the profile.
+        source_id : str
+            Nonempty evidence identifier for the supplied calculation.
+        dates : sequence of date or str
+            Strictly increasing observation dates from valuation through the funding horizon.
+        im_values : sequence of float
+            Finite nonnegative expected posted IM amounts in major currency
+            units aligned to every date, including the opening observation.
+
+        Raises
+        ------
+        ValueError
+            If a date, amount, currency or the legal scope is invalid.
+        TypeError
+            If an argument does not have the expected Python type.
+        """
+
+    @property
+    def as_of(self) -> date:
+        """Get the valuation date.
+
+        Returns
+        -------
+        date
+            First observation date.
+
+        Notes
+        -----
+        This member does not raise for typed arguments.
+        """
+
+    @property
+    def currency(self) -> str:
+        """Get the currency of the expected posted amounts.
 
         Returns
         -------
         str
-            Pretty-printed JSON.
+            ISO 4217 reporting currency.
+
+        Notes
+        -----
+        This member does not raise for typed arguments.
+        """
+
+    @property
+    def basis(self) -> dict[str, Any]:
+        """Get identified scope and method evidence.
+
+        Returns
+        -------
+        dict
+            External source or SIMM runoff evidence on the canonical wire basis.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
-
-        Examples
-        --------
-        >>> isinstance(ImProfile([1.0], [1.0]).to_json(), str)
-        True
+            If the projection's terms cannot be represented as Python data.
         """
-        ...
 
-    def validate(self) -> None:
+    @property
+    def dates(self) -> list[date]:
+        """Get every calendar observation.
+
+        Returns
+        -------
+        list of date
+            Opening through horizon, in time order.
+
+        Notes
+        -----
+        This member does not raise for typed arguments.
         """
-        Validate internal consistency.
-
-        Raises
-        ------
-        ValueError
-            If the profile is empty, lengths differ, times are not
-            strictly increasing and positive, or IM values are
-            negative/non-finite.
-
-        Examples
-        --------
-        >>> ImProfile([1.0], [1.0]).validate()
-        """
-        ...
 
     @property
     def times(self) -> list[float]:
-        """
-        Exposure or IM observation times in years from the valuation date.
+        """Calculate time elapsed from the opening on ACT/365 Fixed.
 
         Returns
         -------
-        list[float]
-            Strictly increasing, positive time points.
+        list of float
+            Year fractions aligned with the dated observations.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> ImProfile([1.0, 2.0], [1.0, 2.0]).times
-        [1.0, 2.0]
+        This member does not raise for typed arguments.
         """
-        ...
 
     @property
     def im_values(self) -> list[float]:
-        """
-        Expected IM at each time point.
+        """Get the posted-margin expectations.
 
         Returns
         -------
-        list[float]
-            Non-negative IM values in the profile's aggregation currency.
+        list of float
+            Dated nonnegative amounts in the profile currency.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> ImProfile([1.0], [100.0]).im_values
-        [100.0]
+        This member does not raise for typed arguments.
         """
-        ...
 
-    def __len__(self) -> int:
+    def validate(self) -> None:
+        """Validate that the date ordering, amounts and evidence are complete.
+
+        Raises
+        ------
+        ValueError
+            If the input fails the dated margin-profile contract.
         """
-        Number of time points.
+
+    def to_json(self) -> str:
+        """Serialize the dated profile.
 
         Returns
         -------
-        int
-            Length of ``times`` (and ``im_values``).
+        str
+            Canonical Rust profile JSON with scope and dates.
+
+        Raises
+        ------
+        ValueError
+            If the profile cannot be serialized.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> ImProfile:
+        """Read an externally supplied or computed profile from JSON.
+
+        Parameters
+        ----------
+        json : str
+            Canonical JSON previously emitted by to_json.
+
+        Returns
+        -------
+        ImProfile
+            Validated profile with its original scope and observation grid.
+
+        Raises
+        ------
+        ValueError
+            If the input cannot be parsed or fails profile validation.
 
         Examples
         --------
-        >>> len(ImProfile([1.0, 2.0], [1.0, 2.0]))
-        2
+        >>> from finstack_quant.margin import ImProfile, NettingSetId
+        >>> original = ImProfile(
+        ...     as_of="2025-01-01",
+        ...     currency="USD",
+        ...     netting_set=NettingSetId.bilateral("bank", "csa"),
+        ...     source_id="expected-risk",
+        ...     dates=["2025-01-01", "2026-01-01"],
+        ...     im_values=[100, 0],
+        ... )
+        >>> ImProfile.from_json(original.to_json()).im_values
+        [100.0, 0.0]
         """
-        ...
 
     def to_dataframe(self) -> pd.DataFrame:
-        """
-        Export as a pandas ``DataFrame`` with time (years) as index.
+        """Build a dated pandas observation frame.
 
         Returns
         -------
         pandas.DataFrame
-            Single column ``im``, indexed by time in years.
+            Date and expected IM columns indexed by years since valuation.
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
-
-        Examples
-        --------
-        >>> df = ImProfile([1.0, 2.0], [100.0, 50.0]).to_dataframe()
-        >>> list(df.columns)
-        ['im']
+        ImportError
+            If pandas is unavailable.
         """
-        ...
 
+    def __len__(self) -> int: ...
     def __repr__(self) -> str: ...
+
+class _MvaPoint(TypedDict):
+    date: str
+    expected_im: float
+    spread_bp: float
+    discount_factor: float
+    own_survival: float
+    counterparty_survival: float
+
+class _MvaInterval(TypedDict):
+    start: _MvaPoint
+    end: _MvaPoint
+    years: float
+    contribution: float
 
 class MvaResult:
     """
@@ -1555,7 +1679,12 @@ class MvaResult:
 
     Examples
     --------
-    >>> result = MvaResult.from_json('{"mva":1.0,"average_im":100.0,"im_profile":[[1.0,100.0]]}')
+    >>> result = MvaResult.from_json(
+    ...     '{"mva":1.0,"average_im":100.0,"im_profile":{"as_of":"2025-01-01","currency":"USD",'
+    ...     '"basis":{"kind":"external","source_id":"projected","netting_set":{"kind":"bilateral",'
+    ...     '"counterparty_id":"dealer","csa_id":"agreement"}},"dates":["2025-01-01","2026-01-01"],'
+    ...     '"im_values":[100.0,100.0]},"intervals":[]}'
+    ... )
     >>> (result.mva, result.average_im)
     (1.0, 100.0)
     """
@@ -1582,9 +1711,14 @@ class MvaResult:
 
         Examples
         --------
-        >>> result = MvaResult.from_json('{"mva":1.0,"average_im":100.0,"im_profile":[[1.0,100.0]]}')
-        >>> result.im_profile
-        [(1.0, 100.0)]
+        >>> result = MvaResult.from_json(
+        ...     '{"mva":1.0,"average_im":100.0,"im_profile":{"as_of":"2025-01-01","currency":"USD",'
+        ...     '"basis":{"kind":"external","source_id":"projected","netting_set":{"kind":"bilateral",'
+        ...     '"counterparty_id":"dealer","csa_id":"agreement"}},"dates":["2025-01-01","2026-01-01"],'
+        ...     '"im_values":[100.0,100.0]},"intervals":[]}'
+        ... )
+        >>> result.im_profile.im_values
+        [100.0, 100.0]
         """
         ...
 
@@ -1628,8 +1762,7 @@ class MvaResult:
         Returns
         -------
         float
-            ``(1/T) * integral_0^T IM(t) dt`` under the same trapezoid
-            convention as ``mva``, in the IM profile's currency.
+            ``(1/T) * integral_0^T IM(t) dt`` on the dated ACT/365 Fixed grid, in the profile currency.
 
         Notes
         -----
@@ -1638,20 +1771,34 @@ class MvaResult:
         ...
 
     @property
-    def im_profile(self) -> list[tuple[float, float]]:
-        """
-        IM profile used, as ``(time, value)`` tuples.
+    def im_profile(self) -> ImProfile:
+        """Get the complete expected posted IM used for the cost.
 
         Returns
         -------
-        list[tuple[float, float]]
-            ``(time_years, im_value)`` pairs echoing the input profile.
+        ImProfile
+            Identified profile with its opening and horizon dates.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This member does not raise for typed arguments.
         """
-        ...
+
+    @property
+    def intervals(self) -> list[_MvaInterval]:
+        """Get factors and contributions on the merged date grid.
+
+        Returns
+        -------
+        list of dict
+            Opening and closing IM, spread, discount and survival for each
+            interval, ACT/365 Fixed interval lengths, and funding contributions.
+
+        Raises
+        ------
+        ValueError
+            If the numerical evidence cannot be represented as Python data.
+        """
 
     def to_dataframe(self) -> pd.DataFrame:
         """
@@ -1660,7 +1807,7 @@ class MvaResult:
         Returns
         -------
         pandas.DataFrame
-            Single column ``im``, indexed by time in years.
+            Columns for date and expected IM, indexed by time in years.
 
         Raises
         ------
@@ -1674,107 +1821,95 @@ class MvaResult:
 def im_profile_from_simm(
     calculator: SimmCalculator,
     sensitivities: SimmSensitivities,
-    currency: str,
-    decay: ImDecayProfile,
-    time_grid: list[float],
+    spec: ImProjectionSpec,
 ) -> ImProfile:
-    """
-    Build a deterministic IM profile from current SIMM sensitivities.
-
-    Computes ``IM(t) = SIMM(sensitivities) * decay(t)`` on ``time_grid``,
-    where the base IM is the full cross-risk-class ISDA SIMM aggregate of
-    ``sensitivities`` (validated first, so an unknown tenor raises).
+    """Project the admitted opening SIMM result with deterministic decay.
 
     Parameters
     ----------
     calculator : SimmCalculator
-        SIMM calculator fixing the version/registry parameters.
+        Elected historical parameter version and margin period of risk.
     sensitivities : SimmSensitivities
-        Current portfolio sensitivities in SIMM buckets.
-    currency : str
-        Aggregation currency for the SIMM total.
-    decay : ImDecayProfile
-        Deterministic decay profile applied to the base IM.
-    time_grid : list[float]
-        Strictly increasing, positive year fractions.
+        Signed original risk keyed by currency, bucket and risk class.
+    spec : ImProjectionSpec
+        Qualified netting source, date, currency and runoff with a complete grid.
 
     Returns
     -------
     ImProfile
-        Expected IM profile ``E[IM(t)]`` on ``time_grid``.
+        Dated projection including today's SIMM and the selected approximation.
 
     Raises
     ------
     ValueError
-        If ``currency`` is not a known currency code, or ``sensitivities``,
-        ``decay`` or ``time_grid`` fails validation.
+        If sensitivities or the dated projection fail validation.
 
     Examples
     --------
-    >>> sens = SimmSensitivities("USD")
-    >>> sens.add_ir_delta("USD", "5Y", 50_000.0)
-    >>> calc = SimmCalculator("v2_6")
-    >>> decay = ImDecayProfile.linear_to_maturity(4.0)
-    >>> profile = im_profile_from_simm(calc, sens, "USD", decay, [1.0, 2.0, 4.0])
-    >>> profile.times
-    [1.0, 2.0, 4.0]
+    >>> from finstack_quant.margin import ImDecayProfile, ImProjectionSpec, NettingSetId
+    >>> from finstack_quant.margin import SimmCalculator, SimmSensitivities, im_profile_from_simm
+    >>> sensitivities = SimmSensitivities("USD")
+    >>> sensitivities.add_ir_delta("USD", "5Y", 50_000.0)
+    >>> spec = ImProjectionSpec(
+    ...     as_of="2025-01-01",
+    ...     currency="USD",
+    ...     netting_set=NettingSetId.bilateral("bank", "csa"),
+    ...     scope_source="trade-risk",
+    ...     dates=["2025-01-01", "2026-01-01"],
+    ...     decay=ImDecayProfile.constant(),
+    ... )
+    >>> im_profile_from_simm(SimmCalculator("v2_6"), sensitivities, spec).times
+    [0.0, 1.0]
     """
-    ...
 
 def compute_mva(
     im_profile: ImProfile,
-    funding_spread_curve: list[tuple[float, float]] | pd.Series,
+    funding_spread: MarginFundingSpread,
     discount_curve: DiscountCurve,
-    survival_curve: HazardCurve | None = None,
+    own_survival: HazardCurve | None,
 ) -> MvaResult:
-    """
-    Compute MVA over an expected-IM profile.
-
-    Integrates ``spread(t) * IM(t) * DF(t) * S(t)`` over the profile's time
-    grid using the same midpoint/trapezoid convention as the CVA engine,
-    with a ``t = 0`` bucket edge (``DF(0) = 1``, ``S(0) = 1``). IM is
-    treated as flat (left-constant) before the first grid point.
+    """Integrate the joint product of posted IM, spread, discount and survival.
 
     Parameters
     ----------
     im_profile : ImProfile
-        Expected IM profile ``E[IM(t)]`` (from ``im_profile_from_simm`` or
-        the stochastic engine's mean per-path IM).
-    funding_spread_curve : list[tuple[float, float]] | pd.Series
-        ``(time_years, spread_bp)`` pairs in basis points, or a ``Series`` of
-        spreads in bp indexed by time in years; linearly interpolated with
-        flat extrapolation, and a single point means a flat spread.
+        Complete dated margin expectations in reporting currency.
+    funding_spread : MarginFundingSpread
+        Flat or dated funding spread in basis points covering the full horizon.
     discount_curve : DiscountCurve
-        Risk-free discount curve.
-    survival_curve : HazardCurve or None, optional
-        Optional bank (own) hazard curve; when ``None``, survival
-        probability ``S(t)`` is treated as 1 for all ``t``.
+        Discount curve queried on its own calendar clock and normalized at valuation.
+    own_survival : HazardCurve or None
+        Institution's survival curve in reporting currency; None omits survival weighting.
 
     Returns
     -------
     MvaResult
-        MVA, time-weighted average IM, and the echoed IM profile.
+        Expected funding cost, average expected IM and replayable interval factors.
 
     Raises
     ------
     ValueError
-        If the profile or spread curve fails validation, or if any curve
-        evaluation returns a non-finite value.
+        If the profile, funding spread or curve coverage is invalid.
+    RuntimeError
+        If curve calculation or numerical integration fails.
 
     Examples
     --------
     >>> from datetime import date
     >>> from finstack_quant.core.market_data import DiscountCurve
-    >>> profile = ImProfile([1.0, 2.0], [1_000_000.0, 1_000_000.0])
-    >>> result = compute_mva(
-    ...     profile,
-    ...     [(0.0, 50.0)],
-    ...     DiscountCurve.flat("USD-OIS", date(2025, 1, 1), 0.0, "act_365f"),
+    >>> from finstack_quant.margin import ImProfile, MarginFundingSpread, NettingSetId, compute_mva
+    >>> profile = ImProfile(
+    ...     as_of="2025-01-01",
+    ...     currency="USD",
+    ...     netting_set=NettingSetId.bilateral("bank", "csa"),
+    ...     source_id="expected-IM",
+    ...     dates=["2025-01-01", "2026-01-01"],
+    ...     im_values=[100, 0],
     ... )
-    >>> round(result.mva, 2)
-    10000.0
+    >>> discount = DiscountCurve.flat("USD-OIS", date(2025, 1, 1), 0.0, "act_365f")
+    >>> round(compute_mva(profile, MarginFundingSpread.flat(50.0), discount, None).mva, 2)
+    0.25
     """
-    ...
 
 def compute_bilateral_xva(
     exposure_profile: ExposureProfile,
@@ -1790,8 +1925,8 @@ def compute_bilateral_xva(
 
     All legs are weighted by joint (first-to-default) survival, so the credit
     and funding components are not double-counted. MVA is computed only when
-    ``funding`` carries an ``im_profile``; that posted IM also reduces ENE for
-    bilateral DVA.
+    ``funding`` carries an ``im_profile``. Bilateral DVA uses the supplied ENE
+    measured under the elected collateral and close-out terms.
 
     The result reports ``total_xva = CVA - DVA + FVA + MVA``; uncomputed
     optional legs contribute zero.

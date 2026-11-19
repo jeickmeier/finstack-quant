@@ -2121,7 +2121,6 @@
       "exposureProfileValidate",
       "frtbSbaCharge",
       "fundingConfigEffectiveBenefitBp",
-      "fundingConfigEffectiveMarginSpreadBp",
       "haircut01",
       "haircut01HaircutBp",
       "imDecayProfileFactor",
@@ -2392,9 +2391,6 @@
     "kind": "function"
   },
   "margin.fundingConfigEffectiveBenefitBp": {
-    "kind": "function"
-  },
-  "margin.fundingConfigEffectiveMarginSpreadBp": {
     "kind": "function"
   },
   "margin.haircut01": {

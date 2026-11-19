@@ -39,6 +39,8 @@ ExposureProfile = _margin.ExposureProfile
 XvaResult = _margin.XvaResult
 ImDecayProfile = _margin.ImDecayProfile
 ImProfile = _margin.ImProfile
+ImProjectionSpec = _margin.ImProjectionSpec
+MarginFundingSpread = _margin.MarginFundingSpread
 MvaResult = _margin.MvaResult
 compute_mva = _margin.compute_mva
 compute_bilateral_xva = _margin.compute_bilateral_xva
@@ -80,9 +82,11 @@ __all__: list[str] = [
     "ImDecayProfile",
     "ImMethodology",
     "ImProfile",
+    "ImProjectionSpec",
     "ImResult",
     "MarginCallType",
     "MarginFundingCost",
+    "MarginFundingSpread",
     "MarginTenor",
     "MarginUtilization",
     "MvaResult",

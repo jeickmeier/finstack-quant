@@ -72,6 +72,20 @@ const exposure = {
 };
 const exposureJson = JSON.stringify(exposure);
 
+function expectedIm(dates, imValues) {
+  return {
+    as_of: exposure.as_of,
+    currency: exposure.currency,
+    basis: {
+      kind: 'external',
+      source_id: 'xva-im-fixture',
+      netting_set: { kind: 'bilateral', counterparty_id: 'bank', csa_id: 'agreement' },
+    },
+    dates,
+    im_values: imValues,
+  };
+}
+
 test('margin namespace exports computeBilateralXva as a live function', () => {
   assert.equal(typeof margin.computeBilateralXva, 'function');
 });
@@ -142,7 +156,8 @@ test('computeBilateralXva folds MVA into total_xva', () => {
     JSON.stringify({
       funding_spread_bp: 50.0,
       funding_benefit_bp: 30.0,
-      im_profile: { times: [1.0, 2.0], im_values: [1e6, 1e6] },
+      im_profile: expectedIm(exposure.dates, [1e6, 1e6, 1e6]),
+      margin_funding_spread: { kind: 'flat', spread_bp: 50 },
     })
   );
 
@@ -157,7 +172,7 @@ test('computeBilateralXva folds MVA into total_xva', () => {
   );
 });
 
-test('computeBilateralXva nets posted IM from bilateral DVA', () => {
+test('computeBilateralXva uses the exposed ENE when IM funding is selected', () => {
   const negativeExposureJson = JSON.stringify({
     ...exposure,
     mtm_values: [-1e6, -1e6, -1e6],
@@ -172,12 +187,13 @@ test('computeBilateralXva nets posted IM from bilateral DVA', () => {
     JSON.stringify({
       funding_spread_bp: 0.0,
       funding_benefit_bp: 0.0,
-      im_profile: { times: [1.0, 2.0], im_values: [400_000.0, 400_000.0] },
+      im_profile: expectedIm(exposure.dates, [400_000, 400_000, 400_000]),
+      margin_funding_spread: { kind: 'flat', spread_bp: 0 },
     })
   );
 
   assert.ok(withoutIm.dva > 0.0);
-  assert.ok(withIm.dva > 0.0 && withIm.dva < withoutIm.dva);
+  assert.equal(withIm.dva, withoutIm.dva);
 });
 
 test('computeBilateralXva rejects an IM/exposure horizon mismatch', () => {
@@ -192,7 +208,8 @@ test('computeBilateralXva rejects an IM/exposure horizon mismatch', () => {
         0.4,
         JSON.stringify({
           funding_spread_bp: 50.0,
-          im_profile: { times: [1.0, 3.0], im_values: [1e6, 1e6] },
+          im_profile: expectedIm(['2025-01-01', '2026-01-01', '2028-01-01'], [1e6, 1e6, 1e6]),
+          margin_funding_spread: { kind: 'flat', spread_bp: 50 },
         })
       ),
     /horizon/

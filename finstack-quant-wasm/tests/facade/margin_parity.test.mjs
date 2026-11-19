@@ -383,19 +383,9 @@ test('FundingConfig, profile and decay twins match Python', () => {
     'benefit'
   );
   close(
-    margin.fundingConfigEffectiveMarginSpreadBp(xva.funding.wire),
-    xva.funding.effective_margin_spread_bp,
-    'margin spread'
-  );
-  close(
     margin.fundingConfigEffectiveBenefitBp(xva.funding.symmetric_wire),
     xva.funding.symmetric_benefit_bp,
     'symmetric benefit'
-  );
-  close(
-    margin.fundingConfigEffectiveMarginSpreadBp(xva.funding.symmetric_wire),
-    xva.funding.symmetric_margin_spread_bp,
-    'symmetric margin spread'
   );
   throwsKind(() => margin.fundingConfigEffectiveBenefitBp({ funding_spread_bp: -1 }), 'validation');
 
@@ -422,11 +412,26 @@ test('FundingConfig, profile and decay twins match Python', () => {
   throwsKind(() => margin.imDecayProfileLinearToMaturity(0), 'validation', /maturity_years/);
   throwsKind(() => margin.imDecayProfileFactor('exponential', 1.0), 'validation');
 
-  assert.equal(margin.imProfileValidate({ times: [1, 2], im_values: [10, 5] }), undefined);
+  const im = {
+    as_of: '2025-01-01',
+    currency: 'USD',
+    basis: {
+      kind: 'external',
+      source_id: 'supplied-im',
+      netting_set: {
+        kind: 'bilateral',
+        counterparty_id: 'bank',
+        csa_id: 'agreement',
+      },
+    },
+    dates: ['2025-01-01', '2026-01-01'],
+    im_values: [10, 5],
+  };
+  assert.equal(margin.imProfileValidate(im), undefined);
   throwsKind(
-    () => margin.imProfileValidate({ times: [2, 1], im_values: [10, 5] }),
+    () => margin.imProfileValidate({ ...im, dates: ['2025-01-01', '2025-01-01'] }),
     'validation',
-    /strictly increasing/
+    /strictly increase/
   );
   const exposure = {
     as_of: '2025-01-01',
@@ -505,25 +510,29 @@ test('SimmSensitivities and SimmCalculator match Python', () => {
 test('imProfileFromSimm and computeMva match Python', () => {
   const sens = simmSensitivities();
   const calculator = new margin.SimmCalculator();
-  const profile = margin.imProfileFromSimm(
-    calculator,
-    sens,
-    'USD',
-    margin.imDecayProfileLinearToMaturity(5.0),
-    [1.0, 2.0, 4.0]
-  );
+  const projection = {
+    as_of: '2025-01-01',
+    currency: 'USD',
+    scope_source: 'shared-parity-risk',
+    netting_set: { kind: 'bilateral', counterparty_id: 'bank', csa_id: 'agreement' },
+    dates: ['2025-01-01', '2026-01-01', '2027-01-01', '2028-12-31'],
+    decay: margin.imDecayProfileLinearToMaturity(5.0),
+  };
+  const profile = margin.imProfileFromSimm(calculator, sens, projection);
   close(profile, golden.mva.profile, 'profile');
 
   const discount = core.DiscountCurve.flat('USD-OIS', '2025-01-01', 0.03, 'act_365f');
   const hazard = core.HazardCurve.flat('BANK', '2025-01-01', 0.02, 0.4, 'act_365f');
-  const spreads = [
-    [0.0, 50.0],
-    [5.0, 80.0],
-  ];
-  close(
-    margin.computeMva(profile, spreads, discount),
-    golden.mva.without_survival,
-    'without_survival'
+  const spreads = {
+    kind: 'dated',
+    knots: [
+      ['2025-01-01', 50],
+      ['2030-01-01', 80],
+    ],
+  };
+  assert.throws(
+    () => margin.computeMva(profile, spreads, discount),
+    /Choose a hazard curve or null/
   );
   close(
     margin.computeMva(profile, spreads, discount, null),
@@ -536,7 +545,11 @@ test('imProfileFromSimm and computeMva match Python', () => {
     'with_survival'
   );
   throwsKind(
-    () => margin.imProfileFromSimm(calculator, sens, 'USD', 'constant', [2.0, 1.0]),
+    () =>
+      margin.imProfileFromSimm(calculator, sens, {
+        ...projection,
+        dates: [...projection.dates].reverse(),
+      }),
     'validation'
   );
 });

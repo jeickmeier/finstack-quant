@@ -38,8 +38,10 @@ from finstack_quant.margin import (
     ImDecayProfile,
     ImMethodology,
     ImProfile,
+    ImProjectionSpec,
     MarginCallType,
     MarginFundingCost,
+    MarginFundingSpread,
     MarginTenor,
     MarginUtilization,
     NettingSetId,
@@ -327,7 +329,7 @@ def compute() -> dict[str, Any]:
         "haircut01": {"wire": _wire(haircut01), "haircut_bp": haircut01.haircut_bp()},
     }
 
-    funding = FundingConfig(50.0, 20.0, None, 35.0)
+    funding = FundingConfig(50.0, 20.0)
     symmetric = FundingConfig(50.0)
     linear = ImDecayProfile.linear_to_maturity(5.0)
     sqrt_time = ImDecayProfile.sqrt_time(4.0)
@@ -335,10 +337,8 @@ def compute() -> dict[str, Any]:
         "funding": {
             "wire": _wire(funding),
             "effective_benefit_bp": funding.effective_benefit_bp(),
-            "effective_margin_spread_bp": funding.effective_margin_spread_bp(),
             "symmetric_wire": _wire(symmetric),
             "symmetric_benefit_bp": symmetric.effective_benefit_bp(),
-            "symmetric_margin_spread_bp": symmetric.effective_margin_spread_bp(),
         },
         "decay": {
             "constant": _wire(ImDecayProfile.constant()),
@@ -372,13 +372,21 @@ def compute() -> dict[str, Any]:
         "breakdown_missing": im.breakdown_amount("nope"),
     }
 
-    profile = im_profile_from_simm(calculator, sens, "USD", linear, [1.0, 2.0, 4.0])
+    projection = ImProjectionSpec(
+        as_of="2025-01-01",
+        currency="USD",
+        scope_source="shared-parity-risk",
+        netting_set=NettingSetId.bilateral("bank", "agreement"),
+        dates=["2025-01-01", "2026-01-01", "2027-01-01", "2028-12-31"],
+        decay=linear,
+    )
+    profile = im_profile_from_simm(calculator, sens, projection)
     discount = DiscountCurve.flat("USD-OIS", date(2025, 1, 1), 0.03, "act_365f")
     hazard = HazardCurve.flat("BANK", date(2025, 1, 1), 0.02, 0.4, "act_365f")
-    spreads = [(0.0, 50.0), (5.0, 80.0)]
+    spreads = MarginFundingSpread.dated([("2025-01-01", 50.0), ("2030-01-01", 80.0)])
     out["mva"] = {
         "profile": _wire(profile),
-        "without_survival": _wire(compute_mva(profile, spreads, discount)),
+        "without_survival": _wire(compute_mva(profile, spreads, discount, None)),
         "with_survival": _wire(compute_mva(profile, spreads, discount, hazard)),
     }
 
@@ -484,8 +492,15 @@ def test_python_margin_matches_the_shared_golden() -> None:
 
 def test_validate_twins_reject_what_wasm_rejects() -> None:
     """The error cases the facade test asserts on the WASM side."""
-    with pytest.raises(ValueError, match="strictly increasing"):
-        ImProfile([2.0, 1.0], [10.0, 5.0]).validate()
+    with pytest.raises(ValueError, match="strictly increase"):
+        ImProfile(
+            as_of="2025-01-01",
+            currency="USD",
+            netting_set=NettingSetId.bilateral("bank", "agreement"),
+            source_id="supplied-im",
+            dates=["2025-01-01", "2025-01-01"],
+            im_values=[10.0, 5.0],
+        )
     with pytest.raises(ValueError, match="vector lengths must be equal"):
         ExposureProfile(
             as_of="2025-01-01",

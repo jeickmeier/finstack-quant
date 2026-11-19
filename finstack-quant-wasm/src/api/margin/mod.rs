@@ -38,8 +38,8 @@ fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Resul
 /// Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
 ///
 /// All legs are weighted by joint (first-to-default) survival. MVA is computed
-/// only when `fundingJson` carries an `im_profile`; that posted IM also reduces
-/// ENE for bilateral DVA.
+/// only when `fundingJson` carries an `im_profile`. Bilateral DVA uses the
+/// supplied ENE measured under the elected collateral and close-out terms.
 ///
 /// The returned object reports the required all-in amount as
 /// `total_xva = CVA - DVA + FVA + MVA`. Optional funding legs are absent from
