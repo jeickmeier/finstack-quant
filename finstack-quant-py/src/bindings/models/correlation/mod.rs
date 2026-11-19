@@ -957,17 +957,17 @@ impl PyPortfolioLossResult {
     }
 
     #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.tranche_loss_statistics")]
-    #[pyo3(text_signature = "(attachment, detachment, pool_notional)")]
+    #[pyo3(text_signature = "(attach_pct, detach_pct, pool_notional)")]
     fn tranche_loss_statistics(
         &self,
         py: Python<'_>,
-        attachment: f64,
-        detachment: f64,
+        attach_pct: f64,
+        detach_pct: f64,
         pool_notional: f64,
     ) -> PyResult<PyTrancheLossStatistics> {
         py.detach(|| {
             self.inner
-                .tranche_loss_statistics(attachment, detachment, pool_notional)
+                .tranche_loss_statistics(attach_pct, detach_pct, pool_notional)
         })
         .map(|inner| PyTrancheLossStatistics { inner })
         .map_err(core_to_py)

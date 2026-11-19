@@ -127,7 +127,7 @@ fn empirical_es_has_exact_tail_mass_and_is_invariant_to_replication() {
     assert_eq!(tied.expected_shortfall, 15.0);
     let tranche = PortfolioLossResult::from_losses(losses, 0.75)
         .unwrap()
-        .tranche_loss_statistics(0.0, 1.0, 100.0)
+        .tranche_loss_statistics(0.0, 100.0, 100.0)
         .unwrap();
     assert!((tranche.expected_shortfall_amount - 20.0).abs() < 1e-12);
 }

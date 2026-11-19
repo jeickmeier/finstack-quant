@@ -170,7 +170,7 @@ _TRANCHE_COLUMNS = [
 
 def test_tranche_loss_statistics_to_dataframe_is_one_row() -> None:
     """A mezzanine tranche the loss distribution straddles, so no two cells tie."""
-    stats = _portfolio_loss_result().tranche_loss_statistics(0.05, 0.20, _PORTFOLIO_NOTIONAL)
+    stats = _portfolio_loss_result().tranche_loss_statistics(5.0, 20.0, _PORTFOLIO_NOTIONAL)
     df = stats.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -190,7 +190,7 @@ def test_tranche_loss_statistics_respect_the_domain_ordering() -> None:
     These are the invariants that make the eleven columns meaningful, and they
     only bite on a tranche that is neither wiped out nor untouched.
     """
-    df = _portfolio_loss_result().tranche_loss_statistics(0.05, 0.20, _PORTFOLIO_NOTIONAL).to_dataframe()
+    df = _portfolio_loss_result().tranche_loss_statistics(5.0, 20.0, _PORTFOLIO_NOTIONAL).to_dataframe()
     row = df.iloc[0]
 
     for scale in ("fraction", "amount"):
@@ -214,7 +214,7 @@ def test_tranche_loss_statistics_concat_into_a_capital_structure() -> None:
     result = _portfolio_loss_result()
     tranches = [(0.0, 0.03), (0.03, 0.07), (0.07, 1.0)]
     table = pd.concat(
-        [result.tranche_loss_statistics(a, d, _PORTFOLIO_NOTIONAL).to_dataframe() for a, d in tranches],
+        [result.tranche_loss_statistics(100 * a, 100 * d, _PORTFOLIO_NOTIONAL).to_dataframe() for a, d in tranches],
         ignore_index=True,
     )
     assert len(table) == len(tranches)

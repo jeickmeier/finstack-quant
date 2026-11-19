@@ -226,7 +226,7 @@ fn from_losses_records_the_confidence_used_for_tail_statistics() {
 #[test]
 fn equity_tranche_absorbs_the_first_losses_and_writes_down_fully() {
     let stats = tranche_pool()
-        .tranche_loss_statistics(0.0, 0.03, TRANCHE_POOL_NOTIONAL)
+        .tranche_loss_statistics(0.0, 3.0, TRANCHE_POOL_NOTIONAL)
         .expect("valid 0-3% equity tranche");
 
     assert_eq!(stats.attachment, 0.0);
@@ -250,10 +250,10 @@ fn equity_tranche_absorbs_the_first_losses_and_writes_down_fully() {
 fn mezzanine_tranche_is_protected_by_subordination() {
     let pool = tranche_pool();
     let equity = pool
-        .tranche_loss_statistics(0.0, 0.03, TRANCHE_POOL_NOTIONAL)
+        .tranche_loss_statistics(0.0, 3.0, TRANCHE_POOL_NOTIONAL)
         .expect("valid equity tranche");
     let mezzanine = pool
-        .tranche_loss_statistics(0.03, 0.10, TRANCHE_POOL_NOTIONAL)
+        .tranche_loss_statistics(3.0, 10.0, TRANCHE_POOL_NOTIONAL)
         .expect("valid 3-10% mezzanine tranche");
 
     // Only the 5% and 10% paths pierce 3%; only the 10% path exhausts it.
@@ -272,7 +272,7 @@ fn mezzanine_tranche_is_protected_by_subordination() {
 fn senior_tranche_above_the_worst_loss_is_untouched() {
     // Boundary case L <= A for every path: the worst path loses exactly 10%.
     let stats = tranche_pool()
-        .tranche_loss_statistics(0.10, 0.30, TRANCHE_POOL_NOTIONAL)
+        .tranche_loss_statistics(10.0, 30.0, TRANCHE_POOL_NOTIONAL)
         .expect("valid 10-30% senior tranche");
 
     assert_eq!(stats.expected_loss_fraction, 0.0);
@@ -287,7 +287,7 @@ fn senior_tranche_above_the_worst_loss_is_untouched() {
 fn thin_equity_tranche_below_every_positive_loss_is_fully_written_down() {
     // Boundary case L >= D on every path that loses anything at all.
     let stats = tranche_pool()
-        .tranche_loss_statistics(0.0, 0.005, TRANCHE_POOL_NOTIONAL)
+        .tranche_loss_statistics(0.0, 0.5, TRANCHE_POOL_NOTIONAL)
         .expect("valid 0-0.5% first-loss tranche");
 
     assert!((stats.expected_loss_fraction - 0.8).abs() < TOL);
@@ -302,10 +302,10 @@ fn tranche_statistics_reject_invalid_boundaries_and_pool_notional() {
     let pool = tranche_pool();
 
     // attachment >= detachment
-    assert!(pool.tranche_loss_statistics(0.10, 0.10, 100.0).is_err());
-    assert!(pool.tranche_loss_statistics(0.20, 0.10, 100.0).is_err());
-    // outside [0, 1]
-    for (attachment, detachment) in [(-0.01, 0.10), (0.10, 1.01), (f64::NAN, 0.10)] {
+    assert!(pool.tranche_loss_statistics(10.0, 10.0, 100.0).is_err());
+    assert!(pool.tranche_loss_statistics(20.0, 10.0, 100.0).is_err());
+    // outside [0, 100]
+    for (attachment, detachment) in [(-1.0, 10.0), (10.0, 101.0), (f64::NAN, 10.0)] {
         assert!(
             pool.tranche_loss_statistics(attachment, detachment, 100.0)
                 .is_err()
@@ -313,6 +313,6 @@ fn tranche_statistics_reject_invalid_boundaries_and_pool_notional() {
     }
     // non-positive or non-finite pool notional
     for notional in [0.0, -100.0, f64::NAN, f64::INFINITY] {
-        assert!(pool.tranche_loss_statistics(0.0, 0.03, notional).is_err());
+        assert!(pool.tranche_loss_statistics(0.0, 3.0, notional).is_err());
     }
 }

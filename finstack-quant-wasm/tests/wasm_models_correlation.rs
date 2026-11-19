@@ -55,11 +55,7 @@ fn portfolio_loss_result_handle_matches_rust() {
     assert!((result.expected_shortfall() - 9.0).abs() < 1e-12);
     assert!(
         result
-            .tranche_loss_statistics(
-                JsValue::from(0.02),
-                JsValue::from(0.06),
-                JsValue::from(100.0)
-            )
+            .tranche_loss_statistics(JsValue::from(2.0), JsValue::from(6.0), JsValue::from(100.0))
             .is_ok()
     );
     let json = result.to_json().expect("json");

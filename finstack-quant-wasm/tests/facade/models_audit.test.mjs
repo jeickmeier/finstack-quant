@@ -149,11 +149,11 @@ test('seasoned lookbacks match independent continuous-maximum payoff values', ()
 test('tranche ES preserves empirical tail probability under replication', () => {
   const { PortfolioLossResult } = facade.models.correlation;
   const losses = [0, 0, 10, 20];
-  const result = PortfolioLossResult.fromLosses(losses, 0.75).trancheLossStatistics(0, 1, 100);
+  const result = PortfolioLossResult.fromLosses(losses, 0.75).trancheLossStatistics(0, 100, 100);
   const repeated = PortfolioLossResult.fromLosses(
     Array(10).fill(losses).flat(),
     0.75
-  ).trancheLossStatistics(0, 1, 100);
+  ).trancheLossStatistics(0, 100, 100);
   assert.ok(Math.abs(result.expected_shortfall_amount - 20) < 1e-12);
   assert.ok(
     Math.abs(result.expected_shortfall_amount - repeated.expected_shortfall_amount) < 1e-12
@@ -173,7 +173,7 @@ test('PortfolioLossResult mirrors the Rust handle and validates its JSON', () =>
   assert.equal(result.confidence, 0.75);
   assert.ok(Math.abs(result.expectedShortfall - 9) < 1e-12);
 
-  const tranche = result.trancheLossStatistics(0.02, 0.06, 100);
+  const tranche = result.trancheLossStatistics(2.0, 6.0, 100);
   assert.deepEqual(Object.keys(tranche).sort(), [
     'attachment',
     'detachment',

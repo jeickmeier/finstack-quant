@@ -250,7 +250,7 @@ for rho in (0.1, 0.5):
     standard_error = losses.std(ddof=1) / math.sqrt(len(losses))
     allocated = 0.0
     for name, attachment, detachment in tranche_bounds:
-        stats = result.tranche_loss_statistics(attachment, detachment, pool_notional)
+        stats = result.tranche_loss_statistics(100 * attachment, 100 * detachment, pool_notional)
         hand = np.clip(losses / pool_notional - attachment, 0, detachment - attachment) * pool_notional
         allocated += stats.expected_loss_amount
         correlation_rows.append({"rho": rho, "tranche": name, "expected_loss_usd": stats.expected_loss_amount,

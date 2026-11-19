@@ -282,9 +282,9 @@ impl PortfolioLossResult {
     ///
     /// # Arguments
     ///
-    /// * `attachment` - Lower tranche boundary as a fraction of pool notional;
+    /// * `attach_pct` - Lower tranche boundary in percentage points of pool notional;
     ///   losses below this point are absorbed by more junior tranches.
-    /// * `detachment` - Upper tranche boundary as a fraction of pool notional;
+    /// * `detach_pct` - Upper tranche boundary in percentage points of pool notional;
     ///   losses above this point are absorbed by more senior tranches.
     /// * `pool_notional` - Total pool notional in the same scalar unit as the
     ///   simulated losses; used to convert path losses to loss fractions.
@@ -303,15 +303,18 @@ impl PortfolioLossResult {
     ///   *Finance and Economics Discussion Series* 2004-36, Federal Reserve Board. `docs/REFERENCES.md#gibson-2004-synthetic-cdos`
     pub fn tranche_loss_statistics(
         &self,
-        attachment: f64,
-        detachment: f64,
+        attach_pct: f64,
+        detach_pct: f64,
         pool_notional: f64,
     ) -> Result<TrancheLossStatistics> {
-        validate_f64_unit_interval(attachment, "tranche attachment")?;
-        validate_f64_unit_interval(detachment, "tranche detachment")?;
-        if attachment >= detachment {
+        if !(0.0..=100.0).contains(&attach_pct) || !(0.0..=100.0).contains(&detach_pct) {
+            return Err(invalid_input(
+                "tranche boundaries must be percentages in [0, 100]",
+            ));
+        }
+        if attach_pct >= detach_pct {
             return Err(invalid_input(format!(
-                "tranche attachment must be strictly below detachment, got {attachment} >= {detachment}"
+                "tranche attachment must be strictly below detachment, got {attach_pct} >= {detach_pct}"
             )));
         }
         if !pool_notional.is_finite() || pool_notional <= 0.0 {
@@ -320,8 +323,18 @@ impl PortfolioLossResult {
             )));
         }
 
-        let width = detachment - attachment;
+        let attachment = attach_pct / 100.0;
+        let detachment = detach_pct / 100.0;
+        let width = (detach_pct - attach_pct) / 100.0;
+        if width <= 0.0 || attachment >= detachment {
+            return Err(invalid_input("tranche boundary fractions must be distinct"));
+        }
         let tranche_notional = width * pool_notional;
+        if !tranche_notional.is_finite() || tranche_notional <= 0.0 {
+            return Err(invalid_input(
+                "derived tranche notional must be finite and positive",
+            ));
+        }
         let mut fractions = Vec::new();
         fractions
             .try_reserve_exact(self.losses.len())
@@ -340,8 +353,10 @@ impl PortfolioLossResult {
             }
             if pool_fraction >= detachment {
                 written_down += 1;
+                fractions.push(1.0);
+            } else {
+                fractions.push((pool_fraction - attachment).clamp(0.0, width) / width);
             }
-            fractions.push((pool_fraction - attachment).clamp(0.0, width) / width);
         }
 
         let path_count = self.losses.len() as f64;
