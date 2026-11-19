@@ -29,10 +29,65 @@ class HazardCurve:
     0.980199
     >>> round(curve.conditional_default_prob("2025-01-01", "2026-01-01"), 6)
     0.019801
-    >>> curve.knot_points
+    >>> list(zip(curve.knots, curve.hazard_rates, strict=True))
     [(1.0, 0.02), (5.0, 0.03)]
 
     """
+
+    @staticmethod
+    def from_dates(
+        id: str,
+        base_date: DateLike,
+        points: Sequence[tuple[DateLike, float]],
+        *,
+        day_count: DayCount | str,
+        recovery_rate: float,
+        calendar_id: str | None = None,
+    ) -> HazardCurve:
+        """Construct an annual default-intensity curve from dated segment ends.
+
+        Parameters
+        ----------
+        id : str
+            Identifier used in market-data lookups.
+        base_date : DateLike
+            Date defining zero years on the source clock.
+        points : Sequence[tuple[DateLike, float]]
+            Strictly increasing segment end dates after the base date. Each intensity applies to the interval ending at its date.
+            Annual default intensities as finite nonnegative decimal rates.
+        day_count : DayCount or str
+            Calendar-to-year-fraction convention such as act_365f.
+        recovery_rate : float
+            Recovered fraction of par, between zero and one.
+        calendar_id : str or None
+            Holiday calendar, required for day counts such as bus_252.
+
+        Returns
+        -------
+        HazardCurve
+            Validated curve with the supplied dated pillars.
+
+        Raises
+        ------
+        TypeError
+            If a date or quote has an incompatible Python type.
+        ValueError
+            If the dated grid, clock, policies or quotes fail validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import HazardCurve
+        >>> curve = HazardCurve.from_dates(
+        ...     "CURVE",
+        ...     "2025-01-01",
+        ...     [("2026-01-01", 0.02)],
+        ...     day_count="act_365f",
+        ...     recovery_rate=0.4,
+        ... )
+        >>> round(curve.sp("2026-01-01"), 6)
+        0.980199
+        """
+        ...
 
     def __init__(
         self,

@@ -1,5 +1,7 @@
 //! Hazard-curve factories, checked local integration, survival/PD queries, and accessors.
 
+use super::super::common::factor::dated_points_to_knots;
+use super::super::common::validate_curve_clock;
 use super::super::common::{signed_curve_year_fraction, stable_positive_log_ratio};
 use super::*;
 
@@ -14,6 +16,45 @@ enum HazardIntegral {
 }
 
 impl HazardCurve {
+    /// Construct an annual default-intensity curve from dated segment ends.
+    ///
+    /// # Arguments
+    /// * `id` - Identifier used to select the market source.
+    /// * `base_date` - Anchor date defining zero time on the curve clock.
+    /// * `points` - Strictly increasing segment end dates after the base date. Each intensity applies to the interval ending at its date.
+    ///   Annual default intensities as finite nonnegative decimal rates.
+    /// * `day_count` - Explicit convention for date-to-time conversion.
+    /// * `recovery_rate` - Fraction of par recovered on default, between zero and one.
+    /// * `calendar_id` - Explicit holiday calendar when required by the day count.
+    ///
+    /// # Errors
+    /// Rejects unsupported clocks, invalid levels or rates, and malformed date grids.
+    pub fn from_dates(
+        id: impl Into<CurveId>,
+        base_date: Date,
+        points: &[(Date, f64)],
+        day_count: DayCount,
+        recovery_rate: f64,
+        calendar_id: Option<&str>,
+    ) -> crate::Result<Self> {
+        let id = id.into();
+        let calendar = validate_curve_clock("HazardCurve", id.as_str(), day_count, calendar_id)?;
+        let knots = dated_points_to_knots(
+            "HazardCurve",
+            base_date,
+            points,
+            day_count,
+            calendar.as_ref(),
+        )?;
+        Self::builder(id)
+            .base_date(base_date)
+            .day_count(day_count)
+            .calendar_id_opt(calendar_id.map(str::to_owned))
+            .knots(knots)
+            .recovery_rate(recovery_rate)
+            .build()
+    }
+
     /// Start building a hazard curve with identifier `id`.
     ///
     /// # Arguments

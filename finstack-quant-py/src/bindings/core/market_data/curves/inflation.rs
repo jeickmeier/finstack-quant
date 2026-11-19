@@ -33,6 +33,37 @@ impl PyInflationCurve {
 
 #[pymethods]
 impl PyInflationCurve {
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.from_dates")]
+    #[staticmethod]
+    #[pyo3(signature = (id, base_date, points, *, day_count, interp, extrapolation, calendar_id=None))]
+    fn from_dates(
+        id: &str,
+        base_date: &Bound<'_, PyAny>,
+        points: Vec<(Bound<'_, PyAny>, f64)>,
+        day_count: &Bound<'_, PyAny>,
+        interp: &str,
+        extrapolation: &str,
+        calendar_id: Option<&str>,
+    ) -> PyResult<Self> {
+        let points = points
+            .iter()
+            .map(|(date, level)| Ok((py_to_date(date)?, *level)))
+            .collect::<PyResult<Vec<_>>>()?;
+        InflationCurve::from_dates(
+            id,
+            py_to_date(base_date)?,
+            &points,
+            extract_day_count(day_count)?,
+            interp.parse::<InterpStyle>().map_err(core_to_py)?,
+            extrapolation
+                .parse::<ExtrapolationPolicy>()
+                .map_err(core_to_py)?,
+            calendar_id,
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(core_to_py)
+    }
+
     #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.__init__")]
     #[new]
     #[pyo3(signature = (id, base_date, knots, *, day_count, interp, extrapolation, calendar_id=None))]

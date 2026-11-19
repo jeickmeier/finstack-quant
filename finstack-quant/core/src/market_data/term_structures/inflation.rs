@@ -55,6 +55,7 @@
 //!   - Fleckenstein, M., Longstaff, F. A., & Lustig, H. (2017). "Deflation Risk."
 //!     *Review of Financial Studies*, 30(8), 2719-2760. `docs/REFERENCES.md#kerkhof-2005`
 
+use super::common::factor::dated_points_to_knots;
 use super::common::{
     CurveCalendar, signed_curve_year_fraction, stable_positive_log_ratio, validate_curve_clock,
 };
@@ -152,6 +153,48 @@ impl TryFrom<RawInflationCurve> for InflationCurve {
 }
 
 impl InflationCurve {
+    /// Construct an inflation curve from dated projected CPI levels.
+    ///
+    /// # Arguments
+    /// * `id` - Identifier used to select the market source.
+    /// * `base_date` - Anchor date defining zero time on the curve clock.
+    /// * `points` - Strictly increasing observation dates with the first observation on the base date.
+    ///   Finite positive unlagged CPI levels in index points.
+    /// * `day_count` - Explicit convention for date-to-time conversion.
+    /// * `interp` - Interpolation of positive CPI levels, such as log-linear.
+    /// * `extrapolation` - Outside-grid policy, such as flat continuation.
+    /// * `calendar_id` - Explicit holiday calendar when required by the day count.
+    ///
+    /// # Errors
+    /// Rejects unsupported clocks, invalid levels or rates, and malformed date grids.
+    pub fn from_dates(
+        id: impl Into<CurveId>,
+        base_date: Date,
+        points: &[(Date, f64)],
+        day_count: DayCount,
+        interp: InterpStyle,
+        extrapolation: ExtrapolationPolicy,
+        calendar_id: Option<&str>,
+    ) -> crate::Result<Self> {
+        let id = id.into();
+        let calendar = validate_curve_clock("InflationCurve", id.as_str(), day_count, calendar_id)?;
+        let knots = dated_points_to_knots(
+            "InflationCurve",
+            base_date,
+            points,
+            day_count,
+            calendar.as_ref(),
+        )?;
+        Self::builder(id)
+            .base_date(base_date)
+            .day_count(day_count)
+            .calendar_id_opt(calendar_id.map(str::to_owned))
+            .knots(knots)
+            .interp(interp)
+            .extrapolation(extrapolation)
+            .build()
+    }
+
     /// Return publication metadata used to qualify projected CPI comparisons.
     pub fn get_series(&self) -> Option<&InflationSeries> {
         self.series.as_ref()

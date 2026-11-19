@@ -1047,3 +1047,30 @@ test('OLS fits a non-square predictor panel in observation order', () => {
   assert.ok(residuals.every((value) => Math.abs(value) < 1e-12));
   assert.throws(() => core.ols([[1], [2, 3], [4]], [1, 2, 3]), /rectangular/);
 });
+
+test('dated hazard and inflation curves preserve distinct origins and quote units', () => {
+  const origin = '2024-01-01';
+  const pillar = '2025-01-01';
+  const hazard = core.HazardCurve.fromDates('ABC', origin, [[pillar, 0.02]], 'act_365f', 0.4);
+  const inflation = core.InflationCurve.fromDates(
+    'CPI',
+    origin,
+    [
+      [origin, 300],
+      [pillar, 306],
+    ],
+    'act_365f',
+    'log_linear',
+    'flat'
+  );
+  try {
+    assert.ok(Math.abs(hazard.sp(pillar) - Math.exp((-0.02 * 366) / 365)) < 1e-14);
+    assert.ok(Math.abs(inflation.cpi(pillar) - 306) < 1e-12);
+    assert.throws(() =>
+      core.HazardCurve.fromDates('ABC', origin, [[origin, 0.02]], 'act_365f', 0.4)
+    );
+  } finally {
+    hazard.free();
+    inflation.free();
+  }
+});

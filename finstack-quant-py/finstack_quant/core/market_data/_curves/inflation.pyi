@@ -33,6 +33,65 @@ class InflationCurve:
 
     """
 
+    @staticmethod
+    def from_dates(
+        id: str,
+        base_date: DateLike,
+        points: Sequence[tuple[DateLike, float]],
+        *,
+        day_count: DayCount | str,
+        interp: str,
+        extrapolation: str,
+        calendar_id: str | None = None,
+    ) -> InflationCurve:
+        """Construct an inflation curve from dated projected CPI levels.
+
+        Parameters
+        ----------
+        id : str
+            Identifier used in market-data lookups.
+        base_date : DateLike
+            Date defining zero years on the source clock.
+        points : Sequence[tuple[DateLike, float]]
+            Strictly increasing observation dates with the first observation on the base date.
+            Finite positive unlagged CPI levels in index points.
+        day_count : DayCount or str
+            Calendar-to-year-fraction convention such as act_365f.
+        interp : str
+            Interpolation label for CPI levels, such as log_linear.
+        extrapolation : str
+            Outside-grid policy, such as flat.
+        calendar_id : str or None
+            Holiday calendar, required for day counts such as bus_252.
+
+        Returns
+        -------
+        InflationCurve
+            Validated curve with the supplied dated pillars.
+
+        Raises
+        ------
+        TypeError
+            If a date or quote has an incompatible Python type.
+        ValueError
+            If the dated grid, clock, policies or quotes fail validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import InflationCurve
+        >>> curve = InflationCurve.from_dates(
+        ...     "CURVE",
+        ...     "2025-01-01",
+        ...     [("2025-01-01", 300.0), ("2026-01-01", 306.0)],
+        ...     day_count="act_365f",
+        ...     interp="log_linear",
+        ...     extrapolation="flat",
+        ... )
+        >>> curve.cpi("2026-01-01")
+        306.0
+        """
+        ...
+
     def __init__(
         self,
         id: str,

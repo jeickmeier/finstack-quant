@@ -87,6 +87,55 @@ impl JsInflationCurve {
 
 #[wasm_bindgen(js_class = InflationCurve)]
 impl JsInflationCurve {
+    /// Construct an inflation curve from dated projected CPI levels.
+    /// @param id - Market source identifier.
+    /// @param baseDate - ISO-8601 date defining zero curve time.
+    /// @param points - ISO date and quote pairs. Strictly increasing observation dates with the first observation on the base date. Finite positive unlagged CPI levels in index points.
+    /// @param dayCount - Date-to-year-fraction convention such as act_365f.
+    /// @param interp - Interpolation label for positive CPI.
+    /// @param extrapolation - Outside-grid policy, such as flat.
+    /// @param calendarId - Holiday calendar, required for calendar-dependent day counts.
+    /// @returns The validated curve on the supplied clock.
+    /// @throws TypeError for mistyped fields or FinstackError for invalid curves or clock conventions.
+    #[wasm_bindgen(js_name = fromDates)]
+    pub fn from_dates(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
+        points: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] interp: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] extrapolation: JsValue,
+        #[wasm_bindgen(js_name = "calendarId", unchecked_optional_param_type = "string")]
+        calendar_id: Option<JsValue>,
+    ) -> Result<JsInflationCurve, JsValue> {
+        let points = from_js_json_exact::<Vec<(String, f64)>>(&points, "points")?
+            .into_iter()
+            .map(|(date, quote)| Ok((parse_iso_date(&date)?, quote)))
+            .collect::<Result<Vec<_>, JsValue>>()?;
+        let calendar_id = calendar_id
+            .as_ref()
+            .map(|id| js_string(id, "calendarId"))
+            .transpose()?;
+        RustInflationCurve::from_dates(
+            js_string(&id, "id")?,
+            js_date(&base_date, "baseDate")?,
+            &points,
+            js_string(&day_count, "dayCount")?
+                .parse::<DayCount>()
+                .map_err(to_js_err)?,
+            js_string(&interp, "interp")?
+                .parse::<InterpStyle>()
+                .map_err(to_js_err)?,
+            js_string(&extrapolation, "extrapolation")?
+                .parse::<ExtrapolationPolicy>()
+                .map_err(to_js_err)?,
+            calendar_id.as_deref(),
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(to_js_err)
+    }
+
     /// Construct an inflation curve from named options.
     ///
     /// # Arguments

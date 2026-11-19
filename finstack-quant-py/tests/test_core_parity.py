@@ -1470,3 +1470,25 @@ def test_dated_price_curve_preserves_signed_levels_on_leap_year_clock() -> None:
     assert curve.price(366.0 / 365.0) == 10.0
     with pytest.raises(ValueError, match="precedes base date"):
         PriceCurve.from_dates("WTI", "2024-01-02", points, "price", "act_365f", "linear", "flat")
+
+
+def test_dated_hazard_and_inflation_use_the_native_act365f_clock() -> None:
+    from finstack_quant.core.market_data import HazardCurve, InflationCurve
+
+    hazard = HazardCurve.from_dates(
+        "ABC", "2024-01-01", [("2025-01-01", 0.02)], day_count="act_365f", recovery_rate=0.4
+    )
+    assert hazard.knots == [366.0 / 365.0]
+    assert hazard.hazard_rates == [0.02]
+    with pytest.raises(ValueError, match="strictly positive"):
+        HazardCurve.from_dates("ABC", "2024-01-01", [("2024-01-01", 0.02)], day_count="act_365f", recovery_rate=0.4)
+    inflation = InflationCurve.from_dates(
+        "CPI",
+        "2024-01-01",
+        [("2024-01-01", 300.0), ("2025-01-01", 306.0)],
+        day_count="act_365f",
+        interp="log_linear",
+        extrapolation="flat",
+    )
+    assert inflation.cpi(366.0 / 365.0) == pytest.approx(306.0)
+    assert inflation.cpi("2025-01-01") == pytest.approx(306.0)

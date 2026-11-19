@@ -1391,7 +1391,7 @@
   "core.HazardCurve": {
     "kind": "class",
     "constructor": true,
-    "statics": ["flat", "fromJson", "fromSurvivalProbs"],
+    "statics": ["flat", "fromDates", "fromJson", "fromSurvivalProbs"],
     "methods": [
       "conditionalDefaultProb",
       "defaultProb",
@@ -1445,7 +1445,7 @@
   "core.InflationCurve": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromJson"],
+    "statics": ["fromDates", "fromJson"],
     "methods": ["cpi", "free", "inflationRate", "toJson"],
     "getters": [
       "baseCpi",

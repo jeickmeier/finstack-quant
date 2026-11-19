@@ -12,6 +12,7 @@ use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 
 /// Credit hazard-rate curve for default-probability modelling.
@@ -49,6 +50,33 @@ impl PyHazardCurve {
 
 #[pymethods]
 impl PyHazardCurve {
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.hazard", "HazardCurve.from_dates")]
+    #[staticmethod]
+    #[pyo3(signature = (id, base_date, points, *, day_count, recovery_rate, calendar_id=None))]
+    fn from_dates(
+        id: &str,
+        base_date: &Bound<'_, PyAny>,
+        points: Vec<(Bound<'_, PyAny>, f64)>,
+        day_count: &Bound<'_, PyAny>,
+        recovery_rate: f64,
+        calendar_id: Option<&str>,
+    ) -> PyResult<Self> {
+        let points = points
+            .iter()
+            .map(|(date, level)| Ok((py_to_date(date)?, *level)))
+            .collect::<PyResult<Vec<_>>>()?;
+        HazardCurve::from_dates(
+            id,
+            py_to_date(base_date)?,
+            &points,
+            extract_day_count(day_count)?,
+            recovery_rate,
+            calendar_id,
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(core_to_py)
+    }
+
     /// Construct a hazard curve from ``(time_years, hazard_rate)`` knots.
     ///
     /// Parameters

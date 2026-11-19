@@ -1,6 +1,8 @@
 //! WASM binding for `finstack_quant_core::market_data::term_structures::HazardCurve`.
 
-use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string, js_string_seq};
+use crate::utils::input::{
+    from_js_json, from_js_json_exact, js_f64, js_f64_seq, js_string, js_string_seq,
+};
 use std::sync::Arc;
 
 use crate::api::core::currency::JsCurrency;
@@ -90,6 +92,49 @@ impl JsHazardCurve {
 
 #[wasm_bindgen(js_class = HazardCurve)]
 impl JsHazardCurve {
+    /// Construct an annual default-intensity curve from dated segment ends.
+    /// @param id - Market source identifier.
+    /// @param baseDate - ISO-8601 date defining zero curve time.
+    /// @param points - ISO date and quote pairs. Strictly increasing segment end dates after the base date. Each intensity applies to the interval ending at its date. Annual default intensities as finite nonnegative decimal rates.
+    /// @param dayCount - Date-to-year-fraction convention such as act_365f.
+    /// @param recoveryRate - Recovered fraction of par in [0, 1].
+    /// @param calendarId - Holiday calendar, required for calendar-dependent day counts.
+    /// @returns The validated curve on the supplied clock.
+    /// @throws TypeError for mistyped fields or FinstackError for invalid curves or clock conventions.
+    #[wasm_bindgen(js_name = fromDates)]
+    pub fn from_dates(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
+        points: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
+        #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
+        recovery_rate: JsValue,
+        #[wasm_bindgen(js_name = "calendarId", unchecked_optional_param_type = "string")]
+        calendar_id: Option<JsValue>,
+    ) -> Result<JsHazardCurve, JsValue> {
+        let points = from_js_json_exact::<Vec<(String, f64)>>(&points, "points")?
+            .into_iter()
+            .map(|(date, quote)| Ok((parse_iso_date(&date)?, quote)))
+            .collect::<Result<Vec<_>, JsValue>>()?;
+        let calendar_id = calendar_id
+            .as_ref()
+            .map(|id| js_string(id, "calendarId"))
+            .transpose()?;
+        RustHazardCurve::from_dates(
+            js_string(&id, "id")?,
+            js_date(&base_date, "baseDate")?,
+            &points,
+            js_string(&day_count, "dayCount")?
+                .parse::<DayCount>()
+                .map_err(to_js_err)?,
+            js_f64(&recovery_rate, "recoveryRate")?,
+            calendar_id.as_deref(),
+        )
+        .map(Self::from_inner)
+        .map_err(to_js_err)
+    }
+
     /// Construct a hazard curve from named options.
     ///
     /// # Arguments
