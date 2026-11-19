@@ -40,6 +40,8 @@ use super::operation_spec::PyOperationSpec;
 /// 'rates_up'
 /// >>> spec == ScenarioSpec.from_json(spec.to_json())
 /// True
+/// >>> (spec + ScenarioSpec("rates_next", [operation])).id
+/// 'rates_up+rates_next'
 #[pyclass(
     name = "ScenarioSpec",
     module = "finstack_quant.scenarios",
@@ -92,6 +94,15 @@ impl PyScenarioSpec {
         };
         inner.validate().map_err(scenarios_to_py)?;
         Ok(Self { inner })
+    }
+
+    fn __add__(&self, other: PyRef<Self>) -> PyResult<Self> {
+        finstack_quant_scenarios::ScenarioSpec::compose(vec![
+            self.inner.clone(),
+            other.inner.clone(),
+        ])
+        .map(Self::from_inner)
+        .map_err(scenarios_to_py)
     }
 
     /// Deserialize and validate canonical scenario JSON.

@@ -39,8 +39,11 @@ class ScenarioSpec:
     'rates_up'
     >>> spec == ScenarioSpec.from_json(spec.to_json())
     True
+    >>> (spec + ScenarioSpec("rates_next", [operation])).id
+    'rates_up+rates_next'
     """
 
+    def __add__(self, other: ScenarioSpec) -> ScenarioSpec: ...
     def __init__(
         self,
         id: str,

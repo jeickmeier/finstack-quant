@@ -626,3 +626,14 @@ def test_base_correlation_bucket_uses_percent_coordinates_and_preserves_failed_m
         with pytest.raises(ValueError, match=r"detachment|correlation"):
             shock(buckets, change)
     assert market.get_base_correlation("CDX").correlations == [0.20, 0.25, 0.45, 0.98]
+
+
+def test_scenario_add_uses_existing_priority_and_leaves_specs_unchanged() -> None:
+    from finstack_quant.scenarios import CurveKind, OperationSpec, ScenarioSpec, compose_scenarios
+
+    later = ScenarioSpec("rates", [OperationSpec.curve_parallel_bp(CurveKind.discount(), "USD-OIS", 11.0)])
+    earlier = ScenarioSpec("vol", [OperationSpec.curve_parallel_bp(CurveKind.discount(), "USD-OIS", -7.0)], priority=-1)
+    snapshot = (later.to_json(), earlier.to_json())
+    assert later + earlier == compose_scenarios([later, earlier])
+    assert (later + earlier).id == "vol+rates"
+    assert (later.to_json(), earlier.to_json()) == snapshot
