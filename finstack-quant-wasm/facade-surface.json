@@ -3666,6 +3666,7 @@
       "excessReturns",
       "factorBrinsonAttribution",
       "fiAttributionResultReconciliationCheck",
+      "girrQuoteDelta",
       "gridAttribution",
       "gridCarinoLink",
       "mwrXirr",
@@ -3754,6 +3755,9 @@
       "positionWhatIf"
     ],
     "getters": []
+  },
+  "portfolio.girrQuoteDelta": {
+    "kind": "function"
   },
   "portfolio.portfolioMargin": {
     "kind": "function"

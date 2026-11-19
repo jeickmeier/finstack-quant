@@ -5,6 +5,7 @@
 //! definition. Render an entry with
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
+use crate::margin::{GirrQuoteDelta, GirrQuoteTarget};
 use crate::{
     PortfolioResult, allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
     attribution::ReconciliationReport, brinson::CarinoLinkedAttribution, brinson::SectorPeriod,
@@ -396,6 +397,15 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::portfolio_cashflows),
+
+    finstack_quant_core::schema_artifact!(
+        GirrQuoteTarget, "portfolio", "girr_quote_target", Input,
+        "Exact ordinary GIRR quote mapping at one regulatory vertex."
+    ),
+    finstack_quant_core::schema_artifact!(
+        GirrQuoteDelta, "portfolio", "girr_quote_delta", Output,
+        "Ordinary GIRR regulatory inputs and their signed position-level quote reprices."
+    ),
     finstack_quant_core::schema_artifact!(
         PortfolioMarginResult,
         "portfolio",

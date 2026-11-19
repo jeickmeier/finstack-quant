@@ -55,6 +55,7 @@ const EXPORTED_KEYS = [
   'excessReturns',
   'factorBrinsonAttribution',
   'fiAttributionResultReconciliationCheck',
+  'girrQuoteDelta',
   'gridAttribution',
   'gridCarinoLink',
   'mwrXirr',
@@ -1475,5 +1476,93 @@ test('typed listed option terms preserve contract economics and validate strike 
   } finally {
     edited.free();
     initial.free();
+  }
+});
+
+test('ordinary GIRR uses exact tenors and preserves the signed quote change under WASM', () => {
+  const date = '2025-01-02';
+  const id = 'GBP-SONIA';
+  const vertices = ['0.25Y', '0.5Y', '1Y', '2Y', '3Y', '5Y', '10Y', '15Y', '20Y', '30Y'];
+  const quotes = vertices.map((vertex, index) => ({
+    kind: 'rate_quote',
+    type: 'deposit',
+    id: vertex,
+    index: 'GBP-SONIA-OIS',
+    pillar: {
+      tenor: {
+        count: index < 2 ? 3 * (index + 1) : Number.parseInt(vertex, 10),
+        unit: index < 2 ? 'months' : 'years',
+      },
+    },
+    rate: 0.057,
+  }));
+  const calibration = facade.calibration.calibrate({
+    schema: 'finstack_quant.calibration/1',
+    plan: {
+      id: 'gbp',
+      quote_sets: { gbp: vertices },
+      steps: [
+        {
+          id,
+          quote_set: 'gbp',
+          kind: 'discount',
+          curve_id: id,
+          currency: 'GBP',
+          base_date: date,
+          method: 'bootstrap',
+          interpolation: 'log_linear',
+          extrapolation: 'extend',
+          conventions: { curve_day_count: 'act_365f' },
+        },
+      ],
+      settings: {},
+    },
+    market_data: quotes,
+  });
+  const market = core.MarketContext.fromJson(calibration.result.final_market);
+  const curve = market.getDiscount(id);
+  const currency = new core.Currency('GBP');
+  const principal = new core.Money(100_000, currency);
+  const bond = facade.valuations.instruments.Bond.zeroCoupon(
+    'ZC',
+    principal,
+    date,
+    '2026-01-02',
+    { periodic: 1 },
+    id
+  );
+  const position = new portfolio.Position('SHORT', bond.toJson(), -2);
+  const builder = portfolio.Portfolio.builder('book', 'GBP', date);
+  const book = builder.addPosition(position).build();
+  const pricing = new core.FinstackConfig();
+
+  try {
+    const targets = curve.rateCalibration.execution.bindings.map(({ quote_id, pillar_date }) => ({
+      risk_currency: 'GBP',
+      risk_curve_id: id,
+      vertex: quote_id,
+      source: { kind: 'discount', curve_id: id },
+      quote: { quote_id, pillar_date },
+    }));
+    const result = portfolio.girrQuoteDelta(book, market, pricing, targets);
+    const year = result.quote_risk.find((row) => row.target.vertex === '1Y');
+    const expected = -200_000 * (1 / 1.0571 - 1 / 1.057);
+    assert.equal(result.as_of, date);
+    assert.equal(result.quote_risk.length, vertices.length);
+    assert.equal(year.positions[0].position_scale, -2);
+    assert.ok(Math.abs(year.positions[0].pnl_base_per_pp - 100 * expected) < 2);
+    const risk = facade.margin.FrtbSensitivities.fromJson(result.sensitivities);
+    try {
+      assert.ok(facade.margin.frtbSbaCharge(risk).total > 0);
+    } finally {
+      risk.free();
+    }
+    assert.throws(
+      () => portfolio.girrQuoteDelta(book, market, pricing, targets.slice(1)),
+      /Missing GIRR delta vertex/
+    );
+  } finally {
+    for (const handle of [pricing, book, position, bond, principal, currency, curve, market])
+      handle.free();
   }
 });

@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import datetime
+from collections.abc import Sequence
+from typing import Literal, TypedDict
 import pandas as pd
+from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
-from finstack_quant.margin import ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities
+from finstack_quant.margin import FrtbSensitivities, ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities
 from finstack_quant.portfolio._container import Portfolio
 
 class NettingSetMargin:
@@ -684,3 +687,190 @@ def portfolio_margin(
     (0, 0)
     """
     ...
+
+class _DiscountGirrSource(TypedDict):
+    kind: Literal["discount"]
+    curve_id: str
+
+class _ProjectionGirrSource(TypedDict):
+    kind: Literal["projection"]
+    curve_id: str
+
+class _LinkedOisGirrSource(TypedDict):
+    kind: Literal["linked_ois"]
+    discount_curve_id: str
+    forward_curve_id: str
+
+class _RateQuoteCoordinate(TypedDict):
+    quote_id: str
+    pillar_date: str
+
+class GirrQuoteTarget:
+    """Identify the exact executed quote that supplies one ordinary FRTB GIRR vertex.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import GirrQuoteTarget
+    >>> target = GirrQuoteTarget(
+    ...     risk_currency="USD",
+    ...     risk_curve_id="USD-OIS",
+    ...     vertex="1Y",
+    ...     source={"kind": "discount", "curve_id": "USD-OIS"},
+    ...     quote={"quote_id": "USD-OIS-SWAP-1Y", "pillar_date": "2026-01-05"},
+    ... )
+    >>> target.to_dict()["vertex"]
+    '1Y'
+    """
+
+    def __init__(
+        self,
+        *,
+        risk_currency: str,
+        risk_curve_id: str,
+        vertex: str,
+        source: _DiscountGirrSource | _ProjectionGirrSource | _LinkedOisGirrSource,
+        quote: _RateQuoteCoordinate,
+    ) -> None:
+        """Record the identity and execution coordinate of a quoted yield.
+
+        Parameters
+        ----------
+        risk_currency : str
+            ISO 4217 currency of the yield curve and regulatory risk factor.
+        risk_curve_id : str
+            Exact risk grouping key, equal to the curve's identifier or to
+            the discount identifier of reciprocal OIS views.
+        vertex : str
+            Case-sensitive Basel vertex such as ``"0.25Y"`` or ``"10Y"``.
+        source : dict
+            Discount or projection curve identifier, or both reciprocal OIS
+            curve identifiers. The chosen source determines which curve
+            views are rebuilt and which observations are held.
+        quote : dict
+            Calibration quote identifier and its original ISO contractual
+            pillar date after applying market conventions.
+
+        Raises
+        ------
+        ValueError
+            If the structured coordinates are malformed or the currency is unknown.
+        """
+
+    def to_dict(self) -> dict[str, object]:
+        """Return the target as a native Python dictionary.
+
+        Returns
+        -------
+        dict
+            The full target with the nested source and executed quote coordinates.
+
+        Raises
+        ------
+        ValueError
+            If the target cannot be represented in its wire shape.
+        """
+
+class GirrQuoteDelta:
+    """Ordinary FRTB yield-curve delta and the position reprices behind it.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.config import FinstackConfig
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, girr_quote_delta
+    >>> book = Portfolio.builder("book", "USD", "2025-01-02").build()
+    >>> result = girr_quote_delta(book, MarketContext(), FinstackConfig(), [])
+    >>> result.to_dict()["quote_risk"]
+    []
+    """
+
+    @property
+    def as_of(self) -> datetime.date:
+        """Return the valuation date held fixed for every quote reprice.
+
+        Returns
+        -------
+        datetime.date
+            The trading book's valuation date on the held pricing market.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def sensitivities(self) -> FrtbSensitivities:
+        """Return the ordinary GIRR yield-curve sensitivities.
+
+        Returns
+        -------
+        FrtbSensitivities
+            An independent container with signed reporting-currency P&L per
+            one percentage point of upward yield shift.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    def to_dict(self) -> dict[str, object]:
+        """Return the position evidence and source fingerprints as a dictionary.
+
+        Returns
+        -------
+        dict
+            Valuation date, pricing and market fingerprints, the observed
+            quote targets, native marks, signed changes and aggregation inputs.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be represented in its wire shape.
+        """
+
+def girr_quote_delta(
+    portfolio: Portfolio,
+    market: MarketContext,
+    pricing: FinstackConfig,
+    targets: Sequence[GirrQuoteTarget],
+) -> GirrQuoteDelta:
+    """Compute ordinary FRTB GIRR delta from upward one-basis-point quote reprices.
+
+    Parameters
+    ----------
+    portfolio : Portfolio
+        Trading-book positions, signed quantities, valuation date and reporting currency.
+    market : MarketContext
+        Held pricing, FX and accepted executed calibration recipes.
+    pricing : FinstackConfig
+        Pricing configuration shared by the center and each shocked valuation.
+    targets : sequence of GirrQuoteTarget
+        Exact quote coordinates for every Basel vertex of each dependent
+        yield curve. Empty input is valid for an empty book.
+
+    Returns
+    -------
+    GirrQuoteDelta
+        Signed position reprices and aggregation inputs by risk currency,
+        yield curve and exact vertex.
+
+    Raises
+    ------
+    PortfolioError
+        If a required regulatory mapping is missing, unsupported, or ambiguous.
+    ValueError
+        If an executed calibration quote or its on-market replay is invalid.
+    KeyError
+        If a required curve or FX observation is unavailable.
+    RuntimeError
+        If calibration or position valuation fails to compute.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.config import FinstackConfig
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, girr_quote_delta
+    >>> book = Portfolio.builder("book", "GBP", "2025-01-02").build()
+    >>> girr_quote_delta(book, MarketContext(), FinstackConfig(), []).as_of.isoformat()
+    '2025-01-02'
+    """

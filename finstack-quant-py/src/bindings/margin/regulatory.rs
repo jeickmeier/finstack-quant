@@ -92,6 +92,12 @@ impl PyDrcPosition {
     }
 }
 
+impl PyFrtbSensitivities {
+    pub(crate) fn from_inner(inner: FrtbSensitivities) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyFrtbSensitivities {
     /// Create an empty sensitivity container.

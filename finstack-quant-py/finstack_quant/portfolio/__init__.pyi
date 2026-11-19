@@ -42,6 +42,9 @@ from finstack_quant.portfolio._cashflows import (
 )
 from finstack_quant.portfolio._margin import (
     NettingSetMargin as NettingSetMargin,
+    GirrQuoteDelta as GirrQuoteDelta,
+    GirrQuoteTarget as GirrQuoteTarget,
+    girr_quote_delta as girr_quote_delta,
     PortfolioMarginResult as PortfolioMarginResult,
     portfolio_margin as portfolio_margin,
 )
@@ -204,6 +207,9 @@ __all__ = [
     "PortfolioCashflowPositionSummary",
     "PortfolioCashflows",
     "PortfolioError",
+    "GirrQuoteDelta",
+    "GirrQuoteTarget",
+    "girr_quote_delta",
     "PortfolioMarginResult",
     "PortfolioMetrics",
     "PortfolioOptimizationResult",

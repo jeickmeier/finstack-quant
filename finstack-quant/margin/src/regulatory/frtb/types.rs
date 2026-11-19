@@ -257,8 +257,8 @@ pub struct FrtbSensitivities {
 
     /// Ordinary GIRR yield delta by (risk currency, curve identifier, tenor).
     ///
-    /// Units: base-currency P&L per **1 percentage-point** (1pp) parallel
-    /// shift of the yield curve — i.e. `100 × DV01`. This matches the
+    /// Units: base-currency P&L from an upward one-basis-point quote
+    /// reprice at the qualified vertex, multiplied by 100. This matches the
     /// FRTB risk-weight convention (`GIRR_DELTA_RISK_WEIGHTS` are stated
     /// in percent, e.g. `1.7` for 1.7%). See the module-level docs on
     /// sensitivity conventions.

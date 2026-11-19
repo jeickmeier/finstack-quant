@@ -127,6 +127,24 @@
       "type_name": "FiCarinoLinkedResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_delta.schema.json",
+      "bytes": 51219,
+      "kind": "output",
+      "path": "schemas/portfolio/1/girr_quote_delta.schema.json",
+      "summary": "Ordinary GIRR regulatory inputs and their signed position-level quote reprices.",
+      "title": "GirrQuoteDelta",
+      "type_name": "GirrQuoteDelta"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_target.schema.json",
+      "bytes": 24910,
+      "kind": "input",
+      "path": "schemas/portfolio/1/girr_quote_target.schema.json",
+      "summary": "Exact ordinary GIRR quote mapping at one regulatory vertex.",
+      "title": "GirrQuoteTarget",
+      "type_name": "GirrQuoteTarget"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
       "bytes": 8971,
       "kind": "output",

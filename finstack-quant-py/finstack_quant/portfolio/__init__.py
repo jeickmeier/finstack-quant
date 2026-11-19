@@ -162,6 +162,9 @@ PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
 CandidatePosition = _portfolio.CandidatePosition
 TradeUniverse = _portfolio.TradeUniverse
 NettingSetMargin = _portfolio.NettingSetMargin
+GirrQuoteDelta = _portfolio.GirrQuoteDelta
+GirrQuoteTarget = _portfolio.GirrQuoteTarget
+girr_quote_delta = _portfolio.girr_quote_delta
 PortfolioMarginResult = _portfolio.PortfolioMarginResult
 portfolio_margin = _portfolio.portfolio_margin
 schema = _portfolio.schema
@@ -183,6 +186,8 @@ __all__ = [
     "FactorPnlProfile",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
+    "GirrQuoteDelta",
+    "GirrQuoteTarget",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -257,6 +262,7 @@ __all__ = [
     "compute_pnl_profiles",
     "excess_returns",
     "factor_brinson_attribution",
+    "girr_quote_delta",
     "grid_attribution",
     "grid_carino_link",
     "mwr_xirr",

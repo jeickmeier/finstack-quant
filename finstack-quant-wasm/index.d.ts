@@ -11670,6 +11670,31 @@ export interface PortfolioNamespace {
   readonly Position: typeof wasm.Position;
   readonly FactorModel: typeof wasm.FactorModel;
   /**
+   * Reprice ordinary FRTB GIRR yield delta at every exact regulated yield vertex.
+   * @param portfolio - Trading-book positions and their reporting currency, priced on the portfolio's as-of date.
+   * @param market - Common market and held currency observations with executed rate quote calibrations.
+   * @param pricing - Common pricing and rounding configuration for the center and all reprices.
+   * @param targets - Exact quote identifiers and executed pillars for each tenored curve. Every dependent curve must cover the complete ten-vertex grid.
+   * @returns Position reprice evidence, source fingerprints and the ordinary FRTB GIRR aggregation inputs.
+   * @throws FinstackError if bindings, curves, pricing or FX inputs are missing, unsupported or inconsistent.
+   * @throws TypeError if `targets` does not match the schema.
+   *
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
+   * const market = new core.MarketContext();
+   * const config = new core.FinstackConfig();
+   * const result = portfolio.girrQuoteDelta(book, market, config, []);
+   * console.log(result.as_of, result.quote_risk.length);
+   * config.free();
+   * market.free();
+   * book.free();
+   * ```
+   */
+  readonly girrQuoteDelta: typeof wasm.girrQuoteDelta;
+  /**
    * Calculate portfolio margin requirements by netting set (Rust
    * `margin::portfolio_margin`).
    *

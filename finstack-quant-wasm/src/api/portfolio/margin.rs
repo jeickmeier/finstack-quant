@@ -73,3 +73,44 @@ pub fn portfolio_margin(
     .map_err(to_js_err)?;
     to_js_value(&result)
 }
+
+/// Reprice ordinary FRTB GIRR yield delta at every exact regulated yield vertex.
+/// @param portfolio - Trading-book positions and their reporting currency, priced on the portfolio's as-of date.
+/// @param market - Common market and held currency observations with executed rate quote calibrations.
+/// @param pricing - Common pricing and rounding configuration for the center and all reprices.
+/// @param targets - Exact quote identifiers and executed pillars for each tenored curve. Every dependent curve must cover the complete ten-vertex grid.
+/// @returns Position reprice evidence, source fingerprints and the ordinary FRTB GIRR aggregation inputs.
+/// @throws FinstackError if bindings, curves, pricing or FX inputs are missing, unsupported or inconsistent.
+/// @throws TypeError if `targets` does not match the schema.
+///
+/// @example
+/// ```typescript
+/// import init, { core, portfolio } from "finstack-quant-wasm";
+/// await init();
+/// const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
+/// const market = new core.MarketContext();
+/// const config = new core.FinstackConfig();
+/// const result = portfolio.girrQuoteDelta(book, market, config, []);
+/// console.log(result.as_of, result.quote_risk.length);
+/// config.free();
+/// market.free();
+/// book.free();
+/// ```
+#[wasm_bindgen(js_name = girrQuoteDelta, unchecked_return_type = "GirrQuoteDelta")]
+pub fn girr_quote_delta(
+    portfolio: &JsPortfolio,
+    market: &JsMarketContext,
+    pricing: &crate::api::core::config::JsFinstackConfig,
+    #[wasm_bindgen(unchecked_param_type = "GirrQuoteTarget[]")] targets: JsValue,
+) -> Result<JsValue, JsValue> {
+    let targets: Vec<finstack_quant_portfolio::margin::GirrQuoteTarget> =
+        from_js_json(&targets, "targets")?;
+    let result = finstack_quant_portfolio::margin::girr_quote_delta(
+        &portfolio.inner,
+        market.inner(),
+        &pricing.inner,
+        &targets,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&result)
+}

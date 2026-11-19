@@ -1995,6 +1995,20 @@
             "bytes": 15100
           },
           {
+            "path": "schemas/portfolio/1/girr_quote_delta.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_delta.schema.json",
+            "type_name": "GirrQuoteDelta",
+            "kind": "output",
+            "bytes": 51219
+          },
+          {
+            "path": "schemas/portfolio/1/girr_quote_target.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_target.schema.json",
+            "type_name": "GirrQuoteTarget",
+            "kind": "input",
+            "bytes": 24910
+          },
+          {
             "path": "schemas/portfolio/1/grid_carino_linked_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
             "type_name": "GridCarinoLinkedResult",
@@ -4942,6 +4956,22 @@
             "type_name": "FiCarinoLinkedResult",
             "kind": "output",
             "bytes": 15100
+          },
+          {
+            "domain": "portfolio",
+            "path": "schemas/portfolio/1/girr_quote_delta.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_delta.schema.json",
+            "type_name": "GirrQuoteDelta",
+            "kind": "output",
+            "bytes": 51219
+          },
+          {
+            "domain": "portfolio",
+            "path": "schemas/portfolio/1/girr_quote_target.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_target.schema.json",
+            "type_name": "GirrQuoteTarget",
+            "kind": "input",
+            "bytes": 24910
           },
           {
             "domain": "portfolio",

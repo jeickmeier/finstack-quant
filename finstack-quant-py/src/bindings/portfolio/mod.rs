@@ -190,6 +190,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "PortfolioOptimizationSpec",
         "PortfolioOptimizationResult",
         // portfolio margin aggregation
+        "GirrQuoteDelta",
+        "GirrQuoteTarget",
+        "girr_quote_delta",
         "NettingSetMargin",
         "PortfolioMarginResult",
         "portfolio_margin",

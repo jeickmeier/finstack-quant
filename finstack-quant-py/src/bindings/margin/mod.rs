@@ -10,6 +10,7 @@ pub(crate) mod im;
 mod im_curvature;
 mod metrics;
 mod regulatory;
+pub(crate) use regulatory::PyFrtbSensitivities;
 mod schema;
 pub(crate) mod types;
 mod xva;

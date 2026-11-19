@@ -60,9 +60,14 @@
 //! ```
 
 mod aggregator;
+mod girr_quotes;
 mod netting_set;
 mod results;
 mod wire;
 
 pub use aggregator::portfolio_margin;
+pub use girr_quotes::{
+    GirrQuoteDelta, GirrQuoteReprice, GirrQuoteRisk, GirrQuoteSource, GirrQuoteTarget,
+    girr_quote_delta,
+};
 pub use results::{NettingSetMargin, PortfolioMarginResult};
