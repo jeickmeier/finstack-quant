@@ -1709,7 +1709,7 @@ class Performance:
         ...
 
     def multi_factor_greeks(
-        self, ticker_idx: int | str, factor_returns: list[list[float]], risk_free_rate: float
+        self, ticker_idx: int | str, factor_returns: Sequence[Sequence[float]] | pd.DataFrame, risk_free_rate: float
     ) -> MultiFactorResult:
         """
         Fit the active total-investment ticker after response-only cash subtraction.
@@ -1718,8 +1718,11 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index or an exact, case-sensitive loaded ticker name.
-        factor_returns : list[list[float]]
-            Finite factor-major predictors already aligned exactly to this ticker's active interval sample, in caller-declared units; factors are not cash-adjusted.
+        factor_returns : sequence of sequences of float or pandas.DataFrame
+            Supply finite factor-major predictors aligned to this ticker's active interval sample.
+            A DataFrame uses string-labeled factor columns and date-like return end dates as its index.
+            Rows are selected and ordered by the ticker's active dates. Extra dates are ignored.
+            Factors use the caller's units and are used without subtracting cash.
         risk_free_rate : float
             Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
 
@@ -1733,7 +1736,11 @@ class Performance:
         AnalyticsError
             If an integer ticker index is outside the loaded columns.
         KeyError
-            If a string ticker name is not loaded.
+            If a string ticker name is not loaded or the DataFrame omits an active date.
+        ValueError
+            If two DataFrame rows map to the same date or any selected factor value is non-finite.
+        TypeError
+            If the predictors cannot be converted to numeric sequences or DataFrame columns.
         AnalyticsError
             If ticker or factor shapes are invalid, frequency is absent, cash is invalid, or the model lacks enough observations or full factor rank.
         RuntimeError

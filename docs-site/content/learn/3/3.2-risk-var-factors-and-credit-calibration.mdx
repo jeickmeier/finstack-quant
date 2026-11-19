@@ -74,19 +74,30 @@ The first block constructs one complete, aligned panel, computes historical VaR/
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="aligned-risk-panel" role="build" */}
 ```python exec id=aligned-risk-panel role=build
+from datetime import date
+
 import math
 import numpy as np
 from _shared.analyst_history import risk_panel
 from finstack_quant.analytics import Performance
 from finstack_quant.core.dates import FiscalConfig
 panel = risk_panel()
-performance = Performance.from_returns(panel[["portfolio", "benchmark"]], frequency="daily", benchmark_ticker="benchmark")
+assert panel.index.is_unique and not panel.isna().any().any()
+performance = Performance.from_returns(panel[["portfolio", "benchmark"]], frequency="daily", benchmark_ticker="benchmark", initial_date=date(2023, 2, 7))
 confidence = 0.95
-measures = {"historical_var":float(performance.value_at_risk(confidence).iloc[0]), "normal_var":float(performance.parametric_var(confidence).iloc[0]), "cornish_fisher_var":float(performance.cornish_fisher_var(confidence).iloc[0]), "historical_es":float(performance.expected_shortfall(confidence).iloc[0])}
-factors = panel[["market", "rates", "credit"]].to_numpy().T.tolist()
-fit = performance.multi_factor_greeks(0, factors)
+measures = {"historical_var":float(performance.value_at_risk(confidence).iloc[0]), "normal_var":float(performance.parametric_var(confidence).iloc[0]), "historical_es":float(performance.expected_shortfall(confidence).iloc[0])}
+from finstack_quant.analytics import AnalyticsError
+try:
+    measures["cornish_fisher_var"] = float(performance.cornish_fisher_var(confidence).iloc[0])
+except AnalyticsError as error:
+    print("Cornish–Fisher estimate rejected:", error)
+assert all(math.isfinite(value) for value in measures.values())
+assert abs(measures["historical_es"]) >= abs(measures["historical_var"])
+factors = panel[["market", "rates", "credit"]]
+fit = performance.multi_factor_greeks(0, factors, risk_free_rate=0.0)
 design = np.column_stack([np.ones(len(panel)), panel[["market", "rates", "credit"]]])
 ols = np.linalg.lstsq(design, panel["portfolio"].to_numpy(), rcond=None)[0]
+assert np.allclose(fit.betas, ols[1:], atol=1e-10), "Dimensionless OLS loadings, independent NumPy reference"
 print("Daily return-risk measures:",measures)
 print("Factor loadings [market,rates,credit]:",fit.betas,"R-squared:",fit.r_squared)
 print("Incorrect 95% one-day VaR times sqrt(10) (not 99%):",measures["normal_var"]*math.sqrt(10))
