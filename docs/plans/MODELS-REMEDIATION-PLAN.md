@@ -181,6 +181,17 @@ grep counts. In the `#### 0d` block the "Record remedy" is the Slice 0 work (MOD
 d5-7); the Heston domain analysis is kept there for Slice 3 #13b and Slice 5, which own it.
 `CREDIT-NN` is short for MODELS-AND-VALUATIONS-CREDIT-NN throughout.
 
+**Progress.** Step 0b (all of CORE-NUMERICS-04 in scope) landed on 2026-11-18 on branch
+`feat/models-slice-0-quadrature`: 0b-a in `6d39a15acd`, 0b-b and 0b-c in `8bb23585cd`, each
+through `mise run slice-gate`. Only 0b-a moved numbers: base-correlation calibration results
+changed in the last digits and the UI fixtures were regenerated; no Rust golden changed. Choices
+made where the record is silent: evaluation limits are named constants beside each caller
+(100,000 for correlated recovery per CREDIT-10 d5, 1,000,000 for the barrier rebate and CDS
+option payoff, and limits that cannot bind before the depth limit for tranches, Hull-White and
+CMS); the classical weighted sum is kept for ordinary samples, with the overflow-safe form only
+above `f64::MAX / 8`; work-limit, geometric and non-finite failures reuse
+`SolverConvergenceFailed` with actual counts. Steps 0a, 0c and 0d are not started.
+
 Landing order inside this slice, each step compiling and passing on its own:
 
 | Step | Content | Size | Moves numbers? | Unblocks |
