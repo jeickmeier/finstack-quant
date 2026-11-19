@@ -26,6 +26,12 @@ pub struct PyModelBuilder {
     inner: Option<ModelBuilder>,
 }
 
+impl PyModelBuilder {
+    pub(crate) fn from_inner(inner: ModelBuilder) -> Self {
+        Self { inner: Some(inner) }
+    }
+}
+
 #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder")]
 #[pyclass(name = "MixedNodeBuilder", module = "finstack_quant.statements")]
 pub struct PyMixedNodeBuilder {
@@ -397,6 +403,23 @@ impl PyModelBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let currency = extract_currency(currency)?;
         slf.builder_mut()?.currency(currency);
+        Ok(slf)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.as_money")]
+    #[pyo3(signature = (node_id, source, currency=None))]
+    fn as_money<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        node_id: &str,
+        source: &str,
+        currency: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let currency = currency
+            .map(crate::bindings::core::currency::extract_currency)
+            .transpose()?;
+        slf.builder_mut()?
+            .as_money(node_id, source, currency)
+            .map_err(statements_to_py)?;
         Ok(slf)
     }
 

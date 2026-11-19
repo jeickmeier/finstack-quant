@@ -16863,107 +16863,118 @@ export default [
   {
     "path": "#/$defs/ExprNode/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3",
-    "description": "Call a registered function with positional arguments."
+    "description": "Exact money literal for typed statement expressions."
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/3/properties/call",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/call"
-  },
-  {
-    "path": "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/0",
-    "ref": "#/$defs/Function",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function"
-  },
-  {
-    "path": "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1"
-  },
-  {
-    "path": "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1/items",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1/items",
-    "ref": "#/$defs/Expr",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
+    "path": "#/$defs/ExprNode/oneOf/3/properties/money_literal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/money_literal",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/ExprNode/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4",
-    "description": "Binary operation (arithmetic, comparison, logical)."
+    "description": "Call a registered function with positional arguments."
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/4/properties/bin_op",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/bin_op"
+    "path": "#/$defs/ExprNode/oneOf/4/properties/call",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/call"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/left",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/left",
-    "description": "Left operand",
-    "ref": "#/$defs/Expr",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
+    "path": "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/0",
+    "ref": "#/$defs/Function",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/op",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/op",
-    "description": "Operator",
-    "ref": "#/$defs/BinOp",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BinOp"
+    "path": "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/right",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/right",
-    "description": "Right operand",
+    "path": "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1/items",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
   },
   {
     "path": "#/$defs/ExprNode/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5",
-    "description": "Unary operation."
+    "description": "Binary operation (arithmetic, comparison, logical)."
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/5/properties/unary_op",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/unary_op"
+    "path": "#/$defs/ExprNode/oneOf/5/properties/bin_op",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/bin_op"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/op",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/op",
+    "path": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/left",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/left",
+    "description": "Left operand",
+    "ref": "#/$defs/Expr",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/op",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/op",
     "description": "Operator",
-    "ref": "#/$defs/UnaryOp",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/UnaryOp"
+    "ref": "#/$defs/BinOp",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BinOp"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/operand",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/operand",
-    "description": "Operand",
+    "path": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/right",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/right",
+    "description": "Right operand",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
   },
   {
     "path": "#/$defs/ExprNode/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6",
+    "description": "Unary operation."
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/6/properties/unary_op",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/unary_op"
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/op",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/op",
+    "description": "Operator",
+    "ref": "#/$defs/UnaryOp",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/UnaryOp"
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/operand",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/operand",
+    "description": "Operand",
+    "ref": "#/$defs/Expr",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7",
     "description": "If-then-else conditional."
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/6/properties/if_then_else",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/if_then_else"
+    "path": "#/$defs/ExprNode/oneOf/7/properties/if_then_else",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7/properties/if_then_else"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/condition",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/condition",
+    "path": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/condition",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/condition",
     "description": "Condition expression",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/else_expr",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/else_expr",
+    "path": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/else_expr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/else_expr",
     "description": "Else branch",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/then_expr",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/then_expr",
+    "path": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/then_expr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/then_expr",
     "description": "Then branch",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"

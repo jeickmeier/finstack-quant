@@ -4020,6 +4020,10 @@
       "financialModelContentHash",
       "financialModelGetNode",
       "financialModelHasNode",
+      "financialModelSpecToBuilder",
+      "financialModelSpecWithCurrency",
+      "financialModelSpecWithMeta",
+      "financialModelSpecWithReportingCurrency",
       "mergeIntoResults",
       "modelNodeIds",
       "monteCarloBreachProbability",
@@ -4081,6 +4085,7 @@
     "methods": [
       "addDebt",
       "addMetricFromRegistry",
+      "asMoney",
       "availabilityDates",
       "build",
       "compute",
@@ -4215,6 +4220,18 @@
     "kind": "function"
   },
   "statements.capitalStructureCashflowsGetMoney": {
+    "kind": "function"
+  },
+  "statements.financialModelSpecToBuilder": {
+    "kind": "function"
+  },
+  "statements.financialModelSpecWithMeta": {
+    "kind": "function"
+  },
+  "statements.financialModelSpecWithCurrency": {
+    "kind": "function"
+  },
+  "statements.financialModelSpecWithReportingCurrency": {
     "kind": "function"
   },
   "statements.normalizationConfigAddAdjustment": {

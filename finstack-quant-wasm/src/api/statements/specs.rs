@@ -4,12 +4,80 @@
 //! `ForecastSpec`, `Adjustment`, `NormalizationConfig`, `CheckConfig` and `CheckSuiteSpec`
 //! is a function that returns (or takes) the plain object.
 
-use crate::utils::input::from_js_json;
+use super::JsModelBuilder;
+use crate::utils::input::{from_js_json, js_currency, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::adjustments::{Adjustment, NormalizationConfig};
 use finstack_quant_statements::checks::{BuiltinCheckSpec, CheckConfig};
 use finstack_quant_statements::evaluator::StatementResult;
 use wasm_bindgen::prelude::*;
+
+/// Resume work on a model with an independent builder.
+/// @param model - Model whose periods, nodes, and settings seed the builder.
+/// @returns Builder holding the existing specification.
+/// @throws `FinstackError` when the model cannot seed a builder.
+#[wasm_bindgen(js_name = financialModelSpecToBuilder)]
+pub fn financial_model_spec_to_builder(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec")]
+    model: JsValue,
+) -> Result<JsModelBuilder, JsValue> {
+    let model = super::load_model(&model, "model")?;
+    model
+        .to_builder()
+        .map(JsModelBuilder::from_inner)
+        .map_err(to_js_err)
+}
+
+/// Insert or replace one literal metadata value on a model copy.
+/// @param model - Source model whose nodes and settings are preserved.
+/// @param key - Exact metadata key.
+/// @param value - JSON-compatible value. Strings are stored verbatim.
+/// @returns Independent model with changed metadata.
+/// @throws `TypeError` for invalid inputs or `FinstackError` for invalid model or metadata values.
+#[wasm_bindgen(js_name = financialModelSpecWithMeta, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+pub fn financial_model_spec_with_meta(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "unknown")] value: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model = super::load_model(&model, "model")?;
+    let key = js_string(&key, "key")?;
+    let value = super::builder::meta_value(&value)?;
+    to_js_value(&model.with_meta(key, value))
+}
+
+/// Copy a model with updated monetary-unit metadata.
+/// @param model - Source model. Existing node currencies are retained.
+/// @param currency - ISO currency recorded on the model.
+/// @returns Independent model with the new currency metadata.
+/// @throws `TypeError` for malformed inputs or `FinstackError` for invalid model or currency.
+#[wasm_bindgen(js_name = financialModelSpecWithCurrency, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+pub fn financial_model_spec_with_currency(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model = super::load_model(&model, "model")?;
+    let currency = js_currency(&currency, "currency")?;
+    to_js_value(&model.with_currency(currency))
+}
+
+/// Copy a model with a different capital-structure reporting currency.
+/// @param model - Source model with a capital structure.
+/// @param currency - ISO currency for capital-structure reports.
+/// @returns Independent specification with the updated reporting currency.
+/// @throws `TypeError` for malformed inputs or `FinstackError` for invalid models, currencies, or a missing capital structure.
+#[wasm_bindgen(js_name = financialModelSpecWithReportingCurrency, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+pub fn financial_model_spec_with_reporting_currency(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model = super::load_model(&model, "model")?;
+    let currency = js_currency(&currency, "currency")?;
+    to_js_value(&model.with_reporting_currency(currency).map_err(to_js_err)?)
+}
 
 /// Copy of a normalization configuration with one more adjustment.
 ///

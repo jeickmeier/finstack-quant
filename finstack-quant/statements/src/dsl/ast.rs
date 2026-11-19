@@ -18,6 +18,14 @@ pub enum StmtExpr {
     /// Literal value (integer or float)
     Literal(f64),
 
+    /// Explicit monetary denomination of a unitless scalar.
+    AsMoney {
+        /// Scalar-valued expression in units of the selected currency.
+        value: Box<StmtExpr>,
+        /// Currency that denominates the scalar, with no FX conversion.
+        currency: finstack_quant_core::currency::Currency,
+    },
+
     /// Node reference (e.g., "revenue", "cogs")
     NodeRef(NodeId),
 
@@ -86,6 +94,7 @@ fn precedence(expr: &StmtExpr) -> u8 {
         StmtExpr::Literal(_)
         | StmtExpr::NodeRef(_)
         | StmtExpr::Call { .. }
+        | StmtExpr::AsMoney { .. }
         | StmtExpr::IfThenElse { .. }
         | StmtExpr::CsRef { .. } => 7,
     }
@@ -133,6 +142,7 @@ impl std::fmt::Display for StmtExpr {
         match self {
             Self::Literal(value) => write!(f, "{value}"),
             Self::NodeRef(id) => f.write_str(id.as_str()),
+            Self::AsMoney { value, currency } => write!(f, "as_money({value}, {currency})"),
             Self::BinOp { op, left, right } => {
                 let level = precedence(self);
                 // Comparisons do not chain: `(a > b) > c` keeps its
@@ -199,6 +209,10 @@ impl StmtExpr {
         match self {
             Self::Literal(_) | Self::CsRef { .. } => self.clone(),
             Self::NodeRef(name) => Self::NodeRef(NodeId::new(rename(name.as_str()))),
+            Self::AsMoney { value, currency } => Self::AsMoney {
+                value: Box::new(value.map_node_refs(rename)),
+                currency: *currency,
+            },
             Self::BinOp { op, left, right } => Self::BinOp {
                 op: *op,
                 left: Box::new(left.map_node_refs(rename)),

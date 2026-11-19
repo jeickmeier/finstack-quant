@@ -16236,6 +16236,19 @@
         },
         {
           "additionalProperties": false,
+          "description": "Exact money literal for typed statement expressions.",
+          "properties": {
+            "money_literal": {
+              "$ref": "#/$defs/d_4ba43030fede59fe5993"
+            }
+          },
+          "required": [
+            "money_literal"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Call a registered function with positional arguments.",
           "properties": {
             "call": {

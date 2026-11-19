@@ -344,3 +344,35 @@ test('model restoration rejects a second Jan 1 in place of Jan 2', () => {
   model.periods.periods[1] = model.periods.periods[0];
   assert.throws(() => statements.validateFinancialModelJson(JSON.stringify(model)), /unique/);
 });
+
+test('financial model derivations preserve literal metadata and the source model', () => {
+  const builder = new statements.ModelBuilder('model-copy');
+  builder.periods('2025Q1..Q1');
+  builder.value('revenue', { '2025Q1': 100 });
+  const original = builder.build();
+  const derived = statements.financialModelSpecWithCurrency(
+    statements.financialModelSpecWithMeta(original, 'literal', '{"revision":1}'),
+    'USD'
+  );
+  assert.equal(derived.meta.literal, '{"revision":1}');
+  assert.equal(derived.meta.currency, 'USD');
+  assert.equal(original.meta, undefined);
+  const resumed = statements.financialModelSpecToBuilder(derived);
+  resumed.asMoney('margin', 'revenue * 0.5');
+  const extended = resumed.build();
+  assert.equal(statements.financialModelHasNode(extended, 'margin'), true);
+  const evaluator = new statements.Evaluator();
+  try {
+    const result = evaluator.evaluate(extended);
+    const margin = statements.statementResultGetMoney(result, 'margin', '2025Q1');
+    assert.equal(Number(margin.amount), 50);
+    assert.equal(margin.currency, 'USD');
+  } finally {
+    evaluator.free();
+  }
+  assert.equal(statements.financialModelHasNode(derived, 'margin'), false);
+  assert.throws(
+    () => statements.financialModelSpecWithReportingCurrency(derived, 'EUR'),
+    /needs a capital structure/
+  );
+});

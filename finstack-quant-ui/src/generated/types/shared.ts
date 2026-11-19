@@ -14572,6 +14572,9 @@ export type ExprNode =
       literal: number;
     }
   | {
+      money_literal: Money6;
+    }
+  | {
       /**
        * @minItems 2
        * @maxItems 2
@@ -56519,6 +56522,9 @@ export interface Expr {
         literal: number;
       }
     | {
+        money_literal: Money6;
+      }
+    | {
         /**
          * @minItems 2
          * @maxItems 2
@@ -56577,6 +56583,9 @@ export interface Expr1 {
       }
     | {
         literal: number;
+      }
+    | {
+        money_literal: Money6;
       }
     | {
         /**
@@ -56639,6 +56648,9 @@ export interface Expr2 {
         literal: number;
       }
     | {
+        money_literal: Money6;
+      }
+    | {
         /**
          * @minItems 2
          * @maxItems 2
@@ -56697,6 +56709,9 @@ export interface Expr3 {
       }
     | {
         literal: number;
+      }
+    | {
+        money_literal: Money6;
       }
     | {
         /**
@@ -56759,6 +56774,9 @@ export interface Expr4 {
         literal: number;
       }
     | {
+        money_literal: Money6;
+      }
+    | {
         /**
          * @minItems 2
          * @maxItems 2
@@ -56819,6 +56837,9 @@ export interface Expr5 {
         literal: number;
       }
     | {
+        money_literal: Money6;
+      }
+    | {
         /**
          * @minItems 2
          * @maxItems 2
@@ -56877,6 +56898,9 @@ export interface Expr6 {
       }
     | {
         literal: number;
+      }
+    | {
+        money_literal: Money6;
       }
     | {
         /**

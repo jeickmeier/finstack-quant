@@ -3909,6 +3909,9 @@ export type ExprNode =
       literal: number;
     }
   | {
+      money_literal: Money;
+    }
+  | {
       /**
        * @minItems 2
        * @maxItems 2

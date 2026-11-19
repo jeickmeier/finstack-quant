@@ -58,6 +58,9 @@ pub(crate) fn validate_ast(root: &StmtExpr) -> Result<()> {
             // A capital reference is typed: its component and scope were
             // checked when it was built.
             StmtExpr::CsRef { .. } => {}
+            StmtExpr::AsMoney { value, .. } => {
+                pending.push((value, depth + 1));
+            }
             StmtExpr::Call { func, args } => {
                 validate_call(func, args)?;
                 pending.extend(args.iter().map(|arg| (arg, depth + 1)));

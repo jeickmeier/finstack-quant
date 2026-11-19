@@ -10193,6 +10193,38 @@ export interface StatementsNamespace {
    */
   readonly capitalStructureCashflowsGetMoney: typeof wasm.capitalStructureCashflowsGetMoney;
   /**
+   * Resume work on a model with an independent builder.
+   * @param model - Model whose periods, nodes, and settings seed the builder.
+   * @returns Builder holding the existing specification.
+   * @throws `FinstackError` when the model cannot seed a builder.
+   */
+  readonly financialModelSpecToBuilder: typeof wasm.financialModelSpecToBuilder;
+  /**
+   * Insert or replace one literal metadata value on a model copy.
+   * @param model - Source model whose nodes and settings are preserved.
+   * @param key - Exact metadata key.
+   * @param value - JSON-compatible value. Strings are stored verbatim.
+   * @returns Independent model with changed metadata.
+   * @throws `TypeError` for invalid inputs or `FinstackError` for invalid model or metadata values.
+   */
+  readonly financialModelSpecWithMeta: typeof wasm.financialModelSpecWithMeta;
+  /**
+   * Copy a model with updated monetary-unit metadata.
+   * @param model - Source model. Existing node currencies are retained.
+   * @param currency - ISO currency recorded on the model.
+   * @returns Independent model with the new currency metadata.
+   * @throws `TypeError` for malformed inputs or `FinstackError` for invalid model or currency.
+   */
+  readonly financialModelSpecWithCurrency: typeof wasm.financialModelSpecWithCurrency;
+  /**
+   * Copy a model with a different capital-structure reporting currency.
+   * @param model - Source model with a capital structure.
+   * @param currency - ISO currency for capital-structure reports.
+   * @returns Independent specification with the updated reporting currency.
+   * @throws `TypeError` for malformed inputs or `FinstackError` for invalid models, currencies, or a missing capital structure.
+   */
+  readonly financialModelSpecWithReportingCurrency: typeof wasm.financialModelSpecWithReportingCurrency;
+  /**
    * Copy of a normalization configuration with one more adjustment.
    *
    * Free-function twin of Python `NormalizationConfig.add_adjustment` (Rust

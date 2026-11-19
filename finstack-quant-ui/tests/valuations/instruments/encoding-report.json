@@ -6950,7 +6950,7 @@
           "#/$defs/ShiftingInterestSpec/properties/schedule",
           "#/$defs/AssetBackedFacility/properties/draws",
           "#/$defs/CompositeSpec/properties/legs",
-          "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1",
+          "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1",
           "#/$defs/CompositeState/properties/resolved_legs"
         ],
         "optional-property-record": [
@@ -6998,31 +6998,31 @@
             "ref": "#/$defs/InstrumentJson"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1/items",
+            "pointer": "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1/items",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/left",
+            "pointer": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/left",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/right",
+            "pointer": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/right",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/operand",
+            "pointer": "#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/operand",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/condition",
+            "pointer": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/condition",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/else_expr",
+            "pointer": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/else_expr",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/then_expr",
+            "pointer": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/then_expr",
             "ref": "#/$defs/Expr"
           }
         ],
@@ -7060,7 +7060,7 @@
           "#/$defs/EquityBridge/properties/other_adjustments/items",
           "#/$defs/DiscountedCashFlow/properties/flows/items",
           "#/$defs/ReserveTarget/oneOf/3/properties/max",
-          "#/$defs/ExprNode/oneOf/3/properties/call"
+          "#/$defs/ExprNode/oneOf/4/properties/call"
         ],
         "uint": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
@@ -18846,7 +18846,7 @@
           "#/$defs/WaterfallTier/properties/tests",
           "#/$defs/ShiftingInterestSpec/properties/schedule",
           "#/$defs/AssetBackedFacility/properties/draws",
-          "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1",
+          "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1",
           "#/$defs/CompositeState/properties/resolved_legs"
         ],
         "optional-property-record": [
@@ -18894,31 +18894,31 @@
             "ref": "#/$defs/CompositeInstrument"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1/items",
+            "pointer": "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1/items",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/left",
+            "pointer": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/left",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/right",
+            "pointer": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/right",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/operand",
+            "pointer": "#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/operand",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/condition",
+            "pointer": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/condition",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/else_expr",
+            "pointer": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/else_expr",
             "ref": "#/$defs/Expr"
           },
           {
-            "pointer": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/then_expr",
+            "pointer": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/then_expr",
             "ref": "#/$defs/Expr"
           }
         ],
@@ -18956,7 +18956,7 @@
           "#/$defs/EquityBridge/properties/other_adjustments/items",
           "#/$defs/DiscountedCashFlow/properties/flows/items",
           "#/$defs/ReserveTarget/oneOf/3/properties/max",
-          "#/$defs/ExprNode/oneOf/3/properties/call"
+          "#/$defs/ExprNode/oneOf/4/properties/call"
         ],
         "uint": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",

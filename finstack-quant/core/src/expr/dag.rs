@@ -144,6 +144,11 @@ pub(crate) fn build_borrowed_plan(expr: &Expr) -> crate::Result<ExecutionPlan> {
                         Operation::IfThenElse,
                         smallvec![condition.as_ref(), then_expr.as_ref(), else_expr.as_ref()],
                     ),
+                    ExprNode::MoneyLiteral(_) => {
+                        return Err(crate::Error::Validation(
+                            "money literals require the typed statements evaluator".into(),
+                        ));
+                    }
                     ExprNode::CsRef { .. } => {
                         return Err(crate::Error::Validation(
                             "capital-structure references require the statements evaluator".into(),
@@ -223,7 +228,10 @@ fn discard_tree(expr: Expr) {
                 pending.push(*then_expr);
                 pending.push(*else_expr);
             }
-            ExprNode::Column(_) | ExprNode::Literal(_) | ExprNode::CsRef { .. } => {}
+            ExprNode::Column(_)
+            | ExprNode::Literal(_)
+            | ExprNode::MoneyLiteral(_)
+            | ExprNode::CsRef { .. } => {}
         }
     }
 }

@@ -424,6 +424,31 @@ class ModelBuilder:
         """
         ...
 
+    def as_money(self, node_id: str, source: str, currency: Currency | str | None = None) -> ModelBuilder:
+        """Denominate a scalar expression as money in the stated currency.
+
+        Parameters
+        ----------
+        node_id : str
+            Unique identifier of the new calculated node.
+        source : str
+            Scalar formula or source node in units of the selected currency.
+        currency : Currency or str or None
+            Explicit ISO denomination, or None to use the stored model currency.
+
+        Returns
+        -------
+        ModelBuilder
+            The current builder with the new monetary expression.
+
+        Raises
+        ------
+        ValueError
+            If IDs or syntax are invalid, or no valid currency is available.
+            Build rejects a source that already has money or Boolean units.
+        """
+        ...
+
     def with_meta(self, key: str, value: Any) -> ModelBuilder:
         """
         Add model-level metadata from a Python value.

@@ -994,6 +994,37 @@ impl ModelBuilder {
         self.with_meta("currency", serde_json::Value::String(currency.to_string()))
     }
 
+    /// Denominate a scalar formula result as an amount of currency.
+    ///
+    /// # Arguments
+    /// * `node_id` - Unique model identifier for the new monetary node.
+    /// * `source` - Scalar DSL expression or source node in units of the selected currency.
+    /// * `currency` - Explicit denomination, or the currency stored in model metadata.
+    ///
+    /// # Errors
+    /// Rejects invalid formula syntax, or absent or invalid model currency when
+    /// an explicit denomination is omitted. Model validation rejects a source
+    /// with monetary or Boolean units.
+    pub fn as_money(
+        &mut self,
+        node_id: impl Into<NodeId>,
+        source: &str,
+        currency: Option<finstack_quant_core::currency::Currency>,
+    ) -> Result<&mut Self> {
+        let currency = match currency {
+            Some(currency) => currency,
+            None => self
+                .meta
+                .get("currency")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|code| code.parse().ok())
+                .ok_or_else(|| {
+                    Error::build("as_money needs an explicit currency or a valid model currency")
+                })?,
+        };
+        self.compute(node_id, format!("as_money(({source}), {currency})"))
+    }
+
     /// Attach a where clause to a named node.
     ///
     /// The where clause is a scalar predicate evaluated before the node's
