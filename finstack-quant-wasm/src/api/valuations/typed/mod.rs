@@ -33,9 +33,16 @@ pub mod data;
 pub mod equity;
 pub mod fixed_income;
 pub mod fx;
+pub mod fx_barrier_option;
+pub mod fx_digital_option;
+pub mod fx_swap;
+pub mod fx_touch_option;
 pub mod inflation_bond;
 pub mod listed;
+pub mod ndf;
+pub mod quanto_option;
 pub mod rates;
+pub mod repo;
 pub mod structured;
 
 use crate::api::core::currency::JsCurrency;
@@ -158,12 +165,28 @@ pub(super) mod arg {
         js_string(value, label).map(T::from)
     }
 
+    /// An optional identifier that preserves every supplied string literally.
+    pub(crate) fn optional_id<T: From<String>>(
+        value: &JsValue,
+        label: &str,
+    ) -> Result<Option<T>, JsValue> {
+        if value.is_null() || value.is_undefined() {
+            return Ok(None);
+        }
+        id(value, label).map(Some)
+    }
+
     /// An array of ISO-8601 date strings.
     pub(crate) fn dates(value: &JsValue, label: &str) -> Result<Vec<Date>, JsValue> {
         crate::utils::input::js_string_seq(value, label)?
             .iter()
             .map(|text| parse_iso_date(text))
             .collect()
+    }
+
+    /// Contractual exact decimal, encoded as a string.
+    pub(crate) fn exact_decimal(value: &JsValue, label: &str) -> Result<Decimal, JsValue> {
+        crate::utils::wire::js_decimal(value, label).map(|value| value.0)
     }
 
     /// A JavaScript number stored as an exact `Decimal`.

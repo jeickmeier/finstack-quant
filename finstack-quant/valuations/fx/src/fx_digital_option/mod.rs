@@ -60,4 +60,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::{DigitalPayoutType, FxDigitalOption};
+pub use types::{DigitalPayoutType, FxDigitalOption, FxDigitalOptionBuilder};

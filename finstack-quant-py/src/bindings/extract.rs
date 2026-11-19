@@ -35,12 +35,19 @@ use crate::bindings::valuations::typed_equity_future::PyEquityFuture;
 use crate::bindings::valuations::typed_equity_future_option::PyEquityFutureOption;
 use crate::bindings::valuations::typed_fra::PyForwardRateAgreement;
 use crate::bindings::valuations::typed_fx::{PyFxForward, PyFxOption};
+use crate::bindings::valuations::typed_fx_barrier_option::PyFxBarrierOption;
+use crate::bindings::valuations::typed_fx_digital_option::PyFxDigitalOption;
 use crate::bindings::valuations::typed_fx_future::PyFxFuture;
 use crate::bindings::valuations::typed_fx_future_option::PyFxFutureOption;
+use crate::bindings::valuations::typed_fx_swap::PyFxSwap;
+use crate::bindings::valuations::typed_fx_touch_option::PyFxTouchOption;
 use crate::bindings::valuations::typed_inflation_bond::PyInflationLinkedBond;
 use crate::bindings::valuations::typed_interest_rate_future::PyInterestRateFuture;
 use crate::bindings::valuations::typed_interest_rate_future_option::PyInterestRateFutureOption;
+use crate::bindings::valuations::typed_ndf::PyNdf;
+use crate::bindings::valuations::typed_quanto_option::PyQuantoOption;
 use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, PySwaption};
+use crate::bindings::valuations::typed_repo::PyRepo;
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::bindings::valuations::typed_structured_credit::{
     PyStructuredCredit, PyStructuredCreditTranche,
@@ -165,6 +172,13 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyCdsTranche,
         PyConvertibleBond,
         PyEquityOption,
+        PyRepo,
+        PyFxSwap,
+        PyNdf,
+        PyQuantoOption,
+        PyFxDigitalOption,
+        PyFxTouchOption,
+        PyFxBarrierOption,
         PyStructuredCredit,
         PyStructuredCreditTranche,
     );

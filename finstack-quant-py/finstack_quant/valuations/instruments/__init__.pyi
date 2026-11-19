@@ -153,6 +153,34 @@ from finstack_quant.valuations.instruments._typed_fx import (
     FxOption as FxOption,
     FxOptionBuilder as FxOptionBuilder,
 )
+from finstack_quant.valuations.instruments._typed_repo import (
+    Repo as Repo,
+    RepoBuilder as RepoBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_swap import (
+    FxSwap as FxSwap,
+    FxSwapBuilder as FxSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_ndf import (
+    Ndf as Ndf,
+    NdfBuilder as NdfBuilder,
+)
+from finstack_quant.valuations.instruments._typed_quanto_option import (
+    QuantoOption as QuantoOption,
+    QuantoOptionBuilder as QuantoOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_digital_option import (
+    FxDigitalOption as FxDigitalOption,
+    FxDigitalOptionBuilder as FxDigitalOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_touch_option import (
+    FxTouchOption as FxTouchOption,
+    FxTouchOptionBuilder as FxTouchOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_barrier_option import (
+    FxBarrierOption as FxBarrierOption,
+    FxBarrierOptionBuilder as FxBarrierOptionBuilder,
+)
 from finstack_quant.valuations.instruments._typed_equity import (
     EquityOption as EquityOption,
     EquityOptionBuilder as EquityOptionBuilder,
@@ -341,6 +369,20 @@ __all__ = [
     "CreditDefaultSwapBuilder",
     "EquityMetrics",
     "EquityOption",
+    "Repo",
+    "RepoBuilder",
+    "FxSwap",
+    "FxSwapBuilder",
+    "Ndf",
+    "NdfBuilder",
+    "QuantoOption",
+    "QuantoOptionBuilder",
+    "FxDigitalOption",
+    "FxDigitalOptionBuilder",
+    "FxTouchOption",
+    "FxTouchOptionBuilder",
+    "FxBarrierOption",
+    "FxBarrierOptionBuilder",
     "EquityOptionBuilder",
     "FixedLegSpec",
     "FloatLegSpec",

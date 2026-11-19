@@ -37,4 +37,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::FxBarrierOption;
+pub use types::{FxBarrierOption, FxBarrierOptionBuilder};

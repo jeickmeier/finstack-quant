@@ -8976,6 +8976,14 @@ export interface ValuationsInstrumentsNamespace {
   readonly CdsOption: typeof wasm.CdsOption;
   readonly ConvertibleBond: typeof wasm.ConvertibleBond;
   readonly EquityOption: typeof wasm.EquityOption;
+  readonly Repo: typeof wasm.Repo;
+  readonly RepoBuilder: typeof wasm.RepoBuilder;
+  readonly FxSwapBuilder: typeof wasm.FxSwapBuilder;
+  readonly NdfBuilder: typeof wasm.NdfBuilder;
+  readonly QuantoOptionBuilder: typeof wasm.QuantoOptionBuilder;
+  readonly FxDigitalOptionBuilder: typeof wasm.FxDigitalOptionBuilder;
+  readonly FxTouchOptionBuilder: typeof wasm.FxTouchOptionBuilder;
+  readonly FxBarrierOptionBuilder: typeof wasm.FxBarrierOptionBuilder;
   readonly StructuredCredit: typeof wasm.StructuredCredit;
   readonly StructuredCreditTranche: typeof wasm.StructuredCreditTranche;
   readonly FxSpot: typeof wasm.FxSpot;

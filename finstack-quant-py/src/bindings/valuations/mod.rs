@@ -32,11 +32,18 @@ pub(crate) mod typed_deposit;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_fra;
 pub(crate) mod typed_fx;
+pub(crate) mod typed_fx_barrier_option;
+pub(crate) mod typed_fx_digital_option;
+pub(crate) mod typed_fx_swap;
+pub(crate) mod typed_fx_touch_option;
 pub(crate) mod typed_inflation_bond;
 mod typed_legs;
 pub(crate) mod typed_listed;
 pub(crate) mod typed_macros;
+pub(crate) mod typed_ndf;
+pub(crate) mod typed_quanto_option;
 pub(crate) mod typed_rates;
+pub(crate) mod typed_repo;
 pub(crate) mod typed_revolving_credit;
 pub(crate) mod typed_structured_credit;
 mod var;
@@ -430,6 +437,13 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_convertible::register(py, &m)?;
     convertible_spot_ladder::register(&m)?;
     typed_equity::register(py, &m)?;
+    typed_repo::register(&m)?;
+    typed_fx_swap::register(&m)?;
+    typed_ndf::register(&m)?;
+    typed_quanto_option::register(&m)?;
+    typed_fx_digital_option::register(&m)?;
+    typed_fx_touch_option::register(&m)?;
+    typed_fx_barrier_option::register(&m)?;
     typed_fx::register(py, &m)?;
     typed_structured_credit::register(py, &m)?;
     typed_revolving_credit::register(py, &m)?;
@@ -483,6 +497,22 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_convertible::EXPORTS);
     exports.extend_from_slice(convertible_spot_ladder::EXPORTS);
     exports.extend_from_slice(typed_equity::EXPORTS);
+    exports.extend_from_slice(&[
+        "Repo",
+        "RepoBuilder",
+        "FxSwap",
+        "FxSwapBuilder",
+        "Ndf",
+        "NdfBuilder",
+        "QuantoOption",
+        "QuantoOptionBuilder",
+        "FxDigitalOption",
+        "FxDigitalOptionBuilder",
+        "FxTouchOption",
+        "FxTouchOptionBuilder",
+        "FxBarrierOption",
+        "FxBarrierOptionBuilder",
+    ]);
     exports.extend_from_slice(typed_fx::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::EXPORTS);
     exports.extend_from_slice(typed_revolving_credit::EXPORTS);

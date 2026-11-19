@@ -50,4 +50,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::{FxTouchOption, TouchType};
+pub use types::{FxTouchOption, FxTouchOptionBuilder, TouchType};

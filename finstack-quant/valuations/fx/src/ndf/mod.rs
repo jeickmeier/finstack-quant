@@ -94,7 +94,7 @@
 
 mod types;
 
-pub use types::{Ndf, NdfFixingSource, NdfTradeDateParams};
+pub use types::{Ndf, NdfBuilder, NdfFixingSource, NdfTradeDateParams};
 
 /// Metrics submodule for NDF risk measures.
 pub(crate) mod metrics;
