@@ -9,6 +9,7 @@ use crate::fi_attribution::FiPositionSnapshot;
 use crate::margin::{
     CsrQuoteClassification, CsrQuoteDelta, CsrQuoteSource, GirrQuoteDelta, GirrQuoteTarget,
 };
+use crate::margin::{ExposureCashVm, ExposureSimulationConfig};
 use crate::margin::{PortfolioFrtbConfig, PortfolioFrtbSensitivitiesResult};
 use crate::{
     PortfolioResult, allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
@@ -411,6 +412,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_packager(package_materialization_schema)
     .with_examples(examples::portfolio_cashflows),
 
+    finstack_quant_core::schema_artifact!(
+        ExposureCashVm, "portfolio", "exposure_cash_vm", Input,
+        "Cash variation margin terms and signed settled balance at exposure valuation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ExposureSimulationConfig, "portfolio", "exposure_simulation_config", Input,
+        "Dated simulated market states, factor mappings, legal scope and optional cash collateral."
+    ),
     finstack_quant_core::schema_artifact!(
         PortfolioFrtbConfig, "portfolio", "portfolio_frtb_config", Input,
         "Exact sources for ordinary portfolio GIRR yield and single-name CDS CSR delta."

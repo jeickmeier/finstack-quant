@@ -2,6 +2,14 @@
 
 ## Itemized changes
 
+### Portfolio: dated Monte Carlo exposure
+
+The portfolio and standalone instrument exposure APIs reprice admitted
+positions in their contractual direction on each dated Philox path.
+The result records the reporting currency and hashes the netting scope into its source
+identity. An elected cash variation-margin agreement reduces exposure
+as calls settle and collateral interest accrues.
+
 ### Margin: dated exposure grids for CVA, DVA and FVA
 
 Exposure profiles carry an opening date, calendar observation dates, the

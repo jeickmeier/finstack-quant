@@ -49,6 +49,8 @@ export const portfolio = {
   FactorModel: wasm.FactorModel,
   girrQuoteDelta: wasm.girrQuoteDelta,
   csrQuoteDelta: wasm.csrQuoteDelta,
+  instrumentExposureProfile: wasm.instrumentExposureProfile,
+  portfolioExposureProfile: wasm.portfolioExposureProfile,
   portfolioFrtbSensitivities: wasm.portfolioFrtbSensitivities,
   portfolioMargin: wasm.portfolioMargin,
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,

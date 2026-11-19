@@ -14,6 +14,7 @@ pub(crate) use regulatory::PyFrtbSensitivities;
 mod schema;
 pub(crate) mod types;
 mod xva;
+pub(crate) use xva::PyExposureProfile;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;

@@ -40,6 +40,12 @@ from finstack_quant.portfolio._cashflows import (
     aggregate_full_cashflows as aggregate_full_cashflows,
     net_in_currency_by_date as net_in_currency_by_date,
 )
+from finstack_quant.portfolio._exposure import (
+    ExposureCashVm as ExposureCashVm,
+    ExposureSimulationConfig as ExposureSimulationConfig,
+    instrument_exposure_profile as instrument_exposure_profile,
+    portfolio_exposure_profile as portfolio_exposure_profile,
+)
 from finstack_quant.portfolio._margin import (
     NettingSetMargin as NettingSetMargin,
     CsrQuoteClassification as CsrQuoteClassification,
@@ -228,8 +234,12 @@ __all__ = [
     "CsrQuoteSource",
     "PortfolioFrtbConfig",
     "PortfolioFrtbSensitivitiesResult",
+    "ExposureCashVm",
+    "ExposureSimulationConfig",
     "CsrQuoteDelta",
     "portfolio_frtb_sensitivities",
+    "portfolio_exposure_profile",
+    "instrument_exposure_profile",
     "csr_quote_delta",
     "GirrQuoteDelta",
     "GirrQuoteTarget",

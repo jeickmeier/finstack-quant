@@ -1516,7 +1516,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/exposure_profile.schema.json",
             "type_name": "ExposureProfile",
             "kind": "input",
-            "bytes": 5932
+            "bytes": 6862
           },
           {
             "path": "schemas/margin/1/frtb_risk_class.schema.json",
@@ -1972,6 +1972,20 @@
             "type_name": "ExcessReturnResult",
             "kind": "output",
             "bytes": 3990
+          },
+          {
+            "path": "schemas/portfolio/1/exposure_cash_vm.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/exposure_cash_vm.schema.json",
+            "type_name": "ExposureCashVm",
+            "kind": "input",
+            "bytes": 42285
+          },
+          {
+            "path": "schemas/portfolio/1/exposure_simulation_config.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/exposure_simulation_config.schema.json",
+            "type_name": "ExposureSimulationConfig",
+            "kind": "input",
+            "bytes": 95209
           },
           {
             "path": "schemas/portfolio/1/factor_assignment_report.schema.json",
@@ -4717,7 +4731,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/exposure_profile.schema.json",
             "type_name": "ExposureProfile",
             "kind": "input",
-            "bytes": 5932
+            "bytes": 6862
           },
           {
             "domain": "margin",
@@ -4974,6 +4988,22 @@
             "type_name": "ExcessReturnResult",
             "kind": "output",
             "bytes": 3990
+          },
+          {
+            "domain": "portfolio",
+            "path": "schemas/portfolio/1/exposure_cash_vm.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/exposure_cash_vm.schema.json",
+            "type_name": "ExposureCashVm",
+            "kind": "input",
+            "bytes": 42285
+          },
+          {
+            "domain": "portfolio",
+            "path": "schemas/portfolio/1/exposure_simulation_config.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/exposure_simulation_config.schema.json",
+            "type_name": "ExposureSimulationConfig",
+            "kind": "input",
+            "bytes": 95209
           },
           {
             "domain": "portfolio",

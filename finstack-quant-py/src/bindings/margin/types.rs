@@ -607,7 +607,7 @@ fn extract_im_methodology(obj: &Bound<'_, PyAny>) -> PyResult<fm::types::ImMetho
 )]
 #[derive(Clone)]
 pub struct PyCsaSpec {
-    pub(super) inner: fm::types::CsaSpec,
+    pub(crate) inner: fm::types::CsaSpec,
 }
 
 impl PyCsaSpec {

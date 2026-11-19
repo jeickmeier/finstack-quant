@@ -40,6 +40,7 @@ pub mod brinson;
 pub mod builder;
 pub mod cashflows;
 pub mod excess_return;
+pub mod exposure;
 pub mod factor_brinson;
 pub mod factor_model;
 pub mod fi_attribution;
@@ -273,3 +274,5 @@ pub fn parse_portfolio_spec_json(
 
     serde_json::to_string(&spec).map_err(to_js_err)
 }
+
+pub use exposure::{instrument_exposure_profile, portfolio_exposure_profile};

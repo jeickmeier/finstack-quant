@@ -421,7 +421,7 @@ class _ExternalExposureBasis(TypedDict):
     policy_id: str
 
 class _SimulatedExposureBasis(TypedDict):
-    kind: Literal["simulated_uncollateralized"]
+    kind: Literal["simulated_uncollateralized", "simulated_cash_vm"]
     source_id: str
     path_count: int
 

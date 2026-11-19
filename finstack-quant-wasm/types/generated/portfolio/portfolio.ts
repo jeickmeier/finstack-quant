@@ -761,6 +761,22 @@ export type AttributionMethod =
       taylor: TaylorAttributionConfig;
     };
 /**
+ * Cheyette base volatility in decimal rate units per square-root model year.
+ *
+ * A level of 0.005 is a 50 basis point rate amplitude. The process samples
+ * the amplitude at the left endpoint of each step and squares it for the
+ * variance-state drift.
+ */
+export type BaseVolatility =
+  | {
+      amplitudes: [number, number][];
+      interpolation: "linear";
+    }
+  | {
+      amplitudes: [number, number][];
+      interpolation: "constant_intervals";
+    };
+/**
  * Enumeration of cash-flow kinds for classification and ordering.
  *
  * Used to distinguish between different types of cashflows for
@@ -885,6 +901,26 @@ export type CashflowFxPolicy = "cip_forward";
  * Meaning of the emitted schedule relative to pricing and waterfall policy.
  */
 export type CashflowRepresentation = "contractual" | "projected" | "placeholder" | "no_residual";
+/**
+ * Collateral asset classes per BCBS-IOSCO standards.
+ *
+ * Asset classes determine baseline haircuts and eligibility criteria.
+ * The BCBS-IOSCO framework specifies minimum haircuts by asset class.
+ *
+ * # Reference
+ *
+ * BCBS-IOSCO "Margin requirements for non-centrally cleared derivatives" (2020)
+ * Annex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`
+ */
+export type CollateralAssetClass =
+  | "cash"
+  | "government_bonds"
+  | "agency_bonds"
+  | "covered_bonds"
+  | "corporate_bonds"
+  | "equity"
+  | "gold"
+  | "mutual_funds";
 /**
  * Declarative constraint specification.
  */
@@ -1061,6 +1097,26 @@ export type RiskMeasure =
       };
     };
 /**
+ * Initial margin calculation methodology.
+ *
+ * Different methodologies are used depending on regulatory requirements,
+ * product type, and whether trades are cleared or bilateral.
+ *
+ * # BCBS-IOSCO Standards
+ *
+ * For bilateral (uncleared) OTC derivatives, either SIMM or the regulatory
+ * schedule approach may be used. SIMM is the industry standard for large
+ * dealers due to its risk-sensitivity.
+ */
+export type ImMethodology = "haircut" | "simm" | "schedule" | "internal_model" | "clearing_house";
+/**
+ * Margin call frequency.
+ *
+ * Determines how often margin calls are made and collateral is exchanged.
+ * Industry standard for OTC derivatives is daily under BCBS-IOSCO rules.
+ */
+export type MarginTenor = "daily" | "weekly" | "monthly" | "on_demand";
+/**
  * Seniority level for credit exposures.
  *
  * Order is **not** total — `SeniorSecured` is strictly senior to `Senior`,
@@ -1088,6 +1144,479 @@ export type LoadPhase = "parse" | "version" | "structure" | "semantic" | "canoni
  * Severity assigned to a persisted artifact diagnostic.
  */
 export type Severity = "error" | "warning";
+/**
+ * Dividend payment specification.
+ */
+export type Dividend =
+  | {
+      cash: number;
+    }
+  | {
+      proportional: number;
+    };
+/**
+ * Mapping from an admitted simulation state component to an exact market target.
+ */
+export type ExposureFactor =
+  | {
+      /**
+       * Exact market curve identifier.
+       */
+      curve_id: Id;
+      /**
+       * Discount or forward curve selected for the parallel move.
+       */
+      curve_kind: CurveKind;
+      /**
+       * Explicit discount dependency when the curve's shock recipe requires it.
+       */
+      discount_curve_id?: Id | null;
+      kind: "rate";
+      /**
+       * Index into the selected process state vector.
+       */
+      state: number;
+    }
+  | {
+      /**
+       * Base currency in the simulation quote.
+       */
+      base: Currency;
+      kind: "fx";
+      /**
+       * Quote currency in the simulation quote.
+       */
+      quote: Currency;
+      /**
+       * Index into the selected process state vector.
+       */
+      state: number;
+    }
+  | {
+      kind: "equity";
+      /**
+       * Exact market price identifier.
+       */
+      price_id: Id;
+      /**
+       * Index into the selected process state vector.
+       */
+      state: number;
+    };
+/**
+ * Identifies a margin netting set.
+ *
+ * Instruments in the same netting set can offset each other for margin
+ * calculation purposes. The netting set is typically defined by the
+ * CSA agreement (bilateral) or by CCP membership (cleared) — these two
+ * shapes are mutually exclusive, so the type encodes them as enum
+ * variants rather than as a struct with two `Option<String>` fields
+ * that could in principle both be set or both be unset.
+ */
+export type NettingSetId =
+  | {
+      /**
+       * Counterparty identifier
+       */
+      counterparty_id: string;
+      /**
+       * CSA identifier
+       */
+      csa_id: string;
+      kind: "bilateral";
+    }
+  | {
+      /**
+       * CCP identifier (also used as the counterparty id)
+       */
+      ccp_id: string;
+      kind: "cleared";
+    };
+/**
+ * Generator of the fractional increments consumed by `rough_bergomi` and
+ * `cheyette_rough`.
+ *
+ * Serialized as an internally tagged object: `{"type": "volterra"}`. The
+ * Hurst exponent always comes from the process parameters.
+ *
+ * Only `volterra` reproduces the published models: both are defined on the
+ * Riemann-Liouville Volterra process, whose increments are not stationary.
+ * `cholesky` and `windowed_conditional` drive the same recursion with true
+ * fractional Brownian motion instead. Forwards are unchanged. Exact
+ * fractional Brownian motion has the same marginal variance `t^(2H)`, so the
+ * expected variance is unchanged too, but its autocovariance differs, so
+ * smiles and path statistics differ. The windowed generator only
+ * approximates the level variance once the path is longer than its window,
+ * which biases the expected variance.
+ *
+ * The variants without settings are written `FbmSpec::Volterra {}` so that
+ * the tagged object rejects unknown keys.
+ *
+ * # References
+ *
+ * - Hybrid scheme: `docs/REFERENCES.md#bennedsen-lunde-pakkanen-2017`
+ * - Rough Bergomi: `docs/REFERENCES.md#bayer-friz-gatheral-2016`
+ */
+export type FbmSpec =
+  | {
+      type: "volterra";
+    }
+  | {
+      type: "cholesky";
+    }
+  | {
+      /**
+       * Positive window length in steps, capped at the number of steps.
+       * Omitted selects `min(max(10, √n), 50)`.
+       */
+      near_field_size?: number | null;
+      type: "windowed_conditional";
+    };
+/**
+ * Stochastic process to simulate, with its parameters.
+ *
+ * Serialized as an internally tagged object: `{"type": "gbm", "r": 0.03, ...}`.
+ * Parameters are re-validated when [`simulate_paths`] runs, so a spec read
+ * from JSON cannot bypass the range checks of the Rust constructors.
+ */
+export type ProcessSpec =
+  | {
+      /**
+       * Dividend/foreign rate (annual)
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual)
+       */
+      r: number;
+      /**
+       * Volatility (annual)
+       */
+      sigma: number;
+      type: "gbm";
+    }
+  | {
+      /**
+       * Dividend schedule as `[time, dividend]` pairs. `time` is the
+       * ex-dividend time in years: strictly positive and distinct, in any
+       * order. A cash dividend is a non-negative amount in spot units and
+       * a proportional dividend a non-negative decimal fraction of spot.
+       */
+      dividends: [number, Dividend][];
+      /**
+       * Diffusion parameters between dividend dates. Set `q` to zero when
+       * every dividend is listed explicitly.
+       */
+      params: GbmParams;
+      type: "gbm_with_dividends";
+    }
+  | {
+      /**
+       * Per-asset parameters; the vector length is the state dimension.
+       */
+      assets: GbmParams[];
+      /**
+       * Row-major `n x n` correlation matrix of the driving Brownian
+       * motions; omitted means independent assets.
+       */
+      correlation?: number[] | null;
+      type: "multi_gbm";
+    }
+  | {
+      /**
+       * Constant drift per year.
+       */
+      mu: number;
+      /**
+       * Constant diffusion scale per square root year.
+       */
+      sigma: number;
+      type: "brownian";
+    }
+  | {
+      /**
+       * Row-major `n x n` correlation matrix of the driving Brownian
+       * motions; omitted means independent components.
+       */
+      correlation?: number[] | null;
+      /**
+       * Per-component drifts per year; the vector length is the state
+       * dimension.
+       */
+      mus: number[];
+      /**
+       * Per-component diffusion scales per square-root year, non-negative.
+       */
+      sigmas: number[];
+      type: "multi_brownian";
+    }
+  | {
+      /**
+       * Optional row-major `n x n` correlation matrix.
+       */
+      correlation?: number[] | null;
+      /**
+       * Mean-reversion speeds `κ_i` per year.
+       */
+      kappas: number[];
+      /**
+       * Diffusion scales `σ_i` per square root year.
+       */
+      sigmas: number[];
+      /**
+       * Long-run means `θ_i` in state units.
+       */
+      thetas: number[];
+      type: "multi_ou";
+    }
+  | (HullWhite1FParams & {
+      type: "hull_white_1f";
+      [k: string]: unknown;
+    })
+  | {
+      /**
+       * Mean reversion speed (κ)
+       */
+      kappa: number;
+      /**
+       * Volatility of volatility (σ)
+       */
+      sigma: number;
+      /**
+       * Long-term mean (θ)
+       */
+      theta: number;
+      type: "cir";
+    }
+  | {
+      /**
+       * Parameters of the unshifted CIR factor.
+       */
+      params: CirParams;
+      /**
+       * Shift values `φ` as decimal rates, one per entry of `shift_times`;
+       * each applies from its time until the next.
+       */
+      shift_curve: number[];
+      /**
+       * Strictly increasing shift start times in years. Times before the
+       * first entry use the first shift value.
+       */
+      shift_times: number[];
+      type: "cir_plus_plus";
+    }
+  | {
+      /**
+       * Mean reversion speed.
+       */
+      kappa: number;
+      /**
+       * Continuously compounded dividend or foreign yield as an annual decimal.
+       */
+      q: number;
+      /**
+       * Continuously compounded risk-free rate as an annual decimal.
+       */
+      r: number;
+      /**
+       * Spot-variance correlation.
+       */
+      rho: number;
+      /**
+       * Long-run variance.
+       */
+      theta: number;
+      type: "heston";
+      /**
+       * Initial variance.
+       */
+      v0: number;
+      /**
+       * Vol-of-vol.
+       */
+      vol_of_vol: number;
+    }
+  | {
+      /**
+       * Mean reversion speed for short-term deviation (κ_X)
+       */
+      kappa: number;
+      /**
+       * Constant risk-premium drift shift for the short-term factor (λ_X).
+       *
+       * Under the risk-neutral measure the short-term factor follows
+       * `dX = (−κ_X X − λ_X) dt + σ_X dW*` (Schwartz & Smith 2000): a constant
+       * drift shift at unchanged κ_X. Defaults to 0 (physical measure).
+       */
+      lambda_x?: number;
+      /**
+       * Drift of long-term trend (μ_Y)
+       */
+      mu_y: number;
+      /**
+       * Correlation between X and Y (ρ)
+       */
+      rho_xy: number;
+      /**
+       * Volatility of short-term component (σ_X)
+       */
+      sigma_x: number;
+      /**
+       * Volatility of long-term component (σ_Y)
+       */
+      sigma_y: number;
+      type: "schwartz_smith";
+    }
+  | {
+      /**
+       * Dividend yield or foreign rate, continuously compounded (annualized
+       * decimal).
+       */
+      q: number;
+      /**
+       * Risk-free rate, continuously compounded (annualized decimal).
+       */
+      r: number;
+      /**
+       * Local volatility `σ_loc(t, S)`: expiry axis in years from the
+       * simulation start, strike axis in spot price units. Flat outside its
+       * grid.
+       */
+      surface: LocalVolSurface;
+      type: "local_vol";
+    }
+  | {
+      /**
+       * Accrual factors τ_i = T_{i+1} − T_i (length N).
+       */
+      accrual_factors: number[];
+      /**
+       * Displacement per forward for negative-rate support (length N).
+       */
+      displacements: number[];
+      /**
+       * Initial forward rates F_i(0) from the curve (length N).
+       */
+      initial_forwards: number[];
+      /**
+       * Number of Brownian factors (2 or 3).
+       */
+      num_factors: number;
+      /**
+       * Number of forward rates (N).
+       */
+      num_forwards: number;
+      /**
+       * Tenor dates T_0, T_1, ..., T_N (N+1 dates, year fractions).
+       */
+      tenors: number[];
+      type: "lmm";
+      /**
+       * Piecewise-constant vol breakpoints (ascending, length M).
+       */
+      vol_times: number[];
+      /**
+       * Factor loadings λ_{i,k}(t) per forward, per time period.
+       *
+       * Outer: M+1 time periods.
+       * Inner: N forwards, each with up to 3 factor loadings.
+       */
+      vol_values: [number, number, number][][];
+    }
+  | {
+      /**
+       * Vol-of-vol scaling (η > 0).
+       */
+      eta: number;
+      /**
+       * Hurst exponent H ∈ (0, 0.5), typically 0.07–0.12 for equity indices.
+       */
+      hurst: HurstExponent;
+      /**
+       * Dividend yield (annual, continuously compounded).
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual, continuously compounded).
+       */
+      r: number;
+      /**
+       * Spot-vol correlation ρ ∈ [-1, 1].
+       */
+      rho: number;
+      type: "rough_bergomi";
+      /**
+       * Initial forward variance curve ξ₀(t).
+       */
+      xi: ForwardVarianceCurve;
+    }
+  | {
+      /**
+       * Hurst exponent H ∈ (0, 0.5) — controls the roughness of the variance.
+       */
+      hurst: HurstExponent;
+      /**
+       * Mean reversion speed (κ > 0).
+       */
+      kappa: number;
+      /**
+       * Dividend yield (annual, continuously compounded).
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual, continuously compounded).
+       */
+      r: number;
+      /**
+       * Spot–variance correlation ρ ∈ (−1, 1).
+       */
+      rho: number;
+      /**
+       * Long-run variance level (θ > 0).
+       */
+      theta: number;
+      type: "rough_heston";
+      /**
+       * Initial variance (v₀ > 0).
+       */
+      v0: number;
+      /**
+       * Volatility of variance — vol-of-vol (σᵥ > 0).
+       */
+      vol_of_vol: number;
+    }
+  | (CheyetteRoughVolParams & {
+      type: "cheyette_rough";
+      [k: string]: unknown;
+    });
+export type Interpolation = "linear" | "constant_intervals";
+/**
+ * Time-discretization scheme used to advance the process.
+ */
+export type SchemeSpec = "default" | "euler" | "log_euler" | "milstein";
+/**
+ * Simulation dates, as year fractions from the simulation start.
+ */
+export type TimeGridSpec =
+  | {
+      /**
+       * Finite positive horizon in years.
+       */
+      expiry: number;
+      /**
+       * Positive number of steps.
+       */
+      num_steps: number;
+      type: "uniform";
+    }
+  | {
+      /**
+       * Strictly increasing finite times in years, starting at exactly
+       * `0.0`, with at least two entries.
+       */
+      times: number[];
+      type: "times";
+    };
 /**
  * A single market dependency extracted from an instrument.
  */
@@ -1190,19 +1719,6 @@ export type GirrQuoteSource =
       kind: "linked_ois";
     };
 /**
- * Initial margin calculation methodology.
- *
- * Different methodologies are used depending on regulatory requirements,
- * product type, and whether trades are cleared or bilateral.
- *
- * # BCBS-IOSCO Standards
- *
- * For bilateral (uncleared) OTC derivatives, either SIMM or the regulatory
- * schedule approach may be used. SIMM is the industry standard for large
- * dealers due to its risk-sensitivity.
- */
-export type ImMethodology = "haircut" | "simm" | "schedule" | "internal_model" | "clearing_house";
-/**
  * Normalized market factor key for portfolio-level dependency tracking.
  */
 export type MarketFactorKey =
@@ -1273,35 +1789,6 @@ export type MissingMetricPolicy = "zero" | "exclude" | "strict";
  * amount per one such unit.
  */
 export type MoveUnit = "basis_point" | "vol_point" | "percent" | "price_unit";
-/**
- * Identifies a margin netting set.
- *
- * Instruments in the same netting set can offset each other for margin
- * calculation purposes. The netting set is typically defined by the
- * CSA agreement (bilateral) or by CCP membership (cleared) — these two
- * shapes are mutually exclusive, so the type encodes them as enum
- * variants rather than as a struct with two `Option<String>` fields
- * that could in principle both be set or both be unset.
- */
-export type NettingSetId =
-  | {
-      /**
-       * Counterparty identifier
-       */
-      counterparty_id: string;
-      /**
-       * CSA identifier
-       */
-      csa_id: string;
-      kind: "bilateral";
-    }
-  | {
-      /**
-       * CCP identifier (also used as the counterparty id)
-       */
-      ccp_id: string;
-      kind: "cleared";
-    };
 /**
  * SIMM credit sector for bucket assignment.
  *
@@ -2351,6 +2838,127 @@ export interface CellReturn {
   upper: number;
 }
 /**
+ * Cheyette + rough stochastic volatility model parameters.
+ *
+ * Encapsulates all inputs required to define the Cheyette dynamics with a
+ * rough vol driver. Serialization preserves both the base-volatility curve
+ * and initial-forward curve; deserialization validates the complete model
+ * through the same constructor used for market inputs.
+ */
+export interface CheyetteRoughVolParams {
+  /**
+   * Vol-of-vol scaling (η > 0).
+   */
+  eta: number;
+  /**
+   * Hurst exponent H ∈ (0, 0.5) for the rough vol driver.
+   */
+  hurst: HurstExponent;
+  /**
+   * Mean reversion of the short rate (κ > 0).
+   */
+  kappa: number;
+  /**
+   * Time knots for the initial forward rate curve φ(t) = f(0, t).
+   */
+  phi_times: number[];
+  /**
+   * Value knots for the initial forward rate curve φ(t) = f(0, t).
+   */
+  phi_values: number[];
+  /**
+   * Correlation between rate and vol innovations ρ ∈ [-1, 1].
+   */
+  rho: number;
+  /**
+   * Base volatility term structure σ₀(t) for the rate process.
+   */
+  sigma_base: BaseVolatility;
+  [k: string]: unknown;
+}
+/**
+ * Validated Hurst exponent H ∈ (0, 1).
+ *
+ * The Hurst exponent determines the roughness of fractional Brownian motion:
+ *
+ * - H < 0.5 — rough (anti-persistent increments)
+ * - H = 0.5 — standard Brownian motion
+ * - H > 0.5 — more regular paths with persistent increments
+ */
+export interface HurstExponent {
+  h: number;
+}
+/**
+ * CIR process parameters.
+ */
+export interface CirParams {
+  /**
+   * Mean reversion speed (κ)
+   */
+  kappa: number;
+  /**
+   * Volatility of volatility (σ)
+   */
+  sigma: number;
+  /**
+   * Long-term mean (θ)
+   */
+  theta: number;
+}
+/**
+ * Single collateral eligibility entry.
+ *
+ * Defines eligibility criteria and haircut for a specific type of collateral.
+ */
+export interface CollateralEligibility {
+  /**
+   * Asset class
+   */
+  asset_class: CollateralAssetClass;
+  /**
+   * Concentration limit as fraction of total collateral (optional)
+   *
+   * E.g., 0.30 means max 30% of collateral can be this type.
+   */
+  concentration_limit?: number | null;
+  /**
+   * Additional FX haircut for currency mismatch (decimal)
+   *
+   * Applied when collateral currency differs from settlement currency.
+   */
+  fx_haircut_addon?: number;
+  /**
+   * Haircut as decimal (e.g., 0.02 = 2%)
+   */
+  haircut: number;
+  /**
+   * Remaining maturity constraints
+   */
+  maturity_constraints?: MaturityConstraints | null;
+  /**
+   * Minimum credit rating requirement (e.g., "A-", "BBB")
+   *
+   * If None, no rating constraint applies.
+   */
+  min_rating?: string | null;
+}
+/**
+ * Maturity constraints for eligible collateral.
+ *
+ * Some CSAs restrict collateral based on remaining maturity to limit
+ * duration risk in the collateral portfolio.
+ */
+export interface MaturityConstraints {
+  /**
+   * Maximum remaining years to maturity (if any)
+   */
+  max_remaining_years?: number | null;
+  /**
+   * Minimum remaining years to maturity (if any)
+   */
+  min_remaining_years?: number | null;
+}
+/**
  * Detailed attribution for base correlation curves.
  *
  * Used for structured credit products (CDO tranches, synthetic credit).
@@ -2673,6 +3281,222 @@ export interface CrossFactorDetail {
    */
   total: Money;
   [k: string]: unknown;
+}
+/**
+ * Credit Support Annex specification (ISDA standard).
+ *
+ * The CSA governs the exchange of collateral between counterparties
+ * for OTC derivatives. This specification captures all key commercial
+ * terms needed for margin calculation and management.
+ *
+ * # ISDA Documentation
+ *
+ * This type represents terms from:
+ * - ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)
+ * - ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)
+ *
+ * # References
+ *
+ * - ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`
+ * - ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`
+ * - BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`
+ */
+export interface CsaSpec {
+  /**
+   * Base currency for margin calculations.
+   *
+   * All exposures and collateral values are converted to this currency
+   * for netting and comparison with thresholds.
+   */
+  base_currency: Currency;
+  /**
+   * Contractual business-day calendar for calls and settlements.
+   */
+  calendar_id: string;
+  /**
+   * Margin call timing parameters.
+   */
+  call_timing: MarginCallTiming;
+  /**
+   * Discount curve ID for collateral valuation.
+   *
+   * Cash collateral is typically discounted at OIS/RFR rates.
+   * This curve should match the CSA's collateral interest rate.
+   */
+  collateral_curve_id: Id;
+  /**
+   * Eligible collateral schedule.
+   *
+   * Defines what collateral types are acceptable and associated haircuts.
+   */
+  eligible_collateral: EligibleCollateralSchedule;
+  /**
+   * CSA identifier (e.g., "USD-CSA-STANDARD", "COUNTERPARTY-XYZ-CSA")
+   */
+  id: string;
+  /**
+   * Initial margin parameters (optional).
+   *
+   * If None, no IM is exchanged (either not in scope for regulations
+   * or trade is cleared).
+   */
+  im_params?: ImParameters | null;
+  /**
+   * Variation margin parameters.
+   *
+   * Governs daily mark-to-market collateral exchange.
+   */
+  vm_params: VmParameters;
+}
+/**
+ * Margin call timing parameters.
+ *
+ * Specifies the operational timing for margin calls including
+ * notification and dispute resolution windows.
+ */
+export interface MarginCallTiming {
+  /**
+   * Grace period for collateral delivery (business days)
+   */
+  delivery_grace_days: number;
+  /**
+   * Dispute resolution window (business days)
+   */
+  dispute_resolution_days: number;
+  /**
+   * Notification deadline (hours after valuation, e.g., 13:00 local time)
+   */
+  notification_deadline_hours: number;
+  /**
+   * Response deadline (hours after notification)
+   */
+  response_deadline_hours: number;
+}
+/**
+ * Eligible collateral schedule with haircuts.
+ *
+ * Defines the complete set of collateral types accepted under a CSA
+ * or margin agreement, along with associated haircuts and constraints.
+ */
+export interface EligibleCollateralSchedule {
+  /**
+   * Default haircut for unlisted collateral (if accepted)
+   *
+   * If None, only explicitly listed collateral types are accepted.
+   */
+  default_haircut?: number | null;
+  /**
+   * List of eligible collateral types with haircuts
+   */
+  eligible: CollateralEligibility[];
+  /**
+   * Whether rehypothecation of posted collateral is permitted
+   *
+   * For IM under BCBS-IOSCO rules, rehypothecation is prohibited.
+   * For VM, rehypothecation may be permitted by bilateral agreement.
+   */
+  rehypothecation_allowed?: boolean;
+}
+/**
+ * Initial margin parameters.
+ *
+ * Initial margin is collateral posted to cover potential future exposure (PFE)
+ * during the close-out period following a default. IM is required for
+ * non-centrally cleared derivatives under BCBS-IOSCO rules.
+ *
+ * # Margin Period of Risk (MPOR)
+ *
+ * The MPOR determines the horizon over which PFE is calculated:
+ * - Standard: 10 business days for bilateral derivatives
+ * - Reduced: 5 days for certain liquid products
+ */
+export interface ImParameters {
+  /**
+   * IM calculation methodology.
+   *
+   * Options include SIMM, regulatory schedule, or CCP methodology.
+   */
+  methodology: ImMethodology;
+  /**
+   * Margin Period of Risk in business days.
+   *
+   * Standard is 10 days under BCBS-IOSCO. CCPs may use shorter periods.
+   */
+  mpor_days: number;
+  /**
+   * Minimum Transfer Amount for IM.
+   *
+   * Combined IM+VM MTA must not exceed €500,000 under BCBS-IOSCO.
+   */
+  mta: Money;
+  /**
+   * Whether IM must be held in a segregated account.
+   *
+   * Under BCBS-IOSCO, IM must be segregated with a third-party custodian
+   * to protect it in case of the collecting party's insolvency.
+   */
+  segregated: boolean;
+  /**
+   * Group-level IM threshold allocated to this CSA by the caller.
+   *
+   * BCBS-IOSCO permits €50M aggregate threshold at group level.
+   * Many large dealers operate with zero threshold by agreement.
+   */
+  threshold: Money;
+}
+/**
+ * Variation margin parameters.
+ *
+ * These parameters govern the daily (or periodic) exchange of variation margin
+ * under a CSA agreement. VM is exchanged to eliminate mark-to-market exposure.
+ *
+ * # ISDA CSA Standard Terms
+ *
+ * The 2016 VM CSA introduced standardized terms for variation margin:
+ * - Zero threshold for in-scope entities
+ * - Daily exchange with T+1 settlement
+ * - Cash or highly liquid securities as collateral
+ */
+export interface VmParameters {
+  /**
+   * Margin call frequency.
+   *
+   * Under BCBS-IOSCO, daily margin exchange is required.
+   */
+  frequency: MarginTenor;
+  /**
+   * Independent Amount (IA) / Additional Margin.
+   *
+   * Fixed collateral amount required regardless of exposure.
+   * Often used for credit enhancement or as a buffer.
+   */
+  independent_amount: Money;
+  /**
+   * Minimum Transfer Amount (MTA).
+   *
+   * Margin calls below MTA are not made. BCBS-IOSCO permits combined
+   * IM+VM MTA up to €500,000 equivalent.
+   */
+  mta: Money;
+  /**
+   * Rounding increment for margin amounts.
+   *
+   * Margin calls are typically rounded to the nearest multiple of this amount.
+   */
+  rounding: Money;
+  /**
+   * Settlement lag in business days (T+n).
+   *
+   * Standard is T+1 for VM under 2016 VM CSA.
+   */
+  settlement_lag: number;
+  /**
+   * Threshold amount below which no margin is exchanged.
+   *
+   * Under BCBS-IOSCO rules for covered entities, VM threshold must be zero.
+   * Legacy bilateral CSAs may have non-zero thresholds.
+   */
+  threshold: Money;
 }
 /**
  * Dated issuer identity and approved ordinary CSR risk bucket.
@@ -3163,6 +3987,197 @@ export interface PositionExcess {
    * Position identifier (mirrors [`ExcessReturnPosition::id`]).
    */
   id: string;
+}
+/**
+ * Cash variation margin terms and signed settled balance at exposure valuation.
+ */
+export interface ExposureCashVm {
+  /**
+   * Settled cash at the valuation cut before the first modeled call.
+   * Positive means held and negative means posted.
+   */
+  opening_settled: Money;
+  /**
+   * Terms of the named bilateral agreement in the reporting currency.
+   */
+  terms: CsaSpec;
+}
+/**
+ * Dated simulated market states, factor mappings, legal scope and optional cash collateral.
+ */
+export interface ExposureSimulationConfig {
+  /**
+   * Elected cash variation margin with scheduled calls, settlements and
+   * collateral interest. Omit for an uncollateralized calculation.
+   */
+  cash_vm?: ExposureCashVm | null;
+  /**
+   * Observation calendar dates, including the portfolio valuation date.
+   */
+  dates: DateWire[];
+  /**
+   * Explicit selection and units of each market factor to simulate.
+   */
+  factors: ExposureFactor[];
+  /**
+   * Structural counterparty and agreement scope for the supplied positions.
+   */
+  netting_set: NettingSetId;
+  /**
+   * Identifier of the authoritative record admitting the supplied book.
+   */
+  netting_source_id: string;
+  /**
+   * Exact position IDs in that netting record, qualified as one eligible set.
+   */
+  position_ids: string[];
+  /**
+   * Process initialized against the held market. Its explicit grid must equal
+   * the ACT/365 Fixed observation dates. Unmapped state channels remain
+   * internal to the process, such as variance driving the equity spot.
+   */
+  simulation: PathSimulationSpec;
+}
+/**
+ * Complete, serializable description of one path simulation.
+ */
+export interface PathSimulationSpec {
+  /**
+   * Emit an antithetic partner after each path, driven by the negated
+   * normal draws of the same stream.
+   */
+  antithetic?: boolean;
+  /**
+   * Fractional-noise generator for `rough_bergomi` and `cheyette_rough`;
+   * omitted selects `volterra`, the generator the pricers use. Setting it
+   * for any other process is a validation error.
+   */
+  fbm?: FbmSpec | null;
+  /**
+   * State at time zero, in the layout documented on the [`ProcessSpec`]
+   * variant. Heston and rough Heston take only spot here and use their
+   * own `v0` for the starting variance.
+   */
+  initial_state: number[];
+  /**
+   * Number of independent random streams, in `1..=100_000`. Each stream
+   * yields one path, or two when `antithetic` is set.
+   */
+  num_paths: number;
+  /**
+   * Process and parameters.
+   */
+  process: ProcessSpec;
+  /**
+   * Discretization scheme; defaults to the process's canonical scheme.
+   */
+  scheme?: SchemeSpec;
+  /**
+   * Root seed of the Philox generator. The same spec always reproduces the
+   * same paths bit for bit.
+   */
+  seed: number;
+  /**
+   * Simulation dates.
+   */
+  time_grid: TimeGridSpec;
+}
+/**
+ * Geometric Brownian Motion parameters.
+ */
+export interface GbmParams {
+  /**
+   * Dividend/foreign rate (annual)
+   */
+  q: number;
+  /**
+   * Risk-free rate (annual)
+   */
+  r: number;
+  /**
+   * Volatility (annual)
+   */
+  sigma: number;
+}
+/**
+ * Validated Hull-White one-factor process parameters.
+ */
+export interface HullWhite1FParams {
+  kappa: number;
+  theta_curve: number[];
+  theta_times: number[];
+  volatility: PiecewiseConstantCurve;
+  [k: string]: unknown;
+}
+/**
+ * A finite, right-continuous piecewise-constant curve.
+ */
+export interface PiecewiseConstantCurve {
+  /**
+   * @minItems 1
+   */
+  times: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  values: [number, ...number[]];
+}
+/**
+ * Local volatility surface `σ_loc(T, K)` on a rectangular expiry-by-strike
+ * grid, extracted from an implied volatility surface via the Dupire formula.
+ *
+ * Off-grid queries are interpolated bilinearly; outside the grid the nearest
+ * boundary value applies (flat extrapolation).
+ *
+ * # Invariants
+ *
+ * - Expiries and strikes are finite and strictly increasing; expiries are
+ *   non-negative and strikes positive.
+ * - There is one finite, non-negative local volatility per grid node, stored
+ *   row-major with the expiry as the slow axis.
+ *
+ * Deserialization enforces the same invariants.
+ */
+export interface LocalVolSurface {
+  /**
+   * Expiry axis in years, strictly increasing and non-negative.
+   */
+  expiries: number[];
+  /**
+   * Local volatilities as annualized decimals, finite and non-negative,
+   * row-major: `local_vols[expiry_index * strikes.len() + strike_index]`.
+   */
+  local_vols: number[];
+  /**
+   * Strike axis in price units of the underlying, strictly increasing and
+   * positive.
+   */
+  strikes: number[];
+}
+/**
+ * Forward variance curve ξ₀(t) for rough volatility models.
+ *
+ * Represents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under
+ * the consuming model's pricing measure. Values are supplied or calibrated by
+ * the caller. The integral sets the model's expected accumulated variance.
+ *
+ * Differencing ATM implied total variance is an optional proxy, not an exact
+ * variance-swap bootstrap. This type interpolates the supplied curve; it does
+ * not perform market calibration.
+ */
+export interface ForwardVarianceCurve {
+  /**
+   * Interpolation contract used by the constructor.
+   */
+  interpolation: Interpolation;
+  /**
+   * Point times or interval ends (strictly increasing year fractions).
+   */
+  times: number[];
+  /**
+   * Point samples or constant interval variances (all nonnegative).
+   */
+  values: number[];
 }
 /**
  * Assignment results for a portfolio-level factor mapping pass.

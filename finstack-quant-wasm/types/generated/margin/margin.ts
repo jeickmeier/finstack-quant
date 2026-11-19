@@ -121,6 +121,17 @@ export type ExposureBasis =
        * Fingerprint of the pricing, market, portfolio and process inputs.
        */
       source_id: string;
+    }
+  | {
+      kind: "simulated_cash_vm";
+      /**
+       * Number of complete paths including antithetic partners.
+       */
+      path_count: number;
+      /**
+       * Fingerprint of the market, priced book, simulation and CSA.
+       */
+      source_id: string;
     };
 /**
  * FRTB risk classes per BCBS d457.
@@ -897,11 +908,13 @@ export interface ExposureProfile {
    */
   diagnostics: ExposureDiagnostics;
   /**
-   * Expected Negative Exposure at each time point: max(-V(t), 0).
+   * Expected positive part of the negated exposed mark at each date,
+   * after any settled collateral in the elected basis.
    */
   ene: number[];
   /**
-   * Expected Positive Exposure at each time point: max(V(t), 0).
+   * Expected positive part of the exposed mark at each date, after any
+   * settled collateral in the elected basis.
    */
   epe: number[];
   /**

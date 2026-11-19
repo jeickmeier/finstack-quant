@@ -11687,6 +11687,27 @@ export interface PortfolioNamespace {
    */
   readonly csrQuoteDelta: typeof wasm.csrQuoteDelta;
   /**
+   * Simulate complete dated exposure at one instrument's contractual size.
+   * @param instrument - Validated instrument envelope, as a typed object or canonical JSON.
+   * @param currency - ISO 4217 reporting currency for marks and exposures.
+   * @param market - Immutable opening market with its required pricing and factor observations.
+   * @param pricing - Valuation and FX conversion settings shared across the paths.
+   * @param spec - Dated factor simulation with the instrument ID as the single scoped position.
+   * @returns Complete dated exposure moments with the selected basis and diagnostics.
+   * @throws TypeError for mistyped host values, or FinstackError for invalid scope, missing market data or failed repricing.
+   */
+  readonly instrumentExposureProfile: typeof wasm.instrumentExposureProfile;
+  /**
+   * Reprice an admitted netting set on complete dated market paths.
+   * @param portfolio - One legally nettable book and its signed positions and reporting currency.
+   * @param market - Immutable opening market with all required prices, curves, fixings and FX.
+   * @param pricing - Shared valuation and FX conversion settings.
+   * @param spec - Dated path simulation, exact risk-factor bindings and netting scope.
+   * @returns Calendar observations, expected exposures, basis and completeness evidence.
+   * @throws FinstackError for an invalid path grid, ambiguous netting or risk source, missing market data or failed repricing.
+   */
+  readonly portfolioExposureProfile: typeof wasm.portfolioExposureProfile;
+  /**
    * Map a trading book onto the admitted ordinary GIRR and single-name CDS CSR grids.
    * @param portfolio - Trading book dates, unsigned and signed position amounts, and reporting currency.
    * @param market - Held pricing, FX and executed quote calibration evidence.

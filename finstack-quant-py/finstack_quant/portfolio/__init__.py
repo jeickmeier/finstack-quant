@@ -172,6 +172,10 @@ CsrQuoteSource = _portfolio.CsrQuoteSource
 PortfolioFrtbConfig = _portfolio.PortfolioFrtbConfig
 PortfolioFrtbSensitivitiesResult = _portfolio.PortfolioFrtbSensitivitiesResult
 portfolio_frtb_sensitivities = _portfolio.portfolio_frtb_sensitivities
+ExposureCashVm = _portfolio.ExposureCashVm
+ExposureSimulationConfig = _portfolio.ExposureSimulationConfig
+instrument_exposure_profile = _portfolio.instrument_exposure_profile
+portfolio_exposure_profile = _portfolio.portfolio_exposure_profile
 CsrQuoteDelta = _portfolio.CsrQuoteDelta
 csr_quote_delta = _portfolio.csr_quote_delta
 GirrQuoteDelta = _portfolio.GirrQuoteDelta
@@ -194,6 +198,8 @@ __all__ = [
     "CsrQuoteSource",
     "DurationCellTable",
     "ExcessReturnResult",
+    "ExposureCashVm",
+    "ExposureSimulationConfig",
     "FactorAssignmentReport",
     "FactorBrinsonResult",
     "FactorContributionDelta",
@@ -288,10 +294,12 @@ __all__ = [
     "girr_quote_delta",
     "grid_attribution",
     "grid_carino_link",
+    "instrument_exposure_profile",
     "mwr_xirr",
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
+    "portfolio_exposure_profile",
     "portfolio_frtb_sensitivities",
     "portfolio_margin",
     "primitive_exposures",

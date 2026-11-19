@@ -52,6 +52,32 @@
             "path_count"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Repriced paths with elected contractual cash variation margin.",
+          "properties": {
+            "kind": {
+              "const": "simulated_cash_vm",
+              "type": "string"
+            },
+            "path_count": {
+              "description": "Number of complete paths including antithetic partners.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source_id": {
+              "description": "Fingerprint of the market, priced book, simulation and CSA.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_id",
+            "path_count"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -156,7 +182,7 @@
       "description": "Completeness counters for the admitted grid. Failed points or valuations invalidate it."
     },
     "ene": {
-      "description": "Expected Negative Exposure at each time point: max(-V(t), 0).",
+      "description": "Expected positive part of the negated exposed mark at each date,\nafter any settled collateral in the elected basis.",
       "items": {
         "format": "double",
         "type": "number"
@@ -164,7 +190,7 @@
       "type": "array"
     },
     "epe": {
-      "description": "Expected Positive Exposure at each time point: max(V(t), 0).",
+      "description": "Expected positive part of the exposed mark at each date, after any\nsettled collateral in the elected basis.",
       "items": {
         "format": "double",
         "type": "number"

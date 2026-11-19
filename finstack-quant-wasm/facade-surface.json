@@ -3690,6 +3690,7 @@
       "girrQuoteDelta",
       "gridAttribution",
       "gridCarinoLink",
+      "instrumentExposureProfile",
       "mwrXirr",
       "netInCurrencyByDate",
       "optimizePortfolio",
@@ -3697,6 +3698,7 @@
       "portfolioAttributionExplainText",
       "portfolioAttributionPctOfTotalByBucket",
       "portfolioAttributionReconciliationCheck",
+      "portfolioExposureProfile",
       "portfolioFrtbSensitivities",
       "portfolioMargin",
       "portfolioMetricsGetMetric",
@@ -3782,6 +3784,12 @@
     "kind": "function"
   },
   "portfolio.csrQuoteDelta": {
+    "kind": "function"
+  },
+  "portfolio.instrumentExposureProfile": {
+    "kind": "function"
+  },
+  "portfolio.portfolioExposureProfile": {
     "kind": "function"
   },
   "portfolio.portfolioFrtbSensitivities": {

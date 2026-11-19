@@ -61,6 +61,7 @@
 
 mod aggregator;
 mod csr_quotes;
+mod exposure;
 mod frtb;
 mod girr_quotes;
 mod netting_set;
@@ -81,4 +82,9 @@ pub use results::{NettingSetMargin, PortfolioMarginResult};
 pub use frtb::{
     FrtbUnmappedPosition, OrdinaryDeltaStatus, PortfolioFrtbConfig,
     PortfolioFrtbSensitivitiesResult, portfolio_frtb_sensitivities,
+};
+
+pub use exposure::{
+    ExposureCashVm, ExposureFactor, ExposureSimulationConfig, instrument_exposure_profile,
+    portfolio_exposure_profile,
 };

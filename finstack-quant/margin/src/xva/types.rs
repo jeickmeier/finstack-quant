@@ -421,6 +421,15 @@ pub enum ExposureBasis {
         #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
         path_count: usize,
     },
+    /// Repriced paths with elected contractual cash variation margin.
+    SimulatedCashVm {
+        /// Fingerprint of the market, priced book, simulation and CSA.
+        source_id: String,
+        /// Number of complete paths including antithetic partners.
+        #[serde(with = "finstack_quant_core::wire::count")]
+        #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
+        path_count: usize,
+    },
 }
 
 /// Expected exposure observations on a complete dated grid.
@@ -458,10 +467,12 @@ pub struct ExposureProfile {
     /// Portfolio mark-to-market value at each time point (may be negative).
     pub mtm_values: Vec<f64>,
 
-    /// Expected Positive Exposure at each time point: max(V(t), 0).
+    /// Expected positive part of the exposed mark at each date, after any
+    /// settled collateral in the elected basis.
     pub epe: Vec<f64>,
 
-    /// Expected Negative Exposure at each time point: max(-V(t), 0).
+    /// Expected positive part of the negated exposed mark at each date,
+    /// after any settled collateral in the elected basis.
     pub ene: Vec<f64>,
 
     /// Completeness counters for the admitted grid. Failed points or valuations invalidate it.
@@ -491,6 +502,10 @@ impl ExposureProfile {
                 policy_id,
             } => !source_id.trim().is_empty() && !policy_id.trim().is_empty(),
             ExposureBasis::SimulatedUncollateralized {
+                source_id,
+                path_count,
+            }
+            | ExposureBasis::SimulatedCashVm {
                 source_id,
                 path_count,
             } => !source_id.trim().is_empty() && *path_count > 0,

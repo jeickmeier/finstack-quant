@@ -11,6 +11,7 @@ mod brinson;
 pub(crate) mod cashflows;
 pub(crate) mod container;
 mod excess_return;
+mod exposure;
 mod factor_brinson;
 pub(crate) mod factor_model;
 mod fi_attribution;
@@ -84,6 +85,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     grid_attribution::register(py, &m)?;
     factor_brinson::register(py, &m)?;
     margin::register(py, &m)?;
+    exposure::register(&m)?;
 
     let exports = vec![
         "PortfolioError",
@@ -199,8 +201,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "CsrQuoteSource",
         "PortfolioFrtbConfig",
         "PortfolioFrtbSensitivitiesResult",
+        "ExposureCashVm",
+        "ExposureSimulationConfig",
         "CsrQuoteDelta",
         "portfolio_frtb_sensitivities",
+        "portfolio_exposure_profile",
+        "instrument_exposure_profile",
         "csr_quote_delta",
         "GirrQuoteDelta",
         "GirrQuoteTarget",

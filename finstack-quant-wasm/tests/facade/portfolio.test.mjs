@@ -59,6 +59,7 @@ const EXPORTED_KEYS = [
   'girrQuoteDelta',
   'gridAttribution',
   'gridCarinoLink',
+  'instrumentExposureProfile',
   'mwrXirr',
   'netInCurrencyByDate',
   'optimizePortfolio',
@@ -66,6 +67,7 @@ const EXPORTED_KEYS = [
   'portfolioAttributionExplainText',
   'portfolioAttributionPctOfTotalByBucket',
   'portfolioAttributionReconciliationCheck',
+  'portfolioExposureProfile',
   'portfolioFrtbSensitivities',
   'portfolioMargin',
   'portfolioMetricsGetMetric',
@@ -1633,5 +1635,67 @@ test('ordinary CSR uses the executed CDS quote and signed book position', () => 
     );
   } finally {
     for (const handle of [pricing, book, position, cds, curve, shocked, market]) handle.free();
+  }
+});
+
+test('dated exposure reprices the signed book and a standalone equity on the same paths', () => {
+  const instrument = facade.valuations.instruments.Equity.example();
+  const market = new core.MarketContext();
+  market.insertPrice('AAPL-SPOT', 100, 'USD');
+  const asOf = '2025-01-02';
+  const dates = [asOf, '2025-02-01', '2025-04-02'];
+  const times = [0, 30 / 365, 90 / 365];
+  const position = new portfolio.Position('short', instrument.toJson(), -2);
+  const book = portfolio.Portfolio.builder('short-equity', 'USD', asOf)
+    .addPosition(position)
+    .build();
+  const pricing = new core.FinstackConfig();
+  const base = {
+    netting_set: { kind: 'bilateral', counterparty_id: 'example-bank', csa_id: 'example-csa' },
+    netting_source_id: 'admitted-teaching-trades',
+    dates,
+    factors: [{ kind: 'equity', state: 0, price_id: 'AAPL-SPOT' }],
+    simulation: {
+      process: { type: 'gbm', r: 0.04, q: 0, sigma: 0 },
+      initial_state: [100],
+      time_grid: { type: 'times', times },
+      num_paths: 4,
+      antithetic: true,
+      seed: 2025,
+    },
+  };
+  try {
+    const before = market.toJson();
+    const short = portfolio.portfolioExposureProfile(book, market, pricing, {
+      ...base,
+      position_ids: ['short'],
+    });
+    assert.equal(short.basis.path_count, 8);
+    assert.deepEqual(short.dates, dates);
+    assert.deepEqual(short.epe, [0, 0, 0]);
+    assert.equal(short.mtm_values[0], -20_000);
+    const standalone = portfolio.instrumentExposureProfile(
+      instrument.toJson(),
+      'USD',
+      market,
+      pricing,
+      {
+        ...base,
+        position_ids: ['EQUITY-AAPL'],
+      }
+    );
+    assert.ok(Math.abs(standalone.epe[2] - 10_000 * Math.exp(0.04 * times[2])) < 1e-8);
+    assert.ok(Math.abs(short.ene[2] - 2 * standalone.epe[2]) < 1e-8);
+    assert.equal(market.toJson(), before);
+    assert.throws(
+      () =>
+        portfolio.portfolioExposureProfile(book, market, pricing, {
+          ...base,
+          position_ids: ['missing'],
+        }),
+      /exact position IDs/
+    );
+  } finally {
+    for (const handle of [pricing, book, position, market, instrument]) handle.free();
   }
 });
