@@ -346,7 +346,7 @@ def analytics_cases() -> dict[str, Any]:
         },
         "terminal_specs": [
             doc(sa.TerminalValueSpec.gordon_growth(0.02)),
-            doc(sa.TerminalValueSpec.exit_multiple(8.5, 0.0)),
+            doc(sa.TerminalValueSpec.exit_multiple(8.5)),
             doc(sa.TerminalValueSpec.h_model(0.08, 0.02, 5.0)),
         ],
         "scenario_diff": doc(sa.scenario_diff(scenario_set, scenario_results, "base", "down", ["profit"], [Q2])),

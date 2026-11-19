@@ -164,7 +164,7 @@ test('statements_analytics matches the cross-host golden', () => {
     },
     terminal_specs: [
       { type: 'gordon_growth', stable_growth_rate: 0.02 },
-      { type: 'exit_multiple', multiple: 8.5, terminal_metric: 0.0 },
+      { type: 'exit_multiple', multiple: 8.5 },
       { type: 'h_model', high_growth_rate: 0.08, stable_growth_rate: 0.02, half_life_years: 5.0 },
     ],
     scenario_diff: sa.scenarioDiff(scenarioSet, scenarioResults, 'base', 'down', ['profit'], [Q2]),

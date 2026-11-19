@@ -5622,6 +5622,7 @@
           "#/$defs/RealEstateAsset/properties/terminal_growth_rate",
           "#/$defs/DiscountedCashFlow/properties/shares_outstanding",
           "#/$defs/DiscountedCashFlow/properties/terminal_flow_override",
+          "#/$defs/TerminalValueSpec/oneOf/1/properties/terminal_metric",
           "#/$defs/ValuationDiscounts/properties/dloc",
           "#/$defs/ValuationDiscounts/properties/dlom",
           "#/$defs/ValuationDiscounts/properties/other_discount",
@@ -17518,6 +17519,7 @@
           "#/$defs/RealEstateAsset/properties/terminal_growth_rate",
           "#/$defs/DiscountedCashFlow/properties/shares_outstanding",
           "#/$defs/DiscountedCashFlow/properties/terminal_flow_override",
+          "#/$defs/TerminalValueSpec/oneOf/1/properties/terminal_metric",
           "#/$defs/ValuationDiscounts/properties/dloc",
           "#/$defs/ValuationDiscounts/properties/dlom",
           "#/$defs/ValuationDiscounts/properties/other_discount",
@@ -20993,6 +20995,7 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
           "#/$defs/d_05fc0451dee1e185f517/properties/shares_outstanding",
           "#/$defs/d_05fc0451dee1e185f517/properties/terminal_flow_override",
+          "#/$defs/d_a4b741fb3a3ad1ae5f23/oneOf/1/properties/terminal_metric",
           "#/$defs/d_24546886b1b30e2280d7/properties/dloc",
           "#/$defs/d_24546886b1b30e2280d7/properties/dlom",
           "#/$defs/d_24546886b1b30e2280d7/properties/other_discount"

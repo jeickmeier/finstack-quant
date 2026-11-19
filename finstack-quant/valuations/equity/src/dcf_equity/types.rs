@@ -46,8 +46,10 @@ pub enum TerminalValueSpec {
     },
     /// Exit Multiple: TV = Terminal_Metric × Multiple
     ExitMultiple {
-        /// Terminal metric value (e.g., EBITDA)
-        terminal_metric: f64,
+        /// Terminal metric in major currency units (for example, EBITDA).
+        /// Required for standalone pricing. A statement DCF can resolve it from a metric node.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        terminal_metric: Option<f64>,
         /// Multiple to apply (e.g., 10.0 for 10x EBITDA)
         multiple: f64,
     },
@@ -528,6 +530,12 @@ impl DiscountedCashFlow {
                 terminal_metric,
                 multiple,
             } => {
+                let terminal_metric = terminal_metric.ok_or_else(|| {
+                    Error::Validation(format!(
+                        "DCF '{}' ExitMultiple requires a resolved terminal_metric",
+                        self.id.as_str()
+                    ))
+                })?;
                 if !terminal_metric.is_finite() || !multiple.is_finite() {
                     return Err(Error::Validation(format!(
                         "DCF '{}' ExitMultiple terminal_metric ({}) and multiple ({}) must be finite",
@@ -702,7 +710,14 @@ impl DiscountedCashFlow {
             TerminalValueSpec::ExitMultiple {
                 terminal_metric,
                 multiple,
-            } => Ok(terminal_metric * multiple),
+            } => terminal_metric
+                .map(|metric| metric * multiple)
+                .ok_or_else(|| {
+                    Error::Validation(format!(
+                        "DCF '{}' ExitMultiple requires a resolved terminal_metric",
+                        self.id.as_str()
+                    ))
+                }),
             TerminalValueSpec::HModel {
                 high_growth_rate,
                 stable_growth_rate,
@@ -1175,17 +1190,32 @@ mod tests {
         // Non-finite exit-multiple inputs must fail validation.
         let mut dcf = build_simple_dcf_gordon();
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: f64::INFINITY,
+            terminal_metric: Some(f64::INFINITY),
             multiple: 10.0,
         };
         assert!(dcf.validate().is_err());
     }
 
     #[test]
+    fn standalone_exit_multiple_requires_a_resolved_metric() {
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.terminal_value = TerminalValueSpec::ExitMultiple {
+            terminal_metric: None,
+            multiple: 10.0,
+        };
+        let error = dcf.validate().expect_err("unresolved terminal metric");
+        assert!(
+            error
+                .to_string()
+                .contains("requires a resolved terminal_metric")
+        );
+    }
+
+    #[test]
     fn validate_rejects_negative_exit_multiple_product() {
         let mut dcf = build_simple_dcf_gordon();
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: -100.0,
+            terminal_metric: Some(-100.0),
             multiple: 10.0,
         };
         let err = dcf.validate().expect_err("negative TV product must error");
@@ -1193,7 +1223,7 @@ mod tests {
 
         // A sign-consistent (non-negative) product passes.
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 100.0,
+            terminal_metric: Some(100.0),
             multiple: 10.0,
         };
         assert!(dcf.validate().is_ok());
@@ -1235,7 +1265,7 @@ mod tests {
         // is needed on a sub-annual grid.
         dcf.terminal_flow_override = None;
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 100.0,
+            terminal_metric: Some(100.0),
             multiple: 8.0,
         };
         assert!(dcf.validate().is_ok());
@@ -1284,7 +1314,7 @@ mod tests {
 
         // ExitMultiple ignores the override.
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 50.0,
+            terminal_metric: Some(50.0),
             multiple: 10.0,
         };
         let tv = dcf.calculate_terminal_value().expect("terminal value");
@@ -1405,7 +1435,7 @@ mod tests {
             flows: vec![(cf_date, 100.0)],
             wacc: 0.10,
             terminal_value: TerminalValueSpec::ExitMultiple {
-                terminal_metric: 150.0,
+                terminal_metric: Some(150.0),
                 multiple: 8.0,
             },
             valuation_date,
@@ -1727,7 +1757,7 @@ mod tests {
         // convention; Gordon-growth (a flow-stream proxy) keeps the shift.
         let mut dcf_exit = build_simple_dcf_gordon();
         dcf_exit.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 500.0,
+            terminal_metric: Some(500.0),
             multiple: 8.0,
         };
         let mut dcf_exit_mid = dcf_exit.clone();
@@ -2335,7 +2365,7 @@ mod tests {
         let mut dcf = build_simple_dcf_gordon();
         dcf.flows.clear();
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 500.0,
+            terminal_metric: Some(500.0),
             multiple: 8.0,
         };
         let tv = dcf

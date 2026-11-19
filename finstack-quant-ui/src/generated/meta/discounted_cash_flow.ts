@@ -1451,7 +1451,7 @@ export default [
   {
     "path": "#/$defs/d_a4b741fb3a3ad1ae5f23/oneOf/1/properties/terminal_metric",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/TerminalValueSpec/oneOf/1/properties/terminal_metric",
-    "description": "Terminal metric value (e.g., EBITDA)",
+    "description": "Terminal metric in major currency units (for example, EBITDA).\nRequired for standalone pricing. A statement DCF can resolve it from a metric node.",
     "format": "double"
   },
   {

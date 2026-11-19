@@ -2076,7 +2076,6 @@
       },
       {
         "multiple": 8.5,
-        "terminal_metric": 0.0,
         "type": "exit_multiple"
       },
       {

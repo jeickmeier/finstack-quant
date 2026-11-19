@@ -29947,7 +29947,7 @@ export default [
   {
     "path": "#/$defs/TerminalValueSpec/oneOf/1/properties/terminal_metric",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TerminalValueSpec/oneOf/1/properties/terminal_metric",
-    "description": "Terminal metric value (e.g., EBITDA)",
+    "description": "Terminal metric in major currency units (for example, EBITDA).\nRequired for standalone pricing. A statement DCF can resolve it from a metric node.",
     "format": "double"
   },
   {

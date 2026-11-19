@@ -550,7 +550,7 @@ test('namespace results match their published result types', () => {
     );
   const gordon = tornado({ type: 'gordon_growth', stable_growth_rate: 0.02 });
   const exitMultiple = tornado(
-    { type: 'exit_multiple', multiple: 8.0, terminal_metric: 999.0 },
+    { type: 'exit_multiple', multiple: 8.0 },
     {
       exit_multiple_metric_node: 'ebitda',
     }

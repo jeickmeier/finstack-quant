@@ -96,15 +96,15 @@ impl PyTerminalValueSpec {
     /// ----------
     /// multiple : float
     ///     Exit multiple in turns (``9.0`` = 9.0x).
-    /// terminal_metric : float
+    /// terminal_metric : float or None
     ///     Terminal-year metric (EBITDA, revenue, ...) in model currency.
-    ///     Required, as in the Rust wire form. Pass ``0.0`` when
+    ///     Omit when
     ///     ``DcfOptions.exit_multiple_metric_node`` supplies the metric from
-    ///     the statement model; without that node ``evaluate_dcf`` raises
+    ///     the statement model. Without that node, ``evaluate_dcf`` raises
     ///     ``ValueError`` unless the metric is positive and finite.
     #[staticmethod]
-    #[pyo3(text_signature = "(multiple, terminal_metric)")]
-    fn exit_multiple(multiple: f64, terminal_metric: f64) -> Self {
+    #[pyo3(signature = (multiple, terminal_metric=None))]
+    fn exit_multiple(multiple: f64, terminal_metric: Option<f64>) -> Self {
         Self {
             inner: TerminalValueSpec::ExitMultiple {
                 terminal_metric,

@@ -2623,9 +2623,10 @@ export type TerminalValueSpec =
        */
       multiple: number;
       /**
-       * Terminal metric value (e.g., EBITDA)
+       * Terminal metric in major currency units (for example, EBITDA).
+       * Required for standalone pricing. A statement DCF can resolve it from a metric node.
        */
-      terminal_metric: number;
+      terminal_metric?: number | null;
       type: "exit_multiple";
       [k: string]: unknown;
     }

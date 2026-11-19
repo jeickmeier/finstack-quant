@@ -65,9 +65,8 @@ def _dcf_model() -> statements.FinancialModelSpec:
     return builder.build()
 
 
-def test_exit_multiple_requires_terminal_metric_and_rejects_a_zero_placeholder() -> None:
-    with pytest.raises(TypeError):
-        TerminalValueSpec.exit_multiple(9.0)  # type: ignore[call-arg]
+def test_exit_multiple_requires_a_literal_metric_or_statement_metric_node() -> None:
+    assert "terminal_metric" not in json.loads(TerminalValueSpec.exit_multiple(9.0).to_json())
     priced = evaluate_dcf(
         _dcf_model(),
         {
@@ -77,16 +76,12 @@ def test_exit_multiple_requires_terminal_metric_and_rejects_a_zero_placeholder()
         },
     )
     assert priced.terminal_value_pv.amount > 0.0
-    # Without exit_multiple_metric_node a zero metric would price a zero terminal value.
-    with pytest.raises(ValueError, match="terminal_metric"):
-        evaluate_dcf(
-            _dcf_model(),
-            {
-                "wacc": 0.10,
-                "terminal_value": TerminalValueSpec.exit_multiple(9.0, 0.0),
-                "net_debt_override": 0.0,
-            },
-        )
+    for terminal in (TerminalValueSpec.exit_multiple(9.0), TerminalValueSpec.exit_multiple(9.0, 0.0)):
+        with pytest.raises(ValueError, match="terminal_metric"):
+            evaluate_dcf(
+                _dcf_model(),
+                {"wacc": 0.10, "terminal_value": terminal, "net_debt_override": 0.0},
+            )
 
 
 @pytest.mark.parametrize(

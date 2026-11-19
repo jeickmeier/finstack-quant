@@ -1205,11 +1205,11 @@ fn resolve_exit_multiple_metric(
         if let TerminalValueSpec::ExitMultiple {
             terminal_metric, ..
         } = terminal_value
-            && !(terminal_metric.is_finite() && terminal_metric > 0.0)
+            && !terminal_metric.is_some_and(|metric| metric.is_finite() && metric > 0.0)
         {
             return Err(finstack_quant_statements::Error::InvalidInput(format!(
                 "exit-multiple terminal_metric must be positive and finite unless \
-                     exit_multiple_metric_node supplies it (got {terminal_metric})"
+                     exit_multiple_metric_node supplies it (got {terminal_metric:?})"
             )));
         }
         return Ok(terminal_value);
@@ -1226,7 +1226,7 @@ fn resolve_exit_multiple_metric(
     let currency = extract_currency_from_model(model)?;
     let metric = trailing_year_metric(model, results, node, last_forecast.end, currency)?;
     Ok(TerminalValueSpec::ExitMultiple {
-        terminal_metric: metric,
+        terminal_metric: Some(metric),
         multiple,
     })
 }
@@ -1697,7 +1697,7 @@ mod tests {
             &model,
             0.10,
             TerminalValueSpec::ExitMultiple {
-                terminal_metric: 150.0,
+                terminal_metric: Some(150.0),
                 multiple: 8.0,
             },
             "ufcf",
@@ -1825,7 +1825,7 @@ mod tests {
                 wacc: 0.10,
                 terminal_value: TerminalValueSpec::ExitMultiple {
                     // Explicit metric is ignored when the node is set.
-                    terminal_metric: 999.0,
+                    terminal_metric: None,
                     multiple: 8.0,
                 },
                 ufcf_node: "ufcf".to_string(),
@@ -1876,7 +1876,7 @@ mod tests {
             };
             let results = Evaluator::new().evaluate(&model).unwrap();
             let terminal = TerminalValueSpec::ExitMultiple {
-                terminal_metric: 999.,
+                terminal_metric: Some(999.),
                 multiple: 8.,
             };
             let resolved =
@@ -1888,7 +1888,7 @@ mod tests {
             else {
                 unreachable!()
             };
-            assert_eq!(terminal_metric, 100.);
+            assert_eq!(terminal_metric, Some(100.));
             model.periods = finstack_quant_core::dates::PeriodPlan::try_new(
                 model.periods.get_calendar(),
                 model.periods[1..].to_vec(),
@@ -1901,7 +1901,7 @@ mod tests {
             assert!(resolve_exit_multiple_metric(&model, &results, terminal, None).is_ok());
             for bad in [0.0, -5.0, f64::NAN] {
                 let unset = TerminalValueSpec::ExitMultiple {
-                    terminal_metric: bad,
+                    terminal_metric: Some(bad),
                     multiple: 8.,
                 };
                 assert!(
@@ -1924,7 +1924,7 @@ mod tests {
             &DcfInputs {
                 wacc: 0.10,
                 terminal_value: TerminalValueSpec::ExitMultiple {
-                    terminal_metric: 150.0,
+                    terminal_metric: Some(150.0),
                     multiple: 8.0,
                 },
                 ufcf_node: "ufcf".to_string(),
@@ -1948,7 +1948,7 @@ mod tests {
             &DcfInputs {
                 wacc: 0.10,
                 terminal_value: TerminalValueSpec::ExitMultiple {
-                    terminal_metric: 150.0,
+                    terminal_metric: Some(150.0),
                     multiple: 8.0,
                 },
                 ufcf_node: "ufcf".to_string(),
