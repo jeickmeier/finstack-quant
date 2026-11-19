@@ -557,6 +557,20 @@ impl PyPnlAttribution {
         self.inner.explain(show_zeros)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._pnl_attribution", "PnlAttribution.compare")]
+    #[staticmethod]
+    fn compare<'py>(
+        py: Python<'py>,
+        attributions: Vec<PyRef<'py, Self>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rows = attributions
+            .iter()
+            .map(|attribution| pnl_attribution_wide_row(&attribution.inner))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(crate::errors::core_to_py)?;
+        serde_rows_to_dataframe_with_schema(py, &rows, &WIDE_COLUMNS)
+    }
+
     /// Export attribution as a single-row pandas ``DataFrame``.
     ///
     /// Raises ``ValueError`` if any headline, factor, residual, detail, or diagnostic amount uses a currency other

@@ -365,3 +365,14 @@ def test_step_dataframes_flatten_injected_rows() -> None:
     )
     with pytest.raises(ValueError, match="Currency mismatch"):
         mixed.validate_currencies()
+
+
+def test_compare_matches_wide_rows_and_preserves_the_empty_schema() -> None:
+    first = _patch_attribution(instrument_id="BOND-1")
+    second = _patch_attribution(instrument_id="BOND-2")
+    combined = PnlAttribution.compare([second, first])
+    expected = pd.concat([second.to_dataframe(), first.to_dataframe()], ignore_index=True)
+    pd.testing.assert_frame_equal(combined, expected)
+    empty = PnlAttribution.compare([])
+    assert empty.empty
+    assert list(empty.columns) == list(expected.columns)

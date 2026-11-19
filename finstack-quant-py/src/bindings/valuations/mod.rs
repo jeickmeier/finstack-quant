@@ -20,8 +20,8 @@ pub(crate) mod typed_credit;
 pub(crate) mod typed_deposit;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_fra;
-pub(crate) mod typed_inflation_bond;
 pub(crate) mod typed_fx;
+pub(crate) mod typed_inflation_bond;
 mod typed_legs;
 pub(crate) mod typed_macros;
 pub(crate) mod typed_rates;
@@ -30,8 +30,7 @@ pub(crate) mod typed_structured_credit;
 mod var;
 
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    serde_to_py,
+    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::pydoc::pydoc;
 use crate::errors::display_to_py;
@@ -50,6 +49,19 @@ pub(crate) struct PyValuationResult {
 }
 
 impl PyValuationResult {
+    fn wide_rows_dataframe<'py>(
+        py: Python<'py>,
+        rows: &[finstack_quant_valuations::results::ValuationRow],
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let identity: [ColumnSchema<'_>; 4] = [
+            ("instrument_id", "str"),
+            ("as_of_date", "str"),
+            ("pv", "float64"),
+            ("currency", "str"),
+        ];
+        serde_rows_to_dataframe_with_schema(py, rows, &identity)
+    }
+
     fn long_rows_dataframe<'py>(
         py: Python<'py>,
         rows: &[finstack_quant_valuations::results::ValuationLongRow],
@@ -221,12 +233,14 @@ impl PyValuationResult {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = self.inner.to_row();
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &["instrument_id", "as_of_date", "pv", "currency"],
-        )
+        Self::wide_rows_dataframe(py, &[self.inner.to_row()])
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations", "ValuationResult.concat")]
+    #[staticmethod]
+    fn concat<'py>(py: Python<'py>, results: Vec<PyRef<'py, Self>>) -> PyResult<Bound<'py, PyAny>> {
+        let rows: Vec<_> = results.iter().map(|result| result.inner.to_row()).collect();
+        Self::wide_rows_dataframe(py, &rows)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult._repr_html_")]

@@ -115,3 +115,25 @@ def test_metric_series_uses_canonical_custom_base_keys() -> None:
     for values in [result, metrics]:
         with pytest.raises(ValueError, match="noncanonical"):
             values.metric_series("custom_xray")
+
+
+def test_valuation_concat_unions_metrics_and_preserves_row_order() -> None:
+    first_wire = {
+        **json.loads((DATA / "instrument_bond_result.json").read_text()),
+        "instrument_id": "BOND-1",
+        "measures": {"dv01": 20.0},
+    }
+    second_wire = {
+        **first_wire,
+        "instrument_id": "BOND-2",
+        "measures": {"cs01": 3.5},
+    }
+    first = ValuationResult.from_json(json.dumps(first_wire))
+    second = ValuationResult.from_json(json.dumps(second_wire))
+    table = ValuationResult.concat([second, first])
+    assert list(table.columns) == ["instrument_id", "as_of_date", "pv", "currency", "cs01", "dv01"]
+    assert table["instrument_id"].tolist() == ["BOND-2", "BOND-1"]
+    assert table["cs01"].iloc[0] == 3.5
+    assert table["dv01"].iloc[1] == 20.0
+    assert table["cs01"].isna().tolist() == [False, True]
+    assert list(ValuationResult.concat([]).columns) == list(table.columns[:4])
