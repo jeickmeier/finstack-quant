@@ -8,61 +8,54 @@ use finstack_quant_statements_analytics::templates::{roll_forward, vintage};
 
 #[test]
 fn test_roll_forward_pattern_arr() -> Result<()> {
-    let model = roll_forward::add_roll_forward(
-        {
-            let mut model_builder = ModelBuilder::new("SaaS Model");
-            model_builder.periods("2025Q1..2025Q4", None)?;
-            model_builder
-                // Inputs
-                .value_scalar(
-                    "new_arr",
-                    &[
-                        (
-                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                            100.0,
-                        ),
-                        (
-                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                            120.0,
-                        ),
-                        (
-                            PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                            140.0,
-                        ),
-                        (
-                            PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                            160.0,
-                        ),
-                    ],
-                );
-            model_builder.value_scalar(
-                "churn_arr",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        10.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        12.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                        14.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                        16.0,
-                    ),
-                ],
-            );
-            model_builder
-        },
-        "arr",
-        &["new_arr"],
-        &["churn_arr"],
-    )
-    .build()?;
+    let mut builder = ModelBuilder::new("SaaS Model");
+    builder.periods("2025Q1..2025Q4", None)?;
+    builder
+        // Inputs
+        .value_scalar(
+            "new_arr",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    100.0,
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    120.0,
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    140.0,
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    160.0,
+                ),
+            ],
+        );
+    builder.value_scalar(
+        "churn_arr",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                10.0,
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                12.0,
+            ),
+            (
+                PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                14.0,
+            ),
+            (
+                PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                16.0,
+            ),
+        ],
+    );
+    roll_forward::add_roll_forward(&mut builder, "arr", &["new_arr"], &["churn_arr"]);
+    let model = builder.build()?;
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model)?;

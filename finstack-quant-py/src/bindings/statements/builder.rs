@@ -526,7 +526,7 @@ impl PyModelBuilder {
 
     /// Mutable access to the builder without taking ownership, so a
     /// fallible Rust call cannot leave the wrapper empty.
-    fn builder_mut(&mut self) -> PyResult<&mut ModelBuilder> {
+    pub(crate) fn builder_mut(&mut self) -> PyResult<&mut ModelBuilder> {
         self.inner.as_mut().ok_or_else(Self::consumed_error)
     }
 }

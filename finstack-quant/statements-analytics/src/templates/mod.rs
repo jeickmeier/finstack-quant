@@ -52,14 +52,15 @@
 //! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 //! # let q1 = PeriodId::quarter(2025, 1)?;
 //! # let values: &[(PeriodId, AmountOrScalar)] = &[(q1, AmountOrScalar::scalar(10.0))];
-//! let builder = {
+//! let mut builder = {
 //!     let mut model_builder = ModelBuilder::new("demo");
 //!     model_builder.periods("2025Q1..2025Q4", None)?;
 //!     model_builder.value("additions", values);
 //!     model_builder.value("disposals", values);
 //!     model_builder
 //! };
-//! let model = add_roll_forward(builder, "inventory", &["additions"], &["disposals"]).build()?;
+//! add_roll_forward(&mut builder, "inventory", &["additions"], &["disposals"]);
+//! let model = builder.build()?;
 //! # let _ = model;
 //! # Ok(())
 //! # }

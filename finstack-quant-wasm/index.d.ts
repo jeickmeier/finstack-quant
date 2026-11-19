@@ -10909,42 +10909,24 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly addVintageBuildup: typeof wasm.addVintageBuildup;
   /**
-   * Add a roll-forward (corkscrew) structure with a zero opening balance.
-   *
-   * Twin of Python `add_roll_forward` (Rust `add_roll_forward`). Adds
-   * `<name>_beg` and `<name>_end`, where
-   * `end = beg + sum(increases) - sum(decreases)` and each period's opening
-   * balance is the prior period's close.
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
-   * @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
-   * @param increases - Existing nodes added to the balance each period.
-   * @param decreases - Existing nodes subtracted from the balance each period.
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
-   *
-   * # Errors
-   *
-   * Throws with kind `validation` if the model is malformed, a node identifier
-   * is invalid, or a generated formula does not compile.
+   * Add a roll-forward with a zero opening balance.
+   * @param builder - Active ModelBuilder receiving the beginning and ending balance nodes.
+   * @param name - Prefix for the generated balance node identifiers.
+   * @param increases - Identifiers of flows added to the balance each period.
+   * @param decreases - Identifiers of flows deducted from the balance each period.
+   * @throws If a parameter has the wrong type or the builder has been consumed.
+   * Generated node identifiers, formulas and references are validated by build.
    */
   readonly addRollForward: typeof wasm.addRollForward;
   /**
-   * Add a roll-forward (corkscrew) structure with an explicit opening balance.
-   *
-   * Twin of Python `add_roll_forward_with_opening` (Rust
-   * `add_roll_forward_with_opening`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
-   * @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
-   * @param increases - Existing nodes added to the balance each period.
-   * @param decreases - Existing nodes subtracted from the balance each period.
-   * @param opening - Opening balance of the first period, in the balance's own units.
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
-   *
-   * # Errors
-   *
-   * Throws with kind `validation` if the model is malformed, a node identifier
-   * is invalid, or a generated formula does not compile.
+   * Add a roll-forward with an explicit opening balance.
+   * @param builder - Active ModelBuilder receiving the beginning and ending balance nodes.
+   * @param name - Prefix for the generated balance node identifiers.
+   * @param increases - Identifiers of flows added to the balance each period.
+   * @param decreases - Identifiers of flows deducted from the balance each period.
+   * @param opening - First-period beginning balance in the flows' own units.
+   * @throws If a parameter has the wrong type or the builder has been consumed.
+   * Generated node identifiers, formulas and references are validated by build.
    */
   readonly addRollForwardWithOpening: typeof wasm.addRollForwardWithOpening;
   /**

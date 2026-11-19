@@ -73,7 +73,9 @@ test('statements_analytics matches the cross-host golden', () => {
     core.RatingScaleRegistry.fromJson(INPUTS.rating_scales)
   );
 
-  const rolled = sa.addRollForwardWithOpening(MODEL, 'debt', ['revenue'], ['cogs'], 10.0);
+  const rollBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addRollForwardWithOpening(rollBuilder, 'debt', ['revenue'], ['cogs'], 10.0);
+  const rolled = rollBuilder.build();
   const vintage = sa.addVintageBuildup(MODEL, 'book', 'revenue', [1.0, 0.5]);
   const noi = sa.addNoiBuildup(MODEL, 'total_rev', ['revenue'], 'total_exp', ['cogs'], 'noi');
   const ncf = sa.addNcfBuildup(noi, 'noi', ['cogs'], 'ncf');
@@ -458,7 +460,9 @@ test('validateScorecardConfig and the spec validators run the Rust checks', () =
 });
 
 test('addRollForward opens at zero and the templates reject bad inputs', () => {
-  const rolled = sa.addRollForward(MODEL, 'debt', ['revenue'], ['cogs']);
+  const rollBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addRollForward(rollBuilder, 'debt', ['revenue'], ['cogs']);
+  const rolled = rollBuilder.build();
   assert.equal(valueOf(rolled, 'debt_end', Q1), 60);
   assert.throws(
     () => sa.addRentRoll(MODEL, []),

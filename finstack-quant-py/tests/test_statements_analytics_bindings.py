@@ -191,12 +191,14 @@ class TestRollForward:
         b = statements.ModelBuilder("rf")
         b.periods("2024Q1..Q2", None)
         b.value("adds", [("2024Q1", 10.0), ("2024Q2", 10.0)])
-        model_json = b.build().to_json()
-        model = add_roll_forward_with_opening(model_json, "bal", ["adds"], [], 100.0)
+        add_roll_forward_with_opening(b, "bal", ["adds"], [], 100.0)
+        b.compute("twice_balance", "2 * bal_end")
+        model = b.build()
         assert isinstance(model, statements.FinancialModelSpec)
         result = statements.Evaluator().evaluate(model)
         assert result.get("bal_end", "2024Q1") == pytest.approx(110.0)
         assert result.get("bal_end", "2024Q2") == pytest.approx(120.0)
+        assert result.get("twice_balance", "2024Q2") == pytest.approx(240.0)
 
 
 class TestStatementResultTypedAccessors:

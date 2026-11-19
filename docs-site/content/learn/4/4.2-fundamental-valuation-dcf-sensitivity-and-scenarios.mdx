@@ -281,10 +281,11 @@ for funded_debt in (80_000_000.0,100_000_000.0):
     builder.constant("lbo_entry_ebitda", Money(entry_metric, "USD"))
     builder.value("lbo_forecast",[(p,float(p in PERIODS[4:])) for p in PERIODS])
     builder.value("lbo_amort",[(p,funded_debt*0.025 if p in PERIODS[4:] else 0.0) for p in PERIODS])
+    add_roll_forward_with_opening(builder, "lbo_debt", [], ["lbo_amort"], funded_debt)
     builder.compute("lbo_interest","lbo_debt_beg * 0.075 / 4 * lbo_forecast")
     builder.compute("lbo_cash_change","lbo_forecast * (ufcf - lbo_interest*(1-tax_rate) - lbo_amort)")
     builder.compute("lbo_cash",f"{entry_cash} + cumsum(lbo_cash_change)")
-    financed = add_roll_forward_with_opening(builder.build(),"lbo_debt",[],["lbo_amort"],funded_debt)
+    financed = builder.build()
     financing_results = Evaluator().evaluate(financed)
     financed = ModelBuilder.from_spec(financed).value_money("annualized_ebitda_usd",[(p,Money(financing_results.get("annualized_ebitda",p),"USD")) for p in PERIODS]).value_money("lbo_debt_end_usd",[(p,Money(financing_results.get("lbo_debt_end",p),"USD")) for p in PERIODS]).build()
     # All company cash is reserved for operating liquidity: no interim distribution or excess-cash credit at exit.

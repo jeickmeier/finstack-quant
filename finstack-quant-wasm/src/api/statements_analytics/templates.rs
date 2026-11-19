@@ -58,75 +58,57 @@ pub fn add_vintage_buildup(
     finish(builder)
 }
 
-/// Add a roll-forward (corkscrew) structure with a zero opening balance.
-///
-/// Twin of Python `add_roll_forward` (Rust `add_roll_forward`). Adds
-/// `<name>_beg` and `<name>_end`, where
-/// `end = beg + sum(increases) - sum(decreases)` and each period's opening
-/// balance is the prior period's close.
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
-/// @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
-/// @param increases - Existing nodes added to the balance each period.
-/// @param decreases - Existing nodes subtracted from the balance each period.
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid, or a generated formula does not compile.
-#[wasm_bindgen(js_name = addRollForward, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+/// Add a roll-forward with a zero opening balance.
+/// @param builder - Active ModelBuilder receiving the beginning and ending balance nodes.
+/// @param name - Prefix for the generated balance node identifiers.
+/// @param increases - Identifiers of flows added to the balance each period.
+/// @param decreases - Identifiers of flows deducted from the balance each period.
+/// @throws If a parameter has the wrong type or the builder has been consumed.
+/// Generated node identifiers, formulas and references are validated by build.
+#[wasm_bindgen(js_name = addRollForward)]
 pub fn add_roll_forward(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut crate::api::statements::JsModelBuilder,
     #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string[]")] increases: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string[]")] decreases: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<(), JsValue> {
     let increases = js_string_seq(&increases, "increases")?;
     let decreases = js_string_seq(&decreases, "decreases")?;
-    let builder = roll_forward::add_roll_forward(
-        builder(&model)?,
+    roll_forward::add_roll_forward(
+        builder.builder_mut()?,
         &js_string(&name, "name")?,
         &refs(&increases),
         &refs(&decreases),
     );
-    finish(builder)
+    Ok(())
 }
 
-/// Add a roll-forward (corkscrew) structure with an explicit opening balance.
-///
-/// Twin of Python `add_roll_forward_with_opening` (Rust
-/// `add_roll_forward_with_opening`).
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
-/// @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
-/// @param increases - Existing nodes added to the balance each period.
-/// @param decreases - Existing nodes subtracted from the balance each period.
-/// @param opening - Opening balance of the first period, in the balance's own units.
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid, or a generated formula does not compile.
-#[wasm_bindgen(js_name = addRollForwardWithOpening, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+/// Add a roll-forward with an explicit opening balance.
+/// @param builder - Active ModelBuilder receiving the beginning and ending balance nodes.
+/// @param name - Prefix for the generated balance node identifiers.
+/// @param increases - Identifiers of flows added to the balance each period.
+/// @param decreases - Identifiers of flows deducted from the balance each period.
+/// @param opening - First-period beginning balance in the flows' own units.
+/// @throws If a parameter has the wrong type or the builder has been consumed.
+/// Generated node identifiers, formulas and references are validated by build.
+#[wasm_bindgen(js_name = addRollForwardWithOpening)]
 pub fn add_roll_forward_with_opening(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut crate::api::statements::JsModelBuilder,
     #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string[]")] increases: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string[]")] decreases: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] opening: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<(), JsValue> {
     let increases = js_string_seq(&increases, "increases")?;
     let decreases = js_string_seq(&decreases, "decreases")?;
-    let builder = roll_forward::add_roll_forward_with_opening(
-        builder(&model)?,
+    roll_forward::add_roll_forward_with_opening(
+        builder.builder_mut()?,
         &js_string(&name, "name")?,
         &refs(&increases),
         &refs(&decreases),
         js_f64(&opening, "opening")?,
     );
-    finish(builder)
+    Ok(())
 }
 
 /// Add a net-operating-income buildup: total revenue, total expenses and NOI.

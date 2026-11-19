@@ -82,7 +82,7 @@ impl JsModelBuilder {
 
     /// Mutable access without taking ownership, so a failed setter call
     /// leaves the builder usable.
-    fn builder_mut(&mut self) -> Result<&mut ModelBuilder, JsValue> {
+    pub(crate) fn builder_mut(&mut self) -> Result<&mut ModelBuilder, JsValue> {
         self.inner.as_mut().ok_or_else(consumed)
     }
 }

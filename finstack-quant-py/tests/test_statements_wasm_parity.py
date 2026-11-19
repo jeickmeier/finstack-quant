@@ -239,7 +239,9 @@ def analytics_cases() -> dict[str, Any]:
     def evaluated(model: st.FinancialModelSpec, node: str, period: str) -> float | None:
         return st.Evaluator().evaluate(model).get(node, period)
 
-    rolled = sa.add_roll_forward_with_opening(MODEL, "debt", ["revenue"], ["cogs"], 10.0)
+    roll_builder = st.ModelBuilder.from_spec(st.FinancialModelSpec.from_json(MODEL))
+    sa.add_roll_forward_with_opening(roll_builder, "debt", ["revenue"], ["cogs"], 10.0)
+    rolled = roll_builder.build()
     vintage = sa.add_vintage_buildup(MODEL, "book", "revenue", [1.0, 0.5])
     noi = sa.add_noi_buildup(MODEL, "total_rev", ["revenue"], "total_exp", ["cogs"], "noi")
     ncf = sa.add_ncf_buildup(noi, "noi", ["cogs"], "ncf")
