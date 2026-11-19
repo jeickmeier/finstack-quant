@@ -26,6 +26,11 @@ pub(crate) mod typed_interest_rate_future_option;
 pub(crate) mod typed_volatility_index_future;
 pub(crate) mod typed_volatility_index_future_option;
 
+pub(crate) mod typed_basis_swap;
+pub(crate) mod typed_bermudan_swaption;
+pub(crate) mod typed_cms_option;
+pub(crate) mod typed_cms_spread_option;
+pub(crate) mod typed_cms_swap;
 pub(crate) mod typed_commodity_asian_option;
 pub(crate) mod typed_commodity_forward;
 pub(crate) mod typed_commodity_future;
@@ -51,6 +56,8 @@ pub(crate) mod typed_fx_swap;
 pub(crate) mod typed_fx_touch_option;
 pub(crate) mod typed_fx_variance_swap;
 pub(crate) mod typed_inflation_bond;
+pub(crate) mod typed_inflation_cap_floor;
+pub(crate) mod typed_inflation_swap;
 mod typed_legs;
 pub(crate) mod typed_listed;
 pub(crate) mod typed_macros;
@@ -61,6 +68,8 @@ pub(crate) mod typed_repo;
 pub(crate) mod typed_revolving_credit;
 pub(crate) mod typed_structured_credit;
 pub(crate) mod typed_variance_swap;
+pub(crate) mod typed_xccy_swap;
+pub(crate) mod typed_yoy_inflation_swap;
 mod var;
 
 use crate::bindings::pandas_utils::{
@@ -452,6 +461,15 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_convertible::register(py, &m)?;
     convertible_spot_ladder::register(&m)?;
     typed_equity::register(py, &m)?;
+    typed_basis_swap::register(&m)?;
+    typed_xccy_swap::register(&m)?;
+    typed_cms_swap::register(&m)?;
+    typed_cms_option::register(&m)?;
+    typed_cms_spread_option::register(&m)?;
+    typed_inflation_swap::register(&m)?;
+    typed_yoy_inflation_swap::register(&m)?;
+    typed_inflation_cap_floor::register(&m)?;
+    typed_bermudan_swaption::register(&m)?;
     typed_commodity_future_option::register(&m)?;
     typed_fx_spot::register(&m)?;
     typed_commodity_forward::register(&m)?;
@@ -527,6 +545,26 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_convertible::EXPORTS);
     exports.extend_from_slice(convertible_spot_ladder::EXPORTS);
     exports.extend_from_slice(typed_equity::EXPORTS);
+    exports.extend_from_slice(&[
+        "BasisSwap",
+        "BasisSwapBuilder",
+        "XccySwap",
+        "XccySwapBuilder",
+        "CmsSwap",
+        "CmsSwapBuilder",
+        "CmsOption",
+        "CmsOptionBuilder",
+        "CmsSpreadOption",
+        "CmsSpreadOptionBuilder",
+        "InflationSwap",
+        "InflationSwapBuilder",
+        "YoYInflationSwap",
+        "YoYInflationSwapBuilder",
+        "InflationCapFloor",
+        "InflationCapFloorBuilder",
+        "BermudanSwaption",
+        "BermudanSwaptionBuilder",
+    ]);
     exports.extend_from_slice(&["CommodityFutureOption", "CommodityFutureOptionBuilder"]);
     exports.extend_from_slice(&[
         "FxSpot",

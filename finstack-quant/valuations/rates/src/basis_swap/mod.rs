@@ -53,4 +53,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::BasisSwap;
+pub use types::{BasisSwap, BasisSwapBuilder};

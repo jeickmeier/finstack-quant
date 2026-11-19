@@ -24,7 +24,12 @@ use crate::bindings::valuations::composite::PyCompositeInstrument;
 use crate::bindings::valuations::convert::serialize_typed_instrument_json;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
+use crate::bindings::valuations::typed_basis_swap::PyBasisSwap;
+use crate::bindings::valuations::typed_bermudan_swaption::PyBermudanSwaption;
 use crate::bindings::valuations::typed_bond_future::PyBondFuture;
+use crate::bindings::valuations::typed_cms_option::PyCmsOption;
+use crate::bindings::valuations::typed_cms_spread_option::PyCmsSpreadOption;
+use crate::bindings::valuations::typed_cms_swap::PyCmsSwap;
 use crate::bindings::valuations::typed_commodity_asian_option::PyCommodityAsianOption;
 use crate::bindings::valuations::typed_commodity_forward::PyCommodityForward;
 use crate::bindings::valuations::typed_commodity_future::PyCommodityFuture;
@@ -56,6 +61,8 @@ use crate::bindings::valuations::typed_fx_swap::PyFxSwap;
 use crate::bindings::valuations::typed_fx_touch_option::PyFxTouchOption;
 use crate::bindings::valuations::typed_fx_variance_swap::PyFxVarianceSwap;
 use crate::bindings::valuations::typed_inflation_bond::PyInflationLinkedBond;
+use crate::bindings::valuations::typed_inflation_cap_floor::PyInflationCapFloor;
+use crate::bindings::valuations::typed_inflation_swap::PyInflationSwap;
 use crate::bindings::valuations::typed_interest_rate_future::PyInterestRateFuture;
 use crate::bindings::valuations::typed_interest_rate_future_option::PyInterestRateFutureOption;
 use crate::bindings::valuations::typed_ndf::PyNdf;
@@ -69,6 +76,8 @@ use crate::bindings::valuations::typed_structured_credit::{
 use crate::bindings::valuations::typed_variance_swap::PyVarianceSwap;
 use crate::bindings::valuations::typed_volatility_index_future::PyVolatilityIndexFuture;
 use crate::bindings::valuations::typed_volatility_index_future_option::PyVolatilityIndexFutureOption;
+use crate::bindings::valuations::typed_xccy_swap::PyXccySwap;
+use crate::bindings::valuations::typed_yoy_inflation_swap::PyYoYInflationSwap;
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::pricer::ParsedInstrument;
@@ -188,6 +197,15 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyConvertibleBond,
         PyEquity,
         PyEquityOption,
+        PyBasisSwap,
+        PyXccySwap,
+        PyCmsSwap,
+        PyCmsOption,
+        PyCmsSpreadOption,
+        PyInflationSwap,
+        PyYoYInflationSwap,
+        PyInflationCapFloor,
+        PyBermudanSwaption,
         PyCommodityFutureOption,
         PyFxSpot,
         PyCommodityForward,

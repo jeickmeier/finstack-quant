@@ -241,6 +241,42 @@ from finstack_quant.valuations.instruments._typed_commodity_future_option import
     CommodityFutureOption as CommodityFutureOption,
     CommodityFutureOptionBuilder as CommodityFutureOptionBuilder,
 )
+from finstack_quant.valuations.instruments._typed_basis_swap import (
+    BasisSwap as BasisSwap,
+    BasisSwapBuilder as BasisSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_xccy_swap import (
+    XccySwap as XccySwap,
+    XccySwapBuilder as XccySwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_cms_swap import (
+    CmsSwap as CmsSwap,
+    CmsSwapBuilder as CmsSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_cms_option import (
+    CmsOption as CmsOption,
+    CmsOptionBuilder as CmsOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_cms_spread_option import (
+    CmsSpreadOption as CmsSpreadOption,
+    CmsSpreadOptionBuilder as CmsSpreadOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_inflation_swap import (
+    InflationSwap as InflationSwap,
+    InflationSwapBuilder as InflationSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_yoy_inflation_swap import (
+    YoYInflationSwap as YoYInflationSwap,
+    YoYInflationSwapBuilder as YoYInflationSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_inflation_cap_floor import (
+    InflationCapFloor as InflationCapFloor,
+    InflationCapFloorBuilder as InflationCapFloorBuilder,
+)
+from finstack_quant.valuations.instruments._typed_bermudan_swaption import (
+    BermudanSwaption as BermudanSwaption,
+    BermudanSwaptionBuilder as BermudanSwaptionBuilder,
+)
 from finstack_quant.valuations.instruments._typed_equity import (
     EquityOption as EquityOption,
     EquityOptionBuilder as EquityOptionBuilder,
@@ -431,6 +467,24 @@ __all__ = [
     "Equity",
     "EquityBuilder",
     "EquityOption",
+    "BasisSwap",
+    "BasisSwapBuilder",
+    "XccySwap",
+    "XccySwapBuilder",
+    "CmsSwap",
+    "CmsSwapBuilder",
+    "CmsOption",
+    "CmsOptionBuilder",
+    "CmsSpreadOption",
+    "CmsSpreadOptionBuilder",
+    "InflationSwap",
+    "InflationSwapBuilder",
+    "YoYInflationSwap",
+    "YoYInflationSwapBuilder",
+    "InflationCapFloor",
+    "InflationCapFloorBuilder",
+    "BermudanSwaption",
+    "BermudanSwaptionBuilder",
     "CommodityFutureOption",
     "CommodityFutureOptionBuilder",
     "FxSpot",

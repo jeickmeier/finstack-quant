@@ -20,4 +20,4 @@ pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use pricer::CmsSpreadOptionPricer;
-pub use types::CmsSpreadOption;
+pub use types::{CmsSpreadOption, CmsSpreadOptionBuilder};

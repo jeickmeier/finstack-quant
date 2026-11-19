@@ -13,4 +13,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricing_mtm;
 mod types;
 
-pub use types::{XccySwap, XccySwapLeg};
+pub use types::{XccySwap, XccySwapBuilder, XccySwapLeg};

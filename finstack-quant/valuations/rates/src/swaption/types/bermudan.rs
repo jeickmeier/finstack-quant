@@ -49,7 +49,13 @@ use finstack_quant_valuations_core::instruments::{SettlementType, VolatilityMode
 /// // Create a 10NC2 (10-year swap, callable after 2 years)
 /// let swaption = BermudanSwaption::example().expect("example");
 /// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(
+    finstack_quant_valuations_macros::FinancialBuilder,
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BermudanSwaption {
@@ -76,6 +82,7 @@ pub struct BermudanSwaption {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub instrument_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
@@ -83,6 +90,7 @@ pub struct BermudanSwaption {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub metric_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
@@ -90,6 +98,7 @@ pub struct BermudanSwaption {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
@@ -137,6 +146,24 @@ pub struct BermudanSwaptionParams {
 }
 
 impl BermudanSwaption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> BermudanSwaptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .option_type(self.option_type)
+            .notional(self.notional)
+            .settlement(self.settlement)
+            .vol_surface_id(self.vol_surface_id.clone())
+            .exercise_schedule(self.exercise_schedule.clone())
+            .bermudan_type(self.bermudan_type)
+            .underlying_fixed_leg(self.underlying_fixed_leg.clone())
+            .underlying_float_leg(self.underlying_float_leg.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Parse a persisted `bermudan_swaption` instrument envelope.
     ///
     /// Accepts exactly the wire form the umbrella crate writes for this

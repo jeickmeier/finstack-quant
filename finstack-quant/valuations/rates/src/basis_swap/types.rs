@@ -171,6 +171,21 @@ pub struct BasisSwap {
 }
 
 impl BasisSwap {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> BasisSwapBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .notional(self.notional)
+            .primary_leg(self.primary_leg.clone())
+            .reference_leg(self.reference_leg.clone())
+            .allow_calendar_fallback(self.allow_calendar_fallback)
+            .allow_same_curve(self.allow_same_curve)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Creates a new basis swap with the specified parameters.
     ///
     /// Dates, discount curves, calendars, and stub conventions are on each leg.

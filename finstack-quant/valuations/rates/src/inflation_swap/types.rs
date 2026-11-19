@@ -122,6 +122,29 @@ pub struct InflationSwap {
 }
 
 impl InflationSwap {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> InflationSwapBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .notional(self.notional)
+            .start_date(self.start_date)
+            .maturity(self.maturity)
+            .fixed_rate(self.fixed_rate)
+            .inflation_index_id(self.inflation_index_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .day_count(self.day_count)
+            .side(self.side)
+            .lag_opt(self.lag)
+            .interpolation_opt(self.interpolation)
+            .base_cpi_opt(self.base_cpi)
+            .business_day_convention(self.business_day_convention)
+            .calendar_id_opt(self.calendar_id.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a canonical example zero-coupon inflation swap (US CPI, 5Y).
     ///
     /// Returns a 5-year USD inflation swap with standard 3-month CPI lag.
@@ -690,6 +713,30 @@ pub struct YoYInflationSwap {
 }
 
 impl YoYInflationSwap {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> YoYInflationSwapBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .notional(self.notional)
+            .start_date(self.start_date)
+            .maturity(self.maturity)
+            .fixed_rate(self.fixed_rate)
+            .frequency(self.frequency)
+            .inflation_index_id(self.inflation_index_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .day_count(self.day_count)
+            .side(self.side)
+            .lag_opt(self.lag)
+            .interpolation_opt(self.interpolation)
+            .base_cpi_opt(self.base_cpi)
+            .business_day_convention(self.business_day_convention)
+            .calendar_id_opt(self.calendar_id.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a canonical example USD 5Y YoY inflation swap (US-CPI, annual payments).
     ///
     /// Returns a 5-year pay-fixed YoY inflation swap with 2.5% fixed rate,

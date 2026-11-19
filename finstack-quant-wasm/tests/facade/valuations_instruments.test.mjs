@@ -609,3 +609,27 @@ test('bond breakeven ladder retains horizon order and its signed spread units', 
     bond.free();
   }
 });
+
+test('typed rates and inflation builders preserve the canonical trade when changing its id', () => {
+  const names = [
+    'BasisSwap',
+    'BermudanSwaption',
+    'CmsOption',
+    'CmsSpreadOption',
+    'CmsSwap',
+    'InflationCapFloor',
+    'InflationSwap',
+    'XccySwap',
+    'YoYInflationSwap',
+  ];
+  for (const name of names) {
+    const trade = valuations.instruments[name].example();
+    const newId = '{"literal":"trade id"}';
+    const copy = trade.toBuilder().id(newId).build();
+    const expected = JSON.parse(trade.toJson());
+    expected.instrument.spec.id = newId;
+    assert.equal(copy.id, newId, name);
+    assert.deepEqual(JSON.parse(copy.toJson()), expected, name);
+    assert.notEqual(trade.id, newId, name);
+  }
+});
