@@ -82,6 +82,11 @@ DurationCellTable = _portfolio.DurationCellTable
 ExcessReturnResult = _portfolio.ExcessReturnResult
 FactorBrinsonResult = _portfolio.FactorBrinsonResult
 FiAttributionResult = _portfolio.FiAttributionResult
+FiAttributionConfig = _portfolio.FiAttributionConfig
+FiPositionSnapshot = _portfolio.FiPositionSnapshot
+FiQuote = _portfolio.FiQuote
+FiQuoteLeg = _portfolio.FiQuoteLeg
+FiReportingBasis = _portfolio.FiReportingBasis
 FiCarinoLinkedResult = _portfolio.FiCarinoLinkedResult
 GridAttributionResult = _portfolio.GridAttributionResult
 GridCarinoLinkedResult = _portfolio.GridCarinoLinkedResult
@@ -184,8 +189,13 @@ __all__ = [
     "FactorContributionDelta",
     "FactorModel",
     "FactorPnlProfile",
+    "FiAttributionConfig",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
+    "FiPositionSnapshot",
+    "FiQuote",
+    "FiQuoteLeg",
+    "FiReportingBasis",
     "GirrQuoteDelta",
     "GirrQuoteTarget",
     "GridAttributionResult",

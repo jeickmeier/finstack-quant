@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import date
+from decimal import Decimal
 from typing import Any
 import pandas as pd
+from finstack_quant.core.currency import Currency
+from finstack_quant.core.money import Money
 from finstack_quant.portfolio._attribution import ReconciliationReport
 
 class FiAttributionResult:
@@ -11,27 +15,24 @@ class FiAttributionResult:
     Single-period Campisi benchmark-relative attribution result.
 
     Returned by :func:`campisi_attribution`. The five effect totals sum to
-    :attr:`active_return`; sector effects preserve first-seen order.
+    :attr:`active_return`; sector effects preserve declared sector order.
 
     Examples
     --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution
-    >>> snap = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> result = campisi_attribution(json.dumps(snap), json.dumps(snap), '{"period_years":0.25}')
-    >>> round(result.active_return, 6)
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.portfolio import (
+    ...     FiAttributionConfig,
+    ...     FiPositionSnapshot,
+    ...     FiReportingBasis,
+    ...     campisi_attribution,
+    ... )
+    >>> basis = FiReportingBasis(
+    ...     "portfolio", "benchmark", "reinvested", "dirty-settlement", "USD-native", "net-of-fees"
+    ... )
+    >>> config = FiAttributionConfig("2025-01-01", "2025-03-15", "USD", basis, ["GOVT"])
+    >>> snap = FiPositionSnapshot("UST.1", "GOVT", "1", 0.02, Money(80, "USD"), Money(5, "USD"))
+    >>> report = campisi_attribution([snap], [snap], config)
+    >>> report.active_return
     0.0
     """
 
@@ -54,7 +55,7 @@ class FiAttributionResult:
     @property
     def portfolio_components(self) -> dict[str, object]:
         """
-        Portfolio-side absolute Campisi split (carry, treasury, spread, selection, total).
+        Portfolio-side absolute Campisi split (carry, treasury, spread, residual, total).
 
         Returns
         -------
@@ -70,7 +71,7 @@ class FiAttributionResult:
     @property
     def benchmark_components(self) -> dict[str, object]:
         """
-        Benchmark-side absolute Campisi split (carry, treasury, spread, selection, total).
+        Benchmark-side absolute Campisi split (carry, treasury, spread, residual, total).
 
         Returns
         -------
@@ -196,9 +197,9 @@ class FiAttributionResult:
         ...
 
     @property
-    def total_selection(self) -> float:
+    def total_residual(self) -> float:
         """
-        Sum of sector selection effects.
+        Sum of sector residual effects.
 
         Returns
         -------
@@ -215,7 +216,7 @@ class FiAttributionResult:
         """
         Per-sector effects as a pandas DataFrame.
 
-        Columns: ``sector``, ``portfolio_weight``, ``benchmark_weight``, ``portfolio_return``, ``benchmark_return``, ``allocation``, ``active_carry``, ``active_treasury``, ``active_spread``, ``selection``, ``total_active``. The schema is pinned, so an empty result keeps the
+        Columns: ``sector``, ``portfolio_weight``, ``benchmark_weight``, ``portfolio_return``, ``benchmark_return``, ``allocation``, ``active_carry``, ``active_treasury``, ``active_spread``, ``residual``, ``total_active``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
 
         Returns
@@ -231,50 +232,23 @@ class FiAttributionResult:
         ...
 
     def reconciliation_check(self, tolerance: float) -> ReconciliationReport:
-        """
-        Reconcile the five Campisi effect totals against the active return.
-
-        Binds the Rust method
-        ``finstack_quant_portfolio::FiAttributionResult::reconciliation_check``.
-        For a result held as JSON, rebuild it first with
-        :meth:`FiAttributionResult.from_json`.
+        """Compare the displayed active return with the sum of displayed effects.
 
         Parameters
         ----------
         tolerance : float
-            Absolute tolerance in return units (``1e-10`` is appropriate for
-            return-space values).
+            Finite nonnegative absolute tolerance in decimal return units.
 
         Returns
         -------
         ReconciliationReport
-            Typed report with ``total_residual``, ``is_reconciled`` and
-            ``tolerance`` (residual and tolerance in return units).
+            Signed difference, comparison tolerance and pass indicator.
 
-        Notes
-        -----
-        This method does not raise.
-
-        Examples
-        --------
-        >>> import json
-        >>> from finstack_quant.portfolio import campisi_attribution
-        >>> snap = [
-        ...     {
-        ...         "sector": "GOVT",
-        ...         "weight": 1.0,
-        ...         "total_return": 0.02,
-        ...         "yield_annual": 0.04,
-        ...         "modified_duration": 5.0,
-        ...         "spread_duration": 0.0,
-        ...         "spread": 0.0,
-        ...         "delta_treasury_yield": -0.001,
-        ...         "delta_spread": 0.0,
-        ...     }
-        ... ]
-        >>> result = campisi_attribution(json.dumps(snap), json.dumps(snap), '{"period_years":0.25}')
-        >>> result.reconciliation_check(1e-10).is_reconciled
-        True
+        Raises
+        ------
+        PortfolioError
+            If the tolerance is negative or nonfinite, or the displayed
+            reconciliation difference cannot be represented.
         """
         ...
 
@@ -303,8 +277,8 @@ class FiAttributionResult:
         Parameters
         ----------
         json : str
-            Canonical payload produced by :meth:`to_json` or the paired
-            ``*_json`` wire function.
+            Canonical payload produced by :meth:`to_json`, including its
+            source observations.
 
         Returns
         -------
@@ -319,9 +293,19 @@ class FiAttributionResult:
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.portfolio import (
+        ...     FiAttributionConfig,
+        ...     FiPositionSnapshot,
+        ...     FiReportingBasis,
+        ...     campisi_attribution,
+        ... )
+        >>> basis = FiReportingBasis("pf", "bm", "reinvested", "dirty", "native", "net")
+        >>> holding = FiPositionSnapshot("X", "GOVT", "1", 0.02, Money(100, "USD"), Money(0, "USD"))
+        >>> first = FiAttributionConfig("2025-01-01", "2025-02-01", "USD", basis, ["GOVT"])
+        >>> period = campisi_attribution([holding], [holding], first)
         >>> from finstack_quant.portfolio import FiAttributionResult
-        >>> doc = '{"sectors": [], "portfolio_components": {"carry": 0.0, "treasury": 0.0, "spread": 0.0, "selection": 0.0, "total": 0.0}, "benchmark_components": {"carry": 0.0, "treasury": 0.0, "spread": 0.0, "selection": 0.0, "total": 0.0}, "portfolio_return": 0.0, "benchmark_return": 0.0, "active_return": 0.0, "total_allocation": 0.0, "total_active_carry": 0.0, "total_active_treasury": 0.0, "total_active_spread": 0.0, "total_selection": 0.0}'
-        >>> FiAttributionResult.from_json(doc).active_return
+        >>> FiAttributionResult.from_json(period.to_json()).active_return
         0.0
         """
         ...
@@ -335,16 +319,23 @@ class FiCarinoLinkedResult:
 
     Examples
     --------
-    >>> from finstack_quant.portfolio import FiCarinoLinkedResult
-    >>> doc = (
-    ...     '{"periods": [], "portfolio_return_compounded": 0.0404,'
-    ...     ' "benchmark_return_compounded": 0.0201, "linked_sectors": [],'
-    ...     ' "linked_allocation": 0.0, "linked_active_carry": 0.0,'
-    ...     ' "linked_active_treasury": 0.0, "linked_active_spread": 0.0,'
-    ...     ' "linked_selection": 0.0}'
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.portfolio import (
+    ...     FiAttributionConfig,
+    ...     FiPositionSnapshot,
+    ...     FiReportingBasis,
+    ...     campisi_attribution,
     ... )
-    >>> FiCarinoLinkedResult.from_json(doc).portfolio_return_compounded
-    0.0404
+    >>> basis = FiReportingBasis("pf", "bm", "reinvested", "dirty", "native", "net")
+    >>> holding = FiPositionSnapshot("X", "GOVT", "1", 0.02, Money(100, "USD"), Money(0, "USD"))
+    >>> first = FiAttributionConfig("2025-01-01", "2025-02-01", "USD", basis, ["GOVT"])
+    >>> period = campisi_attribution([holding], [holding], first)
+    >>> from finstack_quant.portfolio import campisi_carino_link
+    >>> second = FiAttributionConfig("2025-02-01", "2025-03-01", "USD", basis, ["GOVT"])
+    >>> later = campisi_attribution([holding], [holding], second)
+    >>> linked = campisi_carino_link([period, later])
+    >>> linked.active_return_compounded
+    0.0
     """
 
     @property
@@ -392,6 +383,21 @@ class FiCarinoLinkedResult:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    @property
+    def active_return_compounded(self) -> float:
+        """Return compounded active return computed before projecting the two side returns.
+
+        Returns
+        -------
+        float
+            Portfolio less benchmark compounded growth in decimal units.
+
+        Notes
+        -----
+        This accessor does not raise.
         """
         ...
 
@@ -476,9 +482,9 @@ class FiCarinoLinkedResult:
         ...
 
     @property
-    def linked_selection(self) -> float:
+    def linked_residual(self) -> float:
         """
-        Sum of linked selection effects.
+        Sum of linked residual effects.
 
         Returns
         -------
@@ -495,7 +501,7 @@ class FiCarinoLinkedResult:
         """
         Linked per-sector effects as a pandas DataFrame.
 
-        Columns: ``sector``, ``allocation``, ``active_carry``, ``active_treasury``, ``active_spread``, ``selection``, ``total_active``. The schema is pinned, so an empty result keeps the
+        Columns: ``sector``, ``allocation``, ``active_carry``, ``active_treasury``, ``active_spread``, ``residual``, ``total_active``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
 
         Returns
@@ -535,8 +541,8 @@ class FiCarinoLinkedResult:
         Parameters
         ----------
         json : str
-            Canonical payload produced by :meth:`to_json` or the paired
-            ``*_json`` wire function.
+            Canonical payload produced by :meth:`to_json`, including its
+            source observations.
 
         Returns
         -------
@@ -551,187 +557,331 @@ class FiCarinoLinkedResult:
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.portfolio import (
+        ...     FiAttributionConfig,
+        ...     FiPositionSnapshot,
+        ...     FiReportingBasis,
+        ...     campisi_attribution,
+        ... )
+        >>> basis = FiReportingBasis("pf", "bm", "reinvested", "dirty", "native", "net")
+        >>> holding = FiPositionSnapshot("X", "GOVT", "1", 0.02, Money(100, "USD"), Money(0, "USD"))
+        >>> first = FiAttributionConfig("2025-01-01", "2025-02-01", "USD", basis, ["GOVT"])
+        >>> period = campisi_attribution([holding], [holding], first)
+        >>> from finstack_quant.portfolio import campisi_carino_link
+        >>> second = FiAttributionConfig("2025-02-01", "2025-03-01", "USD", basis, ["GOVT"])
+        >>> later = campisi_attribution([holding], [holding], second)
+        >>> linked = campisi_carino_link([period, later])
         >>> from finstack_quant.portfolio import FiCarinoLinkedResult
-        >>> doc = '{"periods": [], "portfolio_return_compounded": 0.0, "benchmark_return_compounded": 0.0, "linked_sectors": [], "linked_allocation": 0.0, "linked_active_carry": 0.0, "linked_active_treasury": 0.0, "linked_active_spread": 0.0, "linked_selection": 0.0}'
-        >>> FiCarinoLinkedResult.from_json(doc).linked_selection
+        >>> FiCarinoLinkedResult.from_json(linked.to_json()).active_return_compounded
         0.0
         """
         ...
 
-def campisi_attribution(
-    portfolio: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    benchmark: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    config: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> FiAttributionResult:
-    """
-    Compute single-period Campisi fixed-income benchmark attribution.
+class FiQuote:
+    """An opening or closing quote for a selected Campisi rate experiment.
 
-    Binds Rust ``finstack_quant_portfolio::campisi_attribution``.
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import FiQuote
+    >>> quote = FiQuote("UST-5Y-par", 0.035)
+    """
+
+    def __init__(self, basis: str, rate: float) -> None:
+        """Record a qualified absolute decimal annual rate.
+
+        Parameters
+        ----------
+        basis : str
+            Stable quote experiment identifier including the relevant curve,
+            tenor or claim, compounding, valuation clock and settlement basis.
+        rate : float
+            Observed annual yield or spread in decimal units. A zero or
+            negative spread is admissible.
+
+        Raises
+        ------
+        TypeError
+            If the basis cannot be read as text or the rate as a number.
+        """
+        ...
+
+class FiQuoteLeg:
+    """Opening normalized duration and two observations on the same basis.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import FiQuote, FiQuoteLeg
+    >>> leg = FiQuoteLeg("UST-5Y-par", 4.5, FiQuote("UST-5Y-par", 0.03), FiQuote("UST-5Y-par", 0.031))
+    """
+
+    def __init__(self, sensitivity_basis: str, duration: float, opening: FiQuote, closing: FiQuote) -> None:
+        """Record the valuation sensitivity and the opening and closing rates.
+
+        Parameters
+        ----------
+        sensitivity_basis : str
+            The exact experiment used to estimate opening normalized duration.
+        duration : float
+            Years of price sensitivity per decimal rate change at the opening mark.
+        opening : FiQuote
+            Opening quote on the selected sensitivity basis.
+        closing : FiQuote
+            Closing quote on the unchanged opening basis.
+
+        Raises
+        ------
+        TypeError
+            If a term has the wrong host type. Basis and finiteness are checked
+            when the report is calculated.
+        """
+        ...
+
+class FiReportingBasis:
+    """Common valuation and realized-return conventions for a Campisi period.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import FiReportingBasis
+    >>> basis = FiReportingBasis("portfolio", "benchmark", "reinvested", "dirty-settlement", "USD-close", "net-of-fees")
+    """
+
+    def __init__(
+        self, portfolio_series_id: str, benchmark_series_id: str, return_policy: str, valuation: str, fx: str, fees: str
+    ) -> None:
+        """Identify the same reporting conventions for both sides.
+
+        Parameters
+        ----------
+        portfolio_series_id : str
+            Nonempty identifier of the portfolio realized return series.
+        benchmark_series_id : str
+            Nonempty identifier of the benchmark realized return series.
+        return_policy : str
+            Named total-return convention, including reinvestment.
+        valuation : str
+            Named valuation cut, settlement and observed price convention.
+        fx : str
+            Named FX translation policy and basis.
+        fees : str
+            Named fee inclusion and treatment policy.
+
+        Raises
+        ------
+        TypeError
+            If any convention is not supplied as text.
+        """
+        ...
+
+class FiAttributionConfig:
+    """Dated reporting window, currency and sector axis for Campisi attribution.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import FiAttributionConfig, FiReportingBasis
+    >>> basis = FiReportingBasis("portfolio", "benchmark", "reinvested", "dirty-settlement", "USD-close", "net-of-fees")
+    >>> config = FiAttributionConfig("2025-01-01", "2025-03-15", "USD", basis, ["Treasuries"])
+    """
+
+    def __init__(
+        self,
+        start: date | str,
+        end: date | str,
+        currency: Currency | str,
+        basis: FiReportingBasis,
+        sectors: list[str],
+    ) -> None:
+        """Record the reporting dates and ordered calculation axis.
+
+        Parameters
+        ----------
+        start : date or str
+            Opening valuation date, as a date or ISO calendar date text.
+        end : date or str
+            Closing valuation date strictly after the opening date.
+        currency : Currency or str
+            Currency of the return basis, opening marks and annual cash coupons.
+        basis : FiReportingBasis
+            Shared conventions supplied by the portfolio and benchmark.
+        sectors : list[str]
+            Unique ordered sector labels, including applicable cash and financing.
+
+        Raises
+        ------
+        TypeError
+            If a date, currency, basis or sector axis has the wrong host type.
+        ValueError
+            If a date or currency cannot be parsed.
+        """
+        ...
+
+class FiPositionSnapshot:
+    """Exact signed opening weight, cash coupon and realized return for a holding.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.portfolio import FiPositionSnapshot
+    >>> snapshot = FiPositionSnapshot("UST", "Treasuries", "1", 0.02, Money(80, "USD"), Money(5, "USD"))
+    """
+
+    def __init__(
+        self,
+        id: str,
+        sector: str,
+        weight: Decimal | str | int,
+        total_return: float,
+        opening_market_value: Money,
+        annual_coupon: Money,
+    ) -> None:
+        """Record one holding on the request's reporting basis.
+
+        Parameters
+        ----------
+        id : str
+            Stable identifier unique on one side of the report.
+        sector : str
+            Label on the declared ordered sector axis.
+        weight : Decimal or str or int
+            Exact signed fraction of opening net capital. Each side must sum to one.
+        total_return : float
+            Realized total return over the request window in decimal units.
+        opening_market_value : Money
+            Positive magnitude of the opening mark in reporting currency.
+        annual_coupon : Money
+            Annual opening cash coupon income in the same currency, including an
+            exact zero for a holding with no cash coupon.
+
+        Raises
+        ------
+        TypeError
+            If fields have the wrong host types.
+        ValueError
+            If the exact opening weight cannot be represented.
+        """
+        ...
+
+    def with_quote_legs(
+        self,
+        *,
+        treasury: FiQuoteLeg | None = None,
+        spread: FiQuoteLeg | None = None,
+    ) -> FiPositionSnapshot:
+        """Return a copy of the holding with elected opening rate sensitivities.
+
+        Parameters
+        ----------
+        treasury : FiQuoteLeg or None
+            Opening-selected government reference quote experiment or an
+            explicitly inapplicable leg.
+        spread : FiQuoteLeg or None
+            Qualified settlement Z-spread experiment or an explicitly
+            inapplicable leg.
+
+        Returns
+        -------
+        FiPositionSnapshot
+            Copy whose Treasury and spread legs are set to the supplied terms.
+
+        Raises
+        ------
+        TypeError
+            If a supplied leg has the wrong host type.
+        """
+        ...
+
+def campisi_attribution(
+    portfolio: list[FiPositionSnapshot],
+    benchmark: list[FiPositionSnapshot],
+    config: FiAttributionConfig,
+) -> FiAttributionResult:
+    """Decompose dated active fixed-income return into five effects.
 
     Parameters
     ----------
-    portfolio : str | dict | list | pandas.DataFrame
-        JSON array of ``FiPositionSnapshot`` objects with ``sector``,
-        ``weight``, ``total_return``, ``yield_annual``, ``modified_duration``,
-        ``spread_duration``, ``spread``, ``delta_treasury_yield``, and
-        ``delta_spread`` fields (decimals; durations in years). Unknown fields
-        are rejected and weights must sum to one. ``spread_duration`` must be
-        the canonical quote-reproducing Z-spread duration; ``spread`` and
-        ``delta_spread`` must use the matching ``z_spread`` basis. OAS,
-        G-spread, and discount-margin values are incompatible. The direct JSON
-        shape has no metric-ID provenance, so this binding cannot detect a
-        mislabeled numeric spread basis.
-    benchmark : str | dict | list | pandas.DataFrame
-        JSON array of ``FiPositionSnapshot`` objects for the benchmark, subject
-        to the same quote-reproducing Z-spread basis contract.
-    config : str | dict | list | pandas.DataFrame
-        JSON object whose only field is ``period_years`` (e.g. ``0.25``). It is
-        required — there is no default — and unknown keys are rejected. The
-        spread convention is not configurable: the Campisi spread effect
-        ``-SD * delta_spread`` is identical under the absolute and
-        Duration-Times-Spread conventions, so a mode switch could only relabel
-        an identical result.
+    portfolio : list[FiPositionSnapshot]
+        Portfolio holdings with exact signed opening weights and realized returns.
+    benchmark : list[FiPositionSnapshot]
+        Benchmark holdings on the same valuation, currency, FX and fee basis.
+    config : FiAttributionConfig
+        Positive-length window and ordered sector axis on which both sides are measured.
 
     Returns
     -------
     FiAttributionResult
-        Typed result with per-sector effects, the five effect totals, and
-        ``to_dataframe()`` / ``to_json()`` exits; use
-        serialize with ``to_json()`` for the wire string.
+        Allocation, cash coupon carry, Treasury, spread and residual. Rates are
+        decimals. Sector returns are absent when that side has no holding.
 
     Raises
     ------
     PortfolioError
-        If weights do not sum to one, inputs are non-finite, ``period_years``
-        is not finite and positive, either side is empty, or a sector present
-        on either side has ``|net sector weight| <= 1e-6 * gross absolute
-        sector weight``. The spread *level* is unconstrained: zero and negative
-        Z-spreads are accepted, because the spread effect never divides by the
-        level. Spread-basis provenance cannot be validated from the numeric JSON
-        shape.
-    ValueError
-        If any JSON argument is malformed.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#campisi-2000``.
+        If a side is empty, exact weights do not sum to one, positions or rates
+        fail validation, or a required result is not representable.
+    TypeError
+        If the inputs are not the expected typed objects.
 
     Examples
     --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution
-    >>> portfolio = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> benchmark = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.01,
-    ...         "yield_annual": 0.03,
-    ...         "modified_duration": 4.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> result = campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}')
-    >>> round(result.active_return, 4)
-    0.01
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.portfolio import (
+    ...     FiAttributionConfig,
+    ...     FiPositionSnapshot,
+    ...     FiReportingBasis,
+    ...     campisi_attribution,
+    ... )
+    >>> basis = FiReportingBasis(
+    ...     "portfolio", "benchmark", "reinvested", "dirty-settlement", "USD-native", "net-of-fees"
+    ... )
+    >>> config = FiAttributionConfig("2025-01-01", "2025-03-15", "USD", basis, ["GOVT"])
+    >>> snap = FiPositionSnapshot("UST.1", "GOVT", "1", 0.02, Money(80, "USD"), Money(5, "USD"))
+    >>> report = campisi_attribution([snap], [snap], config)
+    >>> report.active_return
+    0.0
     """
     ...
 
-def campisi_carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -> FiCarinoLinkedResult:
-    """
-    Carino-link already-computed single-period Campisi attribution results.
-
-    Binds Rust ``finstack_quant_portfolio::campisi_carino_link``.
-
-    Each period result already carries its own applied ``period_years``, so
-    periods of *different* lengths link correctly here (e.g. act/365 calendar
-    months: 31/365, 28/365, 31/365). Attribute each period with
-    :func:`campisi_attribution` first:
-    ``campisi_carino_link([campisi_attribution(p, b, c) for p, b, c in periods])``.
+def campisi_carino_link(periods: list[FiAttributionResult]) -> FiCarinoLinkedResult:
+    """Link contiguous checked Campisi periods with Carino smoothing.
 
     Parameters
     ----------
-    periods : list[FiAttributionResult] | str | list[dict]
-        Chronological list of typed ``FiAttributionResult`` objects (as
-        returned by :func:`campisi_attribution`) or their JSON form
-        (``FiAttributionResult.to_json()``). Every period must carry the same
-        sector ordering. Unknown fields are rejected.
+    periods : list[FiAttributionResult]
+        Nonempty chronological sequence from :func:`campisi_attribution`.
+        Each interval must start when the preceding one ends, with the
+        same series identities, reporting basis, currency and sector axis.
 
     Returns
     -------
     FiCarinoLinkedResult
-        Typed result whose five linked totals sum to the geometrically
-        compounded active return; use :func:`campisi_carino_link` for
-        the raw wire string.
+        Linked decimal effects and the independently compounded active
+        return, with the single-period sources retained for restoration.
 
     Raises
     ------
     PortfolioError
-        If ``periods`` is empty; sector orderings differ; a consumed
-        top-level return/effect, per-sector linked effect, or sector
-        ``total_active`` is non-finite; ``active_return`` disagrees with the
-        portfolio-minus-benchmark return; a sector ``total_active`` disagrees
-        with its five effects; sector effects do not reconcile to their
-        declared top-level totals; the five totals do not reconcile to
-        ``active_return`` within the overflow-safe scaled-L1 tolerance; a
-        reconciliation residual is non-finite; or a return is at or below
-        -100% (outside the Carino domain).
-    ValueError
-        If ``periods`` is malformed or does not match the
-        ``FiAttributionResult`` schema.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#carino-1999``.
+        If the periods disagree on basis or dates, an underlying growth
+        factor is nonpositive, or linked results fail numerical checks.
+    TypeError
+        If a supplied period is not a typed Campisi result.
 
     Examples
     --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
-    >>> portfolio = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> benchmark = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.01,
-    ...         "yield_annual": 0.03,
-    ...         "modified_duration": 4.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> period = campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}')
-    >>> linked = campisi_carino_link([period, period])
-    >>> round(linked.linked_selection, 6)
-    0.013195
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.portfolio import (
+    ...     FiAttributionConfig,
+    ...     FiPositionSnapshot,
+    ...     FiReportingBasis,
+    ...     campisi_attribution,
+    ... )
+    >>> basis = FiReportingBasis("pf", "bm", "reinvested", "dirty", "native", "net")
+    >>> holding = FiPositionSnapshot("X", "GOVT", "1", 0.02, Money(100, "USD"), Money(0, "USD"))
+    >>> first = FiAttributionConfig("2025-01-01", "2025-02-01", "USD", basis, ["GOVT"])
+    >>> period = campisi_attribution([holding], [holding], first)
+    >>> from finstack_quant.portfolio import campisi_carino_link
+    >>> second = FiAttributionConfig("2025-02-01", "2025-03-01", "USD", basis, ["GOVT"])
+    >>> later = campisi_attribution([holding], [holding], second)
+    >>> linked = campisi_carino_link([period, later])
+    >>> round(linked.portfolio_return_compounded, 4)
+    0.0404
     """
     ...

@@ -11804,85 +11804,46 @@ export interface PortfolioNamespace {
    */
   readonly brinsonLinked: typeof wasm.brinsonLinked;
   /**
-   * Compute a single-period Campisi fixed-income attribution from JSON.
+   * Attribute dated fixed-income returns to allocation, coupon carry, Treasury,
+   * settlement Z-spread and residual.
    *
-   * Decomposes both sides into carry / treasury / spread / selection and
-   * splits the active return into allocation plus four active component
-   * effects (Campisi 2000). Returns a structured `FiAttributionResult` object
-   * to chain into `campisiCarinoLink` or
-   * `fiAttributionResultReconciliationCheck`.
-   *
-   * Every snapshot must use the quote-reproducing `z_spread` basis:
-   * `spread_duration` is the canonical Z-spread duration, and `spread` plus
-   * `delta_spread` are the matching Z-spread level and move. OAS, G-spread, or
-   * discount-margin values are incompatible. The direct JSON shape contains
-   * numeric values but no metric IDs, so this binding cannot detect mislabeled
-   * spread provenance.
-   *
-   * Throws when JSON is malformed or canonical Rust validation rejects empty
-   * sides, non-finite values, invalid weights or period length, or a sector
-   * present on either side has `|net sector weight| <= 1e-6 * gross absolute
-   * sector weight`. Spread-basis provenance cannot be validated from numeric
-   * JSON alone.
-   * @param portfolio - Array or JSON text containing `FiPositionSnapshot` objects describing the portfolio side on the quote-reproducing Z-spread basis; weights must sum to 1.
-   * @param benchmark - Array or JSON text containing `FiPositionSnapshot` objects describing the benchmark side on the quote-reproducing Z-spread basis; weights must sum to 1.
-   * @param config - `FiAttributionConfig` object or JSON text; `period_years` is its only field, is required (no default), and unknown keys are rejected.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if any JSON input is malformed; either side is
-   * empty; a value is non-finite; weights do not sum to one; `periodYears` is not
-   * finite and positive; a sector has a zero or near-zero net weight relative to
-   * gross weight; or the result cannot be converted to a JavaScript value.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * @param portfolio - Position snapshots with exact signed opening weights and realized returns on the declared basis.
+   * @param benchmark - Benchmark snapshots on the same valuation, return, FX and fee basis.
+   * @param config - Reporting currency, positive calendar window, conventions and ordered sector axis.
+   * @returns Active return contributions and observed side returns as decimals. An absent side has a null sector return.
+   * @throws FinstackError if the inputs fail validation, exact weights do not sum to one or an output is not representable.
+   * @example
+   * ```typescript
+   * import init, { portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const snapshot = {
+   *   id: "BOND", sector: "Credit", weight: "1", total_return: 0.02,
+   *   opening_market_value: { amount: "80", currency: "USD" },
+   *   annual_coupon: { amount: "5", currency: "USD" },
+   *   treasury: null, spread: null,
+   * } as const;
+   * const report = portfolio.campisiAttribution([snapshot], [snapshot], {
+   *   start: "2025-01-01", end: "2025-03-15", currency: "USD",
+   *   basis: { portfolio_series_id: "portfolio", benchmark_series_id: "benchmark", return_policy: "reinvested", valuation: "dirty", fx: "native", fees: "net" },
+   *   sectors: ["Credit"],
+   * });
+   * console.log(report.active_return); // 0
+   * ```
    */
   readonly campisiAttribution: typeof wasm.campisiAttribution;
   /**
-   * Carino-link already-computed single-period Campisi results.
-   *
-   * Binds Rust `campisi_carino_link`. Attribute each period with
-   * `campisiAttribution` first; each period carries its own already-applied
-   * `period_years`, so periods of *different* lengths (e.g. act/365 calendar
-   * months) link correctly. Returns a structured `FiCarinoLinkedResult` object.
-   *
-   * Throws if no periods are supplied, sector ordering differs, a consumed
-   * top-level return/effect, per-sector linked effect, or sector `total_active`
-   * is non-finite, `active_return` disagrees with the portfolio-minus-benchmark
-   * return, a sector `total_active` disagrees with its five effects, sector
-   * effects do not reconcile to their declared top-level totals, the five
-   * totals do not reconcile to `active_return` within the overflow-safe
-   * scaled-L1 tolerance, a reconciliation residual is non-finite, or a return
-   * is outside the Carino domain.
-   * @param periods - Array or JSON text containing `FiAttributionResult` objects in chronological order, as returned by `campisiAttribution`.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if `periods` is malformed, the sequence is
-   * empty or changes sector ordering, a consumed value or reconciliation is
-   * non-finite or inconsistent, a return is at most `-1`, or the linked result
-   * cannot be converted to a JavaScript value.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * Link contiguous checked Campisi periods with Carino smoothing.
+   * @param periods - Verified period results in chronological order on one series, currency, reporting basis and sector taxonomy.
+   * @returns Linked decimal effects and the independently compounded active return, with source periods retained.
+   * @throws FinstackError if the source observations do not reproduce the period, dates are not contiguous, growth is nonpositive, or a required result is unrepresentable.
    */
   readonly campisiCarinoLink: typeof wasm.campisiCarinoLink;
   /**
-   * Reconcile the five Campisi effect totals against the active return.
-   *
-   * Binds the Rust method `FiAttributionResult::reconciliation_check` (Python
-   * `FiAttributionResult.reconciliation_check`); WASM results are plain
-   * objects, so the method is a free function taking the object. The
-   * decomposition reconciles by construction (selection is the residual), so
-   * this is a floating-point sanity gate rather than a model check. Returns a
-   * structured `ReconciliationReport` object with `total_residual`,
-   * `is_reconciled` and `tolerance`.
-   * @param result - `FiAttributionResult` object or JSON as returned by `campisiAttribution`; unknown fields are rejected.
-   * @param tolerance - Absolute reconciliation tolerance in return units; `1e-10` suits return-space values.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if `result` is malformed or does not match
-   * `FiAttributionResult`, or if the reconciliation report cannot be converted to
-   * a JavaScript value.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * Compare displayed Campisi effects against the source-verified active return.
+   * @param result - Canonical Campisi result, including the dated position observations needed for native replay.
+   * @param tolerance - Finite nonnegative absolute tolerance in decimal return units.
+   * @returns The numerical residual, requested tolerance and pass indicator.
+   * @throws FinstackError if the result disagrees with its source, the tolerance is invalid or serialization fails.
    */
   readonly fiAttributionResultReconciliationCheck: typeof wasm.fiAttributionResultReconciliationCheck;
   /**

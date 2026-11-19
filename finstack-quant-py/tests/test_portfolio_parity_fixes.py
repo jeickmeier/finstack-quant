@@ -435,31 +435,29 @@ class TestOptimizationAndResultsAudit:
         # before the next Rust step; FiAttributionResult had no method form.
         from finstack_quant import portfolio as pf
 
-        def snap(sector: str, weight: float, total_return: float) -> dict[str, float | str]:
-            return {
-                "sector": sector,
-                "weight": weight,
-                "total_return": total_return,
-                "yield_annual": 0.05,
-                "modified_duration": 5.0,
-                "spread_duration": 4.0,
-                "spread": 0.01,
-                "delta_treasury_yield": 0.001,
-                "delta_spread": -0.0005,
-            }
+        def period(start: str, end: str) -> pf.FiAttributionResult:
+            from finstack_quant.core.money import Money
 
-        fi = pf.campisi_attribution(
-            json.dumps([snap("CORP", 0.5, 0.02), snap("GOVT", 0.5, 0.01)]),
-            json.dumps([snap("CORP", 0.4, 0.015), snap("GOVT", 0.6, 0.012)]),
-            json.dumps({"period_years": 0.25}),
-        )
+            mark = Money(100, "USD")
+            coupon = Money(5, "USD")
+            basis = pf.FiReportingBasis("portfolio", "benchmark", "reinvested", "dirty settlement", "native USD", "net")
+            config = pf.FiAttributionConfig(start, end, "USD", basis, ["CORP"])
+            portfolio = [pf.FiPositionSnapshot("P", "CORP", "1", 0.02, mark, coupon)]
+            benchmark = [pf.FiPositionSnapshot("B", "CORP", "1", 0.015, mark, coupon)]
+            return pf.campisi_attribution(portfolio, benchmark, config)
+
+        fi = period("2025-01-01", "2025-03-15")
+        later = period("2025-03-15", "2025-05-01")
         report = fi.reconciliation_check(1e-9)
         assert report.is_reconciled
         assert isinstance(report, pf.ReconciliationReport)
         rebuilt = pf.FiAttributionResult.from_json(fi.to_json())
         assert report.to_json() == rebuilt.reconciliation_check(1e-9).to_json()
-        linked = pf.campisi_carino_link([fi, fi])
-        assert linked.to_json() == pf.campisi_carino_link([json.loads(fi.to_json())] * 2).to_json()
+        linked = pf.campisi_carino_link([fi, later])
+        assert (
+            linked.to_json()
+            == pf.campisi_carino_link([rebuilt, pf.FiAttributionResult.from_json(later.to_json())]).to_json()
+        )
 
         ref = [{"duration": d, "total_return": r} for d, r in ((0.5, 0.01), (1.5, 0.02), (2.5, 0.03))]
         table = pf.cell_returns_from_reference(json.dumps(ref), "UST", json.dumps({"width": 1.0}))

@@ -3141,18 +3141,60 @@ export interface FactorPnlProfile {
  */
 export interface FiAttributionConfig {
   /**
-   * Length of the attribution period in years (e.g. `0.25` for a
-   * quarter). Scales `yield_annual` into the period carry.
+   * Declared common observation, price, FX and fee basis.
    */
-  period_years: number;
+  basis: FiReportingBasis;
+  /**
+   * Reporting currency of returns, opening marks and annual cash coupon income.
+   */
+  currency: Currency;
+  /**
+   * Closing valuation date strictly after the opening date.
+   */
+  end: DateWire;
+  /**
+   * Unique, explicitly ordered sector labels. Include any cash and financing buckets.
+   */
+  sectors: string[];
+  /**
+   * Opening valuation date whose observable holdings and rates set the attribution basis.
+   */
+  start: DateWire;
+}
+/**
+ * The common return, valuation, FX and fee conventions for the two sides.
+ */
+export interface FiReportingBasis {
+  /**
+   * Identifier of the benchmark realized return series.
+   */
+  benchmark_series_id: string;
+  /**
+   * Identifier of the common fee treatment.
+   */
+  fees: string;
+  /**
+   * Identifier of the common FX conversion policy.
+   */
+  fx: string;
+  /**
+   * Identifier of the portfolio realized return series.
+   */
+  portfolio_series_id: string;
+  /**
+   * Identifier of the common total-return policy, including reinvestment.
+   */
+  return_policy: string;
+  /**
+   * Identifier of the common valuation clock, settlement and price basis.
+   */
+  valuation: string;
 }
 /**
  * Single-period Campisi benchmark-relative attribution result.
  *
- * This type is *input-reachable*: [`campisi_carino_link`] consumes a slice of
- * these, and the Python/WASM bindings deserialize them from JSON. It therefore
- * denies unknown fields like the other inbound types in this module, so a
- * misspelled or stale key fails closed instead of being silently dropped.
+ * Replays the recorded position inputs when restored through serde, rejecting
+ * any change to dates, basis or computed output that fails native reconciliation.
  */
 export interface FiAttributionResult {
   /**
@@ -3176,10 +3218,13 @@ export interface FiAttributionResult {
    */
   portfolio_return: number;
   /**
-   * Per-sector effects, in first-seen order (portfolio first, then
-   * benchmark-only sectors).
+   * Per-sector effects in the declared sector order.
    */
   sectors: FiSectorEffect[];
+  /**
+   * Source observations and reporting basis used to produce the result.
+   */
+  source: FiAttributionSource;
   /**
    * Sum of sector active carry effects.
    */
@@ -3197,9 +3242,9 @@ export interface FiAttributionResult {
    */
   total_allocation: number;
   /**
-   * Sum of sector selection effects.
+   * Sum of sector residual effects.
    */
-  total_selection: number;
+  total_residual: number;
 }
 /**
  * Absolute Campisi component contributions for one side (portfolio or
@@ -3207,13 +3252,13 @@ export interface FiAttributionResult {
  */
 export interface FiComponents {
   /**
-   * Income effect `Σ w · y · Δt`.
+   * Coupon income effect `Σ w · (coupon / opening mark) · elapsed days / 365`.
    */
   carry: number;
   /**
-   * Residual selection `Σ w · (r − explained)`.
+   * Unexplained return `Σ w · (r − explained)`.
    */
-  selection: number;
+  residual: number;
   /**
    * Spread effect `Σ w · (−SD · Δs)`.
    */
@@ -3248,48 +3293,135 @@ export interface FiSectorEffect {
    */
   allocation: number;
   /**
-   * Benchmark sector return (weighted, per unit of sector weight).
-   *
-   * For a sector absent from the benchmark this is the benchmark *total*
-   * return `R_b` (the off-benchmark convention; see "Off-benchmark
-   * sectors" in the module docs), so [`Self::allocation`] is identically
-   * zero for such sectors and their active contribution flows through the
-   * component effects instead.
+   * Benchmark sector comparator or whole-benchmark return for an off-benchmark sector.
    */
-  benchmark_return: number;
+  benchmark_comparator: number;
+  /**
+   * Observed benchmark sector return per unit of signed sector weight, when held.
+   */
+  benchmark_return?: number | null;
   /**
    * Benchmark weight in the sector.
    */
   benchmark_weight: number;
   /**
-   * Portfolio sector return (weighted, per unit of sector weight).
-   *
-   * For a sector absent from the portfolio this mirrors
-   * [`Self::benchmark_return`] (`r_p,i := r_b,i`) — reporting-only, since
-   * every effect multiplies it by the zero portfolio weight.
+   * Observed portfolio sector return per unit of signed sector weight, when held.
    */
-  portfolio_return: number;
+  portfolio_return?: number | null;
   /**
    * Portfolio weight in the sector.
    */
   portfolio_weight: number;
   /**
+   * Unexplained active return `w_p (residual_p,i − residual_b,i)`.
+   */
+  residual: number;
+  /**
    * Sector label (mirrors [`FiPositionSnapshot::sector`]).
    */
   sector: string;
-  /**
-   * Security selection residual `w_p (selection_p,i − selection_b,i)`.
-   */
-  selection: number;
   /**
    * Sum of the five effects — the sector's contribution to active return.
    */
   total_active: number;
 }
 /**
+ * Dated source observations retained to check a persisted single-period result.
+ */
+export interface FiAttributionSource {
+  /**
+   * Benchmark holdings and observed realized returns.
+   */
+  benchmark: FiPositionSnapshot[];
+  /**
+   * Common dated reporting basis and sector axis.
+   */
+  config: FiAttributionConfig;
+  /**
+   * Portfolio holdings and observed realized returns.
+   */
+  portfolio: FiPositionSnapshot[];
+}
+/**
+ * Opening holding and realized period return for one position.
+ */
+export interface FiPositionSnapshot {
+  /**
+   * Opening annual cash coupon income in the same currency as the positive mark.
+   */
+  annual_coupon: Money;
+  /**
+   * Position identifier unique on its side of the report.
+   */
+  id: string;
+  /**
+   * Positive magnitude of the opening market value in reporting currency.
+   */
+  opening_market_value: Money;
+  /**
+   * Sector label on the declared sector axis.
+   */
+  sector: string;
+  /**
+   * Qualified settlement Z-spread experiment. Omit for an inapplicable leg.
+   */
+  spread?: FiQuoteLeg | null;
+  /**
+   * Realized total return over the request interval on the declared basis, in decimals.
+   */
+  total_return: number;
+  /**
+   * Opening-selected Treasury or government tenor experiment. Omit for an inapplicable leg.
+   */
+  treasury?: FiQuoteLeg | null;
+  /**
+   * Exact signed fraction of net opening capital, summing to one per side.
+   */
+  weight: DecimalWire;
+}
+/**
+ * Matched observations and opening normalized price sensitivity for one Campisi leg.
+ */
+export interface FiQuoteLeg {
+  /**
+   * Closing level under the opening experiment's unchanged definition.
+   */
+  closing: FiQuote;
+  /**
+   * Opening normalized sensitivity per decimal annual yield or spread change, in years.
+   */
+  duration: number;
+  /**
+   * Opening level of the relevant yield or spread experiment.
+   */
+  opening: FiQuote;
+  /**
+   * Stable matching basis of the shock used to measure opening duration.
+   */
+  sensitivity_basis: string;
+}
+/**
+ * Observation used to identify an opening or closing yield or spread quote.
+ */
+export interface FiQuote {
+  /**
+   * Identifier of the quote experiment including the qualified curve, tenor or claim,
+   * clock, compounding, and settlement convention.
+   */
+  basis: string;
+  /**
+   * Absolute annual decimal yield or spread observed on the request's endpoint date.
+   */
+  rate: number;
+}
+/**
  * Multi-period Carino-linked Campisi attribution.
  */
 export interface FiCarinoLinkedResult {
+  /**
+   * Independently compounded active return, computed before projecting the two side returns.
+   */
+  active_return_compounded: number;
   /**
    * Geometrically compounded benchmark return.
    */
@@ -3311,14 +3443,14 @@ export interface FiCarinoLinkedResult {
    */
   linked_allocation: number;
   /**
+   * Sum of linked residual effects.
+   */
+  linked_residual: number;
+  /**
    * Per-sector linked effects; their grand total reconstructs the
    * compounded active return exactly.
    */
   linked_sectors: FiLinkedSectorEffect[];
-  /**
-   * Sum of linked selection effects.
-   */
-  linked_selection: number;
   /**
    * Per-period single-period results, in chronological order.
    */
@@ -3327,7 +3459,6 @@ export interface FiCarinoLinkedResult {
    * Geometrically compounded portfolio return `∏(1 + r_p,t) − 1`.
    */
   portfolio_return_compounded: number;
-  [k: string]: unknown;
 }
 /**
  * Carino-linked per-sector FI effects summed across periods.
@@ -3350,13 +3481,13 @@ export interface FiLinkedSectorEffect {
    */
   allocation: number;
   /**
+   * Linked residual effect.
+   */
+  residual: number;
+  /**
    * Sector label.
    */
   sector: string;
-  /**
-   * Linked selection effect.
-   */
-  selection: number;
   /**
    * Sum of the five linked effects.
    */

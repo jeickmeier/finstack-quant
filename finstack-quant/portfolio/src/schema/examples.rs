@@ -205,51 +205,76 @@ pub(super) fn excess_return_result() -> Result<Vec<Value>> {
 
 fn fi_snapshot(
     sector: &str,
-    weight: f64,
+    weight: rust_decimal::Decimal,
     spread: f64,
-    modified_duration: f64,
-    delta_spread: f64,
+    duration: f64,
+    spread_move: f64,
 ) -> crate::fi_attribution::FiPositionSnapshot {
-    let yield_annual = 0.04 + spread;
-    let spread_duration = modified_duration - 0.2;
-    let delta_treasury_yield = -0.0010;
-    crate::fi_attribution::FiPositionSnapshot {
-        sector: sector.to_string(),
-        weight,
-        // Carry plus the first-order treasury and spread price effects.
-        total_return: yield_annual / 12.0
-            - modified_duration * delta_treasury_yield
-            - spread_duration * delta_spread,
-        yield_annual,
-        modified_duration,
-        spread_duration,
-        spread,
-        delta_treasury_yield,
-        delta_spread,
+    use crate::fi_attribution::{FiPositionSnapshot, FiQuote, FiQuoteLeg};
+    use finstack_quant_core::{currency::Currency, money::Money, wire::DecimalWire};
+    let leg = |basis: &str, sensitivity, start, end| FiQuoteLeg {
+        sensitivity_basis: basis.to_owned(),
+        duration: sensitivity,
+        opening: FiQuote {
+            basis: basis.to_owned(),
+            rate: start,
+        },
+        closing: FiQuote {
+            basis: basis.to_owned(),
+            rate: end,
+        },
+    };
+    FiPositionSnapshot {
+        id: sector.to_owned(),
+        sector: sector.to_owned(),
+        weight: DecimalWire(weight),
+        total_return: 0.004 + duration * 0.001 - (duration - 0.2) * spread_move,
+        opening_market_value: Money::from((100_i64, Currency::USD)),
+        annual_coupon: Money::from((5_i64, Currency::USD)),
+        treasury: Some(leg("UST:5Y:PAR", duration, 0.04, 0.039)),
+        spread: Some(leg(
+            "USD-OIS:Z:ACT365:MATURITY",
+            duration - 0.2,
+            spread,
+            spread + spread_move,
+        )),
     }
 }
 
-/// One period's Campisi attribution of a portfolio overweight Industrials and
-/// longer in duration than its benchmark.
-fn fi_period_result(delta_spread: f64) -> Result<crate::fi_attribution::FiAttributionResult> {
+fn fi_period_result(
+    delta_spread: f64,
+    config: &crate::fi_attribution::FiAttributionConfig,
+) -> Result<crate::fi_attribution::FiAttributionResult> {
+    use rust_decimal::Decimal;
     let portfolio = [
-        fi_snapshot("Industrials", 0.6, 0.012, 5.6, delta_spread),
-        fi_snapshot("Financials", 0.4, 0.015, 4.4, 0.0),
+        fi_snapshot("Industrials", Decimal::new(6, 1), 0.012, 5.6, delta_spread),
+        fi_snapshot("Financials", Decimal::new(4, 1), 0.015, 4.4, 0.0),
     ];
     let benchmark = [
-        fi_snapshot("Industrials", 0.5, 0.011, 5.0, delta_spread),
-        fi_snapshot("Financials", 0.5, 0.014, 4.0, 0.0),
+        fi_snapshot("Industrials", Decimal::new(5, 1), 0.011, 5.0, delta_spread),
+        fi_snapshot("Financials", Decimal::new(5, 1), 0.014, 4.0, 0.0),
     ];
     Ok(crate::fi_attribution::campisi_attribution(
-        &portfolio,
-        &benchmark,
-        &fi_config_value(),
+        &portfolio, &benchmark, config,
     )?)
 }
 
 fn fi_config_value() -> crate::fi_attribution::FiAttributionConfig {
+    use finstack_quant_core::currency::Currency;
+    use time::macros::date;
     crate::fi_attribution::FiAttributionConfig {
-        period_years: 1.0 / 12.0,
+        start: date!(2025 - 01 - 02),
+        end: date!(2025 - 02 - 03),
+        currency: Currency::USD,
+        basis: crate::fi_attribution::FiReportingBasis {
+            portfolio_series_id: "portfolio".into(),
+            benchmark_series_id: "benchmark".into(),
+            return_policy: "gross-reinvested-total-return".to_owned(),
+            valuation: "settlement-dirty".to_owned(),
+            fx: "USD-native".to_owned(),
+            fees: "gross-of-fees".to_owned(),
+        },
+        sectors: vec!["Industrials".to_owned(), "Financials".to_owned()],
     }
 }
 
@@ -257,10 +282,26 @@ pub(super) fn fi_attribution_config() -> Result<Vec<Value>> {
     example(&fi_config_value())
 }
 
+pub(super) fn fi_position_snapshot() -> Result<Vec<Value>> {
+    example(&fi_snapshot(
+        "Industrials",
+        rust_decimal::Decimal::ONE,
+        0.012,
+        5.6,
+        0.001,
+    ))
+}
+
 pub(super) fn fi_carino_linked_result() -> Result<Vec<Value>> {
+    let first = fi_config_value();
+    let second = crate::fi_attribution::FiAttributionConfig {
+        start: first.end,
+        end: time::macros::date!(2025 - 03 - 03),
+        ..first.clone()
+    };
     example(&crate::fi_attribution::campisi_carino_link(&[
-        fi_period_result(-0.0005)?,
-        fi_period_result(0.0003)?,
+        fi_period_result(-0.0005, &first)?,
+        fi_period_result(0.0003, &second)?,
     ])?)
 }
 

@@ -179,11 +179,13 @@ fn extract_scalar(obj: &Bound<'_, PyAny>) -> PyResult<Scalar> {
     Err(PyTypeError::new_err(EXPECTED))
 }
 
-/// Read an exact FX rate (`int`, `decimal.Decimal` or decimal `str`).
-fn extract_exact_rate(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::Decimal> {
-    const EXPECTED: &str = "convert_at_rate rate must be int, str or decimal.Decimal; use convert_at_rate_f64 for a float";
+/// Read an exact decimal (`int`, `decimal.Decimal` or decimal `str`).
+pub(crate) fn extract_exact_decimal(
+    obj: &Bound<'_, PyAny>,
+    expected: &str,
+) -> PyResult<rust_decimal::Decimal> {
     if obj.is_instance_of::<pyo3::types::PyBool>() || obj.is_instance_of::<PyFloat>() {
-        return Err(PyTypeError::new_err(EXPECTED));
+        return Err(PyTypeError::new_err(expected.to_owned()));
     }
     if obj.is_instance_of::<PyInt>() || obj.cast::<PyString>().is_ok() {
         return finstack_quant_core::decimal::parse_decimal(obj.str()?.to_str()?)
@@ -192,7 +194,7 @@ fn extract_exact_rate(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::Decimal>
     if is_python_decimal(obj)? {
         return decimal_from_py(obj);
     }
-    Err(PyTypeError::new_err(EXPECTED))
+    Err(PyTypeError::new_err(expected.to_owned()))
 }
 
 #[pymethods]
@@ -365,7 +367,10 @@ impl PyMoney {
         rate: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
         let target = extract_currency(target)?;
-        let rate = extract_exact_rate(rate)?;
+        let rate = extract_exact_decimal(
+            rate,
+            "convert_at_rate rate must be int, str or decimal.Decimal; use convert_at_rate_f64 for a float",
+        )?;
         self.inner
             .convert_at_rate(target, rate)
             .map(Self::from_inner)

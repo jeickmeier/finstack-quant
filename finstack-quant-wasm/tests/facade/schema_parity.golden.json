@@ -1985,14 +1985,21 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_attribution_config.schema.json",
             "type_name": "FiAttributionConfig",
             "kind": "input",
-            "bytes": 657
+            "bytes": 22648
           },
           {
             "path": "schemas/portfolio/1/fi_carino_linked_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_carino_linked_result.schema.json",
             "type_name": "FiCarinoLinkedResult",
             "kind": "output",
-            "bytes": 15100
+            "bytes": 55340
+          },
+          {
+            "path": "schemas/portfolio/1/fi_position_snapshot.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_position_snapshot.schema.json",
+            "type_name": "FiPositionSnapshot",
+            "kind": "input",
+            "bytes": 25861
           },
           {
             "path": "schemas/portfolio/1/girr_quote_delta.schema.json",
@@ -4947,7 +4954,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_attribution_config.schema.json",
             "type_name": "FiAttributionConfig",
             "kind": "input",
-            "bytes": 657
+            "bytes": 22648
           },
           {
             "domain": "portfolio",
@@ -4955,7 +4962,15 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_carino_linked_result.schema.json",
             "type_name": "FiCarinoLinkedResult",
             "kind": "output",
-            "bytes": 15100
+            "bytes": 55340
+          },
+          {
+            "domain": "portfolio",
+            "path": "schemas/portfolio/1/fi_position_snapshot.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_position_snapshot.schema.json",
+            "type_name": "FiPositionSnapshot",
+            "kind": "input",
+            "bytes": 25861
           },
           {
             "domain": "portfolio",

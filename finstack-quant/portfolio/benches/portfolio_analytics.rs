@@ -11,6 +11,8 @@ use bench_common::{create_institutional_portfolio, create_market_context};
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::wire::DecimalWire;
 use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::book::Book;
 use finstack_quant_portfolio::brinson::{SectorPeriod, brinson_fachler, carino_link};
@@ -19,7 +21,8 @@ use finstack_quant_portfolio::excess_return::{
 };
 use finstack_quant_portfolio::factor_brinson::{FactorBrinsonInput, factor_brinson_attribution};
 use finstack_quant_portfolio::fi_attribution::{
-    FiAttributionConfig, FiPositionSnapshot, campisi_attribution,
+    FiAttributionConfig, FiPositionSnapshot, FiQuote, FiQuoteLeg, FiReportingBasis,
+    campisi_attribution,
 };
 use finstack_quant_portfolio::grid_attribution::{GridPosition, grid_attribution};
 use finstack_quant_portfolio::grouping::aggregate_by_book;
@@ -151,28 +154,52 @@ fn bench_brinson(c: &mut Criterion) {
     group.finish();
 }
 
-fn campisi_side(n_positions: usize, n_sectors: usize, tilt: f64) -> Vec<FiPositionSnapshot> {
-    let weight = 1.0 / n_positions as f64;
-    (0..n_positions)
+fn campisi_side(tilt: f64) -> Vec<FiPositionSnapshot> {
+    let weight: DecimalWire = serde_json::from_str(r#""0.0005""#).expect("exact 1/2000");
+    let leg = |basis: &str, duration, opening, closing| FiQuoteLeg {
+        sensitivity_basis: basis.to_string(),
+        duration,
+        opening: FiQuote {
+            basis: basis.to_string(),
+            rate: opening,
+        },
+        closing: FiQuote {
+            basis: basis.to_string(),
+            rate: closing,
+        },
+    };
+    (0..2_000)
         .map(|index| FiPositionSnapshot {
-            sector: format!("S{}", index % n_sectors),
+            id: format!("POSITION-{index}"),
+            sector: format!("S{}", index % 20),
             weight,
             total_return: 0.012 + tilt * (index as f64) * 1e-6,
-            yield_annual: 0.04,
-            modified_duration: 5.0,
-            spread_duration: 4.0,
-            spread: 0.01,
-            delta_treasury_yield: -0.001,
-            delta_spread: 0.0005,
+            opening_market_value: Money::from((100_i64, Currency::USD)),
+            annual_coupon: Money::from((4_i64, Currency::USD)),
+            treasury: Some(leg("UST 5Y par", 5.0, 0.03, 0.029)),
+            spread: Some(leg("USD-OIS settlement Z", 4.0, 0.01, 0.0105)),
         })
         .collect()
 }
 
 fn bench_campisi(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_campisi");
-    let config = FiAttributionConfig { period_years: 0.25 };
-    let portfolio = campisi_side(2_000, 20, 1.0);
-    let benchmark = campisi_side(2_000, 20, 0.0);
+    let config = FiAttributionConfig {
+        start: time::macros::date!(2025 - 01 - 01),
+        end: time::macros::date!(2025 - 04 - 01),
+        currency: Currency::USD,
+        basis: FiReportingBasis {
+            portfolio_series_id: "portfolio".into(),
+            benchmark_series_id: "benchmark".into(),
+            return_policy: "reinvested".into(),
+            valuation: "dirty settlement".into(),
+            fx: "native USD".into(),
+            fees: "net of fees".into(),
+        },
+        sectors: (0..20).map(|index| format!("S{index}")).collect(),
+    };
+    let portfolio = campisi_side(1.0);
+    let benchmark = campisi_side(0.0);
     group.bench_function("campisi_2000pos_20sectors", |b| {
         b.iter(|| {
             campisi_attribution(

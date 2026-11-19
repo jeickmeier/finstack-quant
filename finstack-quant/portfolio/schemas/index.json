@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_attribution_config.schema.json",
-      "bytes": 657,
+      "bytes": 22648,
       "kind": "input",
       "path": "schemas/portfolio/1/fi_attribution_config.schema.json",
       "summary": "Configuration for `campisi_attribution`.",
@@ -119,12 +119,21 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_carino_linked_result.schema.json",
-      "bytes": 15100,
+      "bytes": 55340,
       "kind": "output",
       "path": "schemas/portfolio/1/fi_carino_linked_result.schema.json",
       "summary": "Multi-period Carino-linked Campisi attribution.",
       "title": "FiCarinoLinkedResult",
       "type_name": "FiCarinoLinkedResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_position_snapshot.schema.json",
+      "bytes": 25861,
+      "kind": "input",
+      "path": "schemas/portfolio/1/fi_position_snapshot.schema.json",
+      "summary": "Dated position inputs with exact signed weight and matched Campisi quote experiments.",
+      "title": "FiPositionSnapshot",
+      "type_name": "FiPositionSnapshot"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_delta.schema.json",

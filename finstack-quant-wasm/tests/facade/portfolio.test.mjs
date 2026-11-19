@@ -211,27 +211,43 @@ test('analytics.constrainedLeastSquares keeps its declared arity', () => {
   assert.equal(analytics.constrainedLeastSquares.length, 4);
 });
 
-const campisiSnapshot = (sector, weight, totalReturn, yieldAnnual, modifiedDuration) => ({
+const campisiSnapshot = (id, sector, weight, totalReturn, coupon, duration = 5) => ({
+  id,
   sector,
   weight,
   total_return: totalReturn,
-  yield_annual: yieldAnnual,
-  modified_duration: modifiedDuration,
-  spread_duration: 0.0,
-  spread: 0.0,
-  delta_treasury_yield: -0.001,
-  delta_spread: 0.0,
+  opening_market_value: { amount: '80', currency: 'USD' },
+  annual_coupon: { amount: coupon, currency: 'USD' },
+  treasury: {
+    sensitivity_basis: 'UST 5Y settlement yield',
+    duration,
+    opening: { basis: 'UST 5Y settlement yield', rate: 0.03 },
+    closing: { basis: 'UST 5Y settlement yield', rate: 0.031 },
+  },
+  spread: null,
 });
-
-const CAMPISI_PORTFOLIO = JSON.stringify([
-  campisiSnapshot('GOVT', 0.6, 0.016, 0.04, 5.0),
-  campisiSnapshot('CORP', 0.4, 0.012, 0.06, 4.0),
-]);
-const CAMPISI_BENCHMARK = JSON.stringify([
-  campisiSnapshot('GOVT', 0.5, 0.015, 0.04, 5.5),
-  campisiSnapshot('CORP', 0.5, 0.011, 0.055, 4.5),
-]);
-const campisiConfig = (periodYears) => JSON.stringify({ period_years: periodYears });
+const CAMPISI_PORTFOLIO = [
+  campisiSnapshot('P-GOVT', 'GOVT', '0.6', 0.016, '4'),
+  campisiSnapshot('P-CORP', 'CORP', '0.4', 0.012, '6', 4),
+];
+const CAMPISI_BENCHMARK = [
+  campisiSnapshot('B-GOVT', 'GOVT', '0.5', 0.015, '4'),
+  campisiSnapshot('B-CORP', 'CORP', '0.5', 0.011, '5.5', 4.5),
+];
+const campisiConfig = (start = '2025-01-01', end = '2025-03-15', sectors = ['GOVT', 'CORP']) => ({
+  start,
+  end,
+  sectors,
+  currency: 'USD',
+  basis: {
+    portfolio_series_id: 'portfolio',
+    benchmark_series_id: 'benchmark',
+    return_policy: 'reinvested',
+    valuation: 'dirty-settlement',
+    fx: 'native USD',
+    fees: 'net',
+  },
+});
 
 const brinsonPeriod = (wpA, wbA, rpA, rbA, rpB, rbB) => [
   {
@@ -291,57 +307,54 @@ test('portfolio.brinsonLinked links raw sector periods to the compounded active 
   assert.throws(() => portfolio.brinsonLinked(7), TypeError);
 });
 
-test('portfolio.campisiAttribution reconciles the five effects to active return', () => {
+test('portfolio.campisiAttribution reconciles the five checked effects', () => {
   const result = assertStructured(
-    portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, campisiConfig(0.25)),
+    portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, campisiConfig()),
     'campisiAttribution result'
   );
-  // Direct property read: an ES Map would give undefined here.
-  assert.equal(typeof result.active_return, 'number');
+  assert.ok(Math.abs(result.portfolio_components.carry - 0.012) < 1e-12);
+  assert.ok(Math.abs(result.portfolio_components.treasury + 0.0046) < 1e-12);
+  assert.ok(Math.abs(result.active_return - 0.0014) < 1e-12);
   const reconstructed =
     result.total_allocation +
     result.total_active_carry +
     result.total_active_treasury +
     result.total_active_spread +
-    result.total_selection;
+    result.total_residual;
   assert.ok(Math.abs(reconstructed - result.active_return) < 1e-12);
-  assert.equal('spread_mode' in result, false);
+  assert.deepEqual(result.source.config.sectors, ['GOVT', 'CORP']);
 });
 
-test('portfolio.campisiAttribution fails closed on unknown and missing config fields', () => {
-  // `period_years` is the config's only field and has no default: omitting it
-  // must be rejected, not guessed.
+test('portfolio.campisiAttribution rejects legacy inputs and inexact net weights', () => {
+  assert.throws(() => portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, {}));
   assert.throws(() =>
-    portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, JSON.stringify({}))
+    portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, {
+      ...campisiConfig(),
+      period_years: 0.25,
+    })
   );
-  // The retired `spread_mode` key is now an unknown field. A stale caller must
-  // be told, not silently served a result computed without it.
-  assert.throws(() =>
-    portfolio.campisiAttribution(
-      CAMPISI_PORTFOLIO,
-      CAMPISI_BENCHMARK,
-      JSON.stringify({ period_years: 0.25, spread_mode: 'dts' })
-    )
+  const short = structuredClone(CAMPISI_PORTFOLIO);
+  short[0].weight = '0.599999999999999999999';
+  assert.throws(
+    () => portfolio.campisiAttribution(short, CAMPISI_BENCHMARK, campisiConfig()),
+    /weights must sum to one/
   );
 });
 
-test('portfolio.campisiCarinoLink links precomputed periods of unequal length', () => {
-  // 31/365 and 28/365 — an act/365 monthly pair the snapshot-based entry
-  // point cannot express, because it applies one shared period_years.
+test('portfolio.campisiCarinoLink links exact periods of unequal length', () => {
   const jan = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
-    campisiConfig(31 / 365)
+    campisiConfig('2025-01-01', '2025-02-01')
   );
   const feb = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
-    campisiConfig(28 / 365)
+    campisiConfig('2025-02-01', '2025-03-01')
   );
   assert.notEqual(jan.total_active_carry, feb.total_active_carry);
-
   const linked = assertStructured(
-    portfolio.campisiCarinoLink(JSON.stringify([jan, feb])),
+    portfolio.campisiCarinoLink([jan, feb]),
     'campisiCarinoLink result'
   );
   const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
@@ -350,156 +363,63 @@ test('portfolio.campisiCarinoLink links precomputed periods of unequal length', 
     linked.linked_active_carry +
     linked.linked_active_treasury +
     linked.linked_active_spread +
-    linked.linked_selection;
+    linked.linked_residual;
   assert.ok(Math.abs(reconstructed - geometric) < 1e-10);
   assert.equal(linked.periods.length, 2);
+  assert.throws(() => portfolio.campisiCarinoLink([jan, jan]), /contiguous/);
+  assert.throws(() => portfolio.campisiCarinoLink([feb, jan]), /contiguous/);
+  assert.throws(() => portfolio.campisiCarinoLink([CAMPISI_PORTFOLIO]));
 });
 
-test('portfolio.campisiCarinoLink rejects inconsistent result contracts', () => {
+test('portfolio.campisiCarinoLink rejects a tampered result independently of tolerance', () => {
   const result = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
-    campisiConfig(0.25)
+    campisiConfig()
   );
-
   const badActive = { ...result, active_return: result.active_return + 0.001 };
-  assert.throws(() => portfolio.campisiCarinoLink(JSON.stringify([badActive])), /active_return/);
-
   const badSector = structuredClone(result);
-  badSector.sectors[0].selection += 0.001;
+  badSector.sectors[0].residual += 0.001;
   badSector.sectors[0].total_active += 0.001;
-  assert.throws(() => portfolio.campisiCarinoLink(JSON.stringify([badSector])), /total_selection/);
-
-  const badSectorTotal = structuredClone(result);
-  badSectorTotal.sectors[0].total_active += 0.001;
-  assert.throws(
-    () => portfolio.campisiCarinoLink(JSON.stringify([badSectorTotal])),
-    /total_active/
-  );
-});
-
-test('portfolio.campisiCarinoLink accepts huge finite cancelling effects', () => {
-  const period = portfolio.campisiAttribution(
-    CAMPISI_PORTFOLIO,
-    CAMPISI_BENCHMARK,
-    campisiConfig(0.25)
-  );
-  period.portfolio_return = 0.01;
-  period.benchmark_return = 0.01;
-  period.active_return = 0;
-  for (const name of [
-    'total_allocation',
-    'total_active_carry',
-    'total_active_treasury',
-    'total_active_spread',
-    'total_selection',
-  ]) {
-    period[name] = 0;
+  for (const value of [badActive, badSector]) {
+    assert.throws(() => portfolio.campisiCarinoLink([value]), /source observations/);
+    assert.throws(
+      () => portfolio.fiAttributionResultReconciliationCheck(value, 1),
+      /source observations/
+    );
   }
-  for (const sector of period.sectors) {
-    for (const name of [
-      'allocation',
-      'active_carry',
-      'active_treasury',
-      'active_spread',
-      'selection',
-      'total_active',
-    ]) {
-      sector[name] = 0;
-    }
-  }
-  period.total_allocation = 1e308;
-  period.total_active_carry = -1e308;
-  period.sectors[0].allocation = 1e308;
-  period.sectors[0].active_carry = -1e308;
-
-  const linked = portfolio.campisiCarinoLink(JSON.stringify([period]));
-  assert.equal(linked.linked_allocation, 1e308);
-  assert.equal(linked.linked_active_carry, -1e308);
 });
 
-test('portfolio.campisiCarinoLink links per-period campisiAttribution results', () => {
-  const result = portfolio.campisiAttribution(
-    CAMPISI_PORTFOLIO,
-    CAMPISI_BENCHMARK,
-    campisiConfig(0.25)
-  );
-  const linked = assertStructured(
-    portfolio.campisiCarinoLink([result, result]),
-    'campisiCarinoLink result'
-  );
-  const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
-  const reconstructed =
-    linked.linked_allocation +
-    linked.linked_active_carry +
-    linked.linked_active_treasury +
-    linked.linked_active_spread +
-    linked.linked_selection;
-  assert.ok(Math.abs(reconstructed - geometric) < 1e-10);
-
-  // Raw snapshot periods are not `FiAttributionResult`s.
-  const period = {
-    portfolio: JSON.parse(CAMPISI_PORTFOLIO),
-    benchmark: JSON.parse(CAMPISI_BENCHMARK),
-  };
-  assert.throws(() => portfolio.campisiCarinoLink(JSON.stringify([period])));
-});
-
-test('portfolio.campisiAttribution fails closed on a zero-net-weight sector', () => {
-  // A long/short pair (or a CDS hedge against a cash bond) inside one bucket
-  // nets to exactly zero weight. Its real contribution stays in the side
-  // return while every per-sector effect would be forced to zero, so the
-  // decomposition must be rejected with the offending sector named.
-  const core = campisiSnapshot('CORE', 1.0, 0.015, 0.048, 5.0);
-  const cleanBenchmark = JSON.stringify([campisiSnapshot('CORE', 1.0, 0.014, 0.044, 5.5)]);
-
-  const hedgedPortfolio = JSON.stringify([
-    core,
-    campisiSnapshot('HEDGE', 0.5, 0.04, 0.06, 3.0),
-    campisiSnapshot('HEDGE', -0.5, 0.01, 0.02, 1.0),
-  ]);
+test('portfolio.campisiAttribution distinguishes zero net weight from an absent side', () => {
+  const core = campisiSnapshot('CORE', 'CORE', '1', 0.015, '4.8');
+  const hedge = [
+    campisiSnapshot('LONG', 'HEDGE', '0.5', 0.04, '6'),
+    campisiSnapshot('SHORT', 'HEDGE', '-0.5', 0.01, '2'),
+  ];
+  const config = campisiConfig('2025-01-01', '2025-03-15', ['HEDGE', 'CORE']);
   assert.throws(
-    () => portfolio.campisiAttribution(hedgedPortfolio, cleanBenchmark, campisiConfig(0.25)),
-    (error) => /HEDGE/.test(String(error)) && /Portfolio/.test(String(error))
+    () => portfolio.campisiAttribution([core, ...hedge], [core], config),
+    /HEDGE.*exactly zero/
   );
-
-  const hedgedBenchmark = JSON.stringify([
-    campisiSnapshot('CORE', 1.0, 0.014, 0.044, 5.5),
-    campisiSnapshot('HEDGE', 0.4, 0.03, 0.055, 4.0),
-    campisiSnapshot('HEDGE', -0.4, 0.005, 0.015, 1.0),
-  ]);
-  assert.throws(
-    () =>
-      portfolio.campisiAttribution(JSON.stringify([core]), hedgedBenchmark, campisiConfig(0.25)),
-    (error) => /HEDGE/.test(String(error)) && /Benchmark/.test(String(error))
-  );
-
-  // A sector genuinely absent from one side is the legitimate zero-weight
-  // case and must keep working.
-  const oneSided = JSON.stringify([
-    campisiSnapshot('CORE', 0.8, 0.015, 0.048, 5.0),
-    campisiSnapshot('EXTRA', 0.2, 0.021, 0.07, 3.0),
-  ]);
-  const result = portfolio.campisiAttribution(oneSided, cleanBenchmark, campisiConfig(0.25));
+  const oneSided = [
+    { ...core, weight: '0.8' },
+    campisiSnapshot('EXTRA', 'HEDGE', '0.2', 0.021, '7'),
+  ];
+  const result = portfolio.campisiAttribution(oneSided, [core], config);
   assert.deepEqual(
     result.sectors.map((s) => s.sector),
-    ['CORE', 'EXTRA']
+    ['HEDGE', 'CORE']
   );
-  assert.equal(result.sectors[1].benchmark_weight, 0.0);
-  const reconstructed =
-    result.total_allocation +
-    result.total_active_carry +
-    result.total_active_treasury +
-    result.total_active_spread +
-    result.total_selection;
-  assert.ok(Math.abs(reconstructed - result.active_return) < 1e-12);
+  assert.equal(result.sectors[0].benchmark_weight, 0);
+  assert.equal(result.sectors[0].benchmark_return, null);
+  assert.equal(result.sectors[0].benchmark_comparator, 0.015);
 });
 
-test('portfolio.fiAttributionResultReconciliationCheck reports the residual and fails closed', () => {
+test('portfolio.fiAttributionResultReconciliationCheck validates its diagnostic tolerance', () => {
   const result = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
-    campisiConfig(0.25)
+    campisiConfig()
   );
   const report = assertStructured(
     portfolio.fiAttributionResultReconciliationCheck(result, 1e-10),
@@ -507,23 +427,12 @@ test('portfolio.fiAttributionResultReconciliationCheck reports the residual and 
   );
   assert.equal(report.is_reconciled, true);
   assert.equal(report.tolerance, 1e-10);
-  assert.ok(Math.abs(report.total_residual) <= 1e-10);
-
-  // The tolerance argument is load-bearing, not decorative: a result whose
-  // active_return has been tampered with breaks the identity at 1e-10 and
-  // passes only under an absurdly loose tolerance.
-  const tampered = JSON.stringify({ ...result, active_return: result.active_return + 0.01 });
-  assert.equal(
-    portfolio.fiAttributionResultReconciliationCheck(tampered, 1e-10).is_reconciled,
-    false
-  );
-  assert.equal(portfolio.fiAttributionResultReconciliationCheck(tampered, 1.0).is_reconciled, true);
-
-  // `FiAttributionResult` denies unknown fields, so a stale key fails closed
-  // instead of being silently dropped into a report that still "reconciles".
-  const withBogus = JSON.stringify({ ...result, bogus_field: 1.0 });
-  assert.throws(() => portfolio.fiAttributionResultReconciliationCheck(withBogus, 1e-10));
-  assert.throws(() => portfolio.campisiCarinoLink(`[${withBogus}]`));
+  for (const tolerance of [-1, NaN, Infinity]) {
+    assert.throws(() => portfolio.fiAttributionResultReconciliationCheck(result, tolerance));
+  }
+  const unknown = { ...result, bogus_field: 1 };
+  assert.throws(() => portfolio.fiAttributionResultReconciliationCheck(unknown, 1e-10));
+  assert.throws(() => portfolio.campisiCarinoLink([unknown]));
 });
 
 // Credit excess returns, hierarchical grid attribution, and factor-Brinson

@@ -1,503 +1,165 @@
-"""Portfolio Campisi fixed-income attribution binding tests."""
+"""Cross-boundary regression cases for checked Campisi fixed-income attribution."""
 
-from __future__ import annotations
-
+from datetime import date
+from decimal import Decimal
 import json
 
 import pytest
 
-
-def _snap(
-    sector: str,
-    w: float,
-    r: float,
-    y: float,
-    md: float,
-    sd: float,
-    s: float,
-    dy: float,
-    ds: float,
-) -> dict[str, float | str]:
-    """Build one ``FiPositionSnapshot`` mapping with the canonical serde names."""
-    return {
-        "sector": sector,
-        "weight": w,
-        "total_return": r,
-        "yield_annual": y,
-        "modified_duration": md,
-        "spread_duration": sd,
-        "spread": s,
-        "delta_treasury_yield": dy,
-        "delta_spread": ds,
-    }
+from finstack_quant.core.money import Money
+from finstack_quant.portfolio import (
+    FiAttributionConfig,
+    FiAttributionResult,
+    FiPositionSnapshot,
+    FiQuote,
+    FiQuoteLeg,
+    FiReportingBasis,
+    PortfolioError,
+    campisi_attribution,
+    campisi_carino_link,
+)
 
 
-def _portfolio() -> list[dict[str, float | str]]:
-    """Hand-worked golden portfolio: two sectors, two positions each."""
-    return [
-        _snap("GOVT", 0.30, 0.0155, 0.040, 5.0, 0.0, 0.0, -0.0010, 0.0),
-        _snap("GOVT", 0.20, 0.0190, 0.045, 8.0, 0.0, 0.0, -0.0010, 0.0),
-        _snap("CORP", 0.30, 0.0120, 0.060, 4.0, 3.8, 0.0150, -0.0010, 0.0020),
-        _snap("CORP", 0.20, 0.0118, 0.070, 6.0, 5.5, 0.0250, -0.0010, 0.0020),
-    ]
-
-
-def _benchmark() -> list[dict[str, float | str]]:
-    """Hand-worked golden benchmark matching the Rust unit-test fixture."""
-    return [
-        _snap("GOVT", 0.45, 0.0155, 0.038, 6.0, 0.0, 0.0, -0.0010, 0.0),
-        _snap("GOVT", 0.15, 0.0195, 0.042, 9.0, 0.0, 0.0, -0.0010, 0.0),
-        _snap("CORP", 0.25, 0.0090, 0.055, 5.0, 4.8, 0.0120, -0.0010, 0.0020),
-        _snap("CORP", 0.15, 0.0100, 0.065, 7.0, 6.5, 0.0200, -0.0010, 0.0020),
-    ]
-
-
-_CONFIG = {"period_years": 0.25}
-
-
-def test_campisi_attribution_documents_z_spread_basis_contract() -> None:
-    """Direct JSON callers are told which spread basis the snapshots require."""
-    from finstack_quant.portfolio import campisi_attribution
-
-    doc = campisi_attribution.__doc__ or ""
-    assert "z_spread" in doc
-    assert "quote-reproducing" in doc
-    assert "OAS" in doc
-
-
-def test_campisi_attribution_matches_hand_worked_golden() -> None:
-    """The binding reproduces the hand-worked golden decomposition."""
-    from finstack_quant.portfolio import campisi_attribution
-
-    result = json.loads(
-        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
+def _config(
+    sectors: list[str],
+    start: str = "2025-01-01",
+    end: str = "2025-03-15",
+) -> FiAttributionConfig:
+    return FiAttributionConfig(
+        date.fromisoformat(start),
+        date.fromisoformat(end),
+        "USD",
+        FiReportingBasis("portfolio", "benchmark", "reinvested", "dirty settlement", "USD native", "net of fees"),
+        sectors,
     )
 
-    assert result["portfolio_return"] == pytest.approx(0.01441, abs=1e-12)
-    assert result["benchmark_return"] == pytest.approx(0.01365, abs=1e-12)
-    assert result["active_return"] == pytest.approx(0.00076, abs=1e-12)
-    assert result["total_allocation"] == pytest.approx(-0.0007125, abs=1e-12)
-    assert result["total_active_carry"] == pytest.approx(0.00103125, abs=1e-12)
-    assert result["total_active_treasury"] == pytest.approx(-0.00075, abs=1e-12)
-    assert result["total_active_spread"] == pytest.approx(0.0009575, abs=1e-12)
-    assert result["total_selection"] == pytest.approx(0.00023375, abs=1e-12)
-    assert "spread_mode" not in result
 
-    # Absolute per-side Campisi split is surfaced too.
-    assert result["portfolio_components"]["carry"] == pytest.approx(0.01325, abs=1e-12)
-    assert result["portfolio_components"]["treasury"] == pytest.approx(0.0055, abs=1e-12)
-    assert result["portfolio_components"]["spread"] == pytest.approx(-0.00448, abs=1e-12)
-    assert result["portfolio_components"]["selection"] == pytest.approx(0.00014, abs=1e-12)
-    assert result["benchmark_components"]["carry"] == pytest.approx(0.011725, abs=1e-12)
+def _position(
+    id: str,
+    sector: str,
+    weight: str,
+    total_return: float,
+    coupon: Decimal = Decimal(0),
+) -> FiPositionSnapshot:
+    return FiPositionSnapshot(
+        id, sector, Decimal(weight), total_return, Money(80, "USD"), Money.from_decimal(coupon, "USD")
+    )
 
-    assert [s["sector"] for s in result["sectors"]] == ["GOVT", "CORP"]
-    # sectors is a flat records array — pandas-ready without helper code.
-    assert set(result["sectors"][0]) >= {
+
+def _leg(basis: str, duration: float, opening: float, closing: float) -> FiQuoteLeg:
+    return FiQuoteLeg(basis, duration, FiQuote(basis, opening), FiQuote(basis, closing))
+
+
+def test_dated_coupon_and_qualified_shocks() -> None:
+    position = _position("BOND", "Core", "1", 0.02, Decimal(5)).with_quote_legs(
+        treasury=_leg("UST 5Y par", 5.0, 0.03, 0.031),
+        spread=_leg("USD-OIS settlement Z", 4.0, -0.0015, 0.001),
+    )
+    benchmark = _position("CASH", "Core", "1", 0.0)
+    result = campisi_attribution(portfolio=[position], benchmark=[benchmark], config=_config(["Core"]))
+    breakdown = result.portfolio_components
+    assert breakdown == pytest.approx({
+        "carry": 0.0125,
+        "treasury": -0.005,
+        "spread": -0.01,
+        "residual": 0.0225,
+        "total": 0.02,
+    })
+    assert result.reconciliation_check(tolerance=1e-13).is_reconciled
+    assert FiAttributionResult.from_json(result.to_json()).to_json() == result.to_json()
+
+
+def test_one_sided_report_stores_comparator_without_invented_observation() -> None:
+    portfolio = [_position("C1", "Core", "0.75", 0.03), _position("P1", "Portfolio", "0.25", 0.098)]
+    benchmark = [_position("C2", "Core", "0.75", 0.014), _position("B1", "Benchmark", "0.25", 0.01)]
+    result = campisi_attribution(portfolio, benchmark, _config(["Benchmark", "Core", "Portfolio"]))
+    assert result.active_return == pytest.approx(0.034)
+    assert [row["sector"] for row in result.sectors] == ["Benchmark", "Core", "Portfolio"]
+    bonus = result.sectors[-1]
+    assert bonus["benchmark_comparator"] == pytest.approx(0.013)
+    assert bonus["benchmark_return"] is None
+    assert bonus["allocation"] == 0.0
+    missing = result.sectors[0]
+    assert missing["portfolio_return"] is None
+    assert missing["residual"] == 0.0
+    assert list(result.to_dataframe().columns) == [
         "sector",
         "portfolio_weight",
         "benchmark_weight",
         "portfolio_return",
         "benchmark_return",
+        "benchmark_comparator",
         "allocation",
         "active_carry",
         "active_treasury",
         "active_spread",
-        "selection",
+        "residual",
         "total_active",
-    }
-    govt = result["sectors"][0]
-    assert govt["allocation"] == pytest.approx(-0.000285, abs=1e-12)
-    assert govt["active_carry"] == pytest.approx(0.000375, abs=1e-12)
-    assert govt["active_treasury"] == pytest.approx(-0.000275, abs=1e-12)
-    assert govt["active_spread"] == pytest.approx(0.0, abs=1e-12)
-    assert govt["selection"] == pytest.approx(0.0001, abs=1e-12)
+    ]
 
 
-def test_campisi_attribution_accepts_keyword_arguments() -> None:
-    """The advertised ``text_signature`` names are the real keyword names."""
-    from finstack_quant.portfolio import campisi_attribution
+@pytest.mark.parametrize("invalid", ["0.99999999999999999999999", "1.00000000000000000000001"])
+def test_signed_weights_sum_exactly_at_decimal_precision(invalid: str) -> None:
+    benchmark = [_position("CORE", "Core", "1", 0.01)]
+    with pytest.raises(PortfolioError, match="weights must sum to one"):
+        campisi_attribution([_position("BAD", "Core", invalid, 0.02)], benchmark, _config(["Core"]))
 
-    result = json.loads(
+
+def test_exact_net_weight_not_fixed_fraction_of_gross() -> None:
+    def report(short: str, rest: str) -> FiAttributionResult:
+        portfolio = [
+            _position("LONG", "Pair", "0.5", 0.03),
+            _position("SHORT", "Pair", short, 0.01),
+            _position("CASH", "Core", rest, 0.0),
+        ]
+        benchmark = [_position("CASH", "Core", "1", 0.0)]
+        return campisi_attribution(portfolio, benchmark, _config(["Pair", "Core"]))
+
+    assert report("-0.499999999999", "0.999999999999").sectors[0]["portfolio_weight"] == pytest.approx(1e-12)
+    with pytest.raises(PortfolioError, match="exactly zero"):
+        report("-0.5", "1")
+
+
+def test_live_quote_bases_must_match_and_spread_can_cross_zero() -> None:
+    bond = _position("BOND", "Core", "1", 0.01)
+    benchmark = [_position("CASH", "Core", "1", 0.0)]
+    bad = FiQuoteLeg("Z-settlement", 3.0, FiQuote("Z-settlement", 0.0), FiQuote("OAS", 0.001))
+    with pytest.raises(PortfolioError, match="quote and sensitivity bases must match"):
+        campisi_attribution([bond.with_quote_legs(spread=bad)], benchmark, _config(["Core"]))
+    results = [
         campisi_attribution(
-            portfolio=json.dumps(_portfolio()),
-            benchmark=json.dumps(_benchmark()),
-            config=json.dumps(_CONFIG),
-        ).to_json()
-    )
-    assert result["active_return"] == pytest.approx(0.00076, abs=1e-12)
-
-
-def test_campisi_attribution_rejects_unknown_and_missing_config_fields() -> None:
-    """``period_years`` is the config's only field and carries no default.
-
-    Replaces the pair of tests that pinned the retired ``spread_mode``
-    literals. The spread convention is no longer configurable, so a caller
-    still sending the key must be told rather than silently served a result
-    computed without it.
-    """
-    from finstack_quant.portfolio import campisi_attribution
-
-    with pytest.raises(ValueError, match="config JSON"):
-        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps({})).to_json()
-
-    stale = {"period_years": 0.25, "spread_mode": "dts"}
-    with pytest.raises(ValueError, match="config JSON"):
-        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(stale)).to_json()
-
-
-def test_campisi_attribution_then_carino_link_reconstructs_compounded_active_return() -> None:
-    """Per-period attributions, Carino-linked, reconstruct the geometric active return."""
-    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
-
-    period = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
-    result = json.loads(campisi_carino_link([period, period]).to_json())
-
-    geometric_active = result["portfolio_return_compounded"] - result["benchmark_return_compounded"]
-    reconstructed = (
-        result["linked_allocation"]
-        + result["linked_active_carry"]
-        + result["linked_active_treasury"]
-        + result["linked_active_spread"]
-        + result["linked_selection"]
-    )
-    assert reconstructed == pytest.approx(geometric_active, abs=1e-10)
-    # Carino smoothing must not be a no-op: arithmetic ≠ geometric here.
-    arithmetic_active = 2.0 * 0.00076
-    assert abs(arithmetic_active - geometric_active) > 1e-7
-    scale = geometric_active / arithmetic_active
-    assert result["linked_active_spread"] == pytest.approx(2.0 * 0.0009575 * scale, abs=1e-12)
-    assert result["linked_allocation"] == pytest.approx(2.0 * -0.0007125 * scale, abs=1e-12)
-
-    # ``period_years`` moves exactly two of the five linked totals: carry (it
-    # scales ``yield_annual``) and its residual counterpart, selection. Both
-    # are pinned to explicit values so a wrong ``period_years`` reaching the
-    # Rust call cannot pass silently. Two identical quarters at the golden
-    # fixture give the uniform Carino scale k_t/K = 1.01403 exactly.
-    assert result["linked_active_carry"] == pytest.approx(0.002091436875, abs=1e-12)
-    assert result["linked_selection"] == pytest.approx(0.000474059025, abs=1e-12)
-    # Restating the same pins against the per-period totals: 2 x quarterly
-    # effect x Carino scale.
-    assert result["linked_active_carry"] == pytest.approx(2.0 * 0.00103125 * scale, abs=1e-12)
-    assert result["linked_selection"] == pytest.approx(2.0 * 0.00023375 * scale, abs=1e-12)
-
-    assert [s["sector"] for s in result["linked_sectors"]] == ["GOVT", "CORP"]
-    assert len(result["periods"]) == 2
-    assert result["periods"][0]["active_return"] == pytest.approx(0.00076, abs=1e-12)
-    assert result["periods"][0]["total_active_carry"] == pytest.approx(0.00103125, abs=1e-12)
-
-
-def test_campisi_accepts_zero_and_negative_spread_levels() -> None:
-    """The spread *level* never enters the arithmetic, so it is unconstrained.
-
-    Replaces the DTS-propagation test, whose only observable behaviour was the
-    old DTS rejection of a non-positive spread. The surviving spread effect
-    ``-SD * delta_spread`` does not divide by the level, so zero and negative
-    quote-reproducing Z-spreads (including negative levels on rich bonds) are
-    ordinary inputs and must not perturb any effect.
-    """
-    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
-
-    def _link(p_spread: float, b_spread: float) -> dict[str, object]:
-        period = campisi_attribution(
-            json.dumps([_snap("CORP", 1.00, 0.0120, 0.060, 4.0, 3.8, p_spread, -0.0010, 0.0020)]),
-            json.dumps([_snap("CORP", 1.00, 0.0090, 0.055, 5.0, 4.8, b_spread, -0.0010, 0.0020)]),
-            json.dumps(_CONFIG),
+            [bond.with_quote_legs(spread=_leg("Z", 3.0, spread, spread + 0.001))], benchmark, _config(["Core"])
         )
-        return json.loads(campisi_carino_link([period, period]).to_json())
-
-    baseline = _link(0.0150, 0.0120)
-    # w_p (-SD_p ds - (-SD_b ds)) = 1.0 x (-3.8 + 4.8) x 0.0020 per period.
-    assert baseline["periods"][0]["total_active_spread"] == pytest.approx(0.0020, abs=1e-12)
-
-    # A zero portfolio-side spread with a non-zero SD x ds term is precisely
-    # what the retired DTS mode rejected; it is now a legal input.
-    for label, linked in (("zero", _link(0.0, 0.0120)), ("negative", _link(-0.0025, -0.0040))):
-        assert linked["linked_active_spread"] == pytest.approx(baseline["linked_active_spread"], abs=1e-15), label
-        assert linked["linked_selection"] == pytest.approx(baseline["linked_selection"], abs=1e-15), label
-
-
-def test_campisi_carino_link_links_precomputed_results_of_mixed_lengths() -> None:
-    """Results-based linking accepts periods of different lengths (act/365)."""
-    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
-
-    # Real calendar months on act/365: January and February 2025. A single
-    # shared ``period_years`` cannot express this; only the results-based
-    # entry point can.
-    january = json.loads(
-        campisi_attribution(
-            json.dumps(_portfolio()),
-            json.dumps(_benchmark()),
-            json.dumps({"period_years": 31.0 / 365.0}),
-        ).to_json()
-    )
-    february = json.loads(
-        campisi_attribution(
-            json.dumps(_portfolio()),
-            json.dumps(_benchmark()),
-            json.dumps({"period_years": 28.0 / 365.0}),
-        ).to_json()
-    )
-
-    # The two periods really are different lengths: carry differs, and the
-    # residual selection absorbs the difference (total return is an input).
-    assert january["total_active_carry"] != february["total_active_carry"]
-    assert january["total_active_carry"] == pytest.approx(0.004125 * (31.0 / 365.0), abs=1e-15)
-    assert february["total_active_carry"] == pytest.approx(0.004125 * (28.0 / 365.0), abs=1e-15)
-
-    result = json.loads(campisi_carino_link(json.dumps([january, february])).to_json())
-
-    geometric_active = result["portfolio_return_compounded"] - result["benchmark_return_compounded"]
-    reconstructed = (
-        result["linked_allocation"]
-        + result["linked_active_carry"]
-        + result["linked_active_treasury"]
-        + result["linked_active_spread"]
-        + result["linked_selection"]
-    )
-    assert reconstructed == pytest.approx(geometric_active, abs=1e-12)
-
-    # Compounding is over the same two identical total returns as the
-    # equal-length case; only the carry/selection split differs.
-    assert result["portfolio_return_compounded"] == pytest.approx(1.01441**2 - 1.0, abs=1e-12)
-    assert result["benchmark_return_compounded"] == pytest.approx(1.01365**2 - 1.0, abs=1e-12)
-
-    scale = geometric_active / (2.0 * 0.00076)
-    expected_carry = (january["total_active_carry"] + february["total_active_carry"]) * scale
-    expected_selection = (january["total_selection"] + february["total_selection"]) * scale
-    assert result["linked_active_carry"] == pytest.approx(expected_carry, abs=1e-14)
-    assert result["linked_selection"] == pytest.approx(expected_selection, abs=1e-14)
-
-    assert [s["sector"] for s in result["linked_sectors"]] == ["GOVT", "CORP"]
-    assert len(result["periods"]) == 2
-
-
-def test_campisi_carino_link_accepts_keyword_arguments() -> None:
-    """The advertised ``text_signature`` name is the real keyword name."""
-    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
-
-    period = json.loads(
-        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-    )
-    result = json.loads(campisi_carino_link(periods=json.dumps([period, period])).to_json())
-    assert len(result["linked_sectors"]) == 2
-    assert result["linked_active_carry"] == pytest.approx(0.002091436875, abs=1e-12)
-
-
-def test_campisi_attribution_rejects_bad_json_and_bad_weights() -> None:
-    """Malformed JSON raises ValueError; domain errors raise PortfolioError."""
-    from finstack_quant.portfolio import PortfolioError, campisi_attribution
-
-    with pytest.raises(ValueError, match="portfolio JSON"):
-        campisi_attribution("not json", json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-    with pytest.raises(ValueError, match="benchmark JSON"):
-        campisi_attribution(json.dumps(_portfolio()), "not json", json.dumps(_CONFIG)).to_json()
-
-    bad = _portfolio()
-    bad[0]["weight"] = 0.10  # sums to 0.80
-    with pytest.raises(PortfolioError, match="Portfolio weights"):
-        campisi_attribution(json.dumps(bad), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-
-
-def test_campisi_attribution_rejects_zero_net_weight_sector() -> None:
-    """A sector netting to exactly zero weight has no defined per-unit rate.
-
-    Long/short pairs and CDS-vs-cash hedges inside one bucket net to zero. Their
-    real contribution stays in the side return while every per-sector effect
-    would be forced to zero, so the decomposition must fail closed with the
-    offending sector named rather than silently reporting a broken split.
-    """
-    from finstack_quant.portfolio import PortfolioError, campisi_attribution
-
-    core = _snap("CORE", 1.00, 0.0150, 0.048, 5.0, 0.0, 0.0, -0.0010, 0.0)
-    hedged_portfolio = [
-        core,
-        _snap("HEDGE", 0.50, 0.0400, 0.060, 3.0, 0.0, 0.0, -0.0010, 0.0),
-        _snap("HEDGE", -0.50, 0.0100, 0.020, 1.0, 0.0, 0.0, -0.0010, 0.0),
+        for spread in (-0.002, 0.0, 0.015)
     ]
-    clean_benchmark = [_snap("CORE", 1.00, 0.0140, 0.044, 5.5, 0.0, 0.0, -0.0010, 0.0)]
-
-    with pytest.raises(PortfolioError, match="HEDGE") as portfolio_side:
-        campisi_attribution(json.dumps(hedged_portfolio), json.dumps(clean_benchmark), json.dumps(_CONFIG)).to_json()
-    assert "Portfolio" in str(portfolio_side.value)
-
-    hedged_benchmark = [
-        _snap("CORE", 1.00, 0.0140, 0.044, 5.5, 0.0, 0.0, -0.0010, 0.0),
-        _snap("HEDGE", 0.40, 0.0300, 0.055, 4.0, 0.0, 0.0, -0.0010, 0.0),
-        _snap("HEDGE", -0.40, 0.0050, 0.015, 1.0, 0.0, 0.0, -0.0010, 0.0),
-    ]
-    with pytest.raises(PortfolioError, match="HEDGE") as benchmark_side:
-        campisi_attribution(json.dumps([core]), json.dumps(hedged_benchmark), json.dumps(_CONFIG)).to_json()
-    assert "Benchmark" in str(benchmark_side.value)
-
-    # A sector genuinely absent from one side stays legal — that is the
-    # legitimate zero-weight case and must not regress.
-    one_sided = [
-        _snap("CORE", 0.80, 0.0150, 0.048, 5.0, 0.0, 0.0, -0.0010, 0.0),
-        _snap("EXTRA", 0.20, 0.0210, 0.070, 3.0, 4.0, 0.0300, -0.0010, -0.0010),
-    ]
-    result = json.loads(
-        campisi_attribution(json.dumps(one_sided), json.dumps(clean_benchmark), json.dumps(_CONFIG)).to_json()
-    )
-    assert [s["sector"] for s in result["sectors"]] == ["CORE", "EXTRA"]
-    assert result["sectors"][1]["benchmark_weight"] == pytest.approx(0.0, abs=1e-15)
-    reconstructed = (
-        result["total_allocation"]
-        + result["total_active_carry"]
-        + result["total_active_treasury"]
-        + result["total_active_spread"]
-        + result["total_selection"]
-    )
-    assert reconstructed == pytest.approx(result["active_return"], abs=1e-12)
+    assert all(result.portfolio_components["spread"] == pytest.approx(-0.003) for result in results)
 
 
-def test_campisi_carino_link_rejects_bad_json_and_domain_errors() -> None:
-    """The results-based linked entry point maps parse and domain failures."""
-    from finstack_quant.portfolio import PortfolioError, campisi_attribution, campisi_carino_link
-
-    with pytest.raises(ValueError, match="period results JSON"):
-        campisi_carino_link("not json").to_json()
-    # A period *input* is not a period *result*: the schemas are distinct.
-    with pytest.raises(ValueError, match="period results JSON"):
-        campisi_carino_link(json.dumps([{"portfolio": _portfolio(), "benchmark": _benchmark()}])).to_json()
-    with pytest.raises(PortfolioError, match="at least one period"):
-        campisi_carino_link(json.dumps([])).to_json()
-
-    period = json.loads(
-        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-    )
-    renamed = json.loads(json.dumps(period))
-    renamed["sectors"][0]["sector"] = "DIFFERENT"
-    with pytest.raises(PortfolioError, match="sector ordering"):
-        campisi_carino_link(json.dumps([period, renamed])).to_json()
+def test_actual_calendar_windows_and_typed_carino_link() -> None:
+    holding = _position("BOND", "Core", "1", 0.02, Decimal(5))
+    benchmark = _position("CASH", "Core", "1", 0.0)
+    first = campisi_attribution([holding], [benchmark], _config(["Core"], "2025-01-01", "2025-02-01"))
+    second = campisi_attribution([holding], [benchmark], _config(["Core"], "2025-02-01", "2025-03-01"))
+    assert first.total_active_carry == pytest.approx(5 / 80 * 31 / 365)
+    assert second.total_active_carry == pytest.approx(5 / 80 * 28 / 365)
+    result = campisi_carino_link(periods=[first, second])
+    assert result.portfolio_return_compounded == pytest.approx(1.02**2 - 1)
+    assert result.linked_active_carry + result.linked_residual == pytest.approx(1.02**2 - 1)
 
 
-def test_campisi_carino_link_rejects_inconsistent_result_contract() -> None:
-    """Finite tampering of top-level and sector effects fails closed."""
-    from finstack_quant.portfolio import PortfolioError, campisi_attribution, campisi_carino_link
-
-    period = json.loads(
-        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-    )
-
-    bad_active = json.loads(json.dumps(period))
-    bad_active["active_return"] += 0.001
-    with pytest.raises(PortfolioError, match="active_return"):
-        campisi_carino_link(json.dumps([bad_active])).to_json()
-
-    bad_sector = json.loads(json.dumps(period))
-    bad_sector["sectors"][0]["selection"] += 0.001
-    bad_sector["sectors"][0]["total_active"] += 0.001
-    with pytest.raises(PortfolioError, match="total_selection"):
-        campisi_carino_link(json.dumps([bad_sector])).to_json()
-
-    bad_sector_total = json.loads(json.dumps(period))
-    bad_sector_total["sectors"][0]["total_active"] += 0.001
-    with pytest.raises(PortfolioError, match="total_active"):
-        campisi_carino_link(json.dumps([bad_sector_total])).to_json()
+@pytest.mark.parametrize("field", ["active_return", "total_active_carry", "total_residual"])
+def test_restored_result_reconciles_to_native_source(field: str) -> None:
+    bond = _position("BOND", "Core", "1", 0.02, Decimal(5))
+    result = campisi_attribution([bond], [bond], _config(["Core"]))
+    document = json.loads(result.to_json())
+    document[field] += 0.001
+    with pytest.raises(ValueError, match="source observations"):
+        FiAttributionResult.from_json(json.dumps(document))
 
 
-def test_campisi_carino_link_accepts_huge_finite_cancelling_effects() -> None:
-    """Scaled L1 validation does not overflow when finite effects cancel."""
-    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
-
-    period = json.loads(
-        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-    )
-    period["portfolio_return"] = 0.01
-    period["benchmark_return"] = 0.01
-    period["active_return"] = 0.0
-    for name in (
-        "total_allocation",
-        "total_active_carry",
-        "total_active_treasury",
-        "total_active_spread",
-        "total_selection",
-    ):
-        period[name] = 0.0
-    for sector in period["sectors"]:
-        for name in ("allocation", "active_carry", "active_treasury", "active_spread", "selection", "total_active"):
-            sector[name] = 0.0
-    period["total_allocation"] = 1e308
-    period["total_active_carry"] = -1e308
-    period["sectors"][0]["allocation"] = 1e308
-    period["sectors"][0]["active_carry"] = -1e308
-
-    linked = json.loads(campisi_carino_link(json.dumps([period])).to_json())
-    assert linked["linked_allocation"] == pytest.approx(1e308)
-    assert linked["linked_active_carry"] == pytest.approx(-1e308)
-
-
-def test_campisi_result_denies_unknown_fields_on_every_input_path() -> None:
-    """A stale or misspelled key must fail closed, not be silently dropped.
-
-    ``FiAttributionResult`` is an *input* type: :func:`campisi_carino_link` and
-    :meth:`FiAttributionResult.from_json` both deserialize it. Silently ignoring
-    an unknown key would let a hand-assembled or stale payload flow through and
-    still "reconcile", because linking reads the period returns rather than the
-    supplied ``active_return``.
-    """
-    from finstack_quant.portfolio import FiAttributionResult, campisi_attribution, campisi_carino_link
-
-    result = json.loads(
-        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
-    )
-
-    # Our own output round-trips: deny_unknown_fields must not reject it.
-    campisi_carino_link(json.dumps([result])).to_json()
-    FiAttributionResult.from_json(json.dumps(result)).reconciliation_check(1e-10).to_json()
-
-    top_level = {**result, "bogus_field": 1.0}
-    with pytest.raises(ValueError, match="period results JSON"):
-        campisi_carino_link(json.dumps([top_level])).to_json()
-    with pytest.raises(ValueError, match="FiAttributionResult JSON"):
-        FiAttributionResult.from_json(json.dumps(top_level))
-
-    nested_sector = json.loads(json.dumps(result))
-    nested_sector["sectors"][0]["bogus_field"] = 1.0
-    with pytest.raises(ValueError, match="FiAttributionResult JSON"):
-        FiAttributionResult.from_json(json.dumps(nested_sector))
-
-    nested_components = json.loads(json.dumps(result))
-    nested_components["portfolio_components"]["bogus_field"] = 1.0
-    with pytest.raises(ValueError, match="FiAttributionResult JSON"):
-        FiAttributionResult.from_json(json.dumps(nested_components))
-
-
-def test_campisi_reconciliation_check_reports_residual_and_honours_tolerance() -> None:
-    """The reconciliation gate is reachable from Python and its tolerance bites."""
-    from finstack_quant.portfolio import FiAttributionResult, ReconciliationReport, campisi_attribution
-
-    typed = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
-    checked = typed.reconciliation_check(1e-10)
-    assert isinstance(checked, ReconciliationReport)
-    report = json.loads(checked.to_json())
-    result_json = typed.to_json()
-
-    assert report["is_reconciled"] is True
-    assert report["tolerance"] == pytest.approx(1e-10)
-    assert abs(report["total_residual"]) <= 1e-10
-
-    # Hand-check against the five totals the caller would otherwise re-sum.
-    result = json.loads(result_json)
-    reconstructed = (
-        result["total_allocation"]
-        + result["total_active_carry"]
-        + result["total_active_treasury"]
-        + result["total_active_spread"]
-        + result["total_selection"]
-    )
-    assert report["total_residual"] == pytest.approx(result["active_return"] - reconstructed, abs=1e-18)
-
-    # Tolerance is load-bearing: a tampered active_return breaks the identity.
-    tampered = {**result, "active_return": result["active_return"] + 0.01}
-    tampered_result = FiAttributionResult.from_json(json.dumps(tampered))
-    assert tampered_result.reconciliation_check(1e-10).is_reconciled is False
-    assert tampered_result.reconciliation_check(1.0).is_reconciled is True
-
-
-def test_campisi_reconciliation_check_accepts_keyword_arguments() -> None:
-    """Keyword names match the documented ``text_signature``."""
-    from finstack_quant.portfolio import campisi_attribution
-
-    result = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
-    assert result.reconciliation_check(tolerance=1e-10).is_reconciled is True
+@pytest.mark.parametrize("tolerance", [float("nan"), float("inf"), -0.01])
+def test_reconciliation_requires_valid_absolute_tolerance(tolerance: float) -> None:
+    position = _position("BOND", "Core", "1", 0.02)
+    result = campisi_attribution([position], [position], _config(["Core"]))
+    with pytest.raises(PortfolioError, match="finite and nonnegative"):
+        result.reconciliation_check(tolerance)

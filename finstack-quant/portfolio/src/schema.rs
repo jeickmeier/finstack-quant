@@ -5,6 +5,7 @@
 //! definition. Render an entry with
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
+use crate::fi_attribution::FiPositionSnapshot;
 use crate::margin::{GirrQuoteDelta, GirrQuoteTarget};
 use crate::{
     PortfolioResult, allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
@@ -343,6 +344,15 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::fi_attribution_config),
+    finstack_quant_core::schema_artifact!(
+        FiPositionSnapshot,
+        "portfolio",
+        "fi_position_snapshot",
+        Input,
+        "Dated position inputs with exact signed weight and matched Campisi quote experiments."
+    )
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::fi_position_snapshot),
     finstack_quant_core::schema_artifact!(
         FiCarinoLinkedResult,
         "portfolio",

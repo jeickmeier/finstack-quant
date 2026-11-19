@@ -85,6 +85,11 @@ from finstack_quant.portfolio._brinson import (
 )
 from finstack_quant.portfolio._fi_attribution import (
     FiAttributionResult as FiAttributionResult,
+    FiAttributionConfig as FiAttributionConfig,
+    FiPositionSnapshot as FiPositionSnapshot,
+    FiQuote as FiQuote,
+    FiQuoteLeg as FiQuoteLeg,
+    FiReportingBasis as FiReportingBasis,
     FiCarinoLinkedResult as FiCarinoLinkedResult,
     campisi_attribution as campisi_attribution,
     campisi_carino_link as campisi_carino_link,
@@ -185,6 +190,11 @@ __all__ = [
     "FactorModel",
     "FactorPnlProfile",
     "FiAttributionResult",
+    "FiAttributionConfig",
+    "FiPositionSnapshot",
+    "FiQuote",
+    "FiQuoteLeg",
+    "FiReportingBasis",
     "FiCarinoLinkedResult",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
