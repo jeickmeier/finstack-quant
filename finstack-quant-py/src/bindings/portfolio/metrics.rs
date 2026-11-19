@@ -3,7 +3,7 @@
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_valuation_ref;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py};
 use crate::errors::core_to_py;
 use crate::errors::display_to_py;
 use crate::errors::portfolio_to_py;
@@ -199,6 +199,24 @@ impl PyPortfolioMetrics {
                 Ok((entry.components, entry.total, by_entity.unbind()))
             })
             .collect()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._metrics", "PortfolioMetrics.bucketed_dataframe")]
+    fn bucketed_dataframe<'py>(&self, py: Python<'py>, base: &str) -> PyResult<Bound<'py, PyAny>> {
+        let entries = self.metric_series(py, base)?;
+        let mut components = Vec::with_capacity(entries.len());
+        let mut totals = Vec::with_capacity(entries.len());
+        let mut by_entity = Vec::with_capacity(entries.len());
+        for (labels, total, entities) in entries {
+            components.push(labels);
+            totals.push(total);
+            by_entity.push(entities);
+        }
+        let columns = PyDict::new(py);
+        columns.set_item("components", components)?;
+        columns.set_item("total", totals)?;
+        columns.set_item("by_entity", by_entity)?;
+        dict_to_dataframe(py, &columns, None)
     }
 
     /// Export the portfolio-wide aggregated metrics as a pandas ``DataFrame``.

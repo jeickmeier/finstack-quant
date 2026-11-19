@@ -279,6 +279,32 @@ class PortfolioMetrics:
         """
         ...
 
+    def bucketed_dataframe(self, base: str) -> pd.DataFrame:
+        """Present the decoded portfolio risk buckets for one metric as a DataFrame.
+
+        Parameters
+        ----------
+        base : str
+            Canonical base metric identifier for the bucket series, such as
+            ``"bucketed_dv01"``. An unbucketed aggregate under this key is excluded.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per bucket in aggregation order with columns ``components``
+            (ordered decoded identifiers), ``total`` (in portfolio base currency
+            and the metric's risk units) and ``by_entity`` (entity totals in the
+            same units). When there are no buckets, the frame retains its columns.
+
+        Raises
+        ------
+        ValueError
+            If the base metric identifier is invalid.
+        ImportError
+            If pandas is unavailable.
+        """
+        ...
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export the portfolio-wide aggregated metrics as a pandas DataFrame.

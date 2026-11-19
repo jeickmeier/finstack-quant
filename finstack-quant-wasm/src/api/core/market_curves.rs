@@ -307,6 +307,22 @@ impl JsPriceCurve {
 
 #[wasm_bindgen(js_class = PriceCurve)]
 impl JsPriceCurve {
+    /// Return a copy of the curve with a uniform relative shift to its levels.
+    /// @param pct - Signed percentage applied to each knot. A value of 2.5 increases each level by 2.5 percent.
+    /// @returns The shocked curve, preserving knot times and curve conventions.
+    /// @throws `TypeError` if pct is not numeric or `FinstackError` if it is
+    /// non-finite, produces unrepresentable levels, or reverses a volatility index.
+    #[wasm_bindgen(js_name = bumpParallelPct)]
+    pub fn bump_parallel_pct(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] pct: JsValue,
+    ) -> Result<JsPriceCurve, JsValue> {
+        self.inner
+            .bump_parallel_pct(js_f64(&pct, "pct")?)
+            .map(|curve| Self::from_inner(Arc::new(curve)))
+            .map_err(to_js_err)
+    }
+
     /// Construct a price curve from named options.
     ///
     /// # Arguments

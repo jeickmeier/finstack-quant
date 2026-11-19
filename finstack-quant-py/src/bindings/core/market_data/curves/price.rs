@@ -55,6 +55,14 @@ impl PyPriceCurve {
             .map_err(core_to_py)
     }
 
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.bump_parallel_pct")]
+    fn bump_parallel_pct(&self, pct: f64) -> PyResult<Self> {
+        self.inner
+            .bump_parallel_pct(pct)
+            .map(|curve| Self::from_inner(Arc::new(curve)))
+            .map_err(core_to_py)
+    }
+
     #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.price")]
     #[pyo3(text_signature = "(self, t)")]
     fn price(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {

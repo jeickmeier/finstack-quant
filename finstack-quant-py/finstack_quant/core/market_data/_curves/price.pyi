@@ -173,6 +173,28 @@ class PriceCurve:
         """
         ...
 
+    def bump_parallel_pct(self, pct: float) -> PriceCurve:
+        """Return a price curve whose levels have a uniform relative shift.
+
+        Parameters
+        ----------
+        pct : float
+            Signed percentage change applied to every knot. A value of
+            2.5 increases each level by 2.5 percent.
+
+        Returns
+        -------
+        PriceCurve
+            Shocked copy with the original knot dates and curve conventions.
+
+        Raises
+        ------
+        ValueError
+            If the shift is non-finite, produces unrepresentable prices, or
+            reverses the sign of a volatility-index curve.
+        """
+        ...
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export knots as a pandas ``DataFrame``.

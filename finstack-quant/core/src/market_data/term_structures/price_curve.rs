@@ -187,6 +187,24 @@ impl TryFrom<RawPriceCurve> for PriceCurve {
 }
 
 impl PriceCurve {
+    /// Return a copy of the curve with a uniform relative shift to its levels.
+    ///
+    /// # Arguments
+    /// * `pct` - Signed percentage change applied to every knot. A value of
+    ///   `2.5` increases each level by 2.5 percent.
+    ///
+    /// # Errors
+    /// Returns a validation error if the bump is not finite, exceeds the
+    /// representable levels, or would reverse a volatility-index curve.
+    pub fn bump_parallel_pct(&self, pct: f64) -> crate::Result<Self> {
+        self.apply_bump(BumpSpec {
+            mode: BumpMode::Multiplicative,
+            units: BumpUnits::Percent,
+            value: pct,
+            bump_type: BumpType::Parallel,
+        })
+    }
+
     /// Start building a price curve for the given `id`.
     ///
     /// # Arguments
@@ -889,14 +907,7 @@ mod tests {
     #[test]
     fn percentage_bump() {
         let curve = sample_wti_curve();
-        let bumped = curve
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Multiplicative,
-                units: BumpUnits::Percent,
-                value: 10.0,
-                bump_type: BumpType::Parallel,
-            })
-            .expect("Bump should succeed");
+        let bumped = curve.bump_parallel_pct(10.0).expect("Bump should succeed");
         // 75.0 * 1.10 = 82.5
         assert!((bumped.price(0.0).unwrap() - 82.5).abs() < 1e-10);
     }

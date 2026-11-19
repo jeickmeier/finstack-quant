@@ -60,6 +60,15 @@ const price = () =>
     interp: 'linear',
     extrapolation: 'flat',
   });
+test('price curve percent bumps preserve pillars and the source curve', () => {
+  const curve = price();
+  const bumped = curve.bumpParallelPct(-2.5);
+  assert.deepEqual(Array.from(bumped.knots), Array.from(curve.knots));
+  assert.ok(Math.abs(bumped.price(0) - 70.2) < 1e-12);
+  assert.equal(curve.price(0), 72.0);
+  assert.throws(() => curve.bumpParallelPct(Number.NaN), /finite/);
+});
+
 const baseCorrelation = () => new core.BaseCorrelationCurve('CDX-IG', [3.0, 0.25, 7.0, 0.45]);
 const surface = () =>
   new core.VolSurface(

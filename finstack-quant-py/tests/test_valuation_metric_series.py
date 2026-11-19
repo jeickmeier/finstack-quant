@@ -60,6 +60,17 @@ def test_portfolio_metrics_series_preserves_aggregated_metric_payloads() -> None
     assert series == [(["USD-OIS", "10y"], -1.0, {"FUND_Z": -0.25, "FUND_A": -0.75})]
     assert list(series[0][2]) == ["FUND_Z", "FUND_A"]
 
+    buckets = metrics.bucketed_dataframe("bucketed_dv01")
+    assert list(buckets.columns) == ["components", "total", "by_entity"]
+    assert list(buckets.itertuples(index=False, name=None)) == series
+    assert list(buckets.iloc[0]["by_entity"]) == ["FUND_Z", "FUND_A"]
+
+    empty = metrics.bucketed_dataframe("dv01")
+    assert empty.empty
+    assert list(empty.columns) == list(buckets.columns)
+    with pytest.raises(ValueError, match="noncanonical"):
+        metrics.bucketed_dataframe("custom_xray")
+
 
 @pytest.mark.parametrize("location", ["aggregated", "by_position"])
 def test_portfolio_metric_maps_reject_noncanonical_keys(location: str) -> None:

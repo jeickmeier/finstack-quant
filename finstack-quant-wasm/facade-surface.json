@@ -1453,7 +1453,7 @@
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson"],
-    "methods": ["free", "price", "toJson"],
+    "methods": ["bumpParallelPct", "free", "price", "toJson"],
     "getters": [
       "baseDate",
       "calendarId",
