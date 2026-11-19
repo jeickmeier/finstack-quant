@@ -11318,6 +11318,75 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly validateRenewalSpecJson: typeof wasm.validateRenewalSpecJson;
   /**
+   * Decode and validate a set of standalone DCF assumptions.
+   * @param inputs - Named cashflow, terminal specification and WACC as an annual decimal rate.
+   * @returns Validated assumptions in the canonical wire shape, with Rust defaults.
+   * @throws If a field is malformed, the WACC is outside the supported range, or the cashflow node is empty.
+   */
+  readonly dcfInputs: typeof wasm.dcfInputs;
+  /**
+   * Resolve optional DCF controls to their canonical settings.
+   * @param options - DCF options object with optional bridge, timing and discount terms.
+   * @returns Canonical DCF options with all Rust defaults applied.
+   * @throws If any field is malformed or unknown.
+   */
+  readonly dcfOptions: typeof wasm.dcfOptions;
+  /**
+   * Validate a rectangular grid's ordered axes.
+   * @param axes - Lists of unique, nonempty finite WACC rates and growth rates or exit multiples.
+   * @returns Grid axes in their original ordering.
+   * @throws If either axis is empty, repeats a level, or contains a non-finite level.
+   */
+  readonly dcfSensitivityGridSpec: typeof wasm.dcfSensitivityGridSpec;
+  /**
+   * Reprice independent low and high WACC and terminal shocks from an admitted statement run.
+   * @param model - Unchanged model identified by the admitted statement result.
+   * @param results - Statements at the requested valuation and information dates.
+   * @param request - Baseline corporate DCF valuation assumptions.
+   * @param shocks - Positive independent decimal shock distances in the elected parameter dimensions.
+   * @returns Baseline enterprise value and signed deltas or unavailability for each requested endpoint.
+   * @throws If the inputs or baseline are invalid, the shock dimensions disagree, or an admissible endpoint fails to price.
+   */
+  readonly dcfSensitivityOnResults: typeof wasm.dcfSensitivityOnResults;
+  /**
+   * Reprice a rectangular grid of DCF assumptions on the same statement run.
+   * @param model - Unchanged source statement model identified in the results.
+   * @param results - Statement result at the requested cutoff and valuation date.
+   * @param request - Corporate DCF inputs at the baseline WACC and terminal assumption.
+   * @param axes - WACC decimal rates in row order and terminal rates or multiples in column order.
+   * @returns Rectangular grid with same-currency values and reasons for unavailable endpoints.
+   * @throws If the baseline or axes are invalid or pricing an admissible cell fails.
+   */
+  readonly dcfSensitivityGrid: typeof wasm.dcfSensitivityGrid;
+  /**
+   * Value a company's named forecast cashflows on an explicit observation cutoff.
+   * @param model - Identified model with publication dates and a reporting currency.
+   * @param request - Statement valuation date and closed observation cutoff, WACC, authored terminal horizon and basis.
+   * @param market - Optional market state for statements with linked capital-structure instruments.
+   * @returns Enterprise and common-equity values with the exact period and terminal timing.
+   * @throws If required statement evidence is missing, the currency is inconsistent, or the DCF assumptions cannot be valued.
+   */
+  readonly evaluateCorporateDcf: typeof wasm.evaluateCorporateDcf;
+  /**
+   * Value a company using an already evaluated statement snapshot.
+   * @param model - Unchanged model that produced the supplied results.
+   * @param results - Verified statement result on the requested publication cutoff and effective valuation date.
+   * @param request - Identified DCF assumptions, currency, date and terminal basis.
+   * @returns Enterprise and common-equity values from the reused statement run.
+   * @throws If the run identity or valuation cut differs from the request, or the DCF assumptions fail validation.
+   */
+  readonly evaluateDcfFromResults: typeof wasm.evaluateDcfFromResults;
+  /**
+   * Reprice retained, coherent statement forecast paths as one valuation distribution.
+   * @param model - Original statement model supplying the model identity and reporting calendar.
+   * @param results - Verified baseline observations and opening balances on the matching information cutoff.
+   * @param paths - Complete Monte Carlo results retaining the selected monetary forecast samples and path identities.
+   * @param request - Common WACC, dated cash-flow terms and terminal assumptions.
+   * @returns Same-currency values per path and R-7 sample quantiles at the elected probabilities.
+   * @throws If verified provenance differs, the retained paths are incomplete, or a sampled path cannot price.
+   */
+  readonly evaluateDcfMonteCarlo: typeof wasm.evaluateDcfMonteCarlo;
+  /**
    * Value a company with a discounted cash flow of its unlevered free cash flow.
    *
    * Twin of Python `evaluate_dcf` (Rust `evaluate_dcf`). The model

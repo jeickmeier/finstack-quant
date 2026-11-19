@@ -976,7 +976,10 @@ impl Evaluator {
                     .as_ref()
                     .map(|_| (context.market, context.as_of))
             }
-            None => contractual_capital_structure(model, &empty_market),
+            None => {
+                self.visibility_cutoff = None;
+                contractual_capital_structure(model, &empty_market)
+            }
         };
 
         // Run paths — parallel via rayon on native targets, serial on wasm32
@@ -1044,7 +1047,12 @@ impl Evaluator {
             acc
         };
 
-        accumulator.finish()
+        let provenance = super::RunProvenance::for_run(
+            model,
+            context.map_or(ObservationCutoff::FullSnapshot, |source| source.cutoff),
+            context.map(|source| source.as_of),
+        )?;
+        accumulator.finish(provenance)
     }
 
     /// Populate value types, set metadata, and run the optional check suite.

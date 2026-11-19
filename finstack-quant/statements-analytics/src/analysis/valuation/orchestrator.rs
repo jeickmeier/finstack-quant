@@ -422,6 +422,7 @@ impl CorporateAnalysisBuilder {
                     crate::analysis::valuation::corporate::DcfEvalContext {
                         net_debt_override,
                         options: &dcf_options,
+                        projection: None,
                     },
                     self.as_of,
                 )

@@ -119704,6 +119704,21 @@
     "percentiles": [0.05, 0.25, 0.5, 0.75, 0.95]
   },
   "statementMonteCarlo": {
+    "provenance": {
+      "model_id": "ACME-SOFTWARE-3STMT",
+      "model_content_hash": "sha256:f89d87e5a0bac9518c5de593133ed027236a2f68a9c208f0c252d87f6db21044",
+      "observation_cutoff": "full_snapshot",
+      "forecast_streams": [
+        {
+          "node_id": "revenue",
+          "stream_version": 1,
+          "seed": "11",
+          "state": "7798539810902042179",
+          "stream": "12348885475910810477"
+        }
+      ],
+      "run_id": "sha256:12762a9c1a6ddf26cdce5ac9a1078d0e221e018bc340836509c09228b33fc835"
+    },
     "percentile_results": {
       "cash": {
         "metric": "cash",

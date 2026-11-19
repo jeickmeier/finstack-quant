@@ -488,3 +488,38 @@ def test_cashflow_lookup_preserves_currency_guards() -> None:
     cashflows = st.CapitalStructureCashflows.from_json(json.dumps(payload))
     with pytest.raises(RuntimeError, match="Currency mismatch"):
         cashflows.get_component("interest_expense", "TL-A", Q1)
+
+
+def test_dated_dcf_reuses_results_for_grid_and_paths() -> None:
+    """Pin the qualified DCF route and the same rectangular grid used by WASM."""
+    from datetime import date
+
+    day = date(2024, 12, 31)
+    market = MarketContext()
+    builder = st.ModelBuilder("qualified-dcf").periods("2025..2025").currency("USD")
+    builder.source_snapshot("forecast-at-2024-close")
+    builder.value_money("ufcf", [("2025", Money(100, "USD"))])
+    model = builder.build()
+    evaluation = st.Evaluator()
+    results = evaluation.evaluate_with_market(model, market, day, day)
+    request = sa.CorporateDcfRequest(
+        cut=sa.StatementValuationCut(day, day, "USD"),
+        inputs=sa.DcfInputs(wacc=0.10, terminal_value=sa.TerminalValueSpec.gordon_growth(0.02), net_debt_override=50),
+        projection=sa.DcfProjection(
+            terminal_date="2026-01-01",
+            normalized_annual_fcff=sa.TerminalFcffBasis.authored(Money(100, "USD")),
+            stable_growth_ceiling=0.08,
+        ),
+    )
+    base = sa.evaluate_dcf_from_results(model, results, request).enterprise_value.amount
+    assert base == pytest.approx(1249.77910868, abs=1e-7)
+    axes = sa.DcfSensitivityGridSpec([0.09, 0.10], [0.015, 0.02, 0.095])
+    grid = sa.dcf_sensitivity_grid(model, results, request, axes).to_dataframe()
+    assert grid.shape == (2, 3)
+    assert grid.iloc[1, 1] == pytest.approx(base)
+    assert grid.iloc[:, 2].isna().all()
+    config = st.MonteCarloConfig(3, 7, ["ufcf"], [0.5], include_path_data=True)
+    paths = evaluation.evaluate_monte_carlo(model, config, market, day, day)
+    sample = sa.evaluate_dcf_monte_carlo(model, results, paths, request).to_dataframe()
+    assert sample["path_id"].to_list() == [0, 1, 2]
+    assert sample["enterprise_value"].to_list() == pytest.approx([base] * 3)

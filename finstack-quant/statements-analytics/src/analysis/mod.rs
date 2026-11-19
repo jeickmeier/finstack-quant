@@ -73,10 +73,15 @@ pub use scenarios::{
     run_sensitivity, run_variance, variance_bridge,
 };
 pub use valuation::{
-    CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions,
-    CorporateValuationResult, DEFAULT_UFCF_NODE, DcfInputs, DcfOptions, DcfPeriodRow,
-    DcfSensitivityResult, ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche,
-    WaccInputs, dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc,
+    CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions, CorporateDcfRequest,
+    CorporateValuationResult, DEFAULT_UFCF_NODE, DcfDistributionResult, DcfInputs,
+    DcfMultipleShocks, DcfOptions, DcfPathQuantile, DcfPathValue, DcfPeriodRow, DcfProjection,
+    DcfRateShocks, DcfSensitivityEndpoint, DcfSensitivityGridResult, DcfSensitivityGridSpec,
+    DcfSensitivityPair, DcfSensitivityResult, DcfSensitivityShocks, DcfShockReport,
+    DcfTerminalShocks, ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche,
+    StatementValuationCut, TerminalFcffBasis, WaccInputs, dcf_sensitivity, dcf_sensitivity_grid,
+    dcf_sensitivity_on_results, evaluate_corporate_dcf, evaluate_dcf, evaluate_dcf_from_results,
+    evaluate_dcf_monte_carlo, evaluate_lbo, run_corporate_analysis, wacc,
 };
 
 pub use checks::{

@@ -23,10 +23,15 @@ use crate::bindings::statements_analytics::checks::{
 };
 use crate::bindings::statements_analytics::typed::PyTornadoEntry;
 use crate::errors::{serde_json_to_py, statements_to_py};
+use finstack_quant_statements_analytics::analysis::DcfDistributionResult;
 use finstack_quant_statements_analytics::analysis::{
     CorporateAnalysis, CorporateAnalysisOptions, CorporateValuationResult, DEFAULT_UFCF_NODE,
     DcfInputs, DcfOptions, DcfSensitivityResult, LboCheckMappings, LboConfig, LboResult,
     WaccInputs,
+};
+use finstack_quant_statements_analytics::analysis::{
+    CorporateDcfRequest, DcfProjection, DcfSensitivityEndpoint, DcfSensitivityGridResult,
+    DcfSensitivityGridSpec, StatementValuationCut, TerminalFcffBasis,
 };
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     EquityBridge, TerminalValueSpec, ValuationDiscounts,
@@ -356,6 +361,456 @@ wire_methods!(
     "ValuationDiscounts"
 );
 
+#[pyclass(
+    name = "DcfInputs",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfInputs")]
+#[derive(Clone)]
+struct PyDcfInputs {
+    inner: DcfInputs,
+}
+
+#[pymethods]
+impl PyDcfInputs {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfInputs.__init__")]
+    #[pyo3(signature = (*, wacc, terminal_value, ufcf_node=DEFAULT_UFCF_NODE, net_debt_override=None))]
+    fn new(
+        wacc: f64,
+        terminal_value: &PyTerminalValueSpec,
+        ufcf_node: &str,
+        net_debt_override: Option<f64>,
+    ) -> PyResult<Self> {
+        let inner = DcfInputs {
+            wacc,
+            terminal_value: terminal_value.inner.clone(),
+            ufcf_node: ufcf_node.to_owned(),
+            net_debt_override,
+        };
+        inner.validate().map_err(statements_to_py)?;
+        Ok(Self { inner })
+    }
+}
+
+#[pyclass(
+    name = "DcfOptions",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfOptions")]
+#[derive(Clone)]
+struct PyDcfOptions {
+    inner: DcfOptions,
+}
+
+#[pymethods]
+impl PyDcfOptions {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfOptions.__init__")]
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, mid_year_convention=False, equity_bridge=None, shares_outstanding=None, valuation_discounts=None, exit_multiple_metric_node=None)"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner = crate::bindings::module_utils::fields_from_py(py, fields, "DcfOptions")?;
+        Ok(Self { inner })
+    }
+}
+
+#[pyclass(
+    name = "StatementValuationCut",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "StatementValuationCut")]
+#[derive(Clone)]
+struct PyStatementValuationCut {
+    inner: StatementValuationCut,
+}
+
+#[pymethods]
+impl PyStatementValuationCut {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "StatementValuationCut.__init__")]
+    fn new(
+        as_of: &Bound<'_, PyAny>,
+        observed_through: &Bound<'_, PyAny>,
+        currency: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        use crate::bindings::date_utils::py_to_date;
+        Ok(Self {
+            inner: StatementValuationCut {
+                as_of: py_to_date(as_of)?,
+                observed_through: py_to_date(observed_through)?,
+                currency: crate::bindings::core::currency::extract_currency(currency)?,
+            },
+        })
+    }
+}
+
+#[pyclass(
+    name = "DcfProjection",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfProjection")]
+#[derive(Clone)]
+struct PyDcfProjection {
+    inner: DcfProjection,
+}
+
+#[pymethods]
+impl PyDcfProjection {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfProjection.__init__")]
+    #[pyo3(signature = (*, terminal_date, normalized_annual_fcff=None, forward_remainder_node=None, stable_growth_ceiling=None))]
+    fn new(
+        terminal_date: &Bound<'_, PyAny>,
+        normalized_annual_fcff: Option<PyRef<'_, PyTerminalFcffBasis>>,
+        forward_remainder_node: Option<String>,
+        stable_growth_ceiling: Option<f64>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: DcfProjection {
+                terminal_date: crate::bindings::date_utils::py_to_date(terminal_date)?,
+                normalized_annual_fcff: normalized_annual_fcff.map(|basis| basis.inner.clone()),
+                forward_remainder_node,
+                stable_growth_ceiling,
+            },
+        })
+    }
+}
+
+#[pyclass(
+    name = "TerminalFcffBasis",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "TerminalFcffBasis")]
+#[derive(Clone)]
+struct PyTerminalFcffBasis {
+    inner: TerminalFcffBasis,
+}
+
+#[pymethods]
+impl PyTerminalFcffBasis {
+    #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "TerminalFcffBasis.authored")]
+    fn authored(amount: &PyMoney) -> Self {
+        Self {
+            inner: TerminalFcffBasis::Authored {
+                amount: amount.inner,
+            },
+        }
+    }
+
+    #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "TerminalFcffBasis.trailing_additive")]
+    fn trailing_additive() -> Self {
+        Self {
+            inner: TerminalFcffBasis::TrailingAdditive,
+        }
+    }
+}
+
+#[pyclass(
+    name = "CorporateDcfRequest",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "CorporateDcfRequest")]
+#[derive(Clone)]
+struct PyCorporateDcfRequest {
+    inner: CorporateDcfRequest,
+}
+
+#[pymethods]
+impl PyCorporateDcfRequest {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "CorporateDcfRequest.__init__")]
+    #[pyo3(signature = (*, cut, inputs, projection, options=None))]
+    fn new(
+        cut: &PyStatementValuationCut,
+        inputs: &PyDcfInputs,
+        projection: &PyDcfProjection,
+        options: Option<PyRef<'_, PyDcfOptions>>,
+    ) -> Self {
+        Self {
+            inner: CorporateDcfRequest {
+                cut: cut.inner.clone(),
+                inputs: inputs.inner.clone(),
+                projection: projection.inner.clone(),
+                options: options
+                    .map(|options| options.inner.clone())
+                    .unwrap_or_default(),
+            },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_corporate_dcf")]
+#[pyfunction]
+#[pyo3(signature = (model, request, market=None))]
+fn evaluate_corporate_dcf<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    request: &PyCorporateDcfRequest,
+    market: Option<&Bound<'py, PyAny>>,
+) -> PyResult<PyCorporateValuationResult> {
+    let model = extract_model_ref(model)?.into_owned();
+    let request = request.inner.clone();
+    let market = extract_market_opt(py, market)?;
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::evaluate_corporate_dcf(
+                &model,
+                &request,
+                market.as_ref(),
+            )
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyCorporateValuationResult { inner })
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_dcf_from_results")]
+#[pyfunction]
+fn evaluate_dcf_from_results<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    results: &Bound<'py, PyAny>,
+    request: &PyCorporateDcfRequest,
+) -> PyResult<PyCorporateValuationResult> {
+    let model = extract_model_ref(model)?.into_owned();
+    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let request = request.inner.clone();
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::evaluate_dcf_from_results(
+                &model, &results, &request,
+            )
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyCorporateValuationResult { inner })
+}
+
+#[pyclass(
+    name = "DcfSensitivityGridSpec",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridSpec")]
+#[derive(Clone)]
+struct PyDcfSensitivityGridSpec {
+    inner: DcfSensitivityGridSpec,
+}
+
+#[pymethods]
+impl PyDcfSensitivityGridSpec {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridSpec.__init__")]
+    fn new(wacc_values: Vec<f64>, terminal_values: Vec<f64>) -> PyResult<Self> {
+        let inner = DcfSensitivityGridSpec {
+            wacc_values,
+            terminal_values,
+        };
+        inner.validate().map_err(statements_to_py)?;
+        Ok(Self { inner })
+    }
+}
+
+#[pyclass(
+    name = "DcfSensitivityGridResult",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridResult")]
+#[derive(Clone)]
+struct PyDcfSensitivityGridResult {
+    inner: DcfSensitivityGridResult,
+}
+
+#[pymethods]
+impl PyDcfSensitivityGridResult {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridResult.baseline_enterprise_value")]
+    fn baseline_enterprise_value(&self) -> PyMoney {
+        PyMoney::from_inner(self.inner.baseline_enterprise_value)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridResult.to_dataframe")]
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows = self
+            .inner
+            .cells
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|cell| match cell {
+                        DcfSensitivityEndpoint::Priced {
+                            enterprise_value, ..
+                        } => Some(enterprise_value.amount()),
+                        DcfSensitivityEndpoint::Unavailable { .. } => None,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("index", &self.inner.axes.wacc_values)?;
+        kwargs.set_item("columns", &self.inner.axes.terminal_values)?;
+        py.import("pandas")?
+            .getattr("DataFrame")?
+            .call((rows,), Some(&kwargs))
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "dcf_sensitivity_on_results")]
+#[pyfunction]
+fn dcf_sensitivity_on_results<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    results: &Bound<'py, PyAny>,
+    request: &PyCorporateDcfRequest,
+    shocks: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let model = extract_model_ref(model)?.into_owned();
+    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let request = request.inner.clone();
+    let shocks = crate::bindings::module_utils::spec_from_py(py, shocks, "DCF shocks")?;
+    let report = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::dcf_sensitivity_on_results(
+                &model, &results, &request, &shocks,
+            )
+        })
+        .map_err(statements_to_py)?;
+    crate::bindings::pandas_utils::serde_to_py(py, &report)
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "dcf_sensitivity_grid")]
+#[pyfunction]
+fn dcf_sensitivity_grid<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    results: &Bound<'py, PyAny>,
+    request: &PyCorporateDcfRequest,
+    axes: &PyDcfSensitivityGridSpec,
+) -> PyResult<PyDcfSensitivityGridResult> {
+    let model = extract_model_ref(model)?.into_owned();
+    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let request = request.inner.clone();
+    let axes = axes.inner.clone();
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::dcf_sensitivity_grid(
+                &model, &results, &request, &axes,
+            )
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyDcfSensitivityGridResult { inner })
+}
+
+#[pyclass(
+    name = "DcfDistributionResult",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult")]
+#[derive(Clone)]
+struct PyDcfDistributionResult {
+    inner: DcfDistributionResult,
+}
+
+#[pymethods]
+impl PyDcfDistributionResult {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult.to_dataframe")]
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows = self
+            .inner
+            .paths
+            .iter()
+            .map(|row| {
+                serde_json::json!({
+                    "path_id": row.path_id,
+                    "enterprise_value": row.enterprise_value.amount(),
+                    "equity_value": row.equity_value.amount(),
+                    "currency": row.enterprise_value.currency().to_string(),
+                })
+            })
+            .collect::<Vec<_>>();
+        serde_rows_to_dataframe_with_schema(
+            py,
+            &rows,
+            &[
+                ("path_id", "uint32"),
+                ("enterprise_value", "float64"),
+                ("equity_value", "float64"),
+                ("currency", "str"),
+            ],
+        )
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult.quantiles_to_dataframe")]
+    fn quantiles_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows = self
+            .inner
+            .quantiles
+            .iter()
+            .map(|row| {
+                serde_json::json!({
+                    "probability": row.probability,
+                    "enterprise_value": row.enterprise_value.amount(),
+                    "equity_value": row.equity_value.amount(),
+                    "currency": row.enterprise_value.currency().to_string(),
+                })
+            })
+            .collect::<Vec<_>>();
+        serde_rows_to_dataframe_with_schema(
+            py,
+            &rows,
+            &[
+                ("probability", "float64"),
+                ("enterprise_value", "float64"),
+                ("equity_value", "float64"),
+                ("currency", "str"),
+            ],
+        )
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_dcf_monte_carlo")]
+#[pyfunction]
+fn evaluate_dcf_monte_carlo<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    results: &Bound<'py, PyAny>,
+    paths: &crate::bindings::statements::monte_carlo::PyMonteCarloResults,
+    request: &PyCorporateDcfRequest,
+) -> PyResult<PyDcfDistributionResult> {
+    let model = extract_model_ref(model)?.into_owned();
+    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let paths = paths.inner.clone();
+    let request = request.inner.clone();
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::evaluate_dcf_monte_carlo(
+                &model, &results, &paths, &request,
+            )
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyDcfDistributionResult { inner })
+}
+
 fn extract_terminal_value(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<TerminalValueSpec> {
     if let Ok(typed) = obj.extract::<PyRef<'_, PyTerminalValueSpec>>() {
         return Ok(typed.inner.clone());
@@ -366,6 +821,11 @@ fn extract_terminal_value(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Te
 /// Rust `DcfOptions` from its serde form (a dict or JSON string, missing
 /// fields taking their Rust defaults); `None` is `DcfOptions::default()`.
 fn extract_dcf_options(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<DcfOptions> {
+    if let Some(bound) = obj
+        && let Ok(options) = bound.extract::<PyRef<'_, PyDcfOptions>>()
+    {
+        return Ok(options.inner.clone());
+    }
     obj.map(|obj| crate::bindings::module_utils::spec_from_py(py, obj, "options"))
         .transpose()
         .map(Option::unwrap_or_default)
@@ -1000,7 +1460,10 @@ fn evaluate_dcf<'py>(
     as_of: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyCorporateValuationResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let inputs: DcfInputs = crate::bindings::module_utils::spec_from_py(py, inputs, "DcfInputs")?;
+    let inputs = match inputs.extract::<PyRef<'_, PyDcfInputs>>() {
+        Ok(inputs) => inputs.inner.clone(),
+        Err(_) => crate::bindings::module_utils::spec_from_py(py, inputs, "DcfInputs")?,
+    };
     let options = extract_dcf_options(py, options)?;
     let market = extract_market_opt(py, market)?;
     let as_of = as_of
@@ -1312,6 +1775,20 @@ fn run_corporate_analysis<'py>(
 
 /// Register valuation types and functions.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyDcfDistributionResult>()?;
+    m.add_function(pyo3::wrap_pyfunction!(evaluate_dcf_monte_carlo, m)?)?;
+    m.add_class::<PyDcfInputs>()?;
+    m.add_class::<PyDcfOptions>()?;
+    m.add_class::<PyStatementValuationCut>()?;
+    m.add_class::<PyTerminalFcffBasis>()?;
+    m.add_class::<PyDcfProjection>()?;
+    m.add_class::<PyCorporateDcfRequest>()?;
+    m.add_class::<PyDcfSensitivityGridSpec>()?;
+    m.add_class::<PyDcfSensitivityGridResult>()?;
+    m.add_function(pyo3::wrap_pyfunction!(evaluate_corporate_dcf, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(evaluate_dcf_from_results, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(dcf_sensitivity_grid, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(dcf_sensitivity_on_results, m)?)?;
     m.add_class::<PyTerminalValueSpec>()?;
     m.add_class::<PyEquityBridge>()?;
     m.add_class::<PyValuationDiscounts>()?;

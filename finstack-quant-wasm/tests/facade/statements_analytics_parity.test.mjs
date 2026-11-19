@@ -546,3 +546,73 @@ test('DependencyTracer and the extensions reject malformed inputs', () => {
     (e) => e.kind === 'validation'
   );
 });
+
+test('dated DCF reuses matching statements for its grid and coherent sample paths', () => {
+  const day = '2024-12-31';
+  const builder = new statements.ModelBuilder('qualified-dcf');
+  builder.periods('2025..2025');
+  builder.currency('USD');
+  builder.sourceSnapshot('forecast-at-2024-close');
+  const annual = { amount: '100', currency: 'USD' };
+  builder.valueMoney('ufcf', { 2025: annual });
+  const model = builder.build();
+  const evaluator = new statements.Evaluator();
+  const context = new core.MarketContext();
+  try {
+    const market = context.toJson();
+    const results = evaluator.evaluateWithMarket(model, market, day, day);
+    const request = {
+      cut: { as_of: day, observed_through: day, currency: 'USD' },
+      inputs: sa.dcfInputs({
+        wacc: 0.1,
+        terminal_value: { type: 'gordon_growth', stable_growth_rate: 0.02 },
+        net_debt_override: 50,
+      }),
+      options: sa.dcfOptions({}),
+      projection: {
+        terminal_date: '2026-01-01',
+        normalized_annual_fcff: { kind: 'authored', amount: annual },
+        stable_growth_ceiling: 0.08,
+      },
+    };
+    const baseline = sa.evaluateDcfFromResults(model, results, request).enterprise_value;
+    assert.ok(Math.abs(Number(baseline.amount) - 1249.77910868) < 1e-7);
+    const grid = sa.dcfSensitivityGrid(
+      model,
+      results,
+      request,
+      sa.dcfSensitivityGridSpec({ wacc_values: [0.09, 0.1], terminal_values: [0.015, 0.02, 0.095] })
+    );
+    assert.deepEqual(
+      grid.cells.map((row) => row.length),
+      [3, 3]
+    );
+    assert.deepEqual(grid.cells[1][1].enterprise_value, baseline);
+    assert.ok(grid.cells.every((row) => row[2].status === 'unavailable'));
+    const shocks = sa.dcfSensitivityOnResults(model, results, request, {
+      wacc: { low: '0.01', high: '0.02' },
+      terminal: { parameter: 'stable_growth', shocks: { low: '0.005', high: '0.07' } },
+    });
+    const growth = shocks.pairs.find((pair) => pair.parameter_id === 'terminal_growth');
+    assert.equal(growth.low.status, 'priced');
+    assert.equal(growth.high.status, 'unavailable');
+    assert.ok(Math.abs(growth.high.level - 0.09) < 1e-12);
+    const paths = evaluator.evaluateMonteCarlo(
+      model,
+      { n_paths: 3, seed: '7', metrics: ['ufcf'], percentiles: [0.5], include_path_data: true },
+      market,
+      day,
+      day
+    );
+    const distribution = sa.evaluateDcfMonteCarlo(model, results, paths, request);
+    assert.deepEqual(
+      distribution.paths.map((row) => row.path_id),
+      [0, 1, 2]
+    );
+    assert.ok(distribution.paths.every((row) => row.enterprise_value.amount === baseline.amount));
+  } finally {
+    context.free();
+    evaluator.free();
+    builder.free();
+  }
+});

@@ -33,6 +33,20 @@ scenario_diff = _sa.scenario_diff
 variance_bridge = _sa.variance_bridge
 backtest_forecast = _sa.backtest_forecast
 goal_seek = _sa.goal_seek
+DcfInputs = _sa.DcfInputs
+DcfOptions = _sa.DcfOptions
+StatementValuationCut = _sa.StatementValuationCut
+TerminalFcffBasis = _sa.TerminalFcffBasis
+DcfProjection = _sa.DcfProjection
+CorporateDcfRequest = _sa.CorporateDcfRequest
+DcfSensitivityGridSpec = _sa.DcfSensitivityGridSpec
+DcfSensitivityGridResult = _sa.DcfSensitivityGridResult
+evaluate_corporate_dcf = _sa.evaluate_corporate_dcf
+evaluate_dcf_from_results = _sa.evaluate_dcf_from_results
+dcf_sensitivity_grid = _sa.dcf_sensitivity_grid
+dcf_sensitivity_on_results = _sa.dcf_sensitivity_on_results
+DcfDistributionResult = _sa.DcfDistributionResult
+evaluate_dcf_monte_carlo = _sa.evaluate_dcf_monte_carlo
 evaluate_dcf = _sa.evaluate_dcf
 dcf_sensitivity = _sa.dcf_sensitivity
 evaluate_lbo = _sa.evaluate_lbo
@@ -163,11 +177,18 @@ __all__: list[str] = [
     "CorkscrewExtension",
     "CorkscrewReport",
     "CorporateAnalysis",
+    "CorporateDcfRequest",
     "CorporateValuationResult",
     "CreditAssessment",
     "CreditAssessmentPoint",
     "CreditMapping",
     "CreditScorecardExtension",
+    "DcfDistributionResult",
+    "DcfInputs",
+    "DcfOptions",
+    "DcfProjection",
+    "DcfSensitivityGridResult",
+    "DcfSensitivityGridSpec",
     "DcfSensitivityResult",
     "DependencyTracer",
     "DependencyTree",
@@ -217,6 +238,8 @@ __all__: list[str] = [
     "Stage",
     "StageResult",
     "StagingConfig",
+    "StatementValuationCut",
+    "TerminalFcffBasis",
     "TerminalValueSpec",
     "ThreeStatementMapping",
     "TornadoEntry",
@@ -242,8 +265,13 @@ __all__: list[str] = [
     "credit_assessment",
     "credit_assessment_report_text",
     "dcf_sensitivity",
+    "dcf_sensitivity_grid",
+    "dcf_sensitivity_on_results",
+    "evaluate_corporate_dcf",
     "evaluate_covenants",
     "evaluate_dcf",
+    "evaluate_dcf_from_results",
+    "evaluate_dcf_monte_carlo",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",

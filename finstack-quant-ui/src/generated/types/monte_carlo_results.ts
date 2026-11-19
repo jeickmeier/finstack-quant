@@ -21,6 +21,10 @@ export type DA176Fd07772B7Dfa6E59 = number | ("inf" | "-inf" | "nan");
  */
 export type D_9C2Fac7Fef3Fb26Aaf21 = "dimension" | "index" | "measure" | "attribute";
 /**
+ * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+ */
+export type D_6Ebc05Ff50E5Cef14048 = string;
+/**
  * Warning emitted during evaluation.
  */
 export type DCf776B61125046D84B45 =
@@ -198,6 +202,7 @@ export interface MonteCarloResultsWire {
    * Percentiles computed for each metric/period.
    */
   percentiles: number[];
+  provenance: D_46E9B9F749A497Bf5Bc2;
   /**
    * The run's exact base seed, a decimal string in JSON: an unsigned
    * 64-bit value does not fit a JavaScript number.
@@ -527,4 +532,76 @@ export interface D_9Ebf84Cf8414D0C617Ec {
     [k: string]: [number, number][];
   };
   [k: string]: unknown;
+}
+/**
+ * Identified model, observation cut and valuation date for every retained path.
+ */
+export interface D_46E9B9F749A497Bf5Bc2 {
+  /**
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
+   */
+  forecast_streams?: D_25C2Be0082C34Cc8D8F4[];
+  /**
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
+   */
+  model_content_hash: string;
+  /**
+   * Identifier of the evaluated model.
+   */
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff:
+    | "full_snapshot"
+    | {
+        through: D_6Ebc05Ff50E5Cef14048;
+      };
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above. Two runs of the same model content, snapshot, cutoff
+   * and valuation date share it.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: D_6Ebc05Ff50E5Cef14048 | null;
+}
+/**
+ * Replay provenance of one stochastic forecast node in a single run.
+ *
+ * The generator is the shared PCG64 started at `state` on stream `stream`
+ * (`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the
+ * versioned key: the key version, the configured seed, the node and the
+ * single-run mode. Unsigned 64-bit values are decimal strings in JSON.
+ */
+export interface D_25C2Be0082C34Cc8D8F4 {
+  /**
+   * The stochastic forecast node.
+   */
+  node_id: string;
+  /**
+   * The forecast method's exact configured seed.
+   */
+  seed: string;
+  /**
+   * Effective PCG64 starting state.
+   */
+  state: string;
+  /**
+   * Effective PCG64 stream selector.
+   */
+  stream: string;
+  /**
+   * Version of the mapping from the key to the stream.
+   */
+  stream_version: number;
 }

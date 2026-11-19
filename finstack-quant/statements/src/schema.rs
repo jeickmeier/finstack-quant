@@ -221,27 +221,27 @@ fn monte_carlo_config_examples() -> finstack_quant_core::Result<Vec<Value>> {
 
 /// The percentile bands of one metric over two forecast quarters.
 fn monte_carlo_results_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<crate::evaluator::MonteCarloResults>(
-        serde_json::json!({
-            "percentile_results": {
-                "revenue": {
-                    "metric": "revenue",
-                    "value_type": {"type": "scalar"},
-                    "sample_count": 1000,
-                    "values": {
-                        "2025Q1": [[0.05, 940_000.0], [0.5, 1_000_000.0], [0.95, 1_065_000.0]],
-                        "2025Q2": [[0.05, 925_000.0], [0.5, 1_020_000.0], [0.95, 1_120_000.0]]
-                    }
-                }
-            },
-            "n_paths": 1000,
-            "seed": "42",
-            "stream_version": 1,
-            "metrics": ["revenue"],
-            "percentiles": [0.05, 0.5, 0.95],
-            "forecast_periods": ["2025Q1", "2025Q2"]
-        }),
-    )
+    use finstack_quant_core::dates::PeriodId;
+
+    let mut builder = crate::builder::ModelBuilder::new("revenue-simulation");
+    builder.periods("2025Q1..Q2", None)?;
+    builder.source_snapshot("forecast-example");
+    builder.value(
+        "revenue",
+        &[
+            (PeriodId::quarter(2025, 1)?, 1_000_000.0.into()),
+            (PeriodId::quarter(2025, 2)?, 1_020_000.0.into()),
+        ],
+    );
+    let model = builder.build()?;
+    let config = MonteCarloConfig::new(4, 42, ["revenue"]);
+    let results = crate::evaluator::Evaluator::new().evaluate_monte_carlo(&model, &config, None)?;
+    let value = serde_json::to_value(results).map_err(|error| {
+        finstack_quant_core::Error::Internal(format!(
+            "serialize Monte Carlo results example: {error}"
+        ))
+    })?;
+    Ok(vec![value])
 }
 
 /// Quarterly results rolled up to annual: cash is a balance, margin a ratio.

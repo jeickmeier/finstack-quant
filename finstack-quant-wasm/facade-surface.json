@@ -4378,9 +4378,17 @@
       "computeMultiple",
       "creditAssessment",
       "creditAssessmentReportText",
+      "dcfInputs",
+      "dcfOptions",
       "dcfSensitivity",
+      "dcfSensitivityGrid",
+      "dcfSensitivityGridSpec",
+      "dcfSensitivityOnResults",
+      "evaluateCorporateDcf",
       "evaluateCovenants",
       "evaluateDcf",
+      "evaluateDcfFromResults",
+      "evaluateDcfMonteCarlo",
       "evaluateLbo",
       "evaluateScenarioSet",
       "evaluateScenarioSetWithMarket",
@@ -4588,6 +4596,30 @@
     "kind": "function"
   },
   "statements_analytics.validateRenewalSpecJson": {
+    "kind": "function"
+  },
+  "statements_analytics.dcfInputs": {
+    "kind": "function"
+  },
+  "statements_analytics.dcfOptions": {
+    "kind": "function"
+  },
+  "statements_analytics.dcfSensitivityGridSpec": {
+    "kind": "function"
+  },
+  "statements_analytics.dcfSensitivityOnResults": {
+    "kind": "function"
+  },
+  "statements_analytics.dcfSensitivityGrid": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateCorporateDcf": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateDcfFromResults": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateDcfMonteCarlo": {
     "kind": "function"
   },
   "statements_analytics.evaluateDcf": {

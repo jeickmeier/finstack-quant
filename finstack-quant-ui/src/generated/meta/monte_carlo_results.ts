@@ -13,11 +13,11 @@ export default [
         "metrics": [
           "revenue"
         ],
-        "n_paths": 1000,
+        "n_paths": 4,
         "percentile_results": {
           "revenue": {
             "metric": "revenue",
-            "sample_count": 1000,
+            "sample_count": 4,
             "value_type": {
               "type": "scalar"
             },
@@ -25,7 +25,7 @@ export default [
               "2025Q1": [
                 [
                   0.05,
-                  940000
+                  1000000
                 ],
                 [
                   0.5,
@@ -33,13 +33,13 @@ export default [
                 ],
                 [
                   0.95,
-                  1065000
+                  1000000
                 ]
               ],
               "2025Q2": [
                 [
                   0.05,
-                  925000
+                  1020000
                 ],
                 [
                   0.5,
@@ -47,7 +47,7 @@ export default [
                 ],
                 [
                   0.95,
-                  1120000
+                  1020000
                 ]
               ]
             }
@@ -58,6 +58,13 @@ export default [
           0.5,
           0.95
         ],
+        "provenance": {
+          "model_content_hash": "sha256:e8ad0ed13fe5f1c0a4f647a4d7e7f2941e554492ad5b4ec7a6e0d9a155d14f3b",
+          "model_id": "revenue-simulation",
+          "observation_cutoff": "full_snapshot",
+          "run_id": "sha256:5453afee1c1b2059ae709f7fe033a9bbef784b05c8209eac9a547067e1fa3be2",
+          "source_snapshot": "forecast-example"
+        },
         "seed": "42",
         "stream_version": 1
       }
@@ -273,6 +280,38 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumnData/oneOf/8/properties/values/items"
   },
   {
+    "path": "#/$defs/d_25c2be0082c34cc8d8f4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ForecastStream",
+    "description": "Replay provenance of one stochastic forecast node in a single run.\n\nThe generator is the shared PCG64 started at `state` on stream `stream`\n(`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the\nversioned key: the key version, the configured seed, the node and the\nsingle-run mode. Unsigned 64-bit values are decimal strings in JSON."
+  },
+  {
+    "path": "#/$defs/d_25c2be0082c34cc8d8f4/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ForecastStream/properties/node_id",
+    "description": "The stochastic forecast node."
+  },
+  {
+    "path": "#/$defs/d_25c2be0082c34cc8d8f4/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ForecastStream/properties/seed",
+    "description": "The forecast method's exact configured seed."
+  },
+  {
+    "path": "#/$defs/d_25c2be0082c34cc8d8f4/properties/state",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ForecastStream/properties/state",
+    "description": "Effective PCG64 starting state."
+  },
+  {
+    "path": "#/$defs/d_25c2be0082c34cc8d8f4/properties/stream",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ForecastStream/properties/stream",
+    "description": "Effective PCG64 stream selector."
+  },
+  {
+    "path": "#/$defs/d_25c2be0082c34cc8d8f4/properties/stream_version",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ForecastStream/properties/stream_version",
+    "description": "Version of the mapping from the key to the stream.",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_2f3bf3b3f13fb41b2ca2",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumn",
     "description": "A single named column in a [`TableEnvelope`]."
@@ -350,6 +389,64 @@ export default [
     ]
   },
   {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance",
+    "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells."
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/forecast_streams",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/forecast_streams",
+    "description": "The random stream of every stochastic forecast node in a single run,\nin model node order: enough to replay its draws."
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/forecast_streams/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/forecast_streams/items",
+    "ref": "#/$defs/ForecastStream",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ForecastStream"
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/model_content_hash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/model_content_hash",
+    "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash))."
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/model_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/model_id",
+    "description": "Identifier of the evaluated model."
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/observation_cutoff",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/observation_cutoff",
+    "description": "Observations the run was allowed to read.",
+    "ref": "#/$defs/ObservationCutoff",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ObservationCutoff"
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/run_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/run_id",
+    "description": "Identity of this evaluation run: the canonical content hash of the\nfields above. Two runs of the same model content, snapshot, cutoff\nand valuation date share it."
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/source_snapshot",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/source_snapshot",
+    "description": "Identity of the source snapshot the model's observations came from."
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/valuation_date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/valuation_date",
+    "description": "Valuation date the capital structure was priced at, when the run used\na market."
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/valuation_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/valuation_date/anyOf/0",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/valuation_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/valuation_date/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_6dbdf0cc2ba8afa48229",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete",
     "description": "Why a Monte Carlo run published no statistics.\n\nA run is complete only when every path has a value for every requested\nmetric in every forecast period."
@@ -384,6 +481,12 @@ export default [
     "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/reason",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/reason",
     "description": "Why that cell had no value: `missing`, `masked`, or the reason an\nunavailable cell gives (for example `missing_peer_shock`)."
+  },
+  {
+    "path": "#/$defs/d_6ebc05ff50e5cef14048",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/DateWire",
+    "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+    "format": "date"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3",
@@ -567,6 +670,28 @@ export default [
     "description": "A non-finite value, written as its sentinel string.",
     "ref": "#/$defs/NonFiniteSentinel",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteSentinel"
+  },
+  {
+    "path": "#/$defs/d_a9ef2bc562ba1ce16d9d",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ObservationCutoff",
+    "description": "Which explicit observations an evaluation may read.\n\nOn the wire: `\"full_snapshot\"`, or `{\"through\": \"2025-04-25\"}`."
+  },
+  {
+    "path": "#/$defs/d_a9ef2bc562ba1ce16d9d/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ObservationCutoff/oneOf/0",
+    "const": "full_snapshot",
+    "description": "Read every observation in the model's snapshot, with no publication\ncutoff."
+  },
+  {
+    "path": "#/$defs/d_a9ef2bc562ba1ce16d9d/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ObservationCutoff/oneOf/1",
+    "description": "Read an observation only when its availability date is on or before\nthis date, inclusive through the end of the day."
+  },
+  {
+    "path": "#/$defs/d_a9ef2bc562ba1ce16d9d/oneOf/1/properties/through",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ObservationCutoff/oneOf/1/properties/through",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_b888a5be75073df7b251",
@@ -1790,6 +1915,13 @@ export default [
     "path": "#/properties/percentiles/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/percentiles/items",
     "format": "double"
+  },
+  {
+    "path": "#/properties/provenance",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/provenance",
+    "description": "Identified model, observation cut and valuation date for every retained path.",
+    "ref": "#/$defs/RunProvenance",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance"
   },
   {
     "path": "#/properties/seed",

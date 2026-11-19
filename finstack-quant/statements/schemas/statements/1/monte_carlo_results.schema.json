@@ -911,6 +911,11 @@
         }
       ]
     },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
     "EvalWarning": {
       "description": "Warning emitted during evaluation.",
       "oneOf": [
@@ -1087,6 +1092,42 @@
         }
       ]
     },
+    "ForecastStream": {
+      "additionalProperties": false,
+      "description": "Replay provenance of one stochastic forecast node in a single run.\n\nThe generator is the shared PCG64 started at `state` on stream `stream`\n(`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the\nversioned key: the key version, the configured seed, the node and the\nsingle-run mode. Unsigned 64-bit values are decimal strings in JSON.",
+      "properties": {
+        "node_id": {
+          "description": "The stochastic forecast node.",
+          "type": "string"
+        },
+        "seed": {
+          "description": "The forecast method's exact configured seed.",
+          "type": "string"
+        },
+        "state": {
+          "description": "Effective PCG64 starting state.",
+          "type": "string"
+        },
+        "stream": {
+          "description": "Effective PCG64 stream selector.",
+          "type": "string"
+        },
+        "stream_version": {
+          "description": "Version of the mapping from the key to the stream.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node_id",
+        "stream_version",
+        "seed",
+        "state",
+        "stream"
+      ],
+      "type": "object"
+    },
     "MonteCarloIncomplete": {
       "additionalProperties": false,
       "description": "Why a Monte Carlo run published no statistics.\n\nA run is complete only when every path has a value for every requested\nmetric in every forecast period.",
@@ -1195,6 +1236,29 @@
         }
       ]
     },
+    "ObservationCutoff": {
+      "description": "Which explicit observations an evaluation may read.\n\nOn the wire: `\"full_snapshot\"`, or `{\"through\": \"2025-04-25\"}`.",
+      "oneOf": [
+        {
+          "const": "full_snapshot",
+          "description": "Read every observation in the model's snapshot, with no publication\ncutoff.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Read an observation only when its availability date is on or before\nthis date, inclusive through the end of the day.",
+          "properties": {
+            "through": {
+              "$ref": "#/$defs/DateWire"
+            }
+          },
+          "required": [
+            "through"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "PercentileSeries": {
       "description": "Per-metric percentile time series.",
       "properties": {
@@ -1260,6 +1324,60 @@
           ]
         }
       ]
+    },
+    "RunProvenance": {
+      "additionalProperties": false,
+      "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells.",
+      "properties": {
+        "forecast_streams": {
+          "description": "The random stream of every stochastic forecast node in a single run,\nin model node order: enough to replay its draws.",
+          "items": {
+            "$ref": "#/$defs/ForecastStream"
+          },
+          "type": "array"
+        },
+        "model_content_hash": {
+          "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).",
+          "type": "string"
+        },
+        "model_id": {
+          "description": "Identifier of the evaluated model.",
+          "type": "string"
+        },
+        "observation_cutoff": {
+          "$ref": "#/$defs/ObservationCutoff",
+          "description": "Observations the run was allowed to read."
+        },
+        "run_id": {
+          "description": "Identity of this evaluation run: the canonical content hash of the\nfields above. Two runs of the same model content, snapshot, cutoff\nand valuation date share it.",
+          "type": "string"
+        },
+        "source_snapshot": {
+          "description": "Identity of the source snapshot the model's observations came from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valuation_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateWire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Valuation date the capital structure was priced at, when the run used\na market."
+        }
+      },
+      "required": [
+        "model_id",
+        "model_content_hash",
+        "observation_cutoff",
+        "run_id"
+      ],
+      "type": "object"
     },
     "TableColumn": {
       "additionalProperties": false,
@@ -1577,11 +1695,11 @@
       "metrics": [
         "revenue"
       ],
-      "n_paths": 1000,
+      "n_paths": 4,
       "percentile_results": {
         "revenue": {
           "metric": "revenue",
-          "sample_count": 1000,
+          "sample_count": 4,
           "value_type": {
             "type": "scalar"
           },
@@ -1589,7 +1707,7 @@
             "2025Q1": [
               [
                 0.05,
-                940000.0
+                1000000.0
               ],
               [
                 0.5,
@@ -1597,13 +1715,13 @@
               ],
               [
                 0.95,
-                1065000.0
+                1000000.0
               ]
             ],
             "2025Q2": [
               [
                 0.05,
-                925000.0
+                1020000.0
               ],
               [
                 0.5,
@@ -1611,7 +1729,7 @@
               ],
               [
                 0.95,
-                1120000.0
+                1020000.0
               ]
             ]
           }
@@ -1622,6 +1740,13 @@
         0.5,
         0.95
       ],
+      "provenance": {
+        "model_content_hash": "sha256:e8ad0ed13fe5f1c0a4f647a4d7e7f2941e554492ad5b4ec7a6e0d9a155d14f3b",
+        "model_id": "revenue-simulation",
+        "observation_cutoff": "full_snapshot",
+        "run_id": "sha256:5453afee1c1b2059ae709f7fe033a9bbef784b05c8209eac9a547067e1fa3be2",
+        "source_snapshot": "forecast-example"
+      },
       "seed": "42",
       "stream_version": 1
     }
@@ -1684,6 +1809,10 @@
       },
       "type": "array"
     },
+    "provenance": {
+      "$ref": "#/$defs/RunProvenance",
+      "description": "Identified model, observation cut and valuation date for every retained path."
+    },
     "seed": {
       "description": "The run's exact base seed, a decimal string in JSON: an unsigned\n64-bit value does not fit a JavaScript number.",
       "type": "string"
@@ -1703,6 +1832,7 @@
     }
   },
   "required": [
+    "provenance",
     "percentile_results",
     "n_paths",
     "seed",

@@ -157,6 +157,8 @@ pub struct PercentileSeries {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MonteCarloResults {
+    /// Identified model, observation cut and valuation date for every retained path.
+    pub provenance: super::RunProvenance,
     /// Aggregated percentile results: `metric → PercentileSeries`, in the
     /// requested metric order. Empty when the run is incomplete.
     pub percentile_results: IndexMap<String, PercentileSeries>,
@@ -209,6 +211,101 @@ fn percentile_label(percentile: f64) -> String {
 }
 
 impl MonteCarloResults {
+    /// Recover one selected monetary series from complete retained Monte Carlo paths.
+    ///
+    /// # Arguments
+    /// * `metric` - Exact simulated monetary node ID also present in the path table.
+    /// * `currency` - Expected currency of the monetary node, used for checked reconstruction.
+    ///
+    /// # Errors
+    /// Rejects missing or incomplete path data, wrong or unreported model units,
+    /// duplicate samples, invalid path IDs, unrepresentable amounts or uncovered periods.
+    pub fn monetary_paths(
+        &self,
+        metric: &str,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> crate::Result<Vec<IndexMap<PeriodId, finstack_quant_core::money::Money>>> {
+        use finstack_quant_core::money::Money;
+        use finstack_quant_core::table::TableColumnData;
+
+        let invalid = |message: &str| {
+            crate::Error::invalid_input(format!("Monte Carlo metric '{metric}': {message}"))
+        };
+        if self.incomplete.is_some() || self.n_paths == 0 {
+            return Err(invalid("the run is incomplete"));
+        }
+        let series = self
+            .percentile_results
+            .get(metric)
+            .ok_or_else(|| invalid("not sampled"))?;
+        if series.value_type != (crate::types::NodeValueType::Monetary { currency }) {
+            return Err(invalid(
+                "simulated node does not use the requested monetary currency",
+            ));
+        }
+        let table = self
+            .path_data
+            .as_ref()
+            .ok_or_else(|| invalid("retain full path data during simulation"))?;
+        table.validate()?;
+        let column = |name| table.column(name).map(|column| &column.data);
+        let (
+            Some(TableColumnData::UInt32(paths)),
+            Some(TableColumnData::String(periods)),
+            Some(TableColumnData::String(metrics)),
+            Some(TableColumnData::Float64(values)),
+        ) = (
+            column("path_id"),
+            column("period"),
+            column("metric"),
+            column("value"),
+        )
+        else {
+            return Err(invalid("the retained path table has invalid columns"));
+        };
+        let periods_by_label: std::collections::HashMap<_, _> = self
+            .forecast_periods
+            .iter()
+            .map(|period| (period.to_string(), *period))
+            .collect();
+        if periods_by_label.len() != self.forecast_periods.len() {
+            return Err(invalid("the run has duplicate forecast periods"));
+        }
+        let retained_rows = self
+            .n_paths
+            .checked_mul(self.forecast_periods.len())
+            .ok_or_else(|| invalid("path count overflows the forecast table"))?;
+        if self.forecast_periods.is_empty() || retained_rows > table.row_count {
+            return Err(invalid(
+                "retained table cannot cover its declared path count",
+            ));
+        }
+        let mut result = vec![IndexMap::new(); self.n_paths];
+        for (((&path, period), name), &value) in paths.iter().zip(periods).zip(metrics).zip(values)
+        {
+            if name != metric {
+                continue;
+            }
+            let path = result
+                .get_mut(path as usize)
+                .ok_or_else(|| invalid("path ID is outside the run"))?;
+            let id = *periods_by_label
+                .get(period)
+                .ok_or_else(|| invalid("path sample has an unknown forecast period"))?;
+            let money = Money::from_model_value(value, currency)?;
+            if path.insert(id, money).is_some() {
+                return Err(invalid("path repeats a sampled period"));
+            }
+        }
+        if result
+            .iter()
+            .any(|path| path.len() != self.forecast_periods.len())
+        {
+            return Err(invalid("the retained path table omits required samples"));
+        }
+        Ok(result)
+    }
+
     /// Get a time series of one probability level for a metric.
     ///
     /// The level is matched exactly: pass a probability the run was
@@ -726,7 +823,7 @@ impl MonteCarloAccumulator {
         Ok(())
     }
 
-    pub(crate) fn finish(mut self) -> Result<MonteCarloResults> {
+    pub(crate) fn finish(mut self, provenance: super::RunProvenance) -> Result<MonteCarloResults> {
         if self.observed_paths != self.expected_paths {
             return Err(Error::eval(format!(
                 "Monte Carlo aggregation mismatch: expected {} paths, got {}",
@@ -747,6 +844,7 @@ impl MonteCarloAccumulator {
         // Statistics are published only for a complete run.
         if let Some((index, period, path, reason)) = self.first_gap {
             return Ok(MonteCarloResults {
+                provenance,
                 percentile_results: IndexMap::new(),
                 incomplete: Some(MonteCarloIncomplete {
                     metric: self.metrics[index].clone(),
@@ -856,6 +954,7 @@ impl MonteCarloAccumulator {
         };
 
         Ok(MonteCarloResults {
+            provenance,
             percentile_results,
             incomplete: None,
             n_paths: self.observed_paths,
@@ -972,6 +1071,15 @@ mod tests {
         ])
     }
 
+    fn provenance() -> crate::evaluator::RunProvenance {
+        crate::evaluator::RunProvenance::for_run(
+            &model(),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+            None,
+        )
+        .expect("fixture provenance")
+    }
+
     fn accumulator(config: &MonteCarloConfig) -> Result<MonteCarloAccumulator> {
         MonteCarloAccumulator::new(&model(), config, &value_types())
     }
@@ -1007,7 +1115,7 @@ mod tests {
                 .push_path(path, &ratio_path(*second, *third), Vec::new())
                 .expect("valid sample");
         }
-        accumulator.finish().expect("aggregation")
+        accumulator.finish(provenance()).expect("aggregation")
     }
 
     #[test]
@@ -1155,7 +1263,7 @@ mod tests {
             .push_path(0, &ratio_path(1.0, 1.0), Vec::new())
             .expect("valid sample");
         let results = accumulator
-            .finish()
+            .finish(provenance())
             .expect("an incomplete run still returns");
         assert!(results.percentile_results.is_empty());
         assert!(results.path_data.is_none());
@@ -1209,7 +1317,11 @@ mod tests {
                 .push_path(path, &ratio_path(second, third), Vec::new())
                 .expect("sample");
         }
-        let merged = right.merge(left).expect("merge").finish().expect("finish");
+        let merged = right
+            .merge(left)
+            .expect("merge")
+            .finish(provenance())
+            .expect("finish");
         assert_eq!(
             serde_json::to_value(&serial).expect("serialize"),
             serde_json::to_value(&merged).expect("serialize")

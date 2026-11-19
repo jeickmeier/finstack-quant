@@ -1,0 +1,1288 @@
+{
+  "$defs": {
+    "Currency": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XCG",
+          "description": "Caribbean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWG",
+          "description": "Zimbabwe Gold (924)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "DcfInputs": {
+      "additionalProperties": false,
+      "description": "Headline DCF assumptions of [`evaluate_dcf`]: discount rate, terminal value,\ncash-flow node and optional net-debt override.\n\nThe serde form is the host input of `evaluate_dcf`: `wacc` and\n`terminal_value` are required, `ufcf_node` defaults to\n[`DEFAULT_UFCF_NODE`] and `net_debt_override` to `None`; an unknown field\nis rejected. For example\n`{\"wacc\": 0.10, \"terminal_value\": {\"type\": \"gordon_growth\", \"stable_growth_rate\": 0.02}}`.",
+      "properties": {
+        "net_debt_override": {
+          "default": null,
+          "description": "Flat net-debt amount in model currency used instead of the\nmodel-derived equity bridge; `None` (the default) derives net debt\nfrom the model's debt and cash.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "terminal_value": {
+          "$ref": "#/$defs/TerminalValueSpec",
+          "description": "Terminal-value convention applied after the explicit forecast period."
+        },
+        "ufcf_node": {
+          "default": "ufcf",
+          "description": "Node id containing monetary unlevered free cash flow for forecast\nperiods (default [`DEFAULT_UFCF_NODE`], `\"ufcf\"`).",
+          "type": "string"
+        },
+        "wacc": {
+          "description": "Weighted average cost of capital as a decimal (`0.10` means `10%`).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "wacc",
+        "terminal_value"
+      ],
+      "type": "object"
+    },
+    "DcfOptions": {
+      "additionalProperties": false,
+      "description": "Optional configuration for DCF valuation beyond the core WACC/terminal parameters.\n\nPercentage-style inputs use decimal form, so `0.10` means `10%`.\n[`Default`] caps perpetual stable growth at 5%.\n\nThe serde form is the host input for DCF options: every field is optional\nand a missing field takes its [`Default`] value, while an unknown field is\nrejected. For example `{\"exit_multiple_bump\": {\"relative\": 0.10}}` keeps\nevery other default and shocks the exit multiple by ±10%.",
+      "properties": {
+        "equity_bridge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EquityBridge"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Structured equity bridge; when `Some` it is used as-is and the model's\ndebt/cash (and any net-debt override) are not consulted."
+        },
+        "exit_multiple_bump": {
+          "$ref": "#/$defs/ExitMultipleBump",
+          "default": {
+            "absolute": 1.0
+          },
+          "description": "Exit-multiple sensitivity bump (default: `ExitMultipleBump::Absolute(1.0)`).\n\nUse `ExitMultipleBump::Relative` for a proportional shock,\ne.g. `Relative(0.10)` for ±10% of the base multiple. Absolute\nbumps are clamped at zero on the downside."
+        },
+        "exit_multiple_metric_node": {
+          "default": null,
+          "description": "Statement flow node whose complete trailing calendar year supplies the\n[`TerminalValueSpec::ExitMultiple`] metric (default: `None`).\n\nWhen `Some`, sum contiguous actual and forecast periods over the year ending\nat the last forecast boundary. Values must be finite and monetary. Missing\nhistory or a partial boundary requires an explicit annual metric. When `None`, the\nspec's explicit `terminal_metric` is used. Ignored for Gordon\nGrowth and H-Model terminals.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_stable_growth_rate": {
+          "default": 0.05,
+          "description": "Maximum perpetual stable growth rate accepted by Gordon Growth and the\nH-Model (default `0.05` = 5%).\n\nThis is a policy ceiling, not merely the mathematical `g < WACC`\nconstraint. Set it to the valuation's defensible long-run nominal\neconomy or risk-free growth assumption.",
+          "format": "double",
+          "type": "number"
+        },
+        "mid_year_convention": {
+          "default": false,
+          "description": "Enable mid-year discounting convention (default: false).",
+          "type": "boolean"
+        },
+        "shares_outstanding": {
+          "default": null,
+          "description": "Basic shares outstanding for per-share value.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "valuation_discounts": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValuationDiscounts"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Private company valuation discounts (DLOM, DLOC).\n\nDiscounts apply after the DCF EV-to-equity bridge. The reported DCF\nenterprise value remains pre-discount and will not reconcile to\ndiscounted equity value plus net debt when discounts are present."
+        },
+        "wacc_denominator_epsilon": {
+          "default": 0.005,
+          "description": "Minimum spread between WACC-down and the Gordon / H-Model growth\nrate in the terminal-value formula (default `0.005` = 50 bp).\n\nWhen `wacc - bump < growth + epsilon`, the down-shock is clamped\nto `growth + epsilon` so the `1/(wacc - g)` denominator stays\nwell defined. The clamp is reported in the trace so the caller\nknows the bump was shortened.",
+          "format": "double",
+          "type": "number"
+        },
+        "wacc_sensitivity_bump": {
+          "default": 0.01,
+          "description": "WACC sensitivity bump, in decimal (default `0.01` = ±100 bp).\n\nThe down-shock is clamped so the terminal-value denominator\n`wacc - g` cannot collapse (the resulting EV would blow up and\nobscure the true sensitivity). See\n[`DcfOptions::wacc_denominator_epsilon`].",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "DcfProjection": {
+      "additionalProperties": false,
+      "description": "Authored terminal horizon and optional normalized annual FCFF election.",
+      "properties": {
+        "forward_remainder_node": {
+          "description": "Exact monetary node for the forward portion of the one forecast period\nstraddling the cut. Its modeled receipt is the end of that period.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "normalized_annual_fcff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TerminalFcffBasis"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Required for a growth terminal and absent for an exit multiple."
+        },
+        "stable_growth_ceiling": {
+          "description": "Elected maximum annual stable growth as a decimal rate; absent means no ceiling.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "terminal_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Terminal value is discounted to the same cut on its own ACT/365.25 tenor."
+        }
+      },
+      "required": [
+        "terminal_date"
+      ],
+      "type": "object"
+    },
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    },
+    "EquityBridge": {
+      "additionalProperties": false,
+      "description": "Structured equity bridge for converting Enterprise Value to Equity Value.\n\nStandard professional bridge:\n```text\nEquity = EV - Total Debt + Cash - Preferred Equity - Minority Interest\n         + Non-Operating Assets + Σ(other adjustments)\n```\n\nEvery [`DiscountedCashFlow`] carries one; a flat net-debt deduction is\nwritten as `EquityBridge { total_debt, cash, ..Default::default() }`.",
+      "properties": {
+        "cash": {
+          "default": 0.0,
+          "description": "Cash and cash equivalents.",
+          "format": "double",
+          "type": "number"
+        },
+        "minority_interest": {
+          "default": 0.0,
+          "description": "Non-controlling (minority) interests.",
+          "format": "double",
+          "type": "number"
+        },
+        "non_operating_assets": {
+          "default": 0.0,
+          "description": "Non-operating assets (excess cash, investments, real estate, etc.).",
+          "format": "double",
+          "type": "number"
+        },
+        "other_adjustments": {
+          "description": "Named adjustments (e.g., unfunded pension, contingent liabilities).\nPositive values increase equity; negative values decrease it.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "preferred_equity": {
+          "default": 0.0,
+          "description": "Preferred stock at liquidation preference.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_debt": {
+          "default": 0.0,
+          "description": "Total interest-bearing debt.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "ExitMultipleBump": {
+      "description": "Exit-multiple sensitivity shock shape.\n\nAbsolute bumps are in multiple-turn units (e.g. `Absolute(1.0)` is\n±1.0x). Relative bumps are decimal fractions of the base multiple\n(e.g. `Relative(0.10)` is ±10%).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Absolute bump in turns of the multiple.",
+          "properties": {
+            "absolute": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "absolute"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Proportional bump in decimal (0.10 = ±10%).",
+          "properties": {
+            "relative": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "relative"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Money": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "StatementValuationCut": {
+      "additionalProperties": false,
+      "description": "Explicit timing basis for a point-in-time corporate valuation.",
+      "properties": {
+        "as_of": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Effective calendar date from which projected cash receipts are discounted."
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Single reporting currency shared by authored cashflows, bridges and the model."
+        },
+        "observed_through": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Latest publication date eligible for the statement run, inclusive."
+        }
+      },
+      "required": [
+        "as_of",
+        "observed_through",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "TerminalFcffBasis": {
+      "description": "Explicit source of normalized annual FCFF for a perpetual-growth terminal.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Same-currency annualized FCFF authored directly for the terminal date.",
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/Money",
+              "description": "Signed FCFF per year, measured on a nominal currency basis."
+            },
+            "kind": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "amount"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Sum the complete 12 months of additive forecast FCFF at the horizon.",
+          "properties": {
+            "kind": {
+              "const": "trailing_additive",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TerminalValueSpec": {
+      "description": "Terminal value calculation method for DCF.",
+      "oneOf": [
+        {
+          "description": "Gordon Growth Model: TV = FCF_terminal × (1 + g) / (WACC - g)",
+          "properties": {
+            "stable_growth_rate": {
+              "description": "Perpetual stable growth rate as an annual decimal (e.g., 0.02 for\n2%). Must be < WACC.",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "gordon_growth",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "stable_growth_rate"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Exit Multiple: TV = Terminal_Metric × Multiple",
+          "properties": {
+            "multiple": {
+              "description": "Multiple to apply (e.g., 10.0 for 10x EBITDA)",
+              "format": "double",
+              "type": "number"
+            },
+            "terminal_metric": {
+              "description": "Terminal metric in major currency units (for example, EBITDA).\nRequired for standalone pricing. A statement DCF can resolve it from a metric node.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "exit_multiple",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "multiple"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "H-Model: linear fade from high growth to stable growth (Damodaran).\n\n```text\nTV = FCF_T × (1+g_s)/(WACC-g_s) + FCF_T × H × (g_h-g_s)/(WACC-g_s)\n```\n\nwhere `H` is the half-life in years of the high-growth fade period.\nThe first term is the standard Gordon Growth stable-state value;\nthe second term captures the present value of excess growth that\nlinearly decays from `high_growth_rate` to `stable_growth_rate`\nover `2 × half_life_years`.",
+          "properties": {
+            "half_life_years": {
+              "description": "Half-life of the growth fade in years (e.g., 5.0).",
+              "format": "double",
+              "type": "number"
+            },
+            "high_growth_rate": {
+              "description": "Initial high growth rate (e.g., 0.15 for 15%).",
+              "format": "double",
+              "type": "number"
+            },
+            "stable_growth_rate": {
+              "description": "Long-run stable growth rate (e.g., 0.03 for 3%). Must be < WACC.",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "h_model",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "high_growth_rate",
+            "stable_growth_rate",
+            "half_life_years"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ValuationDiscounts": {
+      "additionalProperties": false,
+      "description": "Valuation discounts for private company equity.\n\nApplied multiplicatively after the equity bridge:\n```text\nFMV = Equity Value × (1 - DLOC) × (1 - DLOM) × (1 - other_discount)\n```\n\nThe enterprise value reported by a DCF remains pre-discount. When discounts\nare present, `enterprise_value - net_debt` reconciles to pre-discount\nequity value, not to the discounted fair-market equity value.",
+      "properties": {
+        "dloc": {
+          "description": "Discount for Lack of Control (0.0–1.0, e.g., 0.20 for 20%).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dlom": {
+          "description": "Discount for Lack of Marketability (0.0–1.0, e.g., 0.25 for 25%).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "other_discount": {
+          "description": "Additional discount (0.0–1.0).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_dcf_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Named cash-flow and terminal assumptions on an explicit statement valuation cut.",
+  "properties": {
+    "cut": {
+      "$ref": "#/$defs/StatementValuationCut",
+      "description": "Explicit effective valuation date, observation cutoff and currency."
+    },
+    "inputs": {
+      "$ref": "#/$defs/DcfInputs",
+      "description": "WACC, terminal method and explicitly named operating cashflow."
+    },
+    "options": {
+      "$ref": "#/$defs/DcfOptions",
+      "description": "Additional equity bridge, dilution and timing assumptions."
+    },
+    "projection": {
+      "$ref": "#/$defs/DcfProjection",
+      "description": "Projection selection and normalized annual terminal basis."
+    }
+  },
+  "required": [
+    "cut",
+    "inputs",
+    "projection",
+    "options"
+  ],
+  "title": "CorporateDcfRequest",
+  "type": "object"
+}

@@ -179,6 +179,31 @@ pub struct DcfInputs {
     pub net_debt_override: Option<f64>,
 }
 
+impl DcfInputs {
+    /// Validate assumptions independent of statement data.
+    ///
+    /// # Errors
+    /// Rejects a nonfinite WACC, WACC at or below −100%, an empty cashflow
+    /// node identity, or a nonfinite override.
+    pub fn validate(&self) -> Result<()> {
+        if !self.wacc.is_finite() || self.wacc <= -1.0 {
+            return Err(Error::invalid_input(
+                "DCF WACC must be finite and above -100%",
+            ));
+        }
+        if self.ufcf_node.trim().is_empty() {
+            return Err(Error::invalid_input("DCF cashflow node must be named"));
+        }
+        if self
+            .net_debt_override
+            .is_some_and(|amount| !amount.is_finite())
+        {
+            return Err(Error::invalid_input("DCF net debt override must be finite"));
+        }
+        Ok(())
+    }
+}
+
 /// Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
 ///
 /// Percentage-style inputs use decimal form, so `0.10` means `10%`.
@@ -285,6 +310,7 @@ impl Default for ExitMultipleBump {
 pub(crate) struct DcfEvalContext<'a> {
     pub(crate) net_debt_override: Option<f64>,
     pub(crate) options: &'a DcfOptions,
+    pub(crate) projection: Option<&'a DcfProjection>,
 }
 
 /// Evaluate a financial model using DCF methodology with optional market context.
@@ -399,6 +425,7 @@ pub fn evaluate_dcf(
     let context = DcfEvalContext {
         net_debt_override: inputs.net_debt_override,
         options,
+        projection: None,
     };
     let mut evaluator = Evaluator::new();
     let results = match (market, as_of) {
@@ -428,6 +455,234 @@ pub fn evaluate_dcf(
         as_of,
     )
 }
+
+/// Explicit timing basis for a point-in-time corporate valuation.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct StatementValuationCut {
+    /// Effective calendar date from which projected cash receipts are discounted.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub as_of: Date,
+    /// Latest publication date eligible for the statement run, inclusive.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub observed_through: Date,
+    /// Single reporting currency shared by authored cashflows, bridges and the model.
+    pub currency: Currency,
+}
+
+impl StatementValuationCut {
+    fn check(&self, model: &FinancialModelSpec) -> Result<()> {
+        if self.observed_through > self.as_of {
+            return Err(Error::invalid_input(
+                "DCF observation cut follows its valuation date",
+            ));
+        }
+        if self.currency != extract_currency_from_model(model)? {
+            return Err(Error::invalid_input(
+                "DCF valuation currency must match the statement model",
+            ));
+        }
+        Ok(())
+    }
+
+    fn evaluate(
+        &self,
+        model: &FinancialModelSpec,
+        market: Option<&MarketContext>,
+    ) -> Result<StatementResult> {
+        use finstack_quant_statements::evaluator::ObservationCutoff;
+        self.check(model)?;
+        let empty_market = MarketContext::new();
+        Evaluator::new().evaluate_with_market(
+            model,
+            market.unwrap_or(&empty_market),
+            self.as_of,
+            ObservationCutoff::Through(self.observed_through),
+        )
+    }
+
+    fn check_result<'a>(
+        &self,
+        model: &FinancialModelSpec,
+        results: &'a StatementResult,
+    ) -> Result<&'a finstack_quant_statements::evaluator::RunProvenance> {
+        use finstack_quant_statements::evaluator::ObservationCutoff;
+        self.check(model)?;
+        let provenance = results.provenance.as_ref().ok_or_else(|| {
+            Error::invalid_input("Precomputed DCF requires identified statement run provenance")
+        })?;
+        if provenance.model_id != model.id
+            || provenance.model_content_hash != model.content_hash()?
+            || provenance.source_snapshot != model.source_snapshot
+            || provenance.source_snapshot.is_none()
+            || provenance.observation_cutoff != ObservationCutoff::Through(self.observed_through)
+            || provenance.valuation_date != Some(self.as_of)
+        {
+            return Err(Error::invalid_input(
+                "Statement run does not match the DCF model, snapshot, cut or valuation date",
+            ));
+        }
+        Ok(provenance)
+    }
+}
+
+/// Explicit source of normalized annual FCFF for a perpetual-growth terminal.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum TerminalFcffBasis {
+    /// Same-currency annualized FCFF authored directly for the terminal date.
+    Authored {
+        /// Signed FCFF per year, measured on a nominal currency basis.
+        amount: Money,
+    },
+    /// Sum the complete 12 months of additive forecast FCFF at the horizon.
+    TrailingAdditive,
+}
+
+/// Authored terminal horizon and optional normalized annual FCFF election.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DcfProjection {
+    /// Terminal value is discounted to the same cut on its own ACT/365.25 tenor.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub terminal_date: Date,
+    /// Required for a growth terminal and absent for an exit multiple.
+    pub normalized_annual_fcff: Option<TerminalFcffBasis>,
+    /// Exact monetary node for the forward portion of the one forecast period
+    /// straddling the cut. Its modeled receipt is the end of that period.
+    pub forward_remainder_node: Option<String>,
+    /// Elected maximum annual stable growth as a decimal rate; absent means no ceiling.
+    pub stable_growth_ceiling: Option<f64>,
+}
+
+/// A complete point-in-time corporate valuation request.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CorporateDcfRequest {
+    /// Explicit effective valuation date, observation cutoff and currency.
+    pub cut: StatementValuationCut,
+    /// WACC, terminal method and explicitly named operating cashflow.
+    pub inputs: DcfInputs,
+    /// Projection selection and normalized annual terminal basis.
+    pub projection: DcfProjection,
+    /// Additional equity bridge, dilution and timing assumptions.
+    pub options: DcfOptions,
+}
+
+impl DcfProjection {
+    fn normalized_fcff(
+        &self,
+        model: &FinancialModelSpec,
+        results: &StatementResult,
+        terminal_value: &TerminalValueSpec,
+        fcff_node: &str,
+        currency: Currency,
+        projection_end: Date,
+    ) -> Result<Option<Money>> {
+        match (&self.normalized_annual_fcff, terminal_value) {
+            (None, TerminalValueSpec::ExitMultiple { .. }) => Ok(None),
+            (Some(_), TerminalValueSpec::ExitMultiple { .. }) => Err(Error::invalid_input(
+                "An exit multiple does not use normalized annual FCFF",
+            )),
+            (Some(TerminalFcffBasis::Authored { amount }), _) if amount.currency() == currency => {
+                Ok(Some(*amount))
+            }
+            (Some(TerminalFcffBasis::Authored { .. }), _) => Err(Error::invalid_input(
+                "Annual terminal FCFF must use the valuation currency",
+            )),
+            (Some(TerminalFcffBasis::TrailingAdditive), _) => {
+                if self.terminal_date != projection_end {
+                    return Err(Error::invalid_input(
+                        "The terminal date must match the qualified trailing FCFF horizon",
+                    ));
+                }
+                let end = self.terminal_date.next_day().ok_or_else(|| {
+                    Error::invalid_input("Terminal FCFF horizon has no exclusive endpoint")
+                })?;
+                trailing_year_metric(model, results, fcff_node, end, currency).map(Some)
+            }
+            (None, _) => Err(Error::invalid_input(
+                "Growth terminal valuation requires an explicit annual FCFF basis",
+            )),
+        }
+    }
+}
+
+/// Price a point-in-time corporate DCF on a verified evaluated statement run.
+///
+/// # Arguments
+/// * `model` - The unchanged statement model, including its identified source snapshot.
+/// * `results` - The precomputed statement run at the exact requested currency, cut and valuation date.
+/// * `request` - The authored WACC, cashflow node, terminal basis and equity bridge.
+///
+/// # Errors
+/// Rejects mismatched run provenance, missing or unavailable observations,
+/// mixed currencies, incomplete selected periods, or invalid DCF assumptions.
+pub fn evaluate_dcf_from_results(
+    model: &FinancialModelSpec,
+    results: &StatementResult,
+    request: &CorporateDcfRequest,
+) -> Result<CorporateValuationResult> {
+    request.cut.check_result(model, results)?;
+    let inputs = &request.inputs;
+    inputs.validate()?;
+    evaluate_dcf_from_results_impl(
+        model,
+        results,
+        inputs.wacc,
+        inputs.terminal_value.clone(),
+        &inputs.ufcf_node,
+        DcfEvalContext {
+            net_debt_override: inputs.net_debt_override,
+            options: &request.options,
+            projection: Some(&request.projection),
+        },
+        Some(request.cut.as_of),
+    )
+}
+
+/// Evaluate a statement model at its elected observation cutoff, then price its DCF.
+///
+/// # Arguments
+/// * `model` - Statement model with a source snapshot and observation availability dates.
+/// * `request` - The authored interest rate, currency, forecast and terminal terms.
+/// * `market` - Market input for any capital-structure-linked statement nodes.
+///   Omit when valuation only needs the statements and authored assumptions.
+///
+/// # Errors
+/// Rejects missing source or cutoff evidence, an invalid capital structure,
+/// a missing cash flow, a currency mismatch or invalid valuation assumptions.
+pub fn evaluate_corporate_dcf(
+    model: &FinancialModelSpec,
+    request: &CorporateDcfRequest,
+    market: Option<&MarketContext>,
+) -> Result<CorporateValuationResult> {
+    let results = request.cut.evaluate(model, market)?;
+    evaluate_dcf_from_results(model, &results, request)
+}
+
+mod path;
+mod sensitivity;
+
+pub use path::{DcfDistributionResult, DcfPathQuantile, DcfPathValue, evaluate_dcf_monte_carlo};
+pub use sensitivity::{
+    DcfMultipleShocks, DcfRateShocks, DcfSensitivityEndpoint, DcfSensitivityGridResult,
+    DcfSensitivityGridSpec, DcfSensitivityPair, DcfSensitivityShocks, DcfShockReport,
+    DcfTerminalShocks, dcf_sensitivity_grid, dcf_sensitivity_on_results,
+};
 
 /// Tornado parameter id for the discount-rate shock.
 const SENSITIVITY_PARAM_WACC: &str = "wacc";
@@ -574,6 +829,7 @@ pub fn dcf_sensitivity(
     let context = DcfEvalContext {
         net_debt_override,
         options,
+        projection: None,
     };
 
     let enterprise_value = |terminal: TerminalValueSpec, discount_rate: f64| -> Result<f64> {
@@ -896,12 +1152,28 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         if date <= valuation_date {
             continue;
         }
+        let (node, start) = match context.projection {
+            Some(projection) if period.start < valuation_date => {
+                let node = projection.forward_remainder_node.as_deref().ok_or_else(|| {
+                    Error::invalid_input(format!(
+                        "Period {} crosses the DCF valuation date and requires a modeled forward remainder", period.id
+                    ))
+                })?;
+                if node == ufcf_node {
+                    return Err(Error::invalid_input(
+                        "DCF forward remainder must name its own modeled amount",
+                    ));
+                }
+                (node, valuation_date)
+            }
+            _ => (ufcf_node, period.start),
+        };
         flows.push((
             date,
-            monetary_node_money(results, ufcf_node, &period.id, currency)?,
+            monetary_node_money(results, node, &period.id, currency)?,
         ));
         flow_periods.push(period.id);
-        starts.push(period.start);
+        starts.push(start);
     }
 
     if flows.is_empty() {
@@ -918,70 +1190,28 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         context.options.exit_multiple_metric_node.as_deref(),
     )?;
 
-    // Validate terminal value constraints. Guards are written fail-closed
-    // (negated comparisons) so NaN parameters error instead of silently
-    // producing NaN valuations.
-    if !context.options.max_stable_growth_rate.is_finite() {
-        return Err(finstack_quant_statements::Error::Eval(
-            "DcfOptions.max_stable_growth_rate must be finite".into(),
-        ));
-    }
-    use std::cmp::Ordering;
-    match &terminal_value {
-        TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
-            if stable_growth_rate.partial_cmp(&context.options.max_stable_growth_rate)
-                == Some(Ordering::Greater)
-            {
-                return Err(finstack_quant_statements::Error::Eval(format!(
-                    "Gordon Growth stable_growth_rate ({stable_growth_rate:.4}) exceeds the configured stable-growth \
-                     ceiling ({:.4})",
-                    context.options.max_stable_growth_rate
-                )));
-            }
-            if stable_growth_rate.partial_cmp(&wacc) != Some(Ordering::Less) {
-                return Err(finstack_quant_statements::Error::Eval(format!(
-                    "Gordon Growth terminal value requires stable_growth_rate ({stable_growth_rate:.4}) < \
-                     WACC ({wacc:.4}). A growth rate >= WACC produces an infinite terminal value."
-                )));
-            }
+    let growth_ceiling = match context.projection {
+        Some(projection) => projection.stable_growth_ceiling,
+        None => Some(context.options.max_stable_growth_rate),
+    };
+    if let Some(ceiling) = growth_ceiling {
+        if !ceiling.is_finite() {
+            return Err(Error::invalid_input(
+                "DCF stable-growth ceiling must be finite",
+            ));
         }
-        TerminalValueSpec::HModel {
-            high_growth_rate,
-            stable_growth_rate,
-            half_life_years,
-        } => {
-            if stable_growth_rate.partial_cmp(&context.options.max_stable_growth_rate)
-                == Some(Ordering::Greater)
-            {
-                return Err(finstack_quant_statements::Error::Eval(format!(
-                    "H-Model stable growth rate ({stable_growth_rate:.4}) exceeds the configured \
-                     stable-growth ceiling ({:.4})",
-                    context.options.max_stable_growth_rate
-                )));
-            }
-            if stable_growth_rate.partial_cmp(&wacc) != Some(Ordering::Less) {
-                return Err(finstack_quant_statements::Error::Eval(format!(
-                    "H-Model terminal value requires stable_growth_rate ({:.4}) < WACC ({:.4}).",
-                    stable_growth_rate, wacc
-                )));
-            }
-            if !matches!(
-                high_growth_rate.partial_cmp(stable_growth_rate),
-                Some(Ordering::Greater | Ordering::Equal)
-            ) {
-                return Err(finstack_quant_statements::Error::Eval(format!(
-                    "H-Model requires high_growth_rate ({:.4}) >= stable_growth_rate ({:.4}).",
-                    high_growth_rate, stable_growth_rate
-                )));
-            }
-            if half_life_years.partial_cmp(&0.0) != Some(Ordering::Greater) {
-                return Err(finstack_quant_statements::Error::Eval(format!(
-                    "H-Model requires half_life_years > 0, got {:.4}.",
-                    half_life_years
-                )));
-            }
+        let stable = match terminal_value {
+            TerminalValueSpec::GordonGrowth { stable_growth_rate }
+            | TerminalValueSpec::HModel {
+                stable_growth_rate, ..
+            } => Some(stable_growth_rate),
+            TerminalValueSpec::ExitMultiple { .. } => None,
+        };
+        if stable.is_some_and(|rate| rate > ceiling) {
+            return Err(Error::invalid_input(format!(
+                "DCF stable growth exceeds the elected ceiling ({ceiling})"
+            )));
         }
-        TerminalValueSpec::ExitMultiple { .. } => {}
     }
 
     // Growth-perpetuity terminal values (Gordon, H-Model) capitalize an
@@ -989,22 +1219,37 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     // calendar year, including for explicitly dated annual stub periods.
     // Sparse observations or partial years cannot be substituted for that
     // history without changing the terminal-flow basis.
-    let annual_terminal_fcff = match &terminal_value {
-        TerminalValueSpec::GordonGrowth { .. } | TerminalValueSpec::HModel { .. } => {
-            let last_forecast = model
-                .periods
-                .iter()
-                .rfind(|period| !period.is_actual)
-                .ok_or_else(|| Error::eval("Growth terminal value requires a forecast period"))?;
-            Some(trailing_year_metric(
-                model,
-                results,
-                ufcf_node,
-                last_forecast.end,
-                currency,
-            )?)
-        }
-        TerminalValueSpec::ExitMultiple { .. } => None,
+    let projection_end = flows.last().map(|(end, _)| *end).ok_or_else(|| {
+        Error::eval("DCF requires a terminal horizon after at least one forecast receipt")
+    })?;
+    let annual_terminal_fcff = match context.projection {
+        Some(projection) => projection.normalized_fcff(
+            model,
+            results,
+            &terminal_value,
+            ufcf_node,
+            currency,
+            projection_end,
+        )?,
+        None => match &terminal_value {
+            TerminalValueSpec::GordonGrowth { .. } | TerminalValueSpec::HModel { .. } => {
+                let last_forecast = model
+                    .periods
+                    .iter()
+                    .rfind(|period| !period.is_actual)
+                    .ok_or_else(|| {
+                        Error::eval("Growth terminal value requires a forecast period")
+                    })?;
+                Some(trailing_year_metric(
+                    model,
+                    results,
+                    ufcf_node,
+                    last_forecast.end,
+                    currency,
+                )?)
+            }
+            TerminalValueSpec::ExitMultiple { .. } => None,
+        },
     };
 
     // Determine net debt from the latest balance-sheet period ending on or
@@ -1029,9 +1274,9 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         equity_bridge_from_model(model, results, net_debt_period)?
     };
 
-    let terminal_date = flows.last().map(|(end, _)| *end).ok_or_else(|| {
-        Error::eval("DCF requires a terminal horizon after at least one forecast receipt")
-    })?;
+    let terminal_date = context
+        .projection
+        .map_or(projection_end, |projection| projection.terminal_date);
     let forecast_timing = if context.options.mid_year_convention {
         ForecastTiming::Midpoints {
             period_starts: starts,
@@ -1322,6 +1567,144 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::types::AmountOrScalar;
+
+    #[test]
+    fn dated_dcf_matches_independent_value_and_rejects_another_cut() {
+        use time::macros::date;
+
+        let as_of = date!(2024 - 12 - 31);
+        let forecast = PeriodId::annual(2025).unwrap();
+        let mut builder = ModelBuilder::new("dated-dcf-pin");
+        builder.periods("2025..2025", None).unwrap();
+        builder.value_money("ufcf", &[(forecast, Money::from((100_i64, Currency::USD)))]);
+        builder.with_meta("currency", serde_json::json!("USD"));
+        builder.source_snapshot("authored-forecast-2024-12-31");
+        let model = builder.build().unwrap();
+        let mut request = CorporateDcfRequest {
+            cut: StatementValuationCut {
+                as_of,
+                observed_through: as_of,
+                currency: Currency::USD,
+            },
+            inputs: DcfInputs {
+                wacc: 0.10,
+                terminal_value: TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: Some(50.0),
+            },
+            projection: DcfProjection {
+                terminal_date: date!(2026 - 01 - 01),
+                normalized_annual_fcff: Some(TerminalFcffBasis::Authored {
+                    amount: Money::from((100_i64, Currency::USD)),
+                }),
+                forward_remainder_node: None,
+                stable_growth_ceiling: None,
+            },
+            options: DcfOptions::default(),
+        };
+        let results = request.cut.evaluate(&model, None).unwrap();
+        let direct = evaluate_corporate_dcf(&model, &request, None).unwrap();
+        let reused = evaluate_dcf_from_results(&model, &results, &request).unwrap();
+        assert_eq!(direct.enterprise_value, reused.enterprise_value);
+        assert!((reused.enterprise_value.amount() - 1_249.78).abs() < 0.005);
+        assert!((reused.equity_value.amount() - 1_199.78).abs() < 0.005);
+        request.projection.stable_growth_ceiling = Some(0.025);
+        let points = dcf_sensitivity_grid(
+            &model,
+            &results,
+            &request,
+            &DcfSensitivityGridSpec {
+                wacc_values: vec![0.09, 0.11],
+                terminal_values: vec![0.01, 0.02, 0.03],
+            },
+        )
+        .unwrap();
+        assert_eq!(points.cells.len(), 2);
+        assert!(points.cells.iter().all(|row| row.len() == 3));
+        assert!(matches!(
+            points.cells[0][2],
+            DcfSensitivityEndpoint::Unavailable { level: 0.03, .. }
+        ));
+        let DcfSensitivityEndpoint::Priced { change, .. } = points.cells[0][1] else {
+            panic!("admitted 9% WACC and 2% terminal growth must price");
+        };
+        assert!((change.amount() - 178.56).abs() < 0.02);
+
+        let shock = DcfRateShocks {
+            low: DecimalWire("0.01".parse().unwrap()),
+            high: DecimalWire("0.01".parse().unwrap()),
+        };
+        let sensitivity = dcf_sensitivity_on_results(
+            &model,
+            &results,
+            &request,
+            &DcfSensitivityShocks {
+                wacc: shock,
+                terminal: DcfTerminalShocks::StableGrowth(shock),
+            },
+        )
+        .unwrap();
+        assert_eq!(sensitivity.pairs[0].parameter_id, "wacc");
+        let growth = &sensitivity.pairs[1];
+        let DcfSensitivityEndpoint::Priced { level, change, .. } = growth.low else {
+            panic!("the admitted opposite terminal endpoint must price");
+        };
+        assert!((level - 0.01).abs() < 1e-15);
+        assert!((change.amount() + 138.86).abs() < 0.02);
+        assert!(matches!(
+            growth.high,
+            DcfSensitivityEndpoint::Unavailable { .. }
+        ));
+
+        use finstack_quant_statements::evaluator::{
+            MonteCarloConfig, MonteCarloContext, ObservationCutoff,
+        };
+        let market = MarketContext::new();
+        let context = Some(MonteCarloContext {
+            market: &market,
+            as_of,
+            cutoff: ObservationCutoff::Through(as_of),
+        });
+        let config = MonteCarloConfig {
+            n_paths: 3,
+            seed: 7,
+            metrics: vec!["ufcf".to_owned()],
+            percentiles: vec![0.10, 0.90],
+            include_path_data: true,
+        };
+        let paths = Evaluator::new()
+            .evaluate_monte_carlo(&model, &config, context)
+            .unwrap();
+        let distribution = evaluate_dcf_monte_carlo(&model, &results, &paths, &request).unwrap();
+        assert_eq!(distribution.paths.len(), 3);
+        assert!(
+            distribution
+                .paths
+                .iter()
+                .all(|path| path.enterprise_value == reused.enterprise_value)
+        );
+        assert!(
+            distribution
+                .quantiles
+                .iter()
+                .all(|point| point.equity_value == reused.equity_value)
+        );
+        let no_paths = Evaluator::new()
+            .evaluate_monte_carlo(
+                &model,
+                &MonteCarloConfig {
+                    include_path_data: false,
+                    ..config
+                },
+                context,
+            )
+            .unwrap();
+        assert!(evaluate_dcf_monte_carlo(&model, &results, &no_paths, &request).is_err());
+        request.cut.observed_through = date!(2024 - 12 - 30);
+        assert!(evaluate_dcf_from_results(&model, &results, &request).is_err());
+    }
 
     /// `DcfOptions` is the host input for DCF options: a partial document
     /// fills the rest from `Default`, and an unknown key is rejected.

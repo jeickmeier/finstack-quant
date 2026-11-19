@@ -424,6 +424,98 @@ export type ExitMultipleBump =
       relative: number;
     };
 /**
+ * Explicit source of normalized annual FCFF for a perpetual-growth terminal.
+ */
+export type TerminalFcffBasis =
+  | {
+      /**
+       * Signed FCFF per year, measured on a nominal currency basis.
+       */
+      amount: Money;
+      kind: "authored";
+    }
+  | {
+      kind: "trailing_additive";
+    };
+/**
+ * Which explicit observations an evaluation may read.
+ *
+ * On the wire: `"full_snapshot"`, or `{"through": "2025-04-25"}`.
+ */
+export type ObservationCutoff =
+  | "full_snapshot"
+  | {
+      through: DateWire;
+    };
+/**
+ * Explicit low and high directions for an enterprise exit multiple.
+ */
+export type DcfMultipleShocks =
+  | {
+      /**
+       * Difference from baseline to the higher multiple in turns.
+       */
+      high: DecimalWire;
+      kind: "absolute";
+      /**
+       * Difference from baseline to the lower multiple in turns.
+       */
+      low: DecimalWire;
+    }
+  | {
+      /**
+       * Proportion of baseline added to it.
+       */
+      high: DecimalWire;
+      kind: "relative";
+      /**
+       * Proportion of baseline subtracted from it.
+       */
+      low: DecimalWire;
+    };
+/**
+ * An explicitly requested corporate DCF sensitivity endpoint.
+ */
+export type DcfSensitivityEndpoint =
+  | {
+      /**
+       * Signed difference from baseline enterprise value in the same currency.
+       */
+      change: Money;
+      /**
+       * Repriced enterprise value in the baseline model currency.
+       */
+      enterprise_value: Money;
+      /**
+       * Requested parameter level, in decimal rates or multiple turns.
+       */
+      level: number;
+      status: "priced";
+    }
+  | {
+      /**
+       * Requested parameter level, in decimal rates or multiple turns.
+       */
+      level: number;
+      /**
+       * Reason the requested level cannot be valued.
+       */
+      reason: string;
+      status: "unavailable";
+    };
+/**
+ * Terminal dimension selected for fixed-statement DCF sensitivity.
+ */
+export type DcfTerminalShocks =
+  | {
+      parameter: "stable_growth";
+      shocks: DcfRateShocks;
+    }
+  | {
+      parameter: "exit_multiple";
+      shocks: DcfMultipleShocks;
+    };
+/**
  * Why a configured dimension contributes no signal to the composite score.
  *
  * The conditions are tested in declaration order and the first that holds is
@@ -2342,6 +2434,204 @@ export interface CorporateAnalysisOptions {
   wacc?: number | null;
 }
 /**
+ * Named cash-flow and terminal assumptions on an explicit statement valuation cut.
+ */
+export interface CorporateDcfRequest {
+  /**
+   * Explicit effective valuation date, observation cutoff and currency.
+   */
+  cut: StatementValuationCut;
+  /**
+   * WACC, terminal method and explicitly named operating cashflow.
+   */
+  inputs: DcfInputs;
+  /**
+   * Additional equity bridge, dilution and timing assumptions.
+   */
+  options: DcfOptions;
+  /**
+   * Projection selection and normalized annual terminal basis.
+   */
+  projection: DcfProjection;
+}
+/**
+ * Explicit timing basis for a point-in-time corporate valuation.
+ */
+export interface StatementValuationCut {
+  /**
+   * Effective calendar date from which projected cash receipts are discounted.
+   */
+  as_of: DateWire;
+  /**
+   * Single reporting currency shared by authored cashflows, bridges and the model.
+   */
+  currency: Currency;
+  /**
+   * Latest publication date eligible for the statement run, inclusive.
+   */
+  observed_through: DateWire;
+}
+/**
+ * Headline DCF assumptions of [`evaluate_dcf`]: discount rate, terminal value,
+ * cash-flow node and optional net-debt override.
+ *
+ * The serde form is the host input of `evaluate_dcf`: `wacc` and
+ * `terminal_value` are required, `ufcf_node` defaults to
+ * [`DEFAULT_UFCF_NODE`] and `net_debt_override` to `None`; an unknown field
+ * is rejected. For example
+ * `{"wacc": 0.10, "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02}}`.
+ */
+export interface DcfInputs {
+  /**
+   * Flat net-debt amount in model currency used instead of the
+   * model-derived equity bridge; `None` (the default) derives net debt
+   * from the model's debt and cash.
+   */
+  net_debt_override?: number | null;
+  /**
+   * Terminal-value convention applied after the explicit forecast period.
+   */
+  terminal_value: TerminalValueSpec;
+  /**
+   * Node id containing monetary unlevered free cash flow for forecast
+   * periods (default [`DEFAULT_UFCF_NODE`], `"ufcf"`).
+   */
+  ufcf_node?: string;
+  /**
+   * Weighted average cost of capital as a decimal (`0.10` means `10%`).
+   */
+  wacc: number;
+}
+/**
+ * Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
+ *
+ * Percentage-style inputs use decimal form, so `0.10` means `10%`.
+ * [`Default`] caps perpetual stable growth at 5%.
+ *
+ * The serde form is the host input for DCF options: every field is optional
+ * and a missing field takes its [`Default`] value, while an unknown field is
+ * rejected. For example `{"exit_multiple_bump": {"relative": 0.10}}` keeps
+ * every other default and shocks the exit multiple by ±10%.
+ */
+export interface DcfOptions {
+  /**
+   * Structured equity bridge; when `Some` it is used as-is and the model's
+   * debt/cash (and any net-debt override) are not consulted.
+   */
+  equity_bridge?: EquityBridge | null;
+  /**
+   * Exit-multiple sensitivity bump (default: `ExitMultipleBump::Absolute(1.0)`).
+   *
+   * Use `ExitMultipleBump::Relative` for a proportional shock,
+   * e.g. `Relative(0.10)` for ±10% of the base multiple. Absolute
+   * bumps are clamped at zero on the downside.
+   */
+  exit_multiple_bump?: ExitMultipleBump;
+  /**
+   * Statement flow node whose complete trailing calendar year supplies the
+   * [`TerminalValueSpec::ExitMultiple`] metric (default: `None`).
+   *
+   * When `Some`, sum contiguous actual and forecast periods over the year ending
+   * at the last forecast boundary. Values must be finite and monetary. Missing
+   * history or a partial boundary requires an explicit annual metric. When `None`, the
+   * spec's explicit `terminal_metric` is used. Ignored for Gordon
+   * Growth and H-Model terminals.
+   */
+  exit_multiple_metric_node?: string | null;
+  /**
+   * Maximum perpetual stable growth rate accepted by Gordon Growth and the
+   * H-Model (default `0.05` = 5%).
+   *
+   * This is a policy ceiling, not merely the mathematical `g < WACC`
+   * constraint. Set it to the valuation's defensible long-run nominal
+   * economy or risk-free growth assumption.
+   */
+  max_stable_growth_rate?: number;
+  /**
+   * Enable mid-year discounting convention (default: false).
+   */
+  mid_year_convention?: boolean;
+  /**
+   * Basic shares outstanding for per-share value.
+   */
+  shares_outstanding?: number | null;
+  /**
+   * Private company valuation discounts (DLOM, DLOC).
+   *
+   * Discounts apply after the DCF EV-to-equity bridge. The reported DCF
+   * enterprise value remains pre-discount and will not reconcile to
+   * discounted equity value plus net debt when discounts are present.
+   */
+  valuation_discounts?: ValuationDiscounts | null;
+  /**
+   * Minimum spread between WACC-down and the Gordon / H-Model growth
+   * rate in the terminal-value formula (default `0.005` = 50 bp).
+   *
+   * When `wacc - bump < growth + epsilon`, the down-shock is clamped
+   * to `growth + epsilon` so the `1/(wacc - g)` denominator stays
+   * well defined. The clamp is reported in the trace so the caller
+   * knows the bump was shortened.
+   */
+  wacc_denominator_epsilon?: number;
+  /**
+   * WACC sensitivity bump, in decimal (default `0.01` = ±100 bp).
+   *
+   * The down-shock is clamped so the terminal-value denominator
+   * `wacc - g` cannot collapse (the resulting EV would blow up and
+   * obscure the true sensitivity). See
+   * [`DcfOptions::wacc_denominator_epsilon`].
+   */
+  wacc_sensitivity_bump?: number;
+}
+/**
+ * Valuation discounts for private company equity.
+ *
+ * Applied multiplicatively after the equity bridge:
+ * ```text
+ * FMV = Equity Value × (1 - DLOC) × (1 - DLOM) × (1 - other_discount)
+ * ```
+ *
+ * The enterprise value reported by a DCF remains pre-discount. When discounts
+ * are present, `enterprise_value - net_debt` reconciles to pre-discount
+ * equity value, not to the discounted fair-market equity value.
+ */
+export interface ValuationDiscounts {
+  /**
+   * Discount for Lack of Control (0.0–1.0, e.g., 0.20 for 20%).
+   */
+  dloc?: number | null;
+  /**
+   * Discount for Lack of Marketability (0.0–1.0, e.g., 0.25 for 25%).
+   */
+  dlom?: number | null;
+  /**
+   * Additional discount (0.0–1.0).
+   */
+  other_discount?: number | null;
+}
+/**
+ * Authored terminal horizon and optional normalized annual FCFF election.
+ */
+export interface DcfProjection {
+  /**
+   * Exact monetary node for the forward portion of the one forecast period
+   * straddling the cut. Its modeled receipt is the end of that period.
+   */
+  forward_remainder_node?: string | null;
+  /**
+   * Required for a growth terminal and absent for an exit multiple.
+   */
+  normalized_annual_fcff?: TerminalFcffBasis | null;
+  /**
+   * Elected maximum annual stable growth as a decimal rate; absent means no ceiling.
+   */
+  stable_growth_ceiling?: number | null;
+  /**
+   * Terminal value is discounted to the same cut on its own ACT/365.25 tenor.
+   */
+  terminal_date: DateWire;
+}
+/**
  * Flags periods where a coverage ratio (e.g.
  */
 export interface CoverageFloorCheck {
@@ -2486,127 +2776,186 @@ export interface CurvePctParams {
   start?: number | null;
 }
 /**
- * Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.
+ * Coherent repriced Monte Carlo enterprise and equity values by path and quantile.
  */
-export interface DcfInputs {
+export interface DcfDistributionResult {
   /**
-   * Flat net-debt amount in model currency used instead of the
-   * model-derived equity bridge; `None` (the default) derives net debt
-   * from the model's debt and cash.
+   * One enterprise and equity result per retained path.
    */
-  net_debt_override?: number | null;
+  paths: DcfPathValue[];
   /**
-   * Terminal-value convention applied after the explicit forecast period.
+   * Unchanged model and statement information cutoff shared by the samples.
    */
-  terminal_value: TerminalValueSpec;
+  provenance: RunProvenance;
   /**
-   * Node id containing monetary unlevered free cash flow for forecast
-   * periods (default [`DEFAULT_UFCF_NODE`], `"ufcf"`).
+   * Derived valuation quantiles in the simulation's requested probability order.
    */
-  ufcf_node?: string;
-  /**
-   * Weighted average cost of capital as a decimal (`0.10` means `10%`).
-   */
-  wacc: number;
+  quantiles: DcfPathQuantile[];
 }
 /**
- * Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
+ * One sampled company valuation, with the original Monte Carlo path identity.
  */
-export interface DcfOptions {
+export interface DcfPathValue {
   /**
-   * Structured equity bridge; when `Some` it is used as-is and the model's
-   * debt/cash (and any net-debt override) are not consulted.
+   * Enterprise value in reporting currency.
    */
-  equity_bridge?: EquityBridge | null;
+  enterprise_value: Money;
   /**
-   * Exit-multiple sensitivity bump (default: `ExitMultipleBump::Absolute(1.0)`).
-   *
-   * Use `ExitMultipleBump::Relative` for a proportional shock,
-   * e.g. `Relative(0.10)` for ±10% of the base multiple. Absolute
-   * bumps are clamped at zero on the downside.
+   * Common equity value after bridge and discounts.
    */
-  exit_multiple_bump?: ExitMultipleBump;
+  equity_value: Money;
   /**
-   * Statement flow node whose complete trailing calendar year supplies the
-   * [`TerminalValueSpec::ExitMultiple`] metric (default: `None`).
-   *
-   * When `Some`, sum contiguous actual and forecast periods over the year ending
-   * at the last forecast boundary. Values must be finite and monetary. Missing
-   * history or a partial boundary requires an explicit annual metric. When `None`, the
-   * spec's explicit `terminal_metric` is used. Ignored for Gordon
-   * Growth and H-Model terminals.
+   * Zero-based path identity shared by all sampled cash flows.
    */
-  exit_multiple_metric_node?: string | null;
-  /**
-   * Maximum perpetual stable growth rate accepted by Gordon Growth and the
-   * H-Model (default `0.05` = 5%).
-   *
-   * This is a policy ceiling, not merely the mathematical `g < WACC`
-   * constraint. Set it to the valuation's defensible long-run nominal
-   * economy or risk-free growth assumption.
-   */
-  max_stable_growth_rate?: number;
-  /**
-   * Enable mid-year discounting convention (default: false).
-   */
-  mid_year_convention?: boolean;
-  /**
-   * Basic shares outstanding for per-share value.
-   */
-  shares_outstanding?: number | null;
-  /**
-   * Private company valuation discounts (DLOM, DLOC).
-   *
-   * Discounts apply after the DCF EV-to-equity bridge. The reported DCF
-   * enterprise value remains pre-discount and will not reconcile to
-   * discounted equity value plus net debt when discounts are present.
-   */
-  valuation_discounts?: ValuationDiscounts | null;
-  /**
-   * Minimum spread between WACC-down and the Gordon / H-Model growth
-   * rate in the terminal-value formula (default `0.005` = 50 bp).
-   *
-   * When `wacc - bump < growth + epsilon`, the down-shock is clamped
-   * to `growth + epsilon` so the `1/(wacc - g)` denominator stays
-   * well defined. The clamp is reported in the trace so the caller
-   * knows the bump was shortened.
-   */
-  wacc_denominator_epsilon?: number;
-  /**
-   * WACC sensitivity bump, in decimal (default `0.01` = ±100 bp).
-   *
-   * The down-shock is clamped so the terminal-value denominator
-   * `wacc - g` cannot collapse (the resulting EV would blow up and
-   * obscure the true sensitivity). See
-   * [`DcfOptions::wacc_denominator_epsilon`].
-   */
-  wacc_sensitivity_bump?: number;
+  path_id: number;
 }
 /**
- * Valuation discounts for private company equity.
+ * What a result was evaluated from.
  *
- * Applied multiplicatively after the equity bridge:
- * ```text
- * FMV = Equity Value × (1 - DLOC) × (1 - DLOM) × (1 - other_discount)
- * ```
- *
- * The enterprise value reported by a DCF remains pre-discount. When discounts
- * are present, `enterprise_value - net_debt` reconciles to pre-discount
- * equity value, not to the discounted fair-market equity value.
+ * A consumer that is handed a result checks this against the model, period
+ * plan and run it expects before trusting the cells.
  */
-export interface ValuationDiscounts {
+export interface RunProvenance {
   /**
-   * Discount for Lack of Control (0.0–1.0, e.g., 0.20 for 20%).
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
    */
-  dloc?: number | null;
+  forecast_streams?: ForecastStream[];
   /**
-   * Discount for Lack of Marketability (0.0–1.0, e.g., 0.25 for 25%).
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
    */
-  dlom?: number | null;
+  model_content_hash: string;
   /**
-   * Additional discount (0.0–1.0).
+   * Identifier of the evaluated model.
    */
-  other_discount?: number | null;
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff: ObservationCutoff;
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above. Two runs of the same model content, snapshot, cutoff
+   * and valuation date share it.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: DateWire | null;
+}
+/**
+ * Replay provenance of one stochastic forecast node in a single run.
+ *
+ * The generator is the shared PCG64 started at `state` on stream `stream`
+ * (`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the
+ * versioned key: the key version, the configured seed, the node and the
+ * single-run mode. Unsigned 64-bit values are decimal strings in JSON.
+ */
+export interface ForecastStream {
+  /**
+   * The stochastic forecast node.
+   */
+  node_id: string;
+  /**
+   * The forecast method's exact configured seed.
+   */
+  seed: string;
+  /**
+   * Effective PCG64 starting state.
+   */
+  state: string;
+  /**
+   * Effective PCG64 stream selector.
+   */
+  stream: string;
+  /**
+   * Version of the mapping from the key to the stream.
+   */
+  stream_version: number;
+}
+/**
+ * Same-currency values at an elected Monte Carlo quantile.
+ */
+export interface DcfPathQuantile {
+  /**
+   * R-7 enterprise-value sample quantile.
+   */
+  enterprise_value: Money;
+  /**
+   * R-7 common-equity sample quantile.
+   */
+  equity_value: Money;
+  /**
+   * Requested probability as a fraction between zero and one.
+   */
+  probability: number;
+}
+/**
+ * Decimal-rate distances in the low and high directions from an admitted rate.
+ */
+export interface DcfRateShocks {
+  /**
+   * Positive difference from the baseline to the requested higher rate.
+   */
+  high: DecimalWire;
+  /**
+   * Positive difference from the baseline to the requested lower rate.
+   */
+  low: DecimalWire;
+}
+/**
+ * Rectangular enterprise-value results and unavailable endpoints.
+ */
+export interface DcfSensitivityGridResult {
+  /**
+   * Row and column axes as requested, including economically unavailable levels.
+   */
+  axes: DcfSensitivityGridSpec;
+  /**
+   * Reused verified baseline enterprise value before discounts.
+   */
+  baseline_enterprise_value: Money;
+  /**
+   * Rows indexed by WACC and columns indexed by the terminal parameter.
+   */
+  cells: DcfSensitivityEndpoint[][];
+}
+/**
+ * Explicit axes for an enterprise-value sensitivity grid.
+ */
+export interface DcfSensitivityGridSpec {
+  /**
+   * Stable growth decimal rates or exit multiple turns, in column order.
+   */
+  terminal_values: number[];
+  /**
+   * Annual effective WACC decimal rates, in row order.
+   */
+  wacc_values: number[];
+}
+/**
+ * The two independent directions for a named corporate DCF parameter.
+ */
+export interface DcfSensitivityPair {
+  /**
+   * Endpoint at the requested higher parameter level.
+   */
+  high: DcfSensitivityEndpoint;
+  /**
+   * Endpoint at the requested lower parameter level.
+   */
+  low: DcfSensitivityEndpoint;
+  /**
+   * Canonical name of the parameter changed by this pair.
+   */
+  parameter_id: string;
 }
 /**
  * Enterprise-value tornado for the headline DCF assumptions.
@@ -2664,6 +3013,33 @@ export interface TornadoEntry {
    */
   upside: number;
   [k: string]: unknown;
+}
+/**
+ * Independent WACC and terminal value assumption shocks.
+ */
+export interface DcfSensitivityShocks {
+  /**
+   * Low and high terminal shocks in the compatible terminal dimension.
+   */
+  terminal: DcfTerminalShocks;
+  /**
+   * Positive low and high WACC distances in decimal rate units.
+   */
+  wacc: DcfRateShocks;
+}
+/**
+ * Ranked DCF sensitivity pairs preserving unavailable endpoints.
+ */
+export interface DcfShockReport {
+  /**
+   * Enterprise value at the original WACC and terminal assumptions.
+   */
+  baseline_enterprise_value: Money;
+  /**
+   * Complete pairs ranked by absolute swing, then identifier.
+   * Pairs with an unavailable endpoint follow complete pairs.
+   */
+  pairs: DcfSensitivityPair[];
 }
 /**
  * Hierarchical dependency tree structure.

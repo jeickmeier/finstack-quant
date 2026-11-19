@@ -60,9 +60,12 @@ pub fn package_schema(schema: &mut Value) -> Result<()> {
 use crate::{
     analysis::BridgeChart, analysis::CapexReconciliation, analysis::CapitalStructureSummary,
     analysis::CapitalStructureSummaryConfig, analysis::CeclConfig, analysis::CeclResult,
-    analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CoverageFloorCheck,
-    analysis::CreditAssessment, analysis::DcfInputs, analysis::DcfOptions,
-    analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::DepreciationReconciliation,
+    analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CorporateDcfRequest,
+    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::DcfDistributionResult,
+    analysis::DcfInputs, analysis::DcfOptions, analysis::DcfProjection,
+    analysis::DcfSensitivityGridResult, analysis::DcfSensitivityGridSpec,
+    analysis::DcfSensitivityResult, analysis::DcfSensitivityShocks, analysis::DcfShockReport,
+    analysis::DependencyTree, analysis::DepreciationReconciliation,
     analysis::DividendReconciliation, analysis::EclConfig, analysis::EffectiveTaxRateCheck,
     analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GoalSeekSpec, analysis::GrowthRateConsistency,
@@ -72,7 +75,8 @@ use crate::{
     analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
     analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
     analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
-    analysis::StageResult, analysis::TrendCheck, analysis::VarianceConfig, analysis::WaccInputs,
+    analysis::StageResult, analysis::StatementValuationCut, analysis::TerminalFcffBasis,
+    analysis::TrendCheck, analysis::VarianceConfig, analysis::WaccInputs,
     analysis::WeightedEclResult, analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig,
     extensions::CorkscrewReport, extensions::ScorecardConfig, extensions::ScorecardReport,
     templates::real_estate::LeaseSpec, templates::real_estate::ManagementFeeSpec,
@@ -175,6 +179,78 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "credit_assessment",
         Component,
         "Structured credit assessment: leverage, interest coverage, and free cash flow at a `period` plus a per-period series for trend display."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CorporateDcfRequest,
+        "statements_analytics",
+        "corporate_dcf_request",
+        Input,
+        "Named cash-flow and terminal assumptions on an explicit statement valuation cut."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementValuationCut,
+        "statements_analytics",
+        "statement_valuation_cut",
+        Component,
+        "Effective valuation and information dates and a reporting currency."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfProjection,
+        "statements_analytics",
+        "dcf_projection",
+        Input,
+        "Authored terminal horizon, cash-flow basis and optional forward remainder."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        TerminalFcffBasis,
+        "statements_analytics",
+        "terminal_fcff_basis",
+        Component,
+        "Explicit annual cash flow or the complete additive trailing forecast."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfShockReport,
+        "statements_analytics",
+        "dcf_shock_report",
+        Output,
+        "Ranked DCF sensitivity pairs preserving unavailable endpoints."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfSensitivityShocks,
+        "statements_analytics",
+        "dcf_sensitivity_shocks",
+        Input,
+        "Independent WACC and terminal value assumption shocks."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfSensitivityGridSpec,
+        "statements_analytics",
+        "dcf_sensitivity_grid_spec",
+        Input,
+        "Ordered WACC and terminal parameter axes."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfSensitivityGridResult,
+        "statements_analytics",
+        "dcf_sensitivity_grid_result",
+        Output,
+        "Rectangular enterprise-value results and unavailable endpoints."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfDistributionResult,
+        "statements_analytics",
+        "dcf_distribution_result",
+        Output,
+        "Coherent repriced Monte Carlo enterprise and equity values by path and quantile."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
