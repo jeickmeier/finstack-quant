@@ -165,6 +165,27 @@ impl JsModelBuilder {
         Ok(())
     }
 
+    /// Broadcast a scalar or monetary observation across the model timeline.
+    /// @param nodeId - Unique node identifier stored in the model.
+    /// @param value - Finite unitless number or exact Money wire object, copied to each actual and forecast period.
+    /// @throws Validation error if the builder was consumed, periods are unset or the value is invalid.
+    pub fn constant(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.AmountOrScalar")]
+        value: JsValue,
+    ) -> Result<(), JsValue> {
+        let node_id = js_string(&node_id, "nodeId")?;
+        let value = match value.as_f64() {
+            Some(value) => AmountOrScalar::scalar(value),
+            None => from_js_json(&value, "value")?,
+        };
+        self.builder_mut()?
+            .constant(node_id, value)
+            .map_err(to_js_err)?;
+        Ok(())
+    }
+
     /// Add a value node holding explicit per-period values.
     ///
     /// Twin of Python `ModelBuilder.value` (Rust `ModelBuilder::value`).

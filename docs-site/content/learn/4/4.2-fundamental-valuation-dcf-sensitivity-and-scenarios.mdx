@@ -94,7 +94,7 @@ for node, growth in [("revenue",0.02),("cogs",0.02),("opex",0.015)]:
         [(period,borrower_results.get(node,period)) for period in PERIODS[:4]]
     ).formula(f"lag({node},1) * (1 + {node}_growth)").build()
 # The operating graph stores currency-unit scalars. Stamp USD once at the DCF boundary.
-valuation_builder.value_money("usd_unit",[(period,Money(1,"USD")) for period in PERIODS])
+valuation_builder.constant("usd_unit", Money(1, "USD"))
 valuation_builder.compute("ufcf_usd","ufcf * usd_unit")
 valuation_builder.compute("ebitda_usd","ebitda * usd_unit")
 valuation_builder.compute("total_debt","debt_end * usd_unit").compute("cash","cash_end * usd_unit")
@@ -276,10 +276,9 @@ entry_metric = operating_results.get("annualized_ebitda","2024Q4")
 entry_cash = operating_results.get("cash_end","2024Q4")
 lbo_rows = []
 for funded_debt in (80_000_000.0,100_000_000.0):
-    builder = ModelBuilder.from_spec(operating)
+    builder = ModelBuilder.from_spec(operating).currency("USD")
     # evaluate_lbo reads the first model period: pin the latest-actual closing metric explicitly.
-    builder.value_money("usd_unit",[(p,Money(1,"USD")) for p in PERIODS])
-    builder.value_money("lbo_entry_ebitda",[(p,Money(entry_metric,"USD")) for p in PERIODS])
+    builder.constant("lbo_entry_ebitda", Money(entry_metric, "USD"))
     builder.value("lbo_forecast",[(p,float(p in PERIODS[4:])) for p in PERIODS])
     builder.value("lbo_amort",[(p,funded_debt*0.025 if p in PERIODS[4:] else 0.0) for p in PERIODS])
     builder.compute("lbo_interest","lbo_debt_beg * 0.075 / 4 * lbo_forecast")

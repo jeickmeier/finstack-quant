@@ -284,6 +284,23 @@ test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes a PeriodPl
   assert.equal(model.nodes.seed.availability_dates[Q1], '2025-04-15');
 });
 
+test('ModelBuilder broadcasts exact monetary and scalar constants across its timeline', () => {
+  const builder = new statements.ModelBuilder('constant-inputs');
+  assert.throws(() => builder.constant('cash', 3), /Set model periods/);
+  builder.periods('2025Q1..Q2');
+  assert.throws(() => builder.constant('invalid', Infinity), /finite/);
+  builder.constant('tax_rate', 0.23);
+  builder.constant('cash', { amount: '104.00000000000000001', currency: 'USD' });
+  const built = builder.build();
+  assert.deepEqual(built.nodes.tax_rate.values, { [Q1]: 0.23, [Q2]: 0.23 });
+  for (const period of [Q1, Q2]) {
+    assert.deepEqual(built.nodes.cash.values[period], {
+      amount: '104.00000000000000001',
+      currency: 'USD',
+    });
+  }
+});
+
 test('ModelBuilder reports misuse without discarding the model', () => {
   // Nodes may be added before `periods`; only `build` needs the timeline.
   const noTimeline = new statements.ModelBuilder('no-timeline');

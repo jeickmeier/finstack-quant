@@ -549,6 +549,35 @@ impl ModelBuilder {
         self
     }
 
+    /// Add the same value observation to every model period.
+    ///
+    /// # Arguments
+    /// * `node_id` - Unique node identifier stored in the model.
+    /// * `value` - A finite unitless scalar or an exact monetary amount in its
+    ///   stated currency, copied to every actual and forecast period.
+    ///
+    /// # Errors
+    /// Rejects a missing period plan or a nonfinite scalar. The standard
+    /// builder validation rejects duplicate node identifiers at build time.
+    pub fn constant(
+        &mut self,
+        node_id: impl Into<NodeId>,
+        value: AmountOrScalar,
+    ) -> Result<&mut Self> {
+        if self.periods_slice().is_empty() {
+            return Err(Error::build("Set model periods before adding a constant"));
+        }
+        if matches!(value, AmountOrScalar::Scalar(value) if !value.is_finite()) {
+            return Err(Error::build("Constant scalar must be finite"));
+        }
+        let observations: Vec<_> = self
+            .periods_slice()
+            .iter()
+            .map(|period| (period.id, value))
+            .collect();
+        Ok(self.value(node_id, &observations))
+    }
+
     /// Add a monetary value node with Money values.
     ///
     /// This is a type-safe way to create value nodes that explicitly represent

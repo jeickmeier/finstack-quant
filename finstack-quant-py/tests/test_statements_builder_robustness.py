@@ -86,3 +86,28 @@ class TestMalformedJsonRaisesValueError:
         # inconsistent with model.from_json above.
         with pytest.raises(ValueError, match="Serialization error"):
             statements.Registry().load_from_json_str("not json")
+
+
+def test_model_builder_constant_broadcasts_only_over_declared_periods() -> None:
+    from decimal import Decimal
+    import json
+
+    from finstack_quant.core.money import Money
+
+    builder = statements.ModelBuilder("constant-inputs")
+    with pytest.raises(ValueError, match="Set model periods"):
+        builder.constant("cash", 3)
+    builder.periods("2025Q1..Q2")
+    with pytest.raises(ValueError, match="finite"):
+        builder.constant("invalid", float("inf"))
+    model = (
+        builder
+        .constant("tax_rate", 0.23)
+        .constant("cash", Money.from_decimal(Decimal("104.00000000000000001"), "USD"))
+        .build()
+    )
+    nodes = json.loads(model.to_json())["nodes"]
+    assert nodes["tax_rate"]["values"] == {"2025Q1": 0.23, "2025Q2": 0.23}
+    assert nodes["cash"]["values"] == {
+        period: {"amount": "104.00000000000000001", "currency": "USD"} for period in ("2025Q1", "2025Q2")
+    }

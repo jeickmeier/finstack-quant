@@ -129,6 +129,31 @@ class ModelBuilder:
         """
         ...
 
+    def constant(self, node_id: str, value: Money | float) -> ModelBuilder:
+        """Broadcast a scalar or monetary observation across the model timeline.
+
+        Parameters
+        ----------
+        node_id : str
+            Unique identifier for the new value node.
+        value : Money or float
+            Monetary amount in its explicit currency or finite unitless scalar.
+            Every modeled period receives the same value.
+
+        Returns
+        -------
+        ModelBuilder
+            The builder with the constant node added.
+
+        Raises
+        ------
+        ValueError
+            If periods are unset, the scalar is nonfinite, or the builder was consumed.
+        TypeError
+            If the value is neither Money nor numeric.
+        """
+        ...
+
     def value(self, node_id: str, values: list[tuple[str, float]]) -> ModelBuilder:
         """
         Add a value node with explicit per-period scalars.

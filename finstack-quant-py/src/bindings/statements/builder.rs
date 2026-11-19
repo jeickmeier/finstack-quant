@@ -169,6 +169,19 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.constant")]
+    fn constant<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        node_id: &str,
+        value: &Bound<'py, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let value = super::extract_amount_or_scalar(value)?;
+        slf.builder_mut()?
+            .constant(node_id, value)
+            .map_err(statements_to_py)?;
+        Ok(slf)
+    }
+
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.value")]
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value<'py>(
