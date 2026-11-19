@@ -61,27 +61,28 @@ use crate::{
     analysis::BridgeChart, analysis::CapexReconciliation, analysis::CapitalStructureSummary,
     analysis::CapitalStructureSummaryConfig, analysis::CeclConfig, analysis::CeclResult,
     analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CorporateDcfRequest,
-    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::DcfDistributionResult,
-    analysis::DcfInputs, analysis::DcfOptions, analysis::DcfProjection,
-    analysis::DcfSensitivityGridResult, analysis::DcfSensitivityGridSpec,
-    analysis::DcfSensitivityResult, analysis::DcfSensitivityShocks, analysis::DcfShockReport,
-    analysis::DependencyTree, analysis::DepreciationReconciliation,
-    analysis::DividendReconciliation, analysis::EclConfig, analysis::EclScenario,
-    analysis::EclScenarioOutcome, analysis::EffectiveTaxRateCheck, analysis::Explanation,
-    analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
+    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::DatedLboRequest,
+    analysis::DatedLboResult, analysis::DcfDistributionResult, analysis::DcfInputs,
+    analysis::DcfOptions, analysis::DcfProjection, analysis::DcfSensitivityGridResult,
+    analysis::DcfSensitivityGridSpec, analysis::DcfSensitivityResult,
+    analysis::DcfSensitivityShocks, analysis::DcfShockReport, analysis::DependencyTree,
+    analysis::DepreciationReconciliation, analysis::DividendReconciliation, analysis::EclConfig,
+    analysis::EclScenario, analysis::EclScenarioOutcome, analysis::EffectiveTaxRateCheck,
+    analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GoalSeekSpec, analysis::GrowthRateConsistency,
-    analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboResult,
-    analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
-    analysis::PeerSet, analysis::PeerStats, analysis::RatingPdMap, analysis::RegressionResult,
-    analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
-    analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
-    analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
-    analysis::StageResult, analysis::StatementValuationCut, analysis::TerminalFcffBasis,
-    analysis::TrendCheck, analysis::VarianceConfig, analysis::WaccInputs,
-    analysis::WeightedEclResult, analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig,
-    extensions::CorkscrewReport, extensions::ScorecardConfig, extensions::ScorecardReport,
-    templates::real_estate::LeaseSpec, templates::real_estate::ManagementFeeSpec,
-    templates::real_estate::PropertyTemplateNodes,
+    analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboDebtFunding,
+    analysis::LboEarnings, analysis::LboExitBridge, analysis::LboFunding,
+    analysis::LboFundingResult, analysis::LboResult, analysis::LeverageRangeCheck,
+    analysis::LiquidityRunwayCheck, analysis::PeerFilter, analysis::PeerSet, analysis::PeerStats,
+    analysis::RatingPdMap, analysis::RegressionResult, analysis::RelativeValueReport,
+    analysis::RelativeValueReportConfig, analysis::RelativeValueResult, analysis::ScenarioDiff,
+    analysis::ScenarioResults, analysis::ScenarioSet, analysis::ScoringDimension,
+    analysis::SensitivityResult, analysis::StageResult, analysis::StatementValuationCut,
+    analysis::TerminalFcffBasis, analysis::TrendCheck, analysis::VarianceConfig,
+    analysis::WaccInputs, analysis::WeightedEclResult, analysis::WorkingCapitalConsistency,
+    extensions::CorkscrewConfig, extensions::CorkscrewReport, extensions::ScorecardConfig,
+    extensions::ScorecardReport, templates::real_estate::LeaseSpec,
+    templates::real_estate::ManagementFeeSpec, templates::real_estate::PropertyTemplateNodes,
 };
 
 /// The crate's complete schema registry.
@@ -252,6 +253,62 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "dcf_distribution_result",
         Output,
         "Coherent repriced Monte Carlo enterprise and equity values by path and quantile."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DatedLboRequest,
+        "statements_analytics",
+        "dated_lbo_request",
+        Input,
+        "Acquisition and exit dates, recognized funding and projected exit assumptions."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DatedLboResult,
+        "statements_analytics",
+        "dated_lbo_result",
+        Output,
+        "Reconciled sources and uses and qualified sponsor returns."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboEarnings,
+        "statements_analytics",
+        "lbo_earnings",
+        Component,
+        "Matched earnings basis and purchase or exit multiple."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboDebtFunding,
+        "statements_analytics",
+        "lbo_debt_funding",
+        Component,
+        "Actual closing proceeds and contractual opening face."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboFunding,
+        "statements_analytics",
+        "lbo_funding",
+        Component,
+        "Dated closing cash sources and uses."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboFundingResult,
+        "statements_analytics",
+        "lbo_funding_result",
+        Component,
+        "Reconciled funding gap and identified debt proportions."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboExitBridge,
+        "statements_analytics",
+        "lbo_exit_bridge",
+        Component,
+        "Signed exit equity and available sized and funded returns."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

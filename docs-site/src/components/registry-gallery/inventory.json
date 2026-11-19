@@ -1908,7 +1908,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo-config.json",
-      "sha256": "f8dd984ea23d9ff130ef0cf8eb49c2f4fda28f4e4f399cf9b7b0d69872b5f681"
+      "sha256": "e1d8175d45c3f56cc53447b33d2a4c770108f64b421437f7c386716f0d6152df"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo.json",

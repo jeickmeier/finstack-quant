@@ -368,7 +368,7 @@ pub fn dcf_sensitivity(
 
 /// Evaluate a leveraged-buyout transaction against a statement model.
 ///
-/// Entry enterprise value is priced at the model's first period, the sponsor
+/// Entry enterprise value is priced at the explicitly selected entry period, the sponsor
 /// equity check is solved as the sources-and-uses residual, and exit proceeds
 /// are the exit enterprise value less the modelled net debt at the exit
 /// period. When the config carries `check_mappings`, the Rust LBO check suite
@@ -385,7 +385,7 @@ pub fn dcf_sensitivity(
 /// check-suite failures, or failure to serialize the result to JavaScript.
 /// The result is a structured JavaScript object.
 /// @param modelJson - Financial-model specification JSON.
-/// @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
+/// @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `entry_period` (existing period used to read entry earnings), `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
 /// @returns Leveraged-buyout evaluation result against the statement model.
 #[wasm_bindgen(js_name = evaluateLbo, unchecked_return_type = "LboResult")]
 pub fn evaluate_lbo(

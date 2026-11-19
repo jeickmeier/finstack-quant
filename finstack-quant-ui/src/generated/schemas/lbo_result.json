@@ -22,7 +22,7 @@
       "description": "Entry enterprise value: `entry_multiple × entry metric`."
     },
     "entry_metric": {
-      "description": "Entry metric value read from the model at the first period.",
+      "description": "Entry metric value read from the explicitly selected period.",
       "format": "double",
       "type": "number"
     },

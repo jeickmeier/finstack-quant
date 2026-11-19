@@ -887,14 +887,14 @@ class LboResult:
     @property
     def entry_metric(self) -> float:
         """
-        Entry metric read from the model's first period.
+        Entry metric read from the explicitly selected entry period.
 
         This property does not raise.
 
         Returns
         -------
         float
-            Entry metric read from the model's first period.
+            Entry metric read from the explicitly selected entry period.
         """
     @property
     def debt_total(self) -> Money:
@@ -1544,7 +1544,7 @@ def evaluate_dcf(
 def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     """Evaluate a leveraged-buyout transaction against a statement model.
 
-    Entry enterprise value is priced at the model's first period, the sponsor
+    Entry enterprise value is priced at the explicitly selected entry period, the sponsor
     equity check is the sources-and-uses residual, and exit proceeds are the
     exit enterprise value less modelled net debt at ``exit_period``. IRR is out
     of scope: pair ``exit_equity_proceeds`` with the equity outflow at close and
@@ -1558,7 +1558,7 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     config : dict | str
         The Rust ``LboConfig`` serde form (the document WASM ``evaluateLbo``
         takes as ``configJson``): ``entry_multiple`` (turns, ``8.5`` = 8.5x),
-        ``entry_metric_node`` (monetary node read at the first period),
+        ``entry_metric_node`` (monetary node read at the selected entry period),
         ``transaction_fees`` (model currency), ``sources``
         (``[{"name": ..., "amount": ...}]`` funded at close, model currency),
         ``exit_multiple``, ``exit_metric_node``, ``exit_net_debt_node``,
@@ -1597,6 +1597,7 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     >>> config = {
     ...     "entry_multiple": 8.0,
     ...     "entry_metric_node": "ebitda",
+     "entry_period": "2025Q1",
     ...     "transaction_fees": 0.0,
     ...     "sources": [{"name": "debt", "amount": 500.0}],
     ...     "exit_multiple": 9.0,

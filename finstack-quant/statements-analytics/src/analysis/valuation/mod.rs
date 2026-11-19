@@ -6,6 +6,7 @@
 
 pub(crate) mod corporate;
 pub(crate) mod lbo;
+mod lbo_funding;
 pub(crate) mod orchestrator;
 
 pub use corporate::{
@@ -21,4 +22,9 @@ pub use corporate::{
 pub use lbo::{LboCheckMappings, LboConfig, LboResult, LboTranche, evaluate_lbo};
 pub use orchestrator::{
     CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions, run_corporate_analysis,
+};
+
+pub use lbo_funding::{
+    DatedLboRequest, DatedLboResult, LboAcquisition, LboDebtFunding, LboEarnings, LboEarningsBasis,
+    LboExitBridge, LboFunding, LboFundingResult, LboQualification, evaluate_dated_lbo,
 };

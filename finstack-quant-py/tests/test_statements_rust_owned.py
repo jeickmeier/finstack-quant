@@ -94,6 +94,7 @@ def lbo_model() -> str:
 LBO_CONFIG = {
     "entry_multiple": 8.0,
     "entry_metric_node": "ebitda",
+    "entry_period": "2025Q1",
     "transaction_fees": 0.0,
     "sources": [{"name": "debt", "amount": 500.0}],
     "exit_multiple": 9.0,

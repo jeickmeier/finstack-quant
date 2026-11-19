@@ -1671,13 +1671,20 @@ export default [
   {
     "path": "#/properties/entry_metric_node",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/properties/entry_metric_node",
-    "description": "Node id supplying the entry valuation metric (typically `\"ebitda\"`),\nread at the model's first period."
+    "description": "Node id supplying the entry valuation metric (typically `\"ebitda\"`),\nread at the explicitly selected entry period."
   },
   {
     "path": "#/properties/entry_multiple",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/properties/entry_multiple",
     "description": "Entry valuation multiple applied to `entry_metric_node`, e.g. `8.5`\nfor 8.5x EBITDA.",
     "format": "double"
+  },
+  {
+    "path": "#/properties/entry_period",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/properties/entry_period",
+    "description": "Explicit statement observation period used to size the acquisition.",
+    "ref": "#/$defs/PeriodId",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/PeriodId"
   },
   {
     "path": "#/properties/exit_metric_node",

@@ -55,7 +55,7 @@ export interface LboResultWire {
   debt_total: DF0101272Ae2F9A75933D1;
   entry_enterprise_value: DF0101272Ae2F9A75933D2;
   /**
-   * Entry metric value read from the model at the first period.
+   * Entry metric value read from the explicitly selected period.
    */
   entry_metric: number;
   equity_check: DF0101272Ae2F9A75933D3;

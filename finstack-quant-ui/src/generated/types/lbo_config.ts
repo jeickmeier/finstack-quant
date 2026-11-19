@@ -53,7 +53,7 @@ export interface LboConfigWire {
   check_mappings?: DDffc33B1175F7681824D | null;
   /**
    * Node id supplying the entry valuation metric (typically `"ebitda"`),
-   * read at the model's first period.
+   * read at the explicitly selected entry period.
    */
   entry_metric_node: string;
   /**
@@ -61,6 +61,10 @@ export interface LboConfigWire {
    * for 8.5x EBITDA.
    */
   entry_multiple: number;
+  /**
+   * Explicit statement observation period used to size the acquisition.
+   */
+  entry_period: string;
   /**
    * Node id supplying the exit valuation metric, read at `exit_period`.
    */

@@ -4386,6 +4386,7 @@
       "dcfSensitivityOnResults",
       "evaluateCorporateDcf",
       "evaluateCovenants",
+      "evaluateDatedLbo",
       "evaluateDcf",
       "evaluateDcfFromResults",
       "evaluateDcfMonteCarlo",
@@ -4482,6 +4483,9 @@
     "kind": "function"
   },
   "statements_analytics.dcfSensitivity": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateDatedLbo": {
     "kind": "function"
   },
   "statements_analytics.evaluateLbo": {

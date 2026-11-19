@@ -74,14 +74,17 @@ pub use scenarios::{
 };
 pub use valuation::{
     CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions, CorporateDcfRequest,
-    CorporateValuationResult, DEFAULT_UFCF_NODE, DcfDistributionResult, DcfInputs,
-    DcfMultipleShocks, DcfOptions, DcfPathQuantile, DcfPathValue, DcfPeriodRow, DcfProjection,
-    DcfRateShocks, DcfSensitivityEndpoint, DcfSensitivityGridResult, DcfSensitivityGridSpec,
-    DcfSensitivityPair, DcfSensitivityResult, DcfSensitivityShocks, DcfShockReport,
-    DcfTerminalShocks, ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche,
-    StatementValuationCut, TerminalFcffBasis, WaccInputs, dcf_sensitivity, dcf_sensitivity_grid,
-    dcf_sensitivity_on_results, evaluate_corporate_dcf, evaluate_dcf, evaluate_dcf_from_results,
-    evaluate_dcf_monte_carlo, evaluate_lbo, run_corporate_analysis, wacc,
+    CorporateValuationResult, DEFAULT_UFCF_NODE, DatedLboRequest, DatedLboResult,
+    DcfDistributionResult, DcfInputs, DcfMultipleShocks, DcfOptions, DcfPathQuantile, DcfPathValue,
+    DcfPeriodRow, DcfProjection, DcfRateShocks, DcfSensitivityEndpoint, DcfSensitivityGridResult,
+    DcfSensitivityGridSpec, DcfSensitivityPair, DcfSensitivityResult, DcfSensitivityShocks,
+    DcfShockReport, DcfTerminalShocks, ExitMultipleBump, LboAcquisition, LboCheckMappings,
+    LboConfig, LboDebtFunding, LboEarnings, LboEarningsBasis, LboExitBridge, LboFunding,
+    LboFundingResult, LboQualification, LboResult, LboTranche, StatementValuationCut,
+    TerminalFcffBasis, WaccInputs, dcf_sensitivity, dcf_sensitivity_grid,
+    dcf_sensitivity_on_results, evaluate_corporate_dcf, evaluate_dated_lbo, evaluate_dcf,
+    evaluate_dcf_from_results, evaluate_dcf_monte_carlo, evaluate_lbo, run_corporate_analysis,
+    wacc,
 };
 
 pub use checks::{

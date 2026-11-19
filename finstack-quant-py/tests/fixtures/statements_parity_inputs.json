@@ -710,6 +710,7 @@
   "lbo_config": {
     "entry_multiple": 8.0,
     "entry_metric_node": "ebitda",
+    "entry_period": "2025Q1",
     "transaction_fees": 10.0,
     "sources": [
       {

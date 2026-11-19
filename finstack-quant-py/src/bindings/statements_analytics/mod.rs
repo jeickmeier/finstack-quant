@@ -13,6 +13,7 @@ mod comps;
 mod corkscrew;
 mod covenants;
 pub(crate) mod ecl;
+mod lbo;
 mod relative_value;
 mod reports;
 mod scorecards;
@@ -20,7 +21,7 @@ pub(crate) mod templates_real_estate;
 mod templates_roll_forward;
 mod templates_vintage;
 mod typed;
-mod valuation;
+pub(crate) mod valuation;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -63,6 +64,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     analysis::register(py, &m)?;
     typed::register(py, &m)?;
+    lbo::register(&m)?;
     valuation::register(py, &m)?;
     checks::register(py, &m)?;
     capital_structure::register(py, &m)?;
@@ -187,6 +189,14 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "DcfDistributionResult",
             "evaluate_dcf_monte_carlo",
             "evaluate_dcf",
+            "LboEarnings",
+            "LboDebtFunding",
+            "LboFunding",
+            "DatedLboRequest",
+            "LboFundingResult",
+            "LboExitBridge",
+            "DatedLboResult",
+            "evaluate_dated_lbo",
             "evaluate_lbo",
             "evaluate_scenario_set",
             "evaluate_scenario_set_with_market",

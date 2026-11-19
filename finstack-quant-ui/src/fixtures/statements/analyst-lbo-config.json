@@ -1,6 +1,7 @@
 {
   "entry_multiple": 8.5,
   "entry_metric_node": "ebitda",
+  "entry_period": "2024Q1",
   "transaction_fees": 12000000,
   "sources": [
     { "name": "Term loan B", "amount": 180000000 },

@@ -118,6 +118,24 @@
       "type_name": "CreditAssessment"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json",
+      "bytes": 58904,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/dated_lbo_request.schema.json",
+      "summary": "Acquisition and exit dates, recognized funding and projected exit assumptions.",
+      "title": "DatedLboRequest",
+      "type_name": "DatedLboRequest"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_result.schema.json",
+      "bytes": 45636,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/dated_lbo_result.schema.json",
+      "summary": "Reconciled sources and uses and qualified sponsor returns.",
+      "title": "DatedLboResult",
+      "type_name": "DatedLboResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_distribution_result.schema.json",
       "bytes": 28205,
       "kind": "output",
@@ -335,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
-      "bytes": 42410,
+      "bytes": 42596,
       "kind": "input",
       "path": "schemas/statements_analytics/1/lbo_config.schema.json",
       "summary": "Transaction assumptions for an LBO evaluation.",
@@ -343,8 +361,53 @@
       "type_name": "LboConfig"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_debt_funding.schema.json",
+      "bytes": 22166,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_debt_funding.schema.json",
+      "summary": "Actual closing proceeds and contractual opening face.",
+      "title": "LboDebtFunding",
+      "type_name": "LboDebtFunding"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_earnings.schema.json",
+      "bytes": 2185,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_earnings.schema.json",
+      "summary": "Matched earnings basis and purchase or exit multiple.",
+      "title": "LboEarnings",
+      "type_name": "LboEarnings"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_exit_bridge.schema.json",
+      "bytes": 22925,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_exit_bridge.schema.json",
+      "summary": "Signed exit equity and available sized and funded returns.",
+      "title": "LboExitBridge",
+      "type_name": "LboExitBridge"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_funding.schema.json",
+      "bytes": 25278,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_funding.schema.json",
+      "summary": "Dated closing cash sources and uses.",
+      "title": "LboFunding",
+      "type_name": "LboFunding"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_funding_result.schema.json",
+      "bytes": 22864,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_funding_result.schema.json",
+      "summary": "Reconciled funding gap and identified debt proportions.",
+      "title": "LboFundingResult",
+      "type_name": "LboFundingResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
-      "bytes": 39074,
+      "bytes": 39075,
       "kind": "output",
       "path": "schemas/statements_analytics/1/lbo_result.schema.json",
       "summary": "Outputs of an LBO evaluation.",

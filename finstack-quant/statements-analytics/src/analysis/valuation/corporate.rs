@@ -492,7 +492,7 @@ impl StatementValuationCut {
         Ok(())
     }
 
-    fn evaluate(
+    pub(super) fn evaluate(
         &self,
         model: &FinancialModelSpec,
         market: Option<&MarketContext>,
@@ -508,7 +508,7 @@ impl StatementValuationCut {
         )
     }
 
-    fn check_result<'a>(
+    pub(super) fn check_result<'a>(
         &self,
         model: &FinancialModelSpec,
         results: &'a StatementResult,
@@ -1488,7 +1488,7 @@ fn resolve_exit_multiple_metric(
     })
 }
 
-fn trailing_year_metric(
+pub(super) fn trailing_year_metric(
     model: &FinancialModelSpec,
     results: &StatementResult,
     node: &str,
@@ -1539,7 +1539,7 @@ pub(super) fn monetary_node_value(
     monetary_node_money(results, node, period, currency).map(|amount| amount.amount())
 }
 
-fn monetary_node_money(
+pub(super) fn monetary_node_money(
     results: &StatementResult,
     node: &str,
     period: &PeriodId,

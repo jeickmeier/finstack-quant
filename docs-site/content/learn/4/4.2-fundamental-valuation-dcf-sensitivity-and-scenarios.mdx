@@ -257,7 +257,7 @@ The solved perpetual growth is approximately 2.92365%. The cents-level native re
 
 ### 5. Separate enterprise-value creation from financing returns
 
-The LBO uses the same borrower operating cash flows. It pins the latest-actual EBITDA explicitly because the native LBO evaluator reads its entry metric from the first model period. Entry EV is 8.5× that run-rate EBITDA, exit EV is 9× forecast run-rate EBITDA, and fees are USD 3 million. Compare USD 80 million and USD 100 million of funded debt.
+The LBO uses the same borrower operating cash flows. It pins the latest-actual EBITDA explicitly because the native LBO evaluator reads its entry metric from the selected entry period. Entry EV is 8.5× that run-rate EBITDA, exit EV is 9× forecast run-rate EBITDA, and fees are USD 3 million. Compare USD 80 million and USD 100 million of funded debt.
 
 {/* notebook-block notebook="04_statement_modeling/models/lbo_analysis.ipynb" cell="borrower-lbo-financing" role="build" */}
 ```python exec id=borrower-lbo-financing role=build
@@ -277,8 +277,7 @@ entry_cash = operating_results.get("cash_end","2024Q4")
 lbo_rows = []
 for funded_debt in (80_000_000.0,100_000_000.0):
     builder = ModelBuilder.from_spec(operating).currency("USD")
-    # evaluate_lbo reads the first model period: pin the latest-actual closing metric explicitly.
-    builder.constant("lbo_entry_ebitda", Money(entry_metric, "USD"))
+    # evaluate_lbo reads the selected entry period: pin the latest-actual closing metric explicitly.
     builder.value("lbo_forecast",[(p,float(p in PERIODS[4:])) for p in PERIODS])
     builder.value("lbo_amort",[(p,funded_debt*0.025 if p in PERIODS[4:] else 0.0) for p in PERIODS])
     add_roll_forward_with_opening(builder, "lbo_debt", [], ["lbo_amort"], funded_debt)
@@ -289,7 +288,7 @@ for funded_debt in (80_000_000.0,100_000_000.0):
     financing_results = Evaluator().evaluate(financed)
     financed = ModelBuilder.from_spec(financed).value_money("annualized_ebitda_usd",[(p,Money(financing_results.get("annualized_ebitda",p),"USD")) for p in PERIODS]).value_money("lbo_debt_end_usd",[(p,Money(financing_results.get("lbo_debt_end",p),"USD")) for p in PERIODS]).build()
     # All company cash is reserved for operating liquidity: no interim distribution or excess-cash credit at exit.
-    result = evaluate_lbo(financed,{"entry_multiple":8.5,"entry_metric_node":"lbo_entry_ebitda","exit_multiple":9.0,
+    result = evaluate_lbo(financed,{"entry_multiple":8.5,"entry_metric_node":"annualized_ebitda_usd","entry_period":"2024Q4","exit_multiple":9.0,
         "exit_metric_node":"annualized_ebitda_usd","exit_net_debt_node":"lbo_debt_end_usd","exit_period":"2025Q4",
         "sources":[{"name":"term_loan","amount":funded_debt}],"transaction_fees":3_000_000})
     value_creation = (result.exit_metric-result.entry_metric)*8.5 + result.exit_metric*(9.0-8.5)

@@ -438,6 +438,32 @@ export type TerminalFcffBasis =
       kind: "trailing_additive";
     };
 /**
+ * How a matched earnings observation is read.
+ */
+export type LboEarningsBasis = "as_observed" | "trailing_additive";
+/**
+ * Economic form of the seller consideration at close.
+ */
+export type LboAcquisition =
+  | {
+      kind: "cash_free_debt_free";
+    }
+  | {
+      /**
+       * Cash contributed to transaction reserves at close.
+       */
+      closing_reserves: Money;
+      kind: "seller_and_refinancing";
+      /**
+       * Cash required at close to refinance resolved obligations.
+       */
+      refinancing: Money;
+      /**
+       * Agreed nonnegative purchase consideration paid to the seller.
+       */
+      seller_consideration: Money;
+    };
+/**
  * Which explicit observations an evaluation may read.
  *
  * On the wire: `"full_snapshot"`, or `{"through": "2025-04-25"}`.
@@ -2801,38 +2827,229 @@ export interface CurvePctParams {
   start?: number | null;
 }
 /**
- * Coherent repriced Monte Carlo enterprise and equity values by path and quantile.
+ * Acquisition and exit dates, recognized funding and projected exit assumptions.
  */
-export interface DcfDistributionResult {
+export interface DatedLboRequest {
   /**
-   * One enterprise and equity result per retained path.
+   * Optional report and decision policy for statement checks.
    */
-  paths: DcfPathValue[];
+  checks?: LboQualification | null;
   /**
-   * Unchanged model and statement information cutoff shared by the samples.
+   * Valuation date, reporting currency and entry observation cut.
    */
-  provenance: RunProvenance;
+  cut: StatementValuationCut;
   /**
-   * Derived valuation quantiles in the simulation's requested probability order.
+   * Earnings basis and matching purchase multiple on the entry date.
    */
-  quantiles: DcfPathQuantile[];
+  entry: LboEarnings;
+  /**
+   * Projected earnings basis and exit multiple at the elected exit date.
+   */
+  exit: LboEarnings;
+  /**
+   * Exact projected cash node eligible in the exit equity bridge.
+   */
+  exit_cash_node: string;
+  /**
+   * Exact projected non-debt claims or selling costs payable ahead of equity.
+   */
+  exit_claims_node?: string | null;
+  /**
+   * Exact projected closing debt node, measured as financing face.
+   */
+  exit_debt_node: string;
+  /**
+   * Exit date in the verified projected statement.
+   */
+  exit_valuation_date: DateWire;
+  /**
+   * Date, actual closing uses and named admissible cash sources.
+   */
+  funding: LboFunding;
 }
 /**
- * One sampled company valuation, with the original Monte Carlo path identity.
+ * Optional statement check suite and its effect on the LBO qualification.
  */
-export interface DcfPathValue {
+export interface LboQualification {
   /**
-   * Enterprise value in reporting currency.
+   * Require a passing suite before publishing a funded return.
+   */
+  required: boolean;
+  /**
+   * Checks run on the same statement result used for the transaction.
+   */
+  suite: CheckSuiteSpec;
+}
+/**
+ * Authored earnings observation and timing for one transaction multiple.
+ */
+export interface LboEarnings {
+  /**
+   * Earnings dimension matched to the multiple's convention.
+   */
+  basis: LboEarningsBasis;
+  /**
+   * Price divided by earnings, in positive multiple turns.
+   */
+  multiple: DecimalWire;
+  /**
+   * Exact node name supplying the elected earnings amount in transaction currency.
+   */
+  node: string;
+  /**
+   * Existing statement period containing the closing observation.
+   */
+  period: PeriodId;
+}
+/**
+ * Dated transaction funding assumptions authored on one currency basis.
+ */
+export interface LboFunding {
+  /**
+   * Purchase consideration and refinancing election.
+   */
+  acquisition: LboAcquisition;
+  /**
+   * Separate nonnegative credit against otherwise required closing uses.
+   */
+  closing_credits: Money;
+  /**
+   * Effective investment and refinancing date.
+   */
+  date: DateWire;
+  /**
+   * Admitted cash debt sources and their separately identified opening face.
+   */
+  debt: LboDebtFunding[];
+  /**
+   * Actual sponsor cash committed at entry, or absent for a sizing case.
+   */
+  sponsor_commitment?: Money | null;
+  /**
+   * Nonnegative adviser, financing, and transaction expenses paid at close.
+   */
+  transaction_fees: Money;
+}
+/**
+ * Cash proceeds and opening contractual face of one named debt source.
+ */
+export interface LboDebtFunding {
+  /**
+   * Actual cash proceeds credited at closing, in transaction currency.
+   */
+  cash_proceeds: Money;
+  /**
+   * Unique identity matching the source debt instrument.
+   */
+  name: string;
+  /**
+   * Contractual face outstanding immediately after closing.
+   */
+  opening_face: Money;
+}
+/**
+ * Reconciled sources and uses and qualified sponsor returns.
+ */
+export interface DatedLboResult {
+  /**
+   * Verdict and evidence from the elected statement checks.
+   */
+  checks?: CheckReport | null;
+  /**
+   * Effective closing date used for the initial funding bridge.
+   */
+  entry_date: DateWire;
+  /**
+   * Resolved reported entry earnings in the transaction currency.
+   */
+  entry_earnings: Money;
+  /**
+   * Entry enterprise value from the elected purchase multiple.
+   */
+  entry_enterprise_value: Money;
+  /**
+   * Signed exit residual and applicable sponsor returns.
+   */
+  exit: LboExitBridge;
+  /**
+   * Projected earnings in the same currency.
+   */
+  exit_earnings: Money;
+  /**
+   * Projected exit date used for the common-equity bridge.
+   */
+  exit_valuation_date: DateWire;
+  /**
+   * Reconciled initial uses, cash proceeds, opening face and funding gap.
+   */
+  funding: LboFundingResult;
+  /**
+   * Accepted statement run for all financial inputs and checks.
+   */
+  run: RunProvenance;
+}
+/**
+ * Dated and reconciled sponsor economics on the same numeraire as entry.
+ */
+export interface LboExitBridge {
+  /**
+   * Enterprise value less debt and claims, before the equity option floor.
+   */
+  common_equity_residual: Money;
+  /**
+   * Enterprise value at the elected exit date.
    */
   enterprise_value: Money;
   /**
-   * Common equity value after bridge and discounts.
+   * Proceeds over actual cash only when the commitment reconciles the uses.
    */
-  equity_value: Money;
+  funded_moic?: number | null;
   /**
-   * Zero-based path identity shared by all sampled cash flows.
+   * Debt less admitted cash at exit, which may be negative.
    */
-  path_id: number;
+  net_debt: Money;
+  /**
+   * Other signed claims deducted ahead of common equity.
+   */
+  other_claims: Money;
+  /**
+   * Proceeds over implied required cash, when required cash is positive.
+   */
+  sized_moic?: number | null;
+  /**
+   * Common equity distribution floored at zero.
+   */
+  sponsor_proceeds: Money;
+}
+/**
+ * Reconciled signed funding residual and its separately reported cash and face.
+ */
+export interface LboFundingResult {
+  /**
+   * Total transaction cash uses after separately authored credits.
+   */
+  cash_uses: Money;
+  /**
+   * Total explicitly committed cash sources when a sponsor commitment is supplied.
+   */
+  committed_cash_sources?: Money | null;
+  /**
+   * Cash proceeds from all admitted debt sources.
+   */
+  debt_cash_proceeds: Money;
+  /**
+   * Uses less committed cash sources. A positive amount is a shortage.
+   */
+  funding_gap?: Money | null;
+  /**
+   * Contractual face outstanding at entry, separate from proceeds.
+   */
+  opening_debt_face: Money;
+  /**
+   * Uses less debt cash proceeds, before applying sponsor cash.
+   */
+  required_sponsor_cash: Money;
+  [k: string]: unknown;
 }
 /**
  * What a result was evaluated from.
@@ -2904,6 +3121,40 @@ export interface ForecastStream {
    * Version of the mapping from the key to the stream.
    */
   stream_version: number;
+}
+/**
+ * Coherent repriced Monte Carlo enterprise and equity values by path and quantile.
+ */
+export interface DcfDistributionResult {
+  /**
+   * One enterprise and equity result per retained path.
+   */
+  paths: DcfPathValue[];
+  /**
+   * Unchanged model and statement information cutoff shared by the samples.
+   */
+  provenance: RunProvenance;
+  /**
+   * Derived valuation quantiles in the simulation's requested probability order.
+   */
+  quantiles: DcfPathQuantile[];
+}
+/**
+ * One sampled company valuation, with the original Monte Carlo path identity.
+ */
+export interface DcfPathValue {
+  /**
+   * Enterprise value in reporting currency.
+   */
+  enterprise_value: Money;
+  /**
+   * Common equity value after bridge and discounts.
+   */
+  equity_value: Money;
+  /**
+   * Zero-based path identity shared by all sampled cash flows.
+   */
+  path_id: number;
 }
 /**
  * Same-currency values at an elected Monte Carlo quantile.
@@ -4358,7 +4609,7 @@ export interface LboConfig {
   check_mappings?: LboCheckMappings | null;
   /**
    * Node id supplying the entry valuation metric (typically `"ebitda"`),
-   * read at the model's first period.
+   * read at the explicitly selected entry period.
    */
   entry_metric_node: string;
   /**
@@ -4366,6 +4617,10 @@ export interface LboConfig {
    * for 8.5x EBITDA.
    */
   entry_multiple: number;
+  /**
+   * Explicit statement observation period used to size the acquisition.
+   */
+  entry_period: PeriodId;
   /**
    * Node id supplying the exit valuation metric, read at `exit_period`.
    */
@@ -4429,7 +4684,7 @@ export interface LboResult {
    */
   entry_enterprise_value: Money;
   /**
-   * Entry metric value read from the model at the first period.
+   * Entry metric value read from the explicitly selected period.
    */
   entry_metric: number;
   /**

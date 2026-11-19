@@ -95,6 +95,16 @@ from finstack_quant.statements_analytics._comps import (
     score_relative_value as score_relative_value,
     z_score as z_score,
 )
+from finstack_quant.statements_analytics._lbo import (
+    LboEarnings as LboEarnings,
+    LboDebtFunding as LboDebtFunding,
+    LboFunding as LboFunding,
+    DatedLboRequest as DatedLboRequest,
+    LboFundingResult as LboFundingResult,
+    LboExitBridge as LboExitBridge,
+    DatedLboResult as DatedLboResult,
+    evaluate_dated_lbo as evaluate_dated_lbo,
+)
 from finstack_quant.statements_analytics._valuation import (
     CorporateAnalysis as CorporateAnalysis,
     CorporateValuationResult as CorporateValuationResult,
@@ -280,6 +290,14 @@ __all__ = [
     "DcfDistributionResult",
     "evaluate_dcf_monte_carlo",
     "evaluate_dcf",
+    "LboEarnings",
+    "LboDebtFunding",
+    "LboFunding",
+    "DatedLboRequest",
+    "LboFundingResult",
+    "LboExitBridge",
+    "DatedLboResult",
+    "evaluate_dated_lbo",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",

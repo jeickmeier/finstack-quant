@@ -10696,9 +10696,18 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly dcfSensitivity: typeof wasm.dcfSensitivity;
   /**
+   * Reconstruct a dated leveraged acquisition and calculate qualified exit returns.
+   * @param model - Identified statement model containing admitted actuals and projected exit observations.
+   * @param request - Closing uses, cash sources, exit assumptions and elected check suite.
+   * @param market - Market data for any instruments linked to statement observations.
+   * @returns Reconciled sources and uses, signed exit bridge and any supportable sponsor returns.
+   * @throws If dates, dates of observation, monetary inputs, source data or required checks are invalid.
+   */
+  readonly evaluateDatedLbo: typeof wasm.evaluateDatedLbo;
+  /**
    * Evaluate a leveraged-buyout transaction against a statement model.
    *
-   * Entry enterprise value is priced at the model's first period, the sponsor
+   * Entry enterprise value is priced at the explicitly selected entry period, the sponsor
    * equity check is solved as the sources-and-uses residual, and exit proceeds
    * are the exit enterprise value less the modelled net debt at the exit
    * period. When the config carries `check_mappings`, the Rust LBO check suite
@@ -10715,7 +10724,7 @@ export interface StatementsAnalyticsNamespace {
    * check-suite failures, or failure to serialize the result to JavaScript.
    * The result is a structured JavaScript object.
    * @param modelJson - Financial-model specification JSON.
-   * @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
+   * @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `entry_period` (existing period used to read entry earnings), `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
    * @returns Leveraged-buyout evaluation result against the statement model.
    */
   readonly evaluateLbo: typeof wasm.evaluateLbo;

@@ -1437,7 +1437,7 @@ export default [
   {
     "path": "#/properties/entry_metric",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/properties/entry_metric",
-    "description": "Entry metric value read from the model at the first period.",
+    "description": "Entry metric value read from the explicitly selected period.",
     "format": "double"
   },
   {

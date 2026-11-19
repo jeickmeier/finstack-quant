@@ -429,8 +429,8 @@ impl PyDcfOptions {
 )]
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "StatementValuationCut")]
 #[derive(Clone)]
-struct PyStatementValuationCut {
-    inner: StatementValuationCut,
+pub(crate) struct PyStatementValuationCut {
+    pub(crate) inner: StatementValuationCut,
 }
 
 #[pymethods]
@@ -1217,7 +1217,7 @@ impl PyLboResult {
         PyMoney::from_inner(self.inner.entry_enterprise_value)
     }
 
-    /// Entry metric read from the model's first period.
+    /// Entry metric read from the explicitly selected entry period.
     #[getter]
     fn entry_metric(&self) -> f64 {
         self.inner.entry_metric
@@ -1586,7 +1586,7 @@ fn dcf_sensitivity<'py>(
 
 /// Evaluate a leveraged-buyout transaction against a statement model.
 ///
-/// Entry enterprise value is priced at the model's first period, the sponsor
+/// Entry enterprise value is priced at the explicitly selected entry period, the sponsor
 /// equity check is the sources-and-uses residual, and exit proceeds are the
 /// exit enterprise value less modelled net debt at ``exit_period``. IRR is out
 /// of scope: pair ``exit_equity_proceeds`` with the equity outflow at close and
@@ -1635,7 +1635,7 @@ fn dcf_sensitivity<'py>(
 /// >>> quarters = ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"]
 /// >>> _ = b.value_money("ebitda", [(q, Money(v, "USD")) for q, v in zip(quarters, [100.0] * 4 + [120.0])])
 /// >>> _ = b.value_money("net_debt", [(q, Money(v, "USD")) for q, v in zip(quarters, [300.0] * 4 + [200.0])])
-/// >>> config = {"entry_multiple": 8.0, "entry_metric_node": "ebitda", "transaction_fees": 0.0,
+/// >>> config = {"entry_multiple": 8.0, "entry_metric_node": "ebitda", "entry_period": "2025Q1", "transaction_fees": 0.0,
 /// ...     "sources": [{"name": "debt", "amount": 500.0}], "exit_multiple": 9.0,
 /// ...     "exit_metric_node": "ebitda", "exit_net_debt_node": "net_debt", "exit_period": "2026Q1"}
 /// >>> round(evaluate_lbo(b.build(), config).moic, 4)

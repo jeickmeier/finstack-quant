@@ -100,8 +100,10 @@ pub struct LboConfig {
     /// for 8.5x EBITDA.
     pub entry_multiple: f64,
     /// Node id supplying the entry valuation metric (typically `"ebitda"`),
-    /// read at the model's first period.
+    /// read at the explicitly selected entry period.
     pub entry_metric_node: String,
+    /// Explicit statement observation period used to size the acquisition.
+    pub entry_period: PeriodId,
     /// Transaction fees and expenses funded at close, in the model currency.
     pub transaction_fees: f64,
     /// Funded debt tranches at close. The sponsor equity check is solved as
@@ -129,7 +131,7 @@ pub struct LboConfig {
 pub struct LboResult {
     /// Entry enterprise value: `entry_multiple × entry metric`.
     pub entry_enterprise_value: Money,
-    /// Entry metric value read from the model at the first period.
+    /// Entry metric value read from the explicitly selected period.
     pub entry_metric: f64,
     /// Total funded debt at close (sum of [`LboConfig::sources`]).
     pub debt_total: Money,
@@ -213,6 +215,7 @@ pub struct LboResult {
 /// let config = LboConfig {
 ///     entry_multiple: 8.5,
 ///     entry_metric_node: "ebitda".to_string(),
+///     entry_period: PeriodId::annual(2025).expect("valid annual period"),
 ///     transaction_fees: 3.0,
 ///     sources: vec![LboTranche { name: "term_loan_a".to_string(), amount: 90.0 }],
 ///     exit_multiple: 9.5,
@@ -234,13 +237,22 @@ pub fn evaluate_lbo(model: &FinancialModelSpec, config: &LboConfig) -> Result<Lb
     validate_finite("exit_multiple", config.exit_multiple)?;
     validate_finite("transaction_fees", config.transaction_fees)?;
 
-    let entry_period = model
-        .periods
-        .first()
-        .ok_or_else(|| {
-            Error::Eval("LBO evaluation requires a model with at least one period".into())
-        })?
-        .id;
+    let selected = |period| {
+        model
+            .periods
+            .iter()
+            .position(|row| row.id == period)
+            .ok_or_else(|| {
+                Error::invalid_input(format!(
+                    "LBO selected period {period} is absent from the model"
+                ))
+            })
+    };
+    if selected(config.exit_period)? < selected(config.entry_period)? {
+        return Err(Error::invalid_input(
+            "LBO exit cannot precede the elected entry period",
+        ));
+    }
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(model)?;
@@ -255,7 +267,11 @@ pub fn evaluate_lbo(model: &FinancialModelSpec, config: &LboConfig) -> Result<Lb
         super::corporate::monetary_node_value(&results, node, period, currency)
     };
 
-    let entry_metric = node_value(&config.entry_metric_node, &entry_period, "entry valuation")?;
+    let entry_metric = node_value(
+        &config.entry_metric_node,
+        &config.entry_period,
+        "entry valuation",
+    )?;
     let entry_enterprise_value = config.entry_multiple * entry_metric;
     let uses_total = entry_enterprise_value + config.transaction_fees;
 
@@ -397,6 +413,7 @@ mod tests {
         LboConfig {
             entry_multiple: 8.5,
             entry_metric_node: "ebitda".to_string(),
+            entry_period: PeriodId::annual(2025).expect("valid annual period"),
             transaction_fees: 3.0,
             sources: vec![
                 LboTranche {
@@ -440,6 +457,18 @@ mod tests {
 
         assert_eq!(result.entry_enterprise_value.currency().to_string(), "USD");
         assert!(result.checks.is_none());
+    }
+
+    #[test]
+    fn evaluate_lbo_reads_the_explicit_later_earnings_observation() {
+        let mut config = demo_config();
+        config.entry_period = PeriodId::annual(2026).expect("later fixture period");
+        let valued = evaluate_lbo(&demo_model(), &config).expect("selected observation");
+        assert!((valued.entry_enterprise_value.amount() - 8.5 * 26.4).abs() < 1e-9);
+
+        config.entry_period = PeriodId::annual(2027).expect("uncovered period");
+        let error = evaluate_lbo(&demo_model(), &config).expect_err("must select a real period");
+        assert!(error.to_string().contains("2027"));
     }
 
     #[test]
