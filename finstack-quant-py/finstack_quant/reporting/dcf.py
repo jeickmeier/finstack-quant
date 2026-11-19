@@ -127,8 +127,8 @@ def dcf_tearsheet(
         ``equity_value_per_share`` is a plain float.
     results : StatementResult | str | dict, optional
         Statement results for the UFCF and forecast-summary sections.
-    sensitivity : list[TornadoEntry | dict], optional
-        ``generate_tornado_entries`` output (typed entries, dicts or JSON
+    sensitivity : DcfSensitivityResult | list[TornadoEntry | dict], optional
+        A typed DCF sensitivity result or a list of tornado entries (typed, dicts or JSON
         objects with ``parameter_id``/``downside``/``upside``) for the
         sensitivity tornado, drawn in the given (Rust swing) order.
     ufcf_node : str, default "ufcf"
@@ -151,7 +151,7 @@ def dcf_tearsheet(
         If ``sections`` contains an unknown section name.
     TypeError
         If ``valuation`` is neither a dict nor a JSON string, or
-        ``sensitivity`` is not a list of tornado entries.
+        ``sensitivity`` does not supply tornado entries.
 
     Returns:
     -------

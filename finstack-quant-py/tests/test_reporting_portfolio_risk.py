@@ -23,7 +23,6 @@ _DECOMP_TYPED = position_risk_report({
     "source": {"kind": "parametric", "weights": _WEIGHTS, "covariance": _COV},
 }).decomposition
 _DECOMP = json.loads(_DECOMP_TYPED.to_json())
-_ES = _DECOMP
 _BUDGET = {
     "portfolio_var": 0.2040,
     "total_overbudget": 0.0519,
@@ -52,7 +51,7 @@ _BUDGET = {
 
 
 def test_portfolio_risk_tearsheet_renders_all_sections() -> None:
-    ts = portfolio_risk_tearsheet(_DECOMP, es=_ES, budget=_BUDGET, generated=dt.date(2026, 6, 23))
+    ts = portfolio_risk_tearsheet(_DECOMP, budget=_BUDGET, generated=dt.date(2026, 6, 23))
     assert isinstance(ts, TearSheet)
     html = ts.to_html()
     assert "Portfolio VaR" in html
@@ -71,7 +70,8 @@ def test_portfolio_risk_tearsheet_accepts_json() -> None:
 
 
 def test_portfolio_risk_tearsheet_optional_sections_omitted() -> None:
-    html = portfolio_risk_tearsheet(_DECOMP, generated=dt.date(2026, 6, 23)).to_html()
+    decomp = {key: value for key, value in _DECOMP.items() if key != "es_contributions"}
+    html = portfolio_risk_tearsheet(decomp, generated=dt.date(2026, 6, 23)).to_html()
     assert "VaR Contributions" in html
     assert "ES Contributions" not in html
     assert "Risk Budget" not in html
@@ -102,9 +102,9 @@ def test_portfolio_risk_tearsheet_positions_kpi_without_method() -> None:
 
 
 def test_portfolio_risk_tearsheet_es_budget_bad_rows() -> None:
-    es = {"es_contributions": [*_ES["es_contributions"], None, "bad"]}
+    es = {"es_contributions": [*_DECOMP["es_contributions"], None, "bad"]}
     budget = {**_BUDGET, "positions": [*_BUDGET["positions"], None, 42]}
-    html = portfolio_risk_tearsheet(_DECOMP, es=es, budget=budget, generated=dt.date(2026, 6, 23)).to_html()
+    html = portfolio_risk_tearsheet({**_DECOMP, **es}, budget=budget, generated=dt.date(2026, 6, 23)).to_html()
     assert "ES Contributions" in html
     assert "Risk Budget" in html
 
@@ -112,7 +112,7 @@ def test_portfolio_risk_tearsheet_es_budget_bad_rows() -> None:
 def test_portfolio_risk_tearsheet_renders_var_contributions_from_typed_rust_results() -> None:
     """PYPY-007: the typed decomposition both VaR engines return renders its contributions."""
     sheet = portfolio_risk_tearsheet(_DECOMP_TYPED, generated=dt.date(2026, 6, 23))
-    assert [s.title for s in sheet.sections] == ["VaR Contributions"]
+    assert [s.title for s in sheet.sections] == ["VaR Contributions", "ES Contributions"]
     body = sheet.sections[0].body
     for row in _DECOMP["var_contributions"]:
         # The share column is the Rust ``relative_var`` scaled to percent.
@@ -123,4 +123,4 @@ def test_portfolio_risk_tearsheet_renders_var_contributions_from_typed_rust_resu
         "confidence": 0.95,
         "source": {"kind": "historical", "pnls": pnls},
     }).decomposition
-    assert [s.title for s in portfolio_risk_tearsheet(historical).sections] == ["VaR Contributions"]
+    assert [s.title for s in portfolio_risk_tearsheet(historical).sections] == ["VaR Contributions", "ES Contributions"]

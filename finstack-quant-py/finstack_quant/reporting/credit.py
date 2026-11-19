@@ -78,7 +78,11 @@ def _section_coverage(coverage: Any) -> Section | None:
         tables.data_table(
             rows,
             columns=["Instrument", "DSCR", "Int. Cov.", "LTV"],
-            formats={"DSCR": fmt.ratio, "Int. Cov.": fmt.ratio, "LTV": fmt.pct},
+            formats={
+                "DSCR": fmt.ratio,
+                "Int. Cov.": fmt.ratio,
+                "LTV": lambda value: fmt.pct(value * 100 if value is not None else None),
+            },
         ),
     )
 
@@ -143,7 +147,7 @@ def credit_tearsheet(
     results : StatementResult | str | dict, optional
         Statement results for the EBITDA-build section.
     coverage : list[dict], optional
-        Per-instrument rows (``instrument``/``dscr``/``interest_coverage``/``ltv``).
+        Per-instrument rows (``instrument``/``dscr``/``interest_coverage``/``ltv``). LTV is a decimal ratio, such as 0.55 for 55%.
     covenants : list[dict], optional
         Covenant rows (``covenant``/``threshold``/``current``/``headroom``/``status``).
     title : str, optional

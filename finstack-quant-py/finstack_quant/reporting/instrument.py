@@ -591,7 +591,8 @@ def instrument_tearsheet(
     result : Any
         Precomputed valuation result to render.
     cashflows : Any
-        Optional precomputed cashflow payload with explicit currency on each row; each currency is rendered separately.
+        Optional InstrumentCashflowEnvelope, cashflow DataFrame, or ladder and
+        frame pair. Each row must give its currency.
     definition : Any
         Optional instrument-definition payload used to enrich the rendered sheet.
     title : str or None
@@ -616,7 +617,7 @@ def instrument_tearsheet(
         If ``sections`` contains an unknown name or a cashflow row lacks an explicit currency.
     TypeError
         If ``result`` is an instrument JSON string or mapping instead of a
-        precomputed valuation result.
+        precomputed valuation result, or cashflows cannot supply a DataFrame.
     json.JSONDecodeError
         If an instrument, valuation result, or requested definition contains
         malformed JSON.
@@ -662,6 +663,12 @@ def instrument_tearsheet(
     parsed = _parse_result(result)
     definition, definition_error = _parse_definition_once(definition)
     itype = definition.get("type", "") if isinstance(definition, dict) else ""
+
+    if hasattr(cashflows, "calendar_year_ladder_by_currency"):
+        cashflows = cashflows.to_dataframe()
+    frame = cashflows[1] if isinstance(cashflows, tuple) and len(cashflows) == 2 else cashflows
+    if frame is not None and not hasattr(frame, "iterrows"):
+        raise TypeError("cashflows must supply a DataFrame")
 
     secs = _build_sections(result, cashflows, definition, definition_error, parsed, itype, wanted, theme)
 

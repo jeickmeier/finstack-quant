@@ -17,6 +17,7 @@ Examples:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import datetime as dt
 from typing import Any
 
@@ -46,9 +47,26 @@ def _section_tornado(tornado: Any, theme: Theme) -> Section | None:
 
 
 def _section_scenarios(scenarios: Any, theme: Theme) -> Section | None:
-    if not scenarios or not isinstance(scenarios, dict):
+    if scenarios is None:
         return None
-    items = [(k, v) for k, v in scenarios.items() if isinstance(v, (int, float))]
+    if isinstance(scenarios, dict):
+        named_results = scenarios.items()
+    elif isinstance(scenarios, Sequence) and not isinstance(scenarios, (str, bytes)):
+        if any(not hasattr(item, "scenario_id") or not hasattr(item, "pnl") for item in scenarios):
+            raise TypeError("scenario comparison sequences must contain labeled scenario batch items")
+        named_results = [(item.scenario_id, item.pnl) for item in scenarios]
+    else:
+        raise TypeError("scenarios must be a mapping or an ordered scenario batch")
+    items = []
+    currencies = set()
+    for label, result in named_results:
+        if hasattr(result, "total") and hasattr(result, "currency"):
+            currencies.add(result.currency)
+            items.append((label, result.total))
+        elif isinstance(result, (int, float)):
+            items.append((label, result))
+    if len(currencies) > 1:
+        raise ValueError("scenario P&L must use one base currency")
     if not items:
         return None
     labels = [k for k, _ in items]
@@ -106,8 +124,11 @@ def scenario_tearsheet(
     tornado : list[TornadoEntry | dict], optional
         ``generate_tornado_entries`` output (typed entries, dicts or JSON
         objects with ``parameter_id``/``downside``/``upside``), in Rust order.
-    scenarios : dict, optional
-        ``{scenario_name: target_metric_value}`` for the comparison bars.
+    scenarios : dict or sequence of ScenarioPnlBatchItem, optional
+        A mapping from scenario names to numeric metric values or typed
+        ScenarioPnl results, or an ordered portfolio scenario P&L batch.
+        Typed P&L uses the portfolio base currency, which must agree across
+        the comparison.
     monte_carlo : dict, optional
         A pre-extracted fan: ``{"periods": [...], "p_low": [...], "p_mid": [...], "p_high": [...]}``.
     variance : VarianceReport | dict | str, optional
@@ -128,8 +149,10 @@ def scenario_tearsheet(
         "Generated" stamp; pass a fixed date for reproducible output.
 
     Raises:
-        ValueError: If ``sections`` contains an unknown section name.
-        TypeError: If ``tornado`` is not a list of tornado entries or
+        ValueError: If ``sections`` contains an unknown section name or scenario
+            P&L mixes base currencies.
+        TypeError: If ``scenarios`` is neither a mapping nor a labeled scenario
+            batch, ``tornado`` does not supply tornado entries, or
             ``variance`` is not a variance report, dict, or JSON string.
 
     Returns:

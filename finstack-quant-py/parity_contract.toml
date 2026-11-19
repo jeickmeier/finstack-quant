@@ -1775,7 +1775,11 @@ note = "Pure-Python presentation layer (tear sheets, tables, charts). No Rust co
 [crates.reporting.symbols]
 public = [
     "INSTITUTIONAL",
+    "KPI",
+    "Section",
+    "TearSheet",
     "Theme",
+    "data_table",
     "attribution_tearsheet",
     "benchmark_tearsheet",
     "credit_tearsheet",
@@ -2236,7 +2240,7 @@ js = "portfolio.schema"
 
 [parity.modules."finstack_quant.reporting"]
 js = ""
-excluded = { "INSTITUTIONAL" = "pure-python", "Theme" = "pure-python", "attribution_tearsheet" = "pure-python", "benchmark_tearsheet" = "pure-python", "credit_tearsheet" = "pure-python", "dcf_tearsheet" = "pure-python", "instrument_tearsheet" = "pure-python", "performance_tearsheet" = "pure-python", "portfolio_risk_tearsheet" = "pure-python", "portfolio_tearsheet" = "pure-python", "scenario_tearsheet" = "pure-python", "statement_tearsheet" = "pure-python" }
+excluded = { "INSTITUTIONAL" = "pure-python", "KPI" = "pure-python", "Section" = "pure-python", "TearSheet" = "pure-python", "data_table" = "pure-python", "Theme" = "pure-python", "attribution_tearsheet" = "pure-python", "benchmark_tearsheet" = "pure-python", "credit_tearsheet" = "pure-python", "dcf_tearsheet" = "pure-python", "instrument_tearsheet" = "pure-python", "performance_tearsheet" = "pure-python", "portfolio_risk_tearsheet" = "pure-python", "portfolio_tearsheet" = "pure-python", "scenario_tearsheet" = "pure-python", "statement_tearsheet" = "pure-python" }
 
 [parity.modules."finstack_quant.scenarios"]
 js = "scenarios"

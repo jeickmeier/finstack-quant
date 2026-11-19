@@ -185,7 +185,8 @@ def tornado_entries(tornado: Any, *, noun: str = "tornado") -> list[tuple[Any, A
     Parameters
     ----------
     tornado : Any
-        List or tuple of tornado entries, each carrying ``parameter_id``,
+        A DCF sensitivity result or a list or tuple of tornado entries,
+        each carrying ``parameter_id``,
         ``downside`` and ``upside``.
     noun : str
         Reader-facing noun used in error messages.
@@ -209,6 +210,7 @@ def tornado_entries(tornado: Any, *, noun: str = "tornado") -> list[tuple[Any, A
     >>> tornado_entries([{"parameter_id": "wacc", "downside": -1.0, "upside": 2.0}])
     [('wacc', -1.0, 2.0)]
     """
+    tornado = getattr(tornado, "entries", tornado)
     if not isinstance(tornado, (list, tuple)):
         raise TypeError(f"{noun} must be a list of tornado entries; got {type(tornado).__name__}")
     rows = [json_or_dict(entry, noun=f"{noun} entry") for entry in tornado]
