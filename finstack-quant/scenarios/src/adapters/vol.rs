@@ -220,7 +220,7 @@ pub(crate) fn vol_effects(
             vol_surface_id.as_str()
         )));
     }
-    let factor = 1.0 + pct / 100.0;
+    let factor = (100.0 + pct) / 100.0;
     if !factor.is_finite() || factor < 0.0 {
         return Err(Error::Validation(format!(
             "Volatility shock percentage {pct:.1}% for '{}' implies invalid scaling factor \
@@ -230,25 +230,18 @@ pub(crate) fn vol_effects(
     }
 
     let mut warnings = Vec::new();
-    if ctx.market.get_vol_cube(vol_surface_id.as_str()).is_ok() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Cannot apply scenario volatility shock to '{}': registered as VolCube, which does not support VolSurface grid bumps",
-            vol_surface_id.as_str()
+    let surface = ctx.market.get_surface(vol_surface_id.as_str()).map_err(|err| {
+        let source_kind = if ctx.market.get_vol_cube(vol_surface_id.as_str()).is_ok() {
+            "VolCube"
+        } else if ctx.market.get_fx_delta_vol_surface(vol_surface_id.as_str()).is_ok() {
+            "FxDeltaVolSurface"
+        } else {
+            return err;
+        };
+        finstack_quant_core::Error::Validation(format!(
+            "Cannot apply scenario volatility shock to '{vol_surface_id}': registered as {source_kind}, which does not support VolSurface grid bumps"
         ))
-        .into());
-    }
-    if ctx
-        .market
-        .get_fx_delta_vol_surface(vol_surface_id.as_str())
-        .is_ok()
-    {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Cannot apply scenario volatility shock to '{}': registered as FxDeltaVolSurface, which does not support VolSurface grid bumps",
-            vol_surface_id.as_str()
-        ))
-        .into());
-    }
-    let surface = ctx.market.get_surface(vol_surface_id.as_str())?;
+    })?;
 
     if strikes.is_some() {
         surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
@@ -370,6 +363,45 @@ mod tests {
             builder = builder.row(row);
         }
         builder.build().expect("valid strike Black VolSurface")
+    }
+
+    #[test]
+    fn surface_shock_selects_exact_source_and_preserves_positive_boundary_factor()
+    -> crate::error::Result<()> {
+        use crate::engine::ScenarioEngine;
+        use crate::spec::{OperationSpec, ScenarioSpec};
+        use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
+
+        let as_of = date!(2025 - 01 - 01);
+        let surface = strike_black_surface("VOL", &[0.5], &[100.0], &[&[0.20]], None);
+        let sabr = SabrParameterData::new(0.2, 0.5, 0.3, -0.2, None)?;
+        let cube = VolCube::from_grid("VOL", &[1.0], &[5.0], &[sabr], &[0.03])?;
+        let mut market = MarketContext::new()
+            .insert_surface(surface)
+            .insert_vol_cube(cube);
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of,
+        };
+        let pct = (-100.0_f64).next_up();
+        let scenario = ScenarioSpec {
+            id: "stress_sigma".into(),
+            operations: vec![OperationSpec::VolSurfaceParallelPct {
+                vol_surface_id: "VOL".into(),
+                pct,
+            }],
+            ..Default::default()
+        };
+        ScenarioEngine::new().apply(&scenario, &mut ctx)?;
+        let expected = 0.20 * ((100.0 + pct) / 100.0);
+        assert!(expected > 0.0);
+        assert_eq!(market.get_surface("VOL")?.vols(), &[expected]);
+        assert_eq!(market.get_vol_cube("VOL")?.forwards(), &[0.03]);
+        Ok(())
     }
 
     #[test]
