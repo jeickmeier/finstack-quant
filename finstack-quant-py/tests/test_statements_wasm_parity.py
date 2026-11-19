@@ -245,11 +245,18 @@ def analytics_cases() -> dict[str, Any]:
     vintage_builder = st.ModelBuilder.from_spec(st.FinancialModelSpec.from_json(MODEL))
     sa.add_vintage_buildup(vintage_builder, "book", "revenue", [1.0, 0.5])
     vintage = vintage_builder.build()
-    noi = sa.add_noi_buildup(MODEL, "total_rev", ["revenue"], "total_exp", ["cogs"], "noi")
-    ncf = sa.add_ncf_buildup(noi, "noi", ["cogs"], "ncf")
+    model = st.FinancialModelSpec.from_json(MODEL)
+    cash_builder = st.ModelBuilder.from_spec(model)
+    sa.add_noi_buildup(cash_builder, "total_rev", ["revenue"], "total_exp", ["cogs"], "noi")
+    sa.add_ncf_buildup(cash_builder, "noi", ["cogs"], "ncf")
+    ncf = cash_builder.build()
     lease = sa.LeaseSpec.from_json(json.dumps(INPUTS["lease"]))
-    rent_roll = sa.add_rent_roll(MODEL, [lease])
-    property_model = sa.add_property_operating_statement(MODEL, [lease], [], ["cogs"], [])
+    rent_builder = st.ModelBuilder.from_spec(model)
+    sa.add_rent_roll(rent_builder, [lease])
+    rent_roll = rent_builder.build()
+    property_builder = st.ModelBuilder.from_spec(model)
+    sa.add_property_operating_statement(property_builder, [lease], [], ["cogs"], [])
+    property_model = property_builder.build()
 
     exposure = sa.Exposure(
         id="E1",
@@ -327,7 +334,7 @@ def analytics_cases() -> dict[str, Any]:
             "roll_forward.node_ids": rolled.node_ids(),
             "roll_forward.end": [evaluated(rolled, "debt_end", Q1), evaluated(rolled, "debt_end", Q2)],
             "vintage.book": [evaluated(vintage, "book", Q1), evaluated(vintage, "book", Q2)],
-            "noi": [evaluated(noi, "noi", Q1), evaluated(noi, "noi", Q2)],
+            "noi": [evaluated(ncf, "noi", Q1), evaluated(ncf, "noi", Q2)],
             "ncf": [evaluated(ncf, "ncf", Q1), evaluated(ncf, "ncf", Q2)],
             "rent_roll.node_ids": rent_roll.node_ids(),
             "property.node_ids": property_model.node_ids(),

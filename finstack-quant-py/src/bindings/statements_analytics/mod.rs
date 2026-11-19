@@ -16,7 +16,6 @@ pub(crate) mod ecl;
 mod relative_value;
 mod reports;
 mod scorecards;
-mod templates_common;
 pub(crate) mod templates_real_estate;
 mod templates_roll_forward;
 mod templates_vintage;

@@ -20,62 +20,60 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
     // Build a tiny statement model with NOI and CapEx, then export to dated schedules.
-    let model = real_estate::add_noi_buildup(
-        {
-            let mut model_builder = ModelBuilder::new("re_e2e");
-            model_builder
-                .periods("2025Q1..Q2", None)
-                .expect("periods should parse");
-            model_builder.value(
-                "rent",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(100.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(110.0),
-                    ),
-                ],
-            );
-            model_builder.value(
-                "taxes",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(20.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(22.0),
-                    ),
-                ],
-            );
-            model_builder.value(
-                "capex",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(5.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(6.0),
-                    ),
-                ],
-            );
-            model_builder
-        },
+    let mut model_builder = ModelBuilder::new("re_e2e");
+    model_builder
+        .periods("2025Q1..Q2", None)
+        .expect("periods should parse");
+    model_builder.value(
+        "rent",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(110.0),
+            ),
+        ],
+    );
+    model_builder.value(
+        "taxes",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(20.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(22.0),
+            ),
+        ],
+    );
+    model_builder.value(
+        "capex",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(5.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(6.0),
+            ),
+        ],
+    );
+
+    real_estate::add_noi_buildup(
+        &mut model_builder,
         "total_rev",
         &["rent"],
         "total_exp",
         &["taxes"],
         "noi",
     )
-    .expect("noi template")
-    .build()
-    .expect("build");
+    .expect("noi template");
+    let model = model_builder.build().expect("build");
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");

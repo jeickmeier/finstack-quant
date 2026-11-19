@@ -84,10 +84,6 @@ fn sum_expr_or_zero(nodes: &[&str]) -> String {
 /// * `expense_nodes` - Expense node ids to sum
 /// * `noi_node` - Node id for net operating income
 ///
-/// # Returns
-///
-/// Returns the updated builder with three calculated nodes.
-///
 /// # Errors
 ///
 /// Returns an error if `revenue_nodes` or `expense_nodes` is empty, or if any
@@ -103,7 +99,7 @@ fn sum_expr_or_zero(nodes: &[&str]) -> String {
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-/// let builder = {
+/// let mut builder = {
 ///     let mut model_builder = ModelBuilder::new("property");
 ///     model_builder.periods("2025Q1..Q1", None)?;
 ///     model_builder.value("rent", &[(period, AmountOrScalar::scalar(100.0))]);
@@ -111,8 +107,8 @@ fn sum_expr_or_zero(nodes: &[&str]) -> String {
 ///     model_builder
 /// };
 ///
-/// let builder = add_noi_buildup(
-///     builder,
+/// add_noi_buildup(
+///     &mut builder,
 ///     "total_revenue",
 ///     &["rent"],
 ///     "total_expenses",
@@ -125,17 +121,18 @@ fn sum_expr_or_zero(nodes: &[&str]) -> String {
 /// # }
 /// ```
 pub fn add_noi_buildup(
-    mut builder: ModelBuilder,
+    builder: &mut ModelBuilder,
     total_revenue_node: &str,
     revenue_nodes: &[&str],
     total_expenses_node: &str,
     expense_nodes: &[&str],
     noi_node: &str,
-) -> Result<ModelBuilder> {
+) -> Result<()> {
+    let mut draft = builder.clone();
     let total_rev_expr = sum_expr(revenue_nodes)?;
     let total_exp_expr = sum_expr(expense_nodes)?;
 
-    builder
+    draft
         .compute(total_revenue_node, &total_rev_expr)?
         .compute(total_expenses_node, &total_exp_expr)?
         .compute(
@@ -143,7 +140,8 @@ pub fn add_noi_buildup(
             format!("{total_revenue_node} - {total_expenses_node}"),
         )?;
 
-    Ok(builder)
+    *builder = draft;
+    Ok(())
 }
 
 /// Add a standard NCF (net cash flow) buildup:
@@ -158,10 +156,6 @@ pub fn add_noi_buildup(
 /// * `noi_node` - Existing NOI node id
 /// * `capex_nodes` - CapEx node ids expressed as positive outflows
 /// * `ncf_node` - Node id for net cash flow after CapEx
-///
-/// # Returns
-///
-/// Returns the updated builder with a calculated NCF node.
 ///
 /// # Errors
 ///
@@ -178,7 +172,7 @@ pub fn add_noi_buildup(
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-/// let builder = {
+/// let mut builder = {
 ///     let mut model_builder = ModelBuilder::new("property");
 ///     model_builder.periods("2025Q1..Q1", None)?;
 ///     model_builder.value("noi", &[(period, AmountOrScalar::scalar(60.0))]);
@@ -186,25 +180,25 @@ pub fn add_noi_buildup(
 ///     model_builder
 /// };
 ///
-/// let builder = add_ncf_buildup(builder, "noi", &["capex"], "ncf")?;
+/// add_ncf_buildup(&mut builder, "noi", &["capex"], "ncf")?;
 /// let model = builder.build()?;
 /// assert!(model.nodes.contains_key("ncf"));
 /// # Ok(())
 /// # }
 /// ```
 pub fn add_ncf_buildup(
-    mut builder: ModelBuilder,
+    builder: &mut ModelBuilder,
     noi_node: &str,
     capex_nodes: &[&str],
     ncf_node: &str,
-) -> Result<ModelBuilder> {
+) -> Result<()> {
     if capex_nodes.is_empty() {
         builder.compute(ncf_node, noi_node)?;
     } else {
         let capex_expr = sum_expr(capex_nodes)?;
         builder.compute(ncf_node, format!("{noi_node} - ({capex_expr})"))?;
     }
-    Ok(builder)
+    Ok(())
 }
 
 fn default_occupancy() -> f64 {
@@ -524,11 +518,6 @@ fn apply_free_window(is_free: &mut [bool], start_idx: usize, len: u32) -> Result
 ///   renewals
 /// * `nodes` - Aggregate output node ids
 ///
-/// # Returns
-///
-/// Returns the updated builder with per-lease detail nodes and aggregated PGI,
-/// free-rent, vacancy-loss, and effective-rent nodes.
-///
 /// # Errors
 ///
 /// Returns an error if leases reference unknown periods, contain invalid
@@ -548,7 +537,7 @@ fn apply_free_window(is_free: &mut [bool], start_idx: usize, len: u32) -> Result
 /// };
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let builder = {
+/// let mut builder = {
 ///     let mut model_builder = ModelBuilder::new("property");
 ///     model_builder.periods("2025Q1..Q4", None)?;
 ///     model_builder
@@ -567,17 +556,28 @@ fn apply_free_window(is_free: &mut [bool], start_idx: usize, len: u32) -> Result
 ///     renewal: None,
 /// };
 ///
-/// let builder = add_rent_roll(builder, &[lease], &RentRollOutputNodes::default())?;
+/// add_rent_roll(&mut builder, &[lease], &RentRollOutputNodes::default())?;
 /// let model = builder.build()?;
 /// assert!(model.nodes.contains_key("rent_effective"));
 /// # Ok(())
 /// # }
 /// ```
 pub fn add_rent_roll(
-    mut builder: ModelBuilder,
+    builder: &mut ModelBuilder,
     leases: &[LeaseSpec],
     nodes: &RentRollOutputNodes,
-) -> Result<ModelBuilder> {
+) -> Result<()> {
+    let mut draft = builder.clone();
+    populate_rent_roll(&mut draft, leases, nodes)?;
+    *builder = draft;
+    Ok(())
+}
+
+fn populate_rent_roll(
+    builder: &mut ModelBuilder,
+    leases: &[LeaseSpec],
+    nodes: &RentRollOutputNodes,
+) -> Result<()> {
     if leases.is_empty() {
         return Err(Error::build("add_rent_roll: expected at least one lease"));
     }
@@ -811,7 +811,7 @@ pub fn add_rent_roll(
             ),
         )?;
 
-    Ok(builder)
+    Ok(())
 }
 
 /// Basis for management fee calculation.
@@ -945,11 +945,6 @@ impl Default for PropertyTemplateNodes {
 /// * `management_fee` - Optional fee spec applied to EGI or effective rent
 /// * `nodes` - Aggregate output node ids for the operating statement
 ///
-/// # Returns
-///
-/// Returns the updated builder with rent roll, EGI, OpEx, NOI, CapEx, and NCF
-/// nodes wired together.
-///
 /// # Errors
 ///
 /// Returns an error if the rent roll cannot be generated, if management-fee
@@ -973,7 +968,7 @@ impl Default for PropertyTemplateNodes {
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-/// let builder = {
+/// let mut builder = {
 ///     let mut model_builder = ModelBuilder::new("property");
 ///     model_builder.periods("2025Q1..Q4", None)?;
 ///     model_builder.value("parking_income", &[(period, AmountOrScalar::scalar(5_000.0))]);
@@ -996,8 +991,8 @@ impl Default for PropertyTemplateNodes {
 /// };
 /// let fee = ManagementFeeSpec { rate: 0.03, base: ManagementFeeBase::Egi };
 ///
-/// let builder = add_property_operating_statement(
-///     builder,
+/// add_property_operating_statement(
+///     &mut builder,
 ///     &[lease],
 ///     &["parking_income"],
 ///     &["repairs"],
@@ -1011,22 +1006,23 @@ impl Default for PropertyTemplateNodes {
 /// # }
 /// ```
 pub fn add_property_operating_statement(
-    mut builder: ModelBuilder,
+    builder: &mut ModelBuilder,
     leases: &[LeaseSpec],
     other_income_nodes: &[&str],
     opex_nodes: &[&str],
     capex_nodes: &[&str],
     management_fee: Option<ManagementFeeSpec>,
     nodes: &PropertyTemplateNodes,
-) -> Result<ModelBuilder> {
-    builder = add_rent_roll(builder, leases, &nodes.rent_roll)?;
+) -> Result<()> {
+    let mut draft = builder.clone();
+    populate_rent_roll(&mut draft, leases, &nodes.rent_roll)?;
 
     // Other income total (optional).
     let other_income_expr = sum_expr_or_zero(other_income_nodes);
-    builder.compute(nodes.other_income_total_node.as_str(), other_income_expr)?;
+    draft.compute(nodes.other_income_total_node.as_str(), other_income_expr)?;
 
     // EGI.
-    builder.compute(
+    draft.compute(
         nodes.egi_node.as_str(),
         format!(
             "{} + {}",
@@ -1047,7 +1043,7 @@ pub fn add_property_operating_statement(
             ManagementFeeBase::Egi => nodes.egi_node.as_str(),
             ManagementFeeBase::EffectiveRent => nodes.rent_roll.rent_effective_node.as_str(),
         };
-        builder.compute(
+        draft.compute(
             nodes.management_fee_node.as_str(),
             format!("{base_expr} * {}", spec.rate),
         )?;
@@ -1056,21 +1052,22 @@ pub fn add_property_operating_statement(
 
     // OpEx total.
     let opex_expr = sum_expr_or_zero(&opex_all);
-    builder.compute(nodes.opex_total_node.as_str(), opex_expr)?;
+    draft.compute(nodes.opex_total_node.as_str(), opex_expr)?;
 
     // NOI.
-    builder.compute(
+    draft.compute(
         nodes.noi_node.as_str(),
         format!("{} - {}", nodes.egi_node, nodes.opex_total_node),
     )?;
 
     // CapEx total and NCF.
     let capex_expr = sum_expr_or_zero(capex_nodes);
-    builder.compute(nodes.capex_total_node.as_str(), capex_expr)?;
-    builder.compute(
+    draft.compute(nodes.capex_total_node.as_str(), capex_expr)?;
+    draft.compute(
         nodes.ncf_node.as_str(),
         format!("{} - {}", nodes.noi_node, nodes.capex_total_node),
     )?;
 
-    Ok(builder)
+    *builder = draft;
+    Ok(())
 }

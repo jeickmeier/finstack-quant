@@ -10987,18 +10987,16 @@ export interface StatementsAnalyticsNamespace {
    * Add a net-operating-income buildup: total revenue, total expenses and NOI.
    *
    * Twin of Python `add_noi_buildup` (Rust `add_noi_buildup`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * @param builder - Active ModelBuilder receiving the generated nodes.
    * @param totalRevenueNode - Identifier of the total-revenue node to create.
    * @param revenueNodes - Existing revenue line nodes summed into the total.
    * @param totalExpensesNode - Identifier of the total-expenses node to create.
    * @param expenseNodes - Existing operating-expense line nodes summed into the total.
    * @param noiNode - Identifier of the NOI node to create (`total revenue - total expenses`).
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
    *
    * # Errors
    *
-   * Throws with kind `validation` if the model is malformed, a node list is
+   * Throws with kind `validation` if the builder has been consumed, a node list is
    * empty, a node identifier is invalid, or a generated formula
    * does not compile.
    */
@@ -11007,16 +11005,14 @@ export interface StatementsAnalyticsNamespace {
    * Add a net-cash-flow buildup: NOI less capital expenditure.
    *
    * Twin of Python `add_ncf_buildup` (Rust `add_ncf_buildup`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * @param builder - Active ModelBuilder receiving the generated nodes.
    * @param noiNode - Existing NOI node.
    * @param capexNodes - Existing capital-expenditure nodes subtracted from NOI; an empty list makes NCF equal NOI.
    * @param ncfNode - Identifier of the NCF node to create.
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
    *
    * # Errors
    *
-   * Throws with kind `validation` if the model is malformed, a node identifier
+   * Throws with kind `validation` if the builder has been consumed, a node identifier
    * is invalid, or the generated formula does not compile.
    */
   readonly addNcfBuildup: typeof wasm.addNcfBuildup;
@@ -11024,11 +11020,9 @@ export interface StatementsAnalyticsNamespace {
    * Add a lease-by-lease rent roll: gross rent, free rent, vacancy and effective rent.
    *
    * Twin of Python `add_rent_roll` (Rust `add_rent_roll`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * @param builder - Active ModelBuilder receiving the generated nodes.
    * @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
    * @param nodes - Optional `RentRollOutputNodes` naming the generated total nodes; omitted uses the Rust default names (object or JSON).
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
    *
    * # Errors
    *
@@ -11042,15 +11036,13 @@ export interface StatementsAnalyticsNamespace {
    *
    * Twin of Python `add_property_operating_statement` (Rust
    * `add_property_operating_statement`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * @param builder - Active ModelBuilder receiving the generated nodes.
    * @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
    * @param otherIncomeNodes - Existing other-income nodes added to effective rent; omitted means none.
    * @param opexNodes - Existing operating-expense nodes; omitted means none.
    * @param capexNodes - Existing capital-expenditure nodes; omitted means none.
    * @param managementFee - Optional `ManagementFeeSpec` (`rate` as a decimal of its `base`); omitted adds no fee (object or JSON).
    * @param nodes - Optional `PropertyTemplateNodes` naming the generated nodes; omitted uses the Rust default names (object or JSON).
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
    *
    * # Errors
    *

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
-from finstack_quant.statements import FinancialModelSpec
+from finstack_quant.statements import ModelBuilder
 
 # Real-estate template
 
@@ -1466,20 +1466,20 @@ class PropertyTemplateNodes:
         ...
 
 def add_noi_buildup(
-    model: FinancialModelSpec | str,
+    builder: ModelBuilder,
     total_revenue_node: str,
     revenue_nodes: list[str],
     total_expenses_node: str,
     expense_nodes: list[str],
     noi_node: str,
-) -> FinancialModelSpec:
+) -> None:
     """
-    Apply the NOI buildup template and return a typed ``FinancialModelSpec``.
+    Add net operating income and its component totals to a model builder.
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
-        Model specification object or JSON to augment with NOI calculations.
+    builder : ModelBuilder
+        Active model builder receiving the generated nodes.
     total_revenue_node : str
         Output node ID that sums the selected revenue nodes.
     revenue_nodes : list[str]
@@ -1491,45 +1491,39 @@ def add_noi_buildup(
     noi_node : str
         Output node ID for revenue less operating expenses.
 
-    Returns
-    -------
-    FinancialModelSpec
-        Typed model specification containing revenue, expense, and NOI aggregation nodes.
-
     Raises
     ------
     ValueError
-        If model JSON or a revenue, expense, or NOI node identifier is invalid.
+        If the builder has been consumed or a revenue, expense, or NOI node identifier is invalid.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import add_noi_buildup
-    >>> from finstack_quant.statements import FinancialModelSpec, ModelBuilder
+    >>> from finstack_quant.statements import ModelBuilder
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
     >>> _ = builder.value("rent", [("2025Q1", 100.0)])
     >>> _ = builder.value("opex", [("2025Q1", 30.0)])
-    >>> model = builder.build()
-    >>> updated = add_noi_buildup(model, "revenue", ["rent"], "expenses", ["opex"], "noi")
-    >>> updated.has_node("noi")
+    >>> add_noi_buildup(builder, "revenue", ["rent"], "expenses", ["opex"], "noi")
+    >>> builder.build().has_node("noi")
     True
 
     """
     ...
 
 def add_ncf_buildup(
-    model: FinancialModelSpec | str,
+    builder: ModelBuilder,
     noi_node: str,
     capex_nodes: list[str],
     ncf_node: str,
-) -> FinancialModelSpec:
+) -> None:
     """
-    Apply the NCF buildup template and return a typed ``FinancialModelSpec``.
+    Add net cash flow to a model builder.
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
-        Model specification object or JSON to augment with NCF calculations.
+    builder : ModelBuilder
+        Active model builder receiving the generated nodes.
     noi_node : str
         Existing node ID supplying net operating income before capital spending.
     capex_nodes : list[str]
@@ -1537,89 +1531,79 @@ def add_ncf_buildup(
     ncf_node : str
         Output node ID for net operating income less capital expenditures.
 
-    Returns
-    -------
-    FinancialModelSpec
-        Typed model specification containing the NCF node after deducting the selected capex nodes.
-
     Raises
     ------
     ValueError
-        If model JSON or an NOI, capital-expenditure, or NCF node identifier is invalid.
+        If the builder has been consumed or an NOI, capital-expenditure, or NCF node identifier is invalid.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import add_ncf_buildup
-    >>> from finstack_quant.statements import FinancialModelSpec, ModelBuilder
+    >>> from finstack_quant.statements import ModelBuilder
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
     >>> _ = builder.value("noi", [("2025Q1", 70.0)])
     >>> _ = builder.value("capex", [("2025Q1", 10.0)])
-    >>> model = builder.build()
-    >>> add_ncf_buildup(model, "noi", ["capex"], "ncf").has_node("ncf")
+    >>> add_ncf_buildup(builder, "noi", ["capex"], "ncf")
+    >>> builder.build().has_node("ncf")
     True
 
     """
     ...
 
 def add_rent_roll(
-    model: FinancialModelSpec | str,
+    builder: ModelBuilder,
     leases: list[LeaseSpec],
     nodes: RentRollOutputNodes | None = None,
-) -> FinancialModelSpec:
+) -> None:
     """
-    Apply the rich rent-roll template and return a typed ``FinancialModelSpec``.
+    Add per-lease schedules and totals to a model builder.
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
-        Model specification object or JSON to augment with rental-revenue nodes.
+    builder : ModelBuilder
+        Active model builder receiving the generated nodes.
     leases : list[LeaseSpec]
         Rich lease schedules to calculate and aggregate into the rent roll.
     nodes : RentRollOutputNodes or None
         Optional aggregate output-node names; ``None`` uses template defaults.
 
-    Returns
-    -------
-    FinancialModelSpec
-        Typed model specification containing per-lease schedules and aggregate rent-roll nodes.
-
     Raises
     ------
     ValueError
-        If model JSON, a lease specification, or a rent-roll output node is invalid.
+        If the builder has been consumed, a lease specification, or a rent-roll output node is invalid.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import LeaseSpec, add_rent_roll
-    >>> from finstack_quant.statements import FinancialModelSpec, ModelBuilder
+    >>> from finstack_quant.statements import ModelBuilder
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
     >>> _ = builder.value("other_income", [("2025Q1", 5.0)])
-    >>> model = builder.build()
     >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
-    >>> add_rent_roll(model, [lease]).has_node("rent_effective")
+    >>> add_rent_roll(builder, [lease])
+    >>> builder.build().has_node("rent_effective")
     True
 
     """
     ...
 
 def add_property_operating_statement(
-    model: FinancialModelSpec | str,
+    builder: ModelBuilder,
     leases: list[LeaseSpec],
     other_income_nodes: list[str],
     opex_nodes: list[str],
     capex_nodes: list[str],
     management_fee: ManagementFeeSpec | None = None,
     nodes: PropertyTemplateNodes | None = None,
-) -> FinancialModelSpec:
+) -> None:
     """
-    Apply the full property operating-statement template and return a typed model.
+    Add the full property operating statement to a model builder.
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
-        Model specification object or JSON to augment with property statements.
+    builder : ModelBuilder
+        Active model builder receiving the generated nodes.
     leases : list[LeaseSpec]
         Rich lease schedules used to build rental-revenue and rent-roll outputs.
     other_income_nodes : list[str]
@@ -1633,27 +1617,21 @@ def add_property_operating_statement(
     nodes : PropertyTemplateNodes or None
         Optional generated-node names; ``None`` uses the template defaults.
 
-    Returns
-    -------
-    FinancialModelSpec
-        Typed model specification containing the rent roll, EGI, NOI, capex, and NCF buildup.
-
     Raises
     ------
     ValueError
-        If model JSON, a lease or fee specification, or an operating-statement node is invalid.
+        If the builder has been consumed, a lease or fee specification, or an operating-statement node is invalid.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import LeaseSpec, add_property_operating_statement
-    >>> from finstack_quant.statements import FinancialModelSpec, ModelBuilder
+    >>> from finstack_quant.statements import ModelBuilder
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
     >>> _ = builder.value("other_income", [("2025Q1", 5.0)])
-    >>> model = builder.build()
     >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
-    >>> updated = add_property_operating_statement(model, [lease], [], [], [])
-    >>> updated.has_node("ncf")
+    >>> add_property_operating_statement(builder, [lease], [], [], [])
+    >>> builder.build().has_node("ncf")
     True
 
     """

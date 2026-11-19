@@ -1423,7 +1423,7 @@ status = "exists"
 analysis                    = { python = "finstack_quant.statements_analytics.analysis",         status = "missing", note = "Bindings are currently exported from finstack_quant.statements_analytics root" }
 comps                       = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "analysis::comps is pub(crate) in Rust — not a crate-boundary module — reached only via the flattened comparable-company functions/types re-exported through analysis and bound flat on finstack_quant.statements_analytics" }
 extensions                  = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Credit-scorecard and corkscrew extensions exposed flat on finstack_quant.statements_analytics (ScorecardMetric/Config/Report, CreditScorecardExtension, AccountType, CorkscrewAccount/Config/Report, CorkscrewExtension)" }
-templates                   = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Vintage, roll-forward, and real-estate template mutators return FinancialModelSpec directly and are exported flat with their typed spec classes. WASM binds the same seven add* functions (model in, extended model out) with the spec types as plain objects." }
+templates                   = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Vintage, roll-forward, and real-estate templates mutate an active ModelBuilder. Both hosts export the add functions and use the native builder handle, with WASM spec inputs represented as plain objects." }
 
 # Rust-only surfaces (categories, not every name), deliberately unbound in
 # both hosts for now:

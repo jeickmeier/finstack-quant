@@ -108,7 +108,7 @@ pub fn validate_node_id(node_id: &str) -> Result<()> {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ModelBuilder {
     id: String,
     pub(crate) periods: Option<PeriodPlan>,

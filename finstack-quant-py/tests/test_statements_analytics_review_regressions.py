@@ -244,8 +244,24 @@ def test_binding_requires_values_without_a_rust_default() -> None:
     builder = ModelBuilder("re")
     builder.periods("2025Q1..Q2", None)
     builder.value_scalar("placeholder", [])
-    model = builder.build()
     lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
     with pytest.raises(TypeError):
-        add_property_operating_statement(model, [lease])  # type: ignore[call-arg]
-    assert add_property_operating_statement(model, [lease], [], [], []).has_node("ncf")
+        add_property_operating_statement(builder, [lease])  # type: ignore[call-arg]
+    add_property_operating_statement(builder, [lease], [], [], [])
+    assert builder.build().has_node("ncf")
+
+
+def test_failed_rent_roll_does_not_publish_partial_lease_nodes() -> None:
+    from finstack_quant.statements_analytics import LeaseSpec, add_rent_roll
+
+    builder = ModelBuilder("rent-roll").periods("2025Q1..Q2", None)
+    builder.value_scalar("existing", [("2025Q1", 1.0)])
+    first = LeaseSpec(node_id="first", start="2025Q1", base_rent=100.0)
+    missing = LeaseSpec(node_id="missing", start="2025Q3", base_rent=50.0)
+    with pytest.raises(ValueError, match="2025Q3"):
+        add_rent_roll(builder, [first, missing])
+    add_rent_roll(builder, [first])
+    model = builder.build()
+    assert model.has_node("existing")
+    assert model.has_node("first.effective_rent")
+    assert not model.has_node("missing.effective_rent")

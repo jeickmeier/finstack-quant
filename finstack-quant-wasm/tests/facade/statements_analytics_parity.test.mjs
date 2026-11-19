@@ -79,10 +79,16 @@ test('statements_analytics matches the cross-host golden', () => {
   const vintageBuilder = statements.ModelBuilder.fromSpec(MODEL);
   sa.addVintageBuildup(vintageBuilder, 'book', 'revenue', [1.0, 0.5]);
   const vintage = vintageBuilder.build();
-  const noi = sa.addNoiBuildup(MODEL, 'total_rev', ['revenue'], 'total_exp', ['cogs'], 'noi');
-  const ncf = sa.addNcfBuildup(noi, 'noi', ['cogs'], 'ncf');
-  const rentRoll = sa.addRentRoll(MODEL, [INPUTS.lease]);
-  const property = sa.addPropertyOperatingStatement(MODEL, [INPUTS.lease], null, ['cogs']);
+  const cashBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addNoiBuildup(cashBuilder, 'total_rev', ['revenue'], 'total_exp', ['cogs'], 'noi');
+  sa.addNcfBuildup(cashBuilder, 'noi', ['cogs'], 'ncf');
+  const ncf = cashBuilder.build();
+  const rentBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addRentRoll(rentBuilder, [INPUTS.lease]);
+  const rentRoll = rentBuilder.build();
+  const propertyBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addPropertyOperatingStatement(propertyBuilder, [INPUTS.lease], [], ['cogs'], []);
+  const property = propertyBuilder.build();
 
   const exposure = INPUTS.exposure;
   const schedule = INPUTS.pd_schedule;
@@ -138,7 +144,7 @@ test('statements_analytics matches the cross-host golden', () => {
       'roll_forward.node_ids': statements.modelNodeIds(rolled),
       'roll_forward.end': [valueOf(rolled, 'debt_end', Q1), valueOf(rolled, 'debt_end', Q2)],
       'vintage.book': [valueOf(vintage, 'book', Q1), valueOf(vintage, 'book', Q2)],
-      noi: [valueOf(noi, 'noi', Q1), valueOf(noi, 'noi', Q2)],
+      noi: [valueOf(ncf, 'noi', Q1), valueOf(ncf, 'noi', Q2)],
       ncf: [valueOf(ncf, 'ncf', Q1), valueOf(ncf, 'ncf', Q2)],
       'rent_roll.node_ids': statements.modelNodeIds(rentRoll),
       'property.node_ids': statements.modelNodeIds(property),
@@ -467,20 +473,21 @@ test('addRollForward opens at zero and the templates reject bad inputs', () => {
   const rolled = rollBuilder.build();
   assert.equal(valueOf(rolled, 'debt_end', Q1), 60);
   assert.throws(
-    () => sa.addRentRoll(MODEL, []),
+    () => sa.addRentRoll(statements.ModelBuilder.fromSpec(MODEL), []),
     (e) => e.kind === 'validation'
   );
   assert.throws(
     () => sa.addVintageBuildup(statements.ModelBuilder.fromSpec(MODEL), 'book', 'revenue', ['x']),
     (e) => e instanceof TypeError && e.kind === 'invalid_type'
   );
-  const named = sa.addRentRoll(MODEL, [INPUTS.lease], {
+  const namedBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addRentRoll(namedBuilder, [INPUTS.lease], {
     rent_pgi_node: 'pgi',
     free_rent_node: 'free',
     vacancy_loss_node: 'vacancy',
     rent_effective_node: 'effective',
   });
-  assert.ok(statements.modelNodeIds(named).includes('effective'));
+  assert.ok(statements.modelNodeIds(namedBuilder.build()).includes('effective'));
 });
 
 test('classifyStage honours a StagingConfig and rejects bad PDs', () => {
