@@ -48,6 +48,11 @@ fail-fast = false
 filter = 'test(/bermudan_lsmc_grid_and_seed_acceptance$/)'
 slow-timeout = { period = "60s", terminate-after = 15 }
 
+[[profile.slow.overrides]]
+# The high-resolution rough-Heston path test is O(paths * steps^2).
+filter = 'test(/mc_atm_price_matches_fourier_pricer$/)'
+slow-timeout = { period = "60s", terminate-after = 20 }
+
 [profile.slow.junit]
 path = "junit.xml"
 store-success-output = false

@@ -252,6 +252,8 @@ pub(crate) fn workout_dirty_target(
 /// ```rust
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
+/// use finstack_quant_core::dates::DayCount;
+/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 /// use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 /// use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::bond_workout_ladder;
 /// use finstack_quant_valuations_fixed_income::bond::Bond;
@@ -263,7 +265,10 @@ pub(crate) fn workout_dirty_target(
 ///     InstrumentPricingOverrides::default().with_quoted_clean_price_pct(108.0);
 /// let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
 ///     .base_date(as_of)
+///     .day_count(DayCount::Act365F)
 ///     .knots([(0.0, 1.0), (10.0, 0.70)])
+///     .interp(InterpStyle::Linear)
+///     .extrapolation(ExtrapolationPolicy::Extend)
 ///     .build()?;
 /// let market = MarketContext::new().try_insert(curve).expect("insert market curve");
 ///

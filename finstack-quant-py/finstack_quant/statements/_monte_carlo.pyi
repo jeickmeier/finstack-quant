@@ -221,7 +221,7 @@ class MonteCarloResults:
     Examples
     --------
     >>> from finstack_quant.statements import MonteCarloResults
-    >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
+    >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":2,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
     >>> MonteCarloResults.from_json(payload).n_paths
     2
 
@@ -251,7 +251,7 @@ class MonteCarloResults:
         Examples
         --------
         >>> from finstack_quant.statements import MonteCarloResults
-        >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
+        >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":2,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
         >>> MonteCarloResults.from_json(payload).forecast_periods
         []
 

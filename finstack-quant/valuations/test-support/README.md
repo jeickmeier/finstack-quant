@@ -32,7 +32,7 @@ use finstack_quant_valuations_test_support::{assert_parity, date::date};
 
 let as_of = date(2025, 1, 2);
 let curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-assert!(curve.df(1.0) < 1.0);
+assert!(curve.df(1.0).expect("valid curve time") < 1.0);
 assert_eq!(usd(100.0).amount(), 100.0);
 assert_parity!(1.00005, 1.0, ParityConfig::default(), "flat curve parity");
 ```

@@ -77,6 +77,7 @@
 //!     .float_leg(FloatLegSpec {
 //!         discount_curve_id: "USD-OIS".into(),
 //!         forward_curve_id: "USD-SOFR-3M".into(),
+//!         index_id: "USD-SOFR-3M".into(),
 //!         spread_bp: dec!(0.0),
 //!         frequency: Tenor::quarterly(),
 //!         day_count: DayCount::Act360,

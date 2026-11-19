@@ -40,8 +40,10 @@
 //!
 //! ```
 //! use finstack_quant_scenarios::{ScenarioSpec, OperationSpec, CurveKind, ScenarioEngine, ExecutionContext};
+//! use finstack_quant_core::dates::DayCount;
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_core::market_data::term_structures::DiscountCurve;
+//! use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 //! use finstack_quant_statements::types::FinancialModelSpec;
 //! use time::macros::date;
 //!
@@ -52,7 +54,10 @@
 //! let mut market = MarketContext::new().try_insert(
 //!     DiscountCurve::builder("USD_SOFR")
 //!         .base_date(as_of)
+//!         .day_count(DayCount::Act365F)
 //!         .knots([(0.0, 1.0), (5.0, 0.80)])
+//!         .interp(InterpStyle::Linear)
+//!         .extrapolation(ExtrapolationPolicy::Extend)
 //!         .build()?,
 //! ).expect("insert market curve");
 //! let mut model = FinancialModelSpec::new("test", finstack_quant_core::dates::build_periods("2025Q1..Q1", None)?);

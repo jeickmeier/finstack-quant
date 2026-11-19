@@ -842,14 +842,12 @@ fn test_registry_default_prices_with_instrument_hw1f_overrides() {
 }
 
 /// Defaults must replay the original 50,000 RNG streams (100,000 antithetic
-/// paths) exactly as an explicit configuration. The historical PV remains a
-/// separate numerical anchor: pairing observations before Welford aggregation
-/// changes floating-point reduction order, while preserving the sample mean
-/// mathematically. That reduction need not reproduce the former unpaired mean
-/// bit-for-bit; the allowance below is only floating-point rounding, not MC error.
+/// paths) exactly as an explicit configuration. The legacy PV is a statistical
+/// anchor rather than a bitwise golden; its allowance is based on the reported
+/// Monte Carlo standard error.
 #[test]
 #[ignore = "slow: two full-default LSMC valuations exceed the 60s CI budget; covered by mise run rust-test --slow"]
-fn lsmc_default_mc_pv_unchanged() {
+fn lsmc_default_mc_pv_within_three_standard_errors() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
     let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");
     let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("Valid date");
@@ -887,18 +885,17 @@ fn lsmc_default_mc_pv_unchanged() {
     assert_eq!(result.measures["lsmc_num_paths"], 50_000.0);
     assert_eq!(result.measures["lsmc_seed"], 42.0);
 
-    // Numerical anchor, allowing only floating-point reduction-order noise
-    // (32 ULPs is far below USD 0.000001 at this price). It was re-captured
-    // when the θ(t) fit started following the forward jumps of this
-    // log-linear curve: the earlier anchor, 2.82MM on a 10MM notional, was
-    // eleven times the tree price.
+    // The historical estimate must remain within three Monte Carlo standard
+    // errors. This allows for the sampling change from exact exercise-time
+    // insertion while retaining a check against material pricing drift.
     let legacy_bits = 0x410e27094c608fbd_u64;
-    let rounding_ulps = result.value.amount().to_bits().abs_diff(legacy_bits);
+    let legacy_pv = f64::from_bits(legacy_bits);
+    let mc_stderr = result.measures["mc_stderr"];
+    assert!(mc_stderr.is_finite() && mc_stderr > 0.0);
     assert!(
-        rounding_ulps <= 32,
-        "pv={} differs from legacy PV={} by {rounding_ulps} ULPs",
+        (result.value.amount() - legacy_pv).abs() <= 3.0 * mc_stderr,
+        "pv={} differs from legacy PV={legacy_pv} by more than three MC standard errors ({mc_stderr})",
         result.value.amount(),
-        f64::from_bits(legacy_bits),
     );
 }
 

@@ -419,16 +419,17 @@ pub struct CreditAssessmentPoint {
 ///
 /// ```rust
 /// # use finstack_quant_statements::evaluator::StatementResult;
-/// # use finstack_quant_core::dates::{Period, PeriodId};
+/// # use finstack_quant_core::dates::{Period, PeriodCalendar, PeriodId, PeriodPlan};
 /// # use finstack_quant_statements_analytics::analysis::CreditAssessment;
 /// let q4 = PeriodId::quarter(2025, 4)?;
 /// let mut results = StatementResult::new();
-/// results.periods.get_or_insert_with(|| finstack_quant_core::dates::PeriodPlan::try_new(finstack_quant_core::dates::PeriodCalendar::Gregorian, Vec::new()).expect("valid period plan")).periods.push(Period {
+/// let period = Period {
 ///     id: q4,
 ///     start: time::macros::date!(2025 - 10 - 01),
 ///     end: time::macros::date!(2026 - 01 - 01),
 ///     is_actual: false,
-/// });
+/// };
+/// results.periods = Some(PeriodPlan::try_new(PeriodCalendar::Gregorian, vec![period])?);
 /// results.set_scalar("total_debt", q4, 300.0)?;
 /// let assessment = CreditAssessment::compute(&results, q4)?;
 /// assert_eq!(assessment.period, "2025Q4");

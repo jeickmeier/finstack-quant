@@ -399,6 +399,8 @@ fn compute_fva_internal(
 /// use finstack_quant_margin::xva::cva::compute_cva;
 /// use finstack_quant_margin::xva::types::ExposureProfile;
 /// use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+/// use finstack_quant_core::dates::DayCount;
+/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 /// use time::macros::date;
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
@@ -407,12 +409,16 @@ fn compute_fva_internal(
 /// // Flat 2% hazard and 4% discounting out to five years.
 /// let hazard_curve = HazardCurve::builder("ACME")
 ///     .base_date(as_of)
+///     .day_count(DayCount::Act365F)
 ///     .recovery_rate(0.40)
 ///     .knots([(1.0, 0.02), (5.0, 0.02)])
 ///     .build()?;
 /// let discount_curve = DiscountCurve::builder("USD-OIS")
 ///     .base_date(as_of)
+///     .day_count(DayCount::Act365F)
 ///     .knots([(0.0, 1.0), (5.0, (-0.04f64 * 5.0).exp())])
+///     .interp(InterpStyle::Linear)
+///     .extrapolation(ExtrapolationPolicy::Extend)
 ///     .build()?;
 ///
 /// let profile = ExposureProfile {

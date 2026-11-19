@@ -1164,6 +1164,8 @@ Carlo, now draw from a stream derived from a versioned key (the seed, the
 node, the evaluation mode, and the run seed and path on a Monte Carlo path).
 Re-pin any stored stochastic numbers.
 
+- **Stream version 2.** The PCG64 seed/stream constructor semantics changed;
+  provenance now distinguishes the resulting random sequences from version 1.
 - **Replay.** A single run records `provenance.forecast_streams`: per
   stochastic node the `seed`, `stream_version` and the PCG64 `state` and
   `stream` (decimal strings), enough to replay its draws.

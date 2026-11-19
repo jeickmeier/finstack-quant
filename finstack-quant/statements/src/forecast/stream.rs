@@ -12,7 +12,7 @@ use finstack_quant_core::math::random::Pcg64Rng;
 use serde::Serialize;
 
 /// Version of the mapping from a stream key to a generator stream.
-pub(crate) const STREAM_VERSION: u32 = 1;
+pub(crate) const STREAM_VERSION: u32 = 2;
 
 /// One Monte Carlo path of a run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,10 +130,10 @@ mod tests {
         }
     }
 
-    /// The version 1 mapping is pinned: changing it needs a new version.
+    /// The version 2 mapping is pinned: changing it needs a new version.
     #[test]
-    fn version_one_mapping_is_pinned() {
-        assert_eq!(STREAM_VERSION, 1);
+    fn version_two_mapping_is_pinned() {
+        assert_eq!(STREAM_VERSION, 2);
         let derived = key(42, "revenue", None).derive().unwrap();
         assert_eq!(derived, PINNED);
         // The draws of the stream are part of the version, not only its key.
@@ -149,11 +149,11 @@ mod tests {
     }
 
     const PINNED_NORMALS: [u64; 3] = [
-        13_832_018_856_111_886_045,
-        4_595_048_052_394_679_694,
-        4_605_199_554_829_406_705,
+        4_607_467_717_410_637_358,
+        13_822_980_727_527_897_204,
+        4_613_322_568_342_502_866,
     ];
-    const PINNED_INDICES: [usize; 6] = [2, 0, 0, 2, 1, 0];
+    const PINNED_INDICES: [usize; 6] = [1, 1, 1, 2, 2, 0];
 
-    const PINNED: (u64, u64) = (3_751_829_398_131_865_565, 15_411_871_087_006_207_807);
+    const PINNED: (u64, u64) = (5_421_055_678_508_331_433, 2_459_411_252_354_782_652);
 }

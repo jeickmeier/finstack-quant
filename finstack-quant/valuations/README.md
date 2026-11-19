@@ -116,7 +116,10 @@ fn main() -> finstack_quant_core::Result<()> {
     let market = MarketContext::new().try_insert(
         DiscountCurve::builder("USD-TREASURY")
             .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, 0.40)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
     )?;
 
@@ -276,7 +279,10 @@ let bond = Bond::with_convention(
 let market = MarketContext::new().try_insert(
     DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([(0.0, 1.0), (30.0, 0.40)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?,
 )?;
 let metrics = vec![MetricId::BucketedDv01];
@@ -320,13 +326,19 @@ let market = MarketContext::new()
     .try_insert(
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, 0.40)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
     )?
     .try_insert(
-        ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        ForwardCurve::builder("USD-SOFR-3M")
             .base_date(as_of)
-            .knots([(0.0, 0.04), (30.0, 0.04)])
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
+            .knots([(0.0, 1.0), (30.0, (-0.04_f64 * 30.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
     )?
     .insert_series(ScalarTimeSeries::new(
@@ -364,9 +376,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::create_date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::money::Money;
 use time::Month;
 
 # fn main() -> finstack_quant_core::Result<()> {
@@ -389,7 +402,10 @@ let market = MarketContext::new()
     .try_insert(
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
     )?
     .insert_price("EQUITY-SPOT", MarketScalar::unitless(4500.0)?)
@@ -397,7 +413,10 @@ let market = MarketContext::new()
     .insert_surface(
         VolSurface::builder("EQUITY-VOL")
             .expiries(&[0.25, 0.5, 1.0])
-            .strikes(&[4000.0, 4500.0, 5000.0])
+            .secondary_values(&[4000.0, 4500.0, 5000.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::TotalVariance)
             .row(&[0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20])
@@ -429,9 +448,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::create_date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::money::Money;
 use time::Month;
 
 # fn main() -> finstack_quant_core::Result<()> {
@@ -449,7 +469,10 @@ let market = MarketContext::new()
     .try_insert(
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
     )?
     .insert_price("EQUITY-SPOT", MarketScalar::unitless(4500.0)?)
@@ -457,7 +480,10 @@ let market = MarketContext::new()
     .insert_surface(
         VolSurface::builder("EQUITY-VOL")
             .expiries(&[0.25, 0.5, 1.0])
-            .strikes(&[4000.0, 4500.0, 5000.0])
+            .secondary_values(&[4000.0, 4500.0, 5000.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::TotalVariance)
             .row(&[0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20])

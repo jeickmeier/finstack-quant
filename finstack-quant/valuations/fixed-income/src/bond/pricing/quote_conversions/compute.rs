@@ -90,14 +90,18 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// use finstack_quant_valuations_core::instruments::BondQuoteInput;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-/// use finstack_quant_core::dates::Date;
+/// use finstack_quant_core::dates::{Date, DayCount};
+/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 ///
 /// # let as_of = Date::from_calendar_date(2024, time::Month::January, 15).unwrap();
 /// # let bond = Bond::example().unwrap();
 /// # let curves = MarketContext::new().try_insert(
 /// #     DiscountCurve::builder("USD-TREASURY")
 /// #         .base_date(as_of)
+/// #         .day_count(DayCount::Act365F)
 /// #         .knots([(0.0, 1.0), (10.0, 0.6)])
+/// #         .interp(InterpStyle::Linear)
+/// #         .extrapolation(ExtrapolationPolicy::Extend)
 /// #         .build()?,
 /// # )?;
 /// let quotes = compute_quotes(

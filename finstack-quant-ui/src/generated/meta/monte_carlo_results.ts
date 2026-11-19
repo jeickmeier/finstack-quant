@@ -59,7 +59,7 @@ export default [
           0.95
         ],
         "seed": "42",
-        "stream_version": 1
+        "stream_version": 2
       }
     ],
     "title": "MonteCarloResults"

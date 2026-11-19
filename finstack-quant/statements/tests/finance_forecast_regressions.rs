@@ -823,7 +823,7 @@ fn a_single_run_replays_from_its_recorded_stream() {
             recorded.seed,
             recorded.stream_version
         ),
-        ("x", seed, 1)
+        ("x", seed, 2)
     );
     let mut rng = Pcg64Rng::new(recorded.state, recorded.stream);
     let mut level = 100.0;

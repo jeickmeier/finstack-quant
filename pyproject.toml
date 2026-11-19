@@ -380,7 +380,7 @@ allowed-unresolved-imports = [
 [[tool.ty.overrides]]
 include = ["finstack-quant-py/finstack_quant/__init__.py", "finstack-quant-py/finstack_quant/*/__init__.py"]
 [tool.ty.overrides.rules]
-unresolved-attribute = "ignore"
+missing-attribute = "ignore"
 
 [tool.ty.terminal]
 error-on-warning = true

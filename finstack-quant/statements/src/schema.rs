@@ -236,7 +236,7 @@ fn monte_carlo_results_examples() -> finstack_quant_core::Result<Vec<Value>> {
             },
             "n_paths": 1000,
             "seed": "42",
-            "stream_version": 1,
+            "stream_version": 2,
             "metrics": ["revenue"],
             "percentiles": [0.05, 0.5, 0.95],
             "forecast_periods": ["2025Q1", "2025Q2"]
