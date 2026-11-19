@@ -120,6 +120,71 @@ fn solve_discount_curve(
     Ok(curve)
 }
 
+/// An exact resolved rate quote in one recorded calibration recipe.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct RateQuoteCoordinate {
+    /// Identifier of the authored market quote, without tenor normalization.
+    pub quote_id: String,
+    /// Contractual pillar of the original execution, after holiday adjustments.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub pillar_date: Date,
+}
+
+enum RateQuoteShock<'a> {
+    Bucket(&'a QuoteBump),
+    Exact {
+        target: &'a RateQuoteCoordinate,
+        bp: f64,
+    },
+}
+
+impl RateQuoteShock<'_> {
+    fn apply(
+        self,
+        quotes: Vec<RateQuote>,
+        bindings: &[RateQuoteBinding],
+    ) -> finstack_quant_core::Result<Vec<RateQuote>> {
+        let (target, bp) = match self {
+            Self::Bucket(bump) => return Ok(apply_bump_to_rate_quotes(quotes, bump, bindings)),
+            Self::Exact { target, bp } => (target, bp),
+        };
+        let invalid = |detail: &str| {
+            finstack_quant_core::Error::Validation(format!(
+                "Exact rate quote '{}' at {}: {detail}",
+                target.quote_id, target.pillar_date
+            ))
+        };
+        if target.quote_id.trim().is_empty() || !bp.is_finite() {
+            return Err(invalid(
+                "requires a nonempty quote ID and a finite basis-point shock",
+            ));
+        }
+        let mut positions = bindings
+            .iter()
+            .enumerate()
+            .filter(|(_, binding)| binding.quote_id == target.quote_id);
+        let (index, binding) = positions
+            .next()
+            .ok_or_else(|| invalid("missing executed binding"))?;
+        if positions.next().is_some() || binding.pillar_date != target.pillar_date {
+            return Err(invalid("ambiguous quote ID or a different resolved pillar"));
+        }
+        let mut quotes = quotes;
+        let quote = quotes
+            .get_mut(index)
+            .filter(|quote| quote.id().as_str() == target.quote_id)
+            .ok_or_else(|| invalid("quote and executed binding orders differ"))?;
+        *quote = quote.bump_rate_bp(bp);
+        quote.validate()?;
+        Ok(quotes)
+    }
+}
+
 /// Bump a discount curve by shocking its stored market-rate calibration quotes.
 ///
 /// The unshocked fit must reproduce the supplied curve. A successful bump
@@ -142,7 +207,38 @@ pub fn bump_discount_curve_from_rate_calibration(
         curve,
         calibration,
         context,
-        bump,
+        RateQuoteShock::Bucket(bump),
+        None,
+    )
+}
+
+/// Reprice one exact rate quote of a calibrated discount curve, holding the supplied dependencies fixed.
+///
+/// The unshocked calibration must reproduce the source curve and quote bindings.
+/// The selected quote ID and contractual pillar must uniquely match the original
+/// execution. A quote's native basis-point map handles futures price direction.
+///
+/// # Arguments
+/// * `curve` - Original discount curve with a qualified and accepted rate calibration recipe.
+/// * `context` - Immutable snapshot supplying the exact held discount, projection and fixing dependencies.
+/// * `target` - Stable quote ID and resolved maturity from the curve's original execution.
+/// * `bp` - Finite additive shock in basis points of the selected quoted rate.
+///
+/// # Errors
+/// Returns an error if the source curve cannot replay, a dependency is absent,
+/// the binding is missing or ambiguous, or the shocked solve fails.
+pub fn bump_discount_rate_quote(
+    curve: &DiscountCurve,
+    context: &MarketContext,
+    target: &RateQuoteCoordinate,
+    bp: f64,
+) -> finstack_quant_core::Result<DiscountCurve> {
+    let calibration = required_discount_rate_calibration(curve)?;
+    bump_discount_curve_from_rate_calibration_with_projection(
+        curve,
+        calibration,
+        context,
+        RateQuoteShock::Exact { target, bp },
         None,
     )
 }
@@ -170,7 +266,7 @@ fn bump_discount_curve_from_rate_calibration_with_projection(
     curve: &DiscountCurve,
     calibration: &RateCalibrationRecipe,
     context: &MarketContext,
-    bump: &QuoteBump,
+    bump: RateQuoteShock<'_>,
     pricing_forward_id_override: Option<CurveId>,
 ) -> finstack_quant_core::Result<DiscountCurve> {
     ensure_recipe_has_quotes(curve.id(), calibration)?;
@@ -208,8 +304,7 @@ fn bump_discount_curve_from_rate_calibration_with_projection(
             cfg.discount_curve.validation_tolerance,
         )?;
     }
-    let quotes =
-        apply_bump_to_rate_quotes(quotes, bump, &original_execution(calibration)?.bindings);
+    let quotes = bump.apply(quotes, &original_execution(calibration)?.bindings)?;
     let bumped = solve_discount_curve(&quotes, &params, context, &cfg)?;
     let mut recipe = required_discount_rate_calibration(&bumped)?.clone();
     recipe.role = calibration.role.clone();
@@ -304,6 +399,54 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
     bump: &QuoteBump,
 ) -> finstack_quant_core::Result<ForwardCurve> {
     bump.validate()?;
+    bump_forward_curve_with_shock(
+        curve,
+        calibration,
+        source_context,
+        target_context,
+        RateQuoteShock::Bucket(bump),
+    )
+}
+
+/// Rebuild a term projection curve after repricing one exact recorded rate quote.
+///
+/// # Arguments
+/// * `curve` - Original calibrated projection curve.
+/// * `context` - Immutable center market, including the linked discount curve and fixings.
+/// * `target` - Stable quote ID and executed contractual maturity.
+/// * `bp` - Additive basis-point shock to the selected rate.
+///
+/// # Errors
+/// Rejects a mismatched quote identity, an unqualified source solve, or failed
+/// repricing. A linked single-curve OIS projection requires one joint replay.
+pub fn bump_forward_rate_quote(
+    curve: &ForwardCurve,
+    context: &MarketContext,
+    target: &RateQuoteCoordinate,
+    bp: f64,
+) -> finstack_quant_core::Result<ForwardCurve> {
+    let calibration = required_forward_rate_calibration(curve)?;
+    if calibration.ois_compounding.is_some() {
+        return Err(finstack_quant_core::Error::Validation(
+            "linked single-curve OIS projection requires a joint rate quote replay".into(),
+        ));
+    }
+    bump_forward_curve_with_shock(
+        curve,
+        calibration,
+        context,
+        context,
+        RateQuoteShock::Exact { target, bp },
+    )
+}
+
+fn bump_forward_curve_with_shock(
+    curve: &ForwardCurve,
+    calibration: &RateCalibrationRecipe,
+    source_context: &MarketContext,
+    target_context: &MarketContext,
+    bump: RateQuoteShock<'_>,
+) -> finstack_quant_core::Result<ForwardCurve> {
     ensure_recipe_has_quotes(curve.id(), calibration)?;
     let quotes = rate_quotes_from_recipe(calibration, curve.id())?;
 
@@ -337,8 +480,7 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
             tolerance,
         )?;
     }
-    let quotes =
-        apply_bump_to_rate_quotes(quotes, bump, &original_execution(calibration)?.bindings);
+    let quotes = bump.apply(quotes, &original_execution(calibration)?.bindings)?;
     let bumped = rebootstrap_forward_curve(quotes, &params, target_context, &cfg)?;
     if let Some(policy) = curve.fx_policy() {
         return bumped
@@ -583,24 +725,12 @@ pub(crate) fn bump_market_via_rate_quote_shock(
     let forward_cal = required_forward_rate_calibration(forward.as_ref())?;
 
     let bumped_discount = if linked_single_curve {
-        let tolerance = replay_config(discount_cal)?
-            .discount_curve
-            .validation_tolerance;
-        for (&time, &factor) in forward.knots().iter().zip(forward.factors()) {
-            let date = date_from_forward_time(&forward, time)?;
-            verify_source_factor(
-                forward.id(),
-                time,
-                factor,
-                discount.df_on_date(date)?,
-                tolerance,
-            )?;
-        }
+        verify_linked_projection(&forward, &discount, discount_cal)?;
         bump_discount_curve_from_rate_calibration_with_projection(
             discount.as_ref(),
             discount_cal,
             market,
-            bump,
+            RateQuoteShock::Bucket(bump),
             Some(discount_curve_id.clone()),
         )?
     } else {
@@ -624,6 +754,71 @@ pub(crate) fn bump_market_via_rate_quote_shock(
         .clone()
         .try_insert(bumped_discount)?
         .try_insert(bumped_forward)
+}
+
+/// Shock one executed OIS yield quote in its shared discount and projection representations.
+///
+/// # Arguments
+/// * `market` - Immutable valuation market containing both reciprocal OIS representations and their fixings.
+/// * `discount_curve_id` - Identifier of the discount representation of the single economic curve.
+/// * `forward_curve_id` - Identifier of the matching projection representation.
+/// * `target` - Identifier and executed contractual pillar of the selected quote.
+/// * `bp` - Finite shock in quoted-rate basis points.
+///
+/// # Errors
+/// Rejects unqualified or mismatching OIS recipes, missing dependencies or quote,
+/// and failed source reconstruction or shocked repricing.
+pub fn bump_linked_ois_rate_quote(
+    market: &MarketContext,
+    discount_curve_id: &CurveId,
+    forward_curve_id: &CurveId,
+    target: &RateQuoteCoordinate,
+    bp: f64,
+) -> finstack_quant_core::Result<MarketContext> {
+    let discount = market.get_discount(discount_curve_id.as_str())?;
+    let forward = market.get_forward(forward_curve_id.as_str())?;
+    if !has_linked_single_curve_ois_recipes(
+        &discount,
+        &forward,
+        discount_curve_id,
+        forward_curve_id,
+    )? {
+        return Err(finstack_quant_core::Error::Validation(
+            "joint exact quote replay requires two qualified views of the same OIS curve".into(),
+        ));
+    }
+    let calibration = required_discount_rate_calibration(&discount)?;
+    verify_linked_projection(&forward, &discount, calibration)?;
+    let bumped = bump_discount_curve_from_rate_calibration_with_projection(
+        &discount,
+        calibration,
+        market,
+        RateQuoteShock::Exact { target, bp },
+        Some(discount_curve_id.clone()),
+    )?;
+    let projection = rebuild_linked_ois_projection(&forward, &bumped)?;
+    market.clone().try_insert(bumped)?.try_insert(projection)
+}
+
+fn verify_linked_projection(
+    forward: &ForwardCurve,
+    discount: &DiscountCurve,
+    discount_cal: &RateCalibrationRecipe,
+) -> finstack_quant_core::Result<()> {
+    let tolerance = replay_config(discount_cal)?
+        .discount_curve
+        .validation_tolerance;
+    for (&time, &factor) in forward.knots().iter().zip(forward.factors()) {
+        let date = date_from_forward_time(forward, time)?;
+        verify_source_factor(
+            forward.id(),
+            time,
+            factor,
+            discount.df_on_date(date)?,
+            tolerance,
+        )?;
+    }
+    Ok(())
 }
 
 pub(crate) fn bump_market_via_rate_quote_shock_cached(
@@ -665,7 +860,7 @@ pub(crate) fn bump_single_ois_market_via_rate_quote_shock(
         discount.as_ref(),
         discount_cal,
         market,
-        bump,
+        RateQuoteShock::Bucket(bump),
         Some(curve_id.clone()),
     )?;
     market.clone().try_insert(bumped)
@@ -872,6 +1067,111 @@ mod tests {
             forward_curve_id,
             projection_grid,
         )
+    }
+
+    #[test]
+    fn exact_discount_rate_replay_moves_only_the_matched_quote() {
+        let base = time::macros::date!(2025 - 01 - 02);
+        let short = time::macros::date!(2025 - 07 - 02);
+        let long = time::macros::date!(2026 - 01 - 02);
+        let params = DiscountCurveParams {
+            curve_id: CurveId::new("GBP-SONIA"),
+            currency: Currency::GBP,
+            base_date: base,
+            method: CalibrationMethod::Bootstrap,
+            interpolation: InterpStyle::LogLinear,
+            extrapolation: ExtrapolationPolicy::Extend,
+            pricing_discount_id: None,
+            pricing_forward_id: None,
+            conventions: RatesStepConventions {
+                curve_day_count: Some(DayCount::Act365F),
+                ois_compounding: None,
+            },
+        };
+        let quotes: Vec<_> = [("SHORT", short, 0.041), ("LONG", long, 0.057)]
+            .into_iter()
+            .map(|(id, end, rate)| RateQuote::Deposit {
+                id: QuoteId::new(id),
+                index: IndexId::new("GBP-SONIA-OIS"),
+                pillar: Pillar::Date(end),
+                rate,
+            })
+            .collect();
+        let context = MarketContext::new();
+        let config = CalibrationConfig::default();
+        let center = solve_discount_curve(&quotes, &params, &context, &config).unwrap();
+        let target = RateQuoteCoordinate {
+            quote_id: "LONG".into(),
+            pillar_date: long,
+        };
+        let raised = bump_discount_rate_quote(&center, &context, &target, 1.0).unwrap();
+        let expected = [quotes[0].clone(), quotes[1].bump_rate_bp(1.0)];
+        let rebuilt = solve_discount_curve(&expected, &params, &context, &config).unwrap();
+        assert_eq!(raised.dfs(), rebuilt.dfs());
+        assert_eq!(
+            raised.df_on_date(short).unwrap(),
+            center.df_on_date(short).unwrap()
+        );
+        let actual = raised.df_on_date(long).unwrap() - center.df_on_date(long).unwrap();
+        let expected = (1.0_f64 / 1.0571) - (1.0_f64 / 1.057);
+        assert!((actual - expected).abs() < 1e-10);
+        let wrong_date = RateQuoteCoordinate {
+            pillar_date: short,
+            ..target
+        };
+        assert!(
+            bump_discount_rate_quote(&center, &context, &wrong_date, 1.0)
+                .unwrap_err()
+                .to_string()
+                .contains("resolved pillar")
+        );
+    }
+
+    #[test]
+    fn exact_shared_ois_rate_reprices_one_quote_in_both_views() {
+        let (market, discount_id, forward_id, _) =
+            linked_single_curve_ois_market(CurveId::new("USD-OIS"));
+        let discount = market
+            .get_discount(discount_id.as_str())
+            .expect("center discount");
+        let recipe = required_discount_rate_calibration(&discount).expect("discount recipe");
+        let row = original_execution(recipe)
+            .expect("execution")
+            .bindings
+            .iter()
+            .find(|binding| binding.quote_id == "USD-DEP-1Y")
+            .expect("qualified 1Y binding");
+        let quote = RateQuoteCoordinate {
+            quote_id: row.quote_id.clone(),
+            pillar_date: row.pillar_date,
+        };
+
+        let shocked = bump_linked_ois_rate_quote(&market, &discount_id, &forward_id, &quote, 1.0)
+            .expect("one selected OIS quote shock");
+        let raised = shocked
+            .get_discount(discount_id.as_str())
+            .expect("shocked discount");
+        let projected = shocked
+            .get_forward(forward_id.as_str())
+            .expect("shocked projection");
+        assert!(
+            raised.df_on_date(quote.pillar_date).expect("raised DF")
+                < discount.df_on_date(quote.pillar_date).expect("original DF")
+        );
+        for (time, factor) in projected.knots().iter().zip(projected.factors()) {
+            let date = date_from_forward_time(&projected, *time).expect("projection date");
+            assert_eq!(
+                *factor,
+                raised.df_on_date(date).expect("projected discount factor")
+            );
+        }
+        let wrong = RateQuoteCoordinate {
+            quote_id: "USD-DEP-2Y".into(),
+            ..quote
+        };
+        assert!(
+            bump_linked_ois_rate_quote(&market, &discount_id, &forward_id, &wrong, 1.0).is_err()
+        );
     }
 
     #[test]
@@ -1678,6 +1978,27 @@ mod tests {
         assert_eq!(actual.factors(), fitted.factors());
         assert_eq!(actual.rate_calibration(), fitted.rate_calibration());
         assert_eq!(actual.fx_policy(), source.fx_policy());
+        let row = original_execution(record)
+            .expect("executed quote")
+            .bindings
+            .iter()
+            .find(|binding| binding.quote_id == "SOFR-6M")
+            .expect("quoted 6M");
+        let target = RateQuoteCoordinate {
+            quote_id: row.quote_id.clone(),
+            pillar_date: row.pillar_date,
+        };
+        let single =
+            bump_forward_rate_quote(&source, &context, &target, 1.0).expect("admitted 6M quote");
+        let expected = rebootstrap_forward_curve(
+            vec![quotes[0].clone(), quotes[1].bump_rate_bp(1.0)],
+            &params,
+            &context,
+            &config,
+        )
+        .expect("independent 6M shock");
+        assert_eq!(single.factors(), expected.factors());
+        assert!(bump_forward_rate_quote(&shifted, &context, &target, 1.0).is_err());
     }
 
     #[test]

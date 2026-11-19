@@ -35,7 +35,10 @@ pub(crate) mod rates;
 
 pub use hazard::bump_hazard_spreads;
 pub use provider::{CachedRecalibrationProvider, pricing_options};
-pub use rates::bump_discount_curve_from_rate_calibration;
+pub use rates::{
+    RateQuoteCoordinate, bump_discount_curve_from_rate_calibration, bump_discount_rate_quote,
+    bump_forward_rate_quote, bump_linked_ois_rate_quote,
+};
 
 use crate::CalibrationConfig;
 
