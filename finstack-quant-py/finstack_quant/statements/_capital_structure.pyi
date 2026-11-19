@@ -1089,8 +1089,12 @@ class CapitalStructureCashflows:
             ``debt_balance``, ``accrued_interest`` (cash interest earned and
             not yet due), ``interest_arrears`` (cash interest due and unpaid),
             ``principal_pending`` (principal cash owed and not yet due),
-            ``principal_arrears`` (principal cash due and unpaid) or
-            ``principal_advance_reserve`` (face paid for and not yet reduced).
+            ``principal_arrears`` (principal cash due and unpaid),
+            ``principal_advance_reserve`` (face paid for and not yet reduced),
+            the receipts ``fee_rebates`` and ``repayment_refunds``, or the
+            funding amounts ``funding_proceeds`` (signed company cash of
+            funding settled in the period) and ``funding_principal`` (the
+            principal that funding established).
             Flows are positive payment or receipt magnitudes; balances are
             period-close economic principal on the contract's effective dates.
         instrument_or_total : str

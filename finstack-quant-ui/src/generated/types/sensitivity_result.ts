@@ -1167,6 +1167,10 @@ export interface D_033184211Bfcc772Ee94 {
  *         principal_pending: None,
  *         principal_arrears: None,
  *         principal_advance_reserve: None,
+ *         fee_rebates: None,
+ *         repayment_refunds: None,
+ *         funding_proceeds: None,
+ *         funding_principal: None,
  *         scheduled_cash_interest_due: None,
  *         scheduled_principal_due: None,
  *     });
@@ -1187,6 +1191,10 @@ export interface D_033184211Bfcc772Ee94 {
  *     principal_pending: None,
  *     principal_arrears: None,
  *     principal_advance_reserve: None,
+ *     fee_rebates: None,
+ *     repayment_refunds: None,
+ *     funding_proceeds: None,
+ *     funding_principal: None,
  *     scheduled_cash_interest_due: None,
  *     scheduled_principal_due: None,
  * });
@@ -1513,7 +1521,27 @@ export interface D_1B5716Dde9957A614F3C1 {
 export interface D_677810Bf9653Cfb0A467 {
   accrued_interest: D_1B5716Dde9957A614F3C2;
   debt_balance: D_1B5716Dde9957A614F3C3;
+  /**
+   * Fee cash the company received in the period: a rebate of a fee it
+   * paid. A receipt, reported apart from `fees` and never a waterfall
+   * claim. Positive amount in the breakdown's currency; `Some` on
+   * evaluator-produced breakdowns.
+   */
+  fee_rebates?: D_1B5716Dde9957A614F3C1 | null;
   fees: D_1B5716Dde9957A614F3C4;
+  /**
+   * Principal established by funding that took effect in the period:
+   * draws and issuance at their explicit principal effect, whatever cash
+   * was received. `Some` on evaluator-produced breakdowns of a borrowing.
+   */
+  funding_principal?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Signed company cash of the funding rows that settled in the period:
+   * positive for proceeds received (net of any discount), negative for
+   * cash paid. It is the cash, not the principal it establishes. `Some`
+   * on evaluator-produced breakdowns of a borrowing.
+   */
+  funding_proceeds?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Cash interest already due and still unpaid at the period close:
    * overdue arrears carried as a claim into the next period. It is separate
@@ -1577,6 +1605,14 @@ export interface D_677810Bf9653Cfb0A467 {
    * the breakdown's currency; `Some` on evaluator-produced breakdowns.
    */
   principal_pending?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Principal cash the company received back in the period: a refund of a
+   * repayment. A receipt, reported apart from `principal_payment`; the
+   * balance moves only through the row's explicit principal effect.
+   * Positive amount in the breakdown's currency; `Some` on
+   * evaluator-produced breakdowns.
+   */
+  repayment_refunds?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Scheduled cash interest that fell due in the period under the
    * borrowing's contractual schedule, recognized once on its due date

@@ -1011,6 +1011,10 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
                 funding.amount(),
                 if issue > periods[0].start { 100.0 } else { 0.0 }
             );
+            // The breakdown reports the principal funding established, apart
+            // from its cash: this schedule has no funding leg, so no proceeds.
+            assert_eq!(flows.funding_principal, Some(funding));
+            assert_eq!(flows.funding_proceeds, Some(zero));
             if waterfall {
                 let (_, context, mut state, _) = empty_debt_context();
                 state.opening_balances.insert("TL".into(), opening);

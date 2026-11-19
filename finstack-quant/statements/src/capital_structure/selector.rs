@@ -56,6 +56,14 @@ pub enum CsComponent {
     AccruedInterest,
     /// Cash interest due and unpaid at the period close.
     InterestArrears,
+    /// Fee cash received back in the period.
+    FeeRebates,
+    /// Principal cash received back in the period.
+    RepaymentRefunds,
+    /// Signed company cash of funding settled in the period.
+    FundingProceeds,
+    /// Principal established by funding effective in the period.
+    FundingPrincipal,
     /// Principal cash owed and not yet due at the period close.
     PrincipalPending,
     /// Principal cash due and unpaid at the period close.
@@ -66,7 +74,7 @@ pub enum CsComponent {
 
 impl CsComponent {
     /// Every component, in documentation order.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 24] = [
         Self::InterestExpense,
         Self::InterestExpenseCash,
         Self::InterestExpensePik,
@@ -87,6 +95,10 @@ impl CsComponent {
         Self::PrincipalPending,
         Self::PrincipalArrears,
         Self::PrincipalAdvanceReserve,
+        Self::FeeRebates,
+        Self::RepaymentRefunds,
+        Self::FundingProceeds,
+        Self::FundingPrincipal,
     ];
 
     /// The component's name in a `cs.<component>.<scope>` reference.
@@ -113,6 +125,10 @@ impl CsComponent {
             Self::PrincipalPending => "principal_pending",
             Self::PrincipalArrears => "principal_arrears",
             Self::PrincipalAdvanceReserve => "principal_advance_reserve",
+            Self::FeeRebates => "fee_rebates",
+            Self::RepaymentRefunds => "repayment_refunds",
+            Self::FundingProceeds => "funding_proceeds",
+            Self::FundingPrincipal => "funding_principal",
         }
     }
 
@@ -157,6 +173,10 @@ impl CsComponent {
             Self::PrincipalPending => recorded(flow.principal_pending),
             Self::PrincipalArrears => recorded(flow.principal_arrears),
             Self::PrincipalAdvanceReserve => recorded(flow.principal_advance_reserve),
+            Self::FeeRebates => recorded(flow.fee_rebates),
+            Self::RepaymentRefunds => recorded(flow.repayment_refunds),
+            Self::FundingProceeds => recorded(flow.funding_proceeds),
+            Self::FundingPrincipal => recorded(flow.funding_principal),
         }
     }
 }

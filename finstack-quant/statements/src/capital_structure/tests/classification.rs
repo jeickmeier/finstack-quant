@@ -238,9 +238,21 @@ fn every_kind_is_classified_with_its_sign() {
     .expect("payable rows");
     assert_eq!(paid.fees, usd(2.0));
     assert_eq!(paid.interest_expense_cash, usd(3.0));
-    // A fee the lender pays back is a company receipt, not a fee claim.
-    let rebate = flows(vec![row(CFKind::Fee, on, -2.0, None)]).expect_err("rebate");
-    assert!(rebate.to_string().contains("receipt"), "{rebate}");
+    // A fee the lender pays back is a company receipt, not a fee claim, and
+    // a repayment row the lender pays is a refund, not a negative repayment.
+    let (receipts, _, _) = flows(vec![
+        row(CFKind::Fee, on, 5.0, None),
+        row(CFKind::Fee, on, -2.0, None),
+        row(CFKind::PrePayment, on, -1.5, Some((1.5, on))),
+    ])
+    .expect("receipts");
+    assert_eq!(receipts.fees, usd(5.0));
+    assert_eq!(receipts.fee_rebates, Some(usd(2.0)));
+    assert_eq!(receipts.principal_payment, usd(0.0));
+    assert_eq!(receipts.repayment_refunds, Some(usd(1.5)));
+    // Without such rows the receipts are recorded zeros.
+    assert_eq!(paid.fee_rebates, Some(usd(0.0)));
+    assert_eq!(paid.repayment_refunds, Some(usd(0.0)));
     // Margin cash has no capital-structure classification.
     let margin =
         flows(vec![row(CFKind::VariationMarginPay, on, -1.0, None)]).expect_err("margin row");

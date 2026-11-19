@@ -650,11 +650,56 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
   {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/fee_rebates",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/fee_rebates",
+    "description": "Fee cash the company received in the period: a rebate of a fee it\npaid. A receipt, reported apart from `fees` and never a waterfall\nclaim. Positive amount in the breakdown's currency; `Some` on\nevaluator-produced breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/fee_rebates/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/fee_rebates/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/fee_rebates/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/fee_rebates/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/fees",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/fees",
     "description": "Fees (commitment fees, etc.)",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_principal",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_principal",
+    "description": "Principal established by funding that took effect in the period:\ndraws and issuance at their explicit principal effect, whatever cash\nwas received. `Some` on evaluator-produced breakdowns of a borrowing."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_principal/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_principal/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_principal/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_principal/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_proceeds",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_proceeds",
+    "description": "Signed company cash of the funding rows that settled in the period:\npositive for proceeds received (net of any discount), negative for\ncash paid. It is the cash, not the principal it establishes. `Some`\non evaluator-produced breakdowns of a borrowing."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_proceeds/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_proceeds/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/funding_proceeds/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/funding_proceeds/anyOf/1"
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_arrears",
@@ -781,6 +826,21 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/principal_pending/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_pending/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/repayment_refunds",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/repayment_refunds",
+    "description": "Principal cash the company received back in the period: a refund of a\nrepayment. A receipt, reported apart from `principal_payment`; the\nbalance moves only through the row's explicit principal effect.\nPositive amount in the breakdown's currency; `Some` on\nevaluator-produced breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/repayment_refunds/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/repayment_refunds/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/repayment_refunds/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/repayment_refunds/anyOf/1"
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_cash_interest_due",
@@ -2953,7 +3013,7 @@ export default [
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows",
-    "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\ncomponent accessor returns raw `f64` amounts in the instrument's native\ncurrency or the reporting currency for totals. Callers that need currency\nmetadata should inspect the underlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n        opening_balance: None,\n        scheduled_principal: None,\n        mandatory_prepayment: None,\n        sweep_prepayment: None,\n        voluntary_prepayment: None,\n        interest_arrears: None,\n        principal_pending: None,\n        principal_arrears: None,\n        principal_advance_reserve: None,\n        scheduled_cash_interest_due: None,\n        scheduled_principal_due: None,\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    opening_balance: None,\n    scheduled_principal: None,\n    mandatory_prepayment: None,\n    sweep_prepayment: None,\n    voluntary_prepayment: None,\n    interest_arrears: None,\n    principal_pending: None,\n    principal_arrears: None,\n    principal_advance_reserve: None,\n    scheduled_cash_interest_due: None,\n    scheduled_principal_due: None,\n});\n\nassert_eq!(cs.get_component(\"interest_expense\", \"total\", &period).unwrap(), 12_500.0);\n```"
+    "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\ncomponent accessor returns raw `f64` amounts in the instrument's native\ncurrency or the reporting currency for totals. Callers that need currency\nmetadata should inspect the underlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n        opening_balance: None,\n        scheduled_principal: None,\n        mandatory_prepayment: None,\n        sweep_prepayment: None,\n        voluntary_prepayment: None,\n        interest_arrears: None,\n        principal_pending: None,\n        principal_arrears: None,\n        principal_advance_reserve: None,\n        fee_rebates: None,\n        repayment_refunds: None,\n        funding_proceeds: None,\n        funding_principal: None,\n        scheduled_cash_interest_due: None,\n        scheduled_principal_due: None,\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    opening_balance: None,\n    scheduled_principal: None,\n    mandatory_prepayment: None,\n    sweep_prepayment: None,\n    voluntary_prepayment: None,\n    interest_arrears: None,\n    principal_pending: None,\n    principal_arrears: None,\n    principal_advance_reserve: None,\n    fee_rebates: None,\n    repayment_refunds: None,\n    funding_proceeds: None,\n    funding_principal: None,\n    scheduled_cash_interest_due: None,\n    scheduled_principal_due: None,\n});\n\nassert_eq!(cs.get_component(\"interest_expense\", \"total\", &period).unwrap(), 12_500.0);\n```"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/available_cash",

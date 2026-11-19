@@ -92,6 +92,10 @@ fn test_capital_structure_cashflows_serialization() {
         principal_advance_reserve: None,
         scheduled_cash_interest_due: None,
         scheduled_principal_due: None,
+        fee_rebates: None,
+        repayment_refunds: None,
+        funding_proceeds: None,
+        funding_principal: None,
     };
 
     let mut period_map = IndexMap::new();
@@ -524,6 +528,10 @@ fn test_capital_structure_json_roundtrip() {
         principal_advance_reserve: None,
         scheduled_cash_interest_due: None,
         scheduled_principal_due: None,
+        fee_rebates: None,
+        repayment_refunds: None,
+        funding_proceeds: None,
+        funding_principal: None,
     };
 
     let json = serde_json::to_string(&breakdown).expect("Failed to serialize");

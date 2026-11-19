@@ -73,6 +73,10 @@ pub struct FxConversionRecord {
 ///         principal_pending: None,
 ///         principal_arrears: None,
 ///         principal_advance_reserve: None,
+///         fee_rebates: None,
+///         repayment_refunds: None,
+///         funding_proceeds: None,
+///         funding_principal: None,
 ///         scheduled_cash_interest_due: None,
 ///         scheduled_principal_due: None,
 ///     });
@@ -93,6 +97,10 @@ pub struct FxConversionRecord {
 ///     principal_pending: None,
 ///     principal_arrears: None,
 ///     principal_advance_reserve: None,
+///     fee_rebates: None,
+///     repayment_refunds: None,
+///     funding_proceeds: None,
+///     funding_principal: None,
 ///     scheduled_cash_interest_due: None,
 ///     scheduled_principal_due: None,
 /// });
@@ -381,6 +389,34 @@ pub struct CashflowBreakdown {
     /// `Some` on evaluator-produced breakdowns.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub principal_advance_reserve: Option<Money>,
+
+    /// Fee cash the company received in the period: a rebate of a fee it
+    /// paid. A receipt, reported apart from `fees` and never a waterfall
+    /// claim. Positive amount in the breakdown's currency; `Some` on
+    /// evaluator-produced breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fee_rebates: Option<Money>,
+
+    /// Principal cash the company received back in the period: a refund of a
+    /// repayment. A receipt, reported apart from `principal_payment`; the
+    /// balance moves only through the row's explicit principal effect.
+    /// Positive amount in the breakdown's currency; `Some` on
+    /// evaluator-produced breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repayment_refunds: Option<Money>,
+
+    /// Signed company cash of the funding rows that settled in the period:
+    /// positive for proceeds received (net of any discount), negative for
+    /// cash paid. It is the cash, not the principal it establishes. `Some`
+    /// on evaluator-produced breakdowns of a borrowing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub funding_proceeds: Option<Money>,
+
+    /// Principal established by funding that took effect in the period:
+    /// draws and issuance at their explicit principal effect, whatever cash
+    /// was received. `Some` on evaluator-produced breakdowns of a borrowing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub funding_principal: Option<Money>,
 }
 
 /// What one prepayment priority requested and paid in a period.
@@ -406,7 +442,7 @@ pub struct PrepaymentOutcome {
 }
 
 /// Field names of [`CashflowBreakdown::audit_detail`], in the same order.
-const AUDIT_DETAIL_LABELS: [&str; 11] = [
+const AUDIT_DETAIL_LABELS: [&str; 15] = [
     "opening_balance",
     "scheduled_principal",
     "mandatory_prepayment",
@@ -418,6 +454,10 @@ const AUDIT_DETAIL_LABELS: [&str; 11] = [
     "principal_advance_reserve",
     "scheduled_cash_interest_due",
     "scheduled_principal_due",
+    "fee_rebates",
+    "repayment_refunds",
+    "funding_proceeds",
+    "funding_principal",
 ];
 
 impl CashflowBreakdown {
@@ -435,8 +475,10 @@ impl CashflowBreakdown {
     /// `voluntary_prepayment`), each only when recorded. Those four rows sum
     /// to the `principal_payment` row, so do not add them to it. The last
     /// rows are `interest_arrears` (cash interest due and unpaid at the
-    /// close) and the principal settlement amounts `principal_pending`,
-    /// `principal_arrears` and `principal_advance_reserve`.
+    /// close), the principal settlement amounts `principal_pending`,
+    /// `principal_arrears` and `principal_advance_reserve`, the receipts
+    /// `fee_rebates` and `repayment_refunds`, and the funding amounts
+    /// `funding_proceeds` (signed cash) and `funding_principal`.
     #[must_use]
     pub fn flows(&self) -> Vec<(&'static str, Money)> {
         let mut flows = vec![("interest_expense_cash", self.interest_expense_cash)];
@@ -480,14 +522,19 @@ impl CashflowBreakdown {
             principal_advance_reserve: None,
             scheduled_cash_interest_due: None,
             scheduled_principal_due: None,
+            fee_rebates: None,
+            repayment_refunds: None,
+            funding_proceeds: None,
+            funding_principal: None,
         }
     }
 
     /// Opening balance, the four principal components, interest arrears, the
-    /// three principal settlement amounts and the two contractual due-date
-    /// service amounts, in the order of
+    /// three principal settlement amounts, the two contractual due-date
+    /// service amounts, the two receipts and the two funding amounts, in the
+    /// order of
     /// [`AUDIT_DETAIL_LABELS`].
-    pub(crate) fn audit_detail(&self) -> [Option<Money>; 11] {
+    pub(crate) fn audit_detail(&self) -> [Option<Money>; 15] {
         [
             self.opening_balance,
             self.scheduled_principal,
@@ -500,12 +547,16 @@ impl CashflowBreakdown {
             self.principal_advance_reserve,
             self.scheduled_cash_interest_due,
             self.scheduled_principal_due,
+            self.fee_rebates,
+            self.repayment_refunds,
+            self.funding_proceeds,
+            self.funding_principal,
         ]
     }
 
     /// Mutable view of the fields returned by [`Self::audit_detail`], in the
     /// same order.
-    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 11] {
+    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 15] {
         [
             &mut self.opening_balance,
             &mut self.scheduled_principal,
@@ -518,6 +569,10 @@ impl CashflowBreakdown {
             &mut self.principal_advance_reserve,
             &mut self.scheduled_cash_interest_due,
             &mut self.scheduled_principal_due,
+            &mut self.fee_rebates,
+            &mut self.repayment_refunds,
+            &mut self.funding_proceeds,
+            &mut self.funding_principal,
         ]
     }
 
@@ -1151,6 +1206,10 @@ mod tests {
             principal_advance_reserve: None,
             scheduled_cash_interest_due: None,
             scheduled_principal_due: None,
+            fee_rebates: None,
+            repayment_refunds: None,
+            funding_proceeds: None,
+            funding_principal: None,
         };
 
         let mut period_map = IndexMap::new();

@@ -237,9 +237,10 @@ The full Statements cashflow classification contract was accepted on
 2026-11-15. It covers period admission, native currency and source perspective,
 dated cash and principal effects, and contract-based fee and hedge
 classification. Period admission, the stated perspective, exhaustive signed
-classification and separate dated distress cash are implemented and
-qualified; fee rebates, separate funding proceeds and ledger qualification
-remain.
+classification, separate dated distress cash, fee rebates, repayment refunds
+and separate funding proceeds are implemented and qualified;
+company-perspective schedules, hedge settlement cash, distress totals and
+ledger qualification remain.
 [STATEMENTS-CAPITAL-002](statements-capital/02-cashflow-classification.md#accepted-decision-for-period-admission-and-cashflow-classification).
 
 Statements opening principal reconciliation was accepted on 2026-11-15. The

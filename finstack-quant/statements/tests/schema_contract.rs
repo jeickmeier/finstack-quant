@@ -193,6 +193,10 @@ fn representative_statement_result() -> StatementResult {
         principal_advance_reserve: None,
         scheduled_cash_interest_due: None,
         scheduled_principal_due: None,
+        fee_rebates: None,
+        repayment_refunds: None,
+        funding_proceeds: None,
+        funding_principal: None,
     };
     let mut cashflows = CapitalStructureCashflows::new();
     cashflows.by_instrument.insert(

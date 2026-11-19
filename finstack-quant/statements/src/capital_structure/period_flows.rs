@@ -530,6 +530,9 @@ pub fn calculate_period_flows(
     // from the schedule's perspective. Coupons are netted with their sign, so
     // negative rates or a zero leg cannot turn a receipt into an expense.
     let mut net_coupon_cash = 0.0_f64;
+    let mut fee_rebates = Money::from((0_i64, currency));
+    let mut repayment_refunds = Money::from((0_i64, currency));
+    let mut funding_proceeds = 0.0_f64;
     let unclassified = |cf: &CashFlow, why: &str| {
         crate::error::Error::capital_structure(format!(
             "instrument '{}': {:?} cashflow on {} {why}",
@@ -553,30 +556,30 @@ pub fn calculate_period_flows(
                 ));
             }
             let cash = company_cash(cf.get_amount().amount());
-            let payable = |cash: f64| -> Result<Money> {
-                if cash > 0.0 {
-                    return Err(unclassified(
-                        cf,
-                        "is a receipt where the company pays; rebates and refunds are not reported yet",
-                    ));
-                }
-                // The row's own amount, exactly: no round trip through a float.
-                Ok(cf.get_amount().abs())
-            };
+            // The row's own amount, exactly: no round trip through a float.
+            let magnitude = cf.get_amount().abs();
 
             // Every kind is named: a new kind cannot be classified silently.
             match cf.get_kind() {
                 CFKind::Fixed | CFKind::Floating | CFKind::Stub | CFKind::InflationCoupon => {
                     net_coupon_cash += cash;
                 }
+                // Principal the company pays is a repayment; principal cash it
+                // receives on a repayment row is a refund, a receipt of its
+                // own and not a negative repayment.
+                CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment
+                    if cash > 0.0 =>
+                {
+                    repayment_refunds = repayment_refunds.checked_add(magnitude)?;
+                }
                 CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment => {
                     breakdown.principal_payment =
-                        breakdown.principal_payment.checked_add(payable(cash)?)?;
+                        breakdown.principal_payment.checked_add(magnitude)?;
                 }
                 // A notional row is a redemption when the company pays it.
                 CFKind::Notional if is_repayment_like(cf) => {
                     breakdown.principal_payment =
-                        breakdown.principal_payment.checked_add(payable(cash)?)?;
+                        breakdown.principal_payment.checked_add(magnitude)?;
                 }
                 CFKind::CommitmentFee
                 | CFKind::FacilityFee
@@ -584,7 +587,13 @@ pub fn calculate_period_flows(
                 | CFKind::FrontingFee
                 | CFKind::Fee
                 | CFKind::UsageFee => {
-                    breakdown.fees = breakdown.fees.checked_add(payable(cash)?)?;
+                    // A fee the company pays is a claim; a fee it receives
+                    // back is a rebate and stays a receipt.
+                    if cash > 0.0 {
+                        fee_rebates = fee_rebates.checked_add(magnitude)?;
+                    } else {
+                        breakdown.fees = breakdown.fees.checked_add(magnitude)?;
+                    }
                 }
                 CFKind::Pik => {
                     let capitalized = Money::new(pik_capitalized(cf)?, currency)?;
@@ -598,9 +607,14 @@ pub fn calculate_period_flows(
                 //   moves the balance through the outstanding path;
                 // - distress cash is reported separately with its payment
                 //   date by `period_distress_cash`.
-                CFKind::Notional
-                | CFKind::RevolvingDraw
-                | CFKind::DefaultedNotional
+                CFKind::Notional | CFKind::RevolvingDraw => {
+                    // Funding cash is reported with its sign, apart from the
+                    // principal it establishes.
+                    if is_debt {
+                        funding_proceeds += cash;
+                    }
+                }
+                CFKind::DefaultedNotional
                 | CFKind::Recovery
                 | CFKind::AccruedOnDefault
                 | CFKind::ProtectionPayment => {}
@@ -627,6 +641,12 @@ pub fn calculate_period_flows(
     let (expense, income) = ((-net_coupon_cash).max(0.0), net_coupon_cash.max(0.0));
     breakdown.interest_expense_cash = Money::new(expense, currency)?;
     breakdown.interest_income_cash = Some(Money::new(income, currency)?);
+    breakdown.fee_rebates = Some(fee_rebates);
+    breakdown.repayment_refunds = Some(repayment_refunds);
+    if is_debt {
+        breakdown.funding_proceeds = Some(Money::new(funding_proceeds, currency)?);
+        breakdown.funding_principal = Some(Money::new(net_new_funding, currency)?);
+    }
 
     // outstanding_path only has entries on cashflow dates, so take the latest
     // entry at or before period.end.

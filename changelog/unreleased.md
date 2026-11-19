@@ -1317,6 +1317,17 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: fee rebates, repayment refunds and funding amounts
+
+- A fee row or repayment row that is a company receipt is reported as a
+  receipt: `fee_rebates` and `repayment_refunds` on the cashflow breakdown.
+  Such a row used to fail the evaluation (STATEMENTS-CAPITAL-002).
+- The breakdown of a borrowing reports `funding_proceeds`, the signed company
+  cash of funding settled in the period, apart from `funding_principal`, the
+  principal that funding established.
+- All four are selectable as `cs.<component>.<scope>` and appear in the
+  capital long tables.
+
 ### Statements capital: dated sweeps with arrears, PIK notice periods
 
 - `EcfSweepSpec.payment_lag_days` (optional) makes the measured sweep a dated

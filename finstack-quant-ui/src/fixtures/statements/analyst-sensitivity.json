@@ -1849,6 +1849,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "360000000",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "360000000",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -1921,6 +1937,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -1997,6 +2029,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -2069,6 +2117,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2145,6 +2209,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -2217,6 +2297,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2293,6 +2389,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -2365,6 +2477,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2443,6 +2571,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -2515,6 +2659,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2591,6 +2751,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -2663,6 +2839,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2739,6 +2931,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -2811,6 +3019,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2887,6 +3111,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -2959,6 +3199,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -3038,6 +3294,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "360000000",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "360000000",
+                  "currency": "USD"
                 }
               },
               "2024Q2": {
@@ -3110,6 +3382,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -3186,6 +3474,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q4": {
@@ -3258,6 +3562,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -3334,6 +3654,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q2": {
@@ -3406,6 +3742,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -3482,6 +3834,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q4": {
@@ -3554,6 +3922,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -3633,6 +4017,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "360000000",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "360000000",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -3705,6 +4105,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -3781,6 +4197,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -3853,6 +4285,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -3929,6 +4377,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -4001,6 +4465,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -4077,6 +4557,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -4149,6 +4645,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6148,6 +6660,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "360000000",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "360000000",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -6220,6 +6748,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6296,6 +6840,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -6368,6 +6928,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6444,6 +7020,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -6516,6 +7108,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6592,6 +7200,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -6664,6 +7288,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6742,6 +7382,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -6814,6 +7470,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6890,6 +7562,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -6962,6 +7650,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -7038,6 +7742,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -7110,6 +7830,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -7186,6 +7922,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -7258,6 +8010,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -7337,6 +8105,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "360000000",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "360000000",
+                  "currency": "USD"
                 }
               },
               "2024Q2": {
@@ -7409,6 +8193,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -7485,6 +8285,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q4": {
@@ -7557,6 +8373,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -7633,6 +8465,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q2": {
@@ -7705,6 +8553,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -7781,6 +8645,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q4": {
@@ -7853,6 +8733,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -7932,6 +8828,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "360000000",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "360000000",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -8004,6 +8916,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -8080,6 +9008,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -8152,6 +9096,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -8228,6 +9188,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -8300,6 +9276,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -8376,6 +9368,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -8448,6 +9456,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -10447,6 +11471,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "360000000",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "360000000",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -10519,6 +11559,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -10595,6 +11651,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -10667,6 +11739,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -10743,6 +11831,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -10815,6 +11919,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -10891,6 +12011,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -10963,6 +12099,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -11041,6 +12193,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -11113,6 +12281,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -11189,6 +12373,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -11261,6 +12461,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -11337,6 +12553,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -11409,6 +12641,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -11485,6 +12733,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -11557,6 +12821,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -11636,6 +12916,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "360000000",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "360000000",
+                  "currency": "USD"
                 }
               },
               "2024Q2": {
@@ -11708,6 +13004,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -11784,6 +13096,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q4": {
@@ -11856,6 +13184,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -11932,6 +13276,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q2": {
@@ -12004,6 +13364,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -12080,6 +13456,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q4": {
@@ -12152,6 +13544,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -12231,6 +13639,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "360000000",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "360000000",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -12303,6 +13727,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12379,6 +13819,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -12451,6 +13907,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12527,6 +13999,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -12599,6 +14087,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12675,6 +14179,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -12747,6 +14267,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -14746,6 +16282,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "360000000",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "360000000",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -14818,6 +16370,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -14894,6 +16462,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -14966,6 +16550,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -15042,6 +16642,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -15114,6 +16730,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -15190,6 +16822,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -15262,6 +16910,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -15340,6 +17004,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -15412,6 +17092,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -15488,6 +17184,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -15560,6 +17272,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -15636,6 +17364,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -15708,6 +17452,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -15784,6 +17544,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -15856,6 +17632,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -15935,6 +17727,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "360000000",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "360000000",
+                  "currency": "USD"
                 }
               },
               "2024Q2": {
@@ -16007,6 +17815,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -16083,6 +17907,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q4": {
@@ -16155,6 +17995,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -16231,6 +18087,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q2": {
@@ -16303,6 +18175,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -16379,6 +18267,22 @@
                 "principal_advance_reserve": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q4": {
@@ -16451,6 +18355,22 @@
                   "currency": "USD"
                 },
                 "principal_advance_reserve": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fee_rebates": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "repayment_refunds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_proceeds": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_principal": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -16530,6 +18450,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "360000000",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "360000000",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -16602,6 +18538,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -16678,6 +18630,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -16750,6 +18718,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -16826,6 +18810,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -16898,6 +18898,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -16974,6 +18990,22 @@
                   "principal_advance_reserve": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -17046,6 +19078,22 @@
                     "currency": "USD"
                   },
                   "principal_advance_reserve": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "fee_rebates": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "repayment_refunds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "funding_principal": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -19042,6 +21090,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "360000000",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "360000000",
+                "currency": "USD"
               }
             },
             "2024Q2": {
@@ -19114,6 +21178,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -19190,6 +21270,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q4": {
@@ -19262,6 +21358,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -19338,6 +21450,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q2": {
@@ -19410,6 +21538,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -19486,6 +21630,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q4": {
@@ -19558,6 +21718,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -19636,6 +21812,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q2": {
@@ -19708,6 +21900,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -19784,6 +21992,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q4": {
@@ -19856,6 +22080,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -19932,6 +22172,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q2": {
@@ -20004,6 +22260,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -20080,6 +22352,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q4": {
@@ -20152,6 +22440,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -20231,6 +22535,22 @@
             "principal_advance_reserve": {
               "amount": "0",
               "currency": "USD"
+            },
+            "fee_rebates": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "repayment_refunds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_proceeds": {
+              "amount": "360000000",
+              "currency": "USD"
+            },
+            "funding_principal": {
+              "amount": "360000000",
+              "currency": "USD"
             }
           },
           "2024Q2": {
@@ -20303,6 +22623,22 @@
               "currency": "USD"
             },
             "principal_advance_reserve": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fee_rebates": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "repayment_refunds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_principal": {
               "amount": "0",
               "currency": "USD"
             }
@@ -20379,6 +22715,22 @@
             "principal_advance_reserve": {
               "amount": "0",
               "currency": "USD"
+            },
+            "fee_rebates": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "repayment_refunds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_principal": {
+              "amount": "0",
+              "currency": "USD"
             }
           },
           "2024Q4": {
@@ -20451,6 +22803,22 @@
               "currency": "USD"
             },
             "principal_advance_reserve": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fee_rebates": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "repayment_refunds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_principal": {
               "amount": "0",
               "currency": "USD"
             }
@@ -20527,6 +22895,22 @@
             "principal_advance_reserve": {
               "amount": "0",
               "currency": "USD"
+            },
+            "fee_rebates": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "repayment_refunds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_principal": {
+              "amount": "0",
+              "currency": "USD"
             }
           },
           "2025Q2": {
@@ -20599,6 +22983,22 @@
               "currency": "USD"
             },
             "principal_advance_reserve": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fee_rebates": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "repayment_refunds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_principal": {
               "amount": "0",
               "currency": "USD"
             }
@@ -20675,6 +23075,22 @@
             "principal_advance_reserve": {
               "amount": "0",
               "currency": "USD"
+            },
+            "fee_rebates": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "repayment_refunds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_principal": {
+              "amount": "0",
+              "currency": "USD"
             }
           },
           "2025Q4": {
@@ -20747,6 +23163,22 @@
               "currency": "USD"
             },
             "principal_advance_reserve": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fee_rebates": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "repayment_refunds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "funding_principal": {
               "amount": "0",
               "currency": "USD"
             }
@@ -20826,6 +23258,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "360000000",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "360000000",
+                "currency": "USD"
               }
             },
             "2024Q2": {
@@ -20898,6 +23346,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -20974,6 +23438,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q4": {
@@ -21046,6 +23526,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -21122,6 +23618,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q2": {
@@ -21194,6 +23706,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -21270,6 +23798,22 @@
               "principal_advance_reserve": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q4": {
@@ -21342,6 +23886,22 @@
                 "currency": "USD"
               },
               "principal_advance_reserve": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "fee_rebates": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "repayment_refunds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_proceeds": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "funding_principal": {
                 "amount": "0",
                 "currency": "USD"
               }
