@@ -6,7 +6,6 @@ from datetime import date, timedelta
 from itertools import pairwise
 import math
 
-from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import (
     DiscountCurve,
     ForwardCurve,
@@ -97,7 +96,7 @@ def build_demo_market(as_of: date = DEMO_AS_OF) -> MarketContext:
     market.insert_price("SPX-DIV", 0.015)
 
     fx = FxMatrix(None)
-    fx.set_quotes([(Currency("EUR"), Currency("USD"), 1.08)])
+    fx.set_quotes([("EUR", "USD", 1.08)])
     market.insert_fx(fx)
     return market
 

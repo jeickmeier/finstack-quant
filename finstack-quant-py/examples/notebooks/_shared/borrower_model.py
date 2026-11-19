@@ -11,7 +11,6 @@ True
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from finstack_quant.statements import FinancialModelSpec, ForecastSpec, ModelBuilder
@@ -39,24 +38,30 @@ def borrower_builder() -> ModelBuilder:
     >>> borrower_builder().build().has_node("net_leverage")
     True
     """
+    return _build_borrower("analyst-borrower", ACTUAL_THROUGH)
+
+
+def _build_borrower(model_id: str, actual_through: str) -> ModelBuilder:
+    actual_count = PERIODS.index(actual_through) + 1
+    sales_growth = 0.01 if actual_through == "2024Q3" else 0.02
     b = demo_pl_builder(
-        "analyst-borrower",
+        model_id,
         periods=PERIODS,
-        actual_through=ACTUAL_THROUGH,
-        revenue=[20_000_000.0, 22_000_000.0, 23_000_000.0, 24_000_000.0],
-        cogs=[12_000_000.0, 13_200_000.0, 13_800_000.0, 14_400_000.0],
-        opex=[3_000_000.0, 3_200_000.0, 3_300_000.0, 3_400_000.0],
+        actual_through=actual_through,
+        revenue=[20_000_000.0, 22_000_000.0, 23_000_000.0, 24_000_000.0][:actual_count],
+        cogs=[12_000_000.0, 13_200_000.0, 13_800_000.0, 14_400_000.0][:actual_count],
+        opex=[3_000_000.0, 3_200_000.0, 3_300_000.0, 3_400_000.0][:actual_count],
         margins=False,
         values={
-            "depreciation": [1_000_000.0] * 4,
-            "capex": [1_200_000.0] * 4,
-            "amortization": [2_500_000.0] * 4,
-            "change_nwc": [100_000.0, 200_000.0, 150_000.0, 150_000.0],
-            "interest_rate": [0.075] * 4,
-            "tax_rate": [0.25] * 4,
+            "depreciation": [1_000_000.0] * actual_count,
+            "capex": [1_200_000.0] * actual_count,
+            "amortization": [2_500_000.0] * actual_count,
+            "change_nwc": [100_000.0, 200_000.0, 150_000.0, 150_000.0][:actual_count],
+            "interest_rate": [0.075] * actual_count,
+            "tax_rate": [0.25] * actual_count,
         },
     )
-    for node, growth in (("revenue", 0.02), ("cogs", 0.02), ("opex", 0.015), ("change_nwc", 0.02)):
+    for node, growth in (("revenue", sales_growth), ("cogs", sales_growth), ("opex", 0.015), ("change_nwc", 0.02)):
         b.forecast(node, ForecastSpec.growth(growth))
     for node in ("depreciation", "capex", "amortization", "interest_rate", "tax_rate"):
         b.forecast(node, ForecastSpec.forward_fill())
@@ -128,18 +133,7 @@ def borrower_vintage(vintage: str = "2024Q4") -> FinancialModelSpec:
     """
     if vintage not in ("2024Q3", "2024Q4"):
         raise ValueError("vintage must be '2024Q3' or '2024Q4'")
-    spec = json.loads(borrower_model().to_json())
-    spec["id"] = f"analyst-borrower-{vintage}"
-    spec["meta"]["forecast_vintage"] = vintage
-    for period in spec["periods"]["periods"]:
-        period["is_actual"] = period["id"] <= vintage
-    for node in spec["nodes"].values():
-        if "values" in node:
-            node["values"] = {period: value for period, value in node["values"].items() if period <= vintage}
-    if vintage == "2024Q3":
-        for node in ("revenue", "cogs"):
-            spec["nodes"][node]["forecast"]["params"]["rate"] = 0.01
-    return FinancialModelSpec.from_json(json.dumps(spec))
+    return _build_borrower(f"analyst-borrower-{vintage}", vintage).with_meta("forecast_vintage", vintage).build()
 
 
 def borrower_data() -> dict[str, Any]:
