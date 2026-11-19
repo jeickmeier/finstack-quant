@@ -271,7 +271,7 @@ def parallel_bp_many(
     curve_ids : list[str]
         Identifiers in execution order; an empty list produces no operations.
     bp : float
-        Additive basis points, or percent of forward for commodity curves.
+        Additive rate basis points.
     discount_curve_id : str | None, default None
         Optional ParCDS discount curve copied onto each operation.
 
@@ -283,7 +283,7 @@ def parallel_bp_many(
     Raises
     ------
     ValueError
-        If the curve family label is unknown.
+        If the curve family is unsupported, bp is non-finite, or an identifier is invalid.
     TypeError
         If identifiers are not strings or bp is not numeric.
 

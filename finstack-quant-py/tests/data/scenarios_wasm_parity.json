@@ -796,6 +796,76 @@
    },
    "requires_instruments": true,
    "mutates_instruments": false
+  },
+  {
+   "py": "commodity_curve_parallel_pct",
+   "args": [
+    "WTI",
+    -12.5
+   ],
+   "expected": {
+    "kind": "commodity_curve_parallel_pct",
+    "curve_id": "WTI",
+    "pct": -12.5
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "commodity_curve_node_pct",
+   "args": [
+    "WTI",
+    [
+     [
+      "1Y",
+      -12.5
+     ],
+     [
+      "3Y",
+      4.0
+     ]
+    ],
+    "exact"
+   ],
+   "expected": {
+    "kind": "commodity_curve_node_pct",
+    "curve_id": "WTI",
+    "nodes": [
+     [
+      "1Y",
+      -12.5
+     ],
+     [
+      "3Y",
+      4.0
+     ]
+    ],
+    "match_mode": "exact"
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "hierarchy_commodity_curve_parallel_pct",
+   "args": [
+    {
+     "path": [
+      "Commodity"
+     ]
+    },
+    6.5
+   ],
+   "expected": {
+    "kind": "hierarchy_commodity_curve_parallel_pct",
+    "target": {
+     "path": [
+      "Commodity"
+     ]
+    },
+    "pct": 6.5
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
   }
  ],
  "invalid_operations": [

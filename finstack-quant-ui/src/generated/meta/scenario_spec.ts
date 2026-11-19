@@ -142,7 +142,7 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec",
-    "description": "Individual operation within a scenario.\n\nEach variant represents a specific type of shock or adjustment that can be\napplied to market data, instruments, statements, or the valuation horizon.\nUnits are encoded in the variant name and field docs:\n- `Pct` fields use percentage points (`5.0 = +5%`)\n- `Bp` fields use additive basis points (1 bp = 1e-4), except\n  [`CurveKind::Commodity`] where `bp` is percent of the price-curve\n  forward\n- Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)\n- Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)\n\nHierarchy-targeted variants are resolved into direct identifiers during\n[`crate::engine::ScenarioEngine::apply`] using the market hierarchy attached\nto the execution context."
+    "description": "Individual operation within a scenario.\n\nEach variant represents a specific type of shock or adjustment that can be\napplied to market data, instruments, statements, or the valuation horizon.\nUnits are encoded in the variant name and field docs:\n- `Pct` fields use percentage points (`5.0 = +5%`)\n- `Bp` fields use additive rate basis points (1 bp = 1e-4)\n- Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)\n- Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)\n\nHierarchy-targeted variants are resolved into direct identifiers during\n[`crate::engine::ScenarioEngine::apply`] using the market hierarchy attached\nto the execution context."
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/0",
@@ -202,164 +202,177 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10",
-    "description": "Bucketed volatility surface shock.\n\nSame sticky-strike multiplicative convention as\n[`OperationSpec::VolSurfaceParallelPct`], restricted to the selected\nexpiry/strike buckets (`pct >= -100`). Tenor selection requires an\nexplicit `expiry_clock` on the target surface anchored at the execution\ndate; strike filtering requires a `Strike` secondary axis. The\ncalendar-spread check applies only to `Strike`-axis `BlackLognormal`\nsurfaces and is not a no-arbitrage certificate.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceBucketPct {\n    vol_surface_id: \"SPX\".into(),\n    tenors: Some(vec![\"1M\".into(), \"3M\".into()]),\n    strikes: Some(vec![90.0, 95.0, 100.0]),\n    pct: 15.0,\n};\n```"
+    "description": "Bucket-specific base correlation shifts by detachment.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::BaseCorrBucketPts {\n    surface_id: \"CDX_IG\".into(),\n    detachment_bp: Some(vec![300, 700]), // 3% and 7% detachment\n    points: 0.02, // +0.02 decimal correlation\n};\n```"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/detachment_bp",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/detachment_bp",
+    "description": "Optional detachment points in basis points (e.g., 300 for 3%)."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/detachment_bp/items",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/detachment_bp/items",
+    "format": "int32"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/kind",
-    "const": "vol_surface_bucket_pct"
+    "const": "base_corr_bucket_pts"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/pct",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/pct",
-    "description": "Percentage change in volatility.",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/points",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/points",
+    "description": "Absolute shift in decimal correlation (`0.02` = +0.02).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/strikes",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/strikes",
-    "description": "Optional strike levels."
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/strikes/items",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/strikes/items",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/tenors",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/tenors",
-    "description": "Optional tenor strings (e.g., \"1M\", \"3M\")."
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/tenors/items",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/tenors/items"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/vol_surface_id",
-    "description": "Volatility-surface identifier.",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/surface_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10/properties/surface_id",
+    "description": "Surface identifier.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/11",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/11",
-    "description": "Statement forecast percent change.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::StmtForecastPercent {\n    node_id: \"Revenue\".into(),\n    pct: -5.0, // -5% revenue decrease\n};\n```"
+    "description": "Parallel percent shift to a volatility surface.\n\nShocks are **sticky-strike** multiplicative grid moves: each stored\n`(expiry, secondary_value)` vol is multiplied by `1 + pct/100`. This is\nnot a sticky-delta re-mark. The post-shock fixed-strike calendar-spread\ncheck applies only to `Strike`-axis `BlackLognormal` surfaces and is a\nheuristic screen, not a no-arbitrage certificate.\n\n`pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;\n`pct < -100` fails validation).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceParallelPct {\n    vol_surface_id: \"SPX\".into(),\n    pct: 10.0, // +10% volatility increase\n};\n```"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/11/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/11/properties/kind",
-    "const": "stmt_forecast_percent"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/11/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/11/properties/node_id",
-    "description": "Statement node identifier.",
-    "ref": "#/$defs/Id",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
+    "const": "vol_surface_parallel_pct"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/11/properties/pct",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/11/properties/pct",
-    "description": "Percentage change to apply.",
+    "description": "Percentage change in volatility.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/11/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/11/properties/vol_surface_id",
+    "description": "Volatility-surface identifier.",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12",
-    "description": "Statement forecast value assignment.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::StmtForecastAssign {\n    node_id: \"Revenue\".into(),\n    value: 1_000_000.0,\n};\n```"
+    "description": "Bucketed volatility surface shock.\n\nSame sticky-strike multiplicative convention as\n[`OperationSpec::VolSurfaceParallelPct`], restricted to the selected\nexpiry/strike buckets (`pct >= -100`). Tenor selection requires an\nexplicit `expiry_clock` on the target surface anchored at the execution\ndate; strike filtering requires a `Strike` secondary axis. The\ncalendar-spread check applies only to `Strike`-axis `BlackLognormal`\nsurfaces and is not a no-arbitrage certificate.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceBucketPct {\n    vol_surface_id: \"SPX\".into(),\n    tenors: Some(vec![\"1M\".into(), \"3M\".into()]),\n    strikes: Some(vec![90.0, 95.0, 100.0]),\n    pct: 15.0,\n};\n```"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/kind",
-    "const": "stmt_forecast_assign"
+    "const": "vol_surface_bucket_pct"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/node_id",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/pct",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/pct",
+    "description": "Percentage change in volatility.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/strikes",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/strikes",
+    "description": "Optional strike levels."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/strikes/items",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/strikes/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/tenors",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/tenors",
+    "description": "Optional tenor strings (e.g., \"1M\", \"3M\")."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/tenors/items",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/tenors/items"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/vol_surface_id",
+    "description": "Volatility-surface identifier.",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/13",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/13",
+    "description": "Statement forecast percent change.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::StmtForecastPercent {\n    node_id: \"Revenue\".into(),\n    pct: -5.0, // -5% revenue decrease\n};\n```"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/13/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/13/properties/kind",
+    "const": "stmt_forecast_percent"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/13/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/13/properties/node_id",
     "description": "Statement node identifier.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/12/properties/value",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/12/properties/value",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/13/properties/pct",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/13/properties/pct",
+    "description": "Percentage change to apply.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14",
+    "description": "Statement forecast value assignment.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::StmtForecastAssign {\n    node_id: \"Revenue\".into(),\n    value: 1_000_000.0,\n};\n```"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14/properties/kind",
+    "const": "stmt_forecast_assign"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14/properties/node_id",
+    "description": "Statement node identifier.",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14/properties/value",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14/properties/value",
     "description": "Finite absolute value in the node's units; monetary nodes retain\ntheir currency and interpret this as major currency units.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/13",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/13",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/15",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/15",
     "description": "Bind a statement rate node to a market curve for this scenario.\n\nThe rate at the specified tenor is extracted from the curve and applied\nto the node, overriding any static value. If\n[`ExecutionContext::rate_bindings`](crate::engine::ExecutionContext::rate_bindings)\nis initialized with `Some(_)`, the binding is also registered there so\nlater scenario applications can keep the statement node synchronized with\nmarket curve rolls and shocks. When the context field is `None`, this\noperation performs a one-shot update and does not persist the binding.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, RateBindingSpec};\nuse finstack_quant_core::math::Compounding;\n\nlet op = OperationSpec::RateBinding {\n    binding: RateBindingSpec {\n        node_id: \"InterestExpense\".into(),\n        curve_id: \"USD-OIS\".into(),\n        tenor: \"1Y\".into(),\n        compounding: Compounding::Periodic(std::num::NonZeroU32::MIN),\n        day_count: None,\n    },\n};\n```"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/13/properties/binding",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/13/properties/binding",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/15/properties/binding",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/15/properties/binding",
     "description": "The rate binding specification to apply.",
     "ref": "#/$defs/RateBindingSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/RateBindingSpec"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/13/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/13/properties/kind",
-    "const": "rate_binding"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14",
-    "description": "Instrument spread shock by exact attribute match (FI only).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\nuse indexmap::IndexMap;\n\nlet mut attrs = IndexMap::new();\nattrs.insert(\"rating\".into(), \"CCC\".into());\n\nlet op = OperationSpec::InstrumentSpreadBpByAttr {\n    attrs,\n    bp: 50.0,\n};\n```\n\nMatching semantics:\n- Only instrument metadata key/value pairs are considered (the `meta` map on\n  `Attributes`); tag sets are ignored.\n- Attribute keys/values compared case-insensitively\n- AND semantics (all provided pairs must match metadata)\n- An empty attribute map is rejected at validation time. Use\n  [`OperationSpec::InstrumentSpreadBpByType`] with an explicit list of\n  instrument types to apply a broad shock."
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14/properties/attrs",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14/properties/attrs",
-    "description": "Attributes to match. Matching uses AND semantics with\ncase-insensitive key/value comparison."
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14/properties/attrs/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14/properties/attrs/additionalProperties"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14/properties/bp",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14/properties/bp",
-    "description": "Basis point shift to apply.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/14/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/14/properties/kind",
-    "const": "instrument_spread_bp_by_attr"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/15",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/15",
-    "description": "Instrument price shock by type.\n\n`pct` may be `<= -100`: legitimate write-down stress.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\nuse finstack_quant_valuations::pricer::InstrumentType;\n\nlet op = OperationSpec::InstrumentPricePctByType {\n    instrument_types: vec![InstrumentType::Bond, InstrumentType::TermLoan],\n    pct: -5.0,\n};\n```"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/15/properties/instrument_types",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/15/properties/instrument_types",
-    "description": "Instrument types to shock."
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/15/properties/instrument_types/items",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/15/properties/instrument_types/items",
-    "ref": "#/$defs/InstrumentType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/InstrumentType"
-  },
-  {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/15/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/15/properties/kind",
-    "const": "instrument_price_pct_by_type"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/15/properties/pct",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/15/properties/pct",
-    "description": "Percentage price change.",
-    "format": "double"
+    "const": "rate_binding"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/16",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/16",
-    "description": "Instrument spread shock by type.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\nuse finstack_quant_valuations::pricer::InstrumentType;\n\nlet op = OperationSpec::InstrumentSpreadBpByType {\n    instrument_types: vec![InstrumentType::Cds],\n    bp: 100.0,\n};\n```"
+    "description": "Instrument spread shock by exact attribute match (FI only).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\nuse indexmap::IndexMap;\n\nlet mut attrs = IndexMap::new();\nattrs.insert(\"rating\".into(), \"CCC\".into());\n\nlet op = OperationSpec::InstrumentSpreadBpByAttr {\n    attrs,\n    bp: 50.0,\n};\n```\n\nMatching semantics:\n- Only instrument metadata key/value pairs are considered (the `meta` map on\n  `Attributes`); tag sets are ignored.\n- Attribute keys/values compared case-insensitively\n- AND semantics (all provided pairs must match metadata)\n- An empty attribute map is rejected at validation time. Use\n  [`OperationSpec::InstrumentSpreadBpByType`] with an explicit list of\n  instrument types to apply a broad shock."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/16/properties/attrs",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/16/properties/attrs",
+    "description": "Attributes to match. Matching uses AND semantics with\ncase-insensitive key/value comparison."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/16/properties/attrs/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/16/properties/attrs/additionalProperties"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/16/properties/bp",
@@ -368,97 +381,79 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/16/properties/instrument_types",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/16/properties/instrument_types",
-    "description": "Instrument types to shock."
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/16/properties/instrument_types/items",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/16/properties/instrument_types/items",
-    "ref": "#/$defs/InstrumentType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/InstrumentType"
-  },
-  {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/16/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/16/properties/kind",
-    "const": "instrument_spread_bp_by_type"
+    "const": "instrument_spread_bp_by_attr"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/17",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/17",
-    "description": "Shock asset correlation for structured credit instruments.\n\nApplies a parallel shift to asset correlation parameters. For flat\ncorrelation structures, this bumps the single asset correlation. For\nsectored structures, it bumps both intra-sector and inter-sector\ncorrelations (inter-sector at half the rate).\n\n# Arguments\n- `delta_pts`: Additive shock in decimal correlation (`0.02` = +0.02)\n\n# Clamping\nAsset correlation is clamped to [0, 0.99] after the shock.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::AssetCorrelationPts {\n    delta_pts: 0.02, // +0.02 decimal correlation\n};\n```"
+    "description": "Instrument price shock by type.\n\n`pct` may be `<= -100`: legitimate write-down stress.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\nuse finstack_quant_valuations::pricer::InstrumentType;\n\nlet op = OperationSpec::InstrumentPricePctByType {\n    instrument_types: vec![InstrumentType::Bond, InstrumentType::TermLoan],\n    pct: -5.0,\n};\n```"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/17/properties/delta_pts",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/17/properties/delta_pts",
-    "description": "Additive shock in decimal correlation (`0.02` = +0.02).",
-    "format": "double"
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/17/properties/instrument_types",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/17/properties/instrument_types",
+    "description": "Instrument types to shock."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/17/properties/instrument_types/items",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/17/properties/instrument_types/items",
+    "ref": "#/$defs/InstrumentType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/InstrumentType"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/17/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/17/properties/kind",
-    "const": "asset_correlation_pts"
+    "const": "instrument_price_pct_by_type"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/17/properties/pct",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/17/properties/pct",
+    "description": "Percentage price change.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/18",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/18",
-    "description": "Shock prepay-default correlation for structured credit instruments.\n\nApplies a parallel shift to the correlation between prepayment and\ndefault rates. This is typically negative (higher prepayment = lower\ndefaults due to selection effects).\n\n# Arguments\n- `delta_pts`: Additive shock in decimal correlation (`0.02` = +0.02)\n\n# Clamping\nPrepay-default correlation is clamped to [-0.99, 0.99].\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::PrepayDefaultCorrelationPts {\n    delta_pts: 0.10, // +0.10 decimal correlation (less negative)\n};\n```"
+    "description": "Instrument spread shock by type.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\nuse finstack_quant_valuations::pricer::InstrumentType;\n\nlet op = OperationSpec::InstrumentSpreadBpByType {\n    instrument_types: vec![InstrumentType::Cds],\n    bp: 100.0,\n};\n```"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/18/properties/delta_pts",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/18/properties/delta_pts",
-    "description": "Additive shock in decimal correlation (`0.02` = +0.02).",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/18/properties/bp",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/18/properties/bp",
+    "description": "Basis point shift to apply.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/18/properties/instrument_types",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/18/properties/instrument_types",
+    "description": "Instrument types to shock."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/18/properties/instrument_types/items",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/18/properties/instrument_types/items",
+    "ref": "#/$defs/InstrumentType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/InstrumentType"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/18/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/18/properties/kind",
-    "const": "prepay_default_correlation_pts"
+    "const": "instrument_spread_bp_by_type"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19",
-    "description": "Hierarchy-targeted parallel curve shift.\n\nDuring [`crate::engine::ScenarioEngine::apply`], the engine resolves\n`target` against the market-data hierarchy and expands this into one\n[`OperationSpec::CurveParallelBp`] per matched curve. When multiple\nhierarchy operations reach the same curve, [`ScenarioSpec::resolution_mode`]\ndetermines whether they accumulate or only the most specific match survives."
+    "description": "Shock asset correlation for structured credit instruments.\n\nApplies a parallel shift to asset correlation parameters. For flat\ncorrelation structures, this bumps the single asset correlation. For\nsectored structures, it bumps both intra-sector and inter-sector\ncorrelations (inter-sector at half the rate).\n\n# Arguments\n- `delta_pts`: Additive shock in decimal correlation (`0.02` = +0.02)\n\n# Clamping\nAsset correlation is clamped to [0, 0.99] after the shock.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::AssetCorrelationPts {\n    delta_pts: 0.02, // +0.02 decimal correlation\n};\n```"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19/properties/bp",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19/properties/bp",
-    "description": "Basis point shift (additive), or percent of the price-curve forward\nwhen `curve_kind` is [`CurveKind::Commodity`].",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19/properties/delta_pts",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19/properties/delta_pts",
+    "description": "Additive shock in decimal correlation (`0.02` = +0.02).",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19/properties/curve_kind",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19/properties/curve_kind",
-    "description": "Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).",
-    "ref": "#/$defs/CurveKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/CurveKind"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19/properties/discount_curve_id",
-    "description": "Optional discount curve for hazard-curve recalibration.\n\nPropagated to each expanded [`OperationSpec::CurveParallelBp`].\nIf `None`, the adapter applies heuristic resolution."
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19/properties/discount_curve_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19/properties/discount_curve_id/anyOf/0",
-    "ref": "#/$defs/Id",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19/properties/discount_curve_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19/properties/discount_curve_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19/properties/kind",
-    "const": "hierarchy_curve_parallel_bp"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/19/properties/target",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/19/properties/target",
-    "description": "Hierarchy target to resolve to curves.",
-    "ref": "#/$defs/HierarchyTarget",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget"
+    "const": "asset_correlation_pts"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/2",
@@ -488,96 +483,180 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/20",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/20",
-    "description": "Hierarchy-targeted vol-surface parallel shift.\n\nResolution follows the same hierarchy-expansion rules as\n[`OperationSpec::HierarchyCurveParallelBp`], expanding into\n[`OperationSpec::VolSurfaceParallelPct`] per matched surface (`pct >= -100`)."
+    "description": "Shock prepay-default correlation for structured credit instruments.\n\nApplies a parallel shift to the correlation between prepayment and\ndefault rates. This is typically negative (higher prepayment = lower\ndefaults due to selection effects).\n\n# Arguments\n- `delta_pts`: Additive shock in decimal correlation (`0.02` = +0.02)\n\n# Clamping\nPrepay-default correlation is clamped to [-0.99, 0.99].\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::PrepayDefaultCorrelationPts {\n    delta_pts: 0.10, // +0.10 decimal correlation (less negative)\n};\n```"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/20/properties/delta_pts",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/20/properties/delta_pts",
+    "description": "Additive shock in decimal correlation (`0.02` = +0.02).",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/20/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/20/properties/kind",
-    "const": "hierarchy_vol_surface_parallel_pct"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/20/properties/pct",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/20/properties/pct",
-    "description": "Percentage change in volatility.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/20/properties/target",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/20/properties/target",
-    "description": "Hierarchy target to resolve to surfaces.",
-    "ref": "#/$defs/HierarchyTarget",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget"
+    "const": "prepay_default_correlation_pts"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21",
-    "description": "Hierarchy-targeted equity price shift.\n\nResolution expands the hierarchy target into one direct equity-price\nshock per matched identifier. Percent inputs use percentage points."
+    "description": "Hierarchy-targeted parallel curve shift.\n\nDuring [`crate::engine::ScenarioEngine::apply`], the engine resolves\n`target` against the market-data hierarchy and expands this into one\n[`OperationSpec::CurveParallelBp`] per matched curve. When multiple\nhierarchy operations reach the same curve, [`ScenarioSpec::resolution_mode`]\ndetermines whether they accumulate or only the most specific match survives."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21/properties/bp",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21/properties/bp",
+    "description": "Additive rate shift in basis points.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21/properties/curve_kind",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21/properties/curve_kind",
+    "description": "Rate curve family (Discount, Forward, ParCDS or Inflation).",
+    "ref": "#/$defs/CurveKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/CurveKind"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21/properties/discount_curve_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21/properties/discount_curve_id",
+    "description": "Optional discount curve for hazard-curve recalibration.\n\nPropagated to each expanded [`OperationSpec::CurveParallelBp`].\nIf `None`, the adapter applies heuristic resolution."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21/properties/discount_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21/properties/discount_curve_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21/properties/discount_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21/properties/discount_curve_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21/properties/kind",
-    "const": "hierarchy_equity_price_pct"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21/properties/pct",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21/properties/pct",
-    "description": "Percentage price change.",
-    "format": "double"
+    "const": "hierarchy_curve_parallel_bp"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/21/properties/target",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/21/properties/target",
-    "description": "Hierarchy target to resolve to equity IDs.",
+    "description": "Hierarchy target to resolve to curves.",
     "ref": "#/$defs/HierarchyTarget",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/22",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/22",
-    "description": "Hierarchy-targeted base-correlation parallel shift.\n\nResolution expands the hierarchy target into one direct\n[`OperationSpec::BaseCorrParallelPts`] per matched surface."
+    "description": "Apply a relative price shock to every commodity curve matching the hierarchy target."
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/22/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/22/properties/kind",
-    "const": "hierarchy_base_corr_parallel_pts"
+    "const": "hierarchy_commodity_curve_parallel_pct"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/22/properties/points",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/22/properties/points",
-    "description": "Absolute shift in decimal correlation (`0.02` = +0.02).",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/22/properties/pct",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/22/properties/pct",
+    "description": "Percentage change, such that `5.0` raises prices by five percent.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/22/properties/target",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/22/properties/target",
-    "description": "Hierarchy target to resolve to surfaces.",
+    "description": "Predicate identifying the target commodity curves.",
     "ref": "#/$defs/HierarchyTarget",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/23",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/23",
-    "description": "Roll the valuation horizon forward before any later scenario operations run.\n\n`period` uses tenor-style strings such as `\"1D\"`, `\"1W\"`, `\"1M\"`, and\n`\"1Y\"`. [`TimeRollMode`] controls whether the roll uses business-day-aware\ndate arithmetic, pure calendar arithmetic, or fixed approximate day counts.\n\nThis operation is handled in phase 0 of\n[`crate::engine::ScenarioEngine::apply`], before market or statement\nshocks. If `apply_shocks` is `false`, the engine stops after the time roll\nand returns an [`crate::engine::ApplicationReport`] without applying the\nremaining operations in the scenario.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, TimeRollMode};\n\nlet op = OperationSpec::TimeRollForward {\n    period: \"1M\".into(),\n    apply_shocks: true,\n    roll_mode: TimeRollMode::BusinessDays,\n};\n```"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/23/properties/apply_shocks",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/23/properties/apply_shocks",
-    "default": true,
-    "description": "Whether to continue applying the remaining scenario operations after the roll.\n\nWhen `false`, [`crate::engine::ScenarioEngine::apply`] returns\nimmediately after the roll-forward step."
+    "description": "Hierarchy-targeted vol-surface parallel shift.\n\nResolution follows the same hierarchy-expansion rules as\n[`OperationSpec::HierarchyCurveParallelBp`], expanding into\n[`OperationSpec::VolSurfaceParallelPct`] per matched surface (`pct >= -100`)."
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/23/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/23/properties/kind",
+    "const": "hierarchy_vol_surface_parallel_pct"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/23/properties/pct",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/23/properties/pct",
+    "description": "Percentage change in volatility.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/23/properties/target",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/23/properties/target",
+    "description": "Hierarchy target to resolve to surfaces.",
+    "ref": "#/$defs/HierarchyTarget",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/24",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/24",
+    "description": "Hierarchy-targeted equity price shift.\n\nResolution expands the hierarchy target into one direct equity-price\nshock per matched identifier. Percent inputs use percentage points."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/24/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/24/properties/kind",
+    "const": "hierarchy_equity_price_pct"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/24/properties/pct",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/24/properties/pct",
+    "description": "Percentage price change.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/24/properties/target",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/24/properties/target",
+    "description": "Hierarchy target to resolve to equity IDs.",
+    "ref": "#/$defs/HierarchyTarget",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/25",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/25",
+    "description": "Hierarchy-targeted base-correlation parallel shift.\n\nResolution expands the hierarchy target into one direct\n[`OperationSpec::BaseCorrParallelPts`] per matched surface."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/25/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/25/properties/kind",
+    "const": "hierarchy_base_corr_parallel_pts"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/25/properties/points",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/25/properties/points",
+    "description": "Absolute shift in decimal correlation (`0.02` = +0.02).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/25/properties/target",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/25/properties/target",
+    "description": "Hierarchy target to resolve to surfaces.",
+    "ref": "#/$defs/HierarchyTarget",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/26",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/26",
+    "description": "Roll the valuation horizon forward before any later scenario operations run.\n\n`period` uses tenor-style strings such as `\"1D\"`, `\"1W\"`, `\"1M\"`, and\n`\"1Y\"`. [`TimeRollMode`] controls whether the roll uses business-day-aware\ndate arithmetic, pure calendar arithmetic, or fixed approximate day counts.\n\nThis operation is handled in phase 0 of\n[`crate::engine::ScenarioEngine::apply`], before market or statement\nshocks. If `apply_shocks` is `false`, the engine stops after the time roll\nand returns an [`crate::engine::ApplicationReport`] without applying the\nremaining operations in the scenario.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, TimeRollMode};\n\nlet op = OperationSpec::TimeRollForward {\n    period: \"1M\".into(),\n    apply_shocks: true,\n    roll_mode: TimeRollMode::BusinessDays,\n};\n```"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/26/properties/apply_shocks",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/26/properties/apply_shocks",
+    "default": true,
+    "description": "Whether to continue applying the remaining scenario operations after the roll.\n\nWhen `false`, [`crate::engine::ScenarioEngine::apply`] returns\nimmediately after the roll-forward step."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/26/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/26/properties/kind",
     "const": "time_roll_forward"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/23/properties/period",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/23/properties/period",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/26/properties/period",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/26/properties/period",
     "description": "Period to roll forward (e.g., \"1D\", \"1W\", \"1M\", \"1Y\")"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/23/properties/roll_mode",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/23/properties/roll_mode",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/26/properties/roll_mode",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/26/properties/roll_mode",
     "default": "business_days",
     "description": "Roll mode controlling calendar vs business-day behaviour.\n\nDefaults to `BusinessDays`, which respects calendars when provided.",
     "ref": "#/$defs/TimeRollMode",
@@ -586,12 +665,12 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/3",
-    "description": "Parallel shift to a curve (additive in basis points, except commodity).\n\nFor rate-style curves ([`CurveKind::Discount`], [`CurveKind::Forward`],\n[`CurveKind::ParCDS`], [`CurveKind::Inflation`]), `bp` uses the standard\nfixed-income convention where `1 bp = 0.0001` in fractional rate space.\nFor [`CurveKind::Commodity`], `bp` is **percent of the price-curve\nforward** (`5.0` = +5%); the id must name a [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve),\nnot a discount curve.\n\n**Volatility index curves use a separate variant.** Use\n[`OperationSpec::VolIndexParallelPts`] for VIX/VSTOXX-style curves where\nshocks are quoted in absolute index points.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, CurveKind};\n\nlet op = OperationSpec::CurveParallelBp {\n    curve_kind: CurveKind::Discount,\n    curve_id: \"USD_SOFR\".into(),\n    discount_curve_id: None,\n    bp: 50.0, // +50bp parallel shift\n};\n```"
+    "description": "Parallel additive shift in rate basis points for a discount, forward,\npar CDS or inflation curve. One basis point is 0.0001 in decimal rate space.\nCommodity curves use [`OperationSpec::CommodityCurveParallelPct`].\nVolatility index curves use [`OperationSpec::VolIndexParallelPts`].\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, CurveKind};\n\nlet op = OperationSpec::CurveParallelBp {\n    curve_kind: CurveKind::Discount,\n    curve_id: \"USD_SOFR\".into(),\n    discount_curve_id: None,\n    bp: 50.0, // +50bp parallel shift\n};\n```"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/3/properties/bp",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/3/properties/bp",
-    "description": "Basis point shift (additive), or percent of the price-curve forward\nwhen `curve_kind` is [`CurveKind::Commodity`].",
+    "description": "Additive rate shift in basis points.",
     "format": "double"
   },
   {
@@ -604,7 +683,7 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/3/properties/curve_kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/3/properties/curve_kind",
-    "description": "Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).",
+    "description": "Rate curve family (Discount, Forward, ParCDS or Inflation).",
     "ref": "#/$defs/CurveKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/CurveKind"
   },
@@ -631,7 +710,7 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/4",
-    "description": "Node-specific basis point shifts for curve shaping.\n\nFor rate-style curves, `bp` values use the standard fixed-income\nconvention where `1 bp = 0.0001` in fractional rate space. For\n[`CurveKind::Commodity`], each `bp` is percent of the price-curve\nforward (`10.0` = +10% on that tenor); looking up a discount curve\nunder that id is an error. Use [`OperationSpec::VolIndexNodePts`] for\nvol-index curves.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, CurveKind, TenorMatchMode};\n\nlet op = OperationSpec::CurveNodeBp {\n    curve_kind: CurveKind::Discount,\n    curve_id: \"USD_SOFR\".into(),\n    discount_curve_id: None,\n    nodes: vec![\n        (\"2Y\".into(), 25.0),\n        (\"10Y\".into(), -10.0),\n    ],\n    match_mode: TenorMatchMode::Interpolate,\n};\n```"
+    "description": "Node-specific additive rate shifts in basis points.\n\nOne basis point is 0.0001 in decimal rate space.\nCommodity curves use [`OperationSpec::CommodityCurveNodePct`].\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, CurveKind, TenorMatchMode};\n\nlet op = OperationSpec::CurveNodeBp {\n    curve_kind: CurveKind::Discount,\n    curve_id: \"USD_SOFR\".into(),\n    discount_curve_id: None,\n    nodes: vec![\n        (\"2Y\".into(), 25.0),\n        (\"10Y\".into(), -10.0),\n    ],\n    match_mode: TenorMatchMode::Interpolate,\n};\n```"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/4/properties/curve_id",
@@ -643,7 +722,7 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/4/properties/curve_kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/4/properties/curve_kind",
-    "description": "Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).",
+    "description": "Rate curve family (Discount, Forward, ParCDS or Inflation).",
     "ref": "#/$defs/CurveKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/CurveKind"
   },
@@ -678,7 +757,7 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/4/properties/nodes",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/4/properties/nodes",
-    "description": "Vector of `(tenor, shift)` pairs. Shift is rate bp except for\n[`CurveKind::Commodity`], where it is percent of the forward."
+    "description": "Vector of `(tenor, shift)` pairs where shift is in rate basis points."
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/4/properties/nodes/items",
@@ -696,55 +775,55 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/5",
-    "description": "Parallel shock to a volatility-index curve in absolute index points.\n\n`points` is in absolute vol-index points (e.g. `+0.5` lifts every knot\nof a VIX curve by 0.5 vol points). This is intentionally distinct from\nthe basis-point semantics used by [`OperationSpec::CurveParallelBp`].\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolIndexParallelPts {\n    curve_id: \"VIX\".into(),\n    points: 1.0, // +1.0 vol point on every knot\n};\n```"
+    "description": "Parallel relative price shock to a commodity forward curve."
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/5/properties/curve_id",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/5/properties/curve_id",
-    "description": "Curve identifier.",
+    "description": "Identifier of the commodity price curve.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/5/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/5/properties/kind",
-    "const": "vol_index_parallel_pts"
+    "const": "commodity_curve_parallel_pct"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/5/properties/points",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/5/properties/points",
-    "description": "Absolute index-point shift.",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/5/properties/pct",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/5/properties/pct",
+    "description": "Percentage change, such that `5.0` raises prices by five percent.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/6",
-    "description": "Node-specific shock to a volatility-index curve in absolute index points.\n\nEach `(tenor, points)` entry shifts the matching knot by `points`\nabsolute vol-index points."
+    "description": "Node-specific relative price shocks to a commodity forward curve."
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/6/properties/curve_id",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/6/properties/curve_id",
-    "description": "Curve identifier.",
+    "description": "Identifier of the commodity price curve.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/6/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/6/properties/kind",
-    "const": "vol_index_node_pts"
+    "const": "commodity_curve_node_pct"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/6/properties/match_mode",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/6/properties/match_mode",
     "default": "interpolate",
-    "description": "How to handle tenors not in the curve.",
+    "description": "Policy for requested tenors between curve pillars.",
     "ref": "#/$defs/TenorMatchMode",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/TenorMatchMode"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/6/properties/nodes",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/6/properties/nodes",
-    "description": "Vector of (tenor, points) pairs in absolute vol-index points."
+    "description": "Pairs of tenor and percentage price change; `5.0` raises price by five percent."
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/6/properties/nodes/items",
@@ -762,79 +841,89 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/7",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/7",
-    "description": "Parallel shift to base correlation surface (absolute points).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::BaseCorrParallelPts {\n    surface_id: \"CDX_IG\".into(),\n    points: 0.02, // +0.02 decimal correlation\n};\n```"
+    "description": "Parallel shock to a volatility-index curve in absolute index points.\n\n`points` is in absolute vol-index points (e.g. `+0.5` lifts every knot\nof a VIX curve by 0.5 vol points). This is intentionally distinct from\nthe basis-point semantics used by [`OperationSpec::CurveParallelBp`].\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolIndexParallelPts {\n    curve_id: \"VIX\".into(),\n    points: 1.0, // +1.0 vol point on every knot\n};\n```"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/7/properties/curve_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/7/properties/curve_id",
+    "description": "Curve identifier.",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/7/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/7/properties/kind",
-    "const": "base_corr_parallel_pts"
+    "const": "vol_index_parallel_pts"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/7/properties/points",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/7/properties/points",
-    "description": "Absolute shift in decimal correlation (`0.02` = +0.02).",
+    "description": "Absolute index-point shift.",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/7/properties/surface_id",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/7/properties/surface_id",
-    "description": "Surface identifier.",
-    "ref": "#/$defs/Id",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8",
-    "description": "Bucket-specific base correlation shifts by detachment.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::BaseCorrBucketPts {\n    surface_id: \"CDX_IG\".into(),\n    detachment_bp: Some(vec![300, 700]), // 3% and 7% detachment\n    points: 0.02, // +0.02 decimal correlation\n};\n```"
+    "description": "Node-specific shock to a volatility-index curve in absolute index points.\n\nEach `(tenor, points)` entry shifts the matching knot by `points`\nabsolute vol-index points."
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/detachment_bp",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/detachment_bp",
-    "description": "Optional detachment points in basis points (e.g., 300 for 3%)."
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/detachment_bp/items",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/detachment_bp/items",
-    "format": "int32"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/kind",
-    "const": "base_corr_bucket_pts"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/points",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/points",
-    "description": "Absolute shift in decimal correlation (`0.02` = +0.02).",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/surface_id",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/surface_id",
-    "description": "Surface identifier.",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/curve_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/curve_id",
+    "description": "Curve identifier.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
   {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/kind",
+    "const": "vol_index_node_pts"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/match_mode",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/match_mode",
+    "default": "interpolate",
+    "description": "How to handle tenors not in the curve.",
+    "ref": "#/$defs/TenorMatchMode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/TenorMatchMode"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/nodes",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/nodes",
+    "description": "Vector of (tenor, points) pairs in absolute vol-index points."
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/nodes/items",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/nodes/items"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/nodes/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/nodes/items/prefixItems/0"
+  },
+  {
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/8/properties/nodes/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/8/properties/nodes/items/prefixItems/1",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/9",
-    "description": "Parallel percent shift to a volatility surface.\n\nShocks are **sticky-strike** multiplicative grid moves: each stored\n`(expiry, secondary_value)` vol is multiplied by `1 + pct/100`. This is\nnot a sticky-delta re-mark. The post-shock fixed-strike calendar-spread\ncheck applies only to `Strike`-axis `BlackLognormal` surfaces and is a\nheuristic screen, not a no-arbitrage certificate.\n\n`pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;\n`pct < -100` fails validation).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceParallelPct {\n    vol_surface_id: \"SPX\".into(),\n    pct: 10.0, // +10% volatility increase\n};\n```"
+    "description": "Parallel shift to base correlation surface (absolute points).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::BaseCorrParallelPts {\n    surface_id: \"CDX_IG\".into(),\n    points: 0.02, // +0.02 decimal correlation\n};\n```"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/9/properties/kind",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/9/properties/kind",
-    "const": "vol_surface_parallel_pct"
+    "const": "base_corr_parallel_pts"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/9/properties/pct",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/9/properties/pct",
-    "description": "Percentage change in volatility.",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/9/properties/points",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/9/properties/points",
+    "description": "Absolute shift in decimal correlation (`0.02` = +0.02).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/9/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/9/properties/vol_surface_id",
-    "description": "Volatility-surface identifier.",
+    "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/9/properties/surface_id",
+    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/9/properties/surface_id",
+    "description": "Surface identifier.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Id"
   },
@@ -1858,7 +1947,7 @@ export default [
     "path": "#/$defs/d_81fd93f186ef53980c26/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/CurveKind/oneOf/4",
     "const": "commodity",
-    "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\n`bp` on parallel/node ops is percent of the price-curve forward\n(`5.0` = +5%), not a rate basis-point shock. Looking up a\n[`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)\nunder this id is an error."
+    "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\nPrice shocks use [`OperationSpec::CommodityCurveParallelPct`] or\n[`OperationSpec::CommodityCurveNodePct`]."
   },
   {
     "path": "#/$defs/d_d1ea61763dcf52f6c7dc",

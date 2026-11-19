@@ -4236,19 +4236,6 @@ export type Warning =
     }
   | {
       /**
-       * Curve identifier.
-       */
-      curve_id: string;
-      /**
-       * Detail describing whether the trigger was a parallel or node shock
-       * and which knot(s) were extreme.
-       */
-      detail: string;
-      kind: "commodity_shock_outside_range";
-      [k: string]: unknown;
-    }
-  | {
-      /**
        * Equity price identifier.
        */
       id: string;
@@ -4637,9 +4624,7 @@ export type MoveUnit = "basis_point" | "vol_point" | "percent" | "price_unit";
  * applied to market data, instruments, statements, or the valuation horizon.
  * Units are encoded in the variant name and field docs:
  * - `Pct` fields use percentage points (`5.0 = +5%`)
- * - `Bp` fields use additive basis points (1 bp = 1e-4), except
- *   [`CurveKind::Commodity`] where `bp` is percent of the price-curve
- *   forward
+ * - `Bp` fields use additive rate basis points (1 bp = 1e-4)
  * - Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)
  * - Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)
  *
@@ -4690,8 +4675,7 @@ export type OperationSpec =
     }
   | {
       /**
-       * Basis point shift (additive), or percent of the price-curve forward
-       * when `curve_kind` is [`CurveKind::Commodity`].
+       * Additive rate shift in basis points.
        */
       bp: number;
       /**
@@ -4699,7 +4683,7 @@ export type OperationSpec =
        */
       curve_id: Id;
       /**
-       * Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+       * Rate curve family (Discount, Forward, ParCDS or Inflation).
        */
       curve_kind: CurveKind;
       /**
@@ -4717,7 +4701,7 @@ export type OperationSpec =
        */
       curve_id: Id;
       /**
-       * Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+       * Rate curve family (Discount, Forward, ParCDS or Inflation).
        */
       curve_kind: CurveKind;
       /**
@@ -4733,8 +4717,33 @@ export type OperationSpec =
        */
       match_mode?: TenorMatchMode;
       /**
-       * Vector of `(tenor, shift)` pairs. Shift is rate bp except for
-       * [`CurveKind::Commodity`], where it is percent of the forward.
+       * Vector of `(tenor, shift)` pairs where shift is in rate basis points.
+       */
+      nodes: [string, number][];
+    }
+  | {
+      /**
+       * Identifier of the commodity price curve.
+       */
+      curve_id: Id;
+      kind: "commodity_curve_parallel_pct";
+      /**
+       * Percentage change, such that `5.0` raises prices by five percent.
+       */
+      pct: number;
+    }
+  | {
+      /**
+       * Identifier of the commodity price curve.
+       */
+      curve_id: Id;
+      kind: "commodity_curve_node_pct";
+      /**
+       * Policy for requested tenors between curve pillars.
+       */
+      match_mode?: TenorMatchMode;
+      /**
+       * Pairs of tenor and percentage price change; `5.0` raises price by five percent.
        */
       nodes: [string, number][];
     }
@@ -4902,12 +4911,11 @@ export type OperationSpec =
     }
   | {
       /**
-       * Basis point shift (additive), or percent of the price-curve forward
-       * when `curve_kind` is [`CurveKind::Commodity`].
+       * Additive rate shift in basis points.
        */
       bp: number;
       /**
-       * Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+       * Rate curve family (Discount, Forward, ParCDS or Inflation).
        */
       curve_kind: CurveKind;
       /**
@@ -4920,6 +4928,17 @@ export type OperationSpec =
       kind: "hierarchy_curve_parallel_bp";
       /**
        * Hierarchy target to resolve to curves.
+       */
+      target: HierarchyTarget;
+    }
+  | {
+      kind: "hierarchy_commodity_curve_parallel_pct";
+      /**
+       * Percentage change, such that `5.0` raises prices by five percent.
+       */
+      pct: number;
+      /**
+       * Predicate identifying the target commodity curves.
        */
       target: HierarchyTarget;
     }

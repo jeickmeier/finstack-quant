@@ -28,11 +28,11 @@ fn builtin_registry() -> PyResult<&'static finstack_quant_scenarios::TemplateReg
 /// Parameters
 /// ----------
 /// curve_kind : CurveKind | str
-///     Canonical curve family: discount, forward, par_cds, inflation or commodity.
+///     Canonical curve family: discount, forward, par_cds or inflation.
 /// curve_ids : list[str]
 ///     Curve identifiers in execution order; empty input produces an empty list.
 /// bp : float
-///     Additive basis points, or percent of forward for commodity curves.
+///     Additive rate basis points.
 /// discount_curve_id : str | None, default None
 ///     Optional discount curve for ParCDS quote replay, copied onto each operation.
 ///
@@ -68,6 +68,7 @@ fn parallel_bp_many(
         bp,
         discount_curve_id.map(Into::into),
     )
+    .map_err(scenarios_to_py)?
     .into_iter()
     .map(operation_spec::PyOperationSpec::from_inner)
     .collect())

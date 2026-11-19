@@ -985,7 +985,7 @@
         },
         {
           "const": "commodity",
-          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\n`bp` on parallel/node ops is percent of the price-curve forward\n(`5.0` = +5%), not a rate basis-point shock. Looking up a\n[`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)\nunder this id is an error.",
+          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\nPrice shocks use [`OperationSpec::CommodityCurveParallelPct`] or\n[`OperationSpec::CommodityCurveNodePct`].",
           "type": "string"
         }
       ]
@@ -2084,29 +2084,6 @@
             "for_curve",
             "chosen_discount",
             "reason"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "A commodity price-curve shock was outside the typical percent-of-forward\nstress range (approximately `[-80, +200]` percent).",
-          "properties": {
-            "curve_id": {
-              "description": "Curve identifier.",
-              "type": "string"
-            },
-            "detail": {
-              "description": "Detail describing whether the trigger was a parallel or node shock\nand which knot(s) were extreme.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "commodity_shock_outside_range",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "curve_id",
-            "detail"
           ],
           "type": "object"
         },

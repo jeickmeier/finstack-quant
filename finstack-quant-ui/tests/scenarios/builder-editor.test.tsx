@@ -120,8 +120,15 @@ it("discriminates every OperationSpec variant on its kind tag", () => {
   });
   expect(union).not.toBeNull();
   const kinds = union!.branches.map((branch) => branch.label);
-  expect(kinds).toHaveLength(24);
-  expect(new Set(kinds).size).toBe(24);
+  expect(kinds).toHaveLength(27);
+  expect(new Set(kinds).size).toBe(27);
+  expect(kinds).toEqual(
+    expect.arrayContaining([
+      "commodity_curve_parallel_pct",
+      "commodity_curve_node_pct",
+      "hierarchy_commodity_curve_parallel_pct",
+    ]),
+  );
   expect(union!.branches.every((branch) => branch.tag === "kind")).toBe(true);
   for (const operation of cases.template.operations)
     expect(kinds[union!.selected(operation)]).toBe(operation.kind);

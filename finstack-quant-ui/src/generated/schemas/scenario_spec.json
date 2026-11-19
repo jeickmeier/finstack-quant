@@ -171,7 +171,7 @@
       "type": "string"
     },
     "d_4a1bd77a72c86da677de": {
-      "description": "Individual operation within a scenario.\n\nEach variant represents a specific type of shock or adjustment that can be\napplied to market data, instruments, statements, or the valuation horizon.\nUnits are encoded in the variant name and field docs:\n- `Pct` fields use percentage points (`5.0 = +5%`)\n- `Bp` fields use additive basis points (1 bp = 1e-4), except\n  [`CurveKind::Commodity`] where `bp` is percent of the price-curve\n  forward\n- Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)\n- Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)\n\nHierarchy-targeted variants are resolved into direct identifiers during\n[`crate::engine::ScenarioEngine::apply`] using the market hierarchy attached\nto the execution context.",
+      "description": "Individual operation within a scenario.\n\nEach variant represents a specific type of shock or adjustment that can be\napplied to market data, instruments, statements, or the valuation horizon.\nUnits are encoded in the variant name and field docs:\n- `Pct` fields use percentage points (`5.0 = +5%`)\n- `Bp` fields use additive rate basis points (1 bp = 1e-4)\n- Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)\n- Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)\n\nHierarchy-targeted variants are resolved into direct identifiers during\n[`crate::engine::ScenarioEngine::apply`] using the market hierarchy attached\nto the execution context.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -261,10 +261,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Parallel shift to a curve (additive in basis points, except commodity).\n\nFor rate-style curves ([`CurveKind::Discount`], [`CurveKind::Forward`],\n[`CurveKind::ParCDS`], [`CurveKind::Inflation`]), `bp` uses the standard\nfixed-income convention where `1 bp = 0.0001` in fractional rate space.\nFor [`CurveKind::Commodity`], `bp` is **percent of the price-curve\nforward** (`5.0` = +5%); the id must name a [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve),\nnot a discount curve.\n\n**Volatility index curves use a separate variant.** Use\n[`OperationSpec::VolIndexParallelPts`] for VIX/VSTOXX-style curves where\nshocks are quoted in absolute index points.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, CurveKind};\n\nlet op = OperationSpec::CurveParallelBp {\n    curve_kind: CurveKind::Discount,\n    curve_id: \"USD_SOFR\".into(),\n    discount_curve_id: None,\n    bp: 50.0, // +50bp parallel shift\n};\n```",
+          "description": "Parallel additive shift in rate basis points for a discount, forward,\npar CDS or inflation curve. One basis point is 0.0001 in decimal rate space.\nCommodity curves use [`OperationSpec::CommodityCurveParallelPct`].\nVolatility index curves use [`OperationSpec::VolIndexParallelPts`].\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, CurveKind};\n\nlet op = OperationSpec::CurveParallelBp {\n    curve_kind: CurveKind::Discount,\n    curve_id: \"USD_SOFR\".into(),\n    discount_curve_id: None,\n    bp: 50.0, // +50bp parallel shift\n};\n```",
           "properties": {
             "bp": {
-              "description": "Basis point shift (additive), or percent of the price-curve forward\nwhen `curve_kind` is [`CurveKind::Commodity`].",
+              "description": "Additive rate shift in basis points.",
               "format": "double",
               "type": "number"
             },
@@ -274,7 +274,7 @@
             },
             "curve_kind": {
               "$ref": "#/$defs/d_81fd93f186ef53980c26",
-              "description": "Type of curve (Discount, Forward, ParCDS, Inflation, Commodity)."
+              "description": "Rate curve family (Discount, Forward, ParCDS or Inflation)."
             },
             "discount_curve_id": {
               "anyOf": [
@@ -302,7 +302,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Node-specific basis point shifts for curve shaping.\n\nFor rate-style curves, `bp` values use the standard fixed-income\nconvention where `1 bp = 0.0001` in fractional rate space. For\n[`CurveKind::Commodity`], each `bp` is percent of the price-curve\nforward (`10.0` = +10% on that tenor); looking up a discount curve\nunder that id is an error. Use [`OperationSpec::VolIndexNodePts`] for\nvol-index curves.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, CurveKind, TenorMatchMode};\n\nlet op = OperationSpec::CurveNodeBp {\n    curve_kind: CurveKind::Discount,\n    curve_id: \"USD_SOFR\".into(),\n    discount_curve_id: None,\n    nodes: vec![\n        (\"2Y\".into(), 25.0),\n        (\"10Y\".into(), -10.0),\n    ],\n    match_mode: TenorMatchMode::Interpolate,\n};\n```",
+          "description": "Node-specific additive rate shifts in basis points.\n\nOne basis point is 0.0001 in decimal rate space.\nCommodity curves use [`OperationSpec::CommodityCurveNodePct`].\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, CurveKind, TenorMatchMode};\n\nlet op = OperationSpec::CurveNodeBp {\n    curve_kind: CurveKind::Discount,\n    curve_id: \"USD_SOFR\".into(),\n    discount_curve_id: None,\n    nodes: vec![\n        (\"2Y\".into(), 25.0),\n        (\"10Y\".into(), -10.0),\n    ],\n    match_mode: TenorMatchMode::Interpolate,\n};\n```",
           "properties": {
             "curve_id": {
               "$ref": "#/$defs/d_3d55f4d900c334741d3a",
@@ -310,7 +310,7 @@
             },
             "curve_kind": {
               "$ref": "#/$defs/d_81fd93f186ef53980c26",
-              "description": "Type of curve (Discount, Forward, ParCDS, Inflation, Commodity)."
+              "description": "Rate curve family (Discount, Forward, ParCDS or Inflation)."
             },
             "discount_curve_id": {
               "anyOf": [
@@ -333,7 +333,7 @@
               "description": "How to handle tenors not in the curve."
             },
             "nodes": {
-              "description": "Vector of `(tenor, shift)` pairs. Shift is rate bp except for\n[`CurveKind::Commodity`], where it is percent of the forward.",
+              "description": "Vector of `(tenor, shift)` pairs where shift is in rate basis points.",
               "items": {
                 "maxItems": 2,
                 "minItems": 2,
@@ -354,6 +354,74 @@
           "required": [
             "kind",
             "curve_kind",
+            "curve_id",
+            "nodes"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Parallel relative price shock to a commodity forward curve.",
+          "properties": {
+            "curve_id": {
+              "$ref": "#/$defs/d_3d55f4d900c334741d3a",
+              "description": "Identifier of the commodity price curve."
+            },
+            "kind": {
+              "const": "commodity_curve_parallel_pct",
+              "type": "string"
+            },
+            "pct": {
+              "description": "Percentage change, such that `5.0` raises prices by five percent.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "pct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Node-specific relative price shocks to a commodity forward curve.",
+          "properties": {
+            "curve_id": {
+              "$ref": "#/$defs/d_3d55f4d900c334741d3a",
+              "description": "Identifier of the commodity price curve."
+            },
+            "kind": {
+              "const": "commodity_curve_node_pct",
+              "type": "string"
+            },
+            "match_mode": {
+              "$ref": "#/$defs/d_02550ffac364bae054eb",
+              "default": "interpolate",
+              "description": "Policy for requested tenors between curve pillars."
+            },
+            "nodes": {
+              "description": "Pairs of tenor and percentage price change; `5.0` raises price by five percent.",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
             "curve_id",
             "nodes"
           ],
@@ -757,13 +825,13 @@
           "description": "Hierarchy-targeted parallel curve shift.\n\nDuring [`crate::engine::ScenarioEngine::apply`], the engine resolves\n`target` against the market-data hierarchy and expands this into one\n[`OperationSpec::CurveParallelBp`] per matched curve. When multiple\nhierarchy operations reach the same curve, [`ScenarioSpec::resolution_mode`]\ndetermines whether they accumulate or only the most specific match survives.",
           "properties": {
             "bp": {
-              "description": "Basis point shift (additive), or percent of the price-curve forward\nwhen `curve_kind` is [`CurveKind::Commodity`].",
+              "description": "Additive rate shift in basis points.",
               "format": "double",
               "type": "number"
             },
             "curve_kind": {
               "$ref": "#/$defs/d_81fd93f186ef53980c26",
-              "description": "Type of curve (Discount, Forward, ParCDS, Inflation, Commodity)."
+              "description": "Rate curve family (Discount, Forward, ParCDS or Inflation)."
             },
             "discount_curve_id": {
               "anyOf": [
@@ -790,6 +858,31 @@
             "curve_kind",
             "target",
             "bp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Apply a relative price shock to every commodity curve matching the hierarchy target.",
+          "properties": {
+            "kind": {
+              "const": "hierarchy_commodity_curve_parallel_pct",
+              "type": "string"
+            },
+            "pct": {
+              "description": "Percentage change, such that `5.0` raises prices by five percent.",
+              "format": "double",
+              "type": "number"
+            },
+            "target": {
+              "$ref": "#/$defs/d_3d218202d529576e2f82",
+              "description": "Predicate identifying the target commodity curves."
+            }
+          },
+          "required": [
+            "kind",
+            "target",
+            "pct"
           ],
           "type": "object"
         },
@@ -1751,7 +1844,7 @@
         },
         {
           "const": "commodity",
-          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\n`bp` on parallel/node ops is percent of the price-curve forward\n(`5.0` = +5%), not a rate basis-point shock. Looking up a\n[`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)\nunder this id is an error.",
+          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\nPrice shocks use [`OperationSpec::CommodityCurveParallelPct`] or\n[`OperationSpec::CommodityCurveNodePct`].",
           "type": "string"
         }
       ]

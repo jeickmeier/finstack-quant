@@ -154,8 +154,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
                 let ((CurveKind::Discount, MarketDataTarget::DiscountCurve(curve_id))
                 | (CurveKind::Forward, MarketDataTarget::ForwardCurve(curve_id))
                 | (CurveKind::ParCDS, MarketDataTarget::HazardCurve(curve_id))
-                | (CurveKind::Inflation, MarketDataTarget::InflationCurve(curve_id))
-                | (CurveKind::Commodity, MarketDataTarget::PriceCurve(curve_id))) =
+                | (CurveKind::Inflation, MarketDataTarget::InflationCurve(curve_id))) =
                     (curve_kind, matched_target)
                 else {
                     return None;
@@ -167,6 +166,17 @@ pub(super) fn expand_hierarchy_operations<'a>(
                     bp: *bp,
                 })
             })?,
+            OperationSpec::HierarchyCommodityCurveParallelPct { target, pct } => {
+                expand_target(hierarchy, target, op.kind(), |matched_target| {
+                    let MarketDataTarget::PriceCurve(curve_id) = matched_target else {
+                        return None;
+                    };
+                    Some(OperationSpec::CommodityCurveParallelPct {
+                        curve_id,
+                        pct: *pct,
+                    })
+                })?
+            }
             OperationSpec::HierarchyVolSurfaceParallelPct { target, pct } => {
                 expand_target(hierarchy, target, op.kind(), |matched_target| {
                     let MarketDataTarget::VolSurface(vol_surface_id) = matched_target else {

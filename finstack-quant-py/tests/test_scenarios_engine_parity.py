@@ -657,3 +657,13 @@ def test_scenario_add_uses_existing_priority_and_leaves_specs_unchanged() -> Non
     assert later + earlier == compose_scenarios([later, earlier])
     assert (later + earlier).id == "vol+rates"
     assert (later.to_json(), earlier.to_json()) == snapshot
+
+
+def test_rate_shocks_reject_the_commodity_curve_kind() -> None:
+    commodity = CurveKind.commodity()
+    with pytest.raises(ValueError, match="commodity_curve_parallel_pct"):
+        OperationSpec.curve_parallel_bp(commodity, "WTI", 15).validate()
+    with pytest.raises(ValueError, match="commodity_curve_node_pct"):
+        OperationSpec.curve_node_bp(commodity, "WTI", [("2Y", 15)]).validate()
+    with pytest.raises(ValueError, match="commodity_curve_parallel_pct"):
+        parallel_bp_many(commodity, [], 15)

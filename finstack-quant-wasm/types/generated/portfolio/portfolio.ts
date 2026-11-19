@@ -426,19 +426,6 @@ export type Warning =
     }
   | {
       /**
-       * Curve identifier.
-       */
-      curve_id: string;
-      /**
-       * Detail describing whether the trigger was a parallel or node shock
-       * and which knot(s) were extreme.
-       */
-      detail: string;
-      kind: "commodity_shock_outside_range";
-      [k: string]: unknown;
-    }
-  | {
-      /**
        * Equity price identifier.
        */
       id: string;

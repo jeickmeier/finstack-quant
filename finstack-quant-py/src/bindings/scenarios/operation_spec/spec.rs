@@ -20,9 +20,7 @@ use crate::bindings::module_utils::parse_currency;
 /// Units follow the constructor name:
 ///
 /// - ``*_pct`` fields are percentage points (``5.0`` = +5%).
-/// - ``*_bp`` fields are additive basis points (1 bp = 1e-4) — except on
-///   ``CurveKind.commodity()`` curves, where ``bp`` is **percent of the
-///   forward** (a commodity price curve has no rate to shift).
+/// - ``*_bp`` fields are additive rate basis points (1 bp = 1e-4).
 /// - Vol-index ``*_pts`` are index points (``1.0`` on 18.5 → 19.5).
 /// - Correlation and base-correlation ``*_pts`` are **decimal correlation**
 ///   (``0.02`` = +0.02, not percentage points).
@@ -103,7 +101,7 @@ impl PyOperationSpec {
         }))
     }
 
-    /// Construct one parallel basis-point shift (percent of forward for commodity curves).
+    /// Construct a parallel rate shift in basis points.
     ///
     /// Parameters
     /// ----------
@@ -112,7 +110,7 @@ impl PyOperationSpec {
     /// curve_id : str
     ///     Identifier of the single curve to shock.
     /// bp : float
-    ///     Additive basis points; percent of forward for commodity curves.
+    ///     Additive rate basis points.
     /// discount_curve_id : str | None
     ///     Discount curve used to re-bootstrap ParCDS quotes; omit for Rust resolution.
     ///
@@ -169,6 +167,50 @@ impl PyOperationSpec {
             nodes,
             match_mode,
         }))
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.scenarios._operation_spec.spec", "OperationSpec.commodity_curve_parallel_pct")]
+    #[classmethod]
+    fn commodity_curve_parallel_pct(_cls: &Bound<'_, PyType>, curve_id: &str, pct: f64) -> Self {
+        Self::from_inner(OperationSpec::CommodityCurveParallelPct {
+            curve_id: CurveId::from(curve_id),
+            pct,
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.scenarios._operation_spec.spec", "OperationSpec.commodity_curve_node_pct")]
+    #[classmethod]
+    #[pyo3(signature = (curve_id, nodes, match_mode=None))]
+    fn commodity_curve_node_pct(
+        _cls: &Bound<'_, PyType>,
+        curve_id: &str,
+        nodes: Vec<(String, f64)>,
+        match_mode: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let match_mode = match_mode
+            .map(extract_tenor_match_mode)
+            .transpose()?
+            .unwrap_or_default();
+        Ok(Self::from_inner(OperationSpec::CommodityCurveNodePct {
+            curve_id: CurveId::from(curve_id),
+            nodes,
+            match_mode,
+        }))
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.scenarios._operation_spec.spec", "OperationSpec.hierarchy_commodity_curve_parallel_pct")]
+    #[classmethod]
+    fn hierarchy_commodity_curve_parallel_pct(
+        _cls: &Bound<'_, PyType>,
+        target: &Bound<'_, PyAny>,
+        pct: f64,
+    ) -> PyResult<Self> {
+        Ok(Self::from_inner(
+            OperationSpec::HierarchyCommodityCurveParallelPct {
+                target: extract_hierarchy_target(target)?,
+                pct,
+            },
+        ))
     }
 
     /// Parallel shock to a volatility-index curve in absolute index points.
@@ -353,8 +395,7 @@ impl PyOperationSpec {
         Self::from_inner(OperationSpec::PrepayDefaultCorrelationPts { delta_pts })
     }
 
-    /// Hierarchy-targeted parallel curve shift (basis points; percent of
-    /// forward for commodity curves).
+    /// Hierarchy-targeted parallel rate shift in basis points.
     ///
     /// ``target`` is a ``HierarchyTarget`` or its JSON string
     /// (``{"path": [...], "tag_filter": {...}}``).

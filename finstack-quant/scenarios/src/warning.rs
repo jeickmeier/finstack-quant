@@ -28,16 +28,6 @@ pub enum Warning {
         reason: String,
     },
 
-    /// A commodity price-curve shock was outside the typical percent-of-forward
-    /// stress range (approximately `[-80, +200]` percent).
-    CommodityShockOutsideRange {
-        /// Curve identifier.
-        curve_id: String,
-        /// Detail describing whether the trigger was a parallel or node shock
-        /// and which knot(s) were extreme.
-        detail: String,
-    },
-
     /// Equity identifier was missing from the market context; no bump applied.
     EquityNotFound {
         /// Equity price identifier.
@@ -193,8 +183,7 @@ impl fmt::Display for Warning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Warning::DiscountCurveHeuristic { reason, .. } => f.write_str(reason),
-            Warning::CommodityShockOutsideRange { detail, .. }
-            | Warning::FxTriangulationInconsistent { detail }
+            Warning::FxTriangulationInconsistent { detail }
             | Warning::TenorExtrapolated { detail, .. }
             | Warning::InterpolatedNodeBumpFirstOrder { detail, .. } => f.write_str(detail),
             Warning::EquityNotFound { id } => write!(f, "Equity {id}: not found in market data"),

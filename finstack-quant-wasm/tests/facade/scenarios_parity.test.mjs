@@ -73,7 +73,7 @@ test('only the computing OperationSpec members have WASM functions', () => {
     'operationSpecValidate',
   ]);
   const covered = new Set(GOLDEN.constructors.map(({ py }) => py));
-  assert.equal(covered.size, 25);
+  assert.equal(covered.size, 28);
 });
 
 test('computing constructors reject wrong types and unknown labels', () => {
@@ -161,7 +161,26 @@ test('scenario enum literals are the Python wire values', () => {
   assert.deepEqual(enums.Compounding.quarterly, { periodic: 4 });
   for (const curveKind of Object.values(enums.CurveKind)) {
     const operation = { kind: 'curve_parallel_bp', curve_kind: curveKind, curve_id: 'ACME', bp: 1 };
-    assert.equal(scenarios.operationSpecValidate(operation), undefined);
+    if (curveKind === enums.CurveKind.commodity) {
+      assert.throws(
+        () => scenarios.operationSpecValidate(operation),
+        /commodity_curve_parallel_pct/
+      );
+      assert.throws(
+        () => scenarios.parallelBpMany(curveKind, ['ACME'], 1),
+        /commodity_curve_parallel_pct/
+      );
+      assert.equal(
+        scenarios.operationSpecValidate({
+          kind: 'commodity_curve_parallel_pct',
+          curve_id: 'ACME',
+          pct: 1,
+        }),
+        undefined
+      );
+    } else {
+      assert.equal(scenarios.operationSpecValidate(operation), undefined);
+    }
   }
   for (const rollMode of Object.values(enums.TimeRollMode)) {
     assert.equal(scenarios.operationSpecTimeRollForward('1M', false, rollMode).roll_mode, rollMode);

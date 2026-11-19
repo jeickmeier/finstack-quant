@@ -12696,9 +12696,9 @@ export interface ScenariosNamespace {
   readonly computeHorizonReturn: typeof wasm.computeHorizonReturn;
   /**
    * Expand a parallel shift into one operation per curve identifier.
-   * @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
+   * @param curveKind - Canonical discount, forward, par_cds or inflation family label.
    * @param curveIds - Ordered array of curve identifiers; empty input returns an empty array.
-   * @param bp - Additive basis points; percent of forward for commodity curves.
+   * @param bp - Additive rate basis points.
    * @param discountCurveId - Optional ParCDS discount curve copied onto every operation.
    * @returns An array of operations preserving identifier order.
    *

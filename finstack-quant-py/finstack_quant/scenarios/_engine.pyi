@@ -95,7 +95,7 @@ class ApplicationReport:
         list[dict[str, Any]]
             Structured warnings in emission order. Each dict carries a
             ``kind`` discriminator (``"equity_not_found"``,
-            ``"discount_curve_heuristic"``, ``"commodity_shock_outside_range"``,
+            ``"discount_curve_heuristic"``,
             ...) plus variant-specific fields. Empty when the scenario applied
             cleanly.
 

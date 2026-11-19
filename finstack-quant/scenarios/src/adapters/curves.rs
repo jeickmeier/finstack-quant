@@ -16,9 +16,7 @@ use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable, MarketBump, MarketDataTarget,
 };
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
-use finstack_quant_core::market_data::term_structures::{
-    ForwardCurve, InflationCurve, PriceCurve, PriceCurveKind,
-};
+use finstack_quant_core::market_data::term_structures::{ForwardCurve, InflationCurve, PriceCurve};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
@@ -410,49 +408,34 @@ fn preview_price_level(
     base: &PriceCurve,
     deltas: &[f64],
     t: f64,
-    bump: impl Fn(f64, f64) -> f64,
+    bump: impl Fn(f64, f64) -> Result<f64>,
 ) -> Result<f64> {
     let levels = base
         .prices()
         .iter()
         .zip(deltas)
         .map(|(&level, &delta)| bump(level, delta))
-        .collect();
+        .collect::<Result<_>>()?;
     Ok(rebuild_price_levels(base, levels)?.price(t)?)
 }
 
-/// Typical percent-of-forward stress range for commodity price curves.
-const COMMODITY_LARGE_SHOCK_MIN_PCT: f64 = -80.0;
-const COMMODITY_LARGE_SHOCK_MAX_PCT: f64 = 200.0;
-
-fn commodity_shock_warning(curve_id: &CurveId, pct: f64) -> Option<Warning> {
-    let range = COMMODITY_LARGE_SHOCK_MIN_PCT..=COMMODITY_LARGE_SHOCK_MAX_PCT;
-    (!range.contains(&pct)).then(|| Warning::CommodityShockOutsideRange {
-        curve_id: curve_id.as_str().to_string(),
-        detail: format!(
-            "Commodity curve '{curve_id}' parallel bump {pct:+.1} percent of the price-curve \
-             forward is outside the typical stress range \
-             [{COMMODITY_LARGE_SHOCK_MIN_PCT:+.0}, {COMMODITY_LARGE_SHOCK_MAX_PCT:+.0}] percent."
-        ),
-    })
-}
-
-fn commodity_node_shock_warning(curve_id: &CurveId, nodes: &[(String, f64)]) -> Option<Warning> {
-    let range = COMMODITY_LARGE_SHOCK_MIN_PCT..=COMMODITY_LARGE_SHOCK_MAX_PCT;
-    let extreme: Vec<String> = nodes
-        .iter()
-        .filter(|(_, pct)| !range.contains(pct))
-        .map(|(tenor, pct)| format!("{tenor}={pct:+.1}%"))
-        .collect();
-    (!extreme.is_empty()).then(|| Warning::CommodityShockOutsideRange {
-        curve_id: curve_id.as_str().to_string(),
-        detail: format!(
-            "Commodity curve '{curve_id}' node shocks outside typical stress range \
-             [{COMMODITY_LARGE_SHOCK_MIN_PCT:+.0}, {COMMODITY_LARGE_SHOCK_MAX_PCT:+.0}] percent \
-             of the price-curve forward: [{}].",
-            extreme.join(", ")
-        ),
-    })
+fn checked_commodity_level(price: f64, pct: f64) -> Result<f64> {
+    let fraction = pct / 100.0;
+    let multiplier = (100.0 + pct) / 100.0;
+    let result = if fraction.abs() < 0.5 {
+        price.mul_add(fraction, price)
+    } else {
+        price * multiplier
+    };
+    if !result.is_finite()
+        || (fraction == 0.0 && pct != 0.0)
+        || (result == 0.0 && price != 0.0 && multiplier != 0.0)
+    {
+        return Err(Error::Validation(format!(
+            "Commodity price {price} cannot be represented after a {pct}% shock"
+        )));
+    }
+    Ok(result)
 }
 
 /// Resolve the discount curve ID used by recalibration-based curve bumps.
@@ -683,33 +666,9 @@ pub(crate) fn curve_parallel_effects(
             Vec::new(),
             env,
         ),
-        CurveKind::Commodity => {
-            let base_curve = market
-                .get_price_curve(curve_id.as_str())
-                .map_err(|_| missing_market_err(curve_id.as_str()))?;
-
-            let spec = BumpSpec {
-                mode: BumpMode::Multiplicative,
-                units: BumpUnits::Percent,
-                value: bp,
-                bump_type: BumpType::Parallel,
-            };
-            let bump = match base_curve.kind() {
-                PriceCurveKind::Price => MarketBump::PriceCurve {
-                    id: curve_id.clone(),
-                    spec,
-                },
-                PriceCurveKind::VolIndex => MarketBump::VolIndexCurve {
-                    id: curve_id.clone(),
-                    spec,
-                },
-            };
-            let mut effects = vec![ScenarioEffect::MarketBump(bump)];
-            if let Some(w) = commodity_shock_warning(curve_id, bp) {
-                effects.push(ScenarioEffect::Warning(w));
-            }
-            Ok(effects)
-        }
+        CurveKind::Commodity => Err(Error::Validation(
+            "Commodity price curves require a percentage shock".into(),
+        )),
     }
 }
 
@@ -859,42 +818,67 @@ pub(crate) fn curve_node_effects(
                 result.warnings,
             ))
         }
-        CurveKind::Commodity => {
-            let base_curve = market
-                .get_price_curve(curve_id.as_str())
-                .map_err(|_| missing_market_err(curve_id.as_str()))?;
-
-            let knots: Vec<f64> = base_curve.knots().to_vec();
-            let mut result = resolve_bump_targets(
-                curve_id.as_str(),
-                nodes,
-                &knots,
-                match_mode,
-                as_of,
-                base_curve.day_count(),
-                BumpDelivery::Direct,
-            )?;
-            calibrate_native_interpolant(
-                &mut result,
-                &knots,
-                curve_id.as_str(),
-                |d, t| preview_price_level(&base_curve, d, t, |px, pct| px * (1.0 + pct / 100.0)),
-                |t, pct| Ok(base_curve.price(t)? * (1.0 + pct / 100.0)),
-            )?;
-
-            let mut prices: Vec<f64> = base_curve.prices().to_vec();
-            for &(idx, pct) in &result.indexed_targets {
-                prices[idx] *= 1.0 + pct / 100.0;
-            }
-            let new_curve = rebuild_price_levels(&base_curve, prices)?;
-
-            let mut warnings = result.warnings;
-            if let Some(w) = commodity_node_shock_warning(curve_id, nodes) {
-                warnings.push(w);
-            }
-            Ok(update_effects(new_curve, warnings))
-        }
+        CurveKind::Commodity => Err(Error::Validation(
+            "Commodity price curves require a percentage shock".into(),
+        )),
     }
+}
+
+pub(crate) fn commodity_curve_parallel_pct_effects(
+    curve_id: &CurveId,
+    pct: f64,
+    market: &MarketContext,
+) -> Result<Vec<ScenarioEffect>> {
+    market
+        .get_price_curve(curve_id.as_str())
+        .map_err(|_| missing_market_err(curve_id.as_str()))?;
+    Ok(vec![ScenarioEffect::MarketBump(MarketBump::PriceCurve {
+        id: curve_id.clone(),
+        spec: BumpSpec {
+            mode: BumpMode::Multiplicative,
+            units: BumpUnits::Percent,
+            value: pct,
+            bump_type: BumpType::Parallel,
+        },
+    })])
+}
+
+pub(crate) fn commodity_curve_node_pct_effects(
+    curve_id: &CurveId,
+    nodes: &[(String, f64)],
+    match_mode: TenorMatchMode,
+    market: &MarketContext,
+    as_of: Date,
+) -> Result<Vec<ScenarioEffect>> {
+    let base_curve = market
+        .get_price_curve(curve_id.as_str())
+        .map_err(|_| missing_market_err(curve_id.as_str()))?;
+
+    let knots: Vec<f64> = base_curve.knots().to_vec();
+    let mut result = resolve_bump_targets(
+        curve_id.as_str(),
+        nodes,
+        &knots,
+        match_mode,
+        as_of,
+        base_curve.day_count(),
+        BumpDelivery::Direct,
+    )?;
+    calibrate_native_interpolant(
+        &mut result,
+        &knots,
+        curve_id.as_str(),
+        |d, t| preview_price_level(&base_curve, d, t, checked_commodity_level),
+        |t, pct| checked_commodity_level(base_curve.price(t)?, pct),
+    )?;
+
+    let mut prices: Vec<f64> = base_curve.prices().to_vec();
+    for &(idx, pct) in &result.indexed_targets {
+        prices[idx] = checked_commodity_level(prices[idx], pct)?;
+    }
+    let new_curve = rebuild_price_levels(&base_curve, prices)?;
+
+    Ok(update_effects(new_curve, result.warnings))
 }
 
 /// Generate effects for a parallel vol-index curve shock (absolute index points).
@@ -947,7 +931,7 @@ pub(crate) fn vol_index_node_effects(
         &mut result,
         &knots,
         curve_id.as_str(),
-        |deltas, t| preview_price_level(&base_curve, deltas, t, |level, pts| level + pts),
+        |deltas, t| preview_price_level(&base_curve, deltas, t, |level, pts| Ok(level + pts)),
         |t, points| Ok(base_curve.price(t)? + points),
     )?;
 
@@ -1492,11 +1476,9 @@ mod tests {
                     id: "commodity_parallel".into(),
                     name: None,
                     description: None,
-                    operations: vec![OperationSpec::CurveParallelBp {
-                        curve_kind: CurveKind::Commodity,
+                    operations: vec![OperationSpec::CommodityCurveParallelPct {
                         curve_id: "WTI".into(),
-                        discount_curve_id: None,
-                        bp: 10.0,
+                        pct: 10.0,
                     }],
                     priority: 0,
                     resolution_mode: Default::default(),
@@ -1538,15 +1520,12 @@ mod tests {
             calendar: None,
             as_of,
         };
-        let provider = CachedRecalibrationProvider::default();
-        let env = solve_env(&provider);
-        let effects = curve_node_effects(
-            CurveKind::Commodity,
+        let effects = commodity_curve_node_pct_effects(
             &CurveId::from("WTI"),
-            None,
-            &[("1Y".into(), 10.0)],
+            &[("1Y".into(), -120.0)],
             TenorMatchMode::Exact,
-            &CurveApplyCtx::new(&ctx, &env),
+            ctx.market,
+            as_of,
         )
         .expect("exact commodity node bump should apply");
         let bumped = effects
@@ -1556,7 +1535,7 @@ mod tests {
                 _ => None,
             })
             .expect("price curve update");
-        assert!((bumped.price(1.0).unwrap() - 79.2).abs() < 1e-12);
+        assert!((bumped.price(1.0).unwrap() + 14.4).abs() < 1e-12);
         assert!((bumped.price(0.0).unwrap() - 70.0).abs() < 1e-12);
         assert!((bumped.price(5.0).unwrap() - 75.0).abs() < 1e-12);
     }
@@ -1585,15 +1564,12 @@ mod tests {
             calendar: None,
             as_of,
         };
-        let provider = CachedRecalibrationProvider::default();
-        let env = solve_env(&provider);
-        let effects = curve_node_effects(
-            CurveKind::Commodity,
+        let effects = commodity_curve_node_pct_effects(
             &CurveId::from("WTI"),
-            None,
             &[("3Y".into(), 10.0)],
             TenorMatchMode::Interpolate,
-            &CurveApplyCtx::new(&ctx, &env),
+            ctx.market,
+            as_of,
         )
         .expect("interpolated commodity node bump should apply");
         let bumped = effects
@@ -1612,46 +1588,10 @@ mod tests {
     }
 
     #[test]
-    fn commodity_parallel_large_shock_emits_warning() {
-        let as_of = date!(2025 - 01 - 01);
-        let mut market = MarketContext::new()
-            .try_insert(wti_price_curve(as_of))
-            .expect("insert market curve");
-        let mut model = FinancialModelSpec::new(
-            "demo",
-            finstack_quant_core::dates::PeriodPlan::try_new(
-                finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                vec![],
-            )
-            .expect("valid period plan"),
-        );
-        let ctx = ExecutionContext {
-            market: &mut market,
-            model: Some(&mut model),
-            instruments: None,
-            rate_bindings: None,
-            calendar: None,
-            as_of,
-        };
-
-        let curve_id = CurveId::from("WTI");
-        let provider = CachedRecalibrationProvider::default();
-        let env = solve_env(&provider);
-        let effects = curve_parallel_effects(
-            CurveKind::Commodity,
-            &curve_id,
-            None,
-            250.0,
-            &CurveApplyCtx::new(&ctx, &env),
-        )
-        .expect("commodity shock should be handled");
-
-        let has_warning = effects.iter().any(|e| {
-            matches!(
-                e,
-                ScenarioEffect::Warning(Warning::CommodityShockOutsideRange { .. })
-            )
-        });
-        assert!(has_warning, "expected large-shock warning");
+    fn commodity_relative_shock_handles_exact_zero_and_underflow() {
+        assert_eq!(checked_commodity_level(70.0, -100.0).unwrap(), 0.0);
+        assert!(checked_commodity_level(f64::from_bits(1), -99.0).is_err());
+        assert!(checked_commodity_level(70.0, f64::from_bits(1)).is_err());
+        assert!(checked_commodity_level(f64::MAX, 100.0).is_err());
     }
 }
