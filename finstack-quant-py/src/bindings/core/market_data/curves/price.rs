@@ -10,10 +10,12 @@ use pyo3::types::PyDict;
 use super::helpers::{
     CurveSourceOptions, TimePoint, columns_to_dataframe, extract_time_point, required_option,
 };
-use crate::bindings::date_utils::date_to_py;
+use crate::bindings::core::dates::daycount::extract_day_count;
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 
 #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve")]
 #[pyclass(
@@ -37,6 +39,36 @@ impl PyPriceCurve {
 
 #[pymethods]
 impl PyPriceCurve {
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.from_dates")]
+    #[staticmethod]
+    fn from_dates(
+        id: &str,
+        base_date: &Bound<'_, PyAny>,
+        points: Vec<(Bound<'_, PyAny>, f64)>,
+        kind: &str,
+        day_count: &Bound<'_, PyAny>,
+        interp: &str,
+        extrapolation: &str,
+    ) -> PyResult<Self> {
+        let points = points
+            .iter()
+            .map(|(date, value)| Ok((py_to_date(date)?, *value)))
+            .collect::<PyResult<Vec<_>>>()?;
+        PriceCurve::from_dates(
+            id,
+            py_to_date(base_date)?,
+            &points,
+            kind.parse::<PriceCurveKind>().map_err(core_to_py)?,
+            extract_day_count(day_count)?,
+            interp.parse::<InterpStyle>().map_err(core_to_py)?,
+            extrapolation
+                .parse::<ExtrapolationPolicy>()
+                .map_err(core_to_py)?,
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(core_to_py)
+    }
+
     #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.__init__")]
     #[new]
     fn new(options: &Bound<'_, PyDict>) -> PyResult<Self> {

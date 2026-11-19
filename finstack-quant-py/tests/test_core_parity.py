@@ -1457,3 +1457,16 @@ def test_ols_rectangular_design_and_strided_numpy_predictors() -> None:
         ols([[0, 0], [1], [2, 4], [3, 6]], [5, 7, 2, 4])
     with pytest.raises(ValueError, match="finite"):
         ols([[0], [1], [2]], [5, float("nan"), 2])
+
+
+def test_dated_price_curve_preserves_signed_levels_on_leap_year_clock() -> None:
+    from finstack_quant.core.market_data import PriceCurve
+
+    points = [("2024-01-01", -25.0), ("2025-01-01", 10.0)]
+    args = ("WTI", "2024-01-01", points, "price", "act_365f", "linear", "flat")
+    curve = PriceCurve.from_dates(*args)
+    assert curve.price("2024-01-01") == -25.0
+    assert curve.price("2025-01-01") == 10.0
+    assert curve.price(366.0 / 365.0) == 10.0
+    with pytest.raises(ValueError, match="precedes base date"):
+        PriceCurve.from_dates("WTI", "2024-01-02", points, "price", "act_365f", "linear", "flat")

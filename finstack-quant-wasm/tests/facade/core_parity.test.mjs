@@ -912,6 +912,42 @@ test('FinstackConfig derives scale policies and merges native JSON patches', () 
   }
 });
 
+test('dated price curves preserve signed knots and year fractions', () => {
+  const points = [
+    ['2024-01-01', -25],
+    ['2025-01-01', 10],
+  ];
+  const curve = core.PriceCurve.fromDates(
+    'WTI',
+    '2024-01-01',
+    points,
+    'price',
+    'act_365f',
+    'linear',
+    'flat'
+  );
+  try {
+    assert.equal(curve.price('2024-01-01'), -25);
+    assert.equal(curve.price('2025-01-01'), 10);
+    assert.equal(curve.price(366 / 365), 10);
+    assert.throws(
+      () =>
+        core.PriceCurve.fromDates(
+          'WTI',
+          '2024-01-02',
+          points,
+          'price',
+          'act_365f',
+          'linear',
+          'flat'
+        ),
+      /precedes base date/
+    );
+  } finally {
+    curve.free();
+  }
+});
+
 test('FinstackConfig extensions hold JSON values, not JSON text', () => {
   const cfg = new core.FinstackConfig(null, { generic_epsilon: 1e-9 });
   assert.deepEqual(cfg.tolerances, { generic_epsilon: 1e-9 });

@@ -8,7 +8,10 @@ use crate::api::core::curve_args::TimePoint;
 use crate::api::core::curve_args::flat_pairs;
 use crate::api::core::curve_args::js_time_point;
 use crate::api::core::market_hazard::JsHazardCurve;
-use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string, js_uint};
+use crate::utils::input::{
+    from_js_json, from_js_json_exact, js_f64, js_f64_seq, js_string, js_uint,
+};
+use crate::utils::wire::js_date;
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::term_structures::{
@@ -307,6 +310,52 @@ impl JsPriceCurve {
 
 #[wasm_bindgen(js_class = PriceCurve)]
 impl JsPriceCurve {
+    /// Construct a curve from dated price or index levels.
+    /// @param id - Market identifier used to retrieve the source.
+    /// @param baseDate - ISO-8601 date at zero curve time.
+    /// @param points - Ordered ISO date and native level pairs on or after the base date.
+    /// @param kind - "price" for signed price quotes or "vol_index" for nonnegative index levels.
+    /// @param dayCount - Explicit date-to-time convention usable without a holiday calendar.
+    /// @param interp - Level interpolation label; log-linear requires positive levels.
+    /// @param extrapolation - Outside-grid handling such as "flat".
+    /// @returns Curve using the supplied date pillars.
+    /// @throws TypeError for mistyped data or FinstackError for invalid dates, policies or levels.
+    #[wasm_bindgen(js_name = fromDates)]
+    pub fn from_dates(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
+        points: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "\"price\" | \"vol_index\"")] kind: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] interp: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] extrapolation: JsValue,
+    ) -> Result<JsPriceCurve, JsValue> {
+        let points = from_js_json_exact::<Vec<(String, f64)>>(&points, "points")?
+            .into_iter()
+            .map(|(date, level)| Ok((parse_iso_date(&date)?, level)))
+            .collect::<Result<Vec<_>, JsValue>>()?;
+        RustPriceCurve::from_dates(
+            js_string(&id, "id")?,
+            js_date(&base_date, "baseDate")?,
+            &points,
+            js_string(&kind, "kind")?
+                .parse::<PriceCurveKind>()
+                .map_err(to_js_err)?,
+            js_string(&day_count, "dayCount")?
+                .parse::<DayCount>()
+                .map_err(to_js_err)?,
+            js_string(&interp, "interp")?
+                .parse::<InterpStyle>()
+                .map_err(to_js_err)?,
+            js_string(&extrapolation, "extrapolation")?
+                .parse::<ExtrapolationPolicy>()
+                .map_err(to_js_err)?,
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(to_js_err)
+    }
+
     /// Return a copy of the curve with a uniform relative shift to its levels.
     /// @param pct - Signed percentage applied to each knot. A value of 2.5 increases each level by 2.5 percent.
     /// @returns The shocked curve, preserving knot times and curve conventions.

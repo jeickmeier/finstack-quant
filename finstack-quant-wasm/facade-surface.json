@@ -1462,7 +1462,7 @@
   "core.PriceCurve": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromJson"],
+    "statics": ["fromDates", "fromJson"],
     "methods": ["bumpParallelPct", "free", "price", "toJson"],
     "getters": [
       "baseDate",

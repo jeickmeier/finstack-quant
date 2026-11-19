@@ -1,7 +1,7 @@
 //! Discount-curve construction, queries, and forward derivation.
 
 use super::super::common::factor::{
-    FactorTransformSnapshot, dated_points_to_factors,
+    FactorTransformSnapshot, dated_points_to_knots,
     instantaneous_forward as factor_instantaneous_forward, zero_rate_points_to_factors,
 };
 use super::super::common::{
@@ -128,7 +128,7 @@ impl DiscountCurve {
     ) -> crate::Result<Self> {
         let id: CurveId = id.into();
         let calendar = validate_curve_clock("DiscountCurve", id.as_str(), day_count, None)?;
-        let knots = dated_points_to_factors(
+        let knots = dated_points_to_knots(
             "DiscountCurve",
             base_date,
             points,

@@ -150,6 +150,67 @@ class PriceCurve:
         """
         ...
 
+    @staticmethod
+    def from_dates(
+        id: str,
+        base_date: DateLike,
+        points: Sequence[tuple[DateLike, float]],
+        kind: str,
+        day_count: DayCount | str,
+        interp: str,
+        extrapolation: str,
+    ) -> PriceCurve:
+        """Construct a curve directly from dated forward prices or index levels.
+
+        Parameters
+        ----------
+        id : str
+            Market identifier used to retrieve the curve.
+        base_date : DateLike
+            Curve origin with zero year fraction.
+        points : sequence of tuple
+            Ordered date and native level pairs on or after the base date.
+        kind : str
+            Use "price" for signed commodity prices or "vol_index" for
+            nonnegative index levels.
+        day_count : DayCount or str
+            Date-to-time convention such as "act_365f"; must work without a
+            holiday calendar.
+        interp : str
+            Native level interpolation such as "linear". Log-linear
+            interpolation requires positive levels.
+        extrapolation : str
+            Outside-grid policy, such as "flat".
+
+        Returns
+        -------
+        PriceCurve
+            Source pinned to the supplied dates and levels.
+
+        Raises
+        ------
+        TypeError
+            If an argument cannot be interpreted as the specified Python type.
+        ValueError
+            If dates, time ordering, levels, the clock, or policy labels are invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import PriceCurve
+        >>> curve = PriceCurve.from_dates(
+        ...     "WTI",
+        ...     "2024-01-02",
+        ...     [("2024-01-02", -5.0), ("2024-04-02", 40.0)],
+        ...     "price",
+        ...     "act_365f",
+        ...     "linear",
+        ...     "flat",
+        ... )
+        >>> curve.price("2024-01-02")
+        -5.0
+        """
+        ...
+
     def price(self, t: TimeOrDate) -> float:
         """
         Forward price (or vol-index level) at a year fraction or date.
