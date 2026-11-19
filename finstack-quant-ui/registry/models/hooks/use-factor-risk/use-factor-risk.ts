@@ -16,7 +16,7 @@ export type {
 export interface FactorRiskRequest
   extends
     FactorSensitivitiesRequest,
-    Omit<DecomposeFactorsRequest, "sensitivitiesJson"> {}
+    Omit<DecomposeFactorsRequest, "sensitivities"> {}
 /** Key the chain on the complete snapshotted book, market, factors, covariance and options; nothing is defaulted. */
 export function factorRiskOptions(
   client: FinstackClient | null,
@@ -38,11 +38,11 @@ export function factorRiskOptions(
         asOf: r.asOf,
         bumpConfigJson: r.bumpConfigJson,
       });
-      // The returned matrix is handed to Rust unchanged, as its JSON text.
+      // The returned matrix is passed directly to the native decomposer.
       const decomposition = await ready.call("decomposeFactors", {
-        sensitivitiesJson: JSON.stringify(sensitivities),
-        covarianceJson: r.covarianceJson,
-        riskMeasureJson: r.riskMeasureJson,
+        sensitivities,
+        covariance: r.covariance,
+        riskMeasure: r.riskMeasure,
       });
       return { sensitivities, decomposition };
     },

@@ -7,6 +7,83 @@ use crate::errors::portfolio_to_py;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
+use finstack_quant_portfolio::allocation::{
+    StrategyAllocationInput, WeightAllocationSpec, default_money_decimal_places,
+};
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._allocation", "StrategyAllocationInput")]
+#[pyclass(
+    name = "StrategyAllocationInput",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyStrategyAllocationInput {
+    inner: StrategyAllocationInput,
+}
+
+#[pymethods]
+impl PyStrategyAllocationInput {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._allocation", "StrategyAllocationInput.__init__")]
+    #[new]
+    #[pyo3(signature = (id, *, fixed_weight=None, returns=None, risk_budget=None))]
+    fn new(
+        id: String,
+        fixed_weight: Option<f64>,
+        returns: Option<Vec<f64>>,
+        risk_budget: Option<f64>,
+    ) -> Self {
+        Self {
+            inner: StrategyAllocationInput {
+                id,
+                fixed_weight,
+                returns: returns.unwrap_or_default(),
+                risk_budget,
+            },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._allocation", "WeightAllocationSpec")]
+#[pyclass(
+    name = "WeightAllocationSpec",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyWeightAllocationSpec {
+    inner: WeightAllocationSpec,
+}
+
+#[pymethods]
+impl PyWeightAllocationSpec {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._allocation", "WeightAllocationSpec.__init__")]
+    #[new]
+    #[pyo3(signature = (scheme, total_capital, strategies, *, covariance=None, money_decimal_places=None))]
+    fn new(
+        scheme: &str,
+        total_capital: f64,
+        strategies: Vec<PyRef<'_, PyStrategyAllocationInput>>,
+        covariance: Option<Vec<Vec<f64>>>,
+        money_decimal_places: Option<u32>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: WeightAllocationSpec {
+                scheme: finstack_quant_core::wire::serde_parse(scheme)
+                    .map_err(crate::errors::core_to_py)?,
+                total_capital,
+                strategies: strategies
+                    .into_iter()
+                    .map(|strategy| strategy.inner.clone())
+                    .collect(),
+                covariance,
+                money_decimal_places: money_decimal_places
+                    .unwrap_or_else(default_money_decimal_places),
+            },
+        })
+    }
+}
+
 /// Column schema for [`PyWeightAllocationResult::to_dataframe`].
 const ALLOCATION_COLUMNS: &[ColumnSchema<'static>] = &[
     ("id", "str"),
@@ -74,7 +151,7 @@ impl PyWeightAllocationResult {
     }
 }
 
-/// Allocate strategy weights from a JSON specification.
+/// Allocate strategy weights from a typed specification.
 ///
 /// ``total_capital`` is finite and signed; nonnegative strategy weights allocate
 /// amounts with the same sign. Capital sums to the total rounded at
@@ -84,8 +161,8 @@ impl PyWeightAllocationResult {
 ///
 /// Parameters
 /// ----------
-/// spec : str | dict | list | pandas.DataFrame
-///     JSON-serialized ``WeightAllocationSpec`` with a scheme, finite signed
+/// spec : WeightAllocationSpec | str | dict
+///     Typed request or its wire representation with a scheme, finite signed
 ///     total capital, strategy rows, and any required covariance data.
 ///
 /// Returns
@@ -103,6 +180,13 @@ impl PyWeightAllocationResult {
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn allocate_weights(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyWeightAllocationResult> {
+    if let Ok(typed) = spec.cast::<PyWeightAllocationSpec>() {
+        let spec = typed.borrow().inner.clone();
+        let inner = py
+            .detach(move || finstack_quant_portfolio::allocation::allocate_weights(&spec))
+            .map_err(portfolio_to_py)?;
+        return Ok(PyWeightAllocationResult { inner });
+    }
     let spec = crate::bindings::extract::extract_records_json(py, spec, "spec")?;
     let inner = py
         .detach(move || {
@@ -116,6 +200,8 @@ fn allocate_weights(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyWeigh
 
 /// Register strategy allocation functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyStrategyAllocationInput>()?;
+    m.add_class::<PyWeightAllocationSpec>()?;
     m.add_class::<PyWeightAllocationResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(allocate_weights, m)?)?;
     Ok(())

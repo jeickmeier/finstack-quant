@@ -5349,12 +5349,12 @@ export interface ModelsFactorRiskNamespace {
    * decomposer — populated only by credit-aware position decomposers).
    *
    * `measure` is the risk measure in its canonical serde form, the same shape
-   * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
+   * as the `riskMeasure` input: `"variance"` or `"volatility"`, or an
    * object carrying `confidence` for `var` / `expected_shortfall`. The Python
    * `RiskDecomposition.measure` getter returns the same value.
-   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
-   * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
+   * @param sensitivities - Structured sensitivity matrix as returned by `computeFactorSensitivities`, or its JSON text. Rows follow position order and columns follow factor order.
+   * @param covariance - Factor covariance matrix or its JSON text. Factor identifiers and their order must match sensitivities.
+   * @param riskMeasure - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
    *
    * # Errors
    *

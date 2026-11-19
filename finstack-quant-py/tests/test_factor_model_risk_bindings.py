@@ -222,3 +222,34 @@ def test_sensitivity_json_requires_currency_and_preserves_zero_factor_rows() -> 
     matrix = SensitivityMatrix.from_json(json.dumps(payload))
     assert matrix.position_deltas(0) == []
     assert json.loads(matrix.to_json()) == payload
+
+
+def test_typed_position_risk_matches_wire_with_budget() -> None:
+    from finstack_quant.models.factor.risk import (
+        PositionRiskBudget,
+        PositionRiskRequest,
+        PositionRiskSource,
+        position_risk_report,
+    )
+
+    covariance = [[0.04, 0.01], [0.01, 0.09]]
+    weights = [100.0, 200.0]
+    source = PositionRiskSource.parametric(weights, covariance, compute_incremental=True)
+    budget = PositionRiskBudget([0.4, 0.6], utilization_threshold=1.2)
+    typed = PositionRiskRequest(["A", "B"], source, confidence=0.975, budget=budget)
+    wire = {
+        "position_ids": ["A", "B"],
+        "source": {
+            "kind": "parametric",
+            "weights": weights,
+            "covariance": covariance,
+            "compute_incremental": True,
+        },
+        "confidence": 0.975,
+        "budget": {"targets": [0.4, 0.6], "utilization_threshold": 1.2},
+    }
+    assert position_risk_report(typed).to_json() == position_risk_report(wire).to_json()
+
+    invalid = PositionRiskRequest(["A", "B"], source, confidence=0.5)
+    with pytest.raises(ValueError, match="confidence"):
+        position_risk_report(invalid)

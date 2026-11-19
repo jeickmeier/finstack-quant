@@ -383,11 +383,10 @@ export function createModelsService(
     },
     decomposeFactors(request) {
       return context.result(() =>
-        // The JSON passes through; an omitted risk measure stays unset (Rust: variance).
         native.models.factor.risk.decomposeFactors(
-          request.sensitivitiesJson,
-          request.covarianceJson,
-          request.riskMeasureJson ?? undefined,
+          request.sensitivities,
+          request.covariance,
+          request.riskMeasure ?? undefined,
         ),
       );
     },

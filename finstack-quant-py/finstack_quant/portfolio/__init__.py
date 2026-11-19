@@ -90,6 +90,8 @@ ReplayResult = _portfolio.ReplayResult
 ReplayStep = _portfolio.ReplayStep
 ReplaySummary = _portfolio.ReplaySummary
 WeightAllocationResult = _portfolio.WeightAllocationResult
+StrategyAllocationInput = _portfolio.StrategyAllocationInput
+WeightAllocationSpec = _portfolio.WeightAllocationSpec
 
 parse_portfolio_spec_json = _portfolio.parse_portfolio_spec_json
 aggregate_metrics = _portfolio.aggregate_metrics
@@ -221,6 +223,7 @@ __all__ = [
     "ScenarioPnlBatchItem",
     "ScenarioRevalueView",
     "SensitivityMatrix",
+    "StrategyAllocationInput",
     "StressPnl",
     "StressResult",
     "TradeDirection",
@@ -230,6 +233,7 @@ __all__ = [
     "UnmatchedEntry",
     "UnsupportedContractVersionError",
     "WeightAllocationResult",
+    "WeightAllocationSpec",
     "WeightingScheme",
     "WhatIfResult",
     "aggregate_full_cashflows",

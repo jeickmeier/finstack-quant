@@ -776,12 +776,12 @@ export interface FactorSensitivitiesRequest {
 }
 /** A factor risk decomposition request; an omitted risk measure is left to Rust (variance). */
 export interface DecomposeFactorsRequest {
-  /** Sensitivity-matrix JSON, usually computeFactorSensitivities' result serialized. */
-  readonly sensitivitiesJson: string;
-  /** FactorCovarianceMatrix JSON aligned with the sensitivities' factor ids. */
-  readonly covarianceJson: string;
-  /** RiskMeasure JSON ("variance", "volatility", {"var": {"confidence": 0.99}}, ...). */
-  readonly riskMeasureJson?: string | null;
+  /** Matrix in the position and factor order returned by computeFactorSensitivities. */
+  readonly sensitivities: SensitivityMatrixJson;
+  /** Covariance aligned to the sensitivity factor axis. */
+  readonly covariance: modelsWire.FactorCovarianceMatrix;
+  /** Parametric risk measure. Rust defaults to variance. */
+  readonly riskMeasure?: modelsWire.RiskMeasure | null;
 }
 /** A portfolio valuation request; omitted options are left to Rust. */
 export interface PortfolioValuationRequest {

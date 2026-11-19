@@ -1800,7 +1800,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/models/risk/cases.json",
-      "sha256": "2505e85730f74729008e58f4cbf144a0a8033495f9506acc9790ce63ac4d25d1"
+      "sha256": "d355272a93a65ab1cff80f22c3b28884abefa12906bb261ba9b0d83ff5b79b3b"
     },
     {
       "path": "finstack-quant-ui/tests/models/options/cases.json",

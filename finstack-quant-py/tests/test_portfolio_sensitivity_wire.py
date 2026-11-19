@@ -14,6 +14,7 @@ import json
 import pytest
 
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.models.factor import FactorCovarianceMatrix
 from finstack_quant.models.factor.risk import decompose_factors
 from finstack_quant.portfolio import Portfolio, SensitivityMatrix, compute_factor_sensitivities
 
@@ -32,6 +33,8 @@ def test_wire_round_trips_exactly_and_decomposes_like_wasm() -> None:
     assert matrix.position_deltas(1) == [3.0, -1.0]
 
     variance = decompose_factors(matrix, SENSITIVITY_COVARIANCE)
+    typed_covariance = FactorCovarianceMatrix(["F1", "F2"], [[0.04, 0.01], [0.01, 0.09]])
+    assert decompose_factors(matrix, covariance=typed_covariance).to_json() == variance.to_json()
     # exposures e = [4, 1]; e' S e = 16*0.04 + 2*4*0.01 + 0.09 = 0.81
     assert variance.total_risk == pytest.approx(0.81, abs=1e-12)
     assert variance.measure == "variance"

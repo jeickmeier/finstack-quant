@@ -122,6 +122,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "ReplayResult",
         "ReplayStep",
         "ReplaySummary",
+        "StrategyAllocationInput",
+        "WeightAllocationSpec",
         "WeightAllocationResult",
         "parse_portfolio_spec_json",
         "aggregate_metrics",

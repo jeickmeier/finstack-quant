@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from finstack_quant.portfolio import allocate_weights
+from finstack_quant.portfolio import StrategyAllocationInput, WeightAllocationSpec, allocate_weights
 
 
 def test_allocate_weights_inverse_volatility_from_json_spec() -> None:
@@ -18,7 +18,18 @@ def test_allocate_weights_inverse_volatility_from_json_spec() -> None:
         "money_decimal_places": 2,
     }
 
-    result = json.loads(allocate_weights(json.dumps(spec)).to_json())
+    wire_result = allocate_weights(json.dumps(spec)).to_json()
+    request = WeightAllocationSpec(
+        "inverse_volatility",
+        1000.0,
+        [
+            StrategyAllocationInput("low_vol", returns=[0.01, 0.02, 0.01, 0.02]),
+            StrategyAllocationInput("high_vol", returns=[0.05, -0.05, 0.05, -0.05]),
+        ],
+        money_decimal_places=2,
+    )
+    assert allocate_weights(request).to_json() == wire_result
+    result = json.loads(wire_result)
 
     assert result["scheme"] == "inverse_volatility"
     low, high = result["allocations"]

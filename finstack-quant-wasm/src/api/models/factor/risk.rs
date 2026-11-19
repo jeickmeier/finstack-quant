@@ -5,7 +5,8 @@
 //! Exposed through the `models.factor.risk` facade namespace.
 
 use crate::utils::input::{
-    from_js_json, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_string, js_string_seq,
+    from_js_json, from_js_json_exact, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_string,
+    js_string_seq,
 };
 use crate::utils::{to_js_err, to_js_value};
 
@@ -236,12 +237,12 @@ pub fn position_component_var(
 /// decomposer — populated only by credit-aware position decomposers).
 ///
 /// `measure` is the risk measure in its canonical serde form, the same shape
-/// as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
+/// as the `riskMeasure` input: `"variance"` or `"volatility"`, or an
 /// object carrying `confidence` for `var` / `expected_shortfall`. The Python
 /// `RiskDecomposition.measure` getter returns the same value.
-/// @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
-/// @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-/// @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
+/// @param sensitivities - Structured sensitivity matrix as returned by `computeFactorSensitivities`, or its JSON text. Rows follow position order and columns follow factor order.
+/// @param covariance - Factor covariance matrix or its JSON text. Factor identifiers and their order must match sensitivities.
+/// @param riskMeasure - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
 ///
 /// # Errors
 ///
@@ -254,25 +255,25 @@ pub fn position_component_var(
 /// @returns Returns a structured `RiskDecomposition` object.
 #[wasm_bindgen(js_name = decomposeFactors, unchecked_return_type = "RiskDecomposition")]
 pub fn decompose_factors(
-    #[wasm_bindgen(js_name = "sensitivitiesJson", unchecked_param_type = "JsonInput")]
-    sensitivities_json: JsValue,
-    #[wasm_bindgen(js_name = "covarianceJson", unchecked_param_type = "JsonInput")] covariance_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.portfolio.SensitivityMatrixJson | string")]
+    sensitivities: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.FactorCovarianceMatrix | string")]
+    covariance: JsValue,
     #[wasm_bindgen(
-        js_name = "riskMeasureJson",
-        unchecked_optional_param_type = "JsonInput"
+        js_name = "riskMeasure",
+        unchecked_optional_param_type = "generated.models.RiskMeasure | string | null"
     )]
-    risk_measure_json: Option<JsValue>,
+    risk_measure: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
-        from_js_json(&sensitivities_json, "sensitivitiesJson")?;
+        from_js_json_exact(&sensitivities, "sensitivities")?;
     let matrix = finstack_quant_factor::SensitivityMatrix::try_from(wire).map_err(to_js_err)?;
     let covariance: finstack_quant_factor::FactorCovarianceMatrix =
-        from_js_json(&covariance_json, "covarianceJson")?;
+        from_js_json_exact(&covariance, "covariance")?;
     // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
     // which are not JSON text.
     let measure: finstack_quant_factor::RiskMeasure =
-        crate::utils::wire::js_opt_wire(risk_measure_json.as_ref(), "riskMeasureJson")?
-            .unwrap_or_default();
+        crate::utils::wire::js_opt_wire(risk_measure.as_ref(), "riskMeasure")?.unwrap_or_default();
     let result = finstack_quant_factor::risk::decompose_factors(&matrix, &covariance, &measure)
         .map_err(to_js_err)?;
     to_js_value(&result)

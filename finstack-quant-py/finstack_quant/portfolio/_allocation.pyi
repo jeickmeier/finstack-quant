@@ -2,8 +2,93 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 import pandas as pd
+
+class StrategyAllocationInput:
+    """One strategy's inputs to the selected allocation scheme.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import StrategyAllocationInput
+    >>> strategy = StrategyAllocationInput("credit", fixed_weight=0.5)
+    """
+
+    def __init__(
+        self,
+        id: str,
+        *,
+        fixed_weight: float | None = None,
+        returns: list[float] | None = None,
+        risk_budget: float | None = None,
+    ) -> None:
+        """Store one strategy's allocation inputs.
+
+        Parameters
+        ----------
+        id : str
+            Stable strategy identifier used in the allocation rows.
+        fixed_weight : float, optional
+            Nonnegative capital fraction for the fixed scheme.
+        returns : list[float], optional
+            Historical decimal strategy returns for inverse volatility.
+        risk_budget : float, optional
+            Target contribution fraction for the risk budget scheme.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type. Scheme validation
+            occurs when allocate_weights consumes these inputs.
+        """
+        ...
+
+class WeightAllocationSpec:
+    """Request strategy weights and rounded capital allocations.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import StrategyAllocationInput, WeightAllocationSpec, allocate_weights
+    >>> request = WeightAllocationSpec("equal", 100.0, [StrategyAllocationInput("credit")])
+    >>> allocate_weights(request).allocations[0]["capital"]
+    100.0
+    """
+
+    def __init__(
+        self,
+        scheme: Literal["equal", "fixed", "inverse_volatility", "risk_budget"],
+        total_capital: float,
+        strategies: list[StrategyAllocationInput],
+        *,
+        covariance: list[list[float]] | None = None,
+        money_decimal_places: int | None = None,
+    ) -> None:
+        """Store inputs to the native strategy allocator.
+
+        Parameters
+        ----------
+        scheme : str
+            Equal, fixed, inverse_volatility or risk_budget, spelled in lowercase.
+        total_capital : float
+            Finite signed capital in the reporting currency.
+        strategies : list[StrategyAllocationInput]
+            Rows in strategy order. Ties in rounding follow this order.
+        covariance : list[list[float]], optional
+            Square strategy-return covariance in strategy order for risk budgeting.
+        money_decimal_places : int, optional
+            Scale from zero through 12 for capital rounding. None uses 10.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type.
+        ValueError
+            If the scheme is unknown.
+        OverflowError
+            If the scale is outside the unsigned 32-bit integer representation.
+            The allocator validates the financial inputs and supported scale.
+        """
+        ...
 
 class WeightAllocationResult:
     """
@@ -136,9 +221,9 @@ class WeightAllocationResult:
         """
         ...
 
-def allocate_weights(spec: str | dict[str, Any] | list[Any] | pd.DataFrame) -> WeightAllocationResult:
+def allocate_weights(spec: WeightAllocationSpec | str | dict[str, Any]) -> WeightAllocationResult:
     """
-    Allocate strategy weights from a JSON specification.
+    Allocate strategy weights from a typed specification.
 
     The specification contains a ``scheme`` (for example
     ``"inverse_volatility"``), ``total_capital``, and a list of strategy
@@ -154,7 +239,7 @@ def allocate_weights(spec: str | dict[str, Any] | list[Any] | pd.DataFrame) -> W
 
     Parameters
     ----------
-    spec : str | dict | list | pandas.DataFrame
+    spec : WeightAllocationSpec | str | dict
         JSON-serialized ``WeightAllocationSpec`` with a scheme, finite signed
         total capital, strategy rows, and any required covariance data.
 

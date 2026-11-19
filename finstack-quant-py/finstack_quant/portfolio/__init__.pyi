@@ -59,7 +59,9 @@ from finstack_quant.portfolio._scenarios import (
     scenario_pnl_batch as scenario_pnl_batch,
 )
 from finstack_quant.portfolio._allocation import (
+    StrategyAllocationInput as StrategyAllocationInput,
     WeightAllocationResult as WeightAllocationResult,
+    WeightAllocationSpec as WeightAllocationSpec,
     allocate_weights as allocate_weights,
 )
 from finstack_quant.portfolio._replay import (
@@ -221,6 +223,7 @@ __all__ = [
     "ScenarioPnlBatchItem",
     "ScenarioRevalueView",
     "SensitivityMatrix",
+    "StrategyAllocationInput",
     "StressPnl",
     "StressResult",
     "TradeDirection",
@@ -230,6 +233,7 @@ __all__ = [
     "UnmatchedEntry",
     "UnsupportedContractVersionError",
     "WeightAllocationResult",
+    "WeightAllocationSpec",
     "WeightingScheme",
     "WhatIfResult",
     "aggregate_full_cashflows",

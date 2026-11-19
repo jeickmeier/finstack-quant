@@ -194,8 +194,11 @@ public = [
     "PositionEsContribution",
     "PositionFactorContribution",
     "PositionResidualContribution",
+    "PositionRiskBudget",
     "PositionRiskDecomposition",
     "PositionRiskReport",
+    "PositionRiskRequest",
+    "PositionRiskSource",
     "PositionVarContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
@@ -1731,6 +1734,7 @@ public = [
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
     "SensitivityMatrix",
+    "StrategyAllocationInput",
     "StressPnl",
     "StressResult",
     "TradeDirection",
@@ -1740,6 +1744,7 @@ public = [
     "UnmatchedEntry",
     "UnsupportedContractVersionError",
     "WeightAllocationResult",
+    "WeightAllocationSpec",
     "WeightingScheme",
     "WhatIfResult",
     "aggregate_full_cashflows",
@@ -2224,7 +2229,7 @@ js = "models.factor.credit"
 
 [parity.modules."finstack_quant.models.factor.risk"]
 js = "models.factor.risk"
-types = { FactorContribution = "FactorContribution", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionRiskReport = "PositionRiskReport", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
+types = { FactorContribution = "FactorContribution", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionRiskBudget = "PositionRiskBudget", PositionRiskReport = "PositionRiskReport", PositionRiskRequest = "PositionRiskRequest", PositionRiskSource = "PositionRiskSource", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
 
 [parity.modules."finstack_quant.models.factor.schema"]
 js = "models.factor.schema"
@@ -2258,7 +2263,7 @@ js = "portfolio"
 # Error classes: WASM throws `FinstackError` for portfolio failures and one
 # `ContractValidationError` (told apart by `code` and the `report` diagnostics)
 # for every persisted-contract failure, so the Python subclasses map to those.
-types = { BrinsonPeriodResult = "BrinsonPeriodResult", CandidatePosition = "CandidatePosition", CarinoLinkedAttribution = "CarinoLinkedAttribution", Constraint = "Constraint", ContractLimitExceededError = "ContractValidationError", ContractValidationError = "ContractValidationError", CreditVolReport = "CreditVolReport", DurationCellTable = "DurationCellTable", ExcessReturnResult = "ExcessReturnResult", FactorAssignmentReport = "FactorAssignmentReport", FactorBrinsonResult = "FactorBrinsonResult", FactorContributionDelta = "FactorContributionDelta", FactorPnlProfile = "FactorPnlProfile", FiAttributionResult = "FiAttributionResult", FiCarinoLinkedResult = "FiCarinoLinkedResult", GridAttributionResult = "GridAttributionResult", GridCarinoLinkedResult = "GridCarinoLinkedResult", Inequality = "Inequality", LevelVolContribution = "LevelVolContribution", LinkedReturn = "LinkedReturn", MalformedContractSchemaError = "ContractValidationError", MaterializationReport = "MaterializationReport", MetricExpr = "MetricExpr", MissingContractVersionError = "ContractValidationError", MissingMetricPolicy = "MissingMetricPolicy", NettingSetMargin = "NettingSetMargin", Objective = "Objective", OptimizationStatus = "OptimizationStatus", PerPositionMetric = "PerPositionMetric", PortfolioAttribution = "PortfolioAttribution", PortfolioCashflowPositionSummary = "PortfolioCashflowPositionSummary", PortfolioCashflows = "PortfolioCashflows", PortfolioError = "FinstackError", PortfolioMarginResult = "PortfolioMarginResult", PortfolioMetrics = "PortfolioMetrics", PortfolioOptimizationResult = "PortfolioOptimizationResult", PortfolioOptimizationSpec = "PortfolioOptimizationSpec", PortfolioPrimitiveExposureReport = "PortfolioPrimitiveExposureReport", PortfolioResult = "PortfolioResult", PortfolioValuation = "PortfolioValuation", PositionAssignment = "PositionAssignment", PositionFilter = "PositionFilter", PositionValue = "PositionValue", PositionVolContribution = "PositionVolContribution", ReconciliationReport = "ReconciliationReport", ReplayConfig = "ReplayConfig", ReplayResult = "ReplayResult", ReplayStep = "ReplayStep", ReplaySummary = "ReplaySummary", ScenarioPnl = "ScenarioPnl", ScenarioPnlBatchItem = "ScenarioPnlBatchItem", ScenarioRevalueView = "ScenarioRevalueView", SensitivityMatrix = "SensitivityMatrixJson", StressPnl = "StressPnl", StressResult = "StressResult", TradeDirection = "TradeDirection", TradeSpec = "TradeSpec", TradeType = "TradeType", TradeUniverse = "TradeUniverse", UnmatchedEntry = "UnmatchedEntry", UnsupportedContractVersionError = "ContractValidationError", WeightAllocationResult = "WeightAllocationResult", WeightingScheme = "WeightingScheme", WhatIfResult = "WhatIfResult" }
+types = { BrinsonPeriodResult = "BrinsonPeriodResult", CandidatePosition = "CandidatePosition", CarinoLinkedAttribution = "CarinoLinkedAttribution", Constraint = "Constraint", ContractLimitExceededError = "ContractValidationError", ContractValidationError = "ContractValidationError", CreditVolReport = "CreditVolReport", DurationCellTable = "DurationCellTable", ExcessReturnResult = "ExcessReturnResult", FactorAssignmentReport = "FactorAssignmentReport", FactorBrinsonResult = "FactorBrinsonResult", FactorContributionDelta = "FactorContributionDelta", FactorPnlProfile = "FactorPnlProfile", FiAttributionResult = "FiAttributionResult", FiCarinoLinkedResult = "FiCarinoLinkedResult", GridAttributionResult = "GridAttributionResult", GridCarinoLinkedResult = "GridCarinoLinkedResult", Inequality = "Inequality", LevelVolContribution = "LevelVolContribution", LinkedReturn = "LinkedReturn", MalformedContractSchemaError = "ContractValidationError", MaterializationReport = "MaterializationReport", MetricExpr = "MetricExpr", MissingContractVersionError = "ContractValidationError", MissingMetricPolicy = "MissingMetricPolicy", NettingSetMargin = "NettingSetMargin", Objective = "Objective", OptimizationStatus = "OptimizationStatus", PerPositionMetric = "PerPositionMetric", PortfolioAttribution = "PortfolioAttribution", PortfolioCashflowPositionSummary = "PortfolioCashflowPositionSummary", PortfolioCashflows = "PortfolioCashflows", PortfolioError = "FinstackError", PortfolioMarginResult = "PortfolioMarginResult", PortfolioMetrics = "PortfolioMetrics", PortfolioOptimizationResult = "PortfolioOptimizationResult", PortfolioOptimizationSpec = "PortfolioOptimizationSpec", PortfolioPrimitiveExposureReport = "PortfolioPrimitiveExposureReport", PortfolioResult = "PortfolioResult", PortfolioValuation = "PortfolioValuation", PositionAssignment = "PositionAssignment", PositionFilter = "PositionFilter", PositionValue = "PositionValue", PositionVolContribution = "PositionVolContribution", ReconciliationReport = "ReconciliationReport", ReplayConfig = "ReplayConfig", ReplayResult = "ReplayResult", ReplayStep = "ReplayStep", ReplaySummary = "ReplaySummary", ScenarioPnl = "ScenarioPnl", ScenarioPnlBatchItem = "ScenarioPnlBatchItem", ScenarioRevalueView = "ScenarioRevalueView", SensitivityMatrix = "SensitivityMatrixJson", StressPnl = "StressPnl", StressResult = "StressResult", TradeDirection = "TradeDirection", TradeSpec = "TradeSpec", TradeType = "TradeType", TradeUniverse = "TradeUniverse", UnmatchedEntry = "UnmatchedEntry", UnsupportedContractVersionError = "ContractValidationError", StrategyAllocationInput = "StrategyAllocationInput", WeightAllocationSpec = "WeightAllocationSpec", WeightAllocationResult = "WeightAllocationResult", WeightingScheme = "WeightingScheme", WhatIfResult = "WhatIfResult" }
 
 [parity.modules."finstack_quant.portfolio.schema"]
 js = "portfolio.schema"
@@ -2602,6 +2607,9 @@ renames = { deposit = { js = "calibration.rateQuoteDeposit", reason = "WASM quot
 
 [parity.members."finstack_quant.calibration.VolQuote"]
 renames = { cap_floor_vol = { js = "calibration.volQuoteCapFloorVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::cap_floor_vol)" }, option_vol = { js = "calibration.volQuoteOptionVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::option_vol)" }, swaption_vol = { js = "calibration.volQuoteSwaptionVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::swaption_vol)" } }
+
+[parity.members."finstack_quant.models.factor.risk.PositionRiskSource"]
+excluded = { historical = "literal", parametric = "literal" }
 
 [parity.members."finstack_quant.models.BsGreeks".renames]
 is_valid = { js = "models.bsGreeksIsValid", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }

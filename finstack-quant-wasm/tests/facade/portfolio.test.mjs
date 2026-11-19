@@ -150,7 +150,7 @@ test('models.factor.risk.decomposeFactors consumes the canonical Python monetary
     const measured = models.factor.risk.decomposeFactors(
       JSON.stringify(sensitivities),
       covariance,
-      JSON.stringify(measure)
+      measure
     );
     assert.deepEqual(measured.measure, measure);
     assert.ok(Number.isFinite(measured.total_risk));
@@ -1291,7 +1291,7 @@ test('models.factor.risk.decomposeFactors reads the canonical wire and returns t
     const decomposition = models.factor.risk.decomposeFactors(
       SENSITIVITY_WIRE,
       SENSITIVITY_COVARIANCE,
-      JSON.stringify(measure)
+      measure
     );
     assert.deepEqual(decomposition.measure, expected);
   }
@@ -1304,7 +1304,7 @@ test('models.factor.risk.decomposeFactors reads the canonical wire and returns t
   );
   assert.throws(
     () => models.factor.risk.decomposeFactors(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'nope'),
-    (error) => error.kind === 'validation' && /riskMeasureJson/.test(error.message)
+    (error) => error.kind === 'validation' && /riskMeasure: unknown variant/.test(error.message)
   );
 });
 
