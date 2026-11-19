@@ -2603,6 +2603,7 @@ validate = { js = "models.factor.validateFactorModelConfig", reason = "free-func
 # TypeScript object is its twin (`literal`). Properties computed by a Rust
 # method are recorded as renames to their WASM free-function twins instead.
 [parity.members."finstack_quant.models.factor.FactorCovarianceMatrix".excluded]
+# from_dataframe uses the shared pandas exclusion above.
 n_factors = "literal"
 
 [parity.members."finstack_quant.models.factor.FactorModelConfig".excluded]

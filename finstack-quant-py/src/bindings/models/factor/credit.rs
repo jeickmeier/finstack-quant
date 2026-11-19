@@ -1031,6 +1031,25 @@ impl PyFactorCovarianceMatrix {
         Ok(Self { inner })
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.models.factor", "FactorCovarianceMatrix.from_dataframe")]
+    #[staticmethod]
+    fn from_dataframe(df: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let pandas = df.py().import("pandas")?;
+        if !df.is_instance(&pandas.getattr("DataFrame")?)? {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "df must be a pandas DataFrame",
+            ));
+        }
+        let names: Vec<String> = df.getattr("columns")?.call_method0("tolist")?.extract()?;
+        let rows: Vec<String> = df.getattr("index")?.call_method0("tolist")?.extract()?;
+        if rows != names {
+            return Err(crate::errors::value_error(
+                "DataFrame row and column factor identifiers must match in order",
+            ));
+        }
+        Self::new(names, &df.call_method1("to_numpy", ("float64",))?)
+    }
+
     /// Number of factors represented by the matrix.
     #[getter]
     fn n_factors(&self) -> usize {

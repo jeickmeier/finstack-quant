@@ -15,6 +15,7 @@ from datetime import date as dt_date
 import json
 import math
 
+import pandas as pd
 import pytest
 
 from finstack_quant.models.factor import FactorCovarianceMatrix, FactorModelConfig
@@ -531,3 +532,18 @@ def test_from_dataframe_matches_json_path_and_invents_no_generic_ids() -> None:
         CreditCalibrator.from_dataframe(
             spreads.iloc[0:0], inp["issuer_tags"]["tags"], [], inp["generic_factor"]["spec"], config=cfg
         )
+
+
+def test_factor_covariance_dataframe_validates_labels_and_matrix_values() -> None:
+    ids = ["rates", "credit"]
+    frame = pd.DataFrame([[0.04, -0.005], [-0.005, 0.01]], index=ids, columns=ids)
+    matrix = FactorCovarianceMatrix.from_dataframe(frame)
+    assert matrix.factor_ids == ids
+    pd.testing.assert_frame_equal(matrix.to_dataframe(), frame)
+    with pytest.raises(ValueError, match="identifiers must match in order"):
+        FactorCovarianceMatrix.from_dataframe(frame.reindex(index=ids[::-1]))
+    with pytest.raises(TypeError):
+        FactorCovarianceMatrix.from_dataframe(frame.rename(index={"rates": 1}, columns={"rates": 1}))
+    indefinite = pd.DataFrame([[0.04, 0.05], [0.05, 0.01]], index=ids, columns=ids)
+    with pytest.raises(ValueError, match="positive semi-definite"):
+        FactorCovarianceMatrix.from_dataframe(indefinite)
