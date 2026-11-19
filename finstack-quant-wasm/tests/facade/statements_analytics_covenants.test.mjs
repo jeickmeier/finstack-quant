@@ -91,7 +91,7 @@ function withEngine(start, body) {
 
 test('a covenant window keeps early non-finite leverage out of the evaluation', () => {
   const series = withEngine('2024-10-01', (engine) =>
-    statements_analytics.evaluateCovenants(RESULTS, engine)
+    statements_analytics.evaluateCovenants(engine, RESULTS)
   );
   assert.deepEqual(
     series.map((row) => [row.as_of, Object.keys(row.reports)]),
@@ -122,11 +122,11 @@ test('a covenant window keeps early non-finite leverage out of the evaluation', 
 test('a required non-finite or missing metric throws with the Rust error kind', () => {
   withEngine('2024-07-01', (engine) => {
     assert.throws(
-      () => statements_analytics.evaluateCovenants(RESULTS, engine),
+      () => statements_analytics.evaluateCovenants(engine, RESULTS),
       (error) => error.kind === 'validation' && /leverage/.test(error.message)
     );
     assert.throws(
-      () => statements_analytics.forecastBreaches(RESULTS, engine),
+      () => statements_analytics.forecastBreaches(engine, RESULTS),
       (error) => error.kind === 'validation' && /leverage/.test(error.message)
     );
   });
@@ -135,7 +135,7 @@ test('a required non-finite or missing metric throws with the Rust error kind', 
   );
   try {
     assert.throws(
-      () => statements_analytics.evaluateCovenants(RESULTS, dscr),
+      () => statements_analytics.evaluateCovenants(dscr, RESULTS),
       (error) => error.kind === 'not_found' && /dscr/.test(error.message)
     );
   } finally {
@@ -145,7 +145,7 @@ test('a required non-finite or missing metric throws with the Rust error kind', 
 
 test('forecastBreaches reads every result period and defaults to a deterministic forecast', () => {
   const breaches = withEngine('2024-10-01', (engine) =>
-    statements_analytics.forecastBreaches(RESULTS, engine)
+    statements_analytics.forecastBreaches(engine, RESULTS)
   );
   assert.deepEqual(
     breaches.map((breach) => [breach.covenant_id, breach.breach_date, breach.breach_probability]),

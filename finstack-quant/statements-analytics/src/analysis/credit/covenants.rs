@@ -137,7 +137,7 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 ///     "leverage",
 /// ));
 ///
-/// let series = evaluate_covenants(&results, &engine)?;
+/// let series = evaluate_covenants(&engine, &results)?;
 /// assert_eq!(series[0].as_of.to_string(), "2025-03-31");
 /// assert!(series[0].reports["max_leverage"].passed);
 /// assert!(!series[1].reports["max_leverage"].passed);
@@ -145,8 +145,8 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 /// # }
 /// ```
 pub fn evaluate_covenants(
-    results: &StatementResult,
     covenants: &CovenantEngine,
+    results: &StatementResult,
 ) -> Result<Vec<DatedCovenantReports>> {
     evaluate_series_from_model(
         covenants,
@@ -187,8 +187,8 @@ fn period_ids(results: &StatementResult) -> Vec<PeriodId> {
 ///
 /// - Lognormal breach probability: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 pub fn forecast_breaches(
-    results: &StatementResult,
     covenants: &CovenantEngine,
+    results: &StatementResult,
     config: CovenantForecastConfig,
 ) -> Result<Vec<FutureBreach>> {
     forecast_breaches_generic(
@@ -385,7 +385,7 @@ mod tests {
             .set_series("revenue", IndexMap::from([(p1, 100.0), (p2, 110.0)]))
             .expect("finite fixture values");
 
-        assert!(forecast_breaches(&results, &engine, CovenantForecastConfig::default()).is_err());
+        assert!(forecast_breaches(&engine, &results, CovenantForecastConfig::default()).is_err());
     }
 
     #[test]
@@ -420,7 +420,7 @@ mod tests {
 
         let config = CovenantForecastConfig::default();
         let breaches =
-            forecast_breaches(&results, &engine, config).expect("Forecast should succeed");
+            forecast_breaches(&engine, &results, config).expect("Forecast should succeed");
 
         assert_eq!(breaches.len(), 1);
         assert_eq!(breaches[0].covenant_id, "max_debt_ebitda");

@@ -147,7 +147,7 @@ mixed-currency ratios fail. LTV is `debt_t / value_t`; scalar EV references may
 be broadcast across periods. Metrics include cash DSCR, total (PIK) DSCR, and
 fee-inclusive DSCR. `StatementsAdapter` implements the covenants crate's
 `ModelTimeSeries` bridge, so covenant forecasts do not make that crate depend
-on statements. `evaluate_covenants(&results, &engine)` tests compliance
+on statements. `evaluate_covenants(&engine, &results)` tests compliance
 at the end of every period in `results.periods` and `forecast_breaches` projects breaches over the
 same periods; each period uses the covenants applicable on its end date (a
 covenant window replaces the top-level set), and a metric is read only when an

@@ -80,10 +80,10 @@ it("captures Rust's deterministic and stochastic breach forecasts of the tighten
     const engine = native.CovenantEngine.fromJson(tightJson);
     try {
       return config === undefined
-        ? native.statementsAnalyticsForecastBreaches(resultsJson, engine)
+        ? native.statementsAnalyticsForecastBreaches(engine, resultsJson)
         : native.statementsAnalyticsForecastBreaches(
-            resultsJson,
             engine,
+            resultsJson,
             config,
           );
     } finally {

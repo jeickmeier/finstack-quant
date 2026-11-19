@@ -24,7 +24,7 @@ const engineJson = await read("covenants/analyst-covenants.json");
 const engine = native.CovenantEngine.fromJson(engineJson);
 let series;
 try {
-  series = native.evaluateCovenants(resultJson, engine);
+  series = native.evaluateCovenants(engine, resultJson);
 } finally {
   engine.free();
 }
@@ -47,8 +47,8 @@ const forecast = (config) => {
   const tight = native.CovenantEngine.fromJson(tightJson);
   try {
     return config === undefined
-      ? native.statementsAnalyticsForecastBreaches(resultJson, tight)
-      : native.statementsAnalyticsForecastBreaches(resultJson, tight, config);
+      ? native.statementsAnalyticsForecastBreaches(tight, resultJson)
+      : native.statementsAnalyticsForecastBreaches(tight, resultJson, config);
   } finally {
     tight.free();
   }

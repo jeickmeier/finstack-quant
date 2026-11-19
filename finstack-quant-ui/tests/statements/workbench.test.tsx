@@ -196,7 +196,7 @@ beforeEach(() => {
       case "evaluateCovenants": {
         const engine = native.CovenantEngine.fromJson(arg.engineJson);
         try {
-          return native.evaluateCovenants(arg.resultsJson, engine);
+          return native.evaluateCovenants(engine, arg.resultsJson);
         } finally {
           engine.free();
         }
@@ -205,8 +205,8 @@ beforeEach(() => {
         const engine = native.CovenantEngine.fromJson(arg.engineJson);
         try {
           return native.statementsAnalyticsForecastBreaches(
-            arg.resultsJson,
             engine,
+            arg.resultsJson,
             arg.configJson,
           );
         } finally {

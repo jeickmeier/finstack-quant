@@ -45,8 +45,8 @@ it("captures the native statement series Rust evaluates over every result period
     expect(
       serializeHost(
         native.evaluateCovenants(
-          read("statements/analyst-result.json"),
           engine,
+          read("statements/analyst-result.json"),
         ),
       ),
     ).toBe(serializeHost(series));

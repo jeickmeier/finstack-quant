@@ -325,7 +325,7 @@ Renamed or reshaped public APIs:
 
 - `RollupSpec::default_for` is `RollupSpec::declared_methods` (Python `RollupSpec.declared_methods`, WASM `statements.rollupSpecDeclaredMethods`).
 - `EvaluationContext::new` and `PeriodHistory::from_named_maps` take the model's periods explicitly; `ttm()` no longer derives Gregorian periods from history keys.
-- `evaluate_covenants(results, covenants)` and `forecast_breaches(results, covenants, config)` drop the `model` argument and test every period of `StatementResult::periods` (Python and WASM `statements_analytics.evaluateCovenants` / `forecastBreaches` likewise; the UI covenant requests drop `modelJson`). `StatementsAdapter::new` takes only the results. `CreditAssessment::compute` also spans `StatementResult::periods`.
+- `evaluate_covenants(covenants, results)` and `forecast_breaches(covenants, results, config)` drop the `model` argument and test every period of `StatementResult::periods` (Python and WASM `statements_analytics.evaluateCovenants` / `forecastBreaches` likewise; the UI covenant requests drop `modelJson`). `StatementsAdapter::new` takes only the results. `CreditAssessment::compute` also spans `StatementResult::periods`.
 - `finstack_quant_covenants::evaluate_series_generic` is `evaluate_series_from_model`.
 - `PeerSet::from_universe` returns `(PeerSet, excluded_count)`; the Python and WASM constructors still return the peer set.
 - `PnlBucketShare::field` is the `PnlBucket` enum and `MertonReport::errors` is keyed by `MertonReportMeasure`; both serialize to the same snake-case strings as before.

@@ -9,8 +9,8 @@ from finstack_quant.statements import StatementResult
 # Covenant evaluation and forecasting over statement results
 
 def evaluate_covenants(
-    results: StatementResult | str,
     covenants: CovenantEngine,
+    results: StatementResult | str,
 ) -> pd.DataFrame:
     """
     Evaluate covenant compliance at the end of every statement result period.
@@ -64,7 +64,7 @@ def evaluate_covenants(
     >>> _ = builder.value("senior_leverage", [("2025Q1", 3.0), ("2025Q2", 3.5)])
     >>> model = builder.build()
     >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
-    >>> frame = evaluate_covenants(Evaluator().evaluate(model), engine)
+    >>> frame = evaluate_covenants(engine, Evaluator().evaluate(model))
     >>> frame.loc[frame["covenant"] == "max_total_leverage", ["as_of", "passed"]].values.tolist()
     [['2025-03-31', True], ['2025-06-30', False]]
 
@@ -72,8 +72,8 @@ def evaluate_covenants(
     ...
 
 def forecast_breaches(
-    results: StatementResult | str,
     covenants: CovenantEngine,
+    results: StatementResult | str,
     config: CovenantForecastConfig | None = None,
 ) -> list[FutureBreach]:
     """
@@ -124,7 +124,7 @@ def forecast_breaches(
     >>> model = builder.build()
     >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
     >>> config = CovenantForecastConfig().with_scope("incurrence")  # cov-lite tests are incurrence tests
-    >>> breaches = forecast_breaches(Evaluator().evaluate(model), engine, config)
+    >>> breaches = forecast_breaches(engine, Evaluator().evaluate(model), config)
     >>> [(b.covenant_id, b.breach_date.isoformat()) for b in breaches]
     [('max_total_leverage', '2025-06-30')]
 

@@ -16,16 +16,16 @@ use pyo3::prelude::*;
 
 #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "evaluate_covenants")]
 #[pyfunction]
-#[pyo3(text_signature = "(results, covenants)")]
+#[pyo3(text_signature = "(covenants, results)")]
 fn evaluate_covenants<'py>(
     py: Python<'py>,
-    results: &Bound<'py, PyAny>,
     covenants: PyRef<'py, PyCovenantEngine>,
+    results: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let results = extract_results_ref(results)?;
     let series = finstack_quant_statements_analytics::analysis::evaluate_covenants(
-        &results,
         &covenants.inner,
+        &results,
     )
     .map_err(core_to_py)?;
     dated_reports_frame(py, series)
@@ -34,19 +34,19 @@ fn evaluate_covenants<'py>(
 #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "forecast_breaches")]
 #[pyfunction]
 #[pyo3(
-    signature = (results, covenants, config=None),
-    text_signature = "(results, covenants, config=None)"
+    signature = (covenants, results, config=None),
+    text_signature = "(covenants, results, config=None)"
 )]
 fn forecast_breaches(
-    results: &Bound<'_, PyAny>,
     covenants: PyRef<'_, PyCovenantEngine>,
+    results: &Bound<'_, PyAny>,
     config: Option<PyRef<'_, PyCovenantForecastConfig>>,
 ) -> PyResult<Vec<PyFutureBreach>> {
     let results = extract_results_ref(results)?;
     let config = config.map_or_else(CovenantForecastConfig::default, |c| c.inner.clone());
     finstack_quant_statements_analytics::analysis::forecast_breaches(
-        &results,
         &covenants.inner,
+        &results,
         config,
     )
     .map(|breaches| {

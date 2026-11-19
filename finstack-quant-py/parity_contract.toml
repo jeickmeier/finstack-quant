@@ -1427,7 +1427,8 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   both hosts: evaluate_covenants /
 #   evaluateCovenants (compliance at every result period end; covenant windows
 #   decide which metrics a date requires) and forecast_breaches /
-#   forecastBreaches. Python returns the evaluation as the long DataFrame of
+#   forecastBreaches. Both take (covenants, results), with optional config
+#   for forecasting. Python returns the evaluation as the long DataFrame of
 #   CovenantEngine.evaluate_series and the forecast as FutureBreach objects;
 #   WASM returns DatedCovenantReports rows and FutureBreach wire objects.
 #   capital_structure_summary / capitalStructureSummary are bound in both hosts

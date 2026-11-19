@@ -25,14 +25,14 @@ use wasm_bindgen::prelude::*;
 /// @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
 #[wasm_bindgen(js_name = evaluateCovenants, unchecked_return_type = "generated.covenants.DatedCovenantReports[]")]
 pub fn evaluate_covenants(
-    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
     covenants: &JsCovenantEngine,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
 ) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;
     to_js_value(
         &finstack_quant_statements_analytics::analysis::evaluate_covenants(
-            &results,
             &covenants.inner,
+            &results,
         )
         .map_err(to_js_err)?,
     )
@@ -58,8 +58,8 @@ pub fn evaluate_covenants(
 /// @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).
 #[wasm_bindgen(js_name = statementsAnalyticsForecastBreaches, unchecked_return_type = "generated.covenants.FutureBreach[]")]
 pub fn forecast_breaches(
-    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
     covenants: &JsCovenantEngine,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
     #[wasm_bindgen(
         unchecked_optional_param_type = "generated.covenants.CovenantForecastConfig | string | null"
     )]
@@ -70,8 +70,8 @@ pub fn forecast_breaches(
         js_opt_wire::<CovenantForecastConfig>(config.as_ref(), "config")?.unwrap_or_default();
     to_js_value(
         &finstack_quant_statements_analytics::analysis::forecast_breaches(
-            &results,
             &covenants.inner,
+            &results,
             config,
         )
         .map_err(to_js_err)?,
