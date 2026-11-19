@@ -222,6 +222,14 @@ impl PyFxMatrix {
         })
     }
 
+    /// Create an empty FX matrix for direct and reciprocal quotes.
+    #[staticmethod]
+    fn direct() -> Self {
+        Self {
+            inner: Arc::new(FxMatrix::direct()),
+        }
+    }
+
     /// Set a non-evicting pinned FX quote scoped to one date and policy.
     /// For its ``(on, policy)``, this fixing takes highest authority:
     /// it outranks both pair-global quotes (``set_quotes``) and provider observations.

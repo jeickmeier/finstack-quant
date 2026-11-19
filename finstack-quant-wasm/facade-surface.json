@@ -1641,7 +1641,7 @@
   "core.FxMatrix": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromDict"],
+    "statics": ["direct", "fromDict"],
     "methods": ["free", "rate", "setQuoteOn", "setQuotes"],
     "getters": []
   },

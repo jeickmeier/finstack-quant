@@ -95,7 +95,7 @@ def build_demo_market(as_of: date = DEMO_AS_OF) -> MarketContext:
     market.insert_price("SPX-SPOT", 5200.0, "USD")
     market.insert_price("SPX-DIV", 0.015)
 
-    fx = FxMatrix(None)
+    fx = FxMatrix.direct()
     fx.set_quotes([("EUR", "USD", 1.08)])
     market.insert_fx(fx)
     return market

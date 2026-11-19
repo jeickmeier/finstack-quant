@@ -732,6 +732,14 @@ class TestFxMatrixParity:
         result = fx.rate(usd, eur, date(2024, 1, 1), FxConversionPolicy.CASHFLOW_DATE)
         assert result.rate == pytest.approx(1.0 / 1.10, abs=1e-8)
 
+    def test_direct_matrix_does_not_infer_a_pivot(self) -> None:
+        matrix = FxMatrix.direct()
+        matrix.set_quotes([("EUR", "USD", 1.1), ("GBP", "USD", 1.25)])
+        as_of = date(2024, 1, 1)
+        assert matrix.rate("USD", "EUR", as_of, "cashflow_date").rate == pytest.approx(1 / 1.1)
+        with pytest.raises(KeyError):
+            matrix.rate("EUR", "GBP", as_of, "cashflow_date")
+
     def test_same_currency_unity(self) -> None:
         """Same-currency rate is 1.0."""
         fx = FxMatrix(None)

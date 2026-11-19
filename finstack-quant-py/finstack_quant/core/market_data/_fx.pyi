@@ -389,6 +389,29 @@ class FxMatrix:
         ...
 
     @staticmethod
+    def direct() -> FxMatrix:
+        """
+        Create an empty matrix for direct and reciprocal FX quotes.
+
+        Returns
+        -------
+        FxMatrix
+            Empty in-memory matrix with no cross-routing pivot. Insert quotes
+            with :meth:`set_quotes` or date-specific :meth:`set_quote_on`.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxMatrix
+        >>> FxMatrix.direct()
+        FxMatrix(quotes=0, pinned_quotes=0)
+        """
+        ...
+
+    @staticmethod
     def from_dict(quotes: dict[str, float], pivot_currency: Union[Currency, str, None]) -> FxMatrix:
         """
         Build a matrix from a ``{"EURUSD": 1.1, "GBP/USD": 1.25}`` mapping.

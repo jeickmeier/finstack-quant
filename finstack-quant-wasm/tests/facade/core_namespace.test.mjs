@@ -675,3 +675,14 @@ test('FxMatrix exposes the atomic batch setter without a singleton alias', () =>
     1.1
   );
 });
+
+test('FxMatrix.direct uses reciprocal quotes and requires an explicit pivot for crosses', () => {
+  const fx = core.FxMatrix.direct();
+  const policy = core.FxConversionPolicy.cashflowDate();
+  fx.setQuotes([
+    ['EUR', 'USD', 1.1],
+    ['GBP', 'USD', 1.25],
+  ]);
+  assert.equal(fx.rate('USD', 'EUR', '2025-01-02', policy).rate, 1 / 1.1);
+  assert.throws(() => fx.rate('EUR', 'GBP', '2025-01-02', policy));
+});
