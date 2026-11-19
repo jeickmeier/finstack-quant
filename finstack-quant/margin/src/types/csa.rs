@@ -464,6 +464,158 @@ impl CsaSpec {
     }
 }
 
+/// Author an agreement from explicit collateral, transfer, and scheduling terms.
+#[derive(Debug, Clone)]
+pub struct CsaSpecBuilder {
+    id: String,
+    base_currency: Currency,
+    collateral_curve_id: CurveId,
+    calendar_id: Option<String>,
+    vm_params: Option<VmParameters>,
+    im_params: Option<ImParameters>,
+    eligible_collateral: Option<EligibleCollateralSchedule>,
+    call_timing: Option<MarginCallTiming>,
+}
+
+impl CsaSpecBuilder {
+    /// Select the agreement's registered business-day calendar.
+    ///
+    /// # Arguments
+    /// * `calendar_id` - Calendar used by margin calls and cash settlements.
+    pub fn calendar_id(mut self, calendar_id: impl Into<String>) -> Self {
+        self.calendar_id = Some(calendar_id.into());
+        self
+    }
+
+    /// Set the agreement's variation-margin terms.
+    ///
+    /// # Arguments
+    /// * `params` - Threshold, minimum transfer, rounding and settlement terms, in the base currency.
+    pub fn vm_params(mut self, params: VmParameters) -> Self {
+        self.vm_params = Some(params);
+        self
+    }
+
+    /// Elect the VM threshold and minimum transfer amount.
+    ///
+    /// # Arguments
+    /// * `threshold` - Uncollateralized allowance in the CSA's base currency.
+    /// * `mta` - Minimum transfer amount in the same currency.
+    ///
+    /// Preserves existing rounding, independent amount and scheduling terms.
+    /// With no VM terms selected yet, uses the defaults of `VmParameters::with_threshold`.
+    pub fn vm_threshold(mut self, threshold: Money, mta: Money) -> Self {
+        match self.vm_params.as_mut() {
+            Some(previous) => {
+                previous.threshold = threshold;
+                previous.mta = mta;
+            }
+            None => self.vm_params = Some(VmParameters::with_threshold(threshold, mta)),
+        }
+        self
+    }
+
+    /// Elect SIMM terms from the registry for the agreement's base currency.
+    ///
+    /// # Errors
+    /// Returns an error if the registry does not contain eligible SIMM terms.
+    pub fn im_simm(self) -> Result<Self> {
+        let params = ImParameters::for_methodology(ImMethodology::Simm, self.base_currency)?;
+        Ok(self.im_params(Some(params)))
+    }
+
+    /// Set or clear the agreement's initial-margin terms.
+    ///
+    /// # Arguments
+    /// * `params` - Elected initial-margin method, thresholds and MPOR, or None when IM is out of scope.
+    pub fn im_params(mut self, params: Option<ImParameters>) -> Self {
+        self.im_params = params;
+        self
+    }
+
+    /// Establish the assets the CSA may receive and the applicable haircuts.
+    ///
+    /// # Arguments
+    /// * `schedule` - Contractual collateral eligibility and valuation haircuts.
+    pub fn eligible_collateral(mut self, schedule: EligibleCollateralSchedule) -> Self {
+        self.eligible_collateral = Some(schedule);
+        self
+    }
+
+    /// Establish the operational timing of calls and settlement.
+    ///
+    /// # Arguments
+    /// * `timing` - Elected margin-call and settlement times and dispute window.
+    pub fn call_timing(mut self, timing: MarginCallTiming) -> Self {
+        self.call_timing = Some(timing);
+        self
+    }
+
+    /// Validate and assemble the agreement.
+    ///
+    /// # Errors
+    /// Rejects missing variation-margin, collateral, timing or calendar terms
+    /// and invalid agreement identifiers, money currencies or thresholds.
+    pub fn build(self) -> Result<CsaSpec> {
+        let required = |field| {
+            finstack_quant_core::Error::Validation(format!("CSA builder requires explicit {field}"))
+        };
+        let spec = CsaSpec {
+            id: self.id,
+            base_currency: self.base_currency,
+            collateral_curve_id: self.collateral_curve_id,
+            calendar_id: self.calendar_id.ok_or_else(|| required("calendar_id"))?,
+            vm_params: self.vm_params.ok_or_else(|| required("vm_params"))?,
+            im_params: self.im_params,
+            eligible_collateral: self
+                .eligible_collateral
+                .ok_or_else(|| required("eligible_collateral"))?,
+            call_timing: self.call_timing.ok_or_else(|| required("call_timing"))?,
+        };
+        spec.validate()?;
+        Ok(spec)
+    }
+}
+
+impl CsaSpec {
+    /// Start an agreement with its identifier, margin currency and collateral discounting basis.
+    ///
+    /// # Arguments
+    /// * `id` - Stable identifier used to match the agreement across trades and collateral accounts.
+    /// * `base_currency` - Currency of variation-margin and initial-margin thresholds and transfers.
+    /// * `collateral_curve_id` - Exact identifier of the discount curve for collateral valuation.
+    pub fn builder(
+        id: impl Into<String>,
+        base_currency: Currency,
+        collateral_curve_id: impl Into<CurveId>,
+    ) -> CsaSpecBuilder {
+        CsaSpecBuilder {
+            id: id.into(),
+            base_currency,
+            collateral_curve_id: collateral_curve_id.into(),
+            calendar_id: None,
+            vm_params: None,
+            im_params: None,
+            eligible_collateral: None,
+            call_timing: None,
+        }
+    }
+
+    /// Seed an independent builder from this agreement's complete terms.
+    pub fn to_builder(&self) -> CsaSpecBuilder {
+        Self::builder(
+            self.id.clone(),
+            self.base_currency,
+            self.collateral_curve_id.clone(),
+        )
+        .calendar_id(self.calendar_id.clone())
+        .vm_params(self.vm_params.clone())
+        .im_params(self.im_params.clone())
+        .eligible_collateral(self.eligible_collateral.clone())
+        .call_timing(self.call_timing.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

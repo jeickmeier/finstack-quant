@@ -2,10 +2,74 @@
 
 from __future__ import annotations
 
+from typing import Literal, NotRequired, TypedDict, Unpack
+
 import datetime
 from typing import Any
 import pandas as pd
 from finstack_quant.margin._types import NettingSetId
+
+class _DrcPositionFields(TypedDict):
+    """Input fields for an issuer's non-securitisation default exposure."""
+
+    issuer: str
+    maturity_years: float
+    jtd_amount: float
+    rating_bucket: int
+    sector: Literal["sovereign", "corporate", "local_government"]
+    seniority: Literal["covered_bond", "senior_unsecured", "subordinated", "equity"]
+    pnl_adjustment: NotRequired[float]
+
+class DrcPosition:
+    """Default-risk position in FRTB reporting currency, before the LGD adjustment.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import DrcPosition
+    >>> trade = DrcPosition(
+    ...     issuer="ACME",
+    ...     maturity_years=2,
+    ...     jtd_amount=100000,
+    ...     rating_bucket=4,
+    ...     sector="corporate",
+    ...     seniority="senior_unsecured",
+    ... )
+    >>> trade.to_dict()["issuer"]
+    'ACME'
+    """
+
+    def __init__(self, **fields: Unpack[_DrcPositionFields]) -> None:
+        """Validate a non-securitisation position for the Default Risk Charge.
+
+        Parameters
+        ----------
+        fields : _DrcPositionFields
+            Nonempty issuer, nonnegative residual maturity in years, signed
+            reporting-currency JTD basis before LGD, bucket 1 through 9,
+            sector and seniority. P&L adjustment is signed in reporting
+            currency and defaults to zero. Equity uses the corporate sector.
+
+        Raises
+        ------
+        ValueError
+            If fields are unknown, malformed or violate the native domains.
+        """
+        ...
+
+    def to_dict(self) -> _DrcPositionFields:
+        """Return the native position fields and the effective P&L adjustment.
+
+        Returns
+        -------
+        _DrcPositionFields
+            Independent copy using regulatory wire names.
+
+        Raises
+        ------
+        ValueError
+            If the native position cannot be exported.
+        """
+        ...
 
 class FrtbSensitivities:
     """
@@ -788,7 +852,7 @@ class FrtbSensitivities:
         """
         ...
 
-    def add_drc_position(self, position: dict[str, Any]) -> None:
+    def add_drc_position(self, position: DrcPosition | dict[str, Any]) -> None:
         """Add the canonical Rust DrcPosition object.
 
         Parameters

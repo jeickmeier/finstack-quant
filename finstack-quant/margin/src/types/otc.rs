@@ -32,6 +32,23 @@ pub enum SimmCreditClassification {
     NonQualifying,
 }
 
+impl SimmCreditClassification {
+    /// Create a qualifying credit-risk classification with an explicit sector.
+    ///
+    /// # Arguments
+    /// * `sector` - Industry or issuer-type bucket from the selected SIMM sector definitions.
+    #[must_use]
+    pub const fn qualifying(sector: SimmCreditSector) -> Self {
+        Self::Qualifying { sector }
+    }
+
+    /// Create a non-qualifying credit-risk classification for an eligible exposure.
+    #[must_use]
+    pub const fn non_qualifying() -> Self {
+        Self::NonQualifying
+    }
+}
+
 impl<'de> serde::Deserialize<'de> for SimmCreditClassification {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where

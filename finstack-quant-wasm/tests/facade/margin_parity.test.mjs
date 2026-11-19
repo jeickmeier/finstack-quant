@@ -792,3 +792,31 @@ test('standalone SIMM nets opposing contractual sensitivities before calculating
   assert.throws(() => valuations.calculateSimm([], snapshot, asOf), /empty/);
   assert.throws(() => valuations.calculateSimm([payer], snapshot, asOf, null, 0), /MPOR/);
 });
+
+test('typed margin authoring validates agreement terms and the default-risk position', () => {
+  const usd = new core.Currency('USD');
+  const base = margin.csaSpecUsdRegulatory();
+  const withThreshold = margin
+    .csaSpecToBuilder(base)
+    .vmThreshold(new core.Money(250_000, usd), new core.Money(50_000, usd))
+    .imParams(null)
+    .build();
+  assert.equal(Number(base.vm_params.threshold.amount), 0);
+  assert.equal(Number(withThreshold.vm_params.threshold.amount), 250_000);
+  assert.equal(Number(withThreshold.vm_params.mta.amount), 50_000);
+  assert.equal(withThreshold.im_params, undefined);
+  assert.throws(() => margin.csaSpecBuilder('EXPLICIT', 'USD', 'USD-OIS').build(), /calendar_id/);
+
+  const position = margin.drcPosition({
+    issuer: 'ACME',
+    jtd_amount: 1_000_000,
+    rating_bucket: 3,
+    sector: 'corporate',
+    seniority: 'senior_unsecured',
+    maturity_years: 2,
+  });
+  const sens = new margin.FrtbSensitivities('USD');
+  sens.addDrcPosition(position);
+  assert.ok(margin.frtbSbaCharge(sens).drc > 0);
+  assert.throws(() => margin.drcPosition({ ...position, maturity_years: -1 }), /maturity/);
+});

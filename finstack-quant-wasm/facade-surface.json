@@ -2079,6 +2079,7 @@
   "margin": {
     "kind": "namespace",
     "keys": [
+      "CsaSpecBuilder",
       "FrtbSbaEngine",
       "FrtbSensitivities",
       "HaircutImCalculator",
@@ -2095,13 +2096,16 @@
       "computeMva",
       "constants",
       "csaSpecApplyImTerms",
+      "csaSpecBuilder",
       "csaSpecEurRegulatory",
       "csaSpecRegulatory",
       "csaSpecRegulatoryFromConfig",
+      "csaSpecToBuilder",
       "csaSpecUsdRegulatory",
       "csaSpecValidate",
       "csaSpecWithIm",
       "csaSpecWithVmThreshold",
+      "drcPosition",
       "eligibleCollateralScheduleBcbsStandard",
       "eligibleCollateralScheduleCashOnly",
       "eligibleCollateralScheduleCheckConcentrationLimits",
@@ -2140,6 +2144,10 @@
       "marginUtilizationShortfall",
       "nettingSetIdBilateral",
       "nettingSetIdCleared",
+      "otcMarginSpecBilateralSchedule",
+      "otcMarginSpecBilateralSimm",
+      "otcMarginSpecCleared",
+      "otcMarginSpecWithSimmCreditClassification",
       "saCcrNettingSetConfigMargined",
       "saCcrNettingSetConfigUnmargined",
       "saCcrNettingSetConfigValidate",
@@ -2148,6 +2156,21 @@
       "vmResultNetMargin",
       "vmResultRequiresCall"
     ]
+  },
+  "margin.drcPosition": {
+    "kind": "function"
+  },
+  "margin.otcMarginSpecBilateralSimm": {
+    "kind": "function"
+  },
+  "margin.otcMarginSpecBilateralSchedule": {
+    "kind": "function"
+  },
+  "margin.otcMarginSpecCleared": {
+    "kind": "function"
+  },
+  "margin.otcMarginSpecWithSimmCreditClassification": {
+    "kind": "function"
   },
   "margin.computeBilateralXva": {
     "kind": "function"
@@ -2277,6 +2300,29 @@
     "kind": "function"
   },
   "margin.collateralAssetClassStandardHaircut": {
+    "kind": "function"
+  },
+  "margin.CsaSpecBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "build",
+      "calendarId",
+      "callTiming",
+      "eligibleCollateral",
+      "free",
+      "imParams",
+      "imSimm",
+      "vmParams",
+      "vmThreshold"
+    ],
+    "getters": []
+  },
+  "margin.csaSpecBuilder": {
+    "kind": "function"
+  },
+  "margin.csaSpecToBuilder": {
     "kind": "function"
   },
   "margin.csaSpecApplyImTerms": {

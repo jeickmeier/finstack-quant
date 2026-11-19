@@ -17,9 +17,12 @@ from __future__ import annotations
 from typing import Any, Final
 from finstack_quant.margin import schema as schema
 from finstack_quant.margin._types import (
+    OtcMarginSpec as OtcMarginSpec,
+    SimmCreditClassification as SimmCreditClassification,
     ClearingStatus as ClearingStatus,
     CollateralAssetClass as CollateralAssetClass,
     CsaSpec as CsaSpec,
+    CsaSpecBuilder as CsaSpecBuilder,
     EligibleCollateralSchedule as EligibleCollateralSchedule,
     ImCollateralResult as ImCollateralResult,
     ImMethodology as ImMethodology,
@@ -54,6 +57,7 @@ from finstack_quant.margin._metrics import (
     MarginUtilization as MarginUtilization,
 )
 from finstack_quant.margin._regulatory import (
+    DrcPosition as DrcPosition,
     EadResult as EadResult,
     FrtbSbaEngine as FrtbSbaEngine,
     FrtbSbaResult as FrtbSbaResult,
@@ -73,6 +77,10 @@ __all__ = [
     "CollateralAssetClass",
     "NettingSetId",
     "CsaSpec",
+    "CsaSpecBuilder",
+    "DrcPosition",
+    "OtcMarginSpec",
+    "SimmCreditClassification",
     "EligibleCollateralSchedule",
     "CONSTANTS",
     "VmResult",

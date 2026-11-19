@@ -30,7 +30,6 @@ use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 
-use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations::instruments::rates::cap_floor::CapFloorBuilder;
 use finstack_quant_valuations::instruments::rates::irs::InterestRateSwapBuilder;
 use finstack_quant_valuations::instruments::rates::swaption::SwaptionBuilder;
@@ -254,7 +253,7 @@ impl PyInterestRateSwapBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: OtcMarginSpec = spec_from_py(py, value, "margin_spec")?;
+        let spec = crate::bindings::margin::types::extract_otc_margin_spec(py, value)?;
         builder_set!(
             slf,
             margin_spec,

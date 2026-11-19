@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from finstack_quant.core.currency import Currency
+
 from typing import Any
 import pandas as pd
 from finstack_quant.core.config import FinstackConfig
+from finstack_quant.core.money import Money
 
 class ImMethodology:
     """
@@ -1183,6 +1186,51 @@ class CsaSpec:
     """
 
     @staticmethod
+    def builder(id: str, base_currency: Currency | str, collateral_curve_id: str) -> CsaSpecBuilder:
+        """Start authoring an agreement with an explicit reporting currency.
+
+        Parameters
+        ----------
+        id : str
+            Stable agreement identifier for trade and collateral-account joins.
+        base_currency : Currency or str
+            Contractual currency of margin balances, thresholds and transfers.
+        collateral_curve_id : str
+            Market identifier of the curve used to discount cash collateral.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Builder requiring explicit variation-margin, eligibility, call timing and calendar.
+
+        Raises
+        ------
+        ValueError
+            If the currency code is unrecognized.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import CsaSpec
+        >>> type(CsaSpec.builder("CSA-A", "USD", "USD-OIS")).__name__
+        'CsaSpecBuilder'
+        """
+        ...
+
+    def to_builder(self) -> CsaSpecBuilder:
+        """Copy the agreement's complete terms into an independent builder.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Builder carrying the currency, market references and agreement terms.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+    @staticmethod
     def usd_regulatory() -> CsaSpec:
         """
         Standard regulatory CSA for USD derivatives.
@@ -2294,3 +2342,370 @@ class EligibleCollateralSchedule:
         ...
 
     def __repr__(self) -> str: ...
+
+class SimmCreditClassification:
+    """Select the qualifying or non-qualifying native SIMM credit risk class.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import SimmCreditClassification
+    >>> SimmCreditClassification.qualifying("financial").to_dict()["risk_class"]
+    'qualifying'
+    """
+
+    @staticmethod
+    def qualifying(sector: str) -> SimmCreditClassification:
+        """Classify a credit-qualifying position by its SIMM sector.
+
+        Parameters
+        ----------
+        sector : str
+            Native SIMM sector label, such as financial or sovereign.
+
+        Returns
+        -------
+        SimmCreditClassification
+            Qualifying classification with explicit sector.
+
+        Raises
+        ------
+        ValueError
+            If the native sector label is unrecognized.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import SimmCreditClassification
+        >>> SimmCreditClassification.qualifying("financial").to_dict()["sector"]
+        'financial'
+        """
+        ...
+
+    @staticmethod
+    def non_qualifying() -> SimmCreditClassification:
+        """Classify an applicable exposure as credit non-qualifying.
+
+        Returns
+        -------
+        SimmCreditClassification
+            Non-qualifying classification without a sector assignment.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import SimmCreditClassification
+        >>> SimmCreditClassification.non_qualifying().to_dict()
+        {'risk_class': 'non_qualifying'}
+        """
+        ...
+
+    def to_dict(self) -> dict[str, str]:
+        """Return the native risk-class and applicable sector labels.
+
+        Returns
+        -------
+        dict[str, str]
+            Independent wire mapping.
+
+        Raises
+        ------
+        ValueError
+            If the classification cannot be exported.
+        """
+        ...
+
+class OtcMarginSpec:
+    """Explicit clearing status and CSA terms for a marginable OTC trade.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import CsaSpec, OtcMarginSpec
+    >>> spec = OtcMarginSpec.bilateral_simm(CsaSpec.usd_regulatory())
+    >>> spec.to_dict()["csa"]["base_currency"]
+    'USD'
+    """
+
+    @staticmethod
+    def bilateral_simm(csa: CsaSpec) -> OtcMarginSpec:
+        """Use ISDA SIMM for the supplied bilateral CSA.
+
+        Parameters
+        ----------
+        csa : CsaSpec
+            Existing agreement. Its collateral, VM and timing terms are copied.
+            An agreement with no IM retains that explicit election.
+
+        Returns
+        -------
+        OtcMarginSpec
+            Bilateral terms with the elected initial margin convention.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import CsaSpec, OtcMarginSpec
+        >>> OtcMarginSpec.bilateral_simm(CsaSpec.usd_regulatory()).to_dict()["csa"]["base_currency"]
+        'USD'
+        """
+        ...
+
+    @staticmethod
+    def bilateral_schedule(csa: CsaSpec) -> OtcMarginSpec:
+        """Use schedule-based IM for the supplied bilateral CSA.
+
+        Parameters
+        ----------
+        csa : CsaSpec
+            Existing agreement. Its collateral, VM and timing terms are copied.
+            An agreement with no IM retains that explicit election.
+
+        Returns
+        -------
+        OtcMarginSpec
+            Bilateral terms with the elected initial margin convention.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import CsaSpec, OtcMarginSpec
+        >>> OtcMarginSpec.bilateral_schedule(CsaSpec.usd_regulatory()).to_dict()["csa"]["base_currency"]
+        'USD'
+        """
+        ...
+
+    @staticmethod
+    def cleared(ccp: str, currency: str) -> OtcMarginSpec:
+        """Apply the native cleared-margin defaults for an identified CCP.
+
+        Parameters
+        ----------
+        ccp : str
+            Clearinghouse identifier, such as LCH.
+        currency : str
+            ISO-4217 settlement and collateral reporting currency.
+
+        Returns
+        -------
+        OtcMarginSpec
+            Cleared terms with the embedded collateral schedule and timing.
+
+        Raises
+        ------
+        ValueError
+            If the currency is invalid or the native registry cannot be resolved.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import OtcMarginSpec
+        >>> OtcMarginSpec.cleared("LCH", "USD").to_dict()["csa"]["base_currency"]
+        'USD'
+        """
+        ...
+
+    def with_simm_credit_classification(self, classification: SimmCreditClassification) -> OtcMarginSpec:
+        """Copy the trade's terms with a selected SIMM credit classification.
+
+        Parameters
+        ----------
+        classification : SimmCreditClassification
+            Explicit qualifying sector or non-qualifying election for the trade.
+
+        Returns
+        -------
+        OtcMarginSpec
+            Independent copy with the elected credit class.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """Export the native margin terms for an instrument specification.
+
+        Returns
+        -------
+        dict[str, Any]
+            Independent copy of CSA, clearing status and any credit class.
+
+        Raises
+        ------
+        ValueError
+            If the terms cannot be exported.
+        """
+        ...
+
+class CsaSpecBuilder:
+    """Author and validate the negotiated terms of a Credit Support Annex.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.margin import CsaSpec
+    >>> base = CsaSpec.usd_regulatory()
+    >>> agreement = base.to_builder().vm_threshold(Money(250_000, "USD"), Money(50_000, "USD")).build()
+    >>> agreement.base_currency
+    'USD'
+    """
+
+    def build(self) -> CsaSpec:
+        """Consume the builder and validate the agreement.
+
+        Returns
+        -------
+        CsaSpec
+            Validated terms with explicit market references and margin currency.
+
+        Raises
+        ------
+        ValueError
+            If the builder was consumed, required terms are absent or a term violates the CSA contract.
+        """
+        ...
+
+    def im_simm(self) -> CsaSpecBuilder:
+        """Elect the registry's SIMM initial-margin terms in the agreement currency.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Active builder carrying the elected SIMM terms.
+
+        Raises
+        ------
+        ValueError
+            If the builder was consumed, the registry is unavailable or it has no eligible terms.
+        """
+        ...
+
+    def vm_threshold(self, threshold: Money, mta: Money) -> CsaSpecBuilder:
+        """Set the variation-margin allowance and transfer minimum.
+
+        Parameters
+        ----------
+        threshold : Money
+            Uncollateralized allowance in the CSA currency.
+        mta : Money
+            Minimum transfer in the same currency.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Active builder retaining previously elected VM rounding,
+            independent amount, call frequency and settlement lag.
+
+        Raises
+        ------
+        ValueError
+            If the builder was consumed. Invalid money terms fail at build.
+        """
+        ...
+
+    def calendar_id(self, value: str) -> CsaSpecBuilder:
+        """Set the agreement's calendar id.
+
+        Parameters
+        ----------
+        value : str
+            Registered business-day calendar for calls and settlements.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Active builder carrying the specified terms.
+
+        Raises
+        ------
+        ValueError
+            If the supplied term is malformed or the builder was consumed.
+        """
+        ...
+
+    def vm_params(self, value: dict[str, object]) -> CsaSpecBuilder:
+        """Set the agreement's vm params.
+
+        Parameters
+        ----------
+        value : dict[str, object]
+            Threshold, minimum transfer, rounding and frequency under the canonical variation-margin contract.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Active builder carrying the specified terms.
+
+        Raises
+        ------
+        ValueError
+            If the supplied term is malformed or the builder was consumed.
+        """
+        ...
+
+    def im_params(self, value: dict[str, object] | None) -> CsaSpecBuilder:
+        """Set the agreement's im params.
+
+        Parameters
+        ----------
+        value : dict[str, object] | None
+            Method, MPOR, threshold, transfer minimum and segregation terms. None explicitly clears IM.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Active builder carrying the specified terms.
+
+        Raises
+        ------
+        ValueError
+            If the supplied term is malformed or the builder was consumed.
+        """
+        ...
+
+    def eligible_collateral(self, value: EligibleCollateralSchedule) -> CsaSpecBuilder:
+        """Set the agreement's eligible collateral.
+
+        Parameters
+        ----------
+        value : EligibleCollateralSchedule
+            Schedule of eligible instruments and applied collateral valuation haircuts.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Active builder carrying the specified terms.
+
+        Raises
+        ------
+        ValueError
+            If the supplied term is malformed or the builder was consumed.
+        """
+        ...
+
+    def call_timing(self, value: dict[str, int]) -> CsaSpecBuilder:
+        """Set the agreement's call timing.
+
+        Parameters
+        ----------
+        value : dict[str, int]
+            Hour and business-day fields for the canonical margin call and dispute windows.
+
+        Returns
+        -------
+        CsaSpecBuilder
+            Active builder carrying the specified terms.
+
+        Raises
+        ------
+        ValueError
+            If the supplied term is malformed or the builder was consumed.
+        """
+        ...

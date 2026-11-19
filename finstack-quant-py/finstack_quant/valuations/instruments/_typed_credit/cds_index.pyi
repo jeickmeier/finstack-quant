@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_credit/cds_index.rs``."""
 
 from __future__ import annotations
+from finstack_quant.margin import OtcMarginSpec
 from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
@@ -1090,7 +1091,7 @@ class CdsIndexBuilder:
             If ``value`` is not a ``(date, Money)`` pair.
         """
         ...
-    def margin_spec(self, value: dict[str, object] | str) -> CdsIndexBuilder:
+    def margin_spec(self, value: OtcMarginSpec | dict[str, object] | str) -> CdsIndexBuilder:
         """
         Set the OTC margin (CSA / initial-margin) specification.
 

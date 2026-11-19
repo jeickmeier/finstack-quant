@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_credit/cds.rs``."""
 
 from __future__ import annotations
+from finstack_quant.margin import OtcMarginSpec
 from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
@@ -868,7 +869,7 @@ class CreditDefaultSwapBuilder:
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
         """
         ...
-    def margin_spec(self, value: dict[str, object] | str) -> CreditDefaultSwapBuilder:
+    def margin_spec(self, value: OtcMarginSpec | dict[str, object] | str) -> CreditDefaultSwapBuilder:
         """
         Set the OTC margin (CSA / initial-margin) specification.
 

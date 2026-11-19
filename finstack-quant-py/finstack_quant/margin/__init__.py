@@ -18,6 +18,10 @@ ClearingStatus = _margin.ClearingStatus
 CollateralAssetClass = _margin.CollateralAssetClass
 NettingSetId = _margin.NettingSetId
 CsaSpec = _margin.CsaSpec
+CsaSpecBuilder = _margin.CsaSpecBuilder
+DrcPosition = _margin.DrcPosition
+OtcMarginSpec = _margin.OtcMarginSpec
+SimmCreditClassification = _margin.SimmCreditClassification
 EligibleCollateralSchedule = _margin.EligibleCollateralSchedule
 CONSTANTS = _margin.CONSTANTS
 VmResult = _margin.VmResult
@@ -59,6 +63,8 @@ __all__: list[str] = [
     "ClearingStatus",
     "CollateralAssetClass",
     "CsaSpec",
+    "CsaSpecBuilder",
+    "DrcPosition",
     "EadResult",
     "EligibleCollateralSchedule",
     "ExcessCollateral",
@@ -81,11 +87,13 @@ __all__: list[str] = [
     "MarginUtilization",
     "MvaResult",
     "NettingSetId",
+    "OtcMarginSpec",
     "SaCcrEngine",
     "SaCcrNettingSetConfig",
     "SaCcrTrade",
     "ScheduleImCalculator",
     "SimmCalculator",
+    "SimmCreditClassification",
     "SimmCurvatureSensitivity",
     "SimmSensitivities",
     "VmCalculator",

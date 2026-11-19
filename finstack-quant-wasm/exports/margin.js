@@ -35,6 +35,11 @@ const computeMva = (imProfile, fundingSpreadCurve, discountCurve, survivalCurve 
  * ```
  */
 export const margin = {
+  drcPosition: wasm.drcPosition,
+  otcMarginSpecBilateralSimm: wasm.otcMarginSpecBilateralSimm,
+  otcMarginSpecBilateralSchedule: wasm.otcMarginSpecBilateralSchedule,
+  otcMarginSpecCleared: wasm.otcMarginSpecCleared,
+  otcMarginSpecWithSimmCreditClassification: wasm.otcMarginSpecWithSimmCreditClassification,
   computeBilateralXva: wasm.computeBilateralXva,
   FrtbSbaEngine: wasm.FrtbSbaEngine,
   FrtbSensitivities: wasm.FrtbSensitivities,
@@ -50,6 +55,9 @@ export const margin = {
   collateralAssetClassFromStr: wasm.collateralAssetClassFromStr,
   collateralAssetClassFxAddon: wasm.collateralAssetClassFxAddon,
   collateralAssetClassStandardHaircut: wasm.collateralAssetClassStandardHaircut,
+  CsaSpecBuilder: wasm.CsaSpecBuilder,
+  csaSpecBuilder: wasm.csaSpecBuilder,
+  csaSpecToBuilder: wasm.csaSpecToBuilder,
   csaSpecApplyImTerms: wasm.csaSpecApplyImTerms,
   csaSpecEurRegulatory: wasm.csaSpecEurRegulatory,
   csaSpecRegulatory: wasm.csaSpecRegulatory,

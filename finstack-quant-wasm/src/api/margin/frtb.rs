@@ -882,3 +882,16 @@ pub fn frtb_sba_charge(
         .transpose()?;
     to_js_value(&frtb_sba_charge_rs(&sensitivities.inner, scenario).map_err(to_js_err)?)
 }
+
+/// Construct a checked non-securitisation Default Risk Charge position.
+/// @param position - Native issuer, signed JTD basis, residual maturity, rating, sector, seniority and optional signed P&L adjustment.
+/// @returns Independent validated position in the reporting currency designated by the caller.
+/// @throws FinstackError for missing, unknown or invalid position fields.
+#[wasm_bindgen(js_name = drcPosition, unchecked_return_type = "generated.margin.DrcPosition")]
+pub fn drc_position(
+    #[wasm_bindgen(unchecked_param_type = "generated.margin.DrcPosition")] position: JsValue,
+) -> Result<JsValue, JsValue> {
+    let position: DrcPosition = from_js_json(&position, "position")?;
+    position.validate().map_err(to_js_err)?;
+    to_js_value(&position)
+}

@@ -45,7 +45,7 @@ pub use collateral::{
     CollateralAssetClass, CollateralEligibility, ConcentrationBreach, EligibleCollateralSchedule,
     MaturityConstraints,
 };
-pub use csa::{CsaSpec, MarginCallTiming};
+pub use csa::{CsaSpec, CsaSpecBuilder, MarginCallTiming};
 pub use enums::{ClearingStatus, ImMethodology, MarginTenor};
 pub use netting::NettingSetId;
 pub use otc::{OtcMarginSpec, SimmCreditClassification};

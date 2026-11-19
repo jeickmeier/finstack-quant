@@ -618,6 +618,129 @@ impl PyCsaSpec {
     }
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder")]
+#[pyclass(
+    name = "CsaSpecBuilder",
+    module = "finstack_quant.margin",
+    skip_from_py_object
+)]
+pub(crate) struct PyCsaSpecBuilder {
+    inner: Option<fm::types::CsaSpecBuilder>,
+}
+
+#[pymethods]
+impl PyCsaSpec {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpec.builder")]
+    #[staticmethod]
+    fn builder(
+        id: &str,
+        base_currency: &Bound<'_, PyAny>,
+        collateral_curve_id: &str,
+    ) -> PyResult<PyCsaSpecBuilder> {
+        let currency = crate::bindings::core::currency::extract_currency(base_currency)?;
+        Ok(PyCsaSpecBuilder {
+            inner: Some(fm::types::CsaSpec::builder(
+                id,
+                currency,
+                collateral_curve_id,
+            )),
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpec.to_builder")]
+    fn to_builder(&self) -> PyCsaSpecBuilder {
+        PyCsaSpecBuilder {
+            inner: Some(self.inner.to_builder()),
+        }
+    }
+}
+
+impl PyCsaSpecBuilder {
+    fn take(&mut self) -> PyResult<fm::types::CsaSpecBuilder> {
+        self.inner
+            .take()
+            .ok_or_else(|| crate::errors::value_error("CSA builder has already been consumed"))
+    }
+}
+
+#[pymethods]
+impl PyCsaSpecBuilder {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder.build")]
+    fn build(&mut self) -> PyResult<PyCsaSpec> {
+        Ok(PyCsaSpec {
+            inner: self.take()?.build().map_err(core_to_py)?,
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder.calendar_id")]
+    fn calendar_id<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner = Some(slf.take()?.calendar_id(value));
+        Ok(slf)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder.vm_threshold")]
+    fn vm_threshold<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        threshold: &crate::bindings::core::money::PyMoney,
+        mta: &crate::bindings::core::money::PyMoney,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner = Some(slf.take()?.vm_threshold(threshold.inner, mta.inner));
+        Ok(slf)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder.im_simm")]
+    fn im_simm(mut slf: PyRefMut<'_, Self>) -> PyResult<PyRefMut<'_, Self>> {
+        let builder = slf
+            .inner
+            .as_ref()
+            .ok_or_else(|| crate::errors::value_error("CSA builder has already been consumed"))?;
+        slf.inner = Some(builder.clone().im_simm().map_err(core_to_py)?);
+        Ok(slf)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder.eligible_collateral")]
+    fn eligible_collateral<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &PyEligibleCollateralSchedule,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner = Some(slf.take()?.eligible_collateral(value.inner.clone()));
+        Ok(slf)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder.vm_params")]
+    fn vm_params<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let term = crate::bindings::module_utils::py_to_serde(value.py(), value, "vm_params")?;
+        slf.inner = Some(slf.take()?.vm_params(term));
+        Ok(slf)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder.im_params")]
+    fn im_params<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let term = crate::bindings::module_utils::py_to_serde(value.py(), value, "im_params")?;
+        slf.inner = Some(slf.take()?.im_params(term));
+        Ok(slf)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "CsaSpecBuilder.call_timing")]
+    fn call_timing<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let term = crate::bindings::module_utils::py_to_serde(value.py(), value, "call_timing")?;
+        slf.inner = Some(slf.take()?.call_timing(term));
+        Ok(slf)
+    }
+}
+
 #[pymethods]
 impl PyCsaSpec {
     /// Standard regulatory CSA for USD derivatives (zero VM threshold, daily
@@ -1307,6 +1430,106 @@ impl PyEligibleCollateralSchedule {
     }
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "SimmCreditClassification")]
+#[pyclass(
+    name = "SimmCreditClassification",
+    module = "finstack_quant.margin",
+    frozen,
+    skip_from_py_object
+)]
+pub(crate) struct PySimmCreditClassification {
+    inner: fm::types::SimmCreditClassification,
+}
+
+#[pymethods]
+impl PySimmCreditClassification {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "SimmCreditClassification.qualifying")]
+    #[staticmethod]
+    fn qualifying(sector: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let sector =
+            crate::bindings::module_utils::py_to_serde(sector.py(), sector, "SIMM credit sector")?;
+        Ok(Self {
+            inner: fm::types::SimmCreditClassification::qualifying(sector),
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "SimmCreditClassification.non_qualifying")]
+    #[staticmethod]
+    fn non_qualifying() -> Self {
+        Self {
+            inner: fm::types::SimmCreditClassification::non_qualifying(),
+        }
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "SimmCreditClassification.to_dict")]
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "OtcMarginSpec")]
+#[pyclass(
+    name = "OtcMarginSpec",
+    module = "finstack_quant.margin",
+    frozen,
+    skip_from_py_object
+)]
+pub(crate) struct PyOtcMarginSpec {
+    inner: fm::types::OtcMarginSpec,
+}
+
+pub(crate) fn extract_otc_margin_spec(
+    py: Python<'_>,
+    value: &Bound<'_, PyAny>,
+) -> PyResult<fm::types::OtcMarginSpec> {
+    if let Ok(spec) = value.cast::<PyOtcMarginSpec>() {
+        return Ok(spec.borrow().inner.clone());
+    }
+    crate::bindings::module_utils::spec_from_py(py, value, "margin_spec")
+}
+
+#[pymethods]
+impl PyOtcMarginSpec {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "OtcMarginSpec.bilateral_simm")]
+    #[staticmethod]
+    fn bilateral_simm(csa: &PyCsaSpec) -> Self {
+        Self {
+            inner: fm::types::OtcMarginSpec::bilateral_simm(csa.inner.clone()),
+        }
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "OtcMarginSpec.bilateral_schedule")]
+    #[staticmethod]
+    fn bilateral_schedule(csa: &PyCsaSpec) -> Self {
+        Self {
+            inner: fm::types::OtcMarginSpec::bilateral_schedule(csa.inner.clone()),
+        }
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "OtcMarginSpec.cleared")]
+    #[staticmethod]
+    fn cleared(ccp: &str, currency: &str) -> PyResult<Self> {
+        let inner = fm::types::OtcMarginSpec::cleared(ccp, parse_currency(currency)?)
+            .map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "OtcMarginSpec.with_simm_credit_classification")]
+    fn with_simm_credit_classification(&self, classification: &PySimmCreditClassification) -> Self {
+        Self {
+            inner: self
+                .inner
+                .clone()
+                .with_simm_credit_classification(classification.inner),
+        }
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "OtcMarginSpec.to_dict")]
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+    }
+}
+
 /// Register all types in this module.
 pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyImMethodology>()?;
@@ -1316,6 +1539,9 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCollateralAssetClass>()?;
     m.add_class::<PyNettingSetId>()?;
     m.add_class::<PyCsaSpec>()?;
+    m.add_class::<PyCsaSpecBuilder>()?;
+    m.add_class::<PyOtcMarginSpec>()?;
+    m.add_class::<PySimmCreditClassification>()?;
     m.add_class::<PyImCollateralResult>()?;
     m.add_class::<PyEligibleCollateralSchedule>()?;
 

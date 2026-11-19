@@ -7314,6 +7314,43 @@ export interface MarginSchemaNamespace {
  */
 export interface MarginNamespace {
   /**
+   * Construct a checked non-securitisation Default Risk Charge position.
+   * @param position - Native issuer, signed JTD basis, residual maturity, rating, sector, seniority and optional signed P&L adjustment.
+   * @returns Independent validated position in the reporting currency designated by the caller.
+   * @throws FinstackError for missing, unknown or invalid position fields.
+   */
+  readonly drcPosition: typeof wasm.drcPosition;
+  /**
+   * Set ISDA SIMM on a copy of the bilateral agreement.
+   * @param csa - Authored CSA; collateral, variation margin and timing terms are preserved.
+   * @returns OTC margin specification with the selected methodology if IM is elected.
+   * @throws FinstackError if the CSA document cannot be decoded.
+   */
+  readonly otcMarginSpecBilateralSimm: typeof wasm.otcMarginSpecBilateralSimm;
+  /**
+   * Set schedule-based initial margin on a copy of the bilateral agreement.
+   * @param csa - Authored CSA; collateral, variation margin and timing terms are preserved.
+   * @returns OTC margin specification with the selected methodology if IM is elected.
+   * @throws FinstackError if the CSA document cannot be decoded.
+   */
+  readonly otcMarginSpecBilateralSchedule: typeof wasm.otcMarginSpecBilateralSchedule;
+  /**
+   * Construct margin terms from the embedded cleared-derivative defaults.
+   * @param ccp - Identified clearinghouse, such as LCH.
+   * @param currency - ISO-4217 settlement and collateral currency.
+   * @returns Native cleared OTC margin specification.
+   * @throws FinstackError if the currency or native margin registry is invalid.
+   */
+  readonly otcMarginSpecCleared: typeof wasm.otcMarginSpecCleared;
+  /**
+   * Add an explicit credit classification to an independent OTC margin specification.
+   * @param spec - Native OTC terms holding clearing and CSA settings.
+   * @param classification - Qualifying sector or non-qualifying class on the selected risk basis.
+   * @returns Native margin specification with that classification.
+   * @throws FinstackError if either native document cannot be decoded.
+   */
+  readonly otcMarginSpecWithSimmCreditClassification: typeof wasm.otcMarginSpecWithSimmCreditClassification;
+  /**
    * Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
    *
    * All legs are weighted by joint (first-to-default) survival. MVA is computed
@@ -7454,6 +7491,23 @@ export interface MarginNamespace {
    * registry cannot be loaded.
    */
   readonly collateralAssetClassStandardHaircut: typeof wasm.collateralAssetClassStandardHaircut;
+  readonly CsaSpecBuilder: typeof wasm.CsaSpecBuilder;
+  /**
+   * Start authoring an agreement with an explicit currency and market reference.
+   * @param id - Stable agreement identifier for trade and collateral account joins.
+   * @param baseCurrency - ISO currency for transfers, thresholds and collateral amounts.
+   * @param collateralCurveId - Exact curve identifier used to discount collateral cash.
+   * @returns Builder requiring the agreement's terms, timing and calendar.
+   * @throws FinstackError for an unknown currency or incompatible input type.
+   */
+  readonly csaSpecBuilder: typeof wasm.csaSpecBuilder;
+  /**
+   * Copy a complete CSA value into an independent builder.
+   * @param value - The CSA terms to edit.
+   * @returns Builder carrying the original CSA's agreement terms.
+   * @throws FinstackError when the provided value has invalid contract fields.
+   */
+  readonly csaSpecToBuilder: typeof wasm.csaSpecToBuilder;
   /**
    * Apply a CSA's initial margin terms to one gross IM figure.
    *

@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_rates.rs``."""
 
 from __future__ import annotations
+from finstack_quant.margin import OtcMarginSpec
 from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
@@ -707,7 +708,7 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def margin_spec(self, value: dict[str, object] | str) -> InterestRateSwapBuilder:
+    def margin_spec(self, value: OtcMarginSpec | dict[str, object] | str) -> InterestRateSwapBuilder:
         """
         Set the OTC margin (CSA / initial-margin) specification.
 

@@ -63,6 +63,35 @@ pub struct PyFrtbSensitivities {
     pub(super) inner: FrtbSensitivities,
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._regulatory", "DrcPosition")]
+#[pyclass(
+    name = "DrcPosition",
+    module = "finstack_quant.margin",
+    frozen,
+    skip_from_py_object
+)]
+pub(crate) struct PyDrcPosition {
+    inner: DrcPosition,
+}
+
+#[pymethods]
+impl PyDrcPosition {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._regulatory", "DrcPosition.__init__")]
+    #[new]
+    #[pyo3(signature = (**fields))]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: DrcPosition =
+            crate::bindings::module_utils::fields_from_py(py, fields, "DRC position")?;
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._regulatory", "DrcPosition.to_dict")]
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner)
+    }
+}
+
 #[pymethods]
 impl PyFrtbSensitivities {
     /// Create an empty sensitivity container.
@@ -407,8 +436,8 @@ impl PyFrtbSensitivities {
     ///
     /// Parameters
     /// ----------
-    /// position : dict
-    ///     Rust DrcPosition fields: issuer, signed jtd_amount in reporting
+    /// position : DrcPosition or dict
+    ///     Validated native position or Rust DrcPosition fields: issuer, signed jtd_amount in reporting
     ///     currency before LGD, rating_bucket (1..9), sector, seniority,
     ///     maturity_years (non-negative), and optional pnl_adjustment (default 0).
     ///     Equity seniority requires corporate sector. Securitisations are unsupported.
@@ -421,8 +450,11 @@ impl PyFrtbSensitivities {
     ///     If the position contains values that cannot be converted to JSON.
     #[pyo3(signature = (position))]
     fn add_drc_position(&mut self, position: &Bound<'_, PyAny>) -> PyResult<()> {
-        let position: DrcPosition =
-            crate::bindings::module_utils::py_to_serde(position.py(), position, "position")?;
+        let position: DrcPosition = if let Ok(typed) = position.cast::<PyDrcPosition>() {
+            typed.borrow().inner.clone()
+        } else {
+            crate::bindings::module_utils::py_to_serde(position.py(), position, "position")?
+        };
         position.validate().map_err(core_to_py)?;
         self.inner.add_drc_position(position);
         Ok(())
@@ -1667,6 +1699,7 @@ pub fn saccr_ead(
 /// Register FRTB / SA-CCR classes and functions on the margin module.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFrtbSensitivities>()?;
+    m.add_class::<PyDrcPosition>()?;
     m.add_class::<PyFrtbSbaEngine>()?;
     m.add_class::<PyFrtbSbaResult>()?;
     m.add_class::<PyEadResult>()?;
