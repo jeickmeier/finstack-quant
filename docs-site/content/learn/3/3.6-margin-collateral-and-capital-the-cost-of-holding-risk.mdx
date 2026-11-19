@@ -380,8 +380,20 @@ times=[.5,1.,2.,3.,longest_maturity]
 im_profile=margin_api.im_profile_from_simm(SimmCalculator("v2_6"),netting_sens,"USD",margin_api.ImDecayProfile.linear_to_maturity(longest_maturity),times)
 mva=margin_api.compute_mva(im_profile,[(0.,50.)],credit_market.get_discount("USD-OIS"))
 # The linear IM decay ends at the longest actual trade maturity; it is assumed, not future repricing.
-# Explicit assumed exposure profile; not a simulated future portfolio exposure claim.
-exposure=margin_api.ExposureProfile(times,[net_mtm]*5,[max(net_mtm,0)+50_000*(1-t/6) for t in times],[20_000*(1-t/6) for t in times])
+# A complete external grid on a named valuation basis.
+from datetime import timedelta
+
+grid = [0.0, *times]
+dates = [AS_OF + timedelta(days=round(365*t)) for t in grid]
+exposure = margin_api.ExposureProfile(
+    as_of=AS_OF, currency="USD",
+    basis={"kind": "external", "source_id": "analyst-exposure-grid", "policy_id": "scenario-exercise"},
+    dates=dates, times=grid,
+    mtm_values=[net_mtm]*len(grid),
+    epe=[max(net_mtm, 0) + 50_000*(1-t/6) for t in grid],
+    ene=[20_000*(1-t/6) for t in grid],
+    diagnostics=margin_api.ExposureDiagnostics(total_time_points=len(grid)),
+)
 cpty=HazardCurve("DEALER",AS_OF,[(30.,.02)],recovery_rate=.4,day_count="act_365f")
 own=HazardCurve("SELF",AS_OF,[(30.,.01)],recovery_rate=.4,day_count="act_365f")
 xva=margin_api.compute_bilateral_xva(exposure,cpty,own,credit_market.get_discount("USD-OIS"),.4,.4,margin_api.FundingConfig(50.,30.,im_profile))

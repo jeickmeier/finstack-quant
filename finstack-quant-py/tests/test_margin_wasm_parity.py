@@ -487,7 +487,17 @@ def test_validate_twins_reject_what_wasm_rejects() -> None:
     with pytest.raises(ValueError, match="strictly increasing"):
         ImProfile([2.0, 1.0], [10.0, 5.0]).validate()
     with pytest.raises(ValueError, match="vector lengths must be equal"):
-        ExposureProfile([1.0, 2.0], [0.0], [0.0, 0.0], [0.0, 0.0]).validate()
+        ExposureProfile(
+            as_of="2025-01-01",
+            currency="USD",
+            basis={"kind": "external", "source_id": "parity-test", "policy_id": "unsecured"},
+            dates=["2025-01-01", "2026-01-01"],
+            times=[0.0, 1.0],
+            mtm_values=[0.0],
+            epe=[0.0, 0.0],
+            ene=[0.0, 0.0],
+            diagnostics={"market_roll_failures": 0, "valuation_failures": 0, "total_time_points": 2},
+        ).validate()
     with pytest.raises(ValueError, match="maturity_years"):
         ImDecayProfile.linear_to_maturity(0.0)
     with pytest.raises(ValueError, match="cannot merge SIMM sensitivities in EUR into a USD container"):

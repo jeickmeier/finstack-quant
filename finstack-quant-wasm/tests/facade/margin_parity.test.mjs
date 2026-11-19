@@ -428,15 +428,27 @@ test('FundingConfig, profile and decay twins match Python', () => {
     'validation',
     /strictly increasing/
   );
-  assert.equal(
-    margin.exposureProfileValidate({ times: [1, 2], mtm_values: [0, 0], epe: [0, 0], ene: [0, 0] }),
-    undefined
-  );
+  const exposure = {
+    as_of: '2025-01-01',
+    currency: 'USD',
+    basis: { kind: 'external', source_id: 'parity-test', policy_id: 'unsecured' },
+    dates: ['2025-01-01', '2026-01-01'],
+    times: [0, 1],
+    mtm_values: [0, 0],
+    epe: [0, 0],
+    ene: [0, 0],
+    diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 2 },
+  };
+  assert.equal(margin.exposureProfileValidate(exposure), undefined);
   throwsKind(
-    () =>
-      margin.exposureProfileValidate({ times: [1, 2], mtm_values: [0], epe: [0, 0], ene: [0, 0] }),
+    () => margin.exposureProfileValidate({ ...exposure, mtm_values: [0] }),
     'validation',
     /vector lengths must be equal/
+  );
+  throwsKind(
+    () => margin.exposureProfileValidate({ ...exposure, times: [0.5, 1] }),
+    'validation',
+    /explicit time-zero/
   );
 });
 

@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/exposure_profile.schema.json",
-      "bytes": 3073,
+      "bytes": 5932,
       "kind": "input",
       "path": "schemas/margin/1/exposure_profile.schema.json",
       "summary": "Exposure profile computed at each time grid point.",
@@ -236,7 +236,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/xva_result.schema.json",
-      "bytes": 19958,
+      "bytes": 19956,
       "kind": "output",
       "path": "schemas/margin/1/xva_result.schema.json",
       "summary": "Result of XVA calculations.",

@@ -7323,7 +7323,7 @@ export interface MarginNamespace {
    * `total_xva = CVA - DVA + FVA + MVA`. Optional funding legs are absent from
    * the payload when they were not computed.
    *
-   * @param exposureProfileJson - Strict `ExposureProfile` JSON with `times`,
+   * @param exposureProfile - Strict `ExposureProfile` JSON with `times`,
    * `mtm_values`, `epe`, and `ene` arrays of equal length and an optional
    * `diagnostics` object (`market_roll_failures`, `valuation_failures`,
    * `total_time_points`); unknown fields are rejected.
@@ -7354,7 +7354,13 @@ export interface MarginNamespace {
    * });
    * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
    * const result = margin.computeBilateralXva(
-   *   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
+   *   {
+   *     as_of: "2025-01-01", currency: "USD",
+   *     basis: { kind: "external", source_id: "complete-grid", policy_id: "unsecured" },
+   *     dates: ["2025-01-01", "2026-01-01", "2027-01-01"], times: [0, 1, 2],
+   *     mtm_values: [1e6, 1e6, 1e6], epe: [1e6, 1e6, 1e6], ene: [0, 0, 0],
+   *     diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 3 },
+   *   },
    *   hz, hz, df, 0.4, 0.4,
    *   JSON.stringify({ funding_spread_bp: 50.0 }),
    * );
@@ -7368,7 +7374,13 @@ export interface MarginNamespace {
    * const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03, "act_365f");
    * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
    * const result = margin.computeBilateralXva(
-   *   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
+   *   {
+   *     as_of: "2025-01-01", currency: "USD",
+   *     basis: { kind: "external", source_id: "complete-grid", policy_id: "unsecured" },
+   *     dates: ["2025-01-01", "2026-01-01", "2027-01-01"], times: [0, 1, 2],
+   *     mtm_values: [1e6, 1e6, 1e6], epe: [1e6, 1e6, 1e6], ene: [0, 0, 0],
+   *     diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 3 },
+   *   },
    *   hz, hz, df, 0.4, 0.4,
    *   JSON.stringify({ funding_spread_bp: 50.0 }),
    * );
@@ -7707,7 +7719,7 @@ export interface MarginNamespace {
   readonly excessCollateralHasShortfall: typeof wasm.excessCollateralHasShortfall;
   /**
    * Validate an exposure profile: equal-length arrays on a strictly increasing time grid.
-   * @param exposureProfile - `ExposureProfile` (object or JSON) with `times`, `mtm_values`, `epe`, `ene` and optional `diagnostics`.
+   * @param exposureProfile - `ExposureProfile` (object or JSON) with valuation cut, reporting currency, dated grid, signed marks, EPE and ENE, and completeness diagnostics.
    *
    * # Errors
    *

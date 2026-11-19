@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Sequence
+from datetime import date
+from typing import Any, Literal, TypedDict, Unpack
 import pandas as pd
 from finstack_quant.core.market_data import DiscountCurve, HazardCurve
 from finstack_quant.margin._im import SimmCalculator, SimmSensitivities
@@ -413,310 +415,332 @@ class ExposureDiagnostics:
 
     def __repr__(self) -> str: ...
 
+class _ExternalExposureBasis(TypedDict):
+    kind: Literal["external"]
+    source_id: str
+    policy_id: str
+
+class _SimulatedExposureBasis(TypedDict):
+    kind: Literal["simulated_uncollateralized"]
+    source_id: str
+    path_count: int
+
+class _ExposureDiagnosticsFields(TypedDict):
+    market_roll_failures: int
+    valuation_failures: int
+    total_time_points: int
+
+class _ExposureProfileFields(TypedDict):
+    as_of: date | str
+    currency: str
+    basis: _ExternalExposureBasis | _SimulatedExposureBasis
+    dates: Sequence[date | str]
+    times: list[float]
+    mtm_values: list[float]
+    epe: list[float]
+    ene: list[float]
+    diagnostics: ExposureDiagnostics | _ExposureDiagnosticsFields
+
 class ExposureProfile:
-    """
-    Exposure profile at each time grid point.
+    """Dated observations of portfolio mark-to-market and expected exposure.
 
-    Parameters
-    ----------
-    times : list[float]
-        Exposure or IM observation times in years from the valuation date.
-    mtm_values : list[float]
-        Portfolio MtM at each time.
-    epe : list[float]
-        Expected positive exposure series.
-    ene : list[float]
-        Expected negative exposure series.
-    diagnostics : ExposureDiagnostics | None, optional
-        Engine failure counters to attach; ``None`` when built by hand.
-
-    Returns
-    -------
-    ExposureProfile
-        Profile vectors.
+    Exposure amounts use major units of one reporting currency. Dates map
+    to each valuation curve's own clock. Model year fractions determine
+    the exposure integration clock.
 
     Examples
     --------
-    >>> p = ExposureProfile([0.0, 1.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0])
-    >>> len(p)
-    2
+    >>> profile = ExposureProfile(
+    ...     as_of="2025-01-01",
+    ...     currency="USD",
+    ...     basis={"kind": "external", "source_id": "audit-grid", "policy_id": "unsecured"},
+    ...     dates=["2025-01-01", "2025-07-01"],
+    ...     times=[0.0, 0.5],
+    ...     mtm_values=[20.0, -40.0],
+    ...     epe=[20.0, 0.0],
+    ...     ene=[0.0, 40.0],
+    ...     diagnostics=ExposureDiagnostics(total_time_points=2),
+    ... )
+    >>> profile.validate()
+    >>> profile.as_of.isoformat()
+    '2025-01-01'
+    >>> ExposureProfile.from_dataframe(profile.to_dataframe()).ene
+    [0.0, 40.0]
+    >>> ExposureProfile.from_json(profile.to_json()).dates == profile.dates
+    True
     """
 
-    def __init__(
-        self,
-        times: list[float],
-        mtm_values: list[float],
-        epe: list[float],
-        ene: list[float],
-        diagnostics: ExposureDiagnostics | None = None,
-    ) -> None:
-        """
-        Create aligned MtM, EPE, and ENE vectors on an exposure time grid.
+    def __init__(self, **fields: Unpack[_ExposureProfileFields]) -> None:
+        """Construct a profile from its dated grid, amounts and source evidence.
 
         Parameters
         ----------
-        times : list[float]
-            Finite, nonnegative, strictly increasing times in years. An explicit
-            zero-time point is allowed. Before the first point, XVA holds
-            its exposure constant; it does not assume zero opening exposure.
-        mtm_values : list[float]
-            Portfolio mark-to-market amounts at the corresponding times.
-        epe : list[float]
-            Expected positive exposure amounts at the corresponding times.
-        ene : list[float]
-            Expected negative exposure amounts at the corresponding times.
-        diagnostics : ExposureDiagnostics | None, optional
-            Engine failure counters to attach.
-
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied and
-        checked by ``validate()`` or the XVA entry points.
-        """
-        ...
-
-    @staticmethod
-    def from_dataframe(frame: pd.DataFrame) -> ExposureProfile:
-        """
-        Build a profile from the frame ``to_dataframe`` emits.
-
-        Parameters
-        ----------
-        frame : pd.DataFrame
-            Columns ``mtm_values``, ``epe``, ``ene`` indexed by time in
-            years.
-
-        Returns
-        -------
-        ExposureProfile
-            Profile with the index as ``times`` and no diagnostics.
+        fields : _ExposureProfileFields
+            `as_of` is the valuation cut, as a date or ISO year-month-day.
+            `currency` is the ISO 4217 denomination of all amounts.
+            `basis` records the provenance and policy or simulation fingerprint.
+            `dates` begins at valuation and contains the observation dates in order.
+            `times` contains corresponding model year fractions beginning at zero.
+            `mtm_values` contains signed expected marks in reporting currency.
+            `epe` contains the expected positive parts of the marks.
+            `ene` contains expected positive parts of the negated marks.
+            `diagnostics` records the number of observations and any failures.
 
         Raises
         ------
         ValueError
-            If a column is missing or non-numeric.
-        TypeError
-            If ``frame`` is not a pandas ``DataFrame``.
-
-        Examples
-        --------
-        >>> original = ExposureProfile([0.5, 1.0], [1.0, 2.0], [1.0, 2.0], [0.0, 0.0])
-        >>> ExposureProfile.from_dataframe(original.to_dataframe()).epe
-        [1.0, 2.0]
+            If a field is missing, unknown or cannot be parsed.
         """
-        ...
 
-    @property
-    def diagnostics(self) -> ExposureDiagnostics | None:
-        """
-        Engine diagnostics attached to the profile.
+    @staticmethod
+    def from_dataframe(frame: pd.DataFrame) -> ExposureProfile:
+        """Restore a valid profile from a frame exported by to_dataframe.
+
+        Parameters
+        ----------
+        frame : DataFrame
+            Year-fraction index with dates and exposure columns and preserved
+            finstack_exposure metadata.
 
         Returns
         -------
-        ExposureDiagnostics or None
-            Counters supplied at construction (or carried through
-            ``from_json``), else ``None``.
+        ExposureProfile
+            Checked profile with the original valuation cut and provenance.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        TypeError
+            If the object is not a DataFrame or its metadata is not a mapping.
+        ValueError
+            If a required column or provenance field is missing or invalid.
 
         Examples
         --------
-        >>> p = ExposureProfile([1.0], [0.0], [0.0], [0.0], ExposureDiagnostics(0, 1, 1))
-        >>> p.diagnostics.valuation_failures
-        1
+        >>> profile = ExposureProfile(
+        ...     as_of="2025-01-01",
+        ...     currency="USD",
+        ...     basis={"kind": "external", "source_id": "example", "policy_id": "unsecured"},
+        ...     dates=["2025-01-01"],
+        ...     times=[0.0],
+        ...     mtm_values=[10.0],
+        ...     epe=[10.0],
+        ...     ene=[0.0],
+        ...     diagnostics=ExposureDiagnostics(total_time_points=1),
+        ... )
+        >>> ExposureProfile.from_dataframe(profile.to_dataframe()).mtm_values
+        [10.0]
         """
-        ...
 
     @staticmethod
     def from_json(json: str) -> ExposureProfile:
-        """
-        Parse this object from a JSON object or JSON string.
+        """Read the canonical exposure profile wire object.
 
         Parameters
         ----------
         json : str
-            JSON string.
+            Dated exposure profile JSON, including basis and completeness fields.
 
         Returns
         -------
         ExposureProfile
-            Parsed profile.
+            Profile available for validation and XVA.
 
         Raises
         ------
         ValueError
-            Invalid JSON.
+            If the wire object cannot be decoded.
 
         Examples
         --------
-        >>> original = ExposureProfile([0.0, 1.0], [0.0, 2.0], [0.0, 2.0], [0.0, 0.0])
-        >>> restored = ExposureProfile.from_json(original.to_json())
-        >>> restored.mtm_values
-        [0.0, 2.0]
+        >>> profile = ExposureProfile(
+        ...     as_of="2025-01-01",
+        ...     currency="USD",
+        ...     basis={"kind": "external", "source_id": "example", "policy_id": "unsecured"},
+        ...     dates=["2025-01-01"],
+        ...     times=[0.0],
+        ...     mtm_values=[10.0],
+        ...     epe=[10.0],
+        ...     ene=[0.0],
+        ...     diagnostics=ExposureDiagnostics(total_time_points=1),
+        ... )
+        >>> ExposureProfile.from_json(profile.to_json()).mtm_values
+        [10.0]
         """
-        ...
 
     def to_json(self) -> str:
-        """
-        Serialize this object to a JSON-compatible dict.
+        """Serialize the complete observation grid and its provenance.
 
         Returns
         -------
         str
-            Pretty-printed JSON.
+            Profile wire object as JSON text.
 
         Raises
         ------
         ValueError
-            Serialization error.
-
-        Examples
-        --------
-        >>> '"times"' in ExposureProfile([1.0], [0.0], [0.0], [0.0]).to_json()
-        True
+            If the profile cannot be serialized.
         """
-        ...
 
     def validate(self) -> None:
+        """Check the grid, units, provenance, numeric domain and completeness.
+
+        Raises
+        ------
+        ValueError
+            If observation dates or times are unordered, the opening point
+            or provenance is absent, amounts are malformed, or diagnostics
+            record incomplete rolls or valuations.
         """
-        Validate internal consistency.
+
+    @property
+    def as_of(self) -> date:
+        """Get the exposure valuation cut.
 
         Returns
         -------
-        None
-            Returns ``None`` when the vectors are consistent.
+        date
+            Calendar date of the opening observation.
 
-        Raises
-        ------
-        ValueError
-            If the profile is empty, lengths differ, times are not strictly
-            increasing and positive, or an amount is non-finite.
-
-        Examples
-        --------
-        >>> ExposureProfile([1.0], [0.0], [0.0], [0.0]).validate()
+        Notes
+        -----
+        This accessor does not raise for a valid profile.
         """
-        ...
+
+    @property
+    def currency(self) -> str:
+        """Get the profile reporting currency.
+
+        Returns
+        -------
+        str
+            ISO 4217 code shared by all observed amounts.
+
+        Notes
+        -----
+        This accessor does not raise for a valid profile.
+        """
+
+    @property
+    def basis(self) -> _ExternalExposureBasis | _SimulatedExposureBasis:
+        """Get the exposure provenance.
+
+        Returns
+        -------
+        _ExternalExposureBasis | _SimulatedExposureBasis
+            Source identifier and applicable basis.
+
+        Notes
+        -----
+        This accessor does not raise for a valid profile.
+        """
+
+    @property
+    def dates(self) -> list[date]:
+        """Get the calendar observation dates.
+
+        Returns
+        -------
+        list[date]
+            Ascending dates beginning at the valuation cut.
+
+        Notes
+        -----
+        This accessor does not raise for a valid profile.
+        """
 
     @property
     def times(self) -> list[float]:
-        """
-        Exposure or IM observation times in years from the valuation date.
+        """Get the model integration clock.
 
         Returns
         -------
         list[float]
-            Times.
+            Ascending year fractions from zero.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> ExposureProfile([0.0, 1.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]).times
-        [0.0, 1.0]
+        This accessor does not raise for a valid profile.
         """
-        ...
 
     @property
     def mtm_values(self) -> list[float]:
-        """
-        Portfolio MtM values at each time point.
+        """Get portfolio marks on the grid.
 
         Returns
         -------
         list[float]
-            MtM path.
+            Signed amounts in reporting currency.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> ExposureProfile([0.0], [1.0], [0.0], [0.0]).mtm_values
-        [1.0]
+        This accessor does not raise for a valid profile.
         """
-        ...
 
     @property
     def epe(self) -> list[float]:
-        """
-        Expected Positive Exposure at each time point.
+        """Get expected positive exposure.
 
         Returns
         -------
         list[float]
-            EPE series.
+            Positive-part expectation in reporting currency at each date.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> ExposureProfile([0.0], [0.0], [2.0], [0.0]).epe
-        [2.0]
+        This accessor does not raise for a valid profile.
         """
-        ...
 
     @property
     def ene(self) -> list[float]:
-        """
-        Expected Negative Exposure at each time point.
+        """Get expected negative exposure.
 
         Returns
         -------
         list[float]
-            ENE series.
+            Negated-mark positive-part expectation in reporting currency at each date.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> ExposureProfile([0.0], [0.0], [0.0], [1.0]).ene
-        [1.0]
+        This accessor does not raise for a valid profile.
         """
-        ...
+
+    @property
+    def diagnostics(self) -> ExposureDiagnostics:
+        """Get completeness evidence.
+
+        Returns
+        -------
+        ExposureDiagnostics
+            Calendar observation count and failed roll and valuation counts.
+
+        Notes
+        -----
+        This accessor does not raise for a valid profile.
+        """
 
     def __len__(self) -> int:
-        """Number of time points.
+        """Return the number of calendar observations.
 
         Returns
         -------
         int
-            Length of time grid.
-
-        Examples
-        --------
-        >>> len(ExposureProfile([0.0, 1.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]))
-        2
+            Grid size including the opening observation.
         """
-        ...
 
     def to_dataframe(self) -> pd.DataFrame:
-        """
-        Export as a pandas DataFrame with time (years) as index.
-
-        Columns: ``mtm_values``, ``epe``, ``ene``; ``from_dataframe`` accepts
-        this frame back.
+        """Export dated exposure amounts and source evidence.
 
         Returns
         -------
-        pd.DataFrame
-            Exposure profile as a DataFrame.
+        DataFrame
+            Columns dates, mtm_values, epe and ene, indexed by year
+            fractions with source evidence in the finstack_exposure attribute.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the profile data cannot be converted to pandas.
         """
-        ...
 
     def __repr__(self) -> str: ...
 
@@ -1807,7 +1831,17 @@ def compute_bilateral_xva(
     --------
     >>> import datetime as dt
     >>> from finstack_quant.core.market_data import DiscountCurve, HazardCurve
-    >>> profile = ExposureProfile([1.0, 2.0], [1e6, 1e6], [1e6, 1e6], [0.0, 0.0])
+    >>> profile = ExposureProfile(
+    ...     as_of="2025-01-01",
+    ...     currency="USD",
+    ...     basis={"kind": "external", "source_id": "audited-grid", "policy_id": "unsecured"},
+    ...     dates=["2025-01-01", "2026-01-01", "2027-01-01"],
+    ...     times=[0.0, 1.0, 2.0],
+    ...     mtm_values=[1e6] * 3,
+    ...     epe=[1e6] * 3,
+    ...     ene=[0.0] * 3,
+    ...     diagnostics=ExposureDiagnostics(total_time_points=3),
+    ... )
     >>> df = DiscountCurve(
     ...     "USD-OIS",
     ...     dt.date(2025, 1, 1),

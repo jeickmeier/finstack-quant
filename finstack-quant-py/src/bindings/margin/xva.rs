@@ -227,7 +227,7 @@ impl PyExposureDiagnostics {
     }
 }
 
-/// Exposure profile at each time grid point.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile")]
 #[pyclass(
     name = "ExposureProfile",
     module = "finstack_quant.margin",
@@ -238,83 +238,85 @@ pub struct PyExposureProfile {
     pub(super) inner: xva::ExposureProfile,
 }
 
+impl PyExposureProfile {
+    pub(crate) fn from_inner(inner: xva::ExposureProfile) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyExposureProfile {
-    /// Construct from parallel vectors on a time grid.
-    ///
-    /// ``times`` are nonnegative, strictly increasing year fractions; a zero-time
-    /// origin is allowed, and XVA holds exposure constant before the first point. ``mtm_values``,
-    /// ``epe`` and ``ene`` are amounts in the netting set's currency at each
-    /// time. ``diagnostics`` optionally attaches the engine's failure
-    /// counters. Values are stored as given; ``validate()`` and the XVA
-    /// entry points check consistency.
     #[new]
-    #[pyo3(signature = (times, mtm_values, epe, ene, diagnostics = None))]
-    fn new(
-        times: Vec<f64>,
-        mtm_values: Vec<f64>,
-        epe: Vec<f64>,
-        ene: Vec<f64>,
-        diagnostics: Option<&PyExposureDiagnostics>,
-    ) -> Self {
-        Self {
-            inner: xva::ExposureProfile {
-                times,
-                mtm_values,
-                epe,
-                ene,
-                diagnostics: diagnostics.map(|d| d.inner.clone()),
-            },
+    #[pyo3(signature = (**fields))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.__init__")]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        let fields = fields.map_or_else(|| Ok(PyDict::new(py)), |fields| fields.copy())?;
+        if let Some(diagnostics) = fields.get_item("diagnostics")?
+            && let Ok(diagnostics) = diagnostics.cast::<PyExposureDiagnostics>()
+        {
+            fields.set_item("diagnostics", serde_to_py(py, &diagnostics.borrow().inner)?)?;
         }
+        let inner =
+            crate::bindings::module_utils::fields_from_py(py, Some(&fields), "ExposureProfile")?;
+        Ok(Self::from_inner(inner))
     }
 
-    /// Build a profile from the frame ``to_dataframe`` emits: columns
-    /// ``mtm_values``, ``epe``, ``ene`` indexed by time in years.
-    ///
-    /// Raises ``ValueError`` if a column is missing or non-numeric, and
-    /// ``TypeError`` when ``frame`` is not a pandas ``DataFrame``.
     #[staticmethod]
-    fn from_dataframe(frame: &Bound<'_, PyAny>) -> PyResult<Self> {
-        fn column(frame: &Bound<'_, PyAny>, name: &str) -> PyResult<Vec<f64>> {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.from_dataframe")]
+    fn from_dataframe(py: Python<'_>, frame: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let attributes = frame.getattr("attrs").map_err(|_| {
+            pyo3::exceptions::PyTypeError::new_err("expected an exposure DataFrame")
+        })?;
+        let metadata = attributes.get_item("finstack_exposure").map_err(|_| {
+            crate::errors::value_error("exposure DataFrame has no finstack_exposure metadata")
+        })?;
+        let fields = metadata.cast::<PyDict>()?.copy()?;
+        for name in ["dates", "mtm_values", "epe", "ene"] {
             let column = frame.get_item(name).map_err(|_| {
-                crate::errors::value_error(format!("from_dataframe: column '{name}' is missing"))
+                crate::errors::value_error(format!("exposure DataFrame has no '{name}' column"))
             })?;
-            column
-                .call_method0("tolist")?
-                .extract::<Vec<f64>>()
-                .map_err(|_| {
-                    crate::errors::value_error(format!(
-                        "from_dataframe: column '{name}' must be numeric"
-                    ))
-                })
+            fields.set_item(name, column.call_method0("tolist")?)?;
         }
-        let times: Vec<f64> = frame
-            .getattr("index")?
-            .call_method0("tolist")?
-            .extract()
-            .map_err(|_| {
-                crate::errors::value_error("from_dataframe: index must hold times in years")
-            })?;
-        Ok(Self {
-            inner: xva::ExposureProfile {
-                times,
-                mtm_values: column(frame, "mtm_values")?,
-                epe: column(frame, "epe")?,
-                ene: column(frame, "ene")?,
-                diagnostics: None,
-            },
-        })
+        fields.set_item("times", frame.getattr("index")?.call_method0("tolist")?)?;
+        let profile = Self::new(py, Some(&fields))?;
+        profile.validate()?;
+        Ok(profile)
     }
 
-    /// Engine diagnostics attached to the profile, or ``None``.
     #[getter]
-    fn diagnostics(&self) -> Option<PyExposureDiagnostics> {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.as_of")]
+    fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::date_utils::date_to_py(py, self.inner.as_of)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.currency")]
+    fn currency(&self) -> String {
+        self.inner.currency.to_string()
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.basis")]
+    fn basis<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.basis)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.dates")]
+    fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         self.inner
-            .diagnostics
-            .as_ref()
-            .map(|inner| PyExposureDiagnostics {
-                inner: inner.clone(),
-            })
+            .dates
+            .iter()
+            .map(|&date| crate::bindings::date_utils::date_to_py(py, date))
+            .collect()
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.diagnostics")]
+    fn diagnostics(&self) -> PyExposureDiagnostics {
+        PyExposureDiagnostics {
+            inner: self.inner.diagnostics.clone(),
+        }
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
@@ -327,73 +329,78 @@ impl PyExposureProfile {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize from JSON.
     #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.from_json")]
     fn from_json(json: &str) -> PyResult<Self> {
         let inner: xva::ExposureProfile = serde_json::from_str(json).map_err(display_to_py)?;
         Ok(Self { inner })
     }
 
-    /// Serialize to JSON.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.to_json")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Validate internal consistency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.validate")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Time points in years.
     #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.times")]
     fn times(&self) -> Vec<f64> {
         self.inner.times.clone()
     }
 
-    /// Portfolio MtM values at each time point.
     #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.mtm_values")]
     fn mtm_values(&self) -> Vec<f64> {
         self.inner.mtm_values.clone()
     }
 
-    /// Expected Positive Exposure at each time point.
     #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.epe")]
     fn epe(&self) -> Vec<f64> {
         self.inner.epe.clone()
     }
 
-    /// Expected Negative Exposure at each time point.
     #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.ene")]
     fn ene(&self) -> Vec<f64> {
         self.inner.ene.clone()
     }
 
-    /// Number of time points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.__len__")]
     fn __len__(&self) -> usize {
         self.inner.times.len()
     }
 
-    /// Export as a pandas ``DataFrame`` with time (years) as index.
-    ///
-    /// Columns: ``mtm_values``, ``epe``, ``ene``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
+        data.set_item("dates", self.dates(py)?)?;
         data.set_item("mtm_values", &self.inner.mtm_values)?;
         data.set_item("epe", &self.inner.epe)?;
         data.set_item("ene", &self.inner.ene)?;
         let idx = self.inner.times.clone().into_pyobject(py)?.into_any();
-        dict_to_dataframe(py, &data, Some(idx))
+        let frame = dict_to_dataframe(py, &data, Some(idx))?;
+        let metadata = PyDict::new(py);
+        metadata.set_item("as_of", self.inner.as_of.to_string())?;
+        metadata.set_item("currency", self.currency())?;
+        metadata.set_item("basis", self.basis(py)?)?;
+        metadata.set_item("diagnostics", serde_to_py(py, &self.inner.diagnostics)?)?;
+        frame
+            .getattr("attrs")?
+            .set_item("finstack_exposure", metadata)?;
+        Ok(frame)
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "ExposureProfile(points={}, diagnostics={})",
-            self.inner.times.len(),
-            if self.inner.diagnostics.is_some() {
-                "ExposureDiagnostics(...)"
-            } else {
-                "None"
-            }
+            "ExposureProfile(as_of={}, currency={}, points={})",
+            self.inner.as_of,
+            self.inner.currency,
+            self.inner.times.len()
         )
     }
 

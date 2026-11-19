@@ -54,23 +54,82 @@
 //! - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
 
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 use super::mva;
 use super::types::{CreditXvaRow, ExposureProfile, FundingConfig, FundingXvaRow, XvaResult};
 
-fn validate_exposure_profile_lengths(
-    exposure_profile: &ExposureProfile,
-    label: &str,
-) -> finstack_quant_core::Result<usize> {
-    exposure_profile.validate()?;
-    if exposure_profile.times.is_empty() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{label}: exposure profile must not be empty"
-        )));
+fn profile_discount_factors(
+    profile: &ExposureProfile,
+    curve: &DiscountCurve,
+) -> finstack_quant_core::Result<Vec<f64>> {
+    let origin = profile.as_of;
+    if curve.base_date() > origin
+        || curve
+            .rate_calibration()
+            .is_some_and(|recipe| recipe.currency != profile.currency)
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "XVA discount curve has an incompatible currency or begins after the valuation cut"
+                .into(),
+        ));
     }
+    let anchor = curve.df_on_date(origin)?;
+    if !anchor.is_finite() || anchor <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "XVA discount factor at the valuation cut must be finite and positive".into(),
+        ));
+    }
+    profile
+        .dates
+        .iter()
+        .map(|&date| {
+            let factor = curve.df_on_date(date)? / anchor;
+            if !factor.is_finite() || factor <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "XVA discount factor on {date} is outside the positive finite domain"
+                )));
+            }
+            Ok(factor)
+        })
+        .collect()
+}
 
-    let n = exposure_profile.times.len();
-    Ok(n)
+fn profile_survival_factors(
+    profile: &ExposureProfile,
+    curve: Option<&HazardCurve>,
+) -> finstack_quant_core::Result<Vec<f64>> {
+    let Some(curve) = curve else {
+        return Ok(vec![1.0; profile.dates.len()]);
+    };
+    let origin = profile.as_of;
+    if curve.base_date() > origin || curve.currency().is_some_and(|ccy| ccy != profile.currency) {
+        return Err(finstack_quant_core::Error::Validation(
+            "XVA survival curve has an incompatible currency or begins after the valuation cut"
+                .into(),
+        ));
+    }
+    let anchor = curve.sp_on_date(origin)?;
+    if !anchor.is_finite() || anchor <= 0.0 || anchor > 1.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "XVA survival at the valuation cut must be in (0, 1]".into(),
+        ));
+    }
+    let mut previous = 1.0;
+    profile
+        .dates
+        .iter()
+        .map(|&date| {
+            let factor = curve.sp_on_date(date)? / anchor;
+            if !(0.0..=previous).contains(&factor) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "XVA survival on {date} must be finite, in [0, 1] and nonincreasing"
+                )));
+            }
+            previous = factor;
+            Ok(factor)
+        })
+        .collect()
 }
 
 fn horizons_match(lhs: f64, rhs: f64) -> bool {
@@ -101,7 +160,8 @@ fn compute_cva_internal(
     recovery_rate: f64,
     own_survival_curve: Option<&HazardCurve>,
 ) -> finstack_quant_core::Result<XvaResult> {
-    let n = validate_exposure_profile_lengths(exposure_profile, "CVA")?;
+    exposure_profile.validate()?;
+    let n = exposure_profile.times.len();
 
     if !(0.0..=1.0).contains(&recovery_rate) {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -109,9 +169,13 @@ fn compute_cva_internal(
         )));
     }
 
+    let counterparty = profile_survival_factors(exposure_profile, Some(counterparty_hazard_curve))?;
+    let own_survival = profile_survival_factors(exposure_profile, own_survival_curve)?;
+    let discount = profile_discount_factors(exposure_profile, discount_curve)?;
+
     let lgd = 1.0 - recovery_rate;
 
-    let mut cva = 0.0;
+    let mut cva = NeumaierAccumulator::new();
     let mut cva_rows = Vec::with_capacity(n);
     let mut epe_profile = Vec::with_capacity(n);
     let mut ene_profile = Vec::with_capacity(n);
@@ -133,22 +197,17 @@ fn compute_cva_internal(
         let epe_t = exposure_profile.epe[i];
         let ene_t = exposure_profile.ene[i];
 
-        let survival_t = counterparty_hazard_curve.sp(t)?;
+        let survival_t = counterparty[i];
+        let own_survival_t = own_survival[i];
+        let df_t = discount[i];
 
-        let own_survival_t = match own_survival_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let df_t = discount_curve.df(t)?;
-
-        let marginal_pd = (prev_survival - survival_t).max(0.0);
-        let epe_mid = 0.5 * (prev_epe + epe_t);
-        let df_mid = 0.5 * (prev_df + df_t);
-        let own_survival_mid = 0.5 * (prev_own_survival + own_survival_t);
+        let marginal_pd = prev_survival - survival_t;
+        let epe_mid = 0.5 * prev_epe + 0.5 * epe_t;
+        let df_mid = 0.5 * prev_df + 0.5 * df_t;
+        let own_survival_mid = 0.5 * prev_own_survival + 0.5 * own_survival_t;
 
         let contribution = lgd * epe_mid * marginal_pd * df_mid * own_survival_mid;
-        cva += contribution;
+        cva.add(contribution)?;
         cva_rows.push(CreditXvaRow {
             time: t,
             discount_factor: df_t,
@@ -188,6 +247,7 @@ fn compute_cva_internal(
         effective_epe_running
     };
 
+    let cva = cva.get_total()?;
     Ok(XvaResult {
         cva,
         dva: None,
@@ -216,7 +276,8 @@ fn compute_dva_internal(
     counterparty_survival_curve: Option<&HazardCurve>,
     posted_im: Option<&mva::ImProfile>,
 ) -> finstack_quant_core::Result<(f64, Vec<CreditXvaRow>)> {
-    let n = validate_exposure_profile_lengths(exposure_profile, "DVA")?;
+    exposure_profile.validate()?;
+    let n = exposure_profile.times.len();
 
     if !(0.0..=1.0).contains(&own_recovery_rate) {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -224,8 +285,13 @@ fn compute_dva_internal(
         )));
     }
 
+    let own_survival = profile_survival_factors(exposure_profile, Some(own_hazard_curve))?;
+    let counterparty_survival =
+        profile_survival_factors(exposure_profile, counterparty_survival_curve)?;
+    let discount = profile_discount_factors(exposure_profile, discount_curve)?;
+
     let lgd_own = 1.0 - own_recovery_rate;
-    let mut dva = 0.0;
+    let mut dva = NeumaierAccumulator::new();
     let mut rows = Vec::with_capacity(n);
     let mut prev_survival = 1.0;
     let mut prev_counterparty_survival = 1.0;
@@ -238,23 +304,18 @@ fn compute_dva_internal(
         let im_t = posted_im.map_or(0.0, |profile| im_at(profile, t));
         let ene_t = (exposure_profile.ene[i] - im_t).max(0.0);
 
-        let survival_t = own_hazard_curve.sp(t)?;
+        let survival_t = own_survival[i];
+        let counterparty_survival_t = counterparty_survival[i];
+        let df_t = discount[i];
 
-        let counterparty_survival_t = match counterparty_survival_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let df_t = discount_curve.df(t)?;
-
-        let marginal_pd = (prev_survival - survival_t).max(0.0);
-        let ene_mid = 0.5 * (prev_ene + ene_t);
-        let df_mid = 0.5 * (prev_df + df_t);
+        let marginal_pd = prev_survival - survival_t;
+        let ene_mid = 0.5 * prev_ene + 0.5 * ene_t;
+        let df_mid = 0.5 * prev_df + 0.5 * df_t;
         let counterparty_survival_mid =
-            0.5 * (prev_counterparty_survival + counterparty_survival_t);
+            0.5 * prev_counterparty_survival + 0.5 * counterparty_survival_t;
 
         let contribution = lgd_own * ene_mid * marginal_pd * df_mid * counterparty_survival_mid;
-        dva += contribution;
+        dva.add(contribution)?;
         rows.push(CreditXvaRow {
             time: t,
             discount_factor: df_t,
@@ -273,7 +334,7 @@ fn compute_dva_internal(
         prev_df = df_t;
     }
 
-    Ok((dva, rows))
+    Ok((dva.get_total()?, rows))
 }
 
 fn compute_fva_internal(
@@ -284,12 +345,18 @@ fn compute_fva_internal(
     counterparty_hazard_curve: Option<&HazardCurve>,
     own_hazard_curve: Option<&HazardCurve>,
 ) -> finstack_quant_core::Result<(f64, Vec<FundingXvaRow>)> {
-    let n = validate_exposure_profile_lengths(exposure_profile, "FVA")?;
+    exposure_profile.validate()?;
+    let n = exposure_profile.times.len();
+
+    let counterparty_survival =
+        profile_survival_factors(exposure_profile, counterparty_hazard_curve)?;
+    let own_survival = profile_survival_factors(exposure_profile, own_hazard_curve)?;
+    let discount = profile_discount_factors(exposure_profile, discount_curve)?;
 
     let spread_cost = funding_spread_bp / 10_000.0;
     let spread_benefit = funding_benefit_bp / 10_000.0;
 
-    let mut fva = 0.0;
+    let mut fva = NeumaierAccumulator::new();
     let mut rows = Vec::with_capacity(n);
     let mut prev_counterparty_survival = 1.0;
     let mut prev_own_survival = 1.0;
@@ -303,30 +370,22 @@ fn compute_fva_internal(
         let epe_t = exposure_profile.epe[i];
         let ene_t = exposure_profile.ene[i];
 
-        let counterparty_survival_t = match counterparty_hazard_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let own_survival_t = match own_hazard_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let df_t = discount_curve.df(t)?;
+        let counterparty_survival_t = counterparty_survival[i];
+        let own_survival_t = own_survival[i];
+        let df_t = discount[i];
 
         let dt = t - prev_t;
-        let epe_mid = 0.5 * (prev_epe + epe_t);
-        let ene_mid = 0.5 * (prev_ene + ene_t);
-        let df_mid = 0.5 * (prev_df + df_t);
+        let epe_mid = 0.5 * prev_epe + 0.5 * epe_t;
+        let ene_mid = 0.5 * prev_ene + 0.5 * ene_t;
+        let df_mid = 0.5 * prev_df + 0.5 * df_t;
         let counterparty_survival_mid =
-            0.5 * (prev_counterparty_survival + counterparty_survival_t);
-        let own_survival_mid = 0.5 * (prev_own_survival + own_survival_t);
+            0.5 * prev_counterparty_survival + 0.5 * counterparty_survival_t;
+        let own_survival_mid = 0.5 * prev_own_survival + 0.5 * own_survival_t;
         let joint_survival_mid = counterparty_survival_mid * own_survival_mid;
 
         let contribution =
             (epe_mid * spread_cost - ene_mid * spread_benefit) * df_mid * dt * joint_survival_mid;
-        fva += contribution;
+        fva.add(contribution)?;
         rows.push(FundingXvaRow {
             time: t,
             dt,
@@ -348,7 +407,7 @@ fn compute_fva_internal(
         prev_t = t;
     }
 
-    Ok((fva, rows))
+    Ok((fva.get_total()?, rows))
 }
 
 /// Compute **unilateral** Credit Valuation Adjustment (CVA).
@@ -416,11 +475,21 @@ fn compute_fva_internal(
 ///     .build()?;
 ///
 /// let profile = ExposureProfile {
-///     times: vec![1.0, 2.0, 3.0],
+///     as_of,
+///     currency: finstack_quant_core::currency::Currency::USD,
+///     basis: finstack_quant_margin::xva::types::ExposureBasis::External {
+///         source_id: "verified-path-mean".into(),
+///         policy_id: "netting-set-A-unsecured".into(),
+///     },
+///     dates: vec![as_of, time::macros::date!(2026-01-01), time::macros::date!(2027-01-01)],
+///     times: vec![0.0, 1.0, 2.0],
 ///     mtm_values: vec![1_000_000.0; 3],
 ///     epe: vec![1_000_000.0; 3],
 ///     ene: vec![0.0; 3],
-///     diagnostics: None,
+///     diagnostics: finstack_quant_margin::xva::types::ExposureDiagnostics {
+///         total_time_points: 3,
+///         ..Default::default()
+///     },
 /// };
 ///
 /// let result = compute_cva(&profile, &hazard_curve, &discount_curve, 0.40)?;
@@ -694,7 +763,11 @@ pub fn compute_bilateral_xva(
         }
     };
 
-    result.total_xva = result.cva - dva + fva + mva;
+    let mut total = NeumaierAccumulator::new();
+    for leg in [result.cva, -dva, fva, mva] {
+        total.add(leg)?;
+    }
+    result.total_xva = total.get_total()?;
 
     Ok(result)
 }
@@ -706,6 +779,72 @@ mod tests {
     use finstack_quant_core::dates::Date;
     use time::Month;
 
+    fn exposure_fixture(
+        times: &[f64],
+        mut mtm_values: Vec<f64>,
+        mut epe: Vec<f64>,
+        mut ene: Vec<f64>,
+    ) -> ExposureProfile {
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        let mut times = times.to_vec();
+        if times.first().is_some_and(|time| *time > 0.0) {
+            times.insert(0, 0.0);
+            for observations in [&mut mtm_values, &mut epe, &mut ene] {
+                if let Some(&first) = observations.first() {
+                    observations.insert(0, first);
+                }
+            }
+        }
+        ExposureProfile {
+            as_of,
+            dates: times
+                .iter()
+                .map(|&t| as_of + time::Duration::days((360.0 * t).round() as i64))
+                .collect(),
+            currency: finstack_quant_core::currency::Currency::USD,
+            basis: crate::xva::types::ExposureBasis::External {
+                source_id: "test-grid".into(),
+                policy_id: "test-unsecured-act360".into(),
+            },
+            diagnostics: crate::xva::types::ExposureDiagnostics {
+                total_time_points: times.len(),
+                ..Default::default()
+            },
+            times,
+            mtm_values,
+            epe,
+            ene,
+        }
+    }
+
+    #[test]
+    fn dated_curves_normalize_at_the_cut_and_effective_epe_uses_right_endpoints() {
+        let mut profile = exposure_fixture(
+            &[0.0, 0.5, 1.5],
+            vec![20.0, 40.0, 80.0],
+            vec![20.0, 40.0, 80.0],
+            vec![0.0; 3],
+        );
+        let hazard = flat_hazard_curve(0.02);
+        let discount = DiscountCurve::builder("usd")
+            .base_date(time::macros::date!(2024 - 01 - 01))
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .knots([(0.0, 1.0), (4.0, (-0.12_f64).exp())])
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
+            .build()
+            .expect("ACT/365F discount curve");
+        let result = compute_cva(&profile, &hazard, &discount, 0.4).expect("aligned dated curves");
+        assert_eq!(result.effective_epe, 60.0);
+        assert_eq!(result.cva_rows[0].discount_factor, 1.0);
+        assert!(
+            (result.cva_rows[1].discount_factor - (-0.03_f64 * 180.0 / 365.0).exp()).abs() < 1e-13
+        );
+        assert!((result.cva_rows[1].survival_probability - (-0.02_f64 * 0.5).exp()).abs() < 1e-13);
+        profile.diagnostics.total_time_points = 2;
+        assert!(compute_cva(&profile, &hazard, &discount, 0.4).is_err());
+    }
+
     /// Helper: build a flat hazard rate curve.
     fn flat_hazard_curve(lambda: f64) -> HazardCurve {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
@@ -713,7 +852,7 @@ mod tests {
             .base_date(base)
             .knots([(30.0, lambda)])
             .recovery_rate(0.40)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
             .build()
             .expect("HazardCurve should build")
     }
@@ -732,20 +871,19 @@ mod tests {
             .base_date(base)
             .knots(knots)
             .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve should build")
     }
 
     fn uniform_profile(epe_value: f64, times: &[f64]) -> ExposureProfile {
-        ExposureProfile {
-            times: times.to_vec(),
-            mtm_values: times.iter().map(|_| epe_value).collect(),
-            epe: times.iter().map(|_| epe_value).collect(),
-            ene: times.iter().map(|_| 0.0).collect(),
-            diagnostics: None,
-        }
+        exposure_fixture(
+            times,
+            times.iter().map(|_| epe_value).collect(),
+            times.iter().map(|_| epe_value).collect(),
+            times.iter().map(|_| 0.0).collect(),
+        )
     }
 
     #[test]
@@ -886,8 +1024,8 @@ mod tests {
         let result =
             compute_cva(&profile, &hazard, &discount, 0.40).expect("CVA computation should work");
 
-        assert_eq!(result.epe_profile.len(), times.len());
-        assert_eq!(result.ene_profile.len(), times.len());
+        assert_eq!(result.epe_profile.len(), profile.times.len());
+        assert_eq!(result.ene_profile.len(), profile.times.len());
     }
 
     #[test]
@@ -896,19 +1034,18 @@ mod tests {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
         let times = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let profile = ExposureProfile {
-            times,
-            mtm_values: vec![100.0, 200.0, 50.0, 150.0, 80.0],
-            epe: vec![100.0, 200.0, 50.0, 150.0, 80.0],
-            ene: vec![0.0; 5],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            vec![100.0, 200.0, 50.0, 150.0, 80.0],
+            vec![100.0, 200.0, 50.0, 150.0, 80.0],
+            vec![0.0; 5],
+        );
 
         let result =
             compute_cva(&profile, &hazard, &discount, 0.40).expect("CVA computation should work");
 
         // Profile should be non-decreasing
-        assert_eq!(result.effective_epe_profile.len(), 5);
+        assert_eq!(result.effective_epe_profile.len(), 6);
         for i in 1..result.effective_epe_profile.len() {
             assert!(
                 result.effective_epe_profile[i].1 >= result.effective_epe_profile[i - 1].1,
@@ -942,13 +1079,12 @@ mod tests {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
         let times = vec![1.0, 2.0, 3.0];
-        let profile = ExposureProfile {
-            times,
-            mtm_values: vec![100.0, 300.0, 200.0],
-            epe: vec![100.0, 300.0, 200.0],
-            ene: vec![0.0; 3],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            vec![100.0, 300.0, 200.0],
+            vec![100.0, 300.0, 200.0],
+            vec![0.0; 3],
+        );
 
         let result =
             compute_cva(&profile, &hazard, &discount, 0.40).expect("CVA computation should work");
@@ -964,13 +1100,7 @@ mod tests {
     fn cva_rejects_empty_profile() {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
-        let profile = ExposureProfile {
-            times: vec![],
-            mtm_values: vec![],
-            epe: vec![],
-            ene: vec![],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(&[], vec![], vec![], vec![]);
 
         let result = compute_cva(&profile, &hazard, &discount, 0.40);
         assert!(result.is_err(), "Should reject empty profile");
@@ -1032,13 +1162,12 @@ mod tests {
     fn cva_rejects_mismatched_epe_length() {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
-        let profile = ExposureProfile {
-            times: vec![1.0, 2.0, 3.0],
-            mtm_values: vec![100.0, 200.0, 300.0],
-            epe: vec![100.0, 200.0], // one short
-            ene: vec![0.0, 0.0, 0.0],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &[1.0, 2.0, 3.0],
+            vec![100.0, 200.0, 300.0],
+            vec![100.0, 200.0],
+            vec![0.0, 0.0, 0.0],
+        );
         assert!(
             compute_cva(&profile, &hazard, &discount, 0.40).is_err(),
             "Should reject profile with mismatched EPE length"
@@ -1049,13 +1178,12 @@ mod tests {
     fn cva_rejects_mismatched_ene_length() {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
-        let profile = ExposureProfile {
-            times: vec![1.0, 2.0],
-            mtm_values: vec![100.0, 200.0],
-            epe: vec![100.0, 200.0],
-            ene: vec![0.0], // one short
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &[1.0, 2.0],
+            vec![100.0, 200.0],
+            vec![100.0, 200.0],
+            vec![0.0],
+        );
         assert!(
             compute_cva(&profile, &hazard, &discount, 0.40).is_err(),
             "Should reject profile with mismatched ENE length"
@@ -1103,13 +1231,12 @@ mod tests {
     }
 
     fn uniform_ene_profile(ene_value: f64, times: &[f64]) -> ExposureProfile {
-        ExposureProfile {
-            times: times.to_vec(),
-            mtm_values: times.iter().map(|_| -ene_value).collect(),
-            epe: times.iter().map(|_| 0.0).collect(),
-            ene: times.iter().map(|_| ene_value).collect(),
-            diagnostics: None,
-        }
+        exposure_fixture(
+            times,
+            times.iter().map(|_| -ene_value).collect(),
+            times.iter().map(|_| 0.0).collect(),
+            times.iter().map(|_| ene_value).collect(),
+        )
     }
 
     #[test]
@@ -1313,13 +1440,12 @@ mod tests {
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
 
         // Profile with both EPE and ENE
-        let profile = ExposureProfile {
-            times: times.clone(),
-            mtm_values: times.iter().map(|_| 500_000.0).collect(),
-            epe: times.iter().map(|_| 800_000.0).collect(),
-            ene: times.iter().map(|_| 300_000.0).collect(),
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            times.iter().map(|_| 500_000.0).collect(),
+            times.iter().map(|_| 800_000.0).collect(),
+            times.iter().map(|_| 300_000.0).collect(),
+        );
 
         let result = compute_bilateral_xva(
             &profile,
@@ -1359,13 +1485,12 @@ mod tests {
         let discount = flat_discount_curve(0.04);
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
 
-        let profile = ExposureProfile {
-            times: times.clone(),
-            mtm_values: times.iter().map(|_| 500_000.0).collect(),
-            epe: times.iter().map(|_| 800_000.0).collect(),
-            ene: times.iter().map(|_| 300_000.0).collect(),
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            times.iter().map(|_| 500_000.0).collect(),
+            times.iter().map(|_| 800_000.0).collect(),
+            times.iter().map(|_| 300_000.0).collect(),
+        );
 
         let funding = FundingConfig {
             funding_spread_bp: 50.0,
@@ -1409,13 +1534,12 @@ mod tests {
         let own_hazard = flat_hazard_curve(0.03);
         let discount = flat_discount_curve(0.04);
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
-        let profile = ExposureProfile {
-            times: times.clone(),
-            mtm_values: times.iter().map(|t| 500_000.0 - 20_000.0 * t).collect(),
-            epe: times.iter().map(|t| 800_000.0 - 30_000.0 * t).collect(),
-            ene: times.iter().map(|t| 300_000.0 + 10_000.0 * t).collect(),
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            times.iter().map(|t| 500_000.0 - 20_000.0 * t).collect(),
+            times.iter().map(|t| 800_000.0 - 30_000.0 * t).collect(),
+            times.iter().map(|t| 300_000.0 + 10_000.0 * t).collect(),
+        );
         let funding = FundingConfig {
             funding_spread_bp: 50.0,
             funding_benefit_bp: Some(30.0),
@@ -1425,11 +1549,11 @@ mod tests {
         // Unilateral CVA: rows only for the CVA leg, unit survival weight.
         let unilateral = compute_cva(&profile, &counterparty_hazard, &discount, 0.40)
             .expect("CVA should compute");
-        assert_eq!(unilateral.cva_rows.len(), times.len());
+        assert_eq!(unilateral.cva_rows.len(), profile.times.len());
         assert!(unilateral.dva_rows.is_none() && unilateral.fva_rows.is_none());
         assert!(unilateral.cva_rows.iter().all(|r| r.survival_weight == 1.0));
         let sum: f64 = unilateral.cva_rows.iter().map(|r| r.contribution).sum();
-        assert_eq!(sum, unilateral.cva);
+        assert!((sum - unilateral.cva).abs() <= 1.0e-12 * unilateral.cva);
 
         let result = compute_bilateral_xva(
             &profile,
@@ -1452,10 +1576,10 @@ mod tests {
             ),
         ];
         for (rows, reported, hazard, lgd) in credit_legs {
-            assert_eq!(rows.len(), times.len());
+            assert_eq!(rows.len(), profile.times.len());
             let mut total = 0.0;
             let mut prev_survival = 1.0;
-            for (row, t) in rows.iter().zip(&times) {
+            for (row, t) in rows.iter().zip(&profile.times) {
                 assert_eq!(row.time, *t);
                 assert_eq!(
                     row.discount_factor,
@@ -1467,7 +1591,12 @@ mod tests {
                     (prev_survival - row.survival_probability).max(0.0)
                 );
                 assert!((row.loss_given_default - lgd).abs() < 1e-15);
-                assert!(row.survival_weight < 1.0);
+                if *t == 0.0 {
+                    assert_eq!(row.survival_weight, 1.0);
+                    assert_eq!(row.contribution, 0.0);
+                } else {
+                    assert!(row.survival_weight < 1.0);
+                }
                 assert_eq!(
                     row.contribution,
                     row.loss_given_default
@@ -1479,11 +1608,11 @@ mod tests {
                 total += row.contribution;
                 prev_survival = row.survival_probability;
             }
-            assert_eq!(total, reported);
+            assert!((total - reported).abs() <= 1.0e-12 * reported.abs());
         }
 
         let fva_rows = result.fva_rows.as_ref().expect("FVA rows");
-        assert_eq!(fva_rows.len(), times.len());
+        assert_eq!(fva_rows.len(), profile.times.len());
         let mut total = 0.0;
         for row in fva_rows {
             assert_eq!(row.funding_spread, 0.005);
@@ -1497,13 +1626,20 @@ mod tests {
             );
             total += row.contribution;
         }
-        assert_eq!(total, result.fva.expect("FVA"));
+        let fva = result.fva.expect("FVA");
+        assert!((total - fva).abs() <= 1.0e-12 * fva.abs());
 
         let json = serde_json::to_string(&result).expect("serialize");
         let back: XvaResult = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(back.cva_rows.len(), times.len());
-        assert_eq!(back.dva_rows.map(|rows| rows.len()), Some(times.len()));
-        assert_eq!(back.fva_rows.map(|rows| rows.len()), Some(times.len()));
+        assert_eq!(back.cva_rows.len(), profile.times.len());
+        assert_eq!(
+            back.dva_rows.map(|rows| rows.len()),
+            Some(profile.times.len())
+        );
+        assert_eq!(
+            back.fva_rows.map(|rows| rows.len()),
+            Some(profile.times.len())
+        );
     }
 
     #[test]
@@ -1893,13 +2029,12 @@ mod tests {
         let counterparty_hazard = flat_hazard_curve(0.02);
         let own_hazard = flat_hazard_curve(0.03);
         let discount = flat_discount_curve(0.02);
-        let profile = ExposureProfile {
-            times: vec![1.0, 2.0, 3.0],
-            mtm_values: vec![-100_000.0, -250_000.0, -400_000.0],
-            epe: vec![0.0; 3],
-            ene: vec![100_000.0, 250_000.0, 400_000.0],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &[1.0, 2.0, 3.0],
+            vec![-100_000.0, -250_000.0, -400_000.0],
+            vec![0.0; 3],
+            vec![100_000.0, 250_000.0, 400_000.0],
+        );
         let funding = FundingConfig {
             funding_spread_bp: 0.0,
             im_profile: Some(ImProfile {
@@ -2079,13 +2214,12 @@ mod tests {
         let discount = flat_discount_curve(0.03);
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
 
-        let profile = ExposureProfile {
-            times: times.clone(),
-            mtm_values: times.iter().map(|_| 250_000.0).collect(),
-            epe: times.iter().map(|_| 800_000.0).collect(),
-            ene: times.iter().map(|_| 500_000.0).collect(),
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            times.iter().map(|_| 250_000.0).collect(),
+            times.iter().map(|_| 800_000.0).collect(),
+            times.iter().map(|_| 500_000.0).collect(),
+        );
 
         let funding = FundingConfig {
             funding_spread_bp: 60.0,

@@ -194,8 +194,18 @@ def flat_hazard_curve(lam: float) -> HazardCurve:
     return HazardCurve("HZ", dt.date(2025, 1, 1), [(1.0, lam), (30.0, lam)], recovery_rate=0.40, day_count="act_365f")
 
 
-def uniform_exposure() -> ExposureProfile:
-    return ExposureProfile([1.0, 2.0], [1e6, 1e6], [1e6, 1e6], [0.0, 0.0])
+def uniform_exposure(mark: float = 1e6) -> ExposureProfile:
+    return ExposureProfile(
+        as_of="2025-01-01",
+        currency="USD",
+        basis={"kind": "external", "source_id": "funding-test", "policy_id": "unsecured"},
+        dates=["2025-01-01", "2026-01-01", "2027-01-01"],
+        times=[0.0, 1.0, 2.0],
+        mtm_values=[mark] * 3,
+        epe=[max(mark, 0.0)] * 3,
+        ene=[max(-mark, 0.0)] * 3,
+        diagnostics={"market_roll_failures": 0, "valuation_failures": 0, "total_time_points": 3},
+    )
 
 
 def test_compute_bilateral_xva_aggregates_mva_into_total() -> None:
@@ -224,7 +234,7 @@ def test_compute_bilateral_xva_aggregates_mva_into_total() -> None:
 
 def test_compute_bilateral_xva_nets_posted_im_from_dva() -> None:
     """The Python surface preserves canonical IM-netted bilateral DVA."""
-    exposure = ExposureProfile([1.0, 2.0], [-1e6, -1e6], [0.0, 0.0], [1e6, 1e6])
+    exposure = uniform_exposure(-1e6)
     args = (
         exposure,
         flat_hazard_curve(0.0),

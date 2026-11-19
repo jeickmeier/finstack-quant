@@ -4,6 +4,8 @@
 //! and CSA (Credit Support Annex) terms used across all XVA calculations.
 
 use crate::xva::mva::ImProfile;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 
 /// Funding cost/benefit configuration for FVA and MVA calculation.
 ///
@@ -241,7 +243,7 @@ pub struct XvaResult {
 
     /// Effective EPE profile: `(time, Effective_EPE(t))`.
     ///
-    /// Non-decreasing version of EPE, per Basel III SA-CCR:
+    /// Running maximum of expected positive exposure:
     /// `Effective_EPE(t_k) = max(Effective_EPE(t_{k-1}), EPE(t_k))`
     ///
     /// # References
@@ -250,7 +252,7 @@ pub struct XvaResult {
     ///   counterparty credit risk exposures." `docs/REFERENCES.md#bcbs-279-saccr`
     pub effective_epe_profile: Vec<(f64, f64)>,
 
-    /// Time-weighted average of Effective EPE (regulatory scalar metric).
+    /// Time-weighted diagnostic of the right-endpoint running maximum of EPE.
     ///
     /// Computed as:
     /// ```text
@@ -398,21 +400,59 @@ pub struct ExposureDiagnostics {
     pub total_time_points: usize,
 }
 
-/// Exposure profile computed at each time grid point.
+/// Provenance and basis of all observations in an XVA exposure profile.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ExposureBasis {
+    /// External complete exposure observations, supplied on a documented common basis.
+    External {
+        /// Stable identifier of the source data and its completeness attestation.
+        source_id: String,
+        /// Identifier of the common netting, collateral and model-time policy.
+        policy_id: String,
+    },
+    /// A portfolio repriced on every path and date before taking positive and negative parts.
+    SimulatedUncollateralized {
+        /// Fingerprint of the pricing, market, portfolio and process inputs.
+        source_id: String,
+        /// Number of complete simulated paths including any antithetic partners.
+        #[serde(with = "finstack_quant_core::wire::count")]
+        #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
+        path_count: usize,
+    },
+}
+
+/// Expected exposure observations on a complete dated grid.
 ///
-/// This is the intermediate result from exposure simulation,
-/// consumed by the CVA calculator.
-///
-/// All vectors are expressed in the netting set's reporting currency when one
-/// is configured; otherwise they use the natural single-currency portfolio
-/// currency inferred by the exposure engine.
+/// All marks and exposures use major units of the reporting currency.
+/// Integrators query each discount or survival curve using the calendar
+/// dates. Exposure year fractions define the profile's own integration clock.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ExposureProfile {
-    /// Nonnegative time points in years from valuation date. An explicit zero
-    /// node supplies opening exposure; before the first node exposure is held
-    /// flat at that node, consistently across CVA, DVA, FVA and MVA.
+    /// Valuation cut and required opening observation date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub as_of: Date,
+
+    /// Reporting currency shared by all marks, exposures and adjustments.
+    pub currency: Currency,
+
+    /// Provenance of the exposure model and the complete observation grid.
+    pub basis: ExposureBasis,
+
+    /// Strictly increasing calendar observations starting on the valuation cut.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub dates: Vec<Date>,
+
+    /// Aligned model year fractions, starting at zero and strictly increasing.
     pub times: Vec<f64>,
 
     /// Portfolio mark-to-market value at each time point (may be negative).
@@ -424,9 +464,8 @@ pub struct ExposureProfile {
     /// Expected Negative Exposure at each time point: max(-V(t), 0).
     pub ene: Vec<f64>,
 
-    /// Simulation quality diagnostics (populated by the exposure engine).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub diagnostics: Option<ExposureDiagnostics>,
+    /// Completeness counters for the admitted grid. Failed points or valuations invalidate it.
+    pub diagnostics: ExposureDiagnostics,
 }
 
 impl ExposureProfile {
@@ -446,24 +485,56 @@ impl ExposureProfile {
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let n = self.times.len();
 
-        if self.diagnostics.as_ref().is_some_and(|diagnostics| {
-            diagnostics.market_roll_failures > 0 || diagnostics.valuation_failures > 0
-        }) {
+        let basis_is_identified = match &self.basis {
+            ExposureBasis::External {
+                source_id,
+                policy_id,
+            } => !source_id.trim().is_empty() && !policy_id.trim().is_empty(),
+            ExposureBasis::SimulatedUncollateralized {
+                source_id,
+                path_count,
+            } => !source_id.trim().is_empty() && *path_count > 0,
+        };
+        if !basis_is_identified {
             return Err(finstack_quant_core::Error::Validation(
-                "ExposureProfile contains failed market rolls or instrument valuations and is not valid for XVA"
+                "ExposureProfile requires identified and complete exposure provenance".into(),
+            ));
+        }
+        if self.dates.first() != Some(&self.as_of) || self.times.first() != Some(&0.0) {
+            return Err(finstack_quant_core::Error::Validation(
+                "ExposureProfile must start at the valuation cut with an explicit time-zero node"
                     .into(),
             ));
         }
+        if self.diagnostics.total_time_points != n
+            || self.diagnostics.market_roll_failures > 0
+            || self.diagnostics.valuation_failures > 0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "ExposureProfile diagnostics must reconcile with the grid and show every roll and valuation completed".into(),
+            ));
+        }
 
-        if self.mtm_values.len() != n || self.epe.len() != n || self.ene.len() != n {
+        if self.dates.len() != n
+            || self.mtm_values.len() != n
+            || self.epe.len() != n
+            || self.ene.len() != n
+        {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "ExposureProfile: vector lengths must be equal \
-                 (times={}, mtm={}, epe={}, ene={})",
+                 (dates={}, times={}, mtm={}, epe={}, ene={})",
+                self.dates.len(),
                 n,
                 self.mtm_values.len(),
                 self.epe.len(),
                 self.ene.len()
             )));
+        }
+
+        if self.dates.windows(2).any(|dates| dates[0] >= dates[1]) {
+            return Err(finstack_quant_core::Error::Validation(
+                "ExposureProfile dates must strictly increase".into(),
+            ));
         }
 
         for (i, &t) in self.times.iter().enumerate() {
@@ -511,7 +582,10 @@ mod tests {
     #[test]
     fn exposure_profile_rejects_unknown_fields() {
         let base = serde_json::json!({
-            "times": [1.0], "mtm_values": [1.0], "epe": [1.0], "ene": [0.0]
+            "as_of": "2025-01-01", "dates": ["2025-01-01"], "currency": "USD",
+            "basis": {"kind": "external", "source_id": "test-data", "policy_id": "flat-test"},
+            "times": [0.0], "mtm_values": [1.0], "epe": [1.0], "ene": [0.0],
+            "diagnostics": {"market_roll_failures": 0, "valuation_failures": 0, "total_time_points": 1}
         });
         serde_json::from_value::<ExposureProfile>(base.clone()).expect("base profile parses");
         let diagnostics = serde_json::json!({
@@ -591,11 +665,25 @@ mod tests {
     #[test]
     fn profile_validate_valid() {
         let profile = ExposureProfile {
-            times: vec![0.25, 0.5, 1.0],
+            as_of: time::macros::date!(2025 - 01 - 01),
+            dates: vec![
+                time::macros::date!(2025 - 01 - 01),
+                time::macros::date!(2025 - 07 - 01),
+                time::macros::date!(2026 - 01 - 01),
+            ],
+            currency: Currency::USD,
+            basis: ExposureBasis::External {
+                source_id: "test-grid".into(),
+                policy_id: "test-basis".into(),
+            },
+            times: vec![0.0, 0.5, 1.0],
             mtm_values: vec![100.0, -50.0, 25.0],
             epe: vec![100.0, 0.0, 25.0],
             ene: vec![0.0, 50.0, 0.0],
-            diagnostics: None,
+            diagnostics: ExposureDiagnostics {
+                total_time_points: 3,
+                ..Default::default()
+            },
         };
         profile.validate().expect("Valid profile should pass");
     }
@@ -603,11 +691,24 @@ mod tests {
     #[test]
     fn profile_validate_rejects_mismatched_lengths() {
         let profile = ExposureProfile {
-            times: vec![0.25, 0.5],
+            as_of: time::macros::date!(2025 - 01 - 01),
+            dates: vec![
+                time::macros::date!(2025 - 01 - 01),
+                time::macros::date!(2025 - 07 - 01),
+            ],
+            currency: Currency::USD,
+            basis: ExposureBasis::External {
+                source_id: "test-grid".into(),
+                policy_id: "test-basis".into(),
+            },
+            times: vec![0.0, 0.5],
             mtm_values: vec![100.0],
             epe: vec![100.0, 0.0],
             ene: vec![0.0, 50.0],
-            diagnostics: None,
+            diagnostics: ExposureDiagnostics {
+                total_time_points: 2,
+                ..Default::default()
+            },
         };
         assert!(profile.validate().is_err());
     }
@@ -615,11 +716,21 @@ mod tests {
     #[test]
     fn profile_validate_rejects_negative_epe() {
         let profile = ExposureProfile {
-            times: vec![0.25],
+            as_of: time::macros::date!(2025 - 01 - 01),
+            dates: vec![time::macros::date!(2025 - 01 - 01)],
+            currency: Currency::USD,
+            basis: ExposureBasis::External {
+                source_id: "test-grid".into(),
+                policy_id: "test-basis".into(),
+            },
+            times: vec![0.0],
             mtm_values: vec![100.0],
             epe: vec![-1.0],
             ene: vec![0.0],
-            diagnostics: None,
+            diagnostics: ExposureDiagnostics {
+                total_time_points: 1,
+                ..Default::default()
+            },
         };
         assert!(profile.validate().is_err());
     }
@@ -627,11 +738,21 @@ mod tests {
     #[test]
     fn profile_validate_rejects_nan_mtm() {
         let profile = ExposureProfile {
-            times: vec![0.25],
+            as_of: time::macros::date!(2025 - 01 - 01),
+            dates: vec![time::macros::date!(2025 - 01 - 01)],
+            currency: Currency::USD,
+            basis: ExposureBasis::External {
+                source_id: "test-grid".into(),
+                policy_id: "test-basis".into(),
+            },
+            times: vec![0.0],
             mtm_values: vec![f64::NAN],
             epe: vec![0.0],
             ene: vec![0.0],
-            diagnostics: None,
+            diagnostics: ExposureDiagnostics {
+                total_time_points: 1,
+                ..Default::default()
+            },
         };
         assert!(profile.validate().is_err());
     }
@@ -639,11 +760,24 @@ mod tests {
     #[test]
     fn profile_validate_rejects_non_increasing_times() {
         let profile = ExposureProfile {
-            times: vec![1.0, 0.5],
+            as_of: time::macros::date!(2025 - 01 - 01),
+            dates: vec![
+                time::macros::date!(2025 - 01 - 01),
+                time::macros::date!(2025 - 07 - 01),
+            ],
+            currency: Currency::USD,
+            basis: ExposureBasis::External {
+                source_id: "test-grid".into(),
+                policy_id: "test-basis".into(),
+            },
+            times: vec![0.0, 0.0],
             mtm_values: vec![100.0, 50.0],
             epe: vec![100.0, 50.0],
             ene: vec![0.0, 0.0],
-            diagnostics: None,
+            diagnostics: ExposureDiagnostics {
+                total_time_points: 2,
+                ..Default::default()
+            },
         };
         assert!(profile.validate().is_err());
     }

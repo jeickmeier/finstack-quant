@@ -64,7 +64,7 @@ pub fn funding_config_effective_margin_spread_bp(
 // ---------------------------------------------------------------------------
 
 /// Validate an exposure profile: equal-length arrays on a strictly increasing time grid.
-/// @param exposureProfile - `ExposureProfile` (object or JSON) with `times`, `mtm_values`, `epe`, `ene` and optional `diagnostics`.
+/// @param exposureProfile - `ExposureProfile` (object or JSON) with valuation cut, reporting currency, dated grid, signed marks, EPE and ENE, and completeness diagnostics.
 ///
 /// # Errors
 ///

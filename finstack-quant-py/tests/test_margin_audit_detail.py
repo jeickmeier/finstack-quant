@@ -137,8 +137,18 @@ def test_xva_rows_sum_to_each_reported_leg() -> None:
     )
     counterparty = HazardCurve("CPTY", base, [(1.0, 0.02), (30.0, 0.02)], recovery_rate=0.40, day_count="act_365f")
     own = HazardCurve("OWN", base, [(1.0, 0.03), (30.0, 0.03)], recovery_rate=0.40, day_count="act_365f")
-    times = [0.5, 1.0, 2.0, 3.0]
-    profile = ExposureProfile(times, [5e5, 4e5, 3e5, 2e5], [8e5, 7e5, 6e5, 5e5], [3e5, 3e5, 3e5, 3e5])
+    times = [0.0, 0.5, 1.0, 2.0, 3.0]
+    profile = ExposureProfile(
+        as_of=base,
+        currency="USD",
+        basis={"kind": "external", "source_id": "audit-row-check", "policy_id": "unsecured"},
+        dates=[base + dt.timedelta(days=round(365 * t)) for t in times],
+        times=times,
+        mtm_values=[5e5, 5e5, 4e5, 3e5, 2e5],
+        epe=[8e5, 8e5, 7e5, 6e5, 5e5],
+        ene=[3e5] * 5,
+        diagnostics={"market_roll_failures": 0, "valuation_failures": 0, "total_time_points": 5},
+    )
 
     result = compute_bilateral_xva(profile, counterparty, own, discount, 0.40, 0.35, FundingConfig(50.0, 30.0))
 

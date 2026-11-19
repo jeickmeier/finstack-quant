@@ -18,7 +18,7 @@ mod tests;
 
 use crate::api::core::market_discount::JsDiscountCurve;
 use crate::api::core::market_hazard::JsHazardCurve;
-use crate::utils::input::{js_currency, js_f64, json_text, opt_json_text};
+use crate::utils::input::{js_currency, js_f64, opt_json_text};
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
@@ -45,7 +45,7 @@ fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Resul
 /// `total_xva = CVA - DVA + FVA + MVA`. Optional funding legs are absent from
 /// the payload when they were not computed.
 ///
-/// @param exposureProfileJson - Strict `ExposureProfile` JSON with `times`,
+/// @param exposureProfile - Strict `ExposureProfile` JSON with `times`,
 /// `mtm_values`, `epe`, and `ene` arrays of equal length and an optional
 /// `diagnostics` object (`market_roll_failures`, `valuation_failures`,
 /// `total_time_points`); unknown fields are rejected.
@@ -76,7 +76,13 @@ fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Resul
 /// });
 /// const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
 /// const result = margin.computeBilateralXva(
-///   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
+///   {
+///     as_of: "2025-01-01", currency: "USD",
+///     basis: { kind: "external", source_id: "complete-grid", policy_id: "unsecured" },
+///     dates: ["2025-01-01", "2026-01-01", "2027-01-01"], times: [0, 1, 2],
+///     mtm_values: [1e6, 1e6, 1e6], epe: [1e6, 1e6, 1e6], ene: [0, 0, 0],
+///     diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 3 },
+///   },
 ///   hz, hz, df, 0.4, 0.4,
 ///   JSON.stringify({ funding_spread_bp: 50.0 }),
 /// );
@@ -90,7 +96,13 @@ fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Resul
 /// const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03, "act_365f");
 /// const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
 /// const result = margin.computeBilateralXva(
-///   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
+///   {
+///     as_of: "2025-01-01", currency: "USD",
+///     basis: { kind: "external", source_id: "complete-grid", policy_id: "unsecured" },
+///     dates: ["2025-01-01", "2026-01-01", "2027-01-01"], times: [0, 1, 2],
+///     mtm_values: [1e6, 1e6, 1e6], epe: [1e6, 1e6, 1e6], ene: [0, 0, 0],
+///     diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 3 },
+///   },
 ///   hz, hz, df, 0.4, 0.4,
 ///   JSON.stringify({ funding_spread_bp: 50.0 }),
 /// );
@@ -98,8 +110,11 @@ fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Resul
 /// ```
 #[wasm_bindgen(js_name = computeBilateralXva, unchecked_return_type = "XvaResult")]
 pub fn compute_bilateral_xva(
-    #[wasm_bindgen(js_name = "exposureProfileJson", unchecked_param_type = "JsonInput")]
-    exposure_profile_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "exposureProfile",
+        unchecked_param_type = "generated.margin.ExposureProfile | string"
+    )]
+    exposure_profile: JsValue,
     #[wasm_bindgen(js_name = "counterpartyHazardCurve")] counterparty_hazard_curve: &JsHazardCurve,
     #[wasm_bindgen(js_name = "ownHazardCurve")] own_hazard_curve: &JsHazardCurve,
     #[wasm_bindgen(js_name = "discountCurve")] discount_curve: &JsDiscountCurve,
@@ -115,10 +130,9 @@ pub fn compute_bilateral_xva(
     let counterparty_recovery_rate =
         js_f64(&counterparty_recovery_rate, "counterpartyRecoveryRate")?;
     let own_recovery_rate = js_f64(&own_recovery_rate, "ownRecoveryRate")?;
-    let exposure_profile_json: &str = &json_text(&exposure_profile_json, "exposureProfileJson")?;
     let funding_json = opt_json_text(funding_json.as_ref(), "fundingJson")?;
     let exposure: finstack_quant_margin::xva::types::ExposureProfile =
-        serde_json::from_str(exposure_profile_json).map_err(to_js_err)?;
+        crate::utils::input::from_js_json(&exposure_profile, "exposureProfile")?;
     let funding: Option<finstack_quant_margin::xva::types::FundingConfig> = funding_json
         .as_deref()
         .map(serde_json::from_str)

@@ -379,12 +379,12 @@
       ]
     },
     "effective_epe": {
-      "description": "Time-weighted average of Effective EPE (regulatory scalar metric).\n\nComputed as:\n```text\nEffective_EPE_avg = (1 / min(1, M)) × Σₖ Effective_EPE(tₖ) × Δtₖ\n```\n\nwhere `M` is the portfolio maturity and `Δtₖ = tₖ - tₖ₋₁`.\nThis is the key input for EAD under SA-CCR.\n\n# References\n\n- BCBS 279 (2014). \"The standardised approach for measuring\n  counterparty credit risk exposures.\" `docs/REFERENCES.md#bcbs-279-saccr`",
+      "description": "Time-weighted diagnostic of the right-endpoint running maximum of EPE.\n\nComputed as:\n```text\nEffective_EPE_avg = (1 / min(1, M)) × Σₖ Effective_EPE(tₖ) × Δtₖ\n```\n\nwhere `M` is the portfolio maturity and `Δtₖ = tₖ - tₖ₋₁`.\nThis is the key input for EAD under SA-CCR.\n\n# References\n\n- BCBS 279 (2014). \"The standardised approach for measuring\n  counterparty credit risk exposures.\" `docs/REFERENCES.md#bcbs-279-saccr`",
       "format": "double",
       "type": "number"
     },
     "effective_epe_profile": {
-      "description": "Effective EPE profile: `(time, Effective_EPE(t))`.\n\nNon-decreasing version of EPE, per Basel III SA-CCR:\n`Effective_EPE(t_k) = max(Effective_EPE(t_{k-1}), EPE(t_k))`\n\n# References\n\n- BCBS 279 (2014). \"The standardised approach for measuring\n  counterparty credit risk exposures.\" `docs/REFERENCES.md#bcbs-279-saccr`",
+      "description": "Effective EPE profile: `(time, Effective_EPE(t))`.\n\nRunning maximum of expected positive exposure:\n`Effective_EPE(t_k) = max(Effective_EPE(t_{k-1}), EPE(t_k))`\n\n# References\n\n- BCBS 279 (2014). \"The standardised approach for measuring\n  counterparty credit risk exposures.\" `docs/REFERENCES.md#bcbs-279-saccr`",
       "items": {
         "maxItems": 2,
         "minItems": 2,

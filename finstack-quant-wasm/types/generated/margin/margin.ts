@@ -97,6 +97,32 @@ export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero"
  */
 export type PositiveF64Wire = number;
 /**
+ * Provenance and basis of all observations in an XVA exposure profile.
+ */
+export type ExposureBasis =
+  | {
+      kind: "external";
+      /**
+       * Identifier of the common netting, collateral and model-time policy.
+       */
+      policy_id: string;
+      /**
+       * Stable identifier of the source data and its completeness attestation.
+       */
+      source_id: string;
+    }
+  | {
+      kind: "simulated_uncollateralized";
+      /**
+       * Number of complete simulated paths including any antithetic partners.
+       */
+      path_count: number;
+      /**
+       * Fingerprint of the pricing, market, portfolio and process inputs.
+       */
+      source_id: string;
+    };
+/**
  * FRTB risk classes per BCBS d457.
  */
 export type FrtbRiskClass = "girr" | "csr_non_sec" | "csr_sec_ctp" | "csr_sec_non_ctp" | "equity" | "commodity" | "fx";
@@ -851,9 +877,25 @@ export interface ExposureDiagnostics {
  */
 export interface ExposureProfile {
   /**
-   * Simulation quality diagnostics (populated by the exposure engine).
+   * Valuation cut and required opening observation date.
    */
-  diagnostics?: ExposureDiagnostics | null;
+  as_of: valuations.DateWire;
+  /**
+   * Provenance of the exposure model and the complete observation grid.
+   */
+  basis: ExposureBasis;
+  /**
+   * Reporting currency shared by all marks, exposures and adjustments.
+   */
+  currency: valuations.Currency;
+  /**
+   * Strictly increasing calendar observations starting on the valuation cut.
+   */
+  dates: valuations.DateWire[];
+  /**
+   * Completeness counters for the admitted grid. Failed points or valuations invalidate it.
+   */
+  diagnostics: ExposureDiagnostics;
   /**
    * Expected Negative Exposure at each time point: max(-V(t), 0).
    */
@@ -867,9 +909,7 @@ export interface ExposureProfile {
    */
   mtm_values: number[];
   /**
-   * Nonnegative time points in years from valuation date. An explicit zero
-   * node supplies opening exposure; before the first node exposure is held
-   * flat at that node, consistently across CVA, DVA, FVA and MVA.
+   * Aligned model year fractions, starting at zero and strictly increasing.
    */
   times: number[];
 }
@@ -1944,7 +1984,7 @@ export interface XvaResult {
    */
   dva_rows?: CreditXvaRow[] | null;
   /**
-   * Time-weighted average of Effective EPE (regulatory scalar metric).
+   * Time-weighted diagnostic of the right-endpoint running maximum of EPE.
    *
    * Computed as:
    * ```text
@@ -1963,7 +2003,7 @@ export interface XvaResult {
   /**
    * Effective EPE profile: `(time, Effective_EPE(t))`.
    *
-   * Non-decreasing version of EPE, per Basel III SA-CCR:
+   * Running maximum of expected positive exposure:
    * `Effective_EPE(t_k) = max(Effective_EPE(t_{k-1}), EPE(t_k))`
    *
    * # References

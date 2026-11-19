@@ -1516,7 +1516,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/exposure_profile.schema.json",
             "type_name": "ExposureProfile",
             "kind": "input",
-            "bytes": 3073
+            "bytes": 5932
           },
           {
             "path": "schemas/margin/1/frtb_risk_class.schema.json",
@@ -1663,7 +1663,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/xva_result.schema.json",
             "type_name": "XvaResult",
             "kind": "output",
-            "bytes": 19958
+            "bytes": 19956
           }
         ]
       },
@@ -4717,7 +4717,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/exposure_profile.schema.json",
             "type_name": "ExposureProfile",
             "kind": "input",
-            "bytes": 3073
+            "bytes": 5932
           },
           {
             "domain": "margin",
@@ -4885,7 +4885,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/xva_result.schema.json",
             "type_name": "XvaResult",
             "kind": "output",
-            "bytes": 19958
+            "bytes": 19956
           },
           {
             "domain": "portfolio",

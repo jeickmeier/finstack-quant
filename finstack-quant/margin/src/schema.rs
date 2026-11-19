@@ -287,10 +287,15 @@ mod examples {
 
     pub(super) fn exposure_profile() -> Result<Vec<Value>> {
         example_from_json::<crate::xva::types::ExposureProfile>(json!({
+            "as_of": "2025-01-01",
+            "currency": "USD",
+            "basis": {"kind": "external", "source_id": "complete-example", "policy_id": "unsecured"},
+            "dates": ["2025-01-01", "2025-07-01", "2026-01-01"],
             "times": [0.0, 0.5, 1.0],
             "mtm_values": [0.0, 42_000.0, 31_000.0],
             "epe": [0.0, 85_000.0, 64_000.0],
-            "ene": [0.0, -43_000.0, -33_000.0]
+            "ene": [0.0, 43_000.0, 33_000.0],
+            "diagnostics": {"market_roll_failures": 0, "valuation_failures": 0, "total_time_points": 3}
         }))
     }
 

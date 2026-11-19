@@ -2,6 +2,13 @@
 
 ## Itemized changes
 
+### Margin: dated exposure grids for CVA, DVA and FVA
+
+Exposure profiles carry an opening date, calendar observation dates, the
+reporting currency, and completeness provenance. Credit and funding legs
+sample each curve on its own date axis and normalize factors at the
+valuation cut. Effective EPE uses the right-endpoint running maximum.
+
 ### Portfolio: ordinary FRTB delta grids
 
 `portfolio_frtb_sensitivities` / `portfolioFrtbSensitivities` combine the
