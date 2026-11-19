@@ -236,7 +236,7 @@ JSON boundary instead of a Rust `validation` error. Results are unchanged.
 Old → new:
 
 - Rust `evaluate_dcf(model, wacc, terminal_value, ufcf_node, net_debt_override, options, market, as_of)` → `evaluate_dcf(model, &DcfInputs { .. }, options, market, as_of)`; Python `evaluate_dcf(model, wacc, terminal_value, ufcf_node="ufcf", net_debt_override=None, options=None, market=None, as_of=None)` → `evaluate_dcf(model, inputs, options=None, market=None, as_of=None)`; WASM `evaluateDcf(model, wacc, terminalValue, ufcfNode?, netDebtOverride?, options?, market?, asOf?)` → `evaluateDcf(model, inputs, options?, market?, asOf?)`
-- Rust `goal_seek(model, target_node, target_period, target_value, driver_node, driver_period, update_model, bounds)` → `goal_seek(model, &GoalSeekSpec { .. })`; Python `goal_seek(model, target_node, target_period, target_value, driver_node, driver_period, update_model, bounds=None)` → `goal_seek(model, spec)`; WASM `goalSeek(modelJson, targetNode, targetPeriod, targetValue, driverNode, driverPeriod, updateModel, bounds?)` → `goalSeek(modelJson, spec)`
+- Goal seek now takes a dated `GoalSeekSpec` naming the target and tolerances, an editable forecast cell, and the search policy. Rust takes the held market explicitly. Python `goal_seek` and WASM `goalSeek` accept an optional market and return the verified achieved value, signed residual and explicitly elected solved model.
 - Python `run_corporate_analysis(model, wacc=None, terminal_value=None, net_debt_override=None, cfads_node=None, interest_coverage_node=None, check_suite=None, market=None, as_of=None, ltv_value_node=None)` → `run_corporate_analysis(model, options=None, market=None)`
 
 ### Attribution: Python P&L attribution takes the `AttributionInputs` object

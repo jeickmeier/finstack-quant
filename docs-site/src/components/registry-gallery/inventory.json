@@ -657,7 +657,7 @@
     {
       "name": "goal-seek-form",
       "type": "registry:component",
-      "docs": "Edit statements_analytics.goalSeek arguments: target node and driver node as id-comboboxes over the supplied node ids, target and driver periods, the target value, and an optional lower and upper search bracket in the driver's units (both empty leave the bracket unset so Rust uses its own; a cleared number is sent as NaN, never 0). Solve passes the arguments to the caller (usually the useGoalSeek request); the native GoalSeekResult is shown as returned: solved value, residual, tolerance, evaluations and the converged flag. When onApply is supplied, Apply to model is a second, explicit action that hands the returned model (the input model with the solved driver written in) to the caller, such as the statements workbench's commit; there is no undo, and applyBlocked disables it with a reason. Nothing is calculated or defaulted. Accepts nodeIds, periods, defaultValues, onSubmit, result, loading, error, onApply, applyBlocked, disabled and density props.",
+      "docs": "Author a goal-seek target, editable forecast cell, valuation date and information cutoff. Submit an explicit bracket and tolerances, with exact currency amounts for monetary targets. The form shows the verified driver and target, signed residual, target tolerance and evaluation count. Apply is separately elected and installs the returned solved model while its source remains current.",
       "worker": "none"
     },
     {
@@ -1872,7 +1872,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
-      "sha256": "c0adfbdb14e41168356f54a9e4d3f55c721b51b6a1d9423ef3de84e506fe5fd6"
+      "sha256": "8d925694ee3995eba4ef7d85b492367b3d59fdd31b3821a449c3708a281508b6"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
@@ -1880,7 +1880,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "88748c1991cbb64fe93700c7c5d259fac390f35368930116b351eac59757fbdc"
+      "sha256": "aa715a8d50b118079352d2ae40d3b441cf8645c6e8fc839037b4481aac08e28f"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
@@ -1920,15 +1920,15 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
-      "sha256": "53b3de952a55c739961fa99584f6759e6f85114845774f2f93f65369ccf89cd8"
+      "sha256": "0e5a9ea44711a8210ee65bf9c156326d4832bc0bef7ac48151b343c570c8138e"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
-      "sha256": "211d3158caa5f15dacc2a404b5bd28e8be32bd8424d6d58fc296f13bada57f11"
+      "sha256": "3b740d20c8cbe559857fcd0ebf16a0ab8d1a7e87614966562bca2ca0e25cd22a"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek.json",
-      "sha256": "9844d258ec9f13a2ad80511094864e1e1708415dcd1ca8c47c984f32bbd56176"
+      "sha256": "12ea8beb6e6ab1c21bed8fe1fe7a88dd4606e48b473c3106cf4cf37ebae7f082"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-bridge.json",
@@ -1956,7 +1956,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenario-diff.json",
-      "sha256": "1db3f40df1482cbfd4bc7c001558cfa3b0d0420a07870939291c03e22dc086e8"
+      "sha256": "fbc209d6f92825d46fb5e079e6c0dedfc01fc716aa3fd6a0b433455f139fd9ef"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
@@ -1980,7 +1980,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
-      "sha256": "46b4523844687baea0214be6871d61f7c93772ac8ae788d74fbd86f295445bb7"
+      "sha256": "7eee711c34bb83cba7cf94fd54a3d2010100aa32bd34624d873e2acfcfa75274"
     },
     {
       "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",
@@ -1988,7 +1988,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/export/cases.json",
-      "sha256": "3d7fb52ba51d1f30059a13cd10dcd2a9f4d51c69fd02784e6d62de6d3d22836d"
+      "sha256": "3c097489f0a5c120d3706d85e37359466ab330e425271dc83db5d6f8235b060e"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",

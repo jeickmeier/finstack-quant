@@ -1812,6 +1812,13 @@
           },
           "type": "array"
         },
+        "market_content_hash": {
+          "description": "Canonical snapshot hash of the market held for an explicitly priced run.\nAbsent if the supplied provider cannot furnish a coherent capture.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "model_content_hash": {
           "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).",
           "type": "string"
@@ -1825,7 +1832,7 @@
           "description": "Observations the run was allowed to read."
         },
         "run_id": {
-          "description": "Identity of this evaluation run: the canonical content hash of the\nfields above. Two runs of the same model content, snapshot, cutoff\nand valuation date share it.",
+          "description": "Identity of this evaluation run: the canonical content hash of the\nfields above, including the market snapshot identity when it was supplied.",
           "type": "string"
         },
         "source_snapshot": {

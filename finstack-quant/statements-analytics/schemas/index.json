@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_context_report.schema.json",
-      "bytes": 33088,
+      "bytes": 33352,
       "kind": "output",
       "path": "schemas/statements_analytics/1/credit_context_report.schema.json",
       "summary": "Borrower credit observations and available minima on selected periods.",
@@ -155,7 +155,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_result.schema.json",
-      "bytes": 45636,
+      "bytes": 45900,
       "kind": "output",
       "path": "schemas/statements_analytics/1/dated_lbo_result.schema.json",
       "summary": "Reconciled sources and uses and qualified sponsor returns.",
@@ -164,7 +164,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_distribution_result.schema.json",
-      "bytes": 28205,
+      "bytes": 28469,
       "kind": "output",
       "path": "schemas/statements_analytics/1/dcf_distribution_result.schema.json",
       "summary": "Coherent repriced Monte Carlo enterprise and equity values by path and quantile.",
@@ -344,7 +344,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_result.schema.json",
-      "bytes": 2424,
+      "bytes": 28751,
       "kind": "output",
       "path": "schemas/statements_analytics/1/goal_seek_result.schema.json",
       "summary": "Outcome of a `goal_seek` solve.",
@@ -353,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_spec.schema.json",
-      "bytes": 2180,
+      "bytes": 27274,
       "kind": "input",
       "path": "schemas/statements_analytics/1/goal_seek_spec.schema.json",
       "summary": "Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve.",
@@ -668,7 +668,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_assessment.schema.json",
-      "bytes": 62364,
+      "bytes": 62628,
       "kind": "output",
       "path": "schemas/statements_analytics/1/statement_covenant_assessment.schema.json",
       "summary": "Effective covenant terms and available evidence by dated period.",
@@ -677,7 +677,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_forecast.schema.json",
-      "bytes": 64911,
+      "bytes": 65175,
       "kind": "output",
       "path": "schemas/statements_analytics/1/statement_covenant_forecast.schema.json",
       "summary": "Qualified forecast, breach evidence and per-period coverage.",

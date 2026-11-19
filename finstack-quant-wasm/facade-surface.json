@@ -4405,6 +4405,7 @@
       "forecastStatementCovenants",
       "generateTornadoEntries",
       "goalSeek",
+      "goalSeekSpec",
       "peerFilterAccepts",
       "peerSetFromUniverse",
       "peerStats",
@@ -4502,6 +4503,9 @@
     "kind": "function"
   },
   "statements_analytics.goalSeek": {
+    "kind": "function"
+  },
+  "statements_analytics.goalSeekSpec": {
     "kind": "function"
   },
   "statements_analytics.explainFormula": {

@@ -18,6 +18,7 @@ from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics import (
     AccountType,
     CorkscrewAccount,
+    GoalSeekSpec,
     ScorecardConfig,
     add_roll_forward_with_opening,
     evaluate_dcf,
@@ -28,7 +29,7 @@ from finstack_quant.statements_analytics import (
 
 
 def _model_json() -> str:
-    b = statements.ModelBuilder("test_model")
+    b = statements.ModelBuilder("test_model").source_snapshot("goal-seek-test-forecast")
     b.periods("2024Q1..Q2", None)
     b.value("revenue", [("2024Q1", 100_000.0), ("2024Q2", 110_000.0)])
     b.value("cogs", [("2024Q1", 40_000.0), ("2024Q2", 44_000.0)])
@@ -40,14 +41,18 @@ class TestGoalSeek:
     def test_update_model_false_returns_none(self) -> None:
         outcome = goal_seek(
             _model_json(),
-            {
-                "target_node": "gross_profit",
-                "target_period": "2024Q1",
-                "target_value": 70_000.0,
-                "driver_node": "revenue",
-                "driver_period": "2024Q1",
-                "update_model": False,
-            },
+            GoalSeekSpec(
+                target={"node": "gross_profit", "period": "2024Q1"},
+                target_value=70_000.0,
+                target_tolerance=1e-7,
+                driver={"node": "revenue", "period": "2024Q1"},
+                driver_tolerance=1e-10,
+                max_iterations=100,
+                search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                as_of="2023-12-31",
+                observed_through="2023-12-31",
+                update_model=False,
+            ),
         )
         assert outcome.solved_value > 100_000.0
         assert outcome.model is None
@@ -55,14 +60,18 @@ class TestGoalSeek:
     def test_update_model_true_returns_model(self) -> None:
         outcome = goal_seek(
             _model_json(),
-            {
-                "target_node": "gross_profit",
-                "target_period": "2024Q1",
-                "target_value": 70_000.0,
-                "driver_node": "revenue",
-                "driver_period": "2024Q1",
-                "update_model": True,
-            },
+            GoalSeekSpec(
+                target={"node": "gross_profit", "period": "2024Q1"},
+                target_value=70_000.0,
+                target_tolerance=1e-7,
+                driver={"node": "revenue", "period": "2024Q1"},
+                driver_tolerance=1e-10,
+                max_iterations=100,
+                search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                as_of="2023-12-31",
+                observed_through="2023-12-31",
+                update_model=True,
+            ),
         )
         assert outcome.solved_value > 100_000.0
         assert isinstance(outcome.model, statements.FinancialModelSpec)

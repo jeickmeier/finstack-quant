@@ -124,6 +124,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "ForecastMetrics",
             "FreeRentWindowSpec",
             "GoalSeekResult",
+            "GoalSeekSpec",
             "LboCheckMappings",
             "LboResult",
             "LeaseGrowthConvention",

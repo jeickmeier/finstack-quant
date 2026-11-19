@@ -63,7 +63,7 @@ pub use credit::{
     evaluate_covenants, evaluate_credit_context, forecast_breaches, forecast_statement_covenants,
     score_statement, score_statement_series,
 };
-pub use goal_seek::{GoalSeekResult, GoalSeekSpec, goal_seek};
+pub use goal_seek::{GoalSeekCell, GoalSeekResult, GoalSeekSearch, GoalSeekSpec, goal_seek};
 pub use introspection::{
     DependencyTracer, DependencyTree, Explanation, ExplanationStep, explain_formula,
     render_tree_ascii, render_tree_detailed,

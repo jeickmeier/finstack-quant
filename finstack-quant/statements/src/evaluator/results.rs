@@ -385,13 +385,16 @@ pub struct RunProvenance {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub valuation_date: Option<Date>,
+    /// Canonical snapshot hash of the market held for an explicitly priced run.
+    /// Absent if the supplied provider cannot furnish a coherent capture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub market_content_hash: Option<String>,
     /// The random stream of every stochastic forecast node in a single run,
     /// in model node order: enough to replay its draws.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub forecast_streams: Vec<ForecastStream>,
     /// Identity of this evaluation run: the canonical content hash of the
-    /// fields above. Two runs of the same model content, snapshot, cutoff
-    /// and valuation date share it.
+    /// fields above, including the market snapshot identity when it was supplied.
     pub run_id: String,
 }
 
@@ -433,6 +436,8 @@ impl RunProvenance {
     ///   snapshot are recorded.
     /// * `observation_cutoff` - Observations the run was allowed to read.
     /// * `valuation_date` - Pricing date when the run used a market.
+    /// * `market_content_hash` - Canonical market snapshot identity for an explicitly priced run,
+    ///   or None for a run evaluated without an elected market.
     ///
     /// # Errors
     ///
@@ -444,6 +449,7 @@ impl RunProvenance {
         model: &crate::types::FinancialModelSpec,
         observation_cutoff: super::ObservationCutoff,
         valuation_date: Option<Date>,
+        market_content_hash: Option<String>,
     ) -> crate::error::Result<Self> {
         let model_content_hash = model.content_hash().map_err(hash_error)?;
         Self::with_model_hash(
@@ -451,6 +457,7 @@ impl RunProvenance {
             model_content_hash,
             observation_cutoff,
             valuation_date,
+            market_content_hash,
         )
     }
 
@@ -461,6 +468,7 @@ impl RunProvenance {
         model_content_hash: String,
         observation_cutoff: super::ObservationCutoff,
         valuation_date: Option<Date>,
+        market_content_hash: Option<String>,
     ) -> crate::error::Result<Self> {
         let mut provenance = Self {
             model_id: model.id.clone(),
@@ -468,6 +476,7 @@ impl RunProvenance {
             source_snapshot: model.source_snapshot.clone(),
             observation_cutoff,
             valuation_date,
+            market_content_hash,
             forecast_streams: forecast_streams(model)?,
             run_id: String::new(),
         };
@@ -621,6 +630,7 @@ impl StatementResult {
             model,
             provenance.observation_cutoff,
             provenance.valuation_date,
+            provenance.market_content_hash.clone(),
         )
         .map_err(|error| mismatch(&format!("the model does not validate ({error})")))?;
         if expected != *provenance {

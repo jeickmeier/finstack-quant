@@ -519,7 +519,7 @@
       "type": "registry:component",
       "title": "Goal seek form",
       "description": "Edits the arguments of a native statements_analytics goal seek, shows the returned solution and applies the solved model on an explicit second action.",
-      "docs": "Edit statements_analytics.goalSeek arguments: target node and driver node as id-comboboxes over the supplied node ids, target and driver periods, the target value, and an optional lower and upper search bracket in the driver's units (both empty leave the bracket unset so Rust uses its own; a cleared number is sent as NaN, never 0). Solve passes the arguments to the caller (usually the useGoalSeek request); the native GoalSeekResult is shown as returned: solved value, residual, tolerance, evaluations and the converged flag. When onApply is supplied, Apply to model is a second, explicit action that hands the returned model (the input model with the solved driver written in) to the caller, such as the statements workbench's commit; there is no undo, and applyBlocked disables it with a reason. Nothing is calculated or defaulted. Accepts nodeIds, periods, defaultValues, onSubmit, result, loading, error, onApply, applyBlocked, disabled and density props.",
+      "docs": "Author a goal-seek target, editable forecast cell, valuation date and information cutoff. Submit an explicit bracket and tolerances, with exact currency amounts for monetary targets. The form shows the verified driver and target, signed residual, target tolerance and evaluation count. Apply is separately elected and installs the returned solved model while its source remains current.",
       "files": [
         {
           "path": "components/goal-seek-form/goal-seek-form.tsx",
@@ -536,7 +536,8 @@
         "@finstack/enum-field",
         "@finstack/id-combobox",
         "@finstack/native-display",
-        "button"
+        "button",
+        "input"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
       "categories": ["Individual Components"],

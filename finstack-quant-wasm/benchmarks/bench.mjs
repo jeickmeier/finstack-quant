@@ -290,12 +290,13 @@ const SCENARIO_SET_JSON = JSON.stringify({
 
 const GOAL_SEEK_MODEL_JSON = JSON.stringify({
   id: 'bench-goal-seek',
+  source_snapshot: 'benchmark-forecast',
   periods: [
     {
       id: '2025Q1',
       start: '2025-01-01',
       end: '2025-04-01',
-      is_actual: true,
+      is_actual: false,
     },
   ],
   nodes: {
@@ -1492,12 +1493,16 @@ async function main() {
 
   benchTry('statements_analytics', 'goalSeek', 400, () => {
     w.goalSeek(GOAL_SEEK_MODEL_JSON, {
-      target_node: 'ebitda',
-      target_period: '2025Q1',
-      target_value: 50000.0,
-      driver_node: 'revenue',
-      driver_period: '2025Q1',
+      target: { node: 'ebitda', period: '2025Q1' },
+      target_value: 50000,
+      target_tolerance: 1e-6,
+      driver: { node: 'revenue', period: '2025Q1' },
+      driver_tolerance: 1e-9,
+      max_iterations: 100,
+      as_of: '2024-12-31',
+      observed_through: '2024-12-31',
       update_model: false,
+      search: { kind: 'bracket', lower: 0, upper: 1e6 },
     });
   });
 

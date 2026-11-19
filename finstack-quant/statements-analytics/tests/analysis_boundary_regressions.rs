@@ -40,22 +40,38 @@ fn monetary_model(currency: Currency) -> FinancialModelSpec {
 
 #[test]
 fn monetary_goal_seek_preserves_round_trip_and_currency() {
-    let model = monetary_model(Currency::USD);
+    use finstack_quant_core::{market_data::context::MarketContext, money::Money};
+    use time::macros::date;
+    let mut model = monetary_model(Currency::USD);
+    model.source_snapshot = Some("monetary-goal-seek-fixture".to_owned());
     let period = PeriodId::annual(2025).expect("valid annual period");
     let solved = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "profit".to_string(),
-            target_period: period,
-            target_value: 60.0,
-            driver_node: "revenue".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "profit".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Amount(Money::new(60.0, Currency::USD).unwrap()),
+            target_tolerance: AmountOrScalar::Amount(Money::new(0.000001, Currency::USD).unwrap()),
+            driver: GoalSeekCell {
+                node: "revenue".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 1.0,
+                upper: 200.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: true,
-            bounds: Some((1.0, 200.0)),
         },
+        &MarketContext::new(),
     )
     .unwrap();
-    assert!((solved.solved_value - 120.0).abs() < 1e-8);
+    assert!((solved.solved_value.value() - 120.0).abs() < 1e-8);
     let model = solved.model.expect("update_model=true returns the model");
     let model = {
         let model_builder = ModelBuilder::from_spec(model).unwrap();

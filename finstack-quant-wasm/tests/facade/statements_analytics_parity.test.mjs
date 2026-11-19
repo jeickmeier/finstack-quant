@@ -610,6 +610,18 @@ test('dated DCF reuses matching statements for its grid and coherent sample path
       [0, 1, 2]
     );
     assert.ok(distribution.paths.every((row) => row.enterprise_value.amount === baseline.amount));
+    context.insertDividendYield('NEW-QUOTE', 0.03);
+    const otherPaths = evaluator.evaluateMonteCarlo(
+      model,
+      { n_paths: 3, seed: '7', metrics: ['ufcf'], percentiles: [0.5], include_path_data: true },
+      context.toJson(),
+      day,
+      day
+    );
+    assert.throws(
+      () => sa.evaluateDcfMonteCarlo(model, results, otherPaths, request),
+      /market snapshot/
+    );
   } finally {
     context.free();
     evaluator.free();

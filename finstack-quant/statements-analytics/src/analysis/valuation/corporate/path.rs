@@ -67,9 +67,9 @@ pub fn evaluate_dcf_monte_carlo(
     request: &CorporateDcfRequest,
 ) -> Result<DcfDistributionResult> {
     let provenance = request.cut.check_result(model, results)?;
-    if &paths.provenance != provenance {
+    if provenance.market_content_hash.is_none() || &paths.provenance != provenance {
         return Err(Error::invalid_input(
-            "Monte Carlo paths and baseline statement run have different model, dates or cutoff",
+            "Monte Carlo paths and baseline statement run require matching model, dates, cutoff and captured market snapshot",
         ));
     }
     let inputs = &request.inputs;

@@ -543,6 +543,11 @@ export interface D_46E9B9F749A497Bf5Bc2 {
    */
   forecast_streams?: D_25C2Be0082C34Cc8D8F4[];
   /**
+   * Canonical snapshot hash of the market held for an explicitly priced run.
+   * Absent if the supplied provider cannot furnish a coherent capture.
+   */
+  market_content_hash?: string | null;
+  /**
    * Canonical content hash of the evaluated model
    * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
    */
@@ -561,8 +566,7 @@ export interface D_46E9B9F749A497Bf5Bc2 {
       };
   /**
    * Identity of this evaluation run: the canonical content hash of the
-   * fields above. Two runs of the same model content, snapshot, cutoff
-   * and valuation date share it.
+   * fields above, including the market snapshot identity when it was supplied.
    */
   run_id: string;
   /**

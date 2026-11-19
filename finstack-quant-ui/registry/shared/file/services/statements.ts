@@ -1,5 +1,6 @@
 import type { statements, statements_analytics } from "finstack-quant-wasm";
-import type { StatementsApi } from "../finstack-contract";
+import type { core as coreWire } from "finstack-quant-wasm/types";
+import type { GoalSeekRequest, StatementsApi } from "../finstack-contract";
 import type { ServiceContext } from "./context";
 /** statements and statements_analytics facade members this slice reads. */
 export type StatementsNative = {
@@ -289,19 +290,35 @@ export function createStatementsService(
       });
     },
     goalSeek(request) {
+      // The Rust goal-seek boundary validates codes authored in the form.
+      const toAmount = (value: GoalSeekRequest["targetValue"]) =>
+        typeof value === "number"
+          ? value
+          : {
+              amount: value.amount,
+              currency: value.currency as coreWire.Currency,
+            };
       return context.result(() =>
-        native.statements_analytics.goalSeek(request.modelJson, {
-          target_node: request.targetNode,
-          target_period: request.targetPeriod,
-          target_value: request.targetValue,
-          driver_node: request.driverNode,
-          driver_period: request.driverPeriod,
-          update_model: request.updateModel,
-          bounds:
-            request.bounds === undefined
-              ? undefined
-              : [request.bounds[0], request.bounds[1]],
-        }),
+        native.statements_analytics.goalSeek(
+          request.modelJson,
+          {
+            target: { node: request.targetNode, period: request.targetPeriod },
+            target_value: toAmount(request.targetValue),
+            target_tolerance: toAmount(request.targetTolerance),
+            driver: { node: request.driverNode, period: request.driverPeriod },
+            driver_tolerance: request.driverTolerance,
+            max_iterations: request.maxIterations,
+            as_of: request.asOf,
+            observed_through: request.observedThrough,
+            update_model: request.updateModel,
+            search: {
+              kind: "bracket",
+              lower: request.bounds[0],
+              upper: request.bounds[1],
+            },
+          },
+          request.marketJson,
+        ),
       );
     },
     runVariance(request) {

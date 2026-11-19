@@ -511,6 +511,7 @@ class StatementResult:
             ``model_id``, ``model_content_hash``, optional
             ``source_snapshot``, ``observation_cutoff`` (``"full_snapshot"``
             or ``{"through": "2025-04-25"}``), optional ``valuation_date``,
+            ``market_content_hash`` for an explicitly priced run with a coherent captured market, and
             ``forecast_streams`` when the model has stochastic forecasts
             (per node: ``node_id``, ``stream_version``, and the ``seed``,
             ``state`` and ``stream`` of its PCG64 generator as decimal

@@ -1076,6 +1076,7 @@ mod tests {
             &model(),
             crate::evaluator::ObservationCutoff::FullSnapshot,
             None,
+            None,
         )
         .expect("fixture provenance")
     }

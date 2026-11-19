@@ -27,6 +27,7 @@ export const statements_analytics = {
   evaluateLbo: wasm.evaluateLbo,
   wacc: wasm.wacc,
   goalSeek: wasm.goalSeek,
+  goalSeekSpec: wasm.goalSeekSpec,
   explainFormula: wasm.explainFormula,
   explainFormulaText: wasm.explainFormulaText,
   plSummaryReportText: wasm.plSummaryReportText,

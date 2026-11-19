@@ -426,35 +426,40 @@ pub fn wacc(
     finstack_quant_statements_analytics::analysis::wacc(&inputs).map_err(to_js_err)
 }
 
-/// Find the driver value that makes a target node reach a target value.
-///
-/// Twin of Python `goal_seek` (Rust `goal_seek`). Returns the serde form of
-/// the Rust `GoalSeekResult`: `solved_value`, the solve diagnostics
-/// (`residual` and `tolerance` in the target node's units, `evaluations`,
-/// `converged`) and `model`, the input model with the solved driver written in
-/// when `update_model` is `true` and `null` otherwise. The input model is never
-/// modified; pass `model` straight back as the `modelJson` of another call.
-///
-/// # Errors
-///
-/// Rejects a malformed `modelJson` or `spec` (a missing or unknown key
-/// included), invalid target or driver period identifiers, missing target or
-/// driver nodes or periods, non-finite or unordered bounds, model-evaluation or
-/// solver-convergence failures, or failure to serialize the result.
-/// @param modelJson - Financial-model specification (object or JSON).
-/// @param spec - Rust `GoalSeekSpec` (object or JSON); an unknown key is rejected: `target_node` (node driven toward the target), `target_period` (period label of the target, e.g. `"2025Q4"`), `target_value` (finite target in the target node's units), `driver_node` (node the solve adjusts), `driver_period` (period label of the driver), `update_model` (whether the result carries the model with the solved driver applied) and the optional `bounds` (`[lower, upper]` search bracket in the driver node's units; omitted searches outward from the driver's current value). Every key except `bounds` is required.
-/// @returns Solved driver value and the updated model (or `null`).
-#[wasm_bindgen(js_name = goalSeek, unchecked_return_type = "GoalSeekResult")]
-pub fn goal_seek(
-    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+/// Validate the elected dates, target units and bounded root-search controls.
+/// @param spec - Complete goal-seek assumptions, including the driver, target and both absolute tolerances.
+/// @returns The canonical request with the dates and numerical search controls checked.
+/// @throws Validation error if the request fields or bounds are invalid.
+#[wasm_bindgen(js_name = goalSeekSpec, unchecked_return_type = "generated.statements_analytics.GoalSeekSpec")]
+pub fn goal_seek_spec(
     #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.GoalSeekSpec | string")]
     spec: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let model = crate::api::statements::load_model_text(model_json)?;
     let spec: finstack_quant_statements_analytics::analysis::GoalSeekSpec =
         from_js_json(&spec, "spec")?;
-    let result = finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec)
+    spec.validate().map_err(to_js_err)?;
+    to_js_value(&spec)
+}
+
+/// Find and verify a target at a fixed publication cutoff and market pricing date.
+/// @param model - Original statement model with the elected editable forecast assumption.
+/// @param spec - Explicit driver and target periods, typed amount, tolerances and search policy.
+/// @param market - Held market data for linked financing. Omit for an empty market.
+/// @returns Typed solved driver and target amounts, absolute tolerance, verified run
+///   evidence, and a verified model copy when requested.
+/// @throws If the selected observations, units, dates or root search are inadmissible,
+///   or if the verified objective misses the elected target tolerance.
+#[wasm_bindgen(js_name = goalSeek, unchecked_return_type = "GoalSeekResult")]
+pub fn goal_seek(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.GoalSeekSpec | string")]
+    spec: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "JsonInput | null")] market: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let model = crate::api::statements::load_model(&model, "model")?;
+    let spec = from_js_json(&spec, "spec")?;
+    let market = crate::utils::wire::js_opt_wire(market.as_ref(), "market")?.unwrap_or_default();
+    let result = finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec, &market)
         .map_err(to_js_err)?;
     to_js_value(&result)
 }

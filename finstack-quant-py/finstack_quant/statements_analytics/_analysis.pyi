@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from datetime import date
+from typing import Any, Literal, TypedDict
 import pandas as pd
 from finstack_quant.statements import FinancialModelSpec, StatementResult
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics._typed import (
     BridgeChart,
     ScenarioDiff,
@@ -717,164 +719,342 @@ class ForecastMetrics:
         ValueError: ...
         """
 
-class GoalSeekResult:
-    """
-    Result of a goal-seek solve (the Rust ``GoalSeekResult``).
+class _GoalCell(TypedDict):
+    node: str
+    period: str
 
-    Its JSON form ``{"solved_value", "model", "residual", "tolerance",
-    "evaluations", "converged"}`` is the WASM ``goalSeek`` result; ``model``
-    is ``null`` when it was not requested.
+class _GoalBracket(TypedDict):
+    kind: Literal["bracket"]
+    lower: float
+    upper: float
+
+class _GoalExpansion(TypedDict):
+    kind: Literal["bounded"]
+    lower: float
+    upper: float
+    start: float
+    initial_half_width: float
+    max_expansions: int
+
+class GoalSeekSpec:
+    """Elect a dated editable forecast cell, target, and allowed root search.
 
     Examples
     --------
-    >>> from finstack_quant.statements import ModelBuilder
-    >>> from finstack_quant.statements_analytics import GoalSeekResult, goal_seek
-    >>> b = ModelBuilder("m")
-    >>> _ = b.periods("2025Q1..Q1", None)
-    >>> _ = b.value("revenue", [("2025Q1", 100.0)])
-    >>> _ = b.compute("profit", "revenue * 0.5")
-    >>> spec = {
-    ...     "target_node": "profit",
-    ...     "target_period": "2025Q1",
-    ...     "target_value": 60.0,
-    ...     "driver_node": "revenue",
-    ...     "driver_period": "2025Q1",
-    ...     "update_model": True,
-    ... }
-    >>> result = goal_seek(b.build(), spec)
-    >>> round(result.solved_value, 6), result.model is None
-    (120.0, False)
-    >>> round(GoalSeekResult.from_json(result.to_json()).solved_value, 6)
-    120.0
-    >>> result.converged, abs(result.residual) <= result.tolerance, result.evaluations > 0
-    (True, True, True)
+    >>> from finstack_quant.statements_analytics import GoalSeekSpec
+    >>> spec = GoalSeekSpec(
+    ...     driver={"node": "revenue", "period": "2025Q1"},
+    ...     target={"node": "profit", "period": "2025Q1"},
+    ...     target_value=60.0,
+    ...     target_tolerance=1e-9,
+    ...     driver_tolerance=1e-12,
+    ...     max_iterations=100,
+    ...     search={"kind": "bracket", "lower": 0.0, "upper": 200.0},
+    ...     as_of="2024-12-31",
+    ...     observed_through="2024-12-31",
+    ...     update_model=True,
+    ... )
+    >>> isinstance(spec, GoalSeekSpec)
+    True
     """
-    @property
-    def solved_value(self) -> float:
-        """
-        Driver value that reaches the target, in the driver node's units.
 
-        This property does not raise.
+    def __init__(
+        self,
+        *,
+        driver: _GoalCell,
+        target: _GoalCell,
+        target_value: Money | float,
+        target_tolerance: Money | float,
+        driver_tolerance: float,
+        max_iterations: int,
+        search: _GoalBracket | _GoalExpansion,
+        as_of: date | str,
+        observed_through: date | str,
+        update_model: bool,
+    ) -> None:
+        """Validate and assemble the complete point-in-time solve request.
+
+        Parameters
+        ----------
+        driver : mapping
+            Exact node and period of an explicitly authored editable forecast observation.
+        target : mapping
+            Exact target node and period, on or after the driver period.
+        target_value : Money or float
+            Requested outcome in exactly the target cell's units.
+        target_tolerance : Money or float
+            Nonnegative absolute residual allowance, in exactly the target's units.
+        driver_tolerance : float
+            Positive numerical root tolerance in represented driver units.
+        max_iterations : int
+            Positive number of allowed root iterations after locating a bracket.
+        search : mapping
+            Explicit finite increasing bracket, or bounded expansion with a starting
+            driver, positive initial half-width and maximum number of expansions.
+        as_of : date or str
+            Held market pricing date for every trial and the final verification.
+        observed_through : date or str
+            Inclusive publication cutoff on or before as_of.
+        update_model : bool
+            Return the verified model copy with its solved assumption installed.
+
+        Raises
+        ------
+        ValueError
+            If dates, search limits, tolerances or any required key are invalid.
+        """
+        ...
+
+class GoalSeekResult:
+    """Verified typed driver and fresh target evaluation on the elected cut.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import GoalSeekSpec
+    >>> spec = GoalSeekSpec(
+    ...     driver={"node": "revenue", "period": "2025Q1"},
+    ...     target={"node": "profit", "period": "2025Q1"},
+    ...     target_value=60.0,
+    ...     target_tolerance=1e-9,
+    ...     driver_tolerance=1e-12,
+    ...     max_iterations=100,
+    ...     search={"kind": "bracket", "lower": 0.0, "upper": 200.0},
+    ...     as_of="2024-12-31",
+    ...     observed_through="2024-12-31",
+    ...     update_model=True,
+    ... )
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import goal_seek
+    >>> b = ModelBuilder("forecast").periods("2025Q1..Q1")
+    >>> _ = b.source_snapshot("goal-example-forecast")
+    >>> _ = b.value_scalar("revenue", {"2025Q1": 100.0})
+    >>> _ = b.compute("profit", "revenue * 0.5")
+    >>> result = goal_seek(b.build(), spec)
+    >>> (result.solved_value, result.achieved_value)
+    (120.0, 60.0)
+    """
+
+    @property
+    def solved_value(self) -> float | Money:
+        """Read the reported solved value.
+
+        Returns
+        -------
+        float | Money
+            Driver value selected by the solve in original driver units.
+
+        Raises
+        ------
+        MemoryError
+            If a Python representation cannot be allocated.
+        """
+        ...
+
+    @property
+    def target_value(self) -> float | Money:
+        """Read the reported target value.
+
+        Returns
+        -------
+        float | Money
+            Authored target in the target cell’s units.
+
+        Raises
+        ------
+        MemoryError
+            If a Python representation cannot be allocated.
+        """
+        ...
+
+    @property
+    def achieved_value(self) -> float | Money:
+        """Read the reported achieved value.
+
+        Returns
+        -------
+        float | Money
+            Target value observed in the fresh evaluation.
+
+        Raises
+        ------
+        MemoryError
+            If a Python representation cannot be allocated.
+        """
+        ...
+
+    @property
+    def residual(self) -> float | Money:
+        """Read the reported residual.
+
+        Returns
+        -------
+        float | Money
+            Achieved less requested target, signed in target units.
+
+        Raises
+        ------
+        MemoryError
+            If a Python representation cannot be allocated.
+        """
+        ...
+
+    @property
+    def target_tolerance(self) -> float | Money:
+        """Read the reported target tolerance.
+
+        Returns
+        -------
+        float | Money
+            Authored absolute residual tolerance in target units.
+
+        Raises
+        ------
+        MemoryError
+            If a Python representation cannot be allocated.
+        """
+        ...
+
+    @property
+    def driver_tolerance(self) -> float:
+        """Read the reported driver tolerance.
 
         Returns
         -------
         float
-            Driver value that reaches the target.
-        """
-    @property
-    def model(self) -> FinancialModelSpec | None:
-        """
-        Model with the solved driver written in.
+            Positive numerical root tolerance in driver units.
 
         This property does not raise.
-
-        Returns
-        -------
-        FinancialModelSpec | None
-            The updated model, or ``None`` when ``update_model=False``.
         """
-    @property
-    def residual(self) -> float:
-        """
-        Signed residual at ``solved_value``: the target node's value in the
-        target period minus the requested target, in the target node's units.
+        ...
 
-        It is re-evaluated on the model after the solver returned, so it is
-        the residual of the reported driver value.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float
-            The residual; ``0.0`` for a result loaded from JSON written before diagnostics were recorded (``evaluations == 0``).
-        """
-    @property
-    def tolerance(self) -> float:
-        """
-        Absolute acceptance tolerance on ``residual``, in the target node's
-        units: ``1e-9 * max(abs(target_value), 1)``.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float
-            The tolerance; ``0.0`` for a result loaded from JSON written before diagnostics were recorded.
-        """
     @property
     def evaluations(self) -> int:
-        """
-        Number of model evaluations the solve used: every objective probe by
-        the root finder (bracket search and Brent iterations, including a
-        widened second attempt) plus the final residual check.
-
-        This property does not raise.
+        """Read the reported evaluations.
 
         Returns
         -------
         int
-            Evaluation count; ``0`` only for a result loaded from JSON written before diagnostics were recorded.
-        """
-    @property
-    def converged(self) -> bool:
-        """
-        Whether ``abs(residual) <= tolerance``.
-
-        ``goal_seek`` raises instead of returning when the residual check
-        fails, so every result it returns has ``converged`` ``True``.
+            Evaluation count including the fresh verification.
 
         This property does not raise.
+        """
+        ...
+
+    @property
+    def original_run(self) -> dict[str, object]:
+        """Read the reported original run.
 
         Returns
         -------
-        bool
-            ``True`` for a result returned by ``goal_seek``; ``False`` only for a result loaded from JSON written before diagnostics were recorded.
+        dict[str, object]
+            Content and cutoff identity of the original evaluation.
+
+        Raises
+        ------
+        ValueError
+            If the stored provenance cannot be serialized.
         """
-    def to_json(self) -> str:
+        ...
+
+    @property
+    def solved_run(self) -> dict[str, object]:
+        """Read the reported solved run.
+
+        Returns
+        -------
+        dict[str, object]
+            Content and cutoff identity of the verified solved evaluation.
+
+        Raises
+        ------
+        ValueError
+            If the stored provenance cannot be serialized.
         """
-        Serialize to canonical JSON.
+        ...
+
+    @property
+    def market_hash(self) -> str:
+        """Read the reported market hash.
 
         Returns
         -------
         str
-            ``{"solved_value": ..., "model": ..., "residual": ...,
-            "tolerance": ..., "evaluations": ..., "converged": ...}`` with
-            ``model`` ``null`` when it was not requested; identical to the
-            WASM ``goalSeek`` result and accepted by :meth:`from_json`.
+            Canonical content identity of the held market inputs.
+
+        This property does not raise.
+        """
+        ...
+
+    @property
+    def model(self) -> FinancialModelSpec | None:
+        """Read the reported model.
+
+        Returns
+        -------
+        FinancialModelSpec | None
+            Verified copy with the solved assumption installed, or None when omitted.
+
+        This property does not raise.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """Serialize the verified result for wire interchange.
+
+        Returns
+        -------
+        str
+            Canonical JSON with typed driver, target and provenance.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If the result cannot be encoded.
         """
+        ...
+
     @staticmethod
     def from_json(json: str) -> GoalSeekResult:
-        """
-        Deserialize from canonical JSON.
+        """Read a canonical result and validate its embedded model, if present.
 
         Parameters
         ----------
         json : str
-            JSON document produced by :meth:`to_json` or the WASM ``goalSeek``
-            result; unknown fields are rejected.
+            Exact native goal-seek result document.
 
         Returns
         -------
         GoalSeekResult
-            The value decoded from the supplied JSON document.
+            Decoded result with the same typed values and solved model.
 
         Raises
         ------
         ValueError
-            If ``json`` is not a valid ``GoalSeekResult`` document.
+            If the wire values or embedded model are invalid.
 
         Examples
         --------
         >>> from finstack_quant.statements_analytics import GoalSeekResult
-        >>> GoalSeekResult.from_json('{"solved_value": 1.5, "model": null}').solved_value
-        1.5
+        >>> GoalSeekResult.from_json("{}")
+        Traceback (most recent call last):
+        ValueError: ...
         """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support pickling through the canonical result document.
+
+        Returns
+        -------
+        tuple
+            Result loader and its serialized input.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be encoded.
+        """
+        ...
 
 def backtest_forecast(actual: list[float], forecast: list[float]) -> ForecastMetrics:
     """Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
@@ -954,55 +1134,56 @@ def evaluate_scenario_set_with_market(
 ) -> ScenarioResults:
     """Evaluate all scenarios in a scenario set against a market as of a date.
 
-    Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
-    capital structure's instruments are priced from ``market`` as of
-    ``as_of`` (floating coupons, swaps, caps), so every result carries
-    ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
-    hidden. The market is shared unchanged by every scenario.
+        Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
+        capital structure's instruments are priced from ``market`` as of
+        ``as_of`` (floating coupons, swaps, caps), so every result carries
+        ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
+        hidden. The market is shared unchanged by every scenario.
 
-    Parameters
-    ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
-    scenario_set : ScenarioSet | str
-        A typed scenario set or its JSON serialization.
-    market : MarketContext | str
-        Curves, fixings and FX the instruments are priced from, typed or its
-        canonical JSON.
-    as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-        Valuation date for the instruments' cashflows and the cutoff for
-        explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
+        Parameters
+        ----------
+        model : FinancialModelSpec | str
+            A ``FinancialModelSpec`` object or a JSON string.
+        scenario_set : ScenarioSet | str
+            A typed scenario set or its JSON serialization.
+        market : MarketContext | str
+            Curves, fixings and FX the instruments are priced from, typed or its
+            canonical JSON.
+        as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+            Valuation date for the instruments' cashflows and the cutoff for
+            explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
 
-    Returns
-    -------
-    ScenarioResults
-        Typed mapping of scenario names to statement results.
+        Returns
+        -------
+        ScenarioResults
+            Typed mapping of scenario names to statement results.
 
-    Raises
-    ------
-    ValueError
-        If ``as_of`` is not date-like, the set is empty, a parent chain
-        cycles, an override is incompatible with its node, a forecast
-        override has invalid parameters, or evaluation fails.
-    KeyError
-        If an override names a node missing from the model, or an instrument
-        needs market data ``market`` lacks.
-    RuntimeError
-        If capital-structure cashflow generation or the waterfall fails.
+        Raises
+        ------
+        ValueError
+            If ``as_of`` is not date-like, the set is empty, a parent chain
+            cycles, an override is incompatible with its node, a forecast
+            override has invalid parameters, or evaluation fails.
+        KeyError
+            If an override names a node missing from the model, or an instrument
+            needs market data ``market`` lacks.
+        RuntimeError
+            If capital-structure cashflow generation or the waterfall fails.
 
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.statements import ModelBuilder
-    >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
-    >>> b = ModelBuilder("m")
-    >>> _ = b.periods("2025Q1..Q2", None)
-    >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
-    >>> results = evaluate_scenario_set_with_market(
-    ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
-    ... )
-    >>> results.names
-    ['base', 'down']
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import MarketContext
+    from finstack_quant.core.money import Money
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
+        >>> b = ModelBuilder("m")
+        >>> _ = b.periods("2025Q1..Q2", None)
+        >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+        >>> results = evaluate_scenario_set_with_market(
+        ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
+        ... )
+        >>> results.names
+        ['base', 'down']
     """
 
 def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Explanation:
@@ -1097,70 +1278,60 @@ def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list
     ['revenue@2025Q2']
     """
 
-def goal_seek(model: Any, spec: Mapping[str, Any] | str) -> GoalSeekResult:
-    """Find the driver value that makes a target node reach a target value.
+def goal_seek(
+    model: FinancialModelSpec | str,
+    spec: GoalSeekSpec,
+    market: MarketContext | None = None,
+) -> GoalSeekResult:
+    """Find and verify an editable forecast assumption at fixed observation and market dates.
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
-    spec : dict | str
-        The Rust ``GoalSeekSpec`` serde form (the document WASM ``goalSeek``
-        takes as ``spec``), as a dict or JSON text. Unknown keys raise
-        ``ValueError``:
-
-        * ``target_node`` (str, required): node to drive towards
-          ``target_value``.
-        * ``target_period`` (str, required): period string for the target
-          (e.g. ``"2025Q4"``).
-        * ``target_value`` (float, required): desired value for the target
-          node, in its units; must be finite.
-        * ``driver_node`` (str, required): node whose value is adjusted to
-          reach the target.
-        * ``driver_period`` (str, required): period string for the driver.
-        * ``update_model`` (bool, required): if ``True``, the result's
-          ``model`` is a copy of ``model`` with the solved value written in;
-          if ``False`` it is ``None``.
-        * ``bounds`` (tuple[float, float] | list[float] | None, optional):
-          search bracket ``(lo, hi)`` in the driver node's units, both finite
-          with ``lo < hi``; ``None`` (the default) searches outward from the
-          driver's current value.
+    model : FinancialModelSpec or str
+        Original model containing both the editable assumption and the target.
+    spec : GoalSeekSpec
+        Named driver and target, typed target amount, tolerances and explicit search bounds.
+    market : MarketContext or None
+        The held market inputs for linked financing. None uses an empty market.
 
     Returns
     -------
     GoalSeekResult
-        ``solved_value`` plus ``model`` (the updated ``FinancialModelSpec`` or
-        ``None``) and the solve diagnostics ``residual``, ``tolerance``,
-        ``evaluations`` and ``converged``. ``float(result)`` yields the solved
-        value. The input model is never modified.
+        Freshly verified typed outcome, signed target residual, audit provenance and
+        the solved model copy when requested. The input model is immutable.
 
     Raises
     ------
     ValueError
-        If ``spec`` is malformed (a missing or unknown key included), a period
-        does not parse, ``target_node`` or ``driver_node`` is missing, the
-        solver fails to converge, the bracket does not contain a root, or the
-        final objective residual exceeds 1e-9 times max(1, abs(target_value)).
+        If the cells, dates, units, search domain or a trial evaluation are invalid,
+        or if bracket search or verification cannot achieve the elected target tolerance.
 
     Examples
     --------
+    >>> from finstack_quant.statements_analytics import GoalSeekSpec
+    >>> spec = GoalSeekSpec(
+    ...     driver={"node": "revenue", "period": "2025Q1"},
+    ...     target={"node": "profit", "period": "2025Q1"},
+    ...     target_value=60.0,
+    ...     target_tolerance=1e-9,
+    ...     driver_tolerance=1e-12,
+    ...     max_iterations=100,
+    ...     search={"kind": "bracket", "lower": 0.0, "upper": 200.0},
+    ...     as_of="2024-12-31",
+    ...     observed_through="2024-12-31",
+    ...     update_model=True,
+    ... )
     >>> from finstack_quant.statements import ModelBuilder
     >>> from finstack_quant.statements_analytics import goal_seek
-    >>> b = ModelBuilder("m")
-    >>> _ = b.periods("2025Q1..Q1", None)
-    >>> _ = b.value("revenue", [("2025Q1", 100.0)])
+    >>> b = ModelBuilder("forecast").periods("2025Q1..Q1")
+    >>> _ = b.source_snapshot("goal-example-forecast")
+    >>> _ = b.value_scalar("revenue", {"2025Q1": 100.0})
     >>> _ = b.compute("profit", "revenue * 0.5")
-    >>> spec = {
-    ...     "target_node": "profit",
-    ...     "target_period": "2025Q1",
-    ...     "target_value": 60.0,
-    ...     "driver_node": "revenue",
-    ...     "driver_period": "2025Q1",
-    ...     "update_model": False,
-    ... }
-    >>> round(goal_seek(b.build(), spec).solved_value, 6)
+    >>> result = goal_seek(b.build(), spec)
+    >>> result.solved_value
     120.0
     """
+    ...
 
 def run_sensitivity(model: Any, config: Any) -> SensitivityResult:
     """Run sensitivity analysis on a financial model.

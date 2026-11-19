@@ -167,6 +167,7 @@ Explanation = _sa.Explanation
 ExplanationStep = _sa.ExplanationStep
 ForecastMetrics = _sa.ForecastMetrics
 GoalSeekResult = _sa.GoalSeekResult
+GoalSeekSpec = _sa.GoalSeekSpec
 LboCheckMappings = _sa.LboCheckMappings
 LboResult = _sa.LboResult
 PLSummaryReport = _sa.PLSummaryReport
@@ -242,6 +243,7 @@ __all__: list[str] = [
     "ForecastMetrics",
     "FreeRentWindowSpec",
     "GoalSeekResult",
+    "GoalSeekSpec",
     "ImpairedEclResult",
     "ImpairedEclScenario",
     "ImpairedExposure",

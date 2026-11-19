@@ -429,6 +429,11 @@ impl Evaluator {
                 warnings: all_warnings,
             },
             valuation_date,
+            capital_structure
+                .filter(|_| valuation_date.is_some())
+                .map(|(market, _)| Self::market_content_hash(market))
+                .transpose()?
+                .flatten(),
         )?;
 
         Ok(results)
@@ -778,7 +783,7 @@ impl Evaluator {
         model: &FinancialModelSpec,
         prepared: &PreparedEvaluation,
     ) -> Result<StatementResult> {
-        self.evaluate_prepared_inner(model, prepared)
+        self.evaluate_prepared_inner(model, prepared, None, None)
             .inspect_err(|err| {
                 tracing::error!(
                     model_id = %model.id,
@@ -790,10 +795,47 @@ impl Evaluator {
             })
     }
 
+    /// Evaluate the prepared statement graph at an explicit market and observation cut.
+    ///
+    /// See [`Self::evaluate_prepared`] for the invariants on observation slots
+    /// and inferred units across repeated model runs.
+    ///
+    /// # Arguments
+    /// * `model` - Statement model whose observation payloads may vary across runs.
+    /// * `prepared` - Same period plan, observation slots, formulas and model structure as the snapshot.
+    /// * `market` - Held market and pricing data for capital-structure calculations.
+    /// * `as_of` - Valuation day used to price eligible cashflows.
+    /// * `through` - Inclusive information cut, on or before the valuation date.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid cut, changed plan structure, invalid data
+    /// availability, or a failed statement or capital-structure computation.
+    pub fn evaluate_prepared_at(
+        &mut self,
+        model: &FinancialModelSpec,
+        prepared: &PreparedEvaluation,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        through: finstack_quant_core::dates::Date,
+    ) -> Result<StatementResult> {
+        if through > as_of {
+            return Err(Error::invalid_input(
+                "Statement observation cut follows the valuation date",
+            ));
+        }
+        model.validate_point_in_time()?;
+        self.evaluate_prepared_inner(model, prepared, Some((market, as_of)), Some(through))
+    }
+
     fn evaluate_prepared_inner(
         &mut self,
         model: &FinancialModelSpec,
         prepared: &PreparedEvaluation,
+        market: Option<(
+            &finstack_quant_core::market_data::context::MarketContext,
+            finstack_quant_core::dates::Date,
+        )>,
+        visible_through: Option<finstack_quant_core::dates::Date>,
     ) -> Result<StatementResult> {
         let _span = tracing::info_span!(
             "statements.evaluate_prepared",
@@ -804,7 +846,7 @@ impl Evaluator {
         .entered();
         let explicit_value_types = model.validate_explicit_values()?;
         self.forecast_cache.clear();
-        self.visibility_cutoff = None;
+        self.visibility_cutoff = visible_through;
         // Use the compiled expressions captured at prepare time, not whatever
         // the evaluator's mutable cache currently holds (a later `evaluate` of
         // a different model sharing node ids would otherwise leak its formulas
@@ -862,7 +904,9 @@ impl Evaluator {
         }
 
         let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
-        let capital_structure = contractual_capital_structure(model, &empty_market);
+        let capital_structure =
+            market.or_else(|| contractual_capital_structure(model, &empty_market));
+        let as_of = market.map(|(_, as_of)| as_of);
         let setup = self.run_setup(model, prepared, capital_structure)?;
         let (mut results, all_warnings) =
             self.evaluate_periods(model, prepared, &setup, capital_structure, None)?;
@@ -879,7 +923,11 @@ impl Evaluator {
                 parallel: false,
                 warnings: all_warnings,
             },
-            None,
+            as_of,
+            market
+                .map(|(context, _)| Self::market_content_hash(context))
+                .transpose()?
+                .flatten(),
         )?;
 
         Ok(results)
@@ -1051,8 +1099,27 @@ impl Evaluator {
             model,
             context.map_or(ObservationCutoff::FullSnapshot, |source| source.cutoff),
             context.map(|source| source.as_of),
+            context
+                .map(|source| Self::market_content_hash(source.market))
+                .transpose()?
+                .flatten(),
         )?;
         accumulator.finish(provenance)
+    }
+
+    fn market_content_hash(
+        market: &finstack_quant_core::market_data::context::MarketContext,
+    ) -> Result<Option<String>> {
+        use super::results::hash_error;
+        use finstack_quant_core::market_data::context::MarketContextState;
+
+        // Evaluation can use a live FX provider without a coherent capture capability.
+        let Ok(snapshot) = MarketContextState::try_from(market) else {
+            return Ok(None);
+        };
+        finstack_quant_core::canonical::content_hash(&snapshot)
+            .map(Some)
+            .map_err(hash_error)
     }
 
     /// Populate value types, set metadata, and run the optional check suite.
@@ -1063,6 +1130,7 @@ impl Evaluator {
         prepared: &PreparedEvaluation,
         meta: EvalStats,
         valuation_date: Option<finstack_quant_core::dates::Date>,
+        market_content_hash: Option<String>,
     ) -> Result<()> {
         results.meta = meta;
         results.periods = Some(model.periods.clone());
@@ -1073,6 +1141,7 @@ impl Evaluator {
             self.visibility_cutoff
                 .map_or(ObservationCutoff::FullSnapshot, ObservationCutoff::Through),
             valuation_date,
+            market_content_hash,
         )?);
         if let Some(suite) = &self.check_suite {
             results.check_report = Some(suite.run(model, results)?);
@@ -1560,6 +1629,39 @@ mod tests {
         let cell: crate::evaluator::ResultCell =
             serde_json::from_value(money.clone()).expect("money cell");
         assert_eq!(serde_json::to_value(cell).expect("serialize"), money);
+    }
+
+    #[test]
+    fn priced_run_provenance_includes_the_same_day_market() {
+        let q1 = PeriodId::quarter(2025, 1).expect("first quarter");
+        let day = Date::from_calendar_date(2024, Month::December, 31).expect("run date");
+        let mut builder = ModelBuilder::new("same-day");
+        builder
+            .periods("2025Q1..Q2", None)
+            .expect("forecast periods");
+        let q2 = PeriodId::quarter(2025, 2).expect("second quarter");
+        builder.value_scalar("balance", &[(q1, 200.0), (q2, 201.0)]);
+        let model = builder.build().expect("source model");
+
+        let mut market = MarketContext::new();
+        market.insert_dividend_yield("DIV", 0.02).expect("quote");
+        let evaluate = |context: &MarketContext| {
+            Evaluator::new()
+                .evaluate_with_market(&model, context, day, ObservationCutoff::FullSnapshot)
+                .expect("market-aware evaluation")
+                .provenance
+                .expect("run provenance")
+        };
+        let first = evaluate(&market);
+        assert_eq!(first, evaluate(&market.clone()));
+        let mut replacement = market.clone();
+        replacement
+            .insert_dividend_yield("DIV", 0.03)
+            .expect("new same-day quote");
+        let second = evaluate(&replacement);
+        assert_ne!(first.market_content_hash, second.market_content_hash);
+        assert_ne!(first.run_id, second.run_id);
+        assert_eq!(first.valuation_date, second.valuation_date);
     }
 
     #[test]

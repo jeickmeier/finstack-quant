@@ -1189,6 +1189,44 @@ export type ForecastFadeShape = "linear" | "geometric" | "exponential";
  */
 export type NodeType = "value" | "calculated" | "mixed";
 /**
+ * Caller-elected policy for finding the root bracket in driver units.
+ */
+export type GoalSeekSearch =
+  | {
+      kind: "bracket";
+      /**
+       * Lower end of the driver range.
+       */
+      lower: number;
+      /**
+       * Upper end of the driver range.
+       */
+      upper: number;
+    }
+  | {
+      /**
+       * Initial positive bracket half-width in driver units.
+       */
+      initial_half_width: number;
+      kind: "bounded";
+      /**
+       * Lowest driver value the solver may evaluate.
+       */
+      lower: number;
+      /**
+       * Maximum number of bracket expansions.
+       */
+      max_expansions: number;
+      /**
+       * Starting driver value in the admitted domain.
+       */
+      start: number;
+      /**
+       * Highest driver value the solver may evaluate.
+       */
+      upper: number;
+    };
+/**
  * Dated credit-impaired measurement for one elected scenario.
  */
 export type ImpairedEclOutcome =
@@ -3569,6 +3607,11 @@ export interface RunProvenance {
    */
   forecast_streams?: ForecastStream[];
   /**
+   * Canonical snapshot hash of the market held for an explicitly priced run.
+   * Absent if the supplied provider cannot furnish a coherent capture.
+   */
+  market_content_hash?: string | null;
+  /**
    * Canonical content hash of the evaluated model
    * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
    */
@@ -3583,8 +3626,7 @@ export interface RunProvenance {
   observation_cutoff: ObservationCutoff;
   /**
    * Identity of this evaluation run: the canonical content hash of the
-   * fields above. Two runs of the same model content, snapshot, cutoff
-   * and valuation date share it.
+   * fields above, including the market snapshot identity when it was supplied.
    */
   run_id: string;
   /**
@@ -5128,89 +5170,109 @@ export interface FutureBreach {
   threshold: number;
 }
 /**
+ * Explicit cell address for the goal-seek driver or target.
+ */
+export interface GoalSeekCell {
+  /**
+   * Exact node identifier in the prepared financial statement.
+   */
+  node: string;
+  /**
+   * Existing row of the statement forecast.
+   */
+  period: PeriodId;
+}
+/**
  * Outcome of a `goal_seek` solve.
  */
 export interface GoalSeekResult {
   /**
-   * Whether `|residual| <= tolerance`.
-   *
-   * [`goal_seek`] returns an error instead of a result when the residual
-   * check fails, so every result it produces has `converged == true`;
-   * `false` only for a result read from JSON written before this field
-   * existed.
+   * Target observed in a fresh run at the returned driver.
    */
-  converged?: boolean;
+  achieved_value: AmountOrScalar;
   /**
-   * Number of model evaluations the solve used: every objective probe by
-   * the root finder (bracket search and Brent iterations, including a
-   * widened second attempt when the sign-constrained one fails) plus the
-   * final residual check. Zero only for a result read from JSON written
-   * before this field existed.
+   * Root tolerance in driver units.
    */
-  evaluations?: number;
+  driver_tolerance: number;
   /**
-   * Copy of the input model with `solved_value` written into the driver
-   * node at the driver period, re-validated; `None` when `update_model`
-   * was `false`.
+   * Total statement evaluations, including original admission and fresh verification.
+   */
+  evaluations: number;
+  /**
+   * Fingerprint of the held market used for all evaluation calls.
+   */
+  market_hash: string;
+  /**
+   * Verified runnable copy when requested.
    */
   model?: statements.FinancialModelSpec | null;
   /**
-   * Signed residual at `solved_value`: the target node's value in the
-   * target period minus the requested target, in the target node's units.
-   *
-   * Re-evaluated on the model after the solver returned, so it is the
-   * residual of the reported driver value, not the solver's last iterate.
+   * Provenance for the input statement run.
    */
-  residual?: number;
+  original_run: RunProvenance;
   /**
-   * Driver value, in the driver node's own units (the currency amount for
-   * a monetary node), that brings the target node to the target value
-   * within tolerance.
+   * Achieved target less requested target, in target units.
    */
-  solved_value: number;
+  residual: AmountOrScalar;
   /**
-   * Absolute acceptance tolerance on `residual`, in the target node's
-   * units: `1e-9 * max(|target_value|, 1)`.
+   * Provenance for the fresh run at the reported typed driver.
    */
-  tolerance?: number;
+  solved_run: RunProvenance;
+  /**
+   * Exact reported driver in its original scalar or monetary type.
+   */
+  solved_value: AmountOrScalar;
+  /**
+   * Elected absolute tolerance in target units.
+   */
+  target_tolerance: AmountOrScalar;
+  /**
+   * Requested amount or scalar in target units.
+   */
+  target_value: AmountOrScalar;
 }
 /**
  * Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve.
  */
 export interface GoalSeekSpec {
   /**
-   * Optional `(lower, upper)` bracket, in the driver node's units, that
-   * constrains the search; both ends must be finite and `lower < upper`.
-   * `None` (the default) searches outward from the driver's current value.
-   *
-   * @minItems 2
-   * @maxItems 2
+   * Market pricing day for all trial and final statement evaluations.
    */
-  bounds?: [number, number] | null;
+  as_of: DateWire;
   /**
-   * Node identifier of the driver input the solve varies.
+   * Editable, selected explicit assumption in a forecast period.
    */
-  driver_node: string;
+  driver: GoalSeekCell;
   /**
-   * Period whose driver value the solve varies.
+   * Finite positive root tolerance in the driver cell's units.
    */
-  driver_period: PeriodId;
+  driver_tolerance: number;
   /**
-   * Node identifier of the target metric.
+   * Budget for the Brent iterations following the bracket check or search.
    */
-  target_node: string;
+  max_iterations: number;
   /**
-   * Period in which the target is evaluated.
+   * Inclusive publication cutoff held fixed throughout the solve.
    */
-  target_period: PeriodId;
+  observed_through: DateWire;
   /**
-   * Desired value of the target metric, in the target node's units; must
-   * be finite.
+   * Selected range or bounded search in the driver dimension.
    */
-  target_value: number;
+  search: GoalSeekSearch;
   /**
-   * When `true`, [`GoalSeekResult::model`] holds a copy of the model with
-   * the solved driver value written in; when `false` it is `None`.
+   * Target cell in the same or a later forecast period.
+   */
+  target: GoalSeekCell;
+  /**
+   * Absolute residual tolerance in the exact type and units of the target.
+   */
+  target_tolerance: AmountOrScalar;
+  /**
+   * Desired amount or scalar, in the target cell's native units.
+   */
+  target_value: AmountOrScalar;
+  /**
+   * Return the validated trial model with the verified driver installed.
    */
   update_model: boolean;
 }

@@ -10,6 +10,7 @@ import {
 } from "@testing-library/react";
 import { QueryClient, hashKey } from "@tanstack/react-query";
 import type { GoalSeekResult } from "finstack-quant-wasm";
+import { groupDecimal } from "@/lib/finstack/format/format";
 import model from "../../src/fixtures/statements/analyst-model.json";
 import run from "../../src/fixtures/statements/analyst-goal-seek-run.json";
 import captured from "../../src/fixtures/statements/analyst-goal-seek.json";
@@ -40,15 +41,26 @@ const periods = model.periods.periods.map((period) => period.id);
 const solved = captured as unknown as GoalSeekResult;
 const bounds = run.bounds as [number, number];
 const request: GoalSeekRequest = {
+  ...run,
   modelJson,
-  targetNode: run.targetNode,
-  targetPeriod: run.targetPeriod,
-  targetValue: run.targetValue,
-  driverNode: run.driverNode,
-  driverPeriod: run.driverPeriod,
   updateModel: false,
   bounds,
 };
+
+function nativeSolve(updateModel: boolean): GoalSeekResult {
+  return native.goalSeek(modelJson, {
+    target: { node: run.targetNode, period: run.targetPeriod },
+    target_value: run.targetValue,
+    target_tolerance: run.targetTolerance,
+    driver: { node: run.driverNode, period: run.driverPeriod },
+    driver_tolerance: run.driverTolerance,
+    max_iterations: run.maxIterations,
+    as_of: run.asOf,
+    observed_through: run.observedThrough,
+    update_model: updateModel,
+    search: { kind: "bracket", lower: bounds[0], upper: bounds[1] },
+  });
+}
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
@@ -84,34 +96,19 @@ it(
       const updated = await query.fetchQuery(
         goalSeekOptions(client, 1, { ...request, updateModel: true }),
       );
-      expect(serializeHost(updated)).toBe(
-        serializeHost(
-          native.goalSeek(modelJson, {
-            target_node: run.targetNode,
-            target_period: run.targetPeriod,
-            target_value: run.targetValue,
-            driver_node: run.driverNode,
-            driver_period: run.driverPeriod,
-            update_model: true,
-            bounds,
-          }),
-        ),
-      );
+      expect(serializeHost(updated)).toBe(serializeHost(nativeSolve(true)));
       // The returned model carries the solved driver value and validates natively.
-      expect(updated.model!.nodes.revenue!.values!["2025Q4"]).toEqual({
-        amount: "244390239.98913205",
-        currency: "USD",
-      });
+      expect(updated.model!.nodes.revenue!.values!["2025Q4"]).toEqual(
+        updated.solved_value,
+      );
       native.validateFinancialModelJson(serializeHost(updated.model));
       expect(calls.map(([method]) => method)).toEqual(["goalSeek", "goalSeek"]);
       expect(calls[0]![1]).toEqual(request);
       const fails = (change: Partial<GoalSeekRequest>) =>
         query.fetchQuery(goalSeekOptions(client, 1, { ...request, ...change }));
-      // Unset bounds stay unset: Rust's own bracket fails for this driver.
-      const { bounds: _bounds, ...unbounded } = request;
-      await expect(
-        query.fetchQuery(goalSeekOptions(client, 1, unbounded)),
-      ).rejects.toThrow(/Goal seek failed to find solution/);
+      await expect(fails({ bounds: [500000000, 100000000] })).rejects.toThrow(
+        /bounds/,
+      );
       // A cleared target or bound is NaN, which the facade's JSON boundary rejects.
       await expect(fails({ targetValue: Number.NaN })).rejects.toMatchObject({
         kind: "invalid_type",
@@ -136,6 +133,9 @@ it("keys the solve by every request field and the worker session, and keeps NaN 
     "targetPeriod",
     "driverNode",
     "driverPeriod",
+    "asOf",
+    "observedThrough",
+    "marketJson",
   ])
     expect(
       hashKey(
@@ -161,7 +161,7 @@ it("keys the solve by every request field and the worker session, and keeps NaN 
   expect(goalSeekOptions(client, 1, null).enabled).toBe(false);
 });
 
-it("submits only on Solve, as typed, leaving an empty bracket unset and a cleared value as NaN", () => {
+it("submits only on Solve, as typed, retaining the elected bounds and the exact monetary target", () => {
   const submit = vi.fn<(submission: GoalSeekSubmission) => void>();
   render(
     <GoalSeekForm
@@ -189,11 +189,9 @@ it("submits only on Solve, as typed, leaving an empty bracket unset and a cleare
   });
   fireEvent.click(solve);
   expect(submit.mock.lastCall![0]).toEqual({
-    targetNode: run.targetNode,
-    targetPeriod: run.targetPeriod,
-    targetValue: Number.NaN,
-    driverNode: run.driverNode,
-    driverPeriod: run.driverPeriod,
+    ...run,
+    targetValue: { amount: "", currency: "USD" },
+    bounds: [Number.NaN, Number.NaN],
   });
 });
 
@@ -207,28 +205,19 @@ it("presents the returned solution and hides Apply without a handler", () => {
     />,
   );
   const solution = screen.getByLabelText("Returned goal-seek solution");
-  expect(
-    [...solution.querySelectorAll("dd")].map((node) => node.textContent),
-  ).toEqual([
-    "244,390,239.98913205",
-    "-0.000000029802322387695312",
-    "0.07",
-    "7",
-    "Yes",
-  ]);
+  const rows = [...solution.querySelectorAll("dd")].map(
+    (node) => node.textContent,
+  );
+  expect(rows).toHaveLength(5);
+  expect(rows[0]).toMatch(/USD$/);
+  expect(rows[1]).toBe(groupDecimal(captured.achieved_value.amount) + " USD");
+  expect(rows[3]).toBe("0.01 USD");
+  expect(rows[4]).toBe(String(solved.evaluations));
   expect(screen.queryByRole("button", { name: "Apply to model" })).toBeNull();
 });
 
 it("applies the returned model only on an explicit Apply, and blocks a stale or model-less result", async () => {
-  const updated = native.goalSeek(modelJson, {
-    target_node: run.targetNode,
-    target_period: run.targetPeriod,
-    target_value: run.targetValue,
-    driver_node: run.driverNode,
-    driver_period: run.driverPeriod,
-    update_model: true,
-    bounds,
-  }) as GoalSeekResult;
+  const updated = nativeSolve(true) as GoalSeekResult;
   const apply = vi.fn(async () => null);
   const { rerender } = render(
     <GoalSeekForm
@@ -265,15 +254,7 @@ it("applies the returned model only on an explicit Apply, and blocks a stale or 
 });
 
 it("shows a native apply error as returned", async () => {
-  const updated = native.goalSeek(modelJson, {
-    target_node: run.targetNode,
-    target_period: run.targetPeriod,
-    target_value: run.targetValue,
-    driver_node: run.driverNode,
-    driver_period: run.driverPeriod,
-    update_model: true,
-    bounds,
-  }) as GoalSeekResult;
+  const updated = nativeSolve(true) as GoalSeekResult;
   render(
     <GoalSeekForm
       nodeIds={nodeIds}

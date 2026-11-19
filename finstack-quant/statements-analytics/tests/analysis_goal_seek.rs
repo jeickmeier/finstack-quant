@@ -1,17 +1,21 @@
 //! Goal seek integration tests.
 #![allow(clippy::expect_used, clippy::panic)]
 
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::{dates::PeriodId, market_data::context::MarketContext};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
-use finstack_quant_statements_analytics::analysis::{GoalSeekSpec, goal_seek};
+use finstack_quant_statements_analytics::analysis::{
+    GoalSeekCell, GoalSeekSearch, GoalSeekSpec, goal_seek,
+};
+use time::macros::date;
 
 #[test]
 fn test_goal_seek_simple_linear() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("test");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid period");
@@ -28,18 +32,31 @@ fn test_goal_seek_simple_linear() {
     let solved = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "net_income".to_string(),
-            target_period: period,
-            target_value: 20_000.0,
-            driver_node: "revenue".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "net_income".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Scalar(20_000.0),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "revenue".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 200_000.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: false,
-            bounds: None,
         },
+        &MarketContext::new(),
     )
     .expect("goal seek should succeed");
 
-    assert!((solved.solved_value - 133_333.33).abs() < 1.0);
+    assert!((solved.solved_value.value() - 133_333.33).abs() < 1.0);
     assert!(
         solved.model.is_none(),
         "update_model=false returns no model"
@@ -51,6 +68,7 @@ fn test_goal_seek_with_update() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("test");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid period");
@@ -67,18 +85,31 @@ fn test_goal_seek_with_update() {
     let solved = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "gross_profit".to_string(),
-            target_period: period,
-            target_value: 50_000.0,
-            driver_node: "revenue".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "gross_profit".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Scalar(50_000.0),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "revenue".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 200_000.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: true,
-            bounds: None,
         },
+        &MarketContext::new(),
     )
     .expect("goal seek should succeed");
 
-    assert!((solved.solved_value - 125_000.0).abs() < 1.0);
+    assert!((solved.solved_value.value() - 125_000.0).abs() < 1.0);
 
     // The input model is untouched; the solved copy carries the new driver.
     let original = model
@@ -110,10 +141,17 @@ fn test_goal_seek_interest_coverage() {
 
     let model = {
         let mut model_builder = ModelBuilder::new("test");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2025Q1..Q4", None)
             .expect("valid period range");
-        model_builder.value("revenue", &[(q1, AmountOrScalar::scalar(100_000.0))]);
+        model_builder.value(
+            "revenue",
+            &[
+                (q1, AmountOrScalar::scalar(100_000.0)),
+                (q4, AmountOrScalar::scalar(115_762.5)),
+            ],
+        );
         model_builder.forecast("revenue", ForecastSpec::growth(0.05));
         model_builder
             .compute("interest_expense", "10000.0")
@@ -130,18 +168,31 @@ fn test_goal_seek_interest_coverage() {
     let solved = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "interest_coverage".to_string(),
-            target_period: q4,
-            target_value: 2.0,
-            driver_node: "revenue".to_string(),
-            driver_period: q4,
+            target: GoalSeekCell {
+                node: "interest_coverage".into(),
+                period: q4,
+            },
+            target_value: AmountOrScalar::Scalar(2.0),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "revenue".into(),
+                period: q4,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 200_000.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: true,
-            bounds: None,
         },
+        &MarketContext::new(),
     )
     .expect("goal seek should succeed");
 
-    assert!((solved.solved_value - 66_666.67).abs() < 1.0);
+    assert!((solved.solved_value.value() - 66_666.67).abs() < 1.0);
 
     let model = solved.model.expect("update_model=true returns the model");
     let mut evaluator = Evaluator::new();
@@ -159,6 +210,7 @@ fn test_goal_seek_invalid_target_node() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("test");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid period");
@@ -169,14 +221,27 @@ fn test_goal_seek_invalid_target_node() {
     let result = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "nonexistent".to_string(),
-            target_period: period,
-            target_value: 1000.0,
-            driver_node: "revenue".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "nonexistent".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Scalar(1000.0),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "revenue".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 200_000.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: false,
-            bounds: None,
         },
+        &MarketContext::new(),
     );
 
     assert!(result.is_err());
@@ -187,6 +252,7 @@ fn test_goal_seek_invalid_driver_node() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("test");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid period");
@@ -197,14 +263,27 @@ fn test_goal_seek_invalid_driver_node() {
     let result = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "revenue".to_string(),
-            target_period: period,
-            target_value: 1000.0,
-            driver_node: "nonexistent".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "revenue".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Scalar(1000.0),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "nonexistent".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 200_000.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: false,
-            bounds: None,
         },
+        &MarketContext::new(),
     );
 
     assert!(result.is_err());
@@ -215,6 +294,7 @@ fn test_goal_seek_with_explicit_bounds() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("bounds");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid period");
@@ -228,21 +308,33 @@ fn test_goal_seek_with_explicit_bounds() {
     let solution = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "target".to_string(),
-            target_period: period,
-            target_value: 0.75,
-            driver_node: "driver".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "target".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Scalar(0.75),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "driver".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.5,
+                upper: 1.5,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: false,
-            bounds: Some((0.5, 1.5)),
         },
+        &MarketContext::new(),
     )
     .expect("goal seek should succeed");
 
-    assert!((solution.solved_value - 0.75).abs() < 1e-9);
+    assert!((solution.solved_value.value() - 0.75).abs() < 1e-9);
     // Bounded solves report diagnostics too: two endpoint probes at least.
-    assert!(solution.converged);
-    assert!(solution.residual.abs() <= solution.tolerance);
+    assert!(solution.residual.value().abs() <= solution.target_tolerance.value());
     assert!(solution.evaluations >= 3);
 }
 
@@ -254,6 +346,7 @@ fn test_goal_seek_reports_residual_and_evaluations() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("diagnostics");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid period");
@@ -271,20 +364,32 @@ fn test_goal_seek_reports_residual_and_evaluations() {
     let solved = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "gross_profit".to_string(),
-            target_period: period,
-            target_value: target,
-            driver_node: "revenue".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "gross_profit".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Scalar(target),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "revenue".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 200_000.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: true,
-            bounds: None,
         },
+        &MarketContext::new(),
     )
     .expect("goal seek should succeed");
 
-    assert!(solved.converged);
-    assert_eq!(solved.tolerance, 1e-9 * target);
-    assert!(solved.residual.abs() <= solved.tolerance);
+    assert_eq!(solved.target_tolerance.value(), 1e-7);
+    assert!(solved.residual.value().abs() <= solved.target_tolerance.value());
     // At least a bracket, one iterate and the final residual check.
     assert!(solved.evaluations >= 3, "{}", solved.evaluations);
 
@@ -294,10 +399,10 @@ fn test_goal_seek_reports_residual_and_evaluations() {
         .evaluate(solved_model)
         .expect("solved model evaluates");
     let actual = results.get("gross_profit", &period).expect("target value");
-    assert_eq!(actual - target, solved.residual);
+    assert_eq!(actual - target, solved.residual.value());
 
     let json = serde_json::to_value(&solved).expect("serialize");
-    assert_eq!(json["converged"], serde_json::Value::Bool(true));
+    assert_eq!(json["target_tolerance"], 1e-7);
     assert_eq!(
         json["evaluations"].as_u64(),
         Some(solved.evaluations as u64)
@@ -313,6 +418,7 @@ fn test_goal_seek_result_wire_form() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("wire");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid period");
@@ -326,14 +432,27 @@ fn test_goal_seek_result_wire_form() {
     let bare = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "profit".to_string(),
-            target_period: period,
-            target_value: 60.0,
-            driver_node: "revenue".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "profit".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Scalar(60.0),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "revenue".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 200_000.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: false,
-            bounds: None,
         },
+        &MarketContext::new(),
     )
     .expect("goal seek should succeed");
     let json = serde_json::to_value(&bare).expect("serialize");
@@ -343,14 +462,27 @@ fn test_goal_seek_result_wire_form() {
     let updated = goal_seek(
         &model,
         &GoalSeekSpec {
-            target_node: "profit".to_string(),
-            target_period: period,
-            target_value: 60.0,
-            driver_node: "revenue".to_string(),
-            driver_period: period,
+            target: GoalSeekCell {
+                node: "profit".into(),
+                period,
+            },
+            target_value: AmountOrScalar::Scalar(60.0),
+            target_tolerance: AmountOrScalar::Scalar(1e-7),
+            driver: GoalSeekCell {
+                node: "revenue".into(),
+                period,
+            },
+            driver_tolerance: 1e-10,
+            max_iterations: 100,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 200_000.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
             update_model: true,
-            bounds: None,
         },
+        &MarketContext::new(),
     )
     .expect("goal seek should succeed");
     let text = serde_json::to_string(&updated).expect("serialize");

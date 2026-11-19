@@ -101,6 +101,7 @@ from finstack_quant.statements import (
 )
 from finstack_quant.statements_analytics import (
     DependencyTracer,
+    GoalSeekSpec,
     backtest_forecast,
     evaluate_scenario_set,
     explain_formula,
@@ -456,6 +457,7 @@ _HISTORICAL_PNLS_NUMPY = np.asarray(_HISTORICAL_PNLS_LIST, dtype=np.float64)
 def _build_model_spec() -> FinancialModelSpec:
     """Build a small model spec via ModelBuilder (correct wire format)."""
     b = ModelBuilder("bench-model")
+    b.source_snapshot("benchmark-forecast")
     b.periods("2025Q1..Q2", None)
     b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
     b.value("cogs", [("2025Q1", 60.0), ("2025Q2", 65.0)])
@@ -1237,14 +1239,18 @@ class TestStatementsAnalyticsBenchmarks:
         def _seek():
             return goal_seek(
                 _MODEL_JSON,
-                {
-                    "target_node": "gross_profit",
-                    "target_period": "2025Q1",
-                    "target_value": 50.0,
-                    "driver_node": "revenue",
-                    "driver_period": "2025Q1",
-                    "update_model": False,
-                },
+                GoalSeekSpec(
+                    target={"node": "gross_profit", "period": "2025Q1"},
+                    target_value=50.0,
+                    target_tolerance=1e-7,
+                    driver={"node": "revenue", "period": "2025Q1"},
+                    driver_tolerance=1e-10,
+                    max_iterations=100,
+                    search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                    as_of="2024-12-31",
+                    observed_through="2024-12-31",
+                    update_model=False,
+                ),
             )
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)
@@ -1253,14 +1259,18 @@ class TestStatementsAnalyticsBenchmarks:
         def _seek():
             return goal_seek(
                 _MODEL_SPEC,
-                {
-                    "target_node": "gross_profit",
-                    "target_period": "2025Q1",
-                    "target_value": 50.0,
-                    "driver_node": "revenue",
-                    "driver_period": "2025Q1",
-                    "update_model": False,
-                },
+                GoalSeekSpec(
+                    target={"node": "gross_profit", "period": "2025Q1"},
+                    target_value=50.0,
+                    target_tolerance=1e-7,
+                    driver={"node": "revenue", "period": "2025Q1"},
+                    driver_tolerance=1e-10,
+                    max_iterations=100,
+                    search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                    as_of="2024-12-31",
+                    observed_through="2024-12-31",
+                    update_model=False,
+                ),
             )
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)

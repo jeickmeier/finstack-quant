@@ -1,166 +1,174 @@
-//! Goal seek functionality for financial models.
-//!
-//! This module provides root-finding capabilities to solve for input drivers
-//! that achieve specific target metric values. It wraps the core solver infrastructure
-//! around the statement evaluator.
-//!
-//! # Examples
-//!
-//! ```rust
-//! use finstack_quant_statements::Result;
-//! use finstack_quant_statements::builder::ModelBuilder;
-//! use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
-//! use finstack_quant_statements_analytics::analysis::{GoalSeekSpec, goal_seek};
-//! use finstack_quant_core::dates::PeriodId;
-//!
-//! # fn main() -> Result<()> {
-//! let model = {
-//!     let mut model_builder = ModelBuilder::new("goal_seek_test");
-//!     model_builder.periods("2025Q1..Q4", None)?;
-//!     model_builder.value("revenue", &[
-//!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
-//!     ]);
-//!     model_builder.forecast("revenue", ForecastSpec::growth(0.05));
-//!     model_builder.compute("interest_expense", "10000.0")?;
-//!     model_builder.compute("ebitda", "revenue * 0.3")?;
-//!     model_builder.compute("interest_coverage", "ebitda / interest_expense")?;
-//!     model_builder.build()?
-//! };
-//!
-//! // Solve for Q4 revenue that achieves 2.0x interest coverage
-//! let target_period = PeriodId::quarter(2025, 4).expect("valid period fixture");
-//! let spec = GoalSeekSpec {
-//!     target_node: "interest_coverage".to_string(),
-//!     target_period,
-//!     target_value: 2.0,
-//!     driver_node: "revenue".to_string(),
-//!     driver_period: target_period,
-//!     update_model: true, // Return the model with the solution written in
-//!     bounds: None,
-//! };
-//! let result = goal_seek(&model, &spec)?;
-//!
-//! println!("Revenue needed: ${:.2}", result.solved_value);
-//! assert!(result.model.is_some());
-//! # Ok(())
-//! # }
-//! ```
+//! Qualified point-in-time goal seek over an editable forecast assumption.
 
-use finstack_quant_core::contract::{LoadLimits, parse_json_value};
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::dates::{Date, PeriodId};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_statements::evaluator::Evaluator;
-use finstack_quant_statements::types::{
-    AmountOrScalar, FinancialModelSpec, NodeSpec, NodeValueType,
-};
+use finstack_quant_statements::evaluator::{CellSource, Evaluator, RunProvenance, StatementResult};
+use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
 use finstack_quant_statements::{Error, Result};
-use std::cell::{Cell, RefCell};
 
-/// What a [`goal_seek`] solve targets and which driver it varies.
-///
-/// The serde form is the host input of `goal_seek`: periods are period
-/// strings such as `"2025Q4"`, `bounds` is an optional `[lower, upper]` array
-/// (default `null`), and every other field is required; an unknown field is
-/// rejected.
+/// Explicit cell address for the goal-seek driver or target.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct GoalSeekCell {
+    /// Exact node identifier in the prepared financial statement.
+    pub node: String,
+    /// Existing row of the statement forecast.
+    pub period: PeriodId,
+}
+
+/// Caller-elected policy for finding the root bracket in driver units.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum GoalSeekSearch {
+    /// One preselected bracket with finite ordered endpoints.
+    Bracket {
+        /// Lower end of the driver range.
+        lower: f64,
+        /// Upper end of the driver range.
+        upper: f64,
+    },
+    /// Bounded expansion with explicitly approved endpoints and budget.
+    Bounded {
+        /// Lowest driver value the solver may evaluate.
+        lower: f64,
+        /// Highest driver value the solver may evaluate.
+        upper: f64,
+        /// Starting driver value in the admitted domain.
+        start: f64,
+        /// Initial positive bracket half-width in driver units.
+        initial_half_width: f64,
+        /// Maximum number of bracket expansions.
+        max_expansions: u32,
+    },
+}
+
+/// Dated, typed goal-seek inputs from a single statement snapshot.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GoalSeekSpec {
-    /// Node identifier of the target metric.
-    pub target_node: String,
-    /// Period in which the target is evaluated.
-    pub target_period: PeriodId,
-    /// Desired value of the target metric, in the target node's units; must
-    /// be finite.
-    pub target_value: f64,
-    /// Node identifier of the driver input the solve varies.
-    pub driver_node: String,
-    /// Period whose driver value the solve varies.
-    pub driver_period: PeriodId,
-    /// When `true`, [`GoalSeekResult::model`] holds a copy of the model with
-    /// the solved driver value written in; when `false` it is `None`.
+    /// Editable, selected explicit assumption in a forecast period.
+    pub driver: GoalSeekCell,
+    /// Target cell in the same or a later forecast period.
+    pub target: GoalSeekCell,
+    /// Desired amount or scalar, in the target cell's native units.
+    pub target_value: AmountOrScalar,
+    /// Absolute residual tolerance in the exact type and units of the target.
+    pub target_tolerance: AmountOrScalar,
+    /// Finite positive root tolerance in the driver cell's units.
+    pub driver_tolerance: f64,
+    /// Budget for the Brent iterations following the bracket check or search.
+    pub max_iterations: u32,
+    /// Selected range or bounded search in the driver dimension.
+    pub search: GoalSeekSearch,
+    /// Market pricing day for all trial and final statement evaluations.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub as_of: Date,
+    /// Inclusive publication cutoff held fixed throughout the solve.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub observed_through: Date,
+    /// Return the validated trial model with the verified driver installed.
     pub update_model: bool,
-    /// Optional `(lower, upper)` bracket, in the driver node's units, that
-    /// constrains the search; both ends must be finite and `lower < upper`.
-    /// `None` (the default) searches outward from the driver's current value.
-    #[serde(default)]
-    pub bounds: Option<(f64, f64)>,
 }
 
-/// Outcome of a [`goal_seek`] solve.
-///
-/// The serde form is `{"solved_value": <number>, "model": <FinancialModelSpec
-/// or null>, "residual": <number>, "tolerance": <number>, "evaluations":
-/// <integer>, "converged": <bool>}`; `model` is always present and is `null`
-/// unless the solve was asked to return the updated model. The four
-/// diagnostic fields are always written; a document written before they
-/// existed reads back with `evaluations == 0`, `converged == false` and a zero
-/// `residual` and `tolerance`.
+impl GoalSeekSpec {
+    /// Validate the explicit search geometry, tolerances and information date.
+    ///
+    /// # Errors
+    /// Rejects invalid, nonfinite or inconsistent dates, target controls and search domains.
+    pub fn validate(&self) -> Result<()> {
+        if self.observed_through > self.as_of
+            || !self.target_value.value().is_finite()
+            || !self.target_tolerance.value().is_finite()
+            || self.target_tolerance.value() < 0.0
+            || self.target_value.currency() != self.target_tolerance.currency()
+        {
+            return Err(Error::invalid_input(
+                "Goal seek requires a valid cutoff, finite target and nonnegative absolute tolerance in target units",
+            ));
+        }
+        BrentSolver::new(self.driver_tolerance, self.max_iterations as usize)?;
+        let (lower, upper) = match self.search {
+            GoalSeekSearch::Bracket { lower, upper } => (lower, upper),
+            GoalSeekSearch::Bounded {
+                lower,
+                upper,
+                start,
+                initial_half_width,
+                max_expansions,
+            } => {
+                if !(lower..=upper).contains(&start)
+                    || !initial_half_width.is_finite()
+                    || initial_half_width <= 0.0
+                    || max_expansions == 0
+                {
+                    return Err(Error::invalid_input(
+                        "Goal seek expansion requires an admitted start, positive width and nonzero budget",
+                    ));
+                }
+                (lower, upper)
+            }
+        };
+        if !lower.is_finite() || !upper.is_finite() || lower >= upper {
+            return Err(Error::invalid_input(
+                "Goal seek bounds must be finite and strictly increasing",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Verified typed result and statement provenance from a goal-seek run.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GoalSeekResult {
-    /// Driver value, in the driver node's own units (the currency amount for
-    /// a monetary node), that brings the target node to the target value
-    /// within tolerance.
-    pub solved_value: f64,
-    /// Copy of the input model with `solved_value` written into the driver
-    /// node at the driver period, re-validated; `None` when `update_model`
-    /// was `false`.
-    pub model: Option<FinancialModelSpec>,
-    /// Signed residual at `solved_value`: the target node's value in the
-    /// target period minus the requested target, in the target node's units.
-    ///
-    /// Re-evaluated on the model after the solver returned, so it is the
-    /// residual of the reported driver value, not the solver's last iterate.
-    #[serde(default)]
-    pub residual: f64,
-    /// Absolute acceptance tolerance on `residual`, in the target node's
-    /// units: `1e-9 * max(|target_value|, 1)`.
-    #[serde(default)]
-    pub tolerance: f64,
-    /// Number of model evaluations the solve used: every objective probe by
-    /// the root finder (bracket search and Brent iterations, including a
-    /// widened second attempt when the sign-constrained one fails) plus the
-    /// final residual check. Zero only for a result read from JSON written
-    /// before this field existed.
-    #[serde(default)]
+    /// Exact reported driver in its original scalar or monetary type.
+    pub solved_value: AmountOrScalar,
+    /// Requested amount or scalar in target units.
+    pub target_value: AmountOrScalar,
+    /// Target observed in a fresh run at the returned driver.
+    pub achieved_value: AmountOrScalar,
+    /// Achieved target less requested target, in target units.
+    pub residual: AmountOrScalar,
+    /// Elected absolute tolerance in target units.
+    pub target_tolerance: AmountOrScalar,
+    /// Root tolerance in driver units.
+    pub driver_tolerance: f64,
+    /// Total statement evaluations, including original admission and fresh verification.
+    #[serde(with = "finstack_quant_core::wire::count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub evaluations: usize,
-    /// Whether `|residual| <= tolerance`.
-    ///
-    /// [`goal_seek`] returns an error instead of a result when the residual
-    /// check fails, so every result it produces has `converged == true`;
-    /// `false` only for a result read from JSON written before this field
-    /// existed.
-    #[serde(default)]
-    pub converged: bool,
+    /// Provenance for the input statement run.
+    pub original_run: RunProvenance,
+    /// Provenance for the fresh run at the reported typed driver.
+    pub solved_run: RunProvenance,
+    /// Fingerprint of the held market used for all evaluation calls.
+    pub market_hash: String,
+    /// Verified runnable copy when requested.
+    pub model: Option<FinancialModelSpec>,
 }
 
 impl GoalSeekResult {
-    /// Load a goal-seek result from its canonical JSON, validating the model.
-    ///
-    /// The document is parsed under the default [`LoadLimits`] with duplicate
-    /// keys rejected, and the embedded model is validated, so a persisted or
-    /// hand-edited result cannot carry a model that is not runnable.
+    /// Load a canonical result and admit its optional solved model.
     ///
     /// # Arguments
-    ///
-    /// * `json` - The serde form `{"solved_value": <number>, "model": <model or
-    ///   null>}` plus the optional diagnostics `residual`, `tolerance`,
-    ///   `evaluations` and `converged`.
+    /// * `json` - A serialized result with typed residual, target and original and solved run identities.
     ///
     /// # Errors
-    ///
-    /// Returns [`Error::Serde`] for malformed or oversized JSON, a duplicate,
-    /// missing or unknown field, or an embedded model of the wrong shape or
-    /// version, and the model's validation error when the embedded model is
-    /// not runnable.
+    /// Rejects malformed data or inadmissible model contents.
     pub fn from_json(json: &str) -> Result<Self> {
-        // Limits and key uniqueness are checked on a JSON value; the result
-        // is decoded from the text so the model keeps its node order.
-        parse_json_value(json.as_bytes(), &LoadLimits::default())?;
         let mut result: Self = serde_json::from_str(json)
-            .map_err(|e| Error::Serde(format!("invalid GoalSeekResult JSON: {e}")))?;
+            .map_err(|err| Error::invalid_input(format!("Invalid GoalSeekResult JSON: {err}")))?;
         if let Some(model) = result.model.as_mut() {
             model.validate_semantics()?;
         }
@@ -168,455 +176,262 @@ impl GoalSeekResult {
     }
 }
 
-/// Perform goal seek on a financial model.
-///
-/// Solves for the driver node value that achieves a target metric value in a specific period.
-/// This uses Brent's method for robust root-finding. The input model is never
-/// modified; when `update_model` is `true` the result carries a copy with the
-/// solved driver written in.
-///
-/// # Arguments
-///
-/// * `model` - Financial model to solve against; left unchanged
-/// * `spec` - Target node, period and value, driver node and period, the
-///   `update_model` write-back flag and the optional search `bounds`; see
-///   [`GoalSeekSpec`] for each field's units and constraints
-///
-/// # Returns
-///
-/// Returns a [`GoalSeekResult`] whose `solved_value` has been re-evaluated
-/// against the objective, requiring absolute target residual
-/// <= `1e-9 * max(1, abs(target_value))`. Bracket-width convergence alone is
-/// insufficient.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - `target_value` is not finite
-/// - The target or driver node doesn't exist
-/// - The specified periods are not in the model
-/// - `bounds` are non-finite, unordered, or do not bracket a root
-/// - No solution exists within reasonable bounds, or the final residual
-///   exceeds the tolerance
-/// - The model evaluation fails
-///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_statements::Result;
-/// use finstack_quant_statements::builder::ModelBuilder;
-/// use finstack_quant_statements::evaluator::Evaluator;
-/// use finstack_quant_statements::types::AmountOrScalar;
-/// use finstack_quant_statements_analytics::analysis::{GoalSeekSpec, goal_seek};
-/// use finstack_quant_core::dates::PeriodId;
-///
-/// # fn main() -> Result<()> {
-/// let model = {
-///     let mut model_builder = ModelBuilder::new("example");
-///     model_builder.periods("2025Q1..Q1", None)?;
-///     model_builder.value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0))]);
-///     model_builder.compute("profit_margin", "0.15")?;
-///     model_builder.compute("net_income", "revenue * profit_margin")?;
-///     model_builder.build()?
-/// };
-///
-/// // Verify model evaluates correctly first
-/// let mut evaluator = Evaluator::new();
-/// let results = evaluator.evaluate(&model)?;
-/// let initial_net_income = results.get("net_income", &PeriodId::quarter(2025, 1).expect("valid period fixture")).unwrap();
-/// assert!((initial_net_income - 15_000.0).abs() < 0.01);
-///
-/// // Solve for the revenue that achieves $18,000 of net income. Explicit bounds
-/// // give the root-finder a bracket that is guaranteed to contain the solution.
-/// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-/// let spec = GoalSeekSpec {
-///     target_node: "net_income".to_string(),
-///     target_period: period,
-///     target_value: 18_000.0,
-///     driver_node: "revenue".to_string(),
-///     driver_period: period,
-///     update_model: false,
-///     bounds: Some((50_000.0, 200_000.0)),
-/// };
-/// let solved = goal_seek(&model, &spec)?;
-/// // Expected: 18_000 / 0.15 = 120_000
-/// assert!((solved.solved_value - 120_000.0).abs() < 10.0);
-/// assert!(solved.model.is_none());
-/// # Ok(())
-/// # }
-/// ```
-///
-/// # References
-///
-/// - Root-finding background: `docs/REFERENCES.md#press-numerical-recipes`
-pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<GoalSeekResult> {
-    let GoalSeekSpec {
-        target_node,
-        target_period,
-        target_value,
-        driver_node,
-        driver_period,
-        update_model,
-        bounds,
-    } = spec;
-    let (target_node, driver_node) = (target_node.as_str(), driver_node.as_str());
-    let (target_period, target_value) = (*target_period, *target_value);
-    let (driver_period, update_model, bounds) = (*driver_period, *update_model, *bounds);
-    if !target_value.is_finite() {
-        return Err(Error::invalid_input("Goal-seek target must be finite"));
-    }
-    if !model.has_node(target_node) {
-        return Err(Error::invalid_input(format!(
-            "Target node '{}' not found in model",
-            target_node
-        )));
-    }
-
-    if !model.has_node(driver_node) {
-        return Err(Error::invalid_input(format!(
-            "Driver node '{}' not found in model",
-            driver_node
-        )));
-    }
-
-    if !model.periods.iter().any(|p| p.id == target_period) {
-        return Err(Error::invalid_input(format!(
-            "Target period '{}' not found in model",
-            target_period
-        )));
-    }
-
-    if !model.periods.iter().any(|p| p.id == driver_period) {
-        return Err(Error::invalid_input(format!(
-            "Driver period '{}' not found in model",
-            driver_period
-        )));
-    }
-
-    // Prefer the driver's current value as the Brent start. 1.0 is a
-    // sign-preserving fallback: 0.0 collapses magnitude-scaled brackets,
-    // and a large guess overshoots ratio drivers. Pass `bounds` when the
-    // scale is known.
-    let initial_guess = model
-        .get_node(driver_node)
-        .and_then(|node| node.values.as_ref())
-        .and_then(|values| values.get(&driver_period))
-        .map(|v| match v {
-            AmountOrScalar::Scalar(s) => *s,
-            AmountOrScalar::Amount(a) => a.amount(),
-        })
-        .unwrap_or(1.0);
-
-    // The solver writes the driver cell on every iteration. Give it an
-    // observation slot before preparing, so each iteration is a payload
-    // change in an existing slot and can reuse the plan.
-    let mut working = model.clone();
-    if let Some(node) = working.nodes.get_mut(driver_node) {
-        let amount = amount_for_node(node, initial_guess)?;
-        node.values
-            .get_or_insert_with(Default::default)
-            .entry(driver_period)
-            .or_insert(amount);
-    }
-    let mut evaluator = Evaluator::new();
-    let prepared = evaluator
-        .prepare(&working)
-        .map_err(|error| Error::eval(format!("Goal seek: failed to prepare evaluator: {error}")))?;
-    let eval_cell = RefCell::new((evaluator, working));
-
-    // Counts every model evaluation, reported as `GoalSeekResult::evaluations`.
-    let evaluations = Cell::new(0_usize);
-
-    let objective = |driver_value: f64| -> finstack_quant_core::Result<f64> {
-        evaluations.set(evaluations.get() + 1);
-        let mut borrow = eval_cell.borrow_mut();
-        let (ref mut eval, ref mut temp_model) = *borrow;
-
-        if let Some(node) = temp_model.nodes.get_mut(driver_node) {
-            // Update only the driver period's entry in place. Cloning the whole
-            // `values` map here would copy every period on every solver
-            // iteration; Brent's method probes the objective many times, so a
-            // per-iteration map clone is pure overhead.
-            let amount = amount_for_node(node, driver_value).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "driver conversion failed at {driver_value}: {e}"
-                ))
-            })?;
-            node.values
-                .get_or_insert_with(Default::default)
-                .insert(driver_period, amount);
-        }
-
-        let results = eval.evaluate_prepared(temp_model, &prepared).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "evaluation failed at driver value {driver_value}: {e}"
-            ))
-        })?;
-        match crate::cell_float(&results, target_node, &target_period) {
-            Some(actual_value) => Ok(actual_value - target_value),
-            None => Err(finstack_quant_core::Error::Validation(format!(
-                "target node '{target_node}' produced no value for period \
-                 {target_period} at driver value {driver_value}"
-            ))),
-        }
-    };
-
-    // Check the residual of the proposed driver, then assemble the result.
-    let finish = |solution: f64| -> Result<GoalSeekResult> {
-        let (residual, tolerance) = validate_target_residual(&objective, solution, target_value)?;
-        Ok(GoalSeekResult {
-            solved_value: solution,
-            model: solved_model(model, driver_node, driver_period, update_model, solution)?,
-            residual,
-            tolerance,
-            evaluations: evaluations.get(),
-            converged: true,
-        })
-    };
-
-    if let Some((lower, upper)) = bounds {
-        let solution = solve_with_bounds(&objective, lower, upper).map_err(|e| {
-            Error::eval(format!(
-                "Goal seek failed to find solution within bounds [{lower}, {upper}]: \
-                 target_node='{target_node}', target_value={target_value}, \
-                 driver_node='{driver_node}'. {e}"
-            ))
-        })?;
-        return finish(solution);
-    }
-
-    if !initial_guess.is_finite() {
-        return Err(Error::invalid_input(format!(
-            "Goal seek initial guess must be finite, got {initial_guess}"
-        )));
-    }
-
-    // Pick an initial bracket size scaled to the guess magnitude, then let
-    // Brent's own bracket-expansion search widen as needed inside signed
-    // bounds: if the guess is strictly positive, the root is almost certainly
-    // also positive (revenue, leverage ratio, hazard-rate intensity, etc.) and
-    // the evaluator may fail for non-positive inputs — same logic applies
-    // symmetrically for strictly negative guesses. A zero guess carries no
-    // sign information so both sides start symmetric.
-    let abs_guess = initial_guess.abs().max(1.0);
-    let outer = 1e6_f64.max(abs_guess * 1e3);
-    let half_width = (0.5 * abs_guess).max(1e-4);
-    let solver = BrentSolver::new(1e-12, 100).map_err(|e| Error::eval(e.to_string()))?;
-    let (min_bound, max_bound) = if initial_guess > 0.0 {
-        (0.0, outer)
-    } else if initial_guess < 0.0 {
-        (-outer, 0.0)
-    } else {
-        (-outer, outer)
-    };
-
-    let solution = match solver.solve(
-        objective,
-        initial_guess,
-        min_bound,
-        max_bound,
-        half_width,
-        20,
-    ) {
-        Ok(solution) => solution,
-        Err(first_error)
-            if initial_guess != 0.0
-                && matches!(
-                    first_error,
-                    finstack_quant_core::Error::Input(
-                        finstack_quant_core::InputError::SolverConvergenceFailed { .. }
-                    )
-                ) =>
-        {
-            solver
-                .solve(objective, initial_guess, -outer, outer, half_width, 20)
-                .map_err(|second_error| {
-                    Error::eval(format!(
-                        "Goal seek failed to find solution: target_node='{target_node}', \
-                         target_value={target_value}, driver_node='{driver_node}'. \
-                         Sign-constrained attempt failed with: {first_error}. \
-                         Widened attempt failed with: {second_error}"
-                    ))
-                })?
-        }
-        Err(e) => {
-            return Err(Error::eval(format!(
-                "Goal seek failed to find solution: target_node='{target_node}', \
-                 target_value={target_value}, driver_node='{driver_node}'. {e}"
-            )));
-        }
-    };
-
-    finish(solution)
-}
-
-/// Evaluate the objective at `solution` and return `(residual, tolerance)`,
-/// or an error when the residual is not within tolerance.
-fn validate_target_residual(
-    objective: &impl Fn(f64) -> finstack_quant_core::Result<f64>,
-    solution: f64,
-    target: f64,
-) -> Result<(f64, f64)> {
-    let residual = objective(solution).map_err(|e| Error::eval(e.to_string()))?;
-    let tolerance = 1e-9 * target.abs().max(1.0);
-    if !solution.is_finite() || !residual.is_finite() || residual.abs() > tolerance {
+fn selected_value(
+    run: &StatementResult,
+    key: &GoalSeekCell,
+    assumption: bool,
+) -> Result<AmountOrScalar> {
+    let cell = run.get_cell(&key.node, &key.period).ok_or_else(|| {
+        Error::eval(format!(
+            "Goal seek cannot read '{}' at {}",
+            key.node, key.period
+        ))
+    })?;
+    if assumption && cell.source != Some(CellSource::Value) {
         return Err(Error::eval(format!(
-            "Goal-seek target residual {residual} exceeds tolerance {tolerance} at proposed driver {solution}; model unchanged"
+            "Goal seek driver '{}' at {} must be a visible selected assumption",
+            key.node, key.period
         )));
     }
-    Ok((residual, tolerance))
-}
-
-fn amount_for_node(node: &NodeSpec, value: f64) -> Result<AmountOrScalar> {
-    match node.value_type {
-        Some(NodeValueType::Monetary { currency }) => Ok(AmountOrScalar::amount(value, currency)?),
-        _ => Ok(AmountOrScalar::scalar(value)),
-    }
-}
-
-/// Copy of `model` with `value` written into the driver cell, when requested.
-fn solved_model(
-    model: &FinancialModelSpec,
-    driver_node: &str,
-    driver_period: PeriodId,
-    update_model: bool,
-    value: f64,
-) -> Result<Option<FinancialModelSpec>> {
-    Ok(if update_model {
-        let mut solved = model.clone();
-        if let Some(node) = solved.nodes.get_mut(driver_node) {
-            let mut values = node.values.clone().unwrap_or_default();
-            values.insert(driver_period, amount_for_node(node, value)?);
-            node.values = Some(values);
-        }
-        solved.validate_semantics()?;
-        Some(solved)
-    } else {
-        None
+    cell.value.ok_or_else(|| {
+        Error::eval(format!(
+            "Goal seek cell '{}' at {} is {:?}: {:?}",
+            key.node, key.period, cell.status, cell.reason
+        ))
     })
 }
 
-fn solve_with_bounds<F>(f: &F, lower: f64, upper: f64) -> Result<f64>
-where
-    F: Fn(f64) -> finstack_quant_core::Result<f64>,
-{
-    const TOLERANCE: f64 = 1e-9;
+fn checked_difference(
+    actual: AmountOrScalar,
+    target: AmountOrScalar,
+) -> finstack_quant_core::Result<AmountOrScalar> {
+    match (actual, target) {
+        (AmountOrScalar::Amount(actual), AmountOrScalar::Amount(target)) => {
+            actual.checked_sub(target).map(AmountOrScalar::Amount)
+        }
+        (AmountOrScalar::Scalar(actual), AmountOrScalar::Scalar(target))
+            if (actual - target).is_finite() =>
+        {
+            Ok(AmountOrScalar::Scalar(actual - target))
+        }
+        _ => Err(finstack_quant_core::Error::Validation(
+            "Goal seek target type, currency or numeric domain changed".into(),
+        )),
+    }
+}
 
-    if !lower.is_finite() || !upper.is_finite() {
+fn accepts(residual: AmountOrScalar, tolerance: AmountOrScalar) -> bool {
+    match (residual, tolerance) {
+        (AmountOrScalar::Amount(residual), AmountOrScalar::Amount(tolerance)) => {
+            residual.currency() == tolerance.currency()
+                && residual.amount_decimal().abs() <= tolerance.amount_decimal()
+        }
+        (AmountOrScalar::Scalar(residual), AmountOrScalar::Scalar(tolerance)) => {
+            tolerance.is_finite() && residual.abs() <= tolerance
+        }
+        _ => false,
+    }
+}
+
+/// Reuse a prepared graph to verify the reported typed root on one held snapshot.
+///
+/// # Arguments
+/// * `model` - Statement model with a source snapshot and the existing editable forecast cell.
+/// * `spec` - Dated driver, target and absolute acceptance tolerances with a bounded search policy.
+/// * `market` - Held capital-structure market data or an empty market for unlinked models.
+///
+/// # Errors
+/// Rejects unavailable or masked assumptions, unit or currency mismatches,
+/// invalid search domains, failed trials, and verified residuals outside the
+/// elected target tolerance.
+pub fn goal_seek(
+    model: &FinancialModelSpec,
+    spec: &GoalSeekSpec,
+    market: &MarketContext,
+) -> Result<GoalSeekResult> {
+    spec.validate()?;
+    let driver_period = model
+        .periods
+        .iter()
+        .position(|p| p.id == spec.driver.period && !p.is_actual)
+        .ok_or_else(|| {
+            Error::invalid_input("Goal seek driver must be in an existing forecast period")
+        })?;
+    let target_period = model
+        .periods
+        .iter()
+        .position(|p| p.id == spec.target.period)
+        .ok_or_else(|| Error::invalid_input("Goal seek target period is absent"))?;
+    if target_period < driver_period {
         return Err(Error::invalid_input(
-            "Goal seek bounds must be finite values",
+            "Goal seek target must be in the same or a later period than the editable assumption",
         ));
     }
-
-    if lower >= upper {
-        return Err(Error::invalid_input(
-            "Goal seek lower bound must be less than upper bound",
-        ));
-    }
-
-    let flo = f(lower).map_err(|e| Error::eval(e.to_string()))?;
-    let fhi = f(upper).map_err(|e| Error::eval(e.to_string()))?;
-
-    if !flo.is_finite() || !fhi.is_finite() {
-        return Err(Error::eval(
-            "Goal seek bounds produced non-finite objective values",
-        ));
-    }
-
-    if flo.abs() < TOLERANCE {
-        return Ok(lower);
-    }
-    if fhi.abs() < TOLERANCE {
-        return Ok(upper);
-    }
-
-    if flo * fhi > 0.0 {
+    let mut evaluator = Evaluator::new();
+    let prepared = evaluator.prepare(model)?;
+    let initial = evaluator.evaluate_prepared_at(
+        model,
+        &prepared,
+        market,
+        spec.as_of,
+        spec.observed_through,
+    )?;
+    let original_run = initial
+        .provenance
+        .clone()
+        .ok_or_else(|| Error::eval("Missing original goal-seek run provenance"))?;
+    let market_hash = original_run
+        .market_content_hash
+        .clone()
+        .ok_or_else(|| Error::eval("Goal seek requires a coherent captured market snapshot"))?;
+    let initial_assumption = selected_value(&initial, &spec.driver, true)?;
+    checked_difference(
+        selected_value(&initial, &spec.target, false)?,
+        spec.target_value,
+    )?;
+    let mut working = model.clone();
+    let mut evaluations = 1;
+    let mut trial = |candidate| -> Result<(AmountOrScalar, AmountOrScalar, StatementResult)> {
+        let driver = if let Some(currency) = initial_assumption.currency() {
+            AmountOrScalar::amount(candidate, currency)?
+        } else {
+            AmountOrScalar::Scalar(candidate)
+        };
+        let slot = working
+            .nodes
+            .get_mut(spec.driver.node.as_str())
+            .and_then(|node| node.values.as_mut())
+            .and_then(|values| values.get_mut(&spec.driver.period))
+            .ok_or_else(|| Error::eval("Admitted goal-seek assumption slot disappeared"))?;
+        *slot = driver;
+        evaluations += 1;
+        let result = evaluator.evaluate_prepared_at(
+            &working,
+            &prepared,
+            market,
+            spec.as_of,
+            spec.observed_through,
+        )?;
+        if result
+            .provenance
+            .as_ref()
+            .and_then(|run| run.market_content_hash.as_ref())
+            != Some(&market_hash)
+        {
+            return Err(Error::eval(
+                "Goal seek trial used a different or unavailable market snapshot",
+            ));
+        }
+        if selected_value(&result, &spec.driver, true)? != driver {
+            return Err(Error::eval(
+                "Goal seek evaluation did not select the supplied typed driver",
+            ));
+        }
+        let achieved = selected_value(&result, &spec.target, false)?;
+        Ok((driver, achieved, result))
+    };
+    let mut objective = |candidate| -> finstack_quant_core::Result<f64> {
+        let (_, achieved, _) = trial(candidate).map_err(|err| {
+            finstack_quant_core::Error::Validation(format!(
+                "Goal seek trial at driver {candidate} failed: {err}"
+            ))
+        })?;
+        Ok(checked_difference(achieved, spec.target_value)?.value())
+    };
+    let solver = BrentSolver::new(spec.driver_tolerance, spec.max_iterations as usize)?;
+    let solution = match spec.search {
+        GoalSeekSearch::Bracket { lower, upper } => {
+            solver.solve_in_bracket(&mut objective, lower, upper)?
+        }
+        GoalSeekSearch::Bounded {
+            lower,
+            upper,
+            start,
+            initial_half_width,
+            max_expansions,
+        } => solver.solve(
+            &mut objective,
+            start,
+            lower,
+            upper,
+            initial_half_width,
+            max_expansions as usize,
+        )?,
+    };
+    let (driver, achieved, verified) = trial(solution)?;
+    let residual = checked_difference(achieved, spec.target_value)?;
+    if !accepts(residual, spec.target_tolerance) {
         return Err(Error::eval(format!(
-            "Goal seek bounds [{:.4}, {:.4}] do not bracket a root",
-            lower, upper
+            "Goal-seek verified target miss at {solution}: residual {} exceeds absolute tolerance {}",
+            residual.value(),
+            spec.target_tolerance.value()
         )));
     }
-
-    // Use Brent's method inside the user-supplied bracket; inverse quadratic
-    // interpolation with safeguarded bisection converges super-linearly on
-    // smooth objectives while retaining the robustness of bisection.
-    BrentSolver::new(TOLERANCE, 100)
-        .and_then(|solver| solver.solve_in_bracket(f, lower, upper))
-        .map_err(|e| Error::eval(format!("Goal seek failed within bounds: {e}")))
+    let solved_run = verified
+        .provenance
+        .ok_or_else(|| Error::eval("Missing solved goal-seek run provenance"))?;
+    Ok(GoalSeekResult {
+        solved_value: driver,
+        target_value: spec.target_value,
+        achieved_value: achieved,
+        residual,
+        target_tolerance: spec.target_tolerance,
+        driver_tolerance: spec.driver_tolerance,
+        evaluations,
+        original_run,
+        solved_run,
+        market_hash,
+        model: spec.update_model.then_some(working),
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{GoalSeekResult, solve_with_bounds};
+    use super::*;
+    use finstack_quant_statements::builder::ModelBuilder;
+    use time::macros::date;
 
     #[test]
-    fn goal_seek_result_from_json_validates_the_embedded_model() {
-        let empty = r#"{"solved_value": 1.0, "model": {"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}}"#;
-        let err = GoalSeekResult::from_json(empty).expect_err("a model needs at least one period");
-        assert!(err.to_string().contains("at least one period"), "{err}");
-
-        let without_model = GoalSeekResult::from_json(r#"{"solved_value": 2.5, "model": null}"#)
-            .expect("a result without a model");
-        assert_eq!(without_model.solved_value, 2.5);
-        assert!(without_model.model.is_none());
-        // A document written before the diagnostics existed carries none.
-        assert_eq!(without_model.evaluations, 0);
-        assert!(!without_model.converged);
-
-        let with_diagnostics = GoalSeekResult::from_json(
-            r#"{"solved_value": 2.5, "model": null, "residual": 1e-12, "tolerance": 1e-9,
-                "evaluations": 7, "converged": true}"#,
-        )
-        .expect("a result with diagnostics");
-        assert_eq!(with_diagnostics.residual, 1e-12);
-        assert_eq!(with_diagnostics.tolerance, 1e-9);
-        assert_eq!(with_diagnostics.evaluations, 7);
-        assert!(with_diagnostics.converged);
-
-        assert!(
-            GoalSeekResult::from_json(r#"{"solved_value": 1.0, "model": null, "x": 1}"#).is_err()
-        );
-        // The embedded model is held to the model loader's rules: the exact
-        // version, and no repeated key.
-        let model = {
-            let mut builder = finstack_quant_statements::builder::ModelBuilder::new("m");
-            builder.periods("2025Q1..Q1", None).expect("periods");
-            builder.value_scalar("revenue", &[]);
-            serde_json::to_string(&builder.build().expect("model")).expect("json")
-        };
-        let document = |model: &str| format!(r#"{{"solved_value": 1.0, "model": {model}}}"#);
-        GoalSeekResult::from_json(&document(&model)).expect("a runnable embedded model");
-        for version in ["2", "\"1\"", "1.0"] {
-            let wrong = model.replace(
-                "\"schema_version\":1",
-                &format!("\"schema_version\":{version}"),
-            );
-            assert_ne!(wrong, model);
-            assert!(
-                GoalSeekResult::from_json(&document(&wrong)).is_err(),
-                "{version}"
-            );
-        }
-        let repeated = model.replacen("{\"id\":", "{\"id\":\"shadow\",\"id\":", 1);
-        assert_ne!(repeated, model);
-        assert!(GoalSeekResult::from_json(&document(&repeated)).is_err());
-    }
-
-    #[test]
-    fn solve_with_bounds_accepts_endpoint_within_tolerance() {
-        let solution = solve_with_bounds(
-            &|x| {
-                Ok(if (x - 1.0).abs() < f64::EPSILON {
-                    5e-10
-                } else {
-                    1.0
-                })
+    fn checked_goal_seek_verifies_a_typed_forecast_cell_without_mutating_input() {
+        let first = PeriodId::quarter(2025, 1).unwrap();
+        let last = PeriodId::quarter(2025, 2).unwrap();
+        let mut builder = ModelBuilder::new("held-forecast");
+        builder.periods("2025Q1..Q2", None).unwrap();
+        builder.source_snapshot("forecast-2024-12-31");
+        builder.value_scalar("driver", &[(first, 6.0), (last, 7.0)]);
+        builder.compute("target", "driver * 3.0").unwrap();
+        let model = builder.build().unwrap();
+        let original_hash = model.content_hash().unwrap();
+        let spec = GoalSeekSpec {
+            driver: GoalSeekCell {
+                node: "driver".into(),
+                period: last,
             },
-            1.0,
-            2.0,
-        )
-        .expect("near-zero endpoint should be accepted as converged");
-
-        assert!((solution - 1.0).abs() < f64::EPSILON);
+            target: GoalSeekCell {
+                node: "target".into(),
+                period: last,
+            },
+            target_value: AmountOrScalar::Scalar(27.0),
+            target_tolerance: AmountOrScalar::Scalar(1e-9),
+            driver_tolerance: 1e-12,
+            max_iterations: 64,
+            search: GoalSeekSearch::Bracket {
+                lower: 0.0,
+                upper: 12.0,
+            },
+            as_of: date!(2024 - 12 - 31),
+            observed_through: date!(2024 - 12 - 31),
+            update_model: true,
+        };
+        let result = goal_seek(&model, &spec, &MarketContext::new()).unwrap();
+        assert!((result.solved_value.value() - 9.0).abs() < 1e-12);
+        assert!(result.residual.value().abs() <= spec.target_tolerance.value());
+        assert_eq!(result.original_run.model_content_hash, original_hash);
+        assert_ne!(result.solved_run.model_content_hash, original_hash);
+        assert_eq!(model.content_hash().unwrap(), original_hash);
+        assert_eq!(
+            result.model.unwrap().content_hash().unwrap(),
+            result.solved_run.model_content_hash
+        );
     }
 }

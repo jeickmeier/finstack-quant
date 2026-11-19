@@ -19,7 +19,7 @@ const modelJson: string = native.validateFinancialModelJson(
   JSON.stringify(model),
 );
 const resultsJson = JSON.stringify(result);
-const period = "2025Q4";
+const period = "2025Q3";
 beforeEach(() => {
   vi.stubGlobal("Worker", class {});
   const call = vi.fn(async (method: string, arg: any) => {

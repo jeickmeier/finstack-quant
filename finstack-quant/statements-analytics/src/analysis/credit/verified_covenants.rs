@@ -242,8 +242,12 @@ pub fn assess_statement_covenants(
         .ok_or_else(|| {
             invalid("Covenant observations require a sourced statement run at the elected cutoff")
         })?;
-    let expected =
-        RunProvenance::for_run(model, verified.observation_cutoff, verified.valuation_date)?;
+    let expected = RunProvenance::for_run(
+        model,
+        verified.observation_cutoff,
+        verified.valuation_date,
+        verified.market_content_hash.clone(),
+    )?;
     if &expected != verified || results.periods.as_ref() != Some(&model.periods) {
         return Err(invalid(
             "Covenant statement run does not match its source model or period plan",

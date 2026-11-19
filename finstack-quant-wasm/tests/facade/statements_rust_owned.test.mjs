@@ -36,11 +36,15 @@ function quarter(q, year = 2025) {
 /** A GoalSeekSpec solving `profit` = 60 in 2025Q1 by varying `revenue`. */
 function goalSeekSpec(overrides = {}) {
   return {
-    target_node: 'profit',
-    target_period: '2025Q1',
+    target: { node: 'profit', period: '2025Q1' },
     target_value: 60,
-    driver_node: 'revenue',
-    driver_period: '2025Q1',
+    target_tolerance: 1e-8,
+    driver: { node: 'revenue', period: '2025Q1' },
+    driver_tolerance: 1e-10,
+    max_iterations: 100,
+    search: { kind: 'bracket', lower: 0, upper: 200 },
+    as_of: '2024-12-31',
+    observed_through: '2024-12-31',
     update_model: true,
     ...overrides,
   };
@@ -49,6 +53,7 @@ function goalSeekSpec(overrides = {}) {
 function goalSeekModel() {
   return {
     id: 'goal-seek',
+    source_snapshot: 'goal-seek-forecast',
     schema_version: 1,
     periods: { calendar: 'gregorian', periods: [quarter(1)] },
     nodes: {
@@ -134,16 +139,10 @@ const EXIT_MULTIPLE = { type: 'exit_multiple', terminal_metric: 999.0, multiple:
 
 test('goalSeek returns the Rust GoalSeekResult with the model as an object', () => {
   const updated = sa.goalSeek(goalSeekModel(), goalSeekSpec());
-  assert.deepEqual(Object.keys(updated).sort(), [
-    'converged',
-    'evaluations',
-    'model',
-    'residual',
-    'solved_value',
-    'tolerance',
-  ]);
-  assert.equal(updated.converged, true);
-  assert.ok(Math.abs(updated.residual) <= updated.tolerance);
+  assert.ok(Math.abs(updated.achieved_value - 60) <= updated.target_tolerance);
+  assert.equal(updated.target_value, 60);
+  assert.notEqual(updated.original_run.run_id, updated.solved_run.run_id);
+  assert.ok(Math.abs(updated.residual) <= updated.target_tolerance);
   assert.ok(updated.evaluations > 0);
   assert.ok(Math.abs(updated.solved_value - 120) < 1e-6);
   assert.equal(typeof updated.model, 'object');
@@ -154,15 +153,12 @@ test('goalSeek returns the Rust GoalSeekResult with the model as an object', () 
       1e-6
   );
 
-  const bare = sa.goalSeek(
-    goalSeekModel(),
-    goalSeekSpec({ update_model: false, bounds: [1, 200] })
-  );
+  const bare = sa.goalSeek(goalSeekModel(), goalSeekSpec({ update_model: false }));
   assert.equal(bare.model, null);
   assert.ok(Math.abs(bare.solved_value - 120) < 1e-6);
 });
 
-test('goalSeek requires update_model and a two-number bounds array', () => {
+test('goalSeek requires an explicit update election and valid bounded search', () => {
   const withoutUpdateModel = goalSeekSpec();
   delete withoutUpdateModel.update_model;
   assert.throws(
@@ -170,11 +166,11 @@ test('goalSeek requires update_model and a two-number bounds array', () => {
     (e) => e instanceof Error && e.kind === 'validation' && /update_model/.test(e.message)
   );
   assert.throws(
-    () => sa.goalSeek(goalSeekModel(), goalSeekSpec({ bounds: [1] })),
+    () => sa.goalSeek(goalSeekModel(), goalSeekSpec({ search: { kind: 'bracket', lower: 1 } })),
     (e) => e instanceof Error && e.kind === 'validation'
   );
   assert.throws(
-    () => sa.goalSeek(goalSeekModel(), goalSeekSpec({ tolerance: 1e-6 })),
+    () => sa.goalSeekSpec(goalSeekSpec({ target_tolerance: -1e-6 })),
     (e) => e instanceof Error && e.kind === 'validation' && /tolerance/.test(e.message)
   );
 });

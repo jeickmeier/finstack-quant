@@ -752,6 +752,8 @@ export function StatementsWorkbench({
               <div className="mt-8 border-t border-border pt-6">
                 <SensitivityPanel
                   modelJson={request.modelJson}
+                  marketJson={marketJson}
+                  asOf={asOf}
                   result={result}
                   nodeIds={nodeOptions}
                   periods={periodIds}

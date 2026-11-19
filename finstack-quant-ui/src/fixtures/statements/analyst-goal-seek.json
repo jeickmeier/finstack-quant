@@ -1,8 +1,48 @@
 {
-  "solved_value": 244390239.98913205,
-  "model": null,
-  "residual": -2.9802322387695312e-8,
-  "tolerance": 0.07,
-  "evaluations": 7,
-  "converged": true
+  "solved_value": {
+    "amount": "244390239.98913205",
+    "currency": "USD"
+  },
+  "target_value": {
+    "amount": "70000000",
+    "currency": "USD"
+  },
+  "achieved_value": {
+    "amount": "69999999.999999973125",
+    "currency": "USD"
+  },
+  "residual": {
+    "amount": "-0.000000026875",
+    "currency": "USD"
+  },
+  "target_tolerance": {
+    "amount": "0.01",
+    "currency": "USD"
+  },
+  "driver_tolerance": 1e-9,
+  "evaluations": 6,
+  "original_run": {
+    "model_id": "ACME-SOFTWARE-3STMT",
+    "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+    "source_snapshot": "analyst-published-2025Q1",
+    "observation_cutoff": {
+      "through": "2025-04-01"
+    },
+    "valuation_date": "2025-04-01",
+    "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+    "run_id": "sha256:3f08445e11f9ee52a9c4b59e1306a7780c6cc831c5ea7195e1f081b063d51936"
+  },
+  "solved_run": {
+    "model_id": "ACME-SOFTWARE-3STMT",
+    "model_content_hash": "sha256:90c4aac5feb3355a545165051a1ab5917a4047ce09198146df263617d05bb10d",
+    "source_snapshot": "analyst-published-2025Q1",
+    "observation_cutoff": {
+      "through": "2025-04-01"
+    },
+    "valuation_date": "2025-04-01",
+    "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+    "run_id": "sha256:33728db29ce4c3579e1a4871fbe13e5a04524e41e3f240d6dfa8a59c5e3d810a"
+  },
+  "market_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+  "model": null
 }

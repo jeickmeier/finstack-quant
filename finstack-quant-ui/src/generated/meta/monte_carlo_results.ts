@@ -405,6 +405,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/ForecastStream"
   },
   {
+    "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/market_content_hash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/market_content_hash",
+    "description": "Canonical snapshot hash of the market held for an explicitly priced run.\nAbsent if the supplied provider cannot furnish a coherent capture."
+  },
+  {
     "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/model_content_hash",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/model_content_hash",
     "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash))."
@@ -424,7 +429,7 @@ export default [
   {
     "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/run_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/RunProvenance/properties/run_id",
-    "description": "Identity of this evaluation run: the canonical content hash of the\nfields above. Two runs of the same model content, snapshot, cutoff\nand valuation date share it."
+    "description": "Identity of this evaluation run: the canonical content hash of the\nfields above, including the market snapshot identity when it was supplied."
   },
   {
     "path": "#/$defs/d_46e9b9f749a497bf5bc2/properties/source_snapshot",

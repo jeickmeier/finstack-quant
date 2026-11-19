@@ -530,3 +530,7 @@ def test_dated_dcf_reuses_results_for_grid_and_paths() -> None:
     sample = sa.evaluate_dcf_monte_carlo(model, results, paths, request).to_dataframe()
     assert sample["path_id"].to_list() == [0, 1, 2]
     assert sample["enterprise_value"].to_list() == pytest.approx([base] * 3)
+    replacement = MarketContext().insert_dividend_yield("NEW-QUOTE", 0.03)
+    other_paths = evaluation.evaluate_monte_carlo(model, config, replacement, day, day)
+    with pytest.raises(ValueError, match="market snapshot"):
+        sa.evaluate_dcf_monte_carlo(model, results, other_paths, request)

@@ -136,6 +136,7 @@ impl CheckSuite {
             model,
             source.observation_cutoff,
             source.valuation_date,
+            source.market_content_hash.clone(),
         )
         .map_err(|error| not_a_rollup(&format!("the model does not validate ({error})")))?;
         if expected != *source {

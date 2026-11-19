@@ -377,19 +377,27 @@ export interface StatementSensitivity {
   readonly result: SensitivityResult;
   readonly tornado: TornadoEntry[] | null;
 }
-/** statements_analytics.goalSeek arguments; `bounds` stays unset unless supplied. */
+/** Dated goal-seek arguments authored by the desk. */
 export interface GoalSeekRequest {
   readonly modelJson: string;
+  readonly marketJson?: string;
   readonly targetNode: string;
   readonly targetPeriod: string;
-  /** Value the target node must reach, in its own units. */
-  readonly targetValue: number;
+  /** Value in the target's native units. */
+  readonly targetValue:
+    number | { readonly amount: string; readonly currency: string };
+  /** Absolute acceptance tolerance in the target's native units. */
+  readonly targetTolerance:
+    number | { readonly amount: string; readonly currency: string };
   readonly driverNode: string;
   readonly driverPeriod: string;
-  /** Whether the result carries the model with the solved driver written in. */
+  readonly driverTolerance: number;
+  readonly maxIterations: number;
+  readonly asOf: string;
+  readonly observedThrough: string;
   readonly updateModel: boolean;
-  /** `[lower, upper]` search bracket in the driver node's units. */
-  readonly bounds?: readonly [number, number];
+  /** Explicit increasing bracket in driver units. */
+  readonly bounds: readonly [number, number];
 }
 /** Two evaluated StatementResults compared under a Rust VarianceConfig. */
 export interface RunVarianceRequest {

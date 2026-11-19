@@ -2722,7 +2722,18 @@
               "2025Q1": {
                 "amount": "208300000",
                 "currency": "USD"
+              },
+              "2025Q4": {
+                "amount": "231384660.02999997",
+                "currency": "USD"
               }
+            },
+            "availability_dates": {
+              "2024Q1": "2024-04-01",
+              "2024Q2": "2024-07-01",
+              "2024Q3": "2024-10-01",
+              "2024Q4": "2025-01-01",
+              "2025Q1": "2025-04-01"
             },
             "forecast": {
               "method": "curve_pct",
@@ -2773,6 +2784,13 @@
                 "amount": "70820000",
                 "currency": "USD"
               }
+            },
+            "availability_dates": {
+              "2024Q1": "2024-04-01",
+              "2024Q2": "2024-07-01",
+              "2024Q3": "2024-10-01",
+              "2024Q4": "2025-01-01",
+              "2025Q1": "2025-04-01"
             },
             "formula_text": "revenue * 0.3375",
             "tags": ["income_statement"],
@@ -2830,6 +2848,13 @@
                 "amount": "86100000",
                 "currency": "USD"
               }
+            },
+            "availability_dates": {
+              "2024Q1": "2024-04-01",
+              "2024Q2": "2024-07-01",
+              "2024Q3": "2024-10-01",
+              "2024Q4": "2025-01-01",
+              "2025Q1": "2025-04-01"
             },
             "forecast": {
               "method": "growth_pct",
@@ -2892,6 +2917,13 @@
                 "amount": "12100000",
                 "currency": "USD"
               }
+            },
+            "availability_dates": {
+              "2024Q1": "2024-04-01",
+              "2024Q2": "2024-07-01",
+              "2024Q3": "2024-10-01",
+              "2024Q4": "2025-01-01",
+              "2025Q1": "2025-04-01"
             },
             "forecast": {
               "method": "growth_pct",
@@ -3004,6 +3036,13 @@
                 "currency": "USD"
               }
             },
+            "availability_dates": {
+              "2024Q1": "2024-04-01",
+              "2024Q2": "2024-07-01",
+              "2024Q3": "2024-10-01",
+              "2024Q4": "2025-01-01",
+              "2025Q1": "2025-04-01"
+            },
             "tags": ["debt"],
             "value_type": {
               "type": "monetary",
@@ -3036,6 +3075,13 @@
                 "amount": "25000000",
                 "currency": "USD"
               }
+            },
+            "availability_dates": {
+              "2024Q1": "2024-04-01",
+              "2024Q2": "2024-07-01",
+              "2024Q3": "2024-10-01",
+              "2024Q4": "2025-01-01",
+              "2025Q1": "2025-04-01"
             },
             "forecast": {
               "method": "override",
@@ -3079,6 +3125,13 @@
                 "amount": "10000000",
                 "currency": "USD"
               }
+            },
+            "availability_dates": {
+              "2024Q1": "2024-04-01",
+              "2024Q2": "2024-07-01",
+              "2024Q3": "2024-10-01",
+              "2024Q4": "2025-01-01",
+              "2025Q1": "2025-04-01"
             },
             "forecast": {
               "method": "forward_fill"
@@ -3139,6 +3192,13 @@
                 "amount": "113600000",
                 "currency": "USD"
               }
+            },
+            "availability_dates": {
+              "2024Q1": "2024-04-01",
+              "2024Q2": "2024-07-01",
+              "2024Q3": "2024-10-01",
+              "2024Q4": "2025-01-01",
+              "2025Q1": "2025-04-01"
             },
             "forecast": {
               "method": "forward_fill"
@@ -3221,6 +3281,7 @@
             "rollup": "sum"
           }
         },
+        "source_snapshot": "analyst-published-2025Q1",
         "meta": {
           "entity": "Acme Software Holdings",
           "currency": "USD",
@@ -3941,7 +4002,7 @@
                 "amount": "231384660.02999997",
                 "currency": "USD"
               },
-              "source": "forecast"
+              "source": "value"
             }
           },
           "capex": {
@@ -4975,9 +5036,10 @@
         },
         "provenance": {
           "model_id": "ACME-SOFTWARE-3STMT",
-          "model_content_hash": "sha256:be5c97adf362f37fe7ccb5d2511a4a0bc0104d79ac6611c52e6683c2abbeb8de",
+          "model_content_hash": "sha256:6a6c2dcb3ddfc8be829ea64f72ef27e2a52e3c913542e3a1e573874d21fcc2ba",
+          "source_snapshot": "analyst-published-2025Q1",
           "observation_cutoff": "full_snapshot",
-          "run_id": "sha256:02052a6a02accdc45d005542dca5bf8c59edf47f2af7bd55797462af7a5fae5f"
+          "run_id": "sha256:215b07d4bd15e5145e2f9880141f98631595de29009d0092f5f0b1e5e7ba9103"
         },
         "meta": {
           "num_nodes": 26,

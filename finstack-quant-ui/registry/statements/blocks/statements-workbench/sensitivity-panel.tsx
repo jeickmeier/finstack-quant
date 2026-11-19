@@ -22,6 +22,8 @@ import { useGoalSeek } from "@/hooks/statements/use-goal-seek/use-goal-seek";
  */
 export function SensitivityPanel({
   modelJson,
+  marketJson,
+  asOf,
   result,
   nodeIds,
   periods,
@@ -30,6 +32,8 @@ export function SensitivityPanel({
 }: {
   /** Canonical model JSON the workbench evaluated. */
   modelJson: string;
+  marketJson?: string;
+  asOf?: string;
   /** Its evaluated result; sensitivity base values are read from it. */
   result: StatementResult;
   /** Model node ids, in the workbench's order. */
@@ -52,11 +56,17 @@ export function SensitivityPanel({
   const [solve, setSolve] = useState<{
     modelJson: string;
     submission: GoalSeekSubmission;
+    marketJson?: string;
   } | null>(null);
   // Solved with the model written in, so Apply needs no second call.
   const seek = useGoalSeek(
     solve
-      ? { modelJson: solve.modelJson, ...solve.submission, updateModel: true }
+      ? {
+          modelJson: solve.modelJson,
+          marketJson: solve.marketJson,
+          ...solve.submission,
+          updateModel: true,
+        }
       : null,
   );
   return (
@@ -97,13 +107,17 @@ export function SensitivityPanel({
         <GoalSeekForm
           nodeIds={nodeIds}
           periods={periods}
-          onSubmit={(submission) => setSolve({ modelJson, submission })}
+          defaultValues={{ asOf, observedThrough: asOf }}
+          onSubmit={(submission) =>
+            setSolve({ modelJson, marketJson, submission })
+          }
           result={solve ? seek.data : null}
           loading={seek.isFetching}
           error={seek.error?.message}
           onApply={(model) => onApply(serializeHost(model))}
           applyBlocked={
-            solve && solve.modelJson !== modelJson
+            solve &&
+            (solve.modelJson !== modelJson || solve.marketJson !== marketJson)
               ? "The model changed after this solve; solve again before applying."
               : undefined
           }

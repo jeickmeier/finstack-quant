@@ -17,7 +17,7 @@ from finstack_quant import statements
 from finstack_quant.calibration import VolQuote
 from finstack_quant.models import liquidity, volatility
 from finstack_quant.portfolio import Portfolio
-from finstack_quant.statements_analytics import GoalSeekResult, TerminalValueSpec, evaluate_dcf
+from finstack_quant.statements_analytics import TerminalValueSpec, evaluate_dcf
 
 
 def test_metadata_keeps_json_like_strings_literal() -> None:
@@ -135,13 +135,6 @@ def test_arbitrage_grid_checks_default_to_the_rust_tolerance() -> None:
     default = volatility.check_calendar_spread_grid(expiries, strikes, rows, forwards)
     explicit = volatility.check_calendar_spread_grid(expiries, strikes, rows, forwards, tolerance=1e-10)
     assert len(default) == len(explicit) == 1
-
-
-def test_goal_seek_result_from_json_validates_the_embedded_model() -> None:
-    empty_model = {"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}
-    with pytest.raises(ValueError, match="at least one period"):
-        GoalSeekResult.from_json(json.dumps({"solved_value": 1.0, "model": empty_model}))
-    assert GoalSeekResult.from_json('{"solved_value": 2.5, "model": null}').solved_value == 2.5
 
 
 def test_per_position_metric_json_rejects_unknown_metric_ids() -> None:

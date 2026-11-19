@@ -8394,6 +8394,11 @@ export interface RunProvenance {
    */
   forecast_streams?: ForecastStream[];
   /**
+   * Canonical snapshot hash of the market held for an explicitly priced run.
+   * Absent if the supplied provider cannot furnish a coherent capture.
+   */
+  market_content_hash?: string | null;
+  /**
    * Canonical content hash of the evaluated model
    * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
    */
@@ -8408,8 +8413,7 @@ export interface RunProvenance {
   observation_cutoff: ObservationCutoff;
   /**
    * Identity of this evaluation run: the canonical content hash of the
-   * fields above. Two runs of the same model content, snapshot, cutoff
-   * and valuation date share it.
+   * fields above, including the market snapshot identity when it was supplied.
    */
   run_id: string;
   /**
