@@ -2709,7 +2709,7 @@ excluded = { approximate = "literal", business_days = "literal", calendar_days =
 excluded = { fixed = "literal", percentage = "literal", with_cap = "literal", with_category = "literal" }
 
 [parity.members."finstack_quant.statements.CapitalStructureCashflows"]
-renames = { get_component = { js = "statements.capitalStructureCashflowsGetComponent", reason = "WASM cashflows are plain data; the Rust get_component method is exposed as a free function taking the object" } }
+renames = { get_component = { js = "statements.capitalStructureCashflowsGetComponent", reason = "WASM cashflows are plain data; the Rust get_component method is exposed as a free function taking the object" }, get_money = { js = "statements.capitalStructureCashflowsGetMoney", reason = "WASM cashflows are plain data; the Rust get_money method is exposed as a free function taking the object" } }
 
 [parity.members."finstack_quant.statements.CheckConfig"]
 renames = { validate = { js = "statements.checkConfigValidate", reason = "WASM `CheckConfig` values are plain objects; Rust `CheckConfig::validate` is a free function taking the object" } }

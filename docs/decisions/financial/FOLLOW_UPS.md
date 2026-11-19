@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **617 review items across 31 source scopes with open items**
+This backlog consolidates **616 review items across 31 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (473): implementation and verification work against an
+- **Reconciliation** (472): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (36): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -67,7 +67,7 @@ product consequences remain in their product scope.
 | [Calibration: quotes and curve/smile targets](#calibration-quotes-and-curvesmile-targets) | 18 |
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
-| [Statements: capital structure](#statements-capital-structure) | 6 |
+| [Statements: capital structure](#statements-capital-structure) | 5 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -959,8 +959,6 @@ product consequences remain in their product scope.
 - **Reconciliation — Dated excess-cash-flow elections.** Prepayment and sweep sizing, payment and the principal reduction all fall in the reporting period being evaluated. Implement the separately elected measurement, trigger, payment and principal-effective dates, and carry an unpaid amount as arrears where a dated contractual obligation establishes it. Qualify dated sweeps and arrears with independent agreement examples. [Accepted STATEMENTS-CAPITAL-007](statements-capital/07-prepayments-and-ecf.md#accepted-decision-for-agreement-defined-prepayments-and-ecf-sweeps).
 
 - **Reconciliation — Dated PIK notices, amendments and authorized arrears capitalization.** The modeled exercise elects at the start of the next coupon period after the period that observes the metric. Implement separately elected observation, notice and election-effective dates, amendments on their authorized effective dates, capitalization of arrears through a separately authorized dated action, and qualified payoff terms for an earned coupon affected by a full payoff. Qualify them, and the metric's units against the threshold, with independent agreement examples. [Accepted STATEMENTS-CAPITAL-008](statements-capital/08-pik-and-carry-state.md#accepted-decision-for-contractual-pik-elections-and-carried-claims).
-
-- **Reconciliation — Exact capital exports and typed host accessors.** The capital long tables export amounts as floats, and the host component accessors (`get_component` in Python and WASM) return a float. Export amounts as exact decimal strings tagged with their currency and give hosts the typed selector lookup. [Accepted STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 - **Reconciliation — Rebuilt loan schedules after a waterfall posting.** A revolver with a fixed contractual repayment dated after a sweep fails the run when the swept balance is below that repayment, while a term loan caps its later amortization; make the two owners agree. On a term loan that capitalizes interest the amortization cap counts funded principal only, so amortization after a posting stops at the funded balance and the capitalized interest is redeemed at maturity; size it on the full balance. Found in the branch review (2026-11-18). [Residual schedules](statements-capital/05-residual-coupons.md) · [PIK](statements-capital/08-pik-and-carry-state.md).
 

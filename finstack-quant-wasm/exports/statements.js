@@ -48,6 +48,7 @@ export const statements = {
   checkReportHasWarnings: wasm.checkReportHasWarnings,
   checkReportFindingsBySeverity: wasm.checkReportFindingsBySeverity,
   capitalStructureCashflowsGetComponent: wasm.capitalStructureCashflowsGetComponent,
+  capitalStructureCashflowsGetMoney: wasm.capitalStructureCashflowsGetMoney,
   normalizationConfigAddAdjustment: wasm.normalizationConfigAddAdjustment,
   validateNormalizationConfigJson: wasm.validateNormalizationConfigJson,
   normalize: wasm.normalize,

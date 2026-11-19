@@ -291,8 +291,8 @@ amendments and authorized capitalization of arrears remain open.
 The Statements capital reporting and FX contract was accepted on 2026-11-15.
 It covers native and consolidated views, explicit period-close FX, component
 totals, exact chronological exports and atomic period replacement.
-It is implemented and qualified; exact-decimal table exports and typed host
-accessors remain open. The capital contracts are also reconciled to
+It is implemented and qualified, including exact-decimal table exports and
+typed host accessors. The capital contracts are also reconciled to
 independent hand ledgers over eight quarters and across dated FX.
 [STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 

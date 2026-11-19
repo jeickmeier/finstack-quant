@@ -1317,6 +1317,16 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: exact table amounts, typed host lookup
+
+- `CapitalStructureCashflows::to_table` and `to_totals_table` (Python
+  `to_dataframe` / `to_totals_dataframe`) report each amount twice: `value`,
+  its float view, and `amount`, the exact amount as decimal text. `amount`
+  used to be the float (STATEMENTS-CAPITAL-009).
+- Python `CapitalStructureCashflows.get_money(component, scope, period_id)`
+  and WASM `capitalStructureCashflowsGetMoney` return a component as exact
+  money, the typed twin of `get_component`.
+
 ### Statements checks: typed comparisons, coverage in the analytics checks
 
 Breaking, with no compatibility path (STATEMENTS-CONTRACTS-014).

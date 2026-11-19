@@ -3937,6 +3937,7 @@
       "Registry",
       "applyModelEdits",
       "capitalStructureCashflowsGetComponent",
+      "capitalStructureCashflowsGetMoney",
       "checkConfigValidate",
       "checkReportFindingsBySeverity",
       "checkReportHasErrors",
@@ -4135,6 +4136,9 @@
     "kind": "function"
   },
   "statements.capitalStructureCashflowsGetComponent": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetMoney": {
     "kind": "function"
   },
   "statements.normalizationConfigAddAdjustment": {

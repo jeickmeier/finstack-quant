@@ -1087,6 +1087,54 @@ class CapitalStructureCashflows:
         """
         ...
 
+    def get_money(self, component: str, scope: str, period_id: str) -> Money:
+        """Read one reported capital-structure amount as exact money.
+
+        The typed twin of :meth:`get_component`: the same component and scope
+        names, returning the exact amount with its currency (Rust
+        ``CapitalStructureCashflows::get_money``).
+
+        Parameters
+        ----------
+        component : str
+            A component name accepted by :meth:`get_component`, for example
+            ``"interest_expense_cash"`` or ``"debt_balance"``.
+        scope : str
+            An instrument identifier for its native-currency amount,
+            ``"total"`` for the consolidated total in the reporting currency,
+            or ``"total.<CCY>"`` for the total of the instruments in one
+            native currency. No FX conversion is performed.
+        period_id : str
+            Reporting-period label such as ``"2025Q1"`` present in the result.
+
+        Returns
+        -------
+        Money
+            The exact amount in the scope's currency.
+
+        Raises
+        ------
+        ValueError
+            If ``period_id`` is not a valid reporting-period label.
+        RuntimeError
+            If the component or scope is unknown or malformed, the scope has
+            no data for the period (including a consolidated total that could
+            not be formed, with the reason), or the breakdown does not record
+            the component.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import CapitalStructureCashflows
+        >>> flows = CapitalStructureCashflows.from_json(
+        ...     '{"by_instrument": {}, "totals": {}, "reporting_currency": null}'
+        ... )
+        >>> flows.get_money("fees", "total", "2025Q1")
+        Traceback (most recent call last):
+            ...
+        RuntimeError: Capital structure error: No total cashflow data for period 2025Q1
+        """
+        ...
+
     @property
     def totals_by_currency(self) -> dict[str, dict[str, dict[str, Money]]]:
         """Cross-instrument totals bucketed by native instrument currency.
@@ -1114,8 +1162,9 @@ class CapitalStructureCashflows:
         Returns
         -------
         pandas.DataFrame
-            Columns ``instrument``, ``period``, ``flow_type``, ``amount``
-            and ``currency``. ``flow_type`` is one of
+            Columns ``instrument``, ``period``, ``flow_type``, ``value`` (float
+            view), ``amount`` (the exact amount as decimal text) and
+            ``currency``. ``flow_type`` is one of
             ``interest_expense_cash``, ``interest_income_cash`` (when
             present), ``interest_expense_pik``, ``principal_payment``,
             ``fees``, ``debt_balance``, ``accrued_interest`` and — on
@@ -1143,7 +1192,8 @@ class CapitalStructureCashflows:
         Returns
         -------
         pandas.DataFrame
-            Columns ``period``, ``flow_type``, ``amount`` and ``currency``.
+            Columns ``period``, ``flow_type``, ``value`` (float view),
+            ``amount`` (the exact amount as decimal text) and ``currency``.
 
         Raises
         ------

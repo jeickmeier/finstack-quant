@@ -521,6 +521,18 @@ impl PyCapitalStructureCashflows {
             .map_err(statements_to_py)
     }
 
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.get_money")]
+    #[pyo3(text_signature = "($self, component, scope, period_id)")]
+    fn get_money(&self, component: &str, scope: &str, period_id: &str) -> PyResult<PyMoney> {
+        let pid = super::parse_period_id(period_id)?;
+        let component = component.parse().map_err(statements_to_py)?;
+        let scope = scope.parse().map_err(statements_to_py)?;
+        self.inner
+            .get_money(component, &scope, &pid)
+            .map(|inner| PyMoney { inner })
+            .map_err(statements_to_py)
+    }
+
     /// Cross-instrument totals bucketed by native instrument currency.
     ///
     /// Populated for every evaluation with capital-structure flows, including
@@ -614,8 +626,8 @@ impl PyCapitalStructureCashflows {
     /// sources of ``principal_payment``: ``scheduled_principal``,
     /// ``mandatory_prepayment``, ``sweep_prepayment``,
     /// ``voluntary_prepayment``, ``interest_arrears``, ``principal_pending``,
-    /// ``principal_arrears`` and ``principal_advance_reserve``), ``amount`` (float64, positive debt-service
-    /// magnitude) and ``currency`` (ISO code of that instrument). Rows follow
+    /// ``principal_arrears`` and ``principal_advance_reserve``), ``value`` (float64, positive debt-service
+    /// magnitude), ``amount`` (the exact amount as decimal text) and ``currency`` (ISO code of that instrument). Rows follow
     /// instrument then period order.
     ///
     /// ``principal_payment`` equals the sum of its four source rows, so do

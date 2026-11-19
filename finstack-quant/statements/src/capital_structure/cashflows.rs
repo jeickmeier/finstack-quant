@@ -652,6 +652,7 @@ fn flows_table<'a>(
     let mut instruments = Vec::new();
     let mut periods = Vec::new();
     let mut flow_types = Vec::new();
+    let mut values = Vec::new();
     let mut amounts = Vec::new();
     let mut currencies = Vec::new();
     for (instrument, period, breakdown) in rows {
@@ -659,7 +660,8 @@ fn flows_table<'a>(
             instruments.push(instrument.to_string());
             periods.push(period.to_string());
             flow_types.push(flow_type.to_string());
-            amounts.push(money.amount());
+            values.push(money.amount());
+            amounts.push(money.amount_decimal().to_string());
             currencies.push(money.currency().to_string());
         }
     }
@@ -677,8 +679,10 @@ fn flows_table<'a>(
                 .with_role(TableColumnRole::Index),
             TableColumn::new("flow_type", TableColumnData::String(flow_types))
                 .with_role(TableColumnRole::Dimension),
-            TableColumn::new("amount", TableColumnData::Float64(amounts))
+            TableColumn::new("value", TableColumnData::Float64(values))
                 .with_role(TableColumnRole::Measure),
+            TableColumn::new("amount", TableColumnData::String(amounts))
+                .with_role(TableColumnRole::Attribute),
             TableColumn::new("currency", TableColumnData::String(currencies))
                 .with_role(TableColumnRole::Attribute),
         ],
@@ -708,9 +712,10 @@ impl CapitalStructureCashflows {
     /// Export per-instrument cashflows as a long table.
     ///
     /// Columns: `instrument`, `period` (period identifier such as `2025Q1`),
-    /// `flow_type` (see [`CashflowBreakdown::flows`]), `amount` (in the row's
-    /// own `currency`) and `currency` (ISO 4217 code). One row per instrument,
-    /// period and flow type; amounts are in each instrument's native currency.
+    /// `flow_type` (see [`CashflowBreakdown::flows`]), `value` (the amount's
+    /// float view), `amount` (the exact amount as decimal text) and
+    /// `currency` (ISO 4217 code). One row per instrument, period and flow
+    /// type; amounts are in each instrument's native currency.
     ///
     /// # Errors
     ///

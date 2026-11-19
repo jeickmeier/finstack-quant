@@ -71,7 +71,7 @@ implemented and qualified; notice dates and amendments remain open.
 
 The reporting contract covers native and consolidated views, explicit
 period-close FX, exact component exports and atomic period replacement.
-It is implemented and qualified; exact-decimal table exports remain open.
+It is implemented and qualified, including exact-decimal table exports and typed host accessors.
 
 Dated principal, allocation, the excess-cash-flow sweep, PIK elections and
 reporting are also reconciled to arithmetic done by hand: a two-tranche

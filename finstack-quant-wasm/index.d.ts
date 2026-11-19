@@ -10051,6 +10051,28 @@ export interface StatementsNamespace {
    */
   readonly capitalStructureCashflowsGetComponent: typeof wasm.capitalStructureCashflowsGetComponent;
   /**
+   * Read one capital-structure amount as exact money.
+   *
+   * Free-function twin of Python `CapitalStructureCashflows.get_money` (Rust
+   * `CapitalStructureCashflows::get_money`): the typed form of
+   * `capitalStructureCashflowsGetComponent`, with the same component and scope
+   * names.
+   *
+   * @returns `Money` wire object (`{amount, currency}`): the exact amount in the scope's currency.
+   *
+   * # Errors
+   *
+   * Throws with kind `validation` for malformed inputs or period labels, and
+   * kind `computation` for an unknown component or malformed scope, a scope
+   * with no data for the period (including a consolidated total that could not
+   * be formed), or a component the breakdown does not record.
+   * @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
+   * @param component - A component name accepted by `capitalStructureCashflowsGetComponent`, for example `interest_expense_cash` or `debt_balance`.
+   * @param scope - An instrument identifier for its native-currency amount, `total` for the consolidated total in the reporting currency, or `total.<CCY>` for the total of the instruments in one native currency. This lookup performs no FX.
+   * @param periodId - Reporting-period label such as `2025Q1` present in the result.
+   */
+  readonly capitalStructureCashflowsGetMoney: typeof wasm.capitalStructureCashflowsGetMoney;
+  /**
    * Copy of a normalization configuration with one more adjustment.
    *
    * Free-function twin of Python `NormalizationConfig.add_adjustment` (Rust

@@ -475,3 +475,44 @@ pub fn capital_structure_cashflows_get_component(
         )
         .map_err(to_js_err)
 }
+
+/// Read one capital-structure amount as exact money.
+///
+/// Free-function twin of Python `CapitalStructureCashflows.get_money` (Rust
+/// `CapitalStructureCashflows::get_money`): the typed form of
+/// `capitalStructureCashflowsGetComponent`, with the same component and scope
+/// names.
+///
+/// @returns `Money` wire object (`{amount, currency}`): the exact amount in the scope's currency.
+///
+/// # Errors
+///
+/// Throws with kind `validation` for malformed inputs or period labels, and
+/// kind `computation` for an unknown component or malformed scope, a scope
+/// with no data for the period (including a consolidated total that could not
+/// be formed), or a component the breakdown does not record.
+/// @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
+/// @param component - A component name accepted by `capitalStructureCashflowsGetComponent`, for example `interest_expense_cash` or `debt_balance`.
+/// @param scope - An instrument identifier for its native-currency amount, `total` for the consolidated total in the reporting currency, or `total.<CCY>` for the total of the instruments in one native currency. This lookup performs no FX.
+/// @param periodId - Reporting-period label such as `2025Q1` present in the result.
+#[wasm_bindgen(js_name = capitalStructureCashflowsGetMoney, unchecked_return_type = "generated.statements.Money")]
+pub fn capital_structure_cashflows_get_money(
+    #[wasm_bindgen(
+        js_name = "cashflowsJson",
+        unchecked_param_type = "generated.statements.CapitalStructureCashflows | string"
+    )]
+    cashflows_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] component: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] scope: JsValue,
+    #[wasm_bindgen(js_name = "periodId", unchecked_param_type = "string")] period_id: JsValue,
+) -> Result<JsValue, JsValue> {
+    let cashflows: CapitalStructureCashflows = from_js_json(&cashflows_json, "cashflowsJson")?;
+    let component = js_string(&component, "component")?
+        .parse()
+        .map_err(to_js_err)?;
+    let scope = js_string(&scope, "scope")?.parse().map_err(to_js_err)?;
+    let money = cashflows
+        .get_money(component, &scope, &self::period_id(&period_id)?)
+        .map_err(to_js_err)?;
+    to_js_value(&money)
+}

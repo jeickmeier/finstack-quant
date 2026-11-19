@@ -1078,3 +1078,37 @@ fn capital_scopes_evaluate_natively_and_consolidate_at_the_close() {
             .contains_key(&quarter(1))
     );
 }
+
+/// The capital long table carries each amount exactly as decimal text beside
+/// its float view.
+#[test]
+fn the_capital_table_reports_exact_amounts() {
+    use finstack_quant_core::table::TableColumnData;
+    let model = two_currency_builder(None).build().unwrap();
+    let result = Evaluator::new().evaluate(&model).expect("evaluation");
+    let table = result
+        .cs_cashflows
+        .as_ref()
+        .expect("capital cash flows")
+        .to_table()
+        .expect("table");
+    let column = |name: &str| {
+        table
+            .columns
+            .iter()
+            .find(|column| column.name == name)
+            .unwrap_or_else(|| panic!("column {name}"))
+    };
+    let (TableColumnData::Float64(values), TableColumnData::String(amounts)) =
+        (&column("value").data, &column("amount").data)
+    else {
+        panic!("value is a float column and amount a text column");
+    };
+    assert_eq!(values.len(), amounts.len());
+    for (value, amount) in values.iter().zip(amounts) {
+        let exact: rust_decimal::Decimal = amount.parse().expect("decimal text");
+        assert_eq!(exact.to_string(), *amount);
+        assert!((value - f64::try_from(exact).expect("float view")).abs() < 1e-9);
+    }
+    assert!(amounts.iter().any(|amount| amount == "1000"));
+}
