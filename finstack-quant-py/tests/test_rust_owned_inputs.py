@@ -15,7 +15,27 @@ import pytest
 from finstack_quant import statements
 from finstack_quant.calibration import VolQuote
 from finstack_quant.models import liquidity, volatility
+from finstack_quant.portfolio import Portfolio
 from finstack_quant.statements_analytics import GoalSeekResult, TerminalValueSpec, evaluate_dcf
+
+
+def test_metadata_keeps_json_like_strings_literal() -> None:
+    model = statements.ModelBuilder("metadata").periods("2025Q1..Q1", "2025Q1")
+    model.value("revenue", [("2025Q1", 100.0)])
+    book = Portfolio.builder("metadata", "USD", "2025-01-01")
+    metadata = {"ticker": "123", "description": '{"active":true}', "nested": {"value": "null"}}
+
+    for key, value in metadata.items():
+        model.with_meta(key, value)
+        book.meta(key, value)
+
+    with pytest.raises(ValueError, match="non-finite"):
+        model.with_meta("invalid", float("nan"))
+    with pytest.raises(ValueError, match="non-finite"):
+        book.meta("invalid", {"rate": float("inf")})
+
+    assert json.loads(model.build().to_json())["meta"] == metadata
+    assert book.build().meta == metadata
 
 
 def _dcf_model() -> statements.FinancialModelSpec:
@@ -24,7 +44,7 @@ def _dcf_model() -> statements.FinancialModelSpec:
     builder = statements.ModelBuilder("dcf")
     builder.periods("2025..2026")
     builder.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-    builder.with_meta("currency", '"USD"')
+    builder.with_meta("currency", "USD")
     return builder.build()
 
 

@@ -372,7 +372,7 @@ class ModelBuilder:
 
     def with_meta(self, key: str, value: Any) -> ModelBuilder:
         """
-        Add model-level metadata from a JSON payload.
+        Add model-level metadata from a Python value.
 
         Parameters
         ----------
@@ -381,7 +381,8 @@ class ModelBuilder:
             value in serialized model output. ``currency`` selects the model's
             reporting currency.
         value:
-            JSON-serializable metadata value. For ``currency``, supply a supported
+            JSON-serializable metadata value. Strings are stored verbatim. For
+            ``currency``, supply a supported
             three-letter currency-code string such as ``"USD"``; ``build()``
             raises ``ValueError`` for malformed currency metadata.
 
@@ -393,8 +394,10 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If ``value`` is not JSON-serialisable, periods are not configured, or the builder
-            has already been consumed.
+            If ``value`` contains a non-finite float, periods are not configured, or
+            the builder has already been consumed.
+        TypeError
+            If ``value`` cannot be serialized as JSON.
 
         """
         ...

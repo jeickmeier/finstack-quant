@@ -280,7 +280,7 @@ def test_simulate_paths_scheme_changes_the_paths_but_not_the_seeded_draws() -> N
             {**_GBM_SPEC, "process": {"type": "cir", "kappa": 0.5, "theta": 0.04, "sigma": 0.1}, "scheme": "milstein"},
             "scheme 'milstein' is not available for process 'cir'",
         ),
-        ("not json", "invalid PathSimulationSpec"),
+        ("{bad", "invalid PathSimulationSpec JSON"),
         (42, "invalid PathSimulationSpec"),
     ],
 )

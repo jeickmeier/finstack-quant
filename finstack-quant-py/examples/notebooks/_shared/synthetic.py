@@ -189,7 +189,7 @@ def demo_pl_builder(
         f"{ids[0]}..{ids[-1]}",
         actual_through if actual_through is not None else ids[(len(ids) + 1) // 2 - 1],
     )
-    builder.with_meta("currency", f'"{currency}"')
+    builder.with_meta("currency", currency)
 
     builder.value("revenue", _pairs("revenue", revenue if revenue is not None else DEMO_PL_REVENUE))
     builder.value("cogs", _pairs("cogs", cogs if cogs is not None else DEMO_PL_COGS))

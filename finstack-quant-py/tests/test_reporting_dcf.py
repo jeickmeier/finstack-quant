@@ -124,7 +124,7 @@ def test_bridge_reconciles_to_rust_equity_value_with_valuation_discounts() -> No
     builder = statements.ModelBuilder("dcf")
     builder.periods("2025..2026")
     builder.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-    builder.with_meta("currency", '"USD"')
+    builder.with_meta("currency", "USD")
     result = evaluate_dcf(
         builder.build(),
         {

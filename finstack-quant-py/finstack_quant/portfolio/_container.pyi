@@ -154,7 +154,8 @@ class PortfolioBuilder:
         key : str
             Metadata key.
         value : object
-            Any ``json.dumps``-able value stored on the built portfolio.
+            A JSON-serializable value stored on the built portfolio. Strings
+            are stored verbatim.
 
         Returns
         -------
@@ -164,7 +165,10 @@ class PortfolioBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``.
+            If the builder was already consumed by ``build()`` or the value
+            contains a non-finite float.
+        TypeError
+            If the value cannot be serialized as JSON.
         """
         ...
 

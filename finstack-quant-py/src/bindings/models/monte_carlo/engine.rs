@@ -2,9 +2,9 @@
 
 use super::results::{PyMoneyEstimate, PyPathSummary};
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::module_utils::{opt_spec_from_py, py_to_json_value, spec_from_py};
+use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pydoc::pydoc;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
 use pyo3::prelude::*;
@@ -13,10 +13,8 @@ use pyo3::prelude::*;
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSummary> {
-    let value = py_to_json_value(py, spec, "PathSimulationSpec")?;
+    let spec: PathSimulationSpec = spec_from_py(py, spec, "PathSimulationSpec")?;
     py.detach(move || {
-        let spec: PathSimulationSpec = serde_json::from_value(value)
-            .map_err(|e| serde_json_to_py(e, "invalid PathSimulationSpec"))?;
         finstack_quant_models::monte_carlo::simulate::simulate_paths(&spec).map_err(core_to_py)
     })
     .map(PyPathSummary::from_inner)

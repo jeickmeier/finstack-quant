@@ -1418,7 +1418,7 @@ def dcf_sensitivity(
     >>> b = ModelBuilder("dcf")
     >>> _ = b.periods("2025..2026")
     >>> _ = b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-    >>> _ = b.with_meta("currency", '"USD"')
+    >>> _ = b.with_meta("currency", "USD")
     >>> sens = dcf_sensitivity(
     ...     b.build(),
     ...     0.10,
@@ -1513,7 +1513,7 @@ def evaluate_dcf(
     >>> b = ModelBuilder("dcf")
     >>> _ = b.periods("2025..2026")
     >>> _ = b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-    >>> _ = b.with_meta("currency", '"USD"')
+    >>> _ = b.with_meta("currency", "USD")
     >>> inputs = {
     ...     "wacc": 0.10,
     ...     "terminal_value": TerminalValueSpec.gordon_growth(0.02),
@@ -1573,7 +1573,7 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     >>> from finstack_quant.statements_analytics import evaluate_lbo
     >>> b = ModelBuilder("m")
     >>> _ = b.periods("2025Q1..2026Q1", None)
-    >>> _ = b.with_meta("currency", '"USD"')
+    >>> _ = b.with_meta("currency", "USD")
     >>> quarters = ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"]
     >>> _ = b.value_money("ebitda", [(q, Money(v, "USD")) for q, v in zip(quarters, [100.0] * 4 + [120.0])])
     >>> _ = b.value_money("net_debt", [(q, Money(v, "USD")) for q, v in zip(quarters, [300.0] * 4 + [200.0])])

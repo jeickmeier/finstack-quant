@@ -335,7 +335,7 @@ class TestModelBuilderForecasts:
         b.value("cogs", [("2025Q1", 40.0)])
         b.compute("bonus", "revenue * 0.01")
         b.where_clause("bonus", "revenue > 50")
-        b.with_meta("source", '{"system":"unit-test"}')
+        b.with_meta("source", {"system": "unit-test"})
         b.add_metric_from_registry("fin.gross_profit", statements.Registry.with_builtins())
         model = b.build()
         assert model.has_node("fin.gross_profit")

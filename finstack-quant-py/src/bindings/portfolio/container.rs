@@ -8,7 +8,6 @@ use crate::bindings::date_utils::date_to_py;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::InstrumentArg;
 use crate::bindings::extract::extract_instrument;
-use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pandas_utils::serde_to_py;
@@ -479,7 +478,7 @@ impl PyPortfolioBuilder {
         Ok(slf)
     }
 
-    /// Attach a JSON-shaped metadata entry (any ``json.dumps``-able value).
+    /// Attach a JSON-shaped metadata entry. A Python string is stored verbatim.
     #[pyo3(text_signature = "(self, key, value)")]
     fn meta<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -487,7 +486,7 @@ impl PyPortfolioBuilder {
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let py = slf.py();
-        let value = py_to_json_value(py, value, "portfolio metadata")?;
+        let value = py_to_serde(py, value, "portfolio metadata")?;
         let builder = slf.take()?;
         slf.inner = Some(builder.meta(key, value));
         Ok(slf)

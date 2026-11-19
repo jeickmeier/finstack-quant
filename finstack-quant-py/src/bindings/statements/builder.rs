@@ -384,7 +384,7 @@ impl PyModelBuilder {
         key: &str,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = crate::bindings::module_utils::py_to_json_value(py, value, "meta value")?;
+        let value = crate::bindings::module_utils::py_to_serde(py, value, "meta value")?;
         slf.builder_mut()?.with_meta(key, value);
         Ok(slf)
     }
