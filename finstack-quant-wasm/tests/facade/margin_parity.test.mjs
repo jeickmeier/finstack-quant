@@ -358,7 +358,12 @@ test('margin metric constructors and methods match Python', () => {
 
   const fundingCost = margin.marginFundingCost(10_000_000, 0.05, 0.03, 'USD');
   close(fundingCost, metrics.funding_cost.wire, 'funding_cost');
-  close(margin.marginFundingCostSpread(fundingCost), metrics.funding_cost.spread, 'spread');
+  close(
+    margin.marginFundingCostSpreadRate(fundingCost),
+    metrics.funding_cost.spread,
+    'spread rate'
+  );
+  close(margin.marginFundingCostSpreadBp(fundingCost), 200, 'spread basis points');
   close(
     margin.marginFundingCostCostForPeriod(fundingCost, 0.25),
     metrics.funding_cost.cost_for_period,

@@ -321,7 +321,7 @@ def compute() -> dict[str, Any]:
         },
         "funding_cost": {
             "wire": _wire(funding_cost),
-            "spread": funding_cost.spread(),
+            "spread": funding_cost.spread_rate(),
             "cost_for_period": funding_cost.cost_for_period(0.25),
         },
         "haircut01": {"wire": _wire(haircut01), "haircut_bp": haircut01.haircut_bp()},

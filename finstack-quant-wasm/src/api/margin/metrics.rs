@@ -217,8 +217,8 @@ pub fn margin_funding_cost(
 /// # Errors
 ///
 /// Throws if `funding_cost` is malformed.
-#[wasm_bindgen(js_name = marginFundingCostSpread)]
-pub fn margin_funding_cost_spread(
+#[wasm_bindgen(js_name = marginFundingCostSpreadRate)]
+pub fn margin_funding_cost_spread_rate(
     #[wasm_bindgen(
         js_name = "fundingCost",
         unchecked_param_type = "MarginFundingCost | string"
@@ -226,7 +226,26 @@ pub fn margin_funding_cost_spread(
     funding_cost: JsValue,
 ) -> Result<f64, JsValue> {
     let value: metrics::MarginFundingCost = from_js_json(&funding_cost, "fundingCost")?;
-    Ok(value.spread())
+    Ok(value.spread_rate())
+}
+
+/// Funding spread: funding rate minus collateral rate.
+/// @param fundingCost - `MarginFundingCost` (object or JSON).
+/// @returns The spread in annualized basis points.
+///
+/// # Errors
+///
+/// Throws if `funding_cost` is malformed.
+#[wasm_bindgen(js_name = marginFundingCostSpreadBp)]
+pub fn margin_funding_cost_spread_bp(
+    #[wasm_bindgen(
+        js_name = "fundingCost",
+        unchecked_param_type = "MarginFundingCost | string"
+    )]
+    funding_cost: JsValue,
+) -> Result<f64, JsValue> {
+    let value: metrics::MarginFundingCost = from_js_json(&funding_cost, "fundingCost")?;
+    Ok(value.spread_bp())
 }
 
 /// Funding cost over a period: `annual_cost * year_fraction`.

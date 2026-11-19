@@ -2094,7 +2094,8 @@
       "marginCallTypeFromStr",
       "marginFundingCost",
       "marginFundingCostCostForPeriod",
-      "marginFundingCostSpread",
+      "marginFundingCostSpreadBp",
+      "marginFundingCostSpreadRate",
       "marginTenorFromStr",
       "marginUtilization",
       "marginUtilizationIsAdequate",
@@ -2352,7 +2353,10 @@
   "margin.marginFundingCostCostForPeriod": {
     "kind": "function"
   },
-  "margin.marginFundingCostSpread": {
+  "margin.marginFundingCostSpreadBp": {
+    "kind": "function"
+  },
+  "margin.marginFundingCostSpreadRate": {
     "kind": "function"
   },
   "margin.marginTenorFromStr": {

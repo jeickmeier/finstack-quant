@@ -7799,13 +7799,23 @@ export interface MarginNamespace {
   /**
    * Funding spread: funding rate minus collateral rate.
    * @param fundingCost - `MarginFundingCost` (object or JSON).
+   * @returns The spread in annualized basis points.
+   *
+   * # Errors
+   *
+   * Throws if `funding_cost` is malformed.
+   */
+  readonly marginFundingCostSpreadBp: typeof wasm.marginFundingCostSpreadBp;
+  /**
+   * Funding spread: funding rate minus collateral rate.
+   * @param fundingCost - `MarginFundingCost` (object or JSON).
    * @returns The spread as an annualized decimal.
    *
    * # Errors
    *
    * Throws if `funding_cost` is malformed.
    */
-  readonly marginFundingCostSpread: typeof wasm.marginFundingCostSpread;
+  readonly marginFundingCostSpreadRate: typeof wasm.marginFundingCostSpreadRate;
   /**
    * Parse a margin call frequency from its lower-case wire label.
    * @param s - One of `"daily"`, `"weekly"`, `"monthly"`, `"on_demand"`.

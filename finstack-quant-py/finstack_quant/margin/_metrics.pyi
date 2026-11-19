@@ -529,7 +529,7 @@ class MarginFundingCost:
     Examples
     --------
     >>> m = MarginFundingCost(1e6, 0.05, 0.01, "USD")
-    >>> m.spread() == 0.04
+    >>> m.spread_rate() == 0.04
     True
     """
 
@@ -700,14 +700,14 @@ class MarginFundingCost:
         """
         ...
 
-    def spread(self) -> float:
+    def spread_rate(self) -> float:
         """
         Funding spread (funding rate − collateral rate).
 
         Returns
         -------
         float
-            Net spread.
+            Annualized decimal rate (0.02 represents 2%).
 
         Notes
         -----
@@ -715,8 +715,28 @@ class MarginFundingCost:
 
         Examples
         --------
-        >>> round(MarginFundingCost(0.0, 0.05, 0.02, "USD").spread(), 2)
+        >>> round(MarginFundingCost(0.0, 0.05, 0.02, "USD").spread_rate(), 2)
         0.03
+        """
+        ...
+
+    def spread_bp(self) -> float:
+        """
+        Return the annualized funding spread in basis points.
+
+        Returns
+        -------
+        float
+            Funding rate minus collateral rate, in basis points.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> round(MarginFundingCost(0.0, 0.05, 0.02, "USD").spread_bp(), 2)
+        300.0
         """
         ...
 
@@ -753,11 +773,11 @@ class MarginFundingCost:
         Export the result as a single-row pandas ``DataFrame``.
 
         Columns: ``margin_posted``, ``funding_rate``, ``collateral_rate``,
-        ``spread``, ``annual_cost``, ``currency``.
+        ``spread_rate``, ``annual_cost``, ``currency``.
 
         ``margin_posted`` and ``annual_cost`` are floats in ``currency``; the
         three rate columns are annualized decimal fractions (``0.03`` = 3%).
-        ``annual_cost`` is ``margin_posted * spread``, so a collateral rate
+        ``annual_cost`` is ``margin_posted * spread_rate``, so a collateral rate
         above the funding rate makes it negative (a funding benefit).
 
         Returns

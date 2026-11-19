@@ -2916,7 +2916,7 @@ excluded = { initial_margin = "literal", substitution = "literal", top_up = "lit
 renames = { from_str = { js = "margin.marginCallTypeFromStr", reason = "WASM MarginCallType values are plain wire labels; Rust MarginCallType::from_str is a free function returning the canonical label" } }
 
 [parity.members."finstack_quant.margin.MarginFundingCost"]
-renames = { cost_for_period = { js = "margin.marginFundingCostCostForPeriod", reason = "WASM MarginFundingCost values are plain objects; the Rust MarginFundingCost::cost_for_period method is a free function taking the object" }, spread = { js = "margin.marginFundingCostSpread", reason = "WASM MarginFundingCost values are plain objects; the Rust MarginFundingCost::spread method is a free function taking the object" } }
+renames = { cost_for_period = { js = "margin.marginFundingCostCostForPeriod", reason = "WASM MarginFundingCost values are plain objects; the Rust MarginFundingCost::cost_for_period method is a free function taking the object" }, spread_rate = { js = "margin.marginFundingCostSpreadRate", reason = "WASM MarginFundingCost is a plain value; the decimal-rate accessor takes it as an argument" }, spread_bp = { js = "margin.marginFundingCostSpreadBp", reason = "WASM MarginFundingCost is a plain value; the basis-point accessor takes it as an argument" } }
 
 [parity.members."finstack_quant.margin.MarginTenor"]
 excluded = { daily = "literal", monthly = "literal", on_demand = "literal", weekly = "literal" }

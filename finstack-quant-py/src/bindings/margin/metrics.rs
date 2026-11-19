@@ -350,8 +350,13 @@ impl PyMarginFundingCost {
     }
 
     /// Funding spread (funding rate - collateral rate), decimal.
-    fn spread(&self) -> f64 {
-        self.inner.spread()
+    fn spread_rate(&self) -> f64 {
+        self.inner.spread_rate()
+    }
+
+    /// Annualized funding spread in basis points.
+    fn spread_bp(&self) -> f64 {
+        self.inner.spread_bp()
     }
 
     /// Cost for a period of ``year_fraction`` years; raises ``ValueError``
@@ -366,18 +371,18 @@ impl PyMarginFundingCost {
     /// Export the result as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``margin_posted``, ``funding_rate``, ``collateral_rate``,
-    /// ``spread``, ``annual_cost``, ``currency``.
+    /// ``spread_rate``, ``annual_cost``, ``currency``.
     ///
     /// ``margin_posted`` and ``annual_cost`` are floats in ``currency``; the
     /// three rate columns are annualized decimal fractions (``0.03`` = 3%).
-    /// ``annual_cost`` is ``margin_posted * spread``, so a collateral rate
+    /// ``annual_cost`` is ``margin_posted * spread_rate``, so a collateral rate
     /// above the funding rate makes it negative (a funding benefit).
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("margin_posted", vec![self.inner.margin_posted.amount()])?;
         data.set_item("funding_rate", vec![self.inner.funding_rate])?;
         data.set_item("collateral_rate", vec![self.inner.collateral_rate])?;
-        data.set_item("spread", vec![self.inner.spread()])?;
+        data.set_item("spread_rate", vec![self.inner.spread_rate()])?;
         data.set_item("annual_cost", vec![self.inner.annual_cost.amount()])?;
         data.set_item(
             "currency",

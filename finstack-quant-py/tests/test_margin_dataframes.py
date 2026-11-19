@@ -293,12 +293,13 @@ def test_margin_funding_cost_to_dataframe() -> None:
         "margin_posted",
         "funding_rate",
         "collateral_rate",
-        "spread",
+        "spread_rate",
         "annual_cost",
         "currency",
     ]
     row = df.iloc[0]
-    assert row["spread"] == pytest.approx(0.02)
+    assert row["spread_rate"] == pytest.approx(0.02)
+    assert metric.spread_bp() == pytest.approx(200.0)
     assert row["annual_cost"] == pytest.approx(20_000.0)
     assert row["currency"] == "USD"
 
