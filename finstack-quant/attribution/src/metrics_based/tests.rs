@@ -1124,7 +1124,7 @@ fn credit_rejects_invalid_serialized_closing_pillar() {
         .base_date(base)
         .day_count(closing_curve.day_count())
         .recovery_rate(0.4)
-        .knots(closing_curve.knot_points())
+        .knots(closing_curve.iter_knots())
         .hazard_calibration(recipe)
         .build()
         .expect("core stores the opaque payload");

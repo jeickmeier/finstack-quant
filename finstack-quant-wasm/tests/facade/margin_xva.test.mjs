@@ -326,7 +326,8 @@ test('HazardCurve JSON round trip and members pass through Rust', () => {
   });
   const back = core.HazardCurve.fromJson(hz.toJson());
   assert.equal(back.toJson(), hz.toJson());
-  assert.deepEqual([...hz.knotPoints], [1.0, 0.02, 5.0, 0.03]);
+  assert.deepEqual([...hz.knots], [1.0, 5.0]);
+  assert.deepEqual([...hz.hazardRates], [0.02, 0.03]);
   assert.equal(hz.dayCount, 'act_365f');
   assert.equal(hz.calendarId, undefined);
   assert.equal(hz.issuer, 'ACME');

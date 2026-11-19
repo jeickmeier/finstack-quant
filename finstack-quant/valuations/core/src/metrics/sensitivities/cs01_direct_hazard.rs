@@ -88,7 +88,7 @@ where
         let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;
         let min_lambda = hazard
-            .knot_points()
+            .iter_knots()
             .map(|(_, lambda)| lambda)
             .fold(f64::INFINITY, f64::min);
         let hazard01 =
@@ -116,7 +116,7 @@ where
         };
         let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;
-        let knots: Vec<(f64, f64)> = hazard.knot_points().collect();
+        let knots: Vec<(f64, f64)> = hazard.iter_knots().collect();
 
         let mut series = Vec::with_capacity(knots.len());
         let mut total = NeumaierAccumulator::new();

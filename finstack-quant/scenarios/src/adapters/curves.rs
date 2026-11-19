@@ -803,7 +803,7 @@ pub(crate) fn curve_node_effects(
                 .get_hazard(curve_id.as_str())
                 .map_err(|_| missing_market_err(curve_id.as_str()))?;
 
-            let knots: Vec<f64> = base_curve.knot_points().map(|(t, _)| t).collect();
+            let knots: Vec<f64> = base_curve.knots().to_vec();
             let result = resolve_bump_targets(
                 curve_id.as_str(),
                 nodes,

@@ -370,8 +370,13 @@ impl PyHazardCurve {
     /// -------
     /// pandas.DataFrame
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let (t, lambdas): (Vec<f64>, Vec<f64>) = self.inner.knot_points().unzip();
-        columns_to_dataframe(py, &[("t", t), ("hazard_rate", lambdas)])
+        columns_to_dataframe(
+            py,
+            &[
+                ("t", self.inner.knots().to_vec()),
+                ("hazard_rate", self.inner.hazard_rates().to_vec()),
+            ],
+        )
     }
 
     /// Curve identifier string.
@@ -392,10 +397,16 @@ impl PyHazardCurve {
         self.inner.recovery_rate()
     }
 
-    /// ``(time_years, hazard_rate)`` knots with hazard rates as decimals.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.market_data._curves.hazard", "HazardCurve.knots")]
     #[getter]
-    fn knot_points(&self) -> Vec<(f64, f64)> {
-        self.inner.knot_points().collect()
+    fn knots(&self) -> Vec<f64> {
+        self.inner.knots().to_vec()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.market_data._curves.hazard", "HazardCurve.hazard_rates")]
+    #[getter]
+    fn hazard_rates(&self) -> Vec<f64> {
+        self.inner.hazard_rates().to_vec()
     }
 
     /// Day-count convention label (e.g. ``"act_365f"``).
@@ -452,7 +463,7 @@ impl PyHazardCurve {
             "HazardCurve(id='{}', base_date='{}', knots={}, recovery_rate={})",
             self.inner.id().as_str(),
             self.inner.base_date(),
-            self.inner.knot_points().count(),
+            self.inner.knots().len(),
             self.inner.recovery_rate()
         )
     }

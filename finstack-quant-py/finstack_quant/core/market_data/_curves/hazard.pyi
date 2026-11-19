@@ -442,18 +442,32 @@ class HazardCurve:
         ...
 
     @property
-    def knot_points(self) -> list[tuple[float, float]]:
-        """
-        Piecewise hazard-rate term structure of the credit.
+    def knots(self) -> list[float]:
+        """Return the knot coordinates on the curve time axis.
 
         Returns
         -------
-        list[tuple[float, float]]
-            ``(time_years, hazard_rate)`` pairs in ascending time; hazard rates are continuous decimal intensities per year (``0.02`` is 2%/y).
+        list[float]
+            Years from the base date, in increasing order.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This property does not raise.
+        """
+        ...
+
+    @property
+    def hazard_rates(self) -> list[float]:
+        """Return the hazard intensities at the knots.
+
+        Returns
+        -------
+        list[float]
+            Continuous decimal intensities per year (0.02 is 2% per year).
+
+        Notes
+        -----
+        This property does not raise.
         """
         ...
 

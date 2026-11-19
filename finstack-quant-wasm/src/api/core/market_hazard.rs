@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve as RustHazard
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
-use crate::api::core::curve_args::{TimePoint, flat_pairs, flatten_pairs, js_time_point};
+use crate::api::core::curve_args::{TimePoint, flat_pairs, js_time_point};
 
 /// Credit hazard-rate curve for default-probability modelling.
 ///
@@ -393,10 +393,18 @@ impl JsHazardCurve {
         self.inner.recovery_rate()
     }
 
-    /// Knots as a flat `[t0, lambda0, t1, lambda1, …]` array (years, decimal intensities).
-    #[wasm_bindgen(getter, js_name = knotPoints)]
-    pub fn knot_points(&self) -> Box<[f64]> {
-        flatten_pairs(self.inner.knot_points())
+    /// Knot coordinates in years from the base date, in increasing order.
+    /// @returns A Float64Array of dates expressed as years from the base date.
+    #[wasm_bindgen(getter)]
+    pub fn knots(&self) -> Box<[f64]> {
+        self.inner.knots().into()
+    }
+
+    /// Continuous decimal hazard intensities per year, aligned with the knots.
+    /// @returns A Float64Array of hazard intensities.
+    #[wasm_bindgen(getter, js_name = hazardRates)]
+    pub fn hazard_rates(&self) -> Box<[f64]> {
+        self.inner.hazard_rates().into()
     }
 
     /// Day-count convention label (e.g. `"act_365f"`).
@@ -470,7 +478,8 @@ mod tests {
     #[test]
     fn hazard_curve_options_reach_the_rust_builder() {
         let curve = JsHazardCurve::build(hazard_options()).expect("hazard curve");
-        assert_eq!(&*curve.knot_points(), &[1.0, 0.02, 5.0, 0.03]);
+        assert_eq!(&*curve.knots(), &[1.0, 5.0]);
+        assert_eq!(&*curve.hazard_rates(), &[0.02, 0.03]);
         assert_eq!(curve.day_count(), "act_365f");
         assert_eq!(curve.calendar_id(), None);
         assert_eq!(curve.issuer().as_deref(), Some("ACME"));

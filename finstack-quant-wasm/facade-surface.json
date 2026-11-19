@@ -1398,9 +1398,10 @@
       "currency",
       "dayCount",
       "hazardCalibration",
+      "hazardRates",
       "id",
       "issuer",
-      "knotPoints",
+      "knots",
       "recoveryRate",
       "seniority"
     ]

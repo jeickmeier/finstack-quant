@@ -244,7 +244,7 @@ fn bumps_apply_direct_intensity_atomically_and_require_exact_knots() {
     let parallel = curve
         .apply_bump(BumpSpec::parallel_bp(10.0))
         .expect("parallel direct shift");
-    for ((_, base_l), (_, bumped_l)) in curve.knot_points().zip(parallel.knot_points()) {
+    for ((_, base_l), (_, bumped_l)) in curve.iter_knots().zip(parallel.iter_knots()) {
         assert!((bumped_l - base_l - 0.0010).abs() < 1e-15);
     }
 
@@ -252,7 +252,7 @@ fn bumps_apply_direct_intensity_atomically_and_require_exact_knots() {
     let tenor_bumped = curve
         .with_tenor_hazard_rate_bumps_bp(&[(3.0, 2.0), (5.0, 8.0)])
         .expect("exact unique knots");
-    let rates: Vec<f64> = tenor_bumped.knot_points().map(|(_, r)| r).collect();
+    let rates: Vec<f64> = tenor_bumped.iter_knots().map(|(_, r)| r).collect();
     assert!((rates[0] - 0.010).abs() < 1e-15);
     assert!((rates[1] - 0.0152).abs() < 1e-15);
     assert!((rates[2] - 0.0208).abs() < 1e-15);
@@ -288,8 +288,8 @@ fn bumps_apply_direct_intensity_atomically_and_require_exact_knots() {
         .expect_err("negative shifted hazard rate must fail");
     assert!(err.to_string().contains("negative hazard rate after bump"));
     assert_eq!(
-        attempted.knot_points().collect::<Vec<_>>(),
-        curve.knot_points().collect::<Vec<_>>()
+        attempted.iter_knots().collect::<Vec<_>>(),
+        curve.iter_knots().collect::<Vec<_>>()
     );
 }
 
@@ -317,18 +317,18 @@ fn triangular_key_rate_bumps_partition_the_parallel_hazard_shift() {
     for i in 0..buckets.len() {
         let bumped = curve.apply_bump(spec_for(i)).expect("key-rate bump");
         for (k, ((_, base_lambda), (_, lambda))) in
-            curve.knot_points().zip(bumped.knot_points()).enumerate()
+            curve.iter_knots().zip(bumped.iter_knots()).enumerate()
         {
             summed[k] += lambda - base_lambda;
         }
     }
     for (k, ((_, base_lambda), (_, lambda))) in
-        curve.knot_points().zip(parallel.knot_points()).enumerate()
+        curve.iter_knots().zip(parallel.iter_knots()).enumerate()
     {
         assert!((summed[k] - (lambda - base_lambda)).abs() < 1e-15);
     }
     let first = curve.apply_bump(spec_for(0)).expect("first bucket");
-    let lambda_2y = first.knot_points().nth(1).expect("2y knot").1;
+    let lambda_2y = first.iter_knots().nth(1).expect("2y knot").1;
     assert!((lambda_2y - (0.012 + 0.5 * 0.0010)).abs() < 1e-15);
 }
 

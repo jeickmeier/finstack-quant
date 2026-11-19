@@ -210,13 +210,13 @@ fn hazard_curve_calibration_is_deterministic_across_runs() {
     let base_date = Date::from_calendar_date(2025, Month::March, 20).unwrap();
 
     let baseline_curve = run_hazard_plan(base_date, build_credit_quotes());
-    let baseline_knots: Vec<(f64, f64)> = baseline_curve.knot_points().collect();
+    let baseline_knots: Vec<(f64, f64)> = baseline_curve.iter_knots().collect();
     assert!(!baseline_knots.is_empty(), "baseline should have knots");
 
     // Subsequent runs must match exactly (engine determinism).
     for i in 0..20 {
         let curve = run_hazard_plan(base_date, build_credit_quotes());
-        let knots: Vec<(f64, f64)> = curve.knot_points().collect();
+        let knots: Vec<(f64, f64)> = curve.iter_knots().collect();
         assert_eq!(
             knots, baseline_knots,
             "run {} produced different knots than baseline",

@@ -641,7 +641,7 @@ fn build_recovery_grid(
     }
     if let Some(h) = hazard {
         let h_base = h.base_date();
-        for (k_t, _) in h.knot_points() {
+        for (k_t, _) in h.iter_knots() {
             if !k_t.is_finite() || k_t <= 0.0 {
                 continue;
             }

@@ -806,7 +806,7 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
                 .expect("uncached horizon scenario");
             let expected = independent.get_hazard("ISSUER-A-CDS").unwrap();
             let actual = ctx.market.get_hazard("ISSUER-A-CDS").unwrap();
-            for (t, _) in expected.knot_points() {
+            for (t, _) in expected.iter_knots() {
                 assert!(
                     (actual.sp(t).unwrap() - expected.sp(t).unwrap()).abs() < 1e-12,
                     "cache must honor discount dependencies"
@@ -824,7 +824,7 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
             );
             if bp == 0.0 && discount_bp == 0.0 {
                 let rolled = original.condition(horizon).unwrap();
-                for (t, _) in rolled.knot_points() {
+                for (t, _) in rolled.iter_knots() {
                     assert!((curve.sp(t).unwrap() - rolled.sp(t).unwrap()).abs() < 1e-8);
                 }
             }
@@ -928,7 +928,7 @@ fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
                 .all(|input| input.pillar_date > horizon)
         );
         let conditional = original.condition(horizon).expect("conditional hazard");
-        for (t, _) in conditional.knot_points() {
+        for (t, _) in conditional.iter_knots() {
             assert!((rolled.sp(t).unwrap() - conditional.sp(t).unwrap()).abs() < 1e-8);
         }
         engine
@@ -949,7 +949,7 @@ fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
             .market
             .get_hazard("ISSUER-A-CDS")
             .expect("replayed hazard");
-        for (t, _) in rolled.knot_points() {
+        for (t, _) in rolled.iter_knots() {
             assert!((rolled.sp(t).unwrap() - replayed.sp(t).unwrap()).abs() < 1e-8);
         }
     }
@@ -1009,7 +1009,7 @@ fn default_provider_replays_calibrated_hazard_rolls_without_explicit_wiring() {
         let recipe = rolled.hazard_calibration().expect("usable horizon recipe");
         assert_eq!(recipe.hazard_params()["base_date"], horizon.to_string());
         let conditional = original.condition(horizon).expect("conditional hazard");
-        for (t, _) in conditional.knot_points() {
+        for (t, _) in conditional.iter_knots() {
             assert!((rolled.sp(t).unwrap() - conditional.sp(t).unwrap()).abs() < 1e-8);
         }
     }

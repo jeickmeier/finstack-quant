@@ -720,12 +720,19 @@ impl HazardCurve {
         self.fx_policy.as_deref()
     }
 
-    /// Iterate over `(time_years, hazard_rate)` knot points.
-    pub fn knot_points(&self) -> impl Iterator<Item = (f64, f64)> + '_ {
-        self.knots
-            .iter()
-            .zip(self.lambdas.iter())
-            .map(|(&t, &lambda)| (t, lambda))
+    /// Knot coordinates in years from the base date, in increasing order.
+    pub fn knots(&self) -> &[f64] {
+        &self.knots
+    }
+
+    /// Continuous decimal hazard intensities per year, aligned with the knots.
+    pub fn hazard_rates(&self) -> &[f64] {
+        &self.lambdas
+    }
+
+    /// Iterate over aligned knot years and continuous decimal hazard rates.
+    pub fn iter_knots(&self) -> impl Iterator<Item = (f64, f64)> + '_ {
+        self.knots.iter().copied().zip(self.lambdas.iter().copied())
     }
 
     /// Exact inputs used to calibrate this curve, when available.

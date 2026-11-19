@@ -2096,6 +2096,7 @@ js = "core"
 types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", GridMode = "GridMode", Period = "Period", PeriodPlan = "PeriodPlan", StubKind = "StubKind" }
 
 [parity.modules."finstack_quant.core.market_data"]
+# HazardCurve uses aligned knots and hazard_rates arrays on both hosts.
 # HazardCurve.conditional_default_prob maps by the snake_case/camelCase rule
 # to conditionalDefaultProb; both hosts delegate date interval integration to Rust.
 js = "core"
