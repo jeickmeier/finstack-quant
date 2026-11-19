@@ -278,3 +278,30 @@ pub fn decompose_factors(
         .map_err(to_js_err)?;
     to_js_value(&result)
 }
+
+/// Create a parametric value at risk measure for signed factor P&L.
+/// @param confidence - One-sided loss confidence strictly between 0.5 and 1.
+/// @returns The tagged RiskMeasure literal with its validated confidence.
+/// @throws TypeError for mistyped input and FinstackError for invalid confidence.
+#[wasm_bindgen(js_name = riskMeasureVar, unchecked_return_type = "generated.models.RiskMeasure")]
+pub fn risk_measure_var(
+    #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
+) -> Result<JsValue, JsValue> {
+    let confidence = crate::utils::input::js_f64(&confidence, "confidence")?;
+    let measure = finstack_quant_factor::RiskMeasure::var(confidence).map_err(to_js_err)?;
+    crate::utils::to_js_value(&measure)
+}
+
+/// Create a parametric expected shortfall measure for signed factor P&L.
+/// @param confidence - One-sided loss confidence strictly between 0.5 and 1.
+/// @returns The tagged RiskMeasure literal with its validated confidence.
+/// @throws TypeError for mistyped input and FinstackError for invalid confidence.
+#[wasm_bindgen(js_name = riskMeasureExpectedShortfall, unchecked_return_type = "generated.models.RiskMeasure")]
+pub fn risk_measure_expected_shortfall(
+    #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
+) -> Result<JsValue, JsValue> {
+    let confidence = crate::utils::input::js_f64(&confidence, "confidence")?;
+    let measure =
+        finstack_quant_factor::RiskMeasure::expected_shortfall(confidence).map_err(to_js_err)?;
+    crate::utils::to_js_value(&measure)
+}

@@ -15,7 +15,7 @@ import pytest
 
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.models.factor import FactorCovarianceMatrix
-from finstack_quant.models.factor.risk import decompose_factors
+from finstack_quant.models.factor.risk import RiskMeasure, decompose_factors
 from finstack_quant.portfolio import Portfolio, SensitivityMatrix, compute_factor_sensitivities
 
 SENSITIVITY_WIRE = {
@@ -77,3 +77,13 @@ def test_engine_output_uses_the_wire_form() -> None:
         "factor_ids": [],
         "data": [],
     }
+
+
+def test_typed_tail_measure_matches_its_canonical_wire() -> None:
+    matrix = SensitivityMatrix.from_json(json.dumps(SENSITIVITY_WIRE))
+    measure = RiskMeasure.expected_shortfall(0.975)
+    typed = decompose_factors(matrix, SENSITIVITY_COVARIANCE, measure)
+    wire = decompose_factors(matrix, SENSITIVITY_COVARIANCE, {"expected_shortfall": {"confidence": 0.975}})
+    assert typed.to_json() == wire.to_json()
+    with pytest.raises(ValueError, match="confidence"):
+        RiskMeasure.var(1.0)

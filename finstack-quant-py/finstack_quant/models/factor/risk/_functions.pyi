@@ -42,10 +42,120 @@ def position_component_var(
     """
     ...
 
+class RiskMeasure:
+    """Select a covariance-based aggregation measure for factor exposure.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.factor.risk import RiskMeasure
+    >>> isinstance(RiskMeasure.variance(), RiskMeasure)
+    True
+    """
+
+    @staticmethod
+    def variance() -> RiskMeasure:
+        """Select covariance-based portfolio variance.
+
+        Returns
+        -------
+        RiskMeasure
+            The aggregation measure for the factor-risk report.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.risk import RiskMeasure
+        >>> isinstance(RiskMeasure.variance(), RiskMeasure)
+        True
+        """
+        ...
+
+    @staticmethod
+    def volatility() -> RiskMeasure:
+        """Select the square root of covariance-based portfolio variance.
+
+        Returns
+        -------
+        RiskMeasure
+            The aggregation measure for the factor-risk report.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.risk import RiskMeasure
+        >>> isinstance(RiskMeasure.volatility(), RiskMeasure)
+        True
+        """
+        ...
+
+    @staticmethod
+    def var(confidence: float) -> RiskMeasure:
+        """Select parametric value at risk on the signed P&L axis.
+
+        Parameters
+        ----------
+        confidence : float
+            One-sided loss confidence, a decimal strictly between 0.5 and 1.
+
+        Returns
+        -------
+        RiskMeasure
+            The aggregation measure for the factor-risk report.
+
+        Raises
+        ------
+        ValueError
+            If confidence is outside the open interval or non-finite.
+        TypeError
+            If confidence is not numeric.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.risk import RiskMeasure
+        >>> isinstance(RiskMeasure.var(0.975), RiskMeasure)
+        True
+        """
+        ...
+
+    @staticmethod
+    def expected_shortfall(confidence: float) -> RiskMeasure:
+        """Select parametric expected shortfall on the signed P&L axis.
+
+        Parameters
+        ----------
+        confidence : float
+            One-sided loss confidence, a decimal strictly between 0.5 and 1.
+
+        Returns
+        -------
+        RiskMeasure
+            The aggregation measure for the factor-risk report.
+
+        Raises
+        ------
+        ValueError
+            If confidence is outside the open interval or non-finite.
+        TypeError
+            If confidence is not numeric.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.risk import RiskMeasure
+        >>> isinstance(RiskMeasure.expected_shortfall(0.975), RiskMeasure)
+        True
+        """
+        ...
+
 def decompose_factors(
     sensitivities: SensitivityMatrix,
     covariance: FactorCovarianceMatrix | str | Mapping[str, Any],
-    risk_measure: str | Mapping[str, Any] | None = None,
+    risk_measure: RiskMeasure | str | Mapping[str, Any] | None = None,
 ) -> RiskDecomposition:
     """
         Decompose portfolio risk into factor and position contributions.
@@ -67,7 +177,7 @@ def decompose_factors(
             (``{"factor_ids": [...], "n": n, "data": [row-major n x n]}``) of
             factor-return variances and covariances. Must use the same factor IDs
             and ordering as ``sensitivities``.
-        risk_measure : str or Mapping[str, Any] or None, optional
+        risk_measure : RiskMeasure or str or Mapping[str, Any] or None, optional
             ``RiskMeasure`` wire value: ``"variance"``, ``"volatility"``,
             ``{"var": {"confidence": 0.99}}`` or
             ``{"expected_shortfall": {"confidence": 0.975}}``. ``None`` uses the

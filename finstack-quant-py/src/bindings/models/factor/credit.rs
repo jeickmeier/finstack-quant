@@ -1523,14 +1523,7 @@ impl PyFactorCovarianceForecast {
         risk_measure: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyFactorModelConfig> {
         let h = extract_vol_horizon(horizon)?;
-        let measure: finstack_quant_factor::RiskMeasure = match risk_measure {
-            Some(obj) if !obj.is_none() => {
-                let value = py_to_json_value(py, obj, "risk_measure")?;
-                serde_json::from_value(value)
-                    .map_err(|e| serde_json_to_py(e, "invalid risk_measure"))?
-            }
-            _ => finstack_quant_factor::RiskMeasure::default(),
-        };
+        let measure = super::risk::functions::extract_risk_measure(py, risk_measure)?;
         let config = py
             .detach(|| {
                 let forecast =

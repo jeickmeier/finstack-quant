@@ -5368,6 +5368,20 @@ export interface ModelsFactorRiskNamespace {
    */
   readonly decomposeFactors: typeof wasm.decomposeFactors;
   /**
+   * Create a parametric expected shortfall measure for signed factor P&L.
+   * @param confidence - One-sided loss confidence strictly between 0.5 and 1.
+   * @returns The tagged RiskMeasure literal with its validated confidence.
+   * @throws TypeError for mistyped input and FinstackError for invalid confidence.
+   */
+  readonly riskMeasureExpectedShortfall: typeof wasm.riskMeasureExpectedShortfall;
+  /**
+   * Create a parametric value at risk measure for signed factor P&L.
+   * @param confidence - One-sided loss confidence strictly between 0.5 and 1.
+   * @returns The tagged RiskMeasure literal with its validated confidence.
+   * @throws TypeError for mistyped input and FinstackError for invalid confidence.
+   */
+  readonly riskMeasureVar: typeof wasm.riskMeasureVar;
+  /**
    * Default utilization threshold of `evaluateRiskBudget`. Twin of the Rust and
    * Python constant `DEFAULT_UTILIZATION_THRESHOLD`.
    * @returns The threshold as a fraction of the risk budget.

@@ -88,6 +88,32 @@ pub enum RiskMeasure {
 }
 
 impl RiskMeasure {
+    /// Create a parametric Value at Risk measure at the supplied confidence.
+    ///
+    /// # Arguments
+    /// * `confidence` - One-sided loss confidence in the open interval (0.5, 1).
+    ///
+    /// # Errors
+    /// Returns a validation error for non-finite or out-of-range confidence.
+    pub fn var(confidence: f64) -> finstack_quant_core::Result<Self> {
+        let measure = Self::VaR { confidence };
+        measure.validate()?;
+        Ok(measure)
+    }
+
+    /// Create a parametric expected shortfall measure at the supplied confidence.
+    ///
+    /// # Arguments
+    /// * `confidence` - One-sided loss confidence in the open interval (0.5, 1).
+    ///
+    /// # Errors
+    /// Returns a validation error for non-finite or out-of-range confidence.
+    pub fn expected_shortfall(confidence: f64) -> finstack_quant_core::Result<Self> {
+        let measure = Self::ExpectedShortfall { confidence };
+        measure.validate()?;
+        Ok(measure)
+    }
+
     /// Validate any embedded confidence levels before downstream risk calculations use them.
     ///
     /// Variance and volatility carry no additional parameters. Parametric VaR

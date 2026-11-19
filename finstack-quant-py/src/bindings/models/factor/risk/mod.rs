@@ -1,7 +1,7 @@
 //! Models-owned factor risk wrappers and pure calculation entry points.
 mod budget;
 pub(crate) mod contributions;
-mod functions;
+pub(super) mod functions;
 mod report;
 mod stress;
 use budget::{
@@ -27,6 +27,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFactorContribution>()?;
     m.add_class::<PyPositionFactorContribution>()?;
     m.add_class::<PyPositionResidualContribution>()?;
+    m.add_class::<functions::PyRiskMeasure>()?;
     m.add_class::<PyRiskDecomposition>()?;
     m.add_class::<PyPositionVarContribution>()?;
     m.add_class::<PyPositionEsContribution>()?;

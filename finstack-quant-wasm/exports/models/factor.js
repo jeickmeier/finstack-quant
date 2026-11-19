@@ -57,6 +57,8 @@ const risk = {
   buildStressAttribution: wasm.buildStressAttribution,
   positionComponentVar: wasm.positionComponentVar,
   decomposeFactors: wasm.decomposeFactors,
+  riskMeasureExpectedShortfall: wasm.riskMeasureExpectedShortfall,
+  riskMeasureVar: wasm.riskMeasureVar,
   defaultUtilizationThreshold: wasm.defaultUtilizationThreshold,
 };
 

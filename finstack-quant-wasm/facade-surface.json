@@ -3075,7 +3075,9 @@
       "evaluateRiskBudget",
       "evaluateRiskBudgetFromDecomposition",
       "positionComponentVar",
-      "positionRiskReport"
+      "positionRiskReport",
+      "riskMeasureExpectedShortfall",
+      "riskMeasureVar"
     ]
   },
   "models.factor.risk.positionRiskReport": {
@@ -3094,6 +3096,12 @@
     "kind": "function"
   },
   "models.factor.risk.decomposeFactors": {
+    "kind": "function"
+  },
+  "models.factor.risk.riskMeasureExpectedShortfall": {
+    "kind": "function"
+  },
+  "models.factor.risk.riskMeasureVar": {
     "kind": "function"
   },
   "models.factor.risk.defaultUtilizationThreshold": {

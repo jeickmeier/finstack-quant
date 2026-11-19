@@ -15,6 +15,7 @@ FactorContribution = _risk.FactorContribution
 PositionFactorContribution = _risk.PositionFactorContribution
 PositionResidualContribution = _risk.PositionResidualContribution
 RiskDecomposition = _risk.RiskDecomposition
+RiskMeasure = _risk.RiskMeasure
 PositionVarContribution = _risk.PositionVarContribution
 PositionEsContribution = _risk.PositionEsContribution
 PositionRiskDecomposition = _risk.PositionRiskDecomposition
@@ -50,6 +51,7 @@ __all__: list[str] = [
     "PositionVarContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
+    "RiskMeasure",
     "StressAttribution",
     "StressPositionEntry",
     "TailScenarioBreakdown",

@@ -202,6 +202,7 @@ public = [
     "PositionVarContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
+    "RiskMeasure",
     "StressAttribution",
     "StressPositionEntry",
     "TailScenarioBreakdown",
@@ -2231,7 +2232,7 @@ js = "models.factor.credit"
 
 [parity.modules."finstack_quant.models.factor.risk"]
 js = "models.factor.risk"
-types = { FactorContribution = "FactorContribution", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionRiskBudget = "PositionRiskBudget", PositionRiskReport = "PositionRiskReport", PositionRiskRequest = "PositionRiskRequest", PositionRiskSource = "PositionRiskSource", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
+types = { RiskMeasure = "RiskMeasure", FactorContribution = "FactorContribution", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionRiskBudget = "PositionRiskBudget", PositionRiskReport = "PositionRiskReport", PositionRiskRequest = "PositionRiskRequest", PositionRiskSource = "PositionRiskSource", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
 
 [parity.modules."finstack_quant.models.factor.schema"]
 js = "models.factor.schema"
@@ -2609,6 +2610,13 @@ renames = { deposit = { js = "calibration.rateQuoteDeposit", reason = "WASM quot
 
 [parity.members."finstack_quant.calibration.VolQuote"]
 renames = { cap_floor_vol = { js = "calibration.volQuoteCapFloorVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::cap_floor_vol)" }, option_vol = { js = "calibration.volQuoteOptionVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::option_vol)" }, swaption_vol = { js = "calibration.volQuoteSwaptionVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::swaption_vol)" } }
+
+[parity.members."finstack_quant.models.factor.risk.RiskMeasure"]
+renames = { var = { js = "models.factor.risk.riskMeasureVar", reason = "Rust RiskMeasure::var returns a validated literal in WASM" }, expected_shortfall = { js = "models.factor.risk.riskMeasureExpectedShortfall", reason = "Rust RiskMeasure::expected_shortfall returns a validated literal in WASM" } }
+
+[parity.members."finstack_quant.models.factor.risk.RiskMeasure".excluded]
+variance = "literal"
+volatility = "literal"
 
 [parity.members."finstack_quant.models.factor.risk.PositionRiskSource"]
 excluded = { historical = "literal", parametric = "literal" }

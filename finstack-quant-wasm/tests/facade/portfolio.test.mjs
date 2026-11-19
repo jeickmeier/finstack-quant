@@ -157,6 +157,15 @@ test('models.factor.risk.decomposeFactors consumes the canonical Python monetary
   }
 });
 
+test('tail risk factories validate confidence before decomposition', () => {
+  const risk = models.factor.risk;
+  const es = risk.riskMeasureExpectedShortfall(0.975);
+  assert.deepEqual(es, { expected_shortfall: { confidence: 0.975 } });
+  assert.deepEqual(risk.riskMeasureVar(0.99), { var: { confidence: 0.99 } });
+  assert.throws(() => risk.riskMeasureVar(1.0), /confidence/);
+  assert.deepEqual(risk.decomposeFactors(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, es).measure, es);
+});
+
 test('models.factor.risk.decomposeFactors rejects malformed matrices and missing reporting currency', () => {
   const valid = { base_currency: 'USD', position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
   const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
