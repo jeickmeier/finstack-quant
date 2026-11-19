@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed zero-coupon inflation swap and its builder."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class InflationSwap:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Zero-coupon swap exchanging realized inflation index growth for a fixed leg.
 
     Examples
     --------
@@ -26,7 +26,7 @@ class InflationSwap:
 
     @staticmethod
     def builder() -> InflationSwapBuilder:
-        """Start specifying an bond future.
+        """Start authoring a zero-coupon inflation swap.
 
         Returns
         -------
@@ -40,7 +40,7 @@ class InflationSwap:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import InflationSwap
-        >>> _ = InflationSwap.builder().id("TYU5")
+        >>> _ = InflationSwap.builder().id("example-inflation-swap")
         """
         ...
 
@@ -60,7 +60,7 @@ class InflationSwap:
 
     @staticmethod
     def example() -> InflationSwap:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in zero-coupon inflation swap example.
 
         Returns
         -------
@@ -131,7 +131,7 @@ class InflationSwap:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this zero-coupon inflation swap as a plain Python ``dict``.
 
         Returns
         -------
@@ -155,7 +155,7 @@ class InflationSwap:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this zero-coupon inflation swap and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -166,7 +166,7 @@ class InflationSwap:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -192,9 +192,8 @@ class InflationSwap:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -208,7 +207,7 @@ class InflationSwap:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this zero-coupon inflation swap.
 
         Parameters
         ----------
@@ -233,7 +232,7 @@ class InflationSwap:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -281,7 +280,7 @@ class InflationSwap:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -613,7 +612,7 @@ class InflationSwapBuilder:
         ...
 
     def id(self, value: str) -> InflationSwapBuilder:
-        """Set the bond's id.
+        """Set the zero-coupon inflation swap identifier.
 
         Parameters
         ----------
@@ -895,7 +894,7 @@ class InflationSwapBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> InflationSwapBuilder:
-        """Set the bond's attributes.
+        """Set the zero-coupon inflation swap grouping and filter attributes.
 
         Parameters
         ----------

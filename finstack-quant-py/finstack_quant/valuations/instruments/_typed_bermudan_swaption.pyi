@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed Bermudan swaption and its builder."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class BermudanSwaption:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Interest-rate swap option exercisable on specified dates.
 
     Examples
     --------
@@ -26,7 +26,7 @@ class BermudanSwaption:
 
     @staticmethod
     def builder() -> BermudanSwaptionBuilder:
-        """Start specifying an bond future.
+        """Start authoring a Bermudan swaption.
 
         Returns
         -------
@@ -40,7 +40,7 @@ class BermudanSwaption:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import BermudanSwaption
-        >>> _ = BermudanSwaption.builder().id("TYU5")
+        >>> _ = BermudanSwaption.builder().id("example-bermudan-swaption")
         """
         ...
 
@@ -60,7 +60,7 @@ class BermudanSwaption:
 
     @staticmethod
     def example() -> BermudanSwaption:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in Bermudan swaption example.
 
         Returns
         -------
@@ -131,7 +131,7 @@ class BermudanSwaption:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this Bermudan swaption as a plain Python ``dict``.
 
         Returns
         -------
@@ -155,7 +155,7 @@ class BermudanSwaption:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this Bermudan swaption and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -166,7 +166,7 @@ class BermudanSwaption:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -192,9 +192,8 @@ class BermudanSwaption:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -208,7 +207,7 @@ class BermudanSwaption:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this Bermudan swaption.
 
         Parameters
         ----------
@@ -233,7 +232,7 @@ class BermudanSwaption:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -281,7 +280,7 @@ class BermudanSwaption:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -538,7 +537,7 @@ class BermudanSwaptionBuilder:
         ...
 
     def id(self, value: str) -> BermudanSwaptionBuilder:
-        """Set the bond's id.
+        """Set the Bermudan swaption identifier.
 
         Parameters
         ----------
@@ -720,7 +719,7 @@ class BermudanSwaptionBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> BermudanSwaptionBuilder:
-        """Set the bond's attributes.
+        """Set the Bermudan swaption grouping and filter attributes.
 
         Parameters
         ----------

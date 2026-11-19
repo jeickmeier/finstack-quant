@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed FX spot trade and its builder."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class FxSpot:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Spot transaction in a currency pair quoted as quote currency per unit of base currency.
 
     Examples
     --------
@@ -25,7 +25,7 @@ class FxSpot:
 
     @staticmethod
     def builder() -> FxSpotBuilder:
-        """Start specifying an bond future.
+        """Start authoring an FX spot trade.
 
         Returns
         -------
@@ -39,7 +39,7 @@ class FxSpot:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import FxSpot
-        >>> _ = FxSpot.builder().id("TYU5")
+        >>> _ = FxSpot.builder().id("example-fx-spot")
         """
         ...
 
@@ -59,7 +59,7 @@ class FxSpot:
 
     @staticmethod
     def example() -> FxSpot:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in FX spot trade example.
 
         Returns
         -------
@@ -130,7 +130,7 @@ class FxSpot:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this FX spot trade as a plain Python ``dict``.
 
         Returns
         -------
@@ -154,7 +154,7 @@ class FxSpot:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this FX spot trade and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -165,7 +165,7 @@ class FxSpot:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -191,9 +191,8 @@ class FxSpot:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -207,7 +206,7 @@ class FxSpot:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this FX spot trade.
 
         Parameters
         ----------
@@ -232,7 +231,7 @@ class FxSpot:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -280,7 +279,7 @@ class FxSpot:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -552,7 +551,7 @@ class FxSpotBuilder:
         ...
 
     def id(self, value: str) -> FxSpotBuilder:
-        """Set the bond's id.
+        """Set the FX spot trade identifier.
 
         Parameters
         ----------
@@ -754,7 +753,7 @@ class FxSpotBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> FxSpotBuilder:
-        """Set the bond's attributes.
+        """Set the FX spot trade grouping and filter attributes.
 
         Parameters
         ----------

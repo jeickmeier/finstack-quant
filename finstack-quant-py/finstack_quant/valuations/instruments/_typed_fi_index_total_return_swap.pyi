@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed fixed-income index total-return swap and its builder."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class FiIndexTotalReturnSwap:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Total-return swap on a fixed-income index priced with a carry model.
 
     Examples
     --------
@@ -24,7 +24,7 @@ class FiIndexTotalReturnSwap:
 
     @staticmethod
     def builder() -> FiIndexTotalReturnSwapBuilder:
-        """Start specifying an bond future.
+        """Start authoring a fixed-income index total-return swap.
 
         Returns
         -------
@@ -38,7 +38,7 @@ class FiIndexTotalReturnSwap:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import FiIndexTotalReturnSwap
-        >>> _ = FiIndexTotalReturnSwap.builder().id("TYU5")
+        >>> _ = FiIndexTotalReturnSwap.builder().id("example-fi-index-total-return-swap")
         """
         ...
 
@@ -58,7 +58,7 @@ class FiIndexTotalReturnSwap:
 
     @staticmethod
     def example() -> FiIndexTotalReturnSwap:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in fixed-income index total-return swap example.
 
         Returns
         -------
@@ -129,7 +129,7 @@ class FiIndexTotalReturnSwap:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this fixed-income index total-return swap as a plain Python ``dict``.
 
         Returns
         -------
@@ -153,7 +153,7 @@ class FiIndexTotalReturnSwap:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this fixed-income index total-return swap and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -164,7 +164,7 @@ class FiIndexTotalReturnSwap:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -190,9 +190,8 @@ class FiIndexTotalReturnSwap:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -206,7 +205,7 @@ class FiIndexTotalReturnSwap:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this fixed-income index total-return swap.
 
         Parameters
         ----------
@@ -231,7 +230,7 @@ class FiIndexTotalReturnSwap:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -279,7 +278,7 @@ class FiIndexTotalReturnSwap:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -536,7 +535,7 @@ class FiIndexTotalReturnSwapBuilder:
         ...
 
     def id(self, value: str) -> FiIndexTotalReturnSwapBuilder:
-        """Set the bond's id.
+        """Set the fixed-income index total-return swap identifier.
 
         Parameters
         ----------
@@ -718,7 +717,7 @@ class FiIndexTotalReturnSwapBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> FiIndexTotalReturnSwapBuilder:
-        """Set the bond's attributes.
+        """Set the fixed-income index total-return swap grouping and filter attributes.
 
         Parameters
         ----------

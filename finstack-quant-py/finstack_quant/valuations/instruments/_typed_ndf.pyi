@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed non-deliverable forward and its builder."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class Ndf:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Cash-settled currency forward with separate fixing and settlement terms.
 
     Examples
     --------
@@ -25,7 +25,7 @@ class Ndf:
 
     @staticmethod
     def builder() -> NdfBuilder:
-        """Start specifying an bond future.
+        """Start authoring a non-deliverable forward.
 
         Returns
         -------
@@ -39,7 +39,7 @@ class Ndf:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import Ndf
-        >>> _ = Ndf.builder().id("TYU5")
+        >>> _ = Ndf.builder().id("example-ndf")
         """
         ...
 
@@ -59,7 +59,7 @@ class Ndf:
 
     @staticmethod
     def example() -> Ndf:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in non-deliverable forward example.
 
         Returns
         -------
@@ -130,7 +130,7 @@ class Ndf:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this non-deliverable forward as a plain Python ``dict``.
 
         Returns
         -------
@@ -154,7 +154,7 @@ class Ndf:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this non-deliverable forward and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -165,7 +165,7 @@ class Ndf:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -191,9 +191,8 @@ class Ndf:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -207,7 +206,7 @@ class Ndf:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this non-deliverable forward.
 
         Parameters
         ----------
@@ -232,7 +231,7 @@ class Ndf:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -280,7 +279,7 @@ class Ndf:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -642,7 +641,7 @@ class NdfBuilder:
         ...
 
     def id(self, value: str) -> NdfBuilder:
-        """Set the bond's id.
+        """Set the non-deliverable forward identifier.
 
         Parameters
         ----------
@@ -964,7 +963,7 @@ class NdfBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> NdfBuilder:
-        """Set the bond's attributes.
+        """Set the non-deliverable forward grouping and filter attributes.
 
         Parameters
         ----------

@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed year-on-year inflation swap and its builder."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class YoYInflationSwap:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Swap with payments linked to year-on-year inflation observations.
 
     Examples
     --------
@@ -27,7 +27,7 @@ class YoYInflationSwap:
 
     @staticmethod
     def builder() -> YoYInflationSwapBuilder:
-        """Start specifying an bond future.
+        """Start authoring a year-on-year inflation swap.
 
         Returns
         -------
@@ -41,7 +41,7 @@ class YoYInflationSwap:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import YoYInflationSwap
-        >>> _ = YoYInflationSwap.builder().id("TYU5")
+        >>> _ = YoYInflationSwap.builder().id("example-yoy-inflation-swap")
         """
         ...
 
@@ -61,7 +61,7 @@ class YoYInflationSwap:
 
     @staticmethod
     def example() -> YoYInflationSwap:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in year-on-year inflation swap example.
 
         Returns
         -------
@@ -132,7 +132,7 @@ class YoYInflationSwap:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this year-on-year inflation swap as a plain Python ``dict``.
 
         Returns
         -------
@@ -156,7 +156,7 @@ class YoYInflationSwap:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this year-on-year inflation swap and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -167,7 +167,7 @@ class YoYInflationSwap:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -193,9 +193,8 @@ class YoYInflationSwap:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -209,7 +208,7 @@ class YoYInflationSwap:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this year-on-year inflation swap.
 
         Parameters
         ----------
@@ -234,7 +233,7 @@ class YoYInflationSwap:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -282,7 +281,7 @@ class YoYInflationSwap:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -629,7 +628,7 @@ class YoYInflationSwapBuilder:
         ...
 
     def id(self, value: str) -> YoYInflationSwapBuilder:
-        """Set the bond's id.
+        """Set the year-on-year inflation swap identifier.
 
         Parameters
         ----------
@@ -931,7 +930,7 @@ class YoYInflationSwapBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> YoYInflationSwapBuilder:
-        """Set the bond's attributes.
+        """Set the year-on-year inflation swap grouping and filter attributes.
 
         Parameters
         ----------

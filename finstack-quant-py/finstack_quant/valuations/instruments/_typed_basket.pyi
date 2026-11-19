@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed basket and its builder."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class Basket:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Basket with component instruments, weights and an aggregation rule.
 
     Examples
     --------
@@ -25,7 +25,7 @@ class Basket:
 
     @staticmethod
     def builder() -> BasketBuilder:
-        """Start specifying an bond future.
+        """Start authoring a basket.
 
         Returns
         -------
@@ -39,7 +39,7 @@ class Basket:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import Basket
-        >>> _ = Basket.builder().id("TYU5")
+        >>> _ = Basket.builder().id("example-basket")
         """
         ...
 
@@ -59,7 +59,7 @@ class Basket:
 
     @staticmethod
     def example() -> Basket:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in basket example.
 
         Returns
         -------
@@ -130,7 +130,7 @@ class Basket:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this basket as a plain Python ``dict``.
 
         Returns
         -------
@@ -154,7 +154,7 @@ class Basket:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this basket and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -165,7 +165,7 @@ class Basket:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -191,9 +191,8 @@ class Basket:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -207,7 +206,7 @@ class Basket:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this basket.
 
         Parameters
         ----------
@@ -232,7 +231,7 @@ class Basket:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -280,7 +279,7 @@ class Basket:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -507,7 +506,7 @@ class BasketBuilder:
         ...
 
     def id(self, value: str) -> BasketBuilder:
-        """Set the bond's id.
+        """Set the basket identifier.
 
         Parameters
         ----------
@@ -649,7 +648,7 @@ class BasketBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> BasketBuilder:
-        """Set the bond's attributes.
+        """Set the basket grouping and filter attributes.
 
         Parameters
         ----------

@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed equity total-return future and its builder."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from finstack_quant.core.dates import DayCount
 from finstack_quant.valuations.instruments._typed_listed import ListedFutureTerms
 
 class EquityTotalReturnFuture:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Exchange-listed future on the total return of an equity or index.
 
     Examples
     --------
@@ -26,7 +26,7 @@ class EquityTotalReturnFuture:
 
     @staticmethod
     def builder() -> EquityTotalReturnFutureBuilder:
-        """Start specifying an bond future.
+        """Start authoring an equity total-return future.
 
         Returns
         -------
@@ -40,7 +40,7 @@ class EquityTotalReturnFuture:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import EquityTotalReturnFuture
-        >>> _ = EquityTotalReturnFuture.builder().id("TYU5")
+        >>> _ = EquityTotalReturnFuture.builder().id("example-equity-total-return-future")
         """
         ...
 
@@ -60,7 +60,7 @@ class EquityTotalReturnFuture:
 
     @staticmethod
     def example() -> EquityTotalReturnFuture:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in equity total-return future example.
 
         Returns
         -------
@@ -131,7 +131,7 @@ class EquityTotalReturnFuture:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this equity total-return future as a plain Python ``dict``.
 
         Returns
         -------
@@ -155,7 +155,7 @@ class EquityTotalReturnFuture:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this equity total-return future and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -166,7 +166,7 @@ class EquityTotalReturnFuture:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -192,9 +192,8 @@ class EquityTotalReturnFuture:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -208,7 +207,7 @@ class EquityTotalReturnFuture:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this equity total-return future.
 
         Parameters
         ----------
@@ -233,7 +232,7 @@ class EquityTotalReturnFuture:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -281,7 +280,7 @@ class EquityTotalReturnFuture:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -523,7 +522,7 @@ class EquityTotalReturnFutureBuilder:
         ...
 
     def id(self, value: str) -> EquityTotalReturnFutureBuilder:
-        """Set the bond's id.
+        """Set the equity total-return future identifier.
 
         Parameters
         ----------
@@ -685,7 +684,7 @@ class EquityTotalReturnFutureBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> EquityTotalReturnFutureBuilder:
-        """Set the bond's attributes.
+        """Set the equity total-return future grouping and filter attributes.
 
         Parameters
         ----------

@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed snowball note and its builder."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class Snowball:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Structured note with contractual observation and redemption rules.
 
     Examples
     --------
@@ -27,7 +27,7 @@ class Snowball:
 
     @staticmethod
     def builder() -> SnowballBuilder:
-        """Start specifying an bond future.
+        """Start authoring a snowball note.
 
         Returns
         -------
@@ -41,7 +41,7 @@ class Snowball:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import Snowball
-        >>> _ = Snowball.builder().id("TYU5")
+        >>> _ = Snowball.builder().id("example-snowball")
         """
         ...
 
@@ -61,7 +61,7 @@ class Snowball:
 
     @staticmethod
     def example() -> Snowball:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in snowball note example.
 
         Returns
         -------
@@ -132,7 +132,7 @@ class Snowball:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this snowball note as a plain Python ``dict``.
 
         Returns
         -------
@@ -156,7 +156,7 @@ class Snowball:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this snowball note and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -167,7 +167,7 @@ class Snowball:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -193,9 +193,8 @@ class Snowball:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -209,7 +208,7 @@ class Snowball:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this snowball note.
 
         Parameters
         ----------
@@ -234,7 +233,7 @@ class Snowball:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -282,7 +281,7 @@ class Snowball:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -644,7 +643,7 @@ class SnowballBuilder:
         ...
 
     def id(self, value: str) -> SnowballBuilder:
-        """Set the bond's id.
+        """Set the snowball note identifier.
 
         Parameters
         ----------
@@ -966,7 +965,7 @@ class SnowballBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> SnowballBuilder:
-        """Set the bond's attributes.
+        """Set the snowball note grouping and filter attributes.
 
         Parameters
         ----------

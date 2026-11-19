@@ -1,4 +1,4 @@
-"""Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it.."""
+"""Typed FX barrier option and its builder."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class FxBarrierOption:
-    """Optional conversion policy, FX volatility and correlation inputs for quanto valuation. Pass null to clear it..
+    """Currency option with a specified exchange-rate barrier and monitoring convention.
 
     Examples
     --------
@@ -26,7 +26,7 @@ class FxBarrierOption:
 
     @staticmethod
     def builder() -> FxBarrierOptionBuilder:
-        """Start specifying an bond future.
+        """Start authoring an FX barrier option.
 
         Returns
         -------
@@ -40,7 +40,7 @@ class FxBarrierOption:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import FxBarrierOption
-        >>> _ = FxBarrierOption.builder().id("TYU5")
+        >>> _ = FxBarrierOption.builder().id("example-fx-barrier-option")
         """
         ...
 
@@ -60,7 +60,7 @@ class FxBarrierOption:
 
     @staticmethod
     def example() -> FxBarrierOption:
-        """Construct the canonical bond future fixture.
+        """Construct the built-in FX barrier option example.
 
         Returns
         -------
@@ -131,7 +131,7 @@ class FxBarrierOption:
 
     def to_dict(self) -> dict[str, object]:
         """
-        Serde form of the bond future spec as a plain Python ``dict``.
+        Canonical Rust terms for this FX barrier option as a plain Python ``dict``.
 
         Returns
         -------
@@ -155,7 +155,7 @@ class FxBarrierOption:
         extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price this bond future and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price this FX barrier option and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -166,7 +166,7 @@ class FxBarrierOption:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hull_white_1f"``, ...).
+            Registered model key for these terms. The default uses default_model.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         extras : PriceExtras or dict[str, Any] or str, optional
@@ -192,9 +192,8 @@ class FxBarrierOption:
         ------
         ValueError
             If an input cannot be interpreted or the instrument fails validation.
-            Cash flow valuation requires the bond future’s contractual fixed rate.
         KeyError
-            If the discount curve or requested metric is missing from ``market``.
+            If a required market observation or requested metric key is missing.
         RuntimeError
             If pricing or a metric computation fails.
         """
@@ -460,7 +459,7 @@ class FxBarrierOption:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this bond future (e.g. ``"dv01"``).
+        Compute a registered scalar metric for this FX barrier option.
 
         Parameters
         ----------
@@ -485,7 +484,7 @@ class FxBarrierOption:
         ValueError
             If ``metric_id`` is unknown or an input cannot be interpreted.
         KeyError
-            If the discount curve is missing from ``market``.
+            If an observation required by the selected metric is missing.
         RuntimeError
             If the metric computation fails.
         """
@@ -533,7 +532,7 @@ class FxBarrierOption:
         Returns
         -------
         str
-            The registered bond future model key ``"discounting"``.
+            The registered pricing model key selected for these contract terms.
 
         Notes
         -----
@@ -925,7 +924,7 @@ class FxBarrierOptionBuilder:
         ...
 
     def id(self, value: str) -> FxBarrierOptionBuilder:
-        """Set the bond's id.
+        """Set the FX barrier option identifier.
 
         Parameters
         ----------
@@ -1307,7 +1306,7 @@ class FxBarrierOptionBuilder:
         ...
 
     def attributes(self, value: Attributes | dict[str, Any]) -> FxBarrierOptionBuilder:
-        """Set the bond's attributes.
+        """Set the FX barrier option grouping and filter attributes.
 
         Parameters
         ----------
