@@ -8892,9 +8892,30 @@ export interface ValuationsInstrumentsNamespace {
   readonly Deposit: typeof wasm.Deposit;
   readonly DepositBuilder: typeof wasm.DepositBuilder;
   readonly BondFuture: typeof wasm.BondFuture;
+  readonly InterestRateFutureOption: typeof wasm.InterestRateFutureOption;
+  readonly InterestRateFutureOptionBuilder: typeof wasm.InterestRateFutureOptionBuilder;
+  readonly EquityFutureOption: typeof wasm.EquityFutureOption;
+  readonly EquityFutureOptionBuilder: typeof wasm.EquityFutureOptionBuilder;
+  readonly FxFutureOption: typeof wasm.FxFutureOption;
+  readonly FxFutureOptionBuilder: typeof wasm.FxFutureOptionBuilder;
+  readonly VolatilityIndexFutureOption: typeof wasm.VolatilityIndexFutureOption;
+  readonly VolatilityIndexFutureOptionBuilder: typeof wasm.VolatilityIndexFutureOptionBuilder;
   readonly BondFutureBuilder: typeof wasm.BondFutureBuilder;
   readonly InflationLinkedBond: typeof wasm.InflationLinkedBond;
   readonly InflationLinkedBondBuilder: typeof wasm.InflationLinkedBondBuilder;
+  /**
+   * Validate the native contract terms for an option on a future.
+   * @param terms - Contract and market marks in the stated price units, with exercise and settlement conventions.
+   * @returns Validated independent copy of the supplied terms.
+   * @throws `TypeError` if the input shape is invalid or `FinstackError` for invalid contract terms.
+   */
+  readonly futureOptionTerms: typeof wasm.futureOptionTerms;
+  /**
+   * Construct the native example of an option on a future.
+   * @returns Validated terms with explicit exercise, settlement, and premium conventions.
+   * @throws `FinstackError` if the native sample terms cannot be built.
+   */
+  readonly futureOptionTermsExample: typeof wasm.futureOptionTermsExample;
   /**
    * Validate listed position and lifecycle terms and emit their standard wire form.
    * @param terms - Listed terms with quantity in contracts, multiplier in settlement currency per point, and marks in contract price points.

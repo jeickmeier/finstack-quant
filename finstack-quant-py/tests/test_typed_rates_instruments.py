@@ -381,3 +381,38 @@ def test_bond_future_uses_typed_terms_and_live_and_final_marks() -> None:
     assert pickle.loads(pickle.dumps(edited.terms)).to_json() == edited.terms.to_json()  # noqa: S301
     with pytest.raises(ValueError, match="must be finite"):
         terms.with_marks(float("nan"), None)
+
+
+def test_listed_options_use_native_typed_terms_and_preserve_price() -> None:
+    from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    from finstack_quant.valuations.instruments import (
+        EquityFutureOption,
+        FutureOptionTerms,
+        FxFutureOption,
+        InterestRateFutureOption,
+        VolatilityIndexFutureOption,
+    )
+
+    as_of = datetime.date(2026, 10, 1)
+    market = MarketContext()
+    for curve_id in ("USD-OIS", "EUR-OIS"):
+        market.insert(
+            DiscountCurve(
+                curve_id,
+                as_of,
+                [(0.0, 1.0), (1.0, 0.96), (2.0, 0.92)],
+                interp="log_linear",
+                extrapolation="extend",
+                day_count=DayCount.ACT_365F,
+            )
+        )
+
+    for instrument in (EquityFutureOption, FxFutureOption, InterestRateFutureOption, VolatilityIndexFutureOption):
+        option = instrument.example()
+        terms = FutureOptionTerms(**option.terms.to_dict())
+        edited = option.to_builder().id("EDITED").terms(terms).build()
+        assert option.id != edited.id
+        assert option.terms.to_dict() == edited.terms.to_dict()
+        price = edited.price(market, as_of).value
+        wire_price = price_instrument(edited.to_json(), market, as_of).value
+        assert price == wire_price == option.price(market, as_of).value

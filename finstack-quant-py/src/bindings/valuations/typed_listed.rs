@@ -95,3 +95,40 @@ impl PyListedFutureTerms {
         Ok(Self { inner })
     }
 }
+
+#[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "FutureOptionTerms")]
+#[pyclass(
+    name = "FutureOptionTerms",
+    module = "finstack_quant.valuations.instruments",
+    frozen,
+    skip_from_py_object
+)]
+pub(crate) struct PyFutureOptionTerms {
+    pub(crate) inner: finstack_quant_valuations::instruments::FutureOptionTerms,
+}
+
+#[pymethods]
+impl PyFutureOptionTerms {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "FutureOptionTerms.__init__")]
+    #[new]
+    #[pyo3(signature = (**fields))]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: finstack_quant_valuations::instruments::FutureOptionTerms =
+            crate::bindings::module_utils::fields_from_py(py, fields, "futures option terms")?;
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "FutureOptionTerms.example")]
+    #[staticmethod]
+    fn example() -> PyResult<Self> {
+        finstack_quant_valuations::instruments::FutureOptionTerms::example()
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "FutureOptionTerms.to_dict")]
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+    }
+}

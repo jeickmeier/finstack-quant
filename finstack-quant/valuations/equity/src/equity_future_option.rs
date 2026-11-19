@@ -6,6 +6,7 @@ use finstack_quant_valuations_core::instruments::FutureOptionTerms;
 finstack_quant_valuations_core::define_future_option! {
     /// Exchange-listed option on an arbitrary equity or equity-index futures contract.
     pub struct EquityFutureOption;
+    builder: EquityFutureOptionBuilder,
     instrument_type: finstack_quant_valuations_core::pricer::InstrumentType::EquityFutureOption,
     family: crate::EQUITY,
     register_metrics: register_equity_future_option_metrics,

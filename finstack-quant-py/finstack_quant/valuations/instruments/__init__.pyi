@@ -60,11 +60,30 @@ from finstack_quant.valuations.instruments._typed_legs import (
     PremiumLegSpec as PremiumLegSpec,
     ProtectionLegSpec as ProtectionLegSpec,
 )
+from finstack_quant.valuations.instruments._typed_interest_rate_future_option import (
+    InterestRateFutureOption as InterestRateFutureOption,
+    InterestRateFutureOptionBuilder as InterestRateFutureOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_future_option import (
+    EquityFutureOption as EquityFutureOption,
+    EquityFutureOptionBuilder as EquityFutureOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_future_option import (
+    FxFutureOption as FxFutureOption,
+    FxFutureOptionBuilder as FxFutureOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_volatility_index_future_option import (
+    VolatilityIndexFutureOption as VolatilityIndexFutureOption,
+    VolatilityIndexFutureOptionBuilder as VolatilityIndexFutureOptionBuilder,
+)
 from finstack_quant.valuations.instruments._typed_bond_future import (
     BondFuture as BondFuture,
     BondFutureBuilder as BondFutureBuilder,
 )
-from finstack_quant.valuations.instruments._typed_listed import ListedFutureTerms as ListedFutureTerms
+from finstack_quant.valuations.instruments._typed_listed import (
+    FutureOptionTerms as FutureOptionTerms,
+    ListedFutureTerms as ListedFutureTerms,
+)
 from finstack_quant.valuations.instruments._typed_inflation_bond import (
     InflationLinkedBond as InflationLinkedBond,
     InflationLinkedBondBuilder as InflationLinkedBondBuilder,
@@ -241,6 +260,15 @@ __all__ = [
     "InflationLinkedBond",
     "InflationLinkedBondBuilder",
     "BondFuture",
+    "InterestRateFutureOption",
+    "InterestRateFutureOptionBuilder",
+    "EquityFutureOption",
+    "EquityFutureOptionBuilder",
+    "FxFutureOption",
+    "FxFutureOptionBuilder",
+    "VolatilityIndexFutureOption",
+    "VolatilityIndexFutureOptionBuilder",
+    "FutureOptionTerms",
     "BondFutureBuilder",
     "ListedFutureTerms",
     "EligibilityRule",

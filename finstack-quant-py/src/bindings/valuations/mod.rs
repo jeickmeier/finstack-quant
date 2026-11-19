@@ -17,6 +17,11 @@ mod pricing;
 mod schema;
 pub(crate) mod typed_asset_backed_facility;
 pub(crate) mod typed_bond_future;
+pub(crate) mod typed_equity_future_option;
+pub(crate) mod typed_fx_future_option;
+pub(crate) mod typed_interest_rate_future_option;
+pub(crate) mod typed_volatility_index_future_option;
+
 pub(crate) mod typed_convertible;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_deposit;
@@ -407,6 +412,12 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_inflation_bond::register(&m)?;
     typed_bond_future::register(&m)?;
     m.add_class::<typed_listed::PyListedFutureTerms>()?;
+    m.add_class::<typed_listed::PyFutureOptionTerms>()?;
+    typed_interest_rate_future_option::register(&m)?;
+    typed_equity_future_option::register(&m)?;
+    typed_fx_future_option::register(&m)?;
+    typed_volatility_index_future_option::register(&m)?;
+
     typed_credit::register(py, &m)?;
     typed_convertible::register(py, &m)?;
     convertible_spot_ladder::register(&m)?;
@@ -440,6 +451,15 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "BondFuture",
         "BondFutureBuilder",
         "ListedFutureTerms",
+        "FutureOptionTerms",
+        "InterestRateFutureOption",
+        "InterestRateFutureOptionBuilder",
+        "EquityFutureOption",
+        "EquityFutureOptionBuilder",
+        "FxFutureOption",
+        "FxFutureOptionBuilder",
+        "VolatilityIndexFutureOption",
+        "VolatilityIndexFutureOptionBuilder",
         "ForwardRateAgreement",
         "ForwardRateAgreementBuilder",
     ]);

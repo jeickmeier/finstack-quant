@@ -78,3 +78,27 @@ pub fn listed_future_terms_with_contracts(
     let contracts = js_f64(&contracts, "contracts")?;
     to_js_value(&terms.with_contracts(contracts).map_err(to_js_err)?)
 }
+
+/// Validate the native contract terms for an option on a future.
+/// @param terms - Contract and market marks in the stated price units, with exercise and settlement conventions.
+/// @returns Validated independent copy of the supplied terms.
+/// @throws `TypeError` if the input shape is invalid or `FinstackError` for invalid contract terms.
+#[wasm_bindgen(js_name = futureOptionTerms, unchecked_return_type = "generated.valuations.FutureOptionTerms")]
+pub fn future_option_terms(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.FutureOptionTerms")] terms: JsValue,
+) -> Result<JsValue, JsValue> {
+    let terms: finstack_quant_valuations::instruments::FutureOptionTerms =
+        from_js_json(&terms, "terms")?;
+    terms.validate().map_err(to_js_err)?;
+    to_js_value(&terms)
+}
+
+/// Construct the native example of an option on a future.
+/// @returns Validated terms with explicit exercise, settlement, and premium conventions.
+/// @throws `FinstackError` if the native sample terms cannot be built.
+#[wasm_bindgen(js_name = futureOptionTermsExample, unchecked_return_type = "generated.valuations.FutureOptionTerms")]
+pub fn future_option_terms_example() -> Result<JsValue, JsValue> {
+    let terms =
+        finstack_quant_valuations::instruments::FutureOptionTerms::example().map_err(to_js_err)?;
+    to_js_value(&terms)
+}

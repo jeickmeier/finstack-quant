@@ -1461,3 +1461,19 @@ test('typed bond futures distinguish live and final settlement marks', () => {
     initial.free();
   }
 });
+
+test('typed listed option terms preserve contract economics and validate strike inputs', () => {
+  const instruments = facade.valuations.instruments;
+  const terms = instruments.futureOptionTermsExample();
+  assert.deepEqual(instruments.futureOptionTerms(terms), terms);
+  assert.throws(() => instruments.futureOptionTerms({ ...terms, strike: -1.0 }), /strike/);
+  const initial = instruments.EquityFutureOption.example();
+  const edited = initial.toBuilder().id('EQUITY-OPTION-REPRICE').terms(terms).build();
+  try {
+    assert.notEqual(initial.id, edited.id);
+    assert.deepEqual(edited.terms, terms);
+  } finally {
+    edited.free();
+    initial.free();
+  }
+});

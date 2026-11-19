@@ -12,6 +12,7 @@ use finstack_quant_valuations_core::instruments::{
 finstack_quant_valuations_core::define_future_option! {
     /// Exchange-listed option on a volatility-index futures contract.
     pub struct VolatilityIndexFutureOption;
+    builder: VolatilityIndexFutureOptionBuilder,
     instrument_type: finstack_quant_valuations_core::pricer::InstrumentType::VolatilityIndexFutureOption,
     family: crate::EQUITY,
     register_metrics: register_vol_index_future_option_metrics,

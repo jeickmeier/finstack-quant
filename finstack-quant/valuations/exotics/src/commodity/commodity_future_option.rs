@@ -6,6 +6,7 @@ use finstack_quant_valuations_core::instruments::FutureOptionTerms;
 finstack_quant_valuations_core::define_future_option! {
     /// Exchange-listed option on an arbitrary commodity futures contract.
     pub struct CommodityFutureOption;
+    builder: CommodityFutureOptionBuilder,
     instrument_type: finstack_quant_valuations_core::pricer::InstrumentType::CommodityFutureOption,
     family: crate::EXOTICS,
     register_metrics: register_commodity_future_option_metrics,
