@@ -12,6 +12,7 @@ mod quotes;
 mod report;
 mod result;
 mod schema;
+mod step_params;
 mod validation;
 
 use config::{PyCalibrationConfig, PyRateBounds, PySolverConfig, PyValidationConfig};
@@ -269,6 +270,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationReport>()?;
     m.add_class::<PyCalibrationResult>()?;
     m.add_class::<PyCalibrationStep>()?;
+    step_params::register(&m)?;
     m.add_class::<PyCalibrationValidationReport>()?;
     m.add_class::<PyCdsQuote>()?;
     m.add_class::<PyCdsTrancheQuote>()?;
@@ -316,6 +318,19 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "CalibrationReport",
                 "CalibrationResultEnvelope",
                 "CalibrationStep",
+                "DiscountCurveParams",
+                "ForwardCurveParams",
+                "HazardCurveParams",
+                "InflationCurveParams",
+                "VolSurfaceParams",
+                "SwaptionVolParams",
+                "BaseCorrelationParams",
+                "StudentTParams",
+                "HullWhiteStepParams",
+                "CapFloorHullWhiteStepParams",
+                "SviSurfaceParams",
+                "XccyBasisParams",
+                "ParametricCurveParams",
                 "CalibrationValidationReport",
                 "CdsQuote",
                 "CdsTrancheQuote",

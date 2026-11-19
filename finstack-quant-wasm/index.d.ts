@@ -2736,6 +2736,15 @@ export interface CalibrationNamespace {
    */
   readonly rateBoundsEmergingMarkets: typeof wasm.rateBoundsEmergingMarkets;
   /**
+   * Build a calibration step from a native kind-tagged parameter object.
+   * @param id - Stable step ID used in reports and as the default quote-set name.
+   * @param params - Canonical kind-tagged curve, model or surface parameters, with explicit output identifiers.
+   * @param quoteSet - The parent plan's named quote set. Defaults to the step ID.
+   * @returns One calibration step ready for plan authoring.
+   * @throws `TypeError` for invalid host shapes or `FinstackError` for missing fields, invalid parameters, or blank identifiers.
+   */
+  readonly calibrationStep: typeof wasm.calibrationStep;
+  /**
    * Build a discount-curve bootstrap step.
    *
    * Free-function twin of Python `CalibrationStep.discount` (Rust

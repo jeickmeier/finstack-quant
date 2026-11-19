@@ -478,3 +478,20 @@ def test_inline_calibration_preserves_quote_set_reuse_and_rejects_duplicate_inpu
 
     with pytest.raises(ValueError, match="duplicate calibration market input"):
         CalibrationEnvelope.from_steps("duplicate", [StepWithQuotes(first, [quote, quote])])
+
+
+def test_native_step_parameters_use_distinct_output_and_quote_ids() -> None:
+    from finstack_quant.calibration import DiscountCurveParams
+
+    fields = DiscountCurveParams(curve_id="USD-OIS", currency="USD", base_date="2026-05-08")
+    step = CalibrationStep("discount-front", fields, "on-the-run")
+    wire = json.loads(step.to_json())
+    assert wire["kind"] == "discount"
+    assert wire["curve_id"] == "USD-OIS"
+    assert wire["id"] == "discount-front"
+    assert wire["quote_set"] == "on-the-run"
+    assert fields.to_dict()["interpolation"] == "log_linear"
+    with pytest.raises(ValueError, match="nonempty"):
+        CalibrationStep("discount-front", fields, "")
+    with pytest.raises(TypeError, match="native calibration step"):
+        CalibrationStep("discount-front", fields.to_dict())

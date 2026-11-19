@@ -14,6 +14,8 @@ from finstack_quant.calibration._quotes import (
     XccyQuote,
 )
 
+from finstack_quant.calibration._step_params import StepParams
+
 class CalibrationStep:
     """One calibration step: a target kind, parameters, and a named quote set.
 
@@ -30,6 +32,28 @@ class CalibrationStep:
     'usd_ois'
 
     """
+
+    def __init__(self, id: str, params: StepParams, quote_set: str | None = None) -> None:
+        """Construct a step from a typed calibration parameter object.
+
+        Parameters
+        ----------
+        id : str
+            Nonempty stable step and fit-report identifier.
+        params : StepParams
+            Native kind-specific parameters, including any produced curve
+            or surface identifiers. The parameter class selects the solver.
+        quote_set : str or None
+            Name of the quotes in the parent plan. Omit to use the step ID.
+
+        Raises
+        ------
+        TypeError
+            If params is not a typed calibration parameter object.
+        ValueError
+            If the step or quote-set identifier is blank.
+        """
+        ...
 
     @staticmethod
     def discount(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:

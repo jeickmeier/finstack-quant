@@ -1685,3 +1685,30 @@ export interface PortfolioMaterializationResult {
    */
   report: MaterializationReport;
 }
+
+/** Native authoring fields for the `discount` calibration step. */
+export type DiscountCurveParams = Omit<Extract<generated.calibration.StepParams, { kind: "discount" }>, "kind">;
+/** Native authoring fields for the `forward` calibration step. */
+export type ForwardCurveParams = Omit<Extract<generated.calibration.StepParams, { kind: "forward" }>, "kind">;
+/** Native authoring fields for the `hazard` calibration step. */
+export type HazardCurveParams = Omit<Extract<generated.calibration.StepParams, { kind: "hazard" }>, "kind">;
+/** Native authoring fields for the `inflation` calibration step. */
+export type InflationCurveParams = Omit<Extract<generated.calibration.StepParams, { kind: "inflation" }>, "kind">;
+/** Native authoring fields for the `vol_surface` calibration step. */
+export type VolSurfaceParams = Omit<Extract<generated.calibration.StepParams, { kind: "vol_surface" }>, "kind">;
+/** Native authoring fields for the `swaption_vol` calibration step. */
+export type SwaptionVolParams = Omit<Extract<generated.calibration.StepParams, { kind: "swaption_vol" }>, "kind">;
+/** Native authoring fields for the `base_correlation` calibration step. */
+export type BaseCorrelationParams = Omit<Extract<generated.calibration.StepParams, { kind: "base_correlation" }>, "kind">;
+/** Native authoring fields for the `student_t` calibration step. */
+export type StudentTParams = Omit<Extract<generated.calibration.StepParams, { kind: "student_t" }>, "kind">;
+/** Native authoring fields for the `hull_white` calibration step. */
+export type HullWhiteStepParams = Omit<Extract<generated.calibration.StepParams, { kind: "hull_white" }>, "kind">;
+/** Native authoring fields for the `cap_floor_hull_white` calibration step. */
+export type CapFloorHullWhiteStepParams = Omit<Extract<generated.calibration.StepParams, { kind: "cap_floor_hull_white" }>, "kind">;
+/** Native authoring fields for the `svi_surface` calibration step. */
+export type SviSurfaceParams = Omit<Extract<generated.calibration.StepParams, { kind: "svi_surface" }>, "kind">;
+/** Native authoring fields for the `xccy_basis` calibration step. */
+export type XccyBasisParams = Omit<Extract<generated.calibration.StepParams, { kind: "xccy_basis" }>, "kind">;
+/** Native authoring fields for the `parametric` calibration step. */
+export type ParametricCurveParams = Omit<Extract<generated.calibration.StepParams, { kind: "parametric" }>, "kind">;

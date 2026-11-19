@@ -737,3 +737,19 @@ for (const [enabled, limit] of [
     }
   });
 }
+
+test('native step constructor keeps the output, step and quote-set identities distinct', () => {
+  const step = calibration.calibrationStep(
+    'discount-front',
+    { ...RATES, kind: 'discount', curve_id: 'USD-OIS' },
+    'on-the-run'
+  );
+  assert.equal(step.kind, 'discount');
+  assert.equal(step.curve_id, 'USD-OIS');
+  assert.equal(step.id, 'discount-front');
+  assert.equal(step.quote_set, 'on-the-run');
+  assert.throws(
+    () => calibration.calibrationStep('discount-front', { ...RATES, kind: 'discount' }),
+    /curve_id/
+  );
+});

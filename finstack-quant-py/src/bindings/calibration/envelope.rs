@@ -6,6 +6,7 @@
 
 use super::config::extract_config;
 use super::quotes::extract_market_datum;
+use super::step_params;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::{py_to_json_value, spec_from_py};
 use crate::bindings::pandas_utils::serde_to_py;
@@ -111,6 +112,15 @@ impl PyCalibrationStep {
 
 #[pymethods]
 impl PyCalibrationStep {
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.__init__")]
+    #[new]
+    #[pyo3(signature = (id, params, quote_set=None))]
+    fn new(id: &str, params: &Bound<'_, PyAny>, quote_set: Option<&str>) -> PyResult<Self> {
+        CalibrationStep::new(id, step_params::extract(params)?, quote_set)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.discount")]
     #[staticmethod]
     #[pyo3(signature = (id, params, quote_set = None))]

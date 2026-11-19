@@ -515,6 +515,19 @@ class TestCalibrationNamespace:
             "validate_calibration",
             "validate_surface",
             "validate_vol_bounds",
+            "BaseCorrelationParams",
+            "CapFloorHullWhiteStepParams",
+            "DiscountCurveParams",
+            "ForwardCurveParams",
+            "HazardCurveParams",
+            "HullWhiteStepParams",
+            "InflationCurveParams",
+            "ParametricCurveParams",
+            "StudentTParams",
+            "SviSurfaceParams",
+            "SwaptionVolParams",
+            "VolSurfaceParams",
+            "XccyBasisParams",
         }
         assert set(calibration.__all__) == expected
         assert calibration.CalibrationResultEnvelope.__module__ == "finstack_quant.calibration"

@@ -233,6 +233,7 @@
       "calibrationResultContentHash",
       "calibrationResultResiduals",
       "calibrationResultStepReport",
+      "calibrationStep",
       "calibrationStepBaseCorrelation",
       "calibrationStepCapFloorHullWhite",
       "calibrationStepDiscount",
@@ -349,6 +350,9 @@
     "kind": "function"
   },
   "calibration.rateBoundsEmergingMarkets": {
+    "kind": "function"
+  },
+  "calibration.calibrationStep": {
     "kind": "function"
   },
   "calibration.calibrationStepDiscount": {

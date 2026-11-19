@@ -86,6 +86,7 @@ export const calibration = {
   cdsTrancheQuote: wasm.cdsTrancheQuote,
   rateBoundsForCurrency: wasm.rateBoundsForCurrency,
   rateBoundsEmergingMarkets: wasm.rateBoundsEmergingMarkets,
+  calibrationStep: wasm.calibrationStep,
   calibrationStepDiscount: wasm.calibrationStepDiscount,
   calibrationStepForward: wasm.calibrationStepForward,
   calibrationStepHazard: wasm.calibrationStepHazard,

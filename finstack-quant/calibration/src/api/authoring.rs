@@ -679,6 +679,34 @@ impl XccyQuote {
 }
 
 impl CalibrationStep {
+    /// Build a calibration step from its native, kind-specific parameters.
+    ///
+    /// # Arguments
+    /// * `id` - Nonempty stable identifier for step selection and fit reporting.
+    /// * `params` - Native curve, surface or model parameters including explicit output identifiers.
+    /// * `quote_set` - Optional nonempty named quote set. Omit it to use the step ID.
+    ///
+    /// # Errors
+    /// Rejects blank step or quote-set identifiers. Calibration validates
+    /// dependencies and financial parameters against its quote universe.
+    pub fn new(
+        id: &str,
+        params: crate::api::schema::StepParams,
+        quote_set: Option<&str>,
+    ) -> Result<Self> {
+        let quote_set = quote_set.unwrap_or(id);
+        if id.trim().is_empty() || quote_set.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Calibration step and quote-set IDs must be nonempty".into(),
+            ));
+        }
+        Ok(Self {
+            id: id.into(),
+            params,
+            quote_set: quote_set.into(),
+        })
+    }
+
     /// Seniority label of a hazard step authored without one.
     pub const DEFAULT_HAZARD_SENIORITY: &'static str = "senior";
     /// Parametric family label of a `parametric` step authored without one.
