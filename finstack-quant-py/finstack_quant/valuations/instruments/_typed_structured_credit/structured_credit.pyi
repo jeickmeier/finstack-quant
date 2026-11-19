@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_structured_credit/structured_credit.rs``."""
 
 from __future__ import annotations
+from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
 from typing import Any, Literal
@@ -1116,7 +1117,7 @@ class StructuredCredit:
         as_of: datetime.date | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this deal and return a typed ``ValuationResult``.
@@ -1137,7 +1138,7 @@ class StructuredCredit:
         metrics : list[str], optional
             Metric identifiers to compute (e.g. ``["wal", "clo_warf"]``);
             omitted means valuation only.
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``

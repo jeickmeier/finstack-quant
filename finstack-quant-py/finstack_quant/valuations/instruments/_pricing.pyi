@@ -49,13 +49,74 @@ _InstrumentInput = (
     | CompositeInstrument
 )
 
+class PriceExtras:
+    """Call-time pricing patches, historical scenarios and trace controls.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import PriceExtras
+    >>> PriceExtras(explain=True).explain
+    True
+    """
+
+    def __init__(
+        self,
+        *,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | None = None,
+        instrument_pricing_overrides: dict[str, Any] | None = None,
+        market_history: MarketHistory | None = None,
+        explain: bool = False,
+    ) -> None:
+        """Build transient pricing inputs for the instrument pricing entry points.
+
+        Parameters
+        ----------
+        metric_pricing_overrides : MetricPricingOverrides or dict, optional
+            Metric controls such as the theta horizon, risk basis and bump sizes.
+            A dictionary describes a patch in which absent fields retain their
+            stored values and explicit null leaves clear optional controls.
+        instrument_pricing_overrides : dict, optional
+            Instrument-specific mark and model control patch. Supply values in
+            the same units as the instrument specification. Omitted fields
+            retain stored values and explicit nulls clear nullable controls.
+        market_history : MarketHistory, optional
+            Historical market scenarios required by historical VaR and
+            expected shortfall. Omitting it supplies no history.
+        explain : bool, default False
+            Attach the native valuation trace to the result when true.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type.
+        ValueError
+            If a supplied patch is not a finite JSON-compatible object.
+            The merged controls are validated at pricing time.
+        """
+        ...
+
+    @property
+    def explain(self) -> bool:
+        """Read whether the valuation trace was requested.
+
+        Returns
+        -------
+        bool
+            True when pricing should attach the trace.
+
+        Notes
+        -----
+        This property does not raise.
+        """
+        ...
+
 def price_instrument(
     instrument: _InstrumentInput,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str = "default",
     metrics: list[str] | None = None,
-    extras: dict[str, Any] | str | None = None,
+    extras: PriceExtras | dict[str, Any] | str | None = None,
 ) -> ValuationResult:
     """
     Price one instrument and compute explicit risk metric requests.
@@ -98,7 +159,7 @@ def price_instrument(
         Roll specialness is in basis points against the forward curve
         ``repo_curve_id``, or the discount curve when absent; implied
         financing is an ACT/360 decimal rate.
-    extras : dict[str, Any] or str, optional
+    extras : PriceExtras or dict[str, Any] or str, optional
         The rarer pricing inputs, as a dict or JSON text in the shape of the
         Rust ``PriceExtras``; every key is optional and an unknown key raises
         ``ValueError``.

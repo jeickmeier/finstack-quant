@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_revolving_credit/revolving_credit.rs``."""
 
 from __future__ import annotations
+from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
 from typing import Any
@@ -162,7 +163,7 @@ class RevolvingCredit:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this facility and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -182,7 +183,7 @@ class RevolvingCredit:
         metrics : list[str], optional
             Metric identifiers to compute (for example ``"dv01"`` or
             ``"draw_option_cost"``).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``

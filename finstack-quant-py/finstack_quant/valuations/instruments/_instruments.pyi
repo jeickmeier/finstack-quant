@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/instruments.rs``."""
 
 from __future__ import annotations
+from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 from finstack_quant.cashflows.builder import CashFlowSchedule
 
@@ -632,7 +633,7 @@ class Bond:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this bond and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -654,7 +655,7 @@ class Bond:
             call, put, and return-floor rights jointly with credit risk.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
@@ -1846,7 +1847,7 @@ class TermLoan:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this term loan and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -1863,7 +1864,7 @@ class TermLoan:
             Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
