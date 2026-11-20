@@ -10,12 +10,33 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{
-    RateDiffScale, measure_discounting_zero_rate_difference,
+    RateDiffScale, ZeroRateDiffParams, zero_rate_difference,
 };
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use time::macros::date;
+
+fn discounting_zero_rate_diff(
+    domestic: &dyn Discounting,
+    foreign: &dyn Discounting,
+    anchor: Date,
+    maturity: Date,
+    day_count: DayCount,
+) -> f64 {
+    let alpha = day_count
+        .year_fraction(anchor, maturity, DayCountContext::default())
+        .expect("valid reporting year fraction");
+    zero_rate_difference(ZeroRateDiffParams {
+        d0_anchor: domestic.df_on_date(anchor).expect("domestic anchor df"),
+        d0_maturity: domestic.df_on_date(maturity).expect("domestic maturity df"),
+        d1_anchor: foreign.df_on_date(anchor).expect("foreign anchor df"),
+        d1_maturity: foreign.df_on_date(maturity).expect("foreign maturity df"),
+        alpha,
+        scale: RateDiffScale::Decimal,
+    })
+    .expect("checked zero-rate difference")
+}
 
 fn params(day_count: DayCount) -> StepParams {
     StepParams::XccyBasis(XccyBasisParams {
@@ -80,16 +101,13 @@ fn xccy_basis_builds_signed_spread_output_with_default_discount_interpolation() 
         assert!(report.success);
         let domestic = context.get_discount("USD-OIS").expect("domestic curve");
         let foreign = context.get_discount("EUR-OIS").expect("foreign curve");
-        let spread = measure_discounting_zero_rate_difference(
+        let spread = discounting_zero_rate_diff(
             domestic.as_ref(),
             foreign.as_ref(),
             base,
             maturity,
             DayCount::Act365F,
-            DayCountContext::default(),
-            RateDiffScale::Decimal,
-        )
-        .expect("checked zero-rate difference");
+        );
         assert!(spread * expected_sign > 0.0);
     }
 }
@@ -123,16 +141,13 @@ fn xccy_basis_preserves_foreign_curve_day_count_and_zero_rate_difference() {
         / foreign.dfs()[1])
         .ln()
         / time;
-    let spread = measure_discounting_zero_rate_difference(
+    let spread = discounting_zero_rate_diff(
         domestic.as_ref(),
         foreign.as_ref(),
         base,
         maturity,
         DayCount::Act360,
-        DayCountContext::default(),
-        RateDiffScale::Decimal,
-    )
-    .expect("checked zero-rate difference");
+    );
     assert!((spread - expected).abs() < 1e-12);
 }
 
@@ -153,18 +168,13 @@ fn xccy_basis_is_invariant_to_domestic_curve_clock_and_base() {
             assert!(report.success);
             let domestic = context.get_discount("USD-OIS").expect("domestic curve");
             let foreign = context.get_discount("EUR-OIS").expect("foreign curve");
-            spreads.push(
-                measure_discounting_zero_rate_difference(
-                    domestic.as_ref(),
-                    foreign.as_ref(),
-                    base,
-                    maturity,
-                    DayCount::Act365F,
-                    DayCountContext::default(),
-                    RateDiffScale::Decimal,
-                )
-                .expect("zero-rate difference"),
-            );
+            spreads.push(discounting_zero_rate_diff(
+                domestic.as_ref(),
+                foreign.as_ref(),
+                base,
+                maturity,
+                DayCount::Act365F,
+            ));
         }
     }
     assert!(
