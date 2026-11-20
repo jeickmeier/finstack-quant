@@ -440,7 +440,7 @@
         },
         "covenant_id": {
           "default": "",
-          "description": "Stable identifier matching [`Covenant::instance_key`].",
+          "description": "Stable identifier matching [`Covenant::label`].",
           "type": "string"
         },
         "covenant_type": {
@@ -549,7 +549,7 @@
           ]
         },
         "covenant_id": {
-          "description": "Stable instance identifier of the waived covenant\n(from [`Covenant::instance_key`]).",
+          "description": "Stable instance identifier of the waived covenant\n(from [`Covenant::label`]).",
           "type": "string"
         },
         "description": {
@@ -607,7 +607,7 @@
           "type": "boolean"
         },
         "label": {
-          "description": "Optional instance label disambiguating covenants of the same type.\n\n[`CovenantType::covenant_id`] is discriminant-only, so two covenants of\nthe same type (e.g. a senior and a total leverage test, or two baskets)\nwould collide in compliance reports and breach tracking without a\ndistinct label. Waivers and breaches key off it.",
+          "description": "Required instance label disambiguating covenants of the same type.\n\n[`CovenantType::covenant_id`] is discriminant-only, so two covenants of\nthe same type (e.g. a senior and a total leverage test, or two baskets)\nwould collide in compliance reports and breach tracking without a\ndistinct label. Waivers and breaches key off it.",
           "type": "string"
         },
         "scope": {

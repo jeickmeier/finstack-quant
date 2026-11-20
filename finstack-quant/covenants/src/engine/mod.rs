@@ -492,12 +492,12 @@ mod tests {
     }
 
     #[test]
-    fn instance_key_is_the_declared_label() {
+    fn label_is_stored_on_covenant() {
         let cov = Covenant::new(
             CovenantType::MaxDebtToEbitda { threshold: 4.5 },
             Tenor::quarterly(),
             "senior",
         );
-        assert_eq!(cov.instance_key(), "senior");
+        assert_eq!(cov.label, "senior");
     }
 }

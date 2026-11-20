@@ -945,7 +945,7 @@
           "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
           "pointer": "#",
           "source": "finstack-quant/covenants/schemas/covenants/1/covenant_engine.schema.json",
-          "sha256": "d231fcc6eea1d787197269c77956b94d1a6d6e3c31c6ec09e17b1bc256a45343",
+          "sha256": "778598d2545110415040cb52762c741f18131cc00e907e7ec612e12797559d9a",
           "description": "Covenant engine for evaluation and consequence application."
         }
       ]

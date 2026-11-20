@@ -362,13 +362,9 @@ pub fn forecast_statement_covenants(
         }
         forecasted = true;
         let mut scoped = engine.clone();
-        scoped
-            .specs
-            .retain(|test| test.covenant.instance_key() == *id);
+        scoped.specs.retain(|test| test.covenant.label == *id);
         for window in &mut scoped.windows {
-            window
-                .covenants
-                .retain(|test| test.covenant.instance_key() == *id);
+            window.covenants.retain(|test| test.covenant.label == *id);
         }
         scoped.waivers.retain(|waiver| waiver.covenant_id == *id);
         breaches.extend(forecast_breaches_generic(

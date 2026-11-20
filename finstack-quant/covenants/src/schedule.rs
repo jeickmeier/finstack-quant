@@ -81,14 +81,9 @@ impl ThresholdSchedule {
             self.0.windows(2).all(|w| w[0].0 <= w[1].0),
             "ThresholdSchedule entries must be sorted by date ascending"
         );
-        let mut last = None;
-        for (d, v) in &self.0 {
-            if *d <= test_date {
-                last = Some(*v);
-            } else {
-                break;
-            }
-        }
-        last
+        self.0
+            .partition_point(|(d, _)| *d <= test_date)
+            .checked_sub(1)
+            .map(|i| self.0[i].1)
     }
 }

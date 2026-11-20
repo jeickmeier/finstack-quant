@@ -14,7 +14,6 @@ autotests = false
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0-dev.202610210600", default-features = false }
-finstack-quant-covenants = { path = "../covenants", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-margin = { path = "../margin", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-models = { path = "../models", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-valuations-core = { path = "core", version = "0.11.0-dev.202610210600", default-features = false }
@@ -44,6 +43,7 @@ rayon = "1.11"
 finstack-quant-test-utils = { path = "../test-utils", version = "0.11.0-dev.202610210600" }
 finstack-quant-valuations-test-support = { path = "test-support", version = "0.11.0-dev.202610210600" }
 finstack-quant-calibration = { path = "../calibration", version = "0.11.0-dev.202610210600" }
+finstack-quant-covenants = { path = "../covenants", version = "0.11.0-dev.202610210600" }
 time = { workspace = true, features = ["macros"] }
 proptest = "1.11.0"
 criterion = { workspace = true }
@@ -66,7 +66,6 @@ json-schema = [
     "finstack-quant-valuations-fx/json-schema",
     "finstack-quant-core/json-schema",
     "finstack-quant-cashflows/json-schema",
-    "finstack-quant-covenants/json-schema",
     "finstack-quant-margin/json-schema",
     "finstack-quant-models/json-schema",
 ]

@@ -136,7 +136,7 @@ export interface D_213F3B72Cada138D8E2C {
    */
   consequences: D_916628D26F1Bb84896B6[];
   /**
-   * Stable identifier matching [`Covenant::instance_key`].
+   * Stable identifier matching [`Covenant::label`].
    */
   covenant_id?: string;
   /**
@@ -327,7 +327,7 @@ export interface D_73E2A3D0B082Dde59923 {
    */
   is_active: boolean;
   /**
-   * Optional instance label disambiguating covenants of the same type.
+   * Required instance label disambiguating covenants of the same type.
    *
    * [`CovenantType::covenant_id`] is discriminant-only, so two covenants of
    * the same type (e.g. a senior and a total leverage test, or two baskets)
@@ -394,7 +394,7 @@ export interface D_716A3Fc5837303815E4B {
   amended_threshold?: number | null;
   /**
    * Stable instance identifier of the waived covenant
-   * (from [`Covenant::instance_key`]).
+   * (from [`Covenant::label`]).
    */
   covenant_id: string;
   /**

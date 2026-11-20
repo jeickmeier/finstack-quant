@@ -70,8 +70,8 @@ fn main() -> finstack_quant_core::Result<()> {
 ```
 
 `Covenant::new` takes the covenant type, a nominal test frequency, and a
-**label**. The label is the covenant's identity: `Covenant::instance_key()`
-returns it, and `evaluate` returns `IndexMap<String, CovenantReport>` keyed by
+**label**. The label is the covenant's identity: `Covenant::label`
+holds it, and `evaluate` returns `IndexMap<String, CovenantReport>` keyed by
 it, as does breach history, forecast output, and consequence lookup. Two
 covenants of the same type must carry different labels or they overwrite each
 other. Human-readable text lives in `CovenantReport::covenant_type` /
@@ -197,7 +197,7 @@ batch output; deterministic breaches are always included. Batch scope defaults
 to maintenance; `config.with_scope(CovenantScope::Incurrence)` selects hypothetical
 action capacity. It does not record an executed incurrence breach.
 
-Forecast ids are `Covenant::instance_key()`; the display string travels
+Forecast ids are `Covenant::label`; the display string travels
 separately in `covenant_description`. Nullable forecast fields
 (`projected_values`, `headroom`) serialize as JSON `null` when a value is
 inactive or not meaningful — a springing covenant outside its activation window,
