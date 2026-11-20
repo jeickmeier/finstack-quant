@@ -522,7 +522,8 @@ impl JsMoney {
         let amount: &str = &js_string(&amount, "amount")?;
         let config = js_opt_finstack_config(config.as_ref(), "config")?;
         let inner = match config.as_ref() {
-            Some(cfg) => RustMoney::from_decimal_str_with_config(amount, currency.inner, cfg),
+            Some(cfg) => finstack_quant_core::decimal::parse_decimal(amount)
+                .and_then(|exact| RustMoney::from_decimal_with_config(exact, currency.inner, cfg)),
             None => RustMoney::from_decimal_str(amount, currency.inner),
         }
         .map_err(to_js_err)?;
