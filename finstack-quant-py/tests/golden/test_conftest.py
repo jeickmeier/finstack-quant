@@ -112,6 +112,32 @@ def test_manual_screenshot_paths_must_stay_under_screenshots_directory() -> None
         validate_fixture(path, fixture)
 
 
+@pytest.mark.parametrize(
+    ("source", "keep_yas", "keep_yield", "admitted"),
+    [
+        ("bloomberg-screen", True, True, True),
+        ("bloomberg-screen", False, True, False),
+        ("bloomberg-screen", True, False, False),
+        ("quantlib", True, True, False),
+    ],
+)
+def test_pricing_risk_admits_only_yas_bond_yield_dv01(
+    source: str, keep_yas: bool, keep_yield: bool, admitted: bool
+) -> None:
+    path = fixture_path("pricing/bloomberg/bond/ibm_eur_2034_callable_bloomberg.json")
+    fixture = GoldenFixture.from_path(path)
+    fixture.metadata.source = source
+    if not keep_yas:
+        fixture.metadata.screenshots = [s for s in fixture.metadata.screenshots if s.screen != "YAS"]
+    if not keep_yield:
+        fixture.expected.pop("yield_dv01")
+    if admitted:
+        golden_conftest._validate_required_pricing_risk_metrics(fixture)
+    else:
+        with pytest.raises(AssertionError, match="must assert dv01"):
+            golden_conftest._validate_required_pricing_risk_metrics(fixture)
+
+
 def test_pricing_validation_rejects_inconsistent_swaption_underlying_tenor() -> None:
     path = DATA_ROOTS["pricing"] / "pricing/regression_goldens/swaption/usd_swaption_normal_vol_self_test.json"
     fixture = GoldenFixture.from_path(path)

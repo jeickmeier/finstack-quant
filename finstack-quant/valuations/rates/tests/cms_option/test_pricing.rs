@@ -99,6 +99,45 @@ fn test_cms_cap_pricing() {
 }
 
 #[test]
+fn cms_option_single_curve_dv01_bumps_the_shared_source_once() {
+    use finstack_quant_valuations_core::instruments::{PricingOptions, RatesCurveKind};
+    use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
+    use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
+        Dv01CalculatorConfig, UnifiedDv01Calculator,
+    };
+
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let market = standard_market(as_of);
+    let mut inst = CmsOption::example().expect("example");
+    let curve_id = inst.discount_curve_id.clone();
+    let calculator = UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined());
+    assert_eq!(
+        calculator.collect_curves(&inst, &market).unwrap(),
+        [
+            (curve_id.clone(), RatesCurveKind::Discount),
+            (inst.forward_curve_id.clone(), RatesCurveKind::Forward),
+        ]
+    );
+
+    inst.forward_curve_id = curve_id.clone();
+    assert_eq!(
+        calculator.collect_curves(&inst, &market).unwrap(),
+        [(curve_id.clone(), RatesCurveKind::Discount)]
+    );
+    let priced = inst
+        .price_with_metrics(&market, as_of, &[MetricId::Dv01], PricingOptions::default())
+        .expect("same-ID CMS option prices with DV01");
+    assert!(priced.value.amount() > 0.0);
+    let pv_at = |bp| {
+        let bumped = bump_discount_curve_parallel(&market, &curve_id, bp).unwrap();
+        inst.value(&bumped, as_of).unwrap().amount()
+    };
+    let expected = (pv_at(1.0) - pv_at(-1.0)) / 2.0;
+    assert!(expected > 0.0);
+    assert!((priced.measures["dv01"] - expected).abs() < 1e-8);
+}
+
+#[test]
 fn test_convexity_value() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let market = standard_market(as_of);

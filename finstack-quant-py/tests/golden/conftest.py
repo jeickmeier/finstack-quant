@@ -413,7 +413,16 @@ def _validate_required_pricing_risk_metrics(fixture: GoldenFixture) -> None:
         assert _has_expected_metric(fixture, "dv01"), "rates pricing fixtures must assert dv01"
 
     if domain.startswith("fixed_income."):
-        assert _has_expected_metric(fixture, "dv01"), "fixed-income pricing fixtures must assert dv01"
+        # YAS reports a quoted-yield sensitivity, not a curve bump at fixed OAS.
+        has_yas_yield_dv01 = (
+            domain == "fixed_income.bond"
+            and fixture.metadata.source == "bloomberg-screen"
+            and any(screenshot.screen == "YAS" for screenshot in fixture.metadata.screenshots)
+            and "yield_dv01" in fixture.expected
+        )
+        assert _has_expected_metric(fixture, "dv01") or has_yas_yield_dv01, (
+            "fixed-income pricing fixtures must assert dv01 or a Bloomberg YAS yield_dv01"
+        )
 
     if domain.startswith("credit."):
         assert _has_expected_metric(fixture, "dv01"), "credit pricing fixtures must assert dv01"

@@ -409,7 +409,21 @@ fn validate_required_pricing_risk_metrics(fixture: &GoldenFixture) -> Result<(),
     }
 
     if domain.starts_with("fixed_income.") && !has_expected_metric(fixture, "dv01") {
-        return Err("fixed-income pricing fixtures must assert dv01".to_string());
+        // YAS reports a quoted-yield sensitivity, not a curve bump at fixed OAS.
+        let has_yas_yield_dv01 = domain == "fixed_income.bond"
+            && fixture.metadata.source == "bloomberg-screen"
+            && fixture
+                .metadata
+                .screenshots
+                .iter()
+                .any(|s| s.screen == "YAS")
+            && fixture.expected.contains_key("yield_dv01");
+        if !has_yas_yield_dv01 {
+            return Err(
+                "fixed-income pricing fixtures must assert dv01 or a Bloomberg YAS yield_dv01"
+                    .to_string(),
+            );
+        }
     }
 
     if domain.starts_with("credit.") {
@@ -604,6 +618,24 @@ mod tests {
             .expect_err("regression credit fixtures must assert canonical CS01");
 
         assert!(err.contains("canonical cs01"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn pricing_risk_admits_only_yas_bond_yield_dv01() {
+        let fixture = load_fixture("pricing/bloomberg/bond/ibm_eur_2034_callable_bloomberg.json");
+        validate_required_pricing_risk_metrics(&fixture).expect("YAS yield DV01 is source-backed");
+
+        let mut no_yas = fixture.clone();
+        no_yas.metadata.screenshots.retain(|s| s.screen != "YAS");
+        assert!(validate_required_pricing_risk_metrics(&no_yas).is_err());
+
+        let mut no_yield = fixture.clone();
+        no_yield.expected.remove("yield_dv01");
+        assert!(validate_required_pricing_risk_metrics(&no_yield).is_err());
+
+        let mut non_yas_source = fixture;
+        non_yas_source.metadata.source = "quantlib".to_string();
+        assert!(validate_required_pricing_risk_metrics(&non_yas_source).is_err());
     }
 
     #[test]

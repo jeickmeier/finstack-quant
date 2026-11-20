@@ -6,7 +6,7 @@
     "description": "Bloomberg CDSW 5Y IBM single-name CDS with standard coupon and quoted spread.",
     "valuation_date": "2026-05-02",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg CDSW IBM USD senior CDS, 2014 SNAC XR14, S531 USD Custom Swap Curve - Mid, IBM USD Senior Curve, valuation date 2026-05-02 Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved.",
+    "source_detail": "Bloomberg CDSW IBM USD senior CDS, 2014 SNAC XR14, S531 USD Custom Swap Curve - Mid, IBM USD Senior Curve, valuation date 2026-05-02 Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. The named CDSW *_as_of checks preserve the historical unit-discount (B=1) display proxy: principal is dirty PV plus current-coupon accrual; display default exposure is signed LGD less that clean mark. The archived Cash Amount and Accrued lines are also checked separately. This approximation is not a claim of parity for the recorded May 7 cash settlement.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-02",
     "last_reviewed_by": "jeickmeier",
@@ -591,19 +591,30 @@
     }
   },
   "expected": {
-    "npv": -181992.0,
+    "npv::cdsw_principal_as_of": -181992.0,
+    "npv::cdsw_accrued_as_of": -12222.0,
+    "npv::cdsw_cash_amount_as_of": -194214.0,
     "par_spread": 60.5,
     "dv01": 45.91,
     "cs01": 4680.88,
     "recovery01": 76.03,
     "jump_to_default": 5988055.555555556,
-    "default_exposure": 6181992.0
+    "default_exposure::cdsw_as_of": 6181992.0
   },
   "tolerances": {
-    "npv": {
+    "npv::cdsw_principal_as_of": {
       "abs": 6.0,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Principal rounded to whole USD; widened slightly to allow the remaining model-vs-screen convention residual, transcribed curve input noise, and deterministic protection-leg integration rounding while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic. Widened 5.0 -> 6.0 on 2026-10-01: the 2026-09-30 rate-calculation and interpolation changes moved the residual to 5.83."
+    },
+    "npv::cdsw_accrued_as_of": {
+      "abs": 0.5,
+      "tolerance_reason": "The archived CDSW screen displays 44 ACT/360 days of signed accrued premium rounded to the nearest USD."
+    },
+    "npv::cdsw_cash_amount_as_of": {
+      "abs": 6.0,
+      "rel": 1e-08,
+      "tolerance_reason": "The screen's whole-dollar Cash Amount is Principal plus signed Accrued. Compare the raw economic dirty PV to this line on the same B=1 display basis as Principal, preserving the original USD 6 screen reconciliation band. This is not a dated settlement comparison. abs-or-rel: absolute/display tolerance is the intended gate."
     },
     "par_spread": {
       "abs": 0.02,
@@ -628,9 +639,9 @@
     "jump_to_default": {
       "abs": 1e-06,
       "rel": 1e-12,
-      "tolerance_reason": "The screenshot does not display accrued-premium-adjusted JTD; this asserts finstack JTD exactly while default_exposure below checks Bloomberg Def Exposure. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+      "tolerance_reason": "The screenshot does not display accrued-premium-adjusted JTD; this asserts finstack JTD exactly while the separate CDSW display exposure below checks Bloomberg Def Exposure. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
-    "default_exposure": {
+    "default_exposure::cdsw_as_of": {
       "abs": 6.0,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Def Exposure rounded to whole USD; widened slightly to allow the remaining model-vs-screen convention residual, transcribed curve input noise, and deterministic protection-leg integration rounding while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic. Widened 5.0 -> 6.0 on 2026-10-01: the 2026-09-30 rate-calculation and interpolation changes moved the residual to 5.83."

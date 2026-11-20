@@ -653,7 +653,6 @@
     "asw_market": 0.00816,
     "duration_mod": 6.607,
     "convexity": 0.535,
-    "dv01": -650.0,
     "yield_dv01": -650.0,
     "embedded_option_value": -700.0,
     "vega": -0.01
@@ -703,13 +702,9 @@
       "abs": 0.001,
       "tolerance_reason": "Bloomberg convexity is displayed to three decimals."
     },
-    "dv01": {
-      "abs": 0.5,
-      "tolerance_reason": "Bloomberg DV01 is displayed as 650 on 1MM face."
-    },
     "yield_dv01": {
       "abs": 0.5,
-      "tolerance_reason": "Same Bloomberg DV01 source value asserted under the explicit yield-basis metric."
+      "tolerance_reason": "Bloomberg YAS shows 650 on 1MM face: yield-to-workout DV01, not direct curve DV01 at fixed OAS."
     },
     "embedded_option_value": {
       "abs": 50.0,

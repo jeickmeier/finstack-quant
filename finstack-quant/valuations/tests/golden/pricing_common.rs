@@ -8,7 +8,10 @@ use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations::instruments::PricingOptions;
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
+use finstack_quant_valuations_core::instruments::PayReceive;
+use rust_decimal::prelude::ToPrimitive;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -82,6 +85,38 @@ pub(crate) fn resolve_market(market: &Market) -> Result<MarketContext, String> {
     }
 }
 
+/// Reconstruct the archived IBM CDSW display on its historical B=1 test basis.
+/// This is not an assertion about the cash-settlement date used on the screen.
+fn cdsw_as_of_accrual(
+    fixture: &GoldenFixture,
+    as_of: finstack_quant_core::dates::Date,
+) -> Result<f64, String> {
+    if fixture.metadata.source != "bloomberg-screen" || fixture.metadata.name != "cds_5y_par_spread"
+    {
+        return Err(
+            "CDSW as-of display assertions require the archived IBM CDSW fixture".to_string(),
+        );
+    }
+    let pricing = fixture
+        .pricing()
+        .ok_or("CDSW display requires a pricing fixture")?;
+    let cds: CreditDefaultSwap =
+        serde_json::from_value(pricing.instrument["instrument"]["spec"].clone())
+            .map_err(|error| format!("parse CDSW display fixture: {error}"))?;
+    if cds.side != PayReceive::Pay || cds.upfront.is_some() {
+        return Err("CDSW as-of display requires pay protection and no actual upfront".to_string());
+    }
+    let coupon = cds
+        .premium_leg
+        .coupon_bp
+        .to_f64()
+        .ok_or("CDSW coupon cannot be represented as f64")?;
+    let accrual = cds
+        .clean_quote_accrual(as_of)
+        .map_err(|error| error.to_string())?;
+    Ok(cds.notional.amount() * coupon / 10_000.0 * accrual)
+}
+
 /// Price an instrument fixture that follows the common pricing input contract.
 pub(crate) fn run_pricing_fixture(
     fixture: &GoldenFixture,
@@ -105,15 +140,27 @@ pub(crate) fn run_pricing_fixture(
     )
     .map_err(|err| format!("price instrument JSON: {err}"))?;
 
+    let display_accrual = if fixture.expected.keys().any(|key| key.contains("::cdsw_")) {
+        cdsw_as_of_accrual(fixture, result.as_of)?
+    } else {
+        0.0
+    };
+    let measure = |key| {
+        result
+            .measures
+            .get(key)
+            .copied()
+            .ok_or_else(|| format!("result missing metric '{key}'"))
+    };
+    let dirty = result.value.amount();
     let mut actuals = BTreeMap::new();
     for metric in fixture.expected.keys() {
-        let value = if metric == "npv" {
-            result.value.amount()
-        } else {
-            *result
-                .measures
-                .get(metric.as_str())
-                .ok_or_else(|| format!("result missing metric '{metric}'"))?
+        let value = match metric.as_str() {
+            "npv" | "npv::cdsw_cash_amount_as_of" => dirty,
+            "npv::cdsw_principal_as_of" => dirty + display_accrual,
+            "npv::cdsw_accrued_as_of" => -display_accrual,
+            "default_exposure::cdsw_as_of" => measure("default_exposure")? - display_accrual,
+            key => measure(key)?,
         };
         actuals.insert(metric.clone(), value);
     }
