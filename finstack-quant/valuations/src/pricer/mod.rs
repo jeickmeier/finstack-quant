@@ -1,16 +1,16 @@
 //! Pricer infrastructure: the core dispatch and registry types plus the
 //! closed-world assembly.
 //!
-//! The dispatch types ([`InstrumentType`](finstack_quant_valuations_core::pricer::InstrumentType),
-//! [`ModelKey`](finstack_quant_valuations_core::pricer::ModelKey), [`PricerKey`](finstack_quant_valuations_core::pricer::PricerKey),
-//! [`Pricer`](finstack_quant_valuations_core::pricer::Pricer), [`PricerRegistry`](finstack_quant_valuations_core::pricer::PricerRegistry),
-//! [`PricingDispatch`](finstack_quant_valuations_core::pricer::PricingDispatch), [`Family`](finstack_quant_valuations_core::pricer::Family))
+//! The dispatch types ([`InstrumentType`],
+//! [`ModelKey`], [`PricerKey`],
+//! [`Pricer`], [`PricerRegistry`],
+//! [`PricingDispatch`], [`Family`])
 //! are defined in `finstack_quant_valuations_core::pricer` and re-exported here.
 //! This module adds what needs every instrument family: the
-//! [`FAMILIES`](crate::pricer::FAMILIES) list, the [`STANDARD`](crate::pricer::STANDARD)
+//! [`FAMILIES`] list, the [`STANDARD`]
 //! umbrella family and its registries, and the JSON pricing entry points
-//! ([`parse_boxed_instrument_from_json`](crate::pricer::parse_boxed_instrument_from_json),
-//! [`price_instrument`](crate::pricer::price_instrument) and friends).
+//! ([`parse_boxed_instrument_from_json`],
+//! [`price_instrument`] and friends).
 
 use crate::register_generic;
 pub use finstack_quant_valuations_core::pricer::*;
