@@ -707,7 +707,7 @@ pub(super) fn fx_option_params() -> Result<Vec<Value>> {
     use crate::instruments::fx::fx_option::{FxDeltaConvention, FxDeltaConventionKind};
     use finstack_quant_core::types::{CurveId, InstrumentId};
     example(&crate::instruments::fx::fx_option::FxOptionParams {
-        spot_basis: crate::instruments::fx::fx_option::FxSpotBasis::Cash,
+        spot_basis: finstack_quant_valuations_fx::FxSpotBasis::Cash,
         delivery: crate::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         id: InstrumentId::new("EURUSD-CALL-6M"),
         base_currency: Currency::EUR,

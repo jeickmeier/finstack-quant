@@ -50,7 +50,7 @@ fn test_fx_forward_dependencies_complete() {
     let maturity = as_of.add_months(6).expect("valid date shift");
 
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-FWD-DEPS"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -91,7 +91,7 @@ fn test_missing_fx_matrix_fails() {
     let maturity = as_of.add_months(6).expect("valid date shift");
 
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-FWD-MISSING-FX"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)

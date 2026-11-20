@@ -182,9 +182,7 @@ fn bench_fx_forward_pv(c: &mut Criterion) {
             let as_of = base_date();
             let maturity = as_of + time::Duration::days(*days);
             let forward = FxForward::builder()
-                .spot_basis(
-                    finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash,
-                )
+                .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
                 .id(InstrumentId::new(format!("EURUSD-FWD-{label}")))
                 .base_currency(Currency::EUR)
                 .quote_currency(Currency::USD)

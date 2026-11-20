@@ -212,7 +212,7 @@ fn build_fx_market(
 
 fn build_fx_call_option(expiry: Date, strike: f64, notional: f64) -> FxOption {
     FxOption::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .delivery(
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         )
