@@ -1,6 +1,6 @@
 //! Spec-type bindings for `finstack_quant_cashflows::builder`.
 
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{py_getters, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::{PrincipalExchange, RollRule, ScheduleParams};
 use pyo3::prelude::*;
@@ -161,64 +161,39 @@ impl PyScheduleParams {
         self.inner.validate().map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.frequency")]
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.business_day_convention")]
-    #[getter]
-    fn business_day_convention(&self) -> PyBusinessDayConvention {
-        PyBusinessDayConvention::from_inner(self.inner.business_day_convention)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.stub")]
-    #[getter]
-    fn stub(&self) -> PyStubKind {
-        PyStubKind::from_inner(self.inner.stub)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.payment_lag_days")]
-    #[getter]
-    fn payment_lag_days(&self) -> i32 {
-        self.inner.payment_lag_days
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.end_of_month")]
-    #[getter]
-    fn end_of_month(&self) -> bool {
-        self.inner.end_of_month
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.adjust_accrual_dates")]
-    #[getter]
-    fn adjust_accrual_dates(&self) -> bool {
-        self.inner.adjust_accrual_dates
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.roll_rule")]
-    #[getter]
-    fn roll_rule(&self) -> PyRollRule {
-        PyRollRule {
-            inner: self.inner.roll_rule,
-        }
-    }
-
     /// Python-style field summary.
     fn __repr__(&self) -> String {
         repr_from_serde("ScheduleParams", &self.inner)
     }
 }
+
+py_getters!(PyScheduleParams |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.frequency")]
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.day_count")]
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.business_day_convention")]
+    business_day_convention -> PyBusinessDayConvention = PyBusinessDayConvention::from_inner(s.inner.business_day_convention);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.calendar_id")]
+    calendar_id -> String = s.inner.calendar_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.stub")]
+    stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.payment_lag_days")]
+    payment_lag_days -> i32 = s.inner.payment_lag_days;
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.end_of_month")]
+    end_of_month -> bool = s.inner.end_of_month;
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.adjust_accrual_dates")]
+    adjust_accrual_dates -> bool = s.inner.adjust_accrual_dates;
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.roll_rule")]
+    roll_rule -> PyRollRule = PyRollRule {
+        inner: s.inner.roll_rule,
+    };
+});

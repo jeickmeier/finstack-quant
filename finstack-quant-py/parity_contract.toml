@@ -284,7 +284,7 @@ rust_lib   = "finstack-quant/cashflows/src/lib.rs"
 python_package = "finstack_quant.cashflows"
 visibility = "pub"
 status = "exists"
-note = "Typed submodules (builder/accrual/aggregation/fixings/schema; the CashFlow/CFKind/CashFlowAccrual row types live in finstack_quant.core.cashflow) plus the JSON schedule bridge and its typed twins (build_cashflow_schedule / dated_flows, where dated_flows binds CashFlowSchedule::dated_flows). Rust-only at the crate root (deliberately unbound): the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / MarginStepSpec / PaymentStepSpec / DatedFlowJson (hosts pass dict/JSON to build_cashflow_schedule), the CashflowProvider / CashflowScheduleSource traits, and the in-place CashFlowSchedule mutators update_flows / try_update_flows / retain_flows / push_flow / into_flows (host wrappers are frozen; rebuild via from_flows / scale_amounts instead)."
+note = "Typed submodules (builder/accrual/aggregation/fixings/schema; the CashFlow/CFKind/CashFlowAccrual row types live in finstack_quant.core.cashflow) plus the JSON schedule bridge and its typed twins (build_cashflow_schedule / dated_flows, where dated_flows binds CashFlowSchedule::dated_flows). Rust-only at the crate root (deliberately unbound): the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / MarginStepSpec / PaymentStepSpec / DatedFlowJson (hosts pass dict/JSON to build_cashflow_schedule), the CashflowProvider / CashflowScheduleSource traits, and the in-place CashFlowSchedule mutators update_flows / retain_flows / push_flow / into_flows (host wrappers are frozen; rebuild via from_flows / scale_amounts instead)."
 
 [crates.cashflows.modules]
 fixings     = { python = "finstack_quant.cashflows.fixings",     status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM binds it as cashflows.materializeFixings over CashFlowSchedule handles or schedule JSON." }
@@ -311,11 +311,7 @@ python_package = "finstack_quant.cashflows.builder"
 # carried inside schedule JSON); evaluate_fee_tiers / FeeTier / RateSpec /
 # PrincipalEventSpec (spec internals reachable through the spec types); and the
 # credit-rate helpers psa_cpr /
-# PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR. The FloatingRateSpec
-# DEFAULT_GEARING / DEFAULT_GEARING_INCLUDES_SPREAD / DEFAULT_RESET_LAG_DAYS
-# constants and ScheduleParams::DEFAULT_STUB are Rust-only; the keyword-only
-# Python constructors (FloatingRateSpec, ScheduleParams, FeeSpec.periodic_bp)
-# read the Rust serde struct, whose defaults are those constants.
+# PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR.
 note = "Typed CashFlowBuilder includes build_as_of / buildAsOf for explicit fixing cutoffs and matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",

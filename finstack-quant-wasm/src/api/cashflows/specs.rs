@@ -16,23 +16,118 @@ use finstack_quant_cashflows::builder::{
 };
 use wasm_bindgen::prelude::*;
 
+macro_rules! zero_arg_specs {
+    ($ty:ident, $ret_ty:literal => {
+        $(
+            $(#[$doc:meta])*
+            $method:ident as $fn_name:ident => $js_name:ident;
+        )+
+    }) => {
+        $(
+            #[finstack_quant_wasm_macros::plain_docs]
+            $(#[$doc])*
+            #[wasm_bindgen(js_name = $js_name, unchecked_return_type = $ret_ty)]
+            pub fn $fn_name() -> Result<JsValue, JsValue> {
+                to_js_value(&$ty::$method())
+            }
+        )+
+    };
+}
+
+macro_rules! validate_specs {
+    ($(
+        $(#[$doc:meta])*
+        fn $fn_name:ident($param:ident : $ty:ty => $param_ty:literal) as $js_name:ident;
+    )+) => {
+        $(
+            #[finstack_quant_wasm_macros::plain_docs]
+            $(#[$doc])*
+            #[wasm_bindgen(js_name = $js_name)]
+            pub fn $fn_name(
+                #[wasm_bindgen(unchecked_param_type = $param_ty)] $param: JsValue,
+            ) -> Result<(), JsValue> {
+                js_wire::<$ty>(&$param, stringify!($param))?
+                    .validate()
+                    .map_err(to_js_err)
+            }
+        )+
+    };
+}
+
+macro_rules! spread_float_specs {
+    ($(
+        $(#[$doc:meta])*
+        $method:ident as $fn_name:ident => $js_name:ident;
+    )+) => {
+        $(
+            #[finstack_quant_wasm_macros::plain_docs]
+            $(#[$doc])*
+            #[wasm_bindgen(js_name = $js_name, unchecked_return_type = "generated.cashflows.FloatingRateSpec")]
+            pub fn $fn_name(
+                #[wasm_bindgen(js_name = "spreadBp", unchecked_param_type = "string")]
+                spread_bp: JsValue,
+            ) -> Result<JsValue, JsValue> {
+                to_js_value(&FloatingRateSpec::$method(
+                    js_decimal(&spread_bp, "spreadBp")?.0,
+                ))
+            }
+        )+
+    };
+}
+
+// --- Validation ------------------------------------------------------------------
+
+validate_specs! {
+    /// Check a floating-rate specification's reset lag, caps and floors.
+    ///
+    /// @param spec - `FloatingRateSpec` wire object.
+    /// @throws If `spec` is not a `FloatingRateSpec`, its reset lag is negative, its index floor exceeds its index cap, or its all-in floor exceeds its all-in cap (kind `validation`).
+    fn floating_rate_spec_validate(spec: FloatingRateSpec => "generated.cashflows.FloatingRateSpec") as floatingRateSpecValidate;
+
+    /// Check a notional and its amortization rule for consistency.
+    ///
+    /// @param notional - `Notional` wire object.
+    /// @throws If `notional` is not a `Notional`, its initial balance is negative or non-finite, or its amortization rule mixes currencies, exceeds the initial balance, has a percentage outside `[0, 1]` or has dates out of order (kind `validation`).
+    fn notional_validate(notional: Notional => "generated.cashflows.Notional") as notionalValidate;
+
+    /// Check a default model's curve parameters.
+    ///
+    /// @param spec - `DefaultModelSpec` wire object.
+    /// @throws If `spec` is not a `DefaultModelSpec`, or its CDR, SDA multiplier, vector, cumulative-loss or timing parameters are out of range (kind `validation`).
+    fn default_model_spec_validate(spec: DefaultModelSpec => "generated.cashflows.DefaultModelSpec") as defaultModelSpecValidate;
+
+    /// Check a prepayment model's curve parameters.
+    ///
+    /// @param spec - `PrepaymentModelSpec` wire object.
+    /// @throws If `spec` is not a `PrepaymentModelSpec`, or its CPR, PSA multiplier, ABS speed or vector is out of range (kind `validation`).
+    fn prepayment_model_spec_validate(spec: PrepaymentModelSpec => "generated.cashflows.PrepaymentModelSpec") as prepaymentModelSpecValidate;
+
+    /// Check a recovery model's rate and severity vector.
+    ///
+    /// @param spec - `RecoveryModelSpec` wire object.
+    /// @throws If `spec` is not a `RecoveryModelSpec`, its rate is outside `[0, 1]`, or its severity vector is empty or holds a value outside `[0, 1]` (kind `validation`).
+    fn recovery_model_spec_validate(spec: RecoveryModelSpec => "generated.cashflows.RecoveryModelSpec") as recoveryModelSpecValidate;
+
+    /// Check schedule conventions before building a schedule.
+    ///
+    /// @param params - `ScheduleParams` wire object.
+    /// @throws If `params` is not a `ScheduleParams`, its `calendar_id` names no registered holiday calendar (other than `"weekends_only"`), or its payment lag is negative (kind `validation`).
+    fn schedule_params_validate(params: ScheduleParams => "generated.cashflows.ScheduleParams") as scheduleParamsValidate;
+}
+
 // --- Floating-rate conventions ----------------------------------------------
 
-/// USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
-///
-/// @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 2 } }`.
-#[wasm_bindgen(js_name = floatingLegCompoundingSofrObservationShift, unchecked_return_type = "generated.cashflows.FloatingLegCompounding")]
-pub fn floating_leg_compounding_sofr_observation_shift() -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::sofr_observation_shift())
-}
+zero_arg_specs! { FloatingLegCompounding, "generated.cashflows.FloatingLegCompounding" => {
+    /// USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
+    ///
+    /// @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 2 } }`.
+    sofr_observation_shift as floating_leg_compounding_sofr_observation_shift => floatingLegCompoundingSofrObservationShift;
 
-/// GBP SONIA FRN compounding convention: ISDA 2021 observation shift of 5 business days (Rust `FloatingLegCompounding::sonia_observation_shift`).
-///
-/// @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 5 } }`.
-#[wasm_bindgen(js_name = floatingLegCompoundingSoniaObservationShift, unchecked_return_type = "generated.cashflows.FloatingLegCompounding")]
-pub fn floating_leg_compounding_sonia_observation_shift() -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::sonia_observation_shift())
-}
+    /// GBP SONIA FRN compounding convention: ISDA 2021 observation shift of 5 business days (Rust `FloatingLegCompounding::sonia_observation_shift`).
+    ///
+    /// @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 5 } }`.
+    sonia_observation_shift as floating_leg_compounding_sonia_observation_shift => floatingLegCompoundingSoniaObservationShift;
+}}
 
 /// Whether a compounding convention builds the period rate from daily overnight
 /// fixings (Rust `FloatingLegCompounding::is_overnight`).
@@ -48,59 +143,27 @@ pub fn floating_leg_compounding_is_overnight(
     Ok(js_wire::<FloatingLegCompounding>(&value, "value")?.is_overnight())
 }
 
-/// Check a floating-rate specification's reset lag, caps and floors.
-///
-/// @param spec - `FloatingRateSpec` wire object.
-/// @throws If `spec` is not a `FloatingRateSpec`, its reset lag is negative, its index floor exceeds its index cap, or its all-in floor exceeds its all-in cap (kind `validation`).
-#[wasm_bindgen(js_name = floatingRateSpecValidate)]
-pub fn floating_rate_spec_validate(
-    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.FloatingRateSpec")] spec: JsValue,
-) -> Result<(), JsValue> {
-    js_wire::<FloatingRateSpec>(&spec, "spec")?
-        .validate()
-        .map_err(to_js_err)
-}
+spread_float_specs! {
+    /// USD SOFR floating-rate specification (curve `USD-SOFR`, compounded in arrears).
+    ///
+    /// @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
+    /// @returns `FloatingRateSpec` wire object with the Rust SOFR conventions.
+    /// @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
+    sofr as floating_rate_spec_sofr => floatingRateSpecSofr;
 
-/// USD SOFR floating-rate specification (curve `USD-SOFR`, compounded in arrears).
-///
-/// @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
-/// @returns `FloatingRateSpec` wire object with the Rust SOFR conventions.
-/// @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
-#[wasm_bindgen(js_name = floatingRateSpecSofr, unchecked_return_type = "generated.cashflows.FloatingRateSpec")]
-pub fn floating_rate_spec_sofr(
-    #[wasm_bindgen(js_name = "spreadBp", unchecked_param_type = "string")] spread_bp: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingRateSpec::sofr(
-        js_decimal(&spread_bp, "spreadBp")?.0,
-    ))
-}
+    /// GBP SONIA floating-rate specification (curve `GBP-SONIA`, compounded in arrears).
+    ///
+    /// @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
+    /// @returns `FloatingRateSpec` wire object with the Rust SONIA conventions.
+    /// @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
+    sonia as floating_rate_spec_sonia => floatingRateSpecSonia;
 
-/// GBP SONIA floating-rate specification (curve `GBP-SONIA`, compounded in arrears).
-///
-/// @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
-/// @returns `FloatingRateSpec` wire object with the Rust SONIA conventions.
-/// @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
-#[wasm_bindgen(js_name = floatingRateSpecSonia, unchecked_return_type = "generated.cashflows.FloatingRateSpec")]
-pub fn floating_rate_spec_sonia(
-    #[wasm_bindgen(js_name = "spreadBp", unchecked_param_type = "string")] spread_bp: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingRateSpec::sonia(
-        js_decimal(&spread_bp, "spreadBp")?.0,
-    ))
-}
-
-/// EUR 3-month EURIBOR floating-rate specification (term rate set in advance).
-///
-/// @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
-/// @returns `FloatingRateSpec` wire object with the Rust EURIBOR 3M conventions.
-/// @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
-#[wasm_bindgen(js_name = floatingRateSpecEuribor3m, unchecked_return_type = "generated.cashflows.FloatingRateSpec")]
-pub fn floating_rate_spec_euribor_3m(
-    #[wasm_bindgen(js_name = "spreadBp", unchecked_param_type = "string")] spread_bp: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingRateSpec::euribor_3m(
-        js_decimal(&spread_bp, "spreadBp")?.0,
-    ))
+    /// EUR 3-month EURIBOR floating-rate specification (term rate set in advance).
+    ///
+    /// @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
+    /// @returns `FloatingRateSpec` wire object with the Rust EURIBOR 3M conventions.
+    /// @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
+    euribor_3m as floating_rate_spec_euribor_3m => floatingRateSpecEuribor3m;
 }
 
 // --- Notional ------------------------------------------------------------------
@@ -124,33 +187,7 @@ pub fn notional_par(
     to_js_value(&notional)
 }
 
-/// Check a notional and its amortization rule for consistency.
-///
-/// @param notional - `Notional` wire object.
-/// @throws If `notional` is not a `Notional`, its initial balance is negative or non-finite, or its amortization rule mixes currencies, exceeds the initial balance, has a percentage outside `[0, 1]` or has dates out of order (kind `validation`).
-#[wasm_bindgen(js_name = notionalValidate)]
-pub fn notional_validate(
-    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.Notional")] notional: JsValue,
-) -> Result<(), JsValue> {
-    js_wire::<Notional>(&notional, "notional")?
-        .validate()
-        .map_err(to_js_err)
-}
-
 // --- DefaultModelSpec ------------------------------------------------------------
-
-/// Check a default model's curve parameters.
-///
-/// @param spec - `DefaultModelSpec` wire object.
-/// @throws If `spec` is not a `DefaultModelSpec`, or its CDR, SDA multiplier, vector, cumulative-loss or timing parameters are out of range (kind `validation`).
-#[wasm_bindgen(js_name = defaultModelSpecValidate)]
-pub fn default_model_spec_validate(
-    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.DefaultModelSpec")] spec: JsValue,
-) -> Result<(), JsValue> {
-    js_wire::<DefaultModelSpec>(&spec, "spec")?
-        .validate()
-        .map_err(to_js_err)
-}
 
 /// Monthly default rate (MDR) of a default model at a seasoning month.
 ///
@@ -214,19 +251,6 @@ pub fn default_model_spec_cumulative_default_fraction(
 
 // --- PrepaymentModelSpec ---------------------------------------------------------
 
-/// Check a prepayment model's curve parameters.
-///
-/// @param spec - `PrepaymentModelSpec` wire object.
-/// @throws If `spec` is not a `PrepaymentModelSpec`, or its CPR, PSA multiplier, ABS speed or vector is out of range (kind `validation`).
-#[wasm_bindgen(js_name = prepaymentModelSpecValidate)]
-pub fn prepayment_model_spec_validate(
-    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.PrepaymentModelSpec")] spec: JsValue,
-) -> Result<(), JsValue> {
-    js_wire::<PrepaymentModelSpec>(&spec, "spec")?
-        .validate()
-        .map_err(to_js_err)
-}
-
 /// Single-month mortality (SMM) of a prepayment model at a seasoning month.
 ///
 /// @param spec - `PrepaymentModelSpec` wire object.
@@ -256,129 +280,74 @@ pub fn recovery_model_spec_recovery_rate(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.RecoveryModelSpec")] spec: JsValue,
     #[wasm_bindgen(js_name = "seasoningMonths", unchecked_param_type = "number")] seasoning_months: JsValue,
 ) -> Result<f64, JsValue> {
-    let spec = js_wire::<RecoveryModelSpec>(&spec, "spec")?;
-    spec.validate().map_err(to_js_err)?;
-    spec.recovery_rate(js_uint(&seasoning_months, "seasoningMonths")?)
-        .map_err(to_js_err)
-}
-
-/// Check a recovery model's rate and severity vector.
-///
-/// @param spec - `RecoveryModelSpec` wire object.
-/// @throws If `spec` is not a `RecoveryModelSpec`, its rate is outside `[0, 1]`, or its severity vector is empty or holds a value outside `[0, 1]` (kind `validation`).
-#[wasm_bindgen(js_name = recoveryModelSpecValidate)]
-pub fn recovery_model_spec_validate(
-    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.RecoveryModelSpec")] spec: JsValue,
-) -> Result<(), JsValue> {
     js_wire::<RecoveryModelSpec>(&spec, "spec")?
-        .validate()
+        .recovery_rate(js_uint(&seasoning_months, "seasoningMonths")?)
         .map_err(to_js_err)
 }
 
 // --- ScheduleParams ----------------------------------------------------------------
 
-/// Quarterly Act/360 schedule with Modified Following on a weekends-only calendar.
-///
-/// @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsQuarterlyAct360, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_quarterly_act360() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::quarterly_act360())
-}
+zero_arg_specs! { ScheduleParams, "generated.cashflows.ScheduleParams" => {
+    /// Quarterly Act/360 schedule with Modified Following on a weekends-only calendar.
+    ///
+    /// @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
+    /// @throws If the parameters cannot be serialized.
+    quarterly_act360 as schedule_params_quarterly_act360 => scheduleParamsQuarterlyAct360;
 
-/// Semi-annual 30/360 schedule with Modified Following on a weekends-only calendar.
-///
-/// @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsSemiannual30360, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_semiannual_30360() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::semiannual_30360())
-}
+    /// Semi-annual 30/360 schedule with Modified Following on a weekends-only calendar.
+    ///
+    /// @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
+    /// @throws If the parameters cannot be serialized.
+    semiannual_30360 as schedule_params_semiannual_30360 => scheduleParamsSemiannual30360;
 
-/// Annual ISDA Act/Act schedule with Following on a weekends-only calendar.
-///
-/// This is ISDA Actual/Actual, not ICMA; government bonds use
-/// `scheduleParamsEurGovBond` or `scheduleParamsUsdTreasury`.
-///
-/// @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsAnnualActact, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_annual_actact() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::annual_actact())
-}
+    /// Annual ISDA Act/Act schedule with Following on a weekends-only calendar.
+    ///
+    /// This is ISDA Actual/Actual, not ICMA; government bonds use
+    /// `scheduleParamsEurGovBond` or `scheduleParamsUsdTreasury`.
+    ///
+    /// @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
+    /// @throws If the parameters cannot be serialized.
+    annual_actact as schedule_params_annual_actact => scheduleParamsAnnualActact;
 
-/// USD SOFR swap leg: quarterly, Act/360, Modified Following, USNY, T+2 payment lag.
-///
-/// @returns `ScheduleParams` wire object following ARRC SOFR conventions.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsUsdSofrSwap, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_usd_sofr_swap() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::usd_sofr_swap())
-}
+    /// USD SOFR swap leg: quarterly, Act/360, Modified Following, USNY, T+2 payment lag.
+    ///
+    /// @returns `ScheduleParams` wire object following ARRC SOFR conventions.
+    /// @throws If the parameters cannot be serialized.
+    usd_sofr_swap as schedule_params_usd_sofr_swap => scheduleParamsUsdSofrSwap;
 
-/// USD corporate bond: semi-annual, 30/360, Following, USNY.
-///
-/// @returns `ScheduleParams` wire object for a plain USD corporate coupon schedule.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsUsdCorporateBond, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_usd_corporate_bond() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::usd_corporate_bond())
-}
+    /// USD corporate bond: semi-annual, 30/360, Following, USNY.
+    ///
+    /// @returns `ScheduleParams` wire object for a plain USD corporate coupon schedule.
+    /// @throws If the parameters cannot be serialized.
+    usd_corporate_bond as schedule_params_usd_corporate_bond => scheduleParamsUsdCorporateBond;
 
-/// USD Treasury bond: semi-annual, Act/Act, Following, USNY.
-///
-/// @returns `ScheduleParams` wire object for a Treasury-style coupon schedule.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsUsdTreasury, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_usd_treasury() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::usd_treasury())
-}
+    /// USD Treasury bond: semi-annual, Act/Act, Following, USNY.
+    ///
+    /// @returns `ScheduleParams` wire object for a Treasury-style coupon schedule.
+    /// @throws If the parameters cannot be serialized.
+    usd_treasury as schedule_params_usd_treasury => scheduleParamsUsdTreasury;
 
-/// EUR €STR swap leg: annual, Act/360, Modified Following, TARGET2, T+2 payment lag (LCH template).
-///
-/// @returns `ScheduleParams` wire object for a €STR-style floating leg.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsEurEstrSwap, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_eur_estr_swap() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::eur_estr_swap())
-}
+    /// EUR €STR swap leg: annual, Act/360, Modified Following, TARGET2, T+2 payment lag (LCH template).
+    ///
+    /// @returns `ScheduleParams` wire object for a €STR-style floating leg.
+    /// @throws If the parameters cannot be serialized.
+    eur_estr_swap as schedule_params_eur_estr_swap => scheduleParamsEurEstrSwap;
 
-/// EUR government bond: annual, Act/Act, Following, TARGET2.
-///
-/// @returns `ScheduleParams` wire object for an annual EUR government coupon schedule.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsEurGovBond, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_eur_gov_bond() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::eur_gov_bond())
-}
+    /// EUR government bond: annual, Act/Act, Following, TARGET2.
+    ///
+    /// @returns `ScheduleParams` wire object for an annual EUR government coupon schedule.
+    /// @throws If the parameters cannot be serialized.
+    eur_gov_bond as schedule_params_eur_gov_bond => scheduleParamsEurGovBond;
 
-/// GBP SONIA swap leg: annual, Act/365F, Modified Following, GBLO, no payment lag.
-///
-/// @returns `ScheduleParams` wire object for a SONIA-style floating leg.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsGbpSoniaSwap, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_gbp_sonia_swap() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::gbp_sonia_swap())
-}
+    /// GBP SONIA swap leg: annual, Act/365F, Modified Following, GBLO, no payment lag.
+    ///
+    /// @returns `ScheduleParams` wire object for a SONIA-style floating leg.
+    /// @throws If the parameters cannot be serialized.
+    gbp_sonia_swap as schedule_params_gbp_sonia_swap => scheduleParamsGbpSoniaSwap;
 
-/// JPY TONA swap leg: annual, Act/365F, Modified Following, JPTO, T+2 payment lag.
-///
-/// @returns `ScheduleParams` wire object for a TONA-style floating leg.
-/// @throws If the parameters cannot be serialized.
-#[wasm_bindgen(js_name = scheduleParamsJpyTonaSwap, unchecked_return_type = "generated.cashflows.ScheduleParams")]
-pub fn schedule_params_jpy_tona_swap() -> Result<JsValue, JsValue> {
-    to_js_value(&ScheduleParams::jpy_tona_swap())
-}
-
-/// Check schedule conventions before building a schedule.
-///
-/// @param params - `ScheduleParams` wire object.
-/// @throws If `params` is not a `ScheduleParams`, its `calendar_id` names no registered holiday calendar (other than `"weekends_only"`), or its payment lag is negative (kind `validation`).
-#[wasm_bindgen(js_name = scheduleParamsValidate)]
-pub fn schedule_params_validate(
-    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.ScheduleParams")] params: JsValue,
-) -> Result<(), JsValue> {
-    js_wire::<ScheduleParams>(&params, "params")?
-        .validate()
-        .map_err(to_js_err)
-}
+    /// JPY TONA swap leg: annual, Act/365F, Modified Following, JPTO, T+2 payment lag.
+    ///
+    /// @returns `ScheduleParams` wire object for a TONA-style floating leg.
+    /// @throws If the parameters cannot be serialized.
+    jpy_tona_swap as schedule_params_jpy_tona_swap => scheduleParamsJpyTonaSwap;
+}}

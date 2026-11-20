@@ -19,13 +19,6 @@ mod default;
 mod fees;
 mod prepayment;
 mod recovery;
-/// Extract a `rust_decimal::Decimal` from `decimal.Decimal`, `float`, `int`,
-/// or a numeric `str` (e.g. ``"0.05"``).
-///
-/// `str` and `decimal.Decimal` both go through
-/// `finstack_quant_core::decimal::parse_decimal` (the parser behind
-/// `Money::from_decimal_str`), so text that is not exactly representable as a
-/// Rust `Decimal` is rejected rather than rounded.
 mod schedule;
 
 pub(crate) use amortization::PyAmortizationSpec;
@@ -48,9 +41,25 @@ pub(crate) use schedule::PyPrincipalExchange;
 pub(crate) use schedule::PyRollRule;
 pub(crate) use schedule::PyScheduleParams;
 
+/// Extract a `rust_decimal::Decimal` from `decimal.Decimal`, `float`, `int`,
+/// or a numeric `str` (e.g. ``"0.05"``), rejecting `bool`.
+///
+/// `str`, `int`, and `decimal.Decimal` all go through exact parsing via
+/// `finstack_quant_core::decimal::parse_decimal` (or `decimal_from_py`), so
+/// large integers never lose precision through `f64` and non-representable text
+/// is rejected rather than rounded.
 pub(crate) fn decimal_from_any(obj: &Bound<'_, PyAny>) -> PyResult<Decimal> {
     if is_python_decimal(obj)? {
         return decimal_from_py(obj);
+    }
+    if obj.is_instance_of::<PyBool>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "value cannot be a bool",
+        ));
+    }
+    if obj.is_instance_of::<PyInt>() {
+        return finstack_quant_core::decimal::parse_decimal(obj.str()?.to_str()?)
+            .map_err(core_to_py);
     }
     if let Ok(text) = obj.extract::<String>() {
         return finstack_quant_core::decimal::parse_decimal(&text).map_err(core_to_py);
@@ -74,7 +83,7 @@ pub(crate) fn decimal_rate_from_any(obj: &Bound<'_, PyAny>) -> PyResult<Decimal>
     if let Ok(bps) = obj.cast::<PyBps>() {
         return Ok(Decimal::new(i64::from(bps.borrow().inner.as_bp()), 4));
     }
-    decimal_number_from_any(obj)
+    decimal_from_any(obj)
 }
 
 /// Normalize a contractual quote expressed in basis points.
@@ -86,19 +95,6 @@ pub(crate) fn decimal_bps_from_any(obj: &Bound<'_, PyAny>) -> PyResult<Decimal> 
         return decimal_rate_from_any(obj)?
             .checked_mul(Decimal::from(10_000))
             .ok_or_else(|| crate::errors::value_error("basis-point quote exceeds Decimal range"));
-    }
-    decimal_number_from_any(obj)
-}
-
-fn decimal_number_from_any(obj: &Bound<'_, PyAny>) -> PyResult<Decimal> {
-    if obj.is_instance_of::<PyBool>() {
-        return Err(pyo3::exceptions::PyTypeError::new_err(
-            "rate cannot be a bool",
-        ));
-    }
-    if obj.is_instance_of::<PyInt>() {
-        return finstack_quant_core::decimal::parse_decimal(obj.str()?.to_str()?)
-            .map_err(core_to_py);
     }
     decimal_from_any(obj)
 }

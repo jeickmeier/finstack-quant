@@ -8,6 +8,7 @@ use pyo3::types::PyList;
 use super::builder::schedule::PyCashFlowSchedule;
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::py_getters;
 use crate::errors::core_to_py;
 
 #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing")]
@@ -37,24 +38,20 @@ impl PyProjectedFixing {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing.series_id")]
-    #[getter]
-    fn series_id(&self) -> &str {
-        &self.inner.series_id
-    }
-
     #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing.date")]
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.date)
     }
+}
+
+py_getters! { PyProjectedFixing |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing.series_id")]
+    series_id -> &str = &s.inner.series_id;
 
     #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing.value")]
-    #[getter]
-    fn value(&self) -> Option<f64> {
-        self.inner.value
-    }
-}
+    value -> Option<f64> = s.inner.value;
+}}
 
 #[doc = pydoc!("finstack_quant.cashflows.fixings", "materialize_fixings")]
 #[pyfunction]

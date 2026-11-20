@@ -20,27 +20,6 @@ use finstack_quant_cashflows::schema as canonical;
 
 use crate::errors::{core_to_py, serde_json_to_py};
 
-/// Docstring for the `finstack_quant.cashflows.schema` Python namespace.
-const MODULE_DOC: &str = r#"Compiled-in JSON Schemas for the cashflow wire format.
-
-Every cashflow schema (the amortization, coupon, default, fee, prepayment,
-recovery and schedule specifications, plus the schedule, build-spec, accrual
-and aggregation contracts) is embedded in the extension module, so they always
-match the installed version and cannot drift from the wheel that ships them.
-These are the documents that resolve the
-``https://finstack_quant.dev/schemas/cashflow/1/...`` references appearing
-inside instrument schemas.
-
-Examples
---------
->>> import json
->>> from finstack_quant.cashflows import schema
->>> resources = schema.resources()
->>> base = "https://finstack_quant.dev/schemas/cashflow/1/"
->>> json.loads(resources[base + "schedule_params.schema.json"])["title"]
-'ScheduleParams'
-"#;
-
 /// Render a canonical schema value as pretty-printed JSON text.
 fn schema_json(value: &Value) -> PyResult<String> {
     serde_json::to_string_pretty(value)
@@ -66,7 +45,10 @@ schema_registry_functions!(
 /// Register the `finstack_quant.cashflows.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "schema")?;
-    m.setattr("__doc__", MODULE_DOC)?;
+    m.setattr(
+        "__doc__",
+        pydoc!("finstack_quant.cashflows.schema", "__module__"),
+    )?;
     add_registry_functions(&m)?;
 
     m.add_function(wrap_pyfunction!(resources, &m)?)?;

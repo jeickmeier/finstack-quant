@@ -6,6 +6,7 @@ pub(crate) mod builder;
 pub(crate) mod fixings;
 mod schema;
 
+use crate::bindings::macros::py_getters;
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::CashFlowMeta;
 use finstack_quant_cashflows::{CashflowScheduleBuildSpec, ScheduleBuildOpts};
@@ -126,20 +127,6 @@ impl PyScheduleBuildOpts {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows", "ScheduleBuildOpts.notional_hint")]
-    #[getter]
-    fn notional_hint(&self) -> Option<PyMoney> {
-        self.inner.notional_hint.map(PyMoney::from_inner)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows", "ScheduleBuildOpts.meta")]
-    #[getter]
-    fn meta(&self) -> PyCashFlowMeta {
-        PyCashFlowMeta {
-            inner: self.inner.meta.clone(),
-        }
-    }
-
     /// Python-style summary.
     fn __repr__(&self) -> String {
         let hint = self.inner.notional_hint.map_or_else(
@@ -152,6 +139,16 @@ impl PyScheduleBuildOpts {
         )
     }
 }
+
+py_getters! { PyScheduleBuildOpts |s| {
+    #[doc = pydoc!("finstack_quant.cashflows", "ScheduleBuildOpts.notional_hint")]
+    notional_hint -> Option<PyMoney> = s.inner.notional_hint.map(PyMoney::from_inner);
+
+    #[doc = pydoc!("finstack_quant.cashflows", "ScheduleBuildOpts.meta")]
+    meta -> PyCashFlowMeta = PyCashFlowMeta {
+        inner: s.inner.meta.clone(),
+    };
+}}
 
 #[doc = pydoc!("finstack_quant.cashflows", "schedule_from_dated_flows")]
 #[pyfunction]

@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 /// fixing; existing observations take precedence and are kept unchanged.
 ///
 /// @param market - `MarketContext` handle of the pre-roll market; it is not modified.
-/// @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
+/// @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles, canonical JSON strings or plain objects.
 /// @param oldDate - ISO-8601 inclusive start of the fixing window: same-day projections become observed.
 /// @param newDate - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
 /// @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
@@ -21,7 +21,8 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(js_name = materializeFixings)]
 pub fn materialize_fixings(
     market: &JsMarketContext,
-    #[wasm_bindgen(unchecked_param_type = "readonly JsonInput[]")] schedules: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly (CashFlowSchedule | JsonInput)[]")]
+    schedules: JsValue,
     #[wasm_bindgen(js_name = "oldDate", unchecked_param_type = "string")] old_date: JsValue,
     #[wasm_bindgen(js_name = "newDate", unchecked_param_type = "string")] new_date: JsValue,
 ) -> Result<JsMarketContext, JsValue> {

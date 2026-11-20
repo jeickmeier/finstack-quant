@@ -20,7 +20,7 @@ use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::parse_label;
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{py_getters, wire_methods};
 use crate::bindings::module_utils::spec_from_py;
 use crate::errors::core_to_py;
 
@@ -73,24 +73,6 @@ impl PyCashFlowMeta {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.representation")]
-    #[getter]
-    fn representation(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_tag(&self.inner.representation).map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.calendar_ids")]
-    #[getter]
-    fn calendar_ids(&self) -> Vec<String> {
-        self.inner.calendar_ids.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.commitment")]
-    #[getter]
-    fn commitment(&self) -> Option<PyMoney> {
-        self.inner.commitment.map(PyMoney::from_inner)
-    }
-
     #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -103,22 +85,30 @@ impl PyCashFlowMeta {
         self.inner.maturity.map(|d| date_to_py(py, d)).transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.projected_fixings")]
-    #[getter]
-    fn projected_fixings(&self) -> Vec<PyProjectedFixing> {
-        self.inner
-            .projected_fixings
-            .iter()
-            .cloned()
-            .map(|inner| PyProjectedFixing { inner })
-            .collect()
-    }
-
     /// Python-style field summary.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CashFlowMeta", &self.inner)
     }
 }
+
+py_getters! { PyCashFlowMeta |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.representation")]
+    representation -> PyResult<String> = finstack_quant_core::wire::serde_tag(&s.inner.representation).map_err(core_to_py);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.calendar_ids")]
+    calendar_ids -> Vec<String> = s.inner.calendar_ids.clone();
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.commitment")]
+    commitment -> Option<PyMoney> = s.inner.commitment.map(PyMoney::from_inner);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.projected_fixings")]
+    projected_fixings -> Vec<PyProjectedFixing> = s.inner
+        .projected_fixings
+        .iter()
+        .cloned()
+        .map(|inner| PyProjectedFixing { inner })
+        .collect();
+}}
 
 wire_methods!(
     PyCashFlowMeta,

@@ -5,7 +5,6 @@ use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 use pyo3::prelude::*;
 
-use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 
@@ -27,8 +26,16 @@ wire_methods!(
     DefaultModelSpec,
     "DefaultModelSpec",
     module = "finstack_quant.cashflows.builder._specs.default",
-    validate
+    validate,
+    to_dict
 );
+
+impl PyDefaultModelSpec {
+    fn validated(inner: DefaultModelSpec) -> PyResult<Self> {
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+}
 
 #[pymethods]
 impl PyDefaultModelSpec {
@@ -36,56 +43,47 @@ impl PyDefaultModelSpec {
     #[staticmethod]
     #[pyo3(text_signature = "(cdr)")]
     fn constant_cdr(cdr: f64) -> PyResult<Self> {
-        let inner = DefaultModelSpec::constant_cdr(cdr);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(DefaultModelSpec::constant_cdr(cdr))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.sda")]
     #[staticmethod]
     #[pyo3(text_signature = "(speed_multiplier)")]
     fn sda(speed_multiplier: f64) -> PyResult<Self> {
-        let inner = DefaultModelSpec::sda(speed_multiplier);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(DefaultModelSpec::sda(speed_multiplier))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.vector")]
     #[staticmethod]
     #[pyo3(text_signature = "(monthly_cdr)")]
     fn vector(monthly_cdr: Vec<f64>) -> PyResult<Self> {
-        let inner = DefaultModelSpec::vector(monthly_cdr);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(DefaultModelSpec::vector(monthly_cdr))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.cumulative_loss")]
     #[staticmethod]
     #[pyo3(text_signature = "(cumulative_net_loss_pct, severity)")]
     fn cumulative_loss(cumulative_net_loss_pct: Vec<f64>, severity: f64) -> PyResult<Self> {
-        let inner = DefaultModelSpec::cumulative_loss(cumulative_net_loss_pct, severity);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(DefaultModelSpec::cumulative_loss(
+            cumulative_net_loss_pct,
+            severity,
+        ))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.timing")]
     #[staticmethod]
     #[pyo3(text_signature = "(cumulative_default_rate, annual_pct)")]
     fn timing(cumulative_default_rate: f64, annual_pct: Vec<f64>) -> PyResult<Self> {
-        let inner = DefaultModelSpec::timing(cumulative_default_rate, annual_pct);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(DefaultModelSpec::timing(
+            cumulative_default_rate,
+            annual_pct,
+        ))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.validate")]
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.to_dict")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.mdr")]

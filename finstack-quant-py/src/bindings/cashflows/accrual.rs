@@ -13,7 +13,7 @@ use crate::bindings::cashflows::builder::schedule::PyCashFlowSchedule;
 use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{py_getters, wire_methods};
 use crate::errors::core_to_py;
 
 #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualMethod")]
@@ -45,15 +45,6 @@ impl PyAccrualMethod {
         inner: AccrualMethod::Compounded,
     };
 
-    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualMethod.name")]
-    #[getter]
-    fn name(&self) -> &'static str {
-        match self.inner {
-            AccrualMethod::Linear => "linear",
-            AccrualMethod::Compounded => "compounded",
-        }
-    }
-
     /// Python-style representation (``AccrualMethod.LINEAR``).
     fn __repr__(&self) -> String {
         match self.inner {
@@ -62,6 +53,14 @@ impl PyAccrualMethod {
         }
     }
 }
+
+py_getters!(PyAccrualMethod |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualMethod.name")]
+    name -> &'static str = match s.inner {
+        AccrualMethod::Linear => "linear",
+        AccrualMethod::Compounded => "compounded",
+    };
+});
 
 #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule")]
 #[pyclass(
@@ -91,18 +90,6 @@ impl PyExCouponRule {
                 calendar_id: calendar_id.map(Into::into),
             },
         }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.days_before_coupon")]
-    #[getter]
-    fn days_before_coupon(&self) -> u32 {
-        self.inner.days_before_coupon
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.ex_date")]
@@ -143,6 +130,13 @@ wire_methods!(
     "ExCouponRule",
     module = "finstack_quant.cashflows.accrual"
 );
+py_getters!(PyExCouponRule |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.days_before_coupon")]
+    days_before_coupon -> u32 = s.inner.days_before_coupon;
+
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.calendar_id")]
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig")]
 #[pyclass(
@@ -184,35 +178,6 @@ impl PyAccrualConfig {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.method")]
-    #[getter]
-    fn method(&self) -> PyAccrualMethod {
-        PyAccrualMethod {
-            inner: self.inner.method.clone(),
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.ex_coupon")]
-    #[getter]
-    fn ex_coupon(&self) -> Option<PyExCouponRule> {
-        self.inner
-            .ex_coupon
-            .clone()
-            .map(|inner| PyExCouponRule { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.include_pik")]
-    #[getter]
-    fn include_pik(&self) -> bool {
-        self.inner.include_pik
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.frequency")]
-    #[getter]
-    fn frequency(&self) -> Option<PyTenor> {
-        self.inner.frequency.map(PyTenor::from_inner)
-    }
-
     /// Python-style field summary.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("AccrualConfig", &self.inner)
@@ -225,6 +190,25 @@ wire_methods!(
     "AccrualConfig",
     module = "finstack_quant.cashflows.accrual"
 );
+py_getters!(PyAccrualConfig |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.method")]
+    method -> PyAccrualMethod = PyAccrualMethod {
+        inner: s.inner.method.clone(),
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.ex_coupon")]
+    ex_coupon -> Option<PyExCouponRule> = s
+        .inner
+        .ex_coupon
+        .clone()
+        .map(|inner| PyExCouponRule { inner });
+
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.include_pik")]
+    include_pik -> bool = s.inner.include_pik;
+
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.frequency")]
+    frequency -> Option<PyTenor> = s.inner.frequency.map(PyTenor::from_inner);
+});
 
 #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualIndex")]
 #[pyclass(

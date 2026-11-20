@@ -6,7 +6,7 @@
 
 import type * as wasm from './pkg/finstack_quant_wasm.js';
 import type * as generated from './types/generated/index.js';
-import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DiscountCurve, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, MarketContext, MarketContextCurve, Money, MoneyValue, MvaResult, ScalarTimeSeries, ScheduleBuilder, start } from './pkg/finstack_quant_wasm.js';
+import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DiscountCurve, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, MarketContext, MarketContextCurve, Money, MoneyValue, MvaResult, ScalarTimeSeries, ScheduleBuilder, start } from './pkg/finstack_quant_wasm.js';
 
 export { default } from './pkg/finstack_quant_wasm.js';
 export type * from './pkg/finstack_quant_wasm.js';
@@ -3575,26 +3575,26 @@ export interface CashflowsNamespace {
    * fixing; existing observations take precedence and are kept unchanged.
    *
    * @param market - `MarketContext` handle of the pre-roll market; it is not modified.
-   * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
+   * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles, canonical JSON strings or plain objects.
    * @param oldDate - ISO-8601 inclusive start of the fixing window: same-day projections become observed.
    * @param newDate - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
    * @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
    * @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).
    */
-  readonly materializeFixings: (market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string) => MarketContext;
+  readonly materializeFixings: typeof wasm.materializeFixings;
   /**
    * Merge several schedules into one under a new notional and day count.
    *
    * Flows are concatenated and put into canonical order; calendar ids and
    * projected fixings are merged.
    *
-   * @param schedules - Schedules to merge: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
+   * @param schedules - Schedules to merge: `CashFlowSchedule` handles, canonical JSON strings or plain objects.
    * @param notional - `Notional` wire object of the merged schedule.
    * @param dayCount - `DayCount` wire string of the merged schedule.
    * @returns The merged `CashFlowSchedule` handle.
    * @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
    */
-  readonly mergeCashflowSchedules: (schedules: readonly (CashFlowSchedule | JsonInput)[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount) => CashFlowSchedule;
+  readonly mergeCashflowSchedules: typeof wasm.mergeCashflowSchedules;
   /**
    * Convert monthly conditional prepayment or default mortality to annual mortality.
    *
