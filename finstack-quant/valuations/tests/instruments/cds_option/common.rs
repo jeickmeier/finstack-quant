@@ -20,6 +20,23 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
 };
 use rust_decimal::Decimal;
 
+/// Rebuild the market for both the CDSO option and its linked CDSW underlying.
+pub(super) fn cdx_ig_46_fixture() -> (CdsOption, MarketContext) {
+    use finstack_quant_calibration::api::{engine, schema::CalibrationEnvelope};
+
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../golden/data/pricing/bloomberg/cds_option/cdx_ig_46_payer_atm_jun26.json"
+    ))
+    .expect("parse CDSO fixture");
+    let envelope: CalibrationEnvelope =
+        serde_json::from_value(fixture["market"]["envelope"].clone()).expect("parse envelope");
+    let calibrated = engine::calibrate(&envelope).expect("calibrate CDSO market");
+    let market = MarketContext::try_from(calibrated.result.final_market).expect("rehydrate market");
+    let option = serde_json::from_value(fixture["instrument"]["instrument"]["spec"].clone())
+        .expect("parse CDSO option");
+    (option, market)
+}
+
 /// Standard flat discount curve for testing
 pub fn flat_discount(id: &str, base: Date, rate: f64) -> DiscountCurve {
     super::super::common::calibrated_discount(id, base, rate)

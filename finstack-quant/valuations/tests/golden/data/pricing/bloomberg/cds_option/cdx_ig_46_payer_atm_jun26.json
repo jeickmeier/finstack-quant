@@ -6,7 +6,7 @@
     "description": "Bloomberg CDSO CDX.NA.IG.46 100MM USD payer option struck at the ATM forward spread.",
     "valuation_date": "2026-05-07",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg CDSO/CDSW/CDSD CDX.NA.IG.46 V1, 100MM USD notional, S531 USD ISDA Swap Curve - Mid, CBBT Mid CDX curve, valuation date 2026-05-07, expiry 2026-06-17, ATM payer struck at 55.2848bp, Spread Vol 36.63% [dv01 re-blessed 2026-05-17: audit fix W-18 reconciled the CDS-option IR DV01 to finstack-quant's internal central-difference convention (consistent with the CDS DV01) for portfolio aggregation; dv01 is now an internal signed slope = -(Bloomberg CDSO screen DV01)/2, no longer a like-for-like Bloomberg-screen value.] [credit curve flattened 2026-10-08: all index par-spread quotes are the CBBT Mid index quote, 53.6264 bp, as shown on the CDSO and linked CDSW screens (ISDA standard upfront model, single flat spread). The previous 16.14-92.35 bp term structure was transcribed from a different screen and is not an input to CDSO; expected outputs and tolerances are unchanged.]",
+    "source_detail": "Bloomberg CDSO/CDSW/CDSD CDX.NA.IG.46 V1, 100MM USD notional, S531 USD ISDA Swap Curve - Mid, CBBT Mid CDX curve, valuation date 2026-05-07, expiry 2026-06-17, ATM payer struck at 55.2848bp, Spread Vol 36.63% [dv01 re-blessed 2026-05-17: audit fix W-18 reconciled the CDS-option IR DV01 to finstack-quant's internal central-difference convention (consistent with the CDS DV01) for portfolio aggregation; dv01 is now an internal signed slope = -(Bloomberg CDSO screen DV01)/2, no longer a like-for-like Bloomberg-screen value.] The flat-index reconstruction calibrates one constant hazard to the 53.6264 bp traded spread for June 20, 2031 shown on CDSW. CDSD shows a separate Ask matrix. The CDSO credit-curve settings are unavailable.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-07",
     "last_reviewed_by": "claude",
@@ -30,7 +30,7 @@
         "path": "screenshots/cdx_ig_46_payer_atm_jun26__swap_curve.png",
         "screen": "CDSD",
         "captured_on": "2026-05-07",
-        "description": "Bloomberg CDSD forward CDS matrix for CDX.NA.IG.46 using S531 USD ISDA Swap Curve - Mid and CBBT Mid CDX curve, with 5Y spot spread 53.6264bp"
+        "description": "Bloomberg CDSD forward CDS matrix with CDS Market set to Ask and Knock Out set to Yes. Its displayed 5Y spread is 53.6264 bp."
       },
       {
         "path": "screenshots/cdx_ig_46_payer_atm_jun26__benchmark_curve_rates.png",
@@ -48,7 +48,7 @@
       "schema": "finstack_quant.calibration/1",
       "plan": {
         "id": "cdx_ig_46_pricing_market",
-        "description": "Calibration setup: bootstraps the USD-S531 swap discount curve and the CDX.NA.IG.46 hazard curve from raw quotes. The SABR vol surface continues to ship as a snapshot in prior_market (calibrating it from raw option quotes is deferred to a later sweep).",
+        "description": "Bootstraps S531 from the captured rates and a constant index hazard from the single CDSW maturity. The spread volatility override and flat surface use the CDSO screen quote.",
         "quote_sets": {
           "s531_rates": [
             "USD-S531-DEP-1M",
@@ -72,14 +72,7 @@
             "USD-S531-SWAP-30Y"
           ],
           "cdx_ig_46_cds": [
-            "CDX-IG-46-CBBT-6M",
-            "CDX-IG-46-CBBT-1Y",
-            "CDX-IG-46-CBBT-2Y",
-            "CDX-IG-46-CBBT-3Y",
-            "CDX-IG-46-CBBT-4Y",
-            "CDX-IG-46-CBBT-5Y",
-            "CDX-IG-46-CBBT-7Y",
-            "CDX-IG-46-CBBT-10Y"
+            "CDX-IG-46-CBBT-5Y"
           ]
         },
         "steps": [
@@ -373,96 +366,6 @@
         {
           "kind": "cds_quote",
           "type": "cds_par_spread",
-          "id": "CDX-IG-46-CBBT-6M",
-          "entity": "CDX.NA.IG.46",
-          "convention": {
-            "currency": "USD",
-            "doc_clause": "isda_na"
-          },
-          "pillar": {
-            "tenor": {
-              "count": 6,
-              "unit": "months"
-            }
-          },
-          "spread_bp": 53.6264,
-          "recovery_rate": 0.4
-        },
-        {
-          "kind": "cds_quote",
-          "type": "cds_par_spread",
-          "id": "CDX-IG-46-CBBT-1Y",
-          "entity": "CDX.NA.IG.46",
-          "convention": {
-            "currency": "USD",
-            "doc_clause": "isda_na"
-          },
-          "pillar": {
-            "tenor": {
-              "count": 1,
-              "unit": "years"
-            }
-          },
-          "spread_bp": 53.6264,
-          "recovery_rate": 0.4
-        },
-        {
-          "kind": "cds_quote",
-          "type": "cds_par_spread",
-          "id": "CDX-IG-46-CBBT-2Y",
-          "entity": "CDX.NA.IG.46",
-          "convention": {
-            "currency": "USD",
-            "doc_clause": "isda_na"
-          },
-          "pillar": {
-            "tenor": {
-              "count": 2,
-              "unit": "years"
-            }
-          },
-          "spread_bp": 53.6264,
-          "recovery_rate": 0.4
-        },
-        {
-          "kind": "cds_quote",
-          "type": "cds_par_spread",
-          "id": "CDX-IG-46-CBBT-3Y",
-          "entity": "CDX.NA.IG.46",
-          "convention": {
-            "currency": "USD",
-            "doc_clause": "isda_na"
-          },
-          "pillar": {
-            "tenor": {
-              "count": 3,
-              "unit": "years"
-            }
-          },
-          "spread_bp": 53.6264,
-          "recovery_rate": 0.4
-        },
-        {
-          "kind": "cds_quote",
-          "type": "cds_par_spread",
-          "id": "CDX-IG-46-CBBT-4Y",
-          "entity": "CDX.NA.IG.46",
-          "convention": {
-            "currency": "USD",
-            "doc_clause": "isda_na"
-          },
-          "pillar": {
-            "tenor": {
-              "count": 4,
-              "unit": "years"
-            }
-          },
-          "spread_bp": 53.6264,
-          "recovery_rate": 0.4
-        },
-        {
-          "kind": "cds_quote",
-          "type": "cds_par_spread",
           "id": "CDX-IG-46-CBBT-5Y",
           "entity": "CDX.NA.IG.46",
           "convention": {
@@ -470,46 +373,7 @@
             "doc_clause": "isda_na"
           },
           "pillar": {
-            "tenor": {
-              "count": 5,
-              "unit": "years"
-            }
-          },
-          "spread_bp": 53.6264,
-          "recovery_rate": 0.4
-        },
-        {
-          "kind": "cds_quote",
-          "type": "cds_par_spread",
-          "id": "CDX-IG-46-CBBT-7Y",
-          "entity": "CDX.NA.IG.46",
-          "convention": {
-            "currency": "USD",
-            "doc_clause": "isda_na"
-          },
-          "pillar": {
-            "tenor": {
-              "count": 7,
-              "unit": "years"
-            }
-          },
-          "spread_bp": 53.6264,
-          "recovery_rate": 0.4
-        },
-        {
-          "kind": "cds_quote",
-          "type": "cds_par_spread",
-          "id": "CDX-IG-46-CBBT-10Y",
-          "entity": "CDX.NA.IG.46",
-          "convention": {
-            "currency": "USD",
-            "doc_clause": "isda_na"
-          },
-          "pillar": {
-            "tenor": {
-              "count": 10,
-              "unit": "years"
-            }
+            "date": "2031-06-20"
           },
           "spread_bp": 53.6264,
           "recovery_rate": 0.4
@@ -626,7 +490,7 @@
     "npv": {
       "abs": 6.0,
       "rel": 1e-06,
-      "tolerance_reason": "Expected output is the raw Bloomberg Market Value. Phase 6 index front-end-protection timing fix reconciled NPV to -$0.09 versus Bloomberg; the 2026-06 moderate-fix pass removed the ARRC 2-day lookback from cleared-OIS presets (plain compounded in arrears), shifting the bootstrapped USD swap curve and leaving a documented -$5.32 residual. A $6 band admits this convention residual without hiding model drift."
+      "tolerance_reason": "Raw market value on the archived CDSO screen. The absolute reconciliation tolerance is USD 6. The current residual is tracked in known_non_executable.json."
     },
     "par_spread": {
       "abs": 0.07,
@@ -636,7 +500,7 @@
     "delta": {
       "abs": 0.001,
       "rel": 1e-06,
-      "tolerance_reason": "Expected output is the raw Bloomberg CDSO Delta N(d1) stored as a unitless ratio (50.70% -> 0.5070). A 0.001 absolute band is tighter than the requested 0.01 max and allows only source-screen rounding noise."
+      "tolerance_reason": "CDSO displays 50.70%, stored as a unitless ratio. Finstack uses Black N(d1) with its model forward par spread and contractual strike. The captured delta and displayed ATM forward do not reconcile under that formula. See RECONCILIATION.md."
     },
     "gamma": {
       "abs": 0.005,
@@ -645,7 +509,7 @@
     "vega": {
       "abs": 25.0,
       "rel": 0.01,
-      "tolerance_reason": "Expected output is the raw Bloomberg Vega(1%). After Phase 8 (canonical-NPV simplification \u2014 see convention_decisions), finstack reports the plain one-sided \u03c3+0.01 forward difference of the canonical Bloomberg quadrature NPV. The previous FEP-beta vega re-parameterization closed the residual to ~$1 but introduced a parallel calibration pathway and silent solver fallbacks; removing it leaves a documented ~$21 (0.62%) convention residual on this fixture without admitting material model drift."
+      "tolerance_reason": "CDSO displays Vega(1%) in USD for a one percentage point spread-volatility bump. Finstack bumps volatility from 36.63% to 37.63% and refits the spread distribution to the same cash forward. The current USD 45.44 difference is tracked in RECONCILIATION.md."
     },
     "dv01": {
       "abs": 0.5,

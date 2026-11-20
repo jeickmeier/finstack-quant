@@ -14,37 +14,37 @@
     },
     {
       "path": "pricing/bloomberg/cds_option/cdx_ig_46_payer_atm_jun26.json",
-      "description": "Known difference: CDX IG 46 Bloomberg CDSO residual after the 2026-10-08 flat-index-curve correction",
+      "description": "CDX IG 46 Bloomberg CDSO reconciliation on the quoted 2031 maturity",
       "metrics": [
         {
           "metric": "npv",
-          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
-          "evidence": "Flat 53.6264 bp curve measurement with dated accrued settlement: Finstack 118369.97215935 versus preserved target 118781.76; unchanged tolerance USD 6. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
+          "reason": "The captured payer quote, linked spot CDS and breakeven are insufficient to determine the option forward cash and strike cash separately.",
+          "evidence": "Finstack 118373.49444694 on the single-maturity 53.6264 bp spread. See data/pricing/bloomberg/cds_option/RECONCILIATION.md. CDSO market value 118781.76, difference USD 408.27, tolerance USD 6."
         },
         {
           "metric": "par_spread",
-          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
-          "evidence": "Flat 53.6264 bp curve measurement: Finstack 55.02488105 versus preserved target 55.2848; unchanged tolerance 0.07 bp. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
+          "reason": "The captured payer quote, linked spot CDS and breakeven are insufficient to determine the option forward cash and strike cash separately.",
+          "evidence": "Finstack 55.02583169 on the single-maturity 53.6264 bp spread. See data/pricing/bloomberg/cds_option/RECONCILIATION.md."
         },
         {
           "metric": "delta",
-          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
-          "evidence": "Flat 53.6264 bp curve measurement: Finstack 0.50917392 versus preserved target 0.507; unchanged tolerance 0.001. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
+          "reason": "The captured payer quote, linked spot CDS and breakeven are insufficient to determine the option forward cash and strike cash separately.",
+          "evidence": "Finstack 0.50923004 on the single-maturity 53.6264 bp spread. See data/pricing/bloomberg/cds_option/RECONCILIATION.md."
         },
         {
           "metric": "vega",
-          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
-          "evidence": "Flat 53.6264 bp curve measurement: Finstack 3366.29691355 versus preserved target 3411.78; unchanged tolerance USD 25 or 1%. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
+          "reason": "The captured payer quote, linked spot CDS and breakeven are insufficient to determine the option forward cash and strike cash separately.",
+          "evidence": "Finstack 3366.34174417 on the single-maturity 53.6264 bp spread. See data/pricing/bloomberg/cds_option/RECONCILIATION.md."
         },
         {
           "metric": "dv01",
-          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
-          "evidence": "Flat 53.6264 bp curve measurement: Finstack -9.65717151 versus preserved target -112.536042572938; unchanged tolerance USD 0.5. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section). The target is the fixture's earlier self-derived internal value, not a screen number; the screen IR DV01 is 228.21."
+          "reason": "The fixture's signed IR DV01 target is historical Finstack output. The CDSO screen shows 228.21 under a different bump convention.",
+          "evidence": "Finstack -24.43479944 on the single-maturity 53.6264 bp spread. See data/pricing/bloomberg/cds_option/RECONCILIATION.md."
         },
         {
           "metric": "cs01",
-          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
-          "evidence": "Flat 53.6264 bp curve measurement: Finstack 23966.54950855 versus preserved target 25352.02; unchanged tolerance USD 650. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
+          "reason": "The captured payer quote, linked spot CDS and breakeven are insufficient to determine the option forward cash and strike cash separately.",
+          "evidence": "Finstack 23969.66168697 on the single-maturity 53.6264 bp spread. See data/pricing/bloomberg/cds_option/RECONCILIATION.md."
         }
       ]
     },

@@ -543,8 +543,8 @@ impl CdsOption {
         }
     }
 
-    /// CDS option Δ for spread strikes: closed-form Black-76 N(d₁) on the
-    /// displayed ATM forward spread (DOCS 2055833 §2.5).
+    /// CDS option Δ for spread strikes uses Black-76 N(d₁) on the
+    /// model forward par spread and the contractual strike spread.
     ///
     /// Returned as a unit-less ratio (multiply by 100 for the displayed
     /// percentage). Calls Δ ≥ 0, puts Δ ≤ 0; zero at or after expiry.

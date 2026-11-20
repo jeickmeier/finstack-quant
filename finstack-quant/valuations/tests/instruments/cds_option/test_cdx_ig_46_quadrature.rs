@@ -12,38 +12,10 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::bloo
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::constants::bloomberg_cdso;
-use finstack_quant_calibration::api::engine;
-use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use serde_json::Value;
-use std::fs;
-use std::path::PathBuf;
+use super::common::cdx_ig_46_fixture;
 use time::macros::date;
-
-const FIXTURE: &str =
-    "tests/golden/data/pricing/bloomberg/cds_option/cdx_ig_46_payer_atm_jun26.json";
-
-fn fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(FIXTURE)
-}
-
-fn load_fixture_json() -> Value {
-    let raw = fs::read_to_string(fixture_path()).expect("read fixture");
-    serde_json::from_str(&raw).expect("parse fixture")
-}
-
-fn bootstrap_market(fixture: &Value) -> MarketContext {
-    let envelope: CalibrationEnvelope =
-        serde_json::from_value(fixture["market"]["envelope"].clone()).expect("parse envelope");
-    let result = engine::calibrate(&envelope).expect("calibrate");
-    MarketContext::try_from(result.result.final_market).expect("rehydrate market")
-}
-
-fn load_option(fixture: &Value) -> CdsOption {
-    serde_json::from_value(fixture["instrument"]["instrument"]["spec"].clone())
-        .expect("parse cds option spec")
-}
 
 fn context_for(
     option: &CdsOption,
@@ -69,10 +41,8 @@ fn context_for(
 
 #[test]
 fn cdx_ig_46_production_integrand_converges_at_quadrature_step() {
-    let fixture = load_fixture_json();
     let as_of = date!(2026 - 05 - 07);
-    let market = bootstrap_market(&fixture);
-    let option = load_option(&fixture);
+    let (option, market) = cdx_ig_46_fixture();
     let sigma = finstack_quant_valuations::instruments::credit_derivatives::cds_option::pricer::resolve_sigma(&option, &market, as_of).expect("fixture volatility");
     let ctx = context_for(&option, &market, as_of, sigma);
     let m = calibrate_lognormal_mean(&ctx).expect("calibrate lognormal mean");
@@ -106,10 +76,8 @@ fn cdx_ig_46_production_integrand_converges_at_quadrature_step() {
 
 #[test]
 fn cdx_ig_46_option_payoff_matches_threshold_split_integration() {
-    let fixture = load_fixture_json();
     let as_of = date!(2026 - 05 - 07);
-    let market = bootstrap_market(&fixture);
-    let option = load_option(&fixture);
+    let (option, market) = cdx_ig_46_fixture();
     let sigma = finstack_quant_valuations::instruments::credit_derivatives::cds_option::pricer::resolve_sigma(&option, &market, as_of).expect("fixture volatility");
     let ctx = context_for(&option, &market, as_of, sigma);
     let m = calibrate_lognormal_mean(&ctx).expect("calibrate mean");
@@ -156,7 +124,7 @@ const SCREEN: [(&str, f64, f64); 6] = [
 
 /// Diagnostic only: prices the fixture under each candidate CDSO convention
 /// and scores the result against six screen values. Run with
-/// `mise run rust-test-filter -- finstack-quant-valuations cdx_ig_46_convention_matrix --lib --slow`.
+/// `mise run rust-test-filter -- finstack-quant-valuations cdx_ig_46_convention_matrix --integration valuations --slow`.
 #[test]
 #[ignore = "diagnostic convention matrix; prints a table and asserts nothing"]
 fn cdx_ig_46_convention_matrix() {
@@ -164,10 +132,8 @@ fn cdx_ig_46_convention_matrix() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::special_functions::norm_cdf;
 
-    let fixture = load_fixture_json();
     let as_of = date!(2026 - 05 - 07);
-    let market = bootstrap_market(&fixture);
-    let option = load_option(&fixture);
+    let (option, market) = cdx_ig_46_fixture();
     let sigma = finstack_quant_valuations::instruments::credit_derivatives::cds_option::pricer::resolve_sigma(&option, &market, as_of).expect("fixture volatility");
     let notional = option.notional.amount();
     let discount = market
@@ -298,5 +264,28 @@ fn cdx_ig_46_convention_matrix() {
          Martin s0*A0/Af = {:.4} bp, default-adjusted forward (OpenGamma eq. 79) = {:.4} bp",
         53.6264 * spot_annuity / forward_annuity,
         ctx.forward_par_spread * 1e4
+    );
+
+    // At the displayed breakeven, compare clean exercise cash with the premium.
+    // This diagnostic uses a screen output and cannot be used to price the option.
+    let breakeven = 57.8824 / 1e4;
+    let clean_payoff = ctx.swap_value_per_n(breakeven) + ctx.signed_strike_adjustment_per_n();
+    let payoff_pv = notional * ctx.df_to_settlement * clean_payoff;
+    let implied_vol = option
+        .implied_vol(&market, as_of, SCREEN[0].1, None)
+        .expect("invert screen premium");
+    println!(
+        "discounted payoff at screen breakeven {payoff_pv:.2}, model vol implied by screen premium {:.5}%",
+        implied_vol * 100.0
+    );
+
+    // Sensitivity only: force the displayed spread into the existing cash
+    // calibration anchor, holding every other model input fixed.
+    let mut displayed = ctx;
+    displayed.forward_par_spread = SCREEN[1].1 / 1e4;
+    let mean = calibrate_lognormal_mean(&displayed).expect("calibrate displayed forward scenario");
+    println!(
+        "payer NPV with only the displayed forward substituted {:.2}",
+        price(&displayed, false, displayed.t_expiry, mean)
     );
 }

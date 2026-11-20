@@ -1,9 +1,8 @@
 //! Delta for [`CdsOption`], branched by strike kind.
 //!
-//! - **Spread strikes**: Bloomberg's CDSO terminal reports Δ as the
-//!   Black-76 N(d₁) sensitivity of the option premium to the displayed ATM
-//!   forward spread (DOCS 2055833 §2.5 in conjunction with the closed-form
-//!   lognormal-spread identity).
+//! - **Spread strikes** use Black-76 N(d₁) with the model's loss-adjusted
+//!   forward par spread and the contractual strike spread. The archived
+//!   CDX IG 46 screen gives a different delta at its displayed ATM forward.
 //! - **Clean-price strikes**: the Black spread `d₁` is not defined for a
 //!   price strike, so Δ is the curve-reprice hedge ratio
 //!   `option_CS01 / underlying_spread_DV01` under a symmetric par-spread
@@ -69,8 +68,7 @@ pub(crate) fn delta_with_provider(
     }
 }
 
-/// Bloomberg CDSO Δ — closed-form Black-76 N(d₁) on the displayed ATM
-/// forward spread (spread strikes only).
+/// Closed-form Black-76 N(d₁) on the model forward par spread (spread strikes only).
 fn spread_black_delta(
     option: &CdsOption,
     curves: &MarketContext,

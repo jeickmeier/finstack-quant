@@ -190,7 +190,7 @@ Registered for `InstrumentType::CdsOption` in `metrics/mod.rs`:
 
 | `MetricId` | Definition |
 |-----------|-----------|
-| `Delta` | Closed-form Black-76 `N(d₁)` on the displayed ATM forward spread (matches the Bloomberg CDSO screen). Not valid for a clean-price strike — price-struck delta uses curve-reprice hedge-ratio semantics instead. |
+| `Delta` | Spread strikes use Black-76 `N(d₁)` on the model forward par spread and quoted strike. The CDX IG 46 screen delta remains unreconciled. Clean-price strikes use the curve-repriced hedge ratio. |
 | `Gamma` | Central difference of delta across a ±5 bp move in the displayed ATM forward. Same spread/price branch as delta. |
 | `Vega` | One-sided forward difference of the canonical quadrature NPV on a `+0.01` lognormal-vol bump. |
 | `Theta` | DOCS 2055833 §2.5 verbatim: shorten `t_e` by `1/365.25` and re-price. |

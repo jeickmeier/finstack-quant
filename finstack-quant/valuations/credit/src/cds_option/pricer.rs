@@ -248,16 +248,9 @@ pub fn synthetic_underlying_cds(
         },
     )?;
 
-    // Bloomberg CDSO ATM Fwd uses Default_Leg(0, T_mat) — the spot
-    // protection PV from valuation date to underlying CDS maturity, NOT a
-    // forward-start protection leg from option expiry. Per the published
-    // CDSO methodology (Bloomberg Help: "Calculating ATM Forward Spread for
-    // CDSO"): "Default Leg: Present value of expected loss from the
-    // valuation date (today) to the underlying CDS maturity." We therefore
-    // leave `protection_effective_date` unset; with `premium.start = prior
-    // IMM` (≤ as_of), `protection_start()` returns `premium.start` and
-    // `pv_protection_leg` integrates over `[as_of, T_mat]` — i.e., spot
-    // protection.
+    // The synthetic CDS also serves spot risk calculations. ForwardCdsContext
+    // sets the delivered CDS protection start on a copy and includes pre-expiry
+    // expected loss separately when building the non-knockout index forward.
     cds.instrument_pricing_overrides.model_config =
         option.instrument_pricing_overrides.model_config.clone();
     cds.valuation_convention = CdsValuationConvention::BloombergCdswClean;
