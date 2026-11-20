@@ -902,7 +902,7 @@
     "Swaption": {
       "curves": {
         "discount_curves": ["USD-OIS"],
-        "forward_curves": ["USD-OIS"],
+        "forward_curves": [],
         "credit_curves": [],
         "inflation_curves": []
       },
