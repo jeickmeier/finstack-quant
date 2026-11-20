@@ -489,7 +489,6 @@ fn shifted_materialization_preserves_convention_and_displacement_rows() {
         serde_json::from_str(&serde_json::to_string(&surface).unwrap()).unwrap();
     for artifact in [
         restored,
-        surface.scaled(1.01).unwrap(),
         surface
             .apply_bucket_bump(
                 Some(&[1.0]),

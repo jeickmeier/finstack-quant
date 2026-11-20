@@ -448,31 +448,6 @@ impl VolSurface {
         self.vols[idx] = bumped;
         Ok(original)
     }
-
-    /// Return a new volatility surface scaled uniformly by `scale`.
-    ///
-    /// Multiplies every volatility by `scale` while preserving ID, axes, quote
-    /// convention, displacements, interpolation mode, and expiry clock. Zero `scale`
-    /// intentionally zeroes quotes; positive quotes that underflow to zero under a
-    /// strictly positive factor are rejected.
-    ///
-    /// # Arguments
-    ///
-    /// * `scale` - Finite non-negative multiplier applied to each stored
-    ///   annual volatility. `1.01` increases quotes by 1%.
-    ///
-    /// # Errors
-    ///
-    /// Rejects a negative or non-finite multiplier, non-finite scaled values, or
-    /// positive quotes that underflow to zero under a strictly positive factor.
-    pub fn scaled(&self, scale: f64) -> crate::Result<Self> {
-        if !scale.is_finite() || scale < 0.0 {
-            return Err(crate::Error::Validation(
-                "volatility scale must be finite and non-negative".to_string(),
-            ));
-        }
-        self.apply_bucket_bump(None, None, BumpSpec::multiplier(scale))
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -1166,7 +1141,11 @@ mod displacement_tests {
             None,
         )
         .unwrap();
-        assert!(subnormal.scaled(0.5).is_err());
+        assert!(
+            subnormal
+                .apply_bucket_bump(None, None, BumpSpec::multiplier(0.5))
+                .is_err()
+        );
         assert!(
             surface
                 .apply_bucket_bump(Some(&[1.0, 1.0]), None, BumpSpec::multiplier(1.1))

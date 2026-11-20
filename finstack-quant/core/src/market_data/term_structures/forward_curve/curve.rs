@@ -250,16 +250,6 @@ impl ForwardCurve {
         &self.factors
     }
 
-    /// Paired `(time, factor)` pillars stored on this curve.
-    #[must_use]
-    pub fn knot_points(&self) -> Vec<(f64, f64)> {
-        self.knots
-            .iter()
-            .copied()
-            .zip(self.factors.iter().copied())
-            .collect()
-    }
-
     /// Interpolation style configured for this curve.
     #[inline]
     pub fn interp_style(&self) -> InterpStyle {

@@ -304,7 +304,11 @@ fn volatility_mutations_reject_invalid_values_without_changing_the_source() {
         .unwrap();
     let original = surface.vols().to_vec();
     for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(surface.scaled(invalid).is_err());
+        assert!(
+            surface
+                .apply_bucket_bump(None, None, BumpSpec::multiplier(invalid))
+                .is_err()
+        );
         assert!(
             surface
                 .bump_point_absolute_in_place(1.0, 90.0, invalid)
@@ -321,17 +325,33 @@ fn volatility_mutations_reject_invalid_values_without_changing_the_source() {
                 .is_err()
         );
     }
-    assert!(surface.scaled(-1.0).is_err());
-    assert_eq!(surface.scaled(1.0).unwrap().vols(), original);
     assert!(
         surface
-            .scaled(0.0)
+            .apply_bucket_bump(None, None, BumpSpec::multiplier(-1.0))
+            .is_err()
+    );
+    assert_eq!(
+        surface
+            .apply_bucket_bump(None, None, BumpSpec::multiplier(1.0))
+            .unwrap()
+            .vols(),
+        original
+    );
+    assert!(
+        surface
+            .apply_bucket_bump(None, None, BumpSpec::multiplier(0.0))
             .unwrap()
             .vols()
             .iter()
             .all(|v| *v == 0.0)
     );
     assert_eq!(surface.vols(), original);
-    let enormous = surface.scaled(f64::MAX).unwrap();
-    assert!(enormous.scaled(10.0).is_err());
+    let enormous = surface
+        .apply_bucket_bump(None, None, BumpSpec::multiplier(f64::MAX))
+        .unwrap();
+    assert!(
+        enormous
+            .apply_bucket_bump(None, None, BumpSpec::multiplier(10.0))
+            .is_err()
+    );
 }

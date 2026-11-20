@@ -184,7 +184,7 @@ impl MarketContext {
             .ok_or_else(|| crate::InputError::NotFound {
                 id: curve_id.to_string(),
             })?;
-        if let Err(err) = storage.apply_bump_preserving_id(curve_id, spec) {
+        if let Err(err) = storage.apply_bump_preserving_id(spec) {
             Arc::make_mut(&mut self.curves).insert(curve_id.clone(), previous);
             return Err(err);
         }
@@ -457,7 +457,7 @@ impl MarketContext {
             .ok_or_else(|| crate::InputError::NotFound {
                 id: cid.to_string(),
             })?;
-        storage.apply_bump_preserving_id(&curve_id, bump_spec)?;
+        storage.apply_bump_preserving_id(bump_spec)?;
         Ok(self.curve_affects_credit_indices(&curve_id))
     }
 

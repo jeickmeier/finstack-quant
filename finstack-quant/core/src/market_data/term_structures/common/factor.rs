@@ -520,12 +520,7 @@ macro_rules! define_factor_curve_transform {
                 rate: f64,
                 shape: crate::market_data::bumps::BumpType,
             ) -> crate::Result<()> {
-                self.adjustment.add_bump(
-                    self.offset,
-                    rate,
-                    shape,
-                    super::super::common::RateShock::ZeroRate,
-                )
+                self.adjustment.add_bump(self.offset, rate, shape)
             }
 
             pub(super) fn condition(

@@ -416,15 +416,6 @@ impl InflationCurve {
         self.knots.is_empty()
     }
 
-    /// Create a builder pre-populated with this curve's state and `new_id`.
-    ///
-    /// # Arguments
-    ///
-    /// * `new_id` - Identifier assigned to the rebuilt curve.
-    pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> InflationCurveBuilder {
-        self.metadata_builder(new_id).knots(self.knot_points())
-    }
-
     fn metadata_builder(&self, id: impl Into<CurveId>) -> InflationCurveBuilder {
         InflationCurve::builder(id)
             .series(self.series.clone())

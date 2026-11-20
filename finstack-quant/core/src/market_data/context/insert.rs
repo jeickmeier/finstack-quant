@@ -597,20 +597,6 @@ impl MarketContext {
         removed
     }
 
-    /// Retain only the credit index aggregates for which `pred` returns `true`, mutating in place.
-    ///
-    /// # Arguments
-    ///
-    /// * `pred` - Predicate evaluated once per `(id, data)` pair; `true` keeps the entry.
-    pub fn retain_credit_indices_mut(
-        &mut self,
-        mut pred: impl FnMut(&CurveId, &Arc<CreditIndexData>) -> bool,
-    ) -> &mut Self {
-        Arc::make_mut(&mut self.credit_indices).retain(|id, data| pred(id, data));
-        self.invalidate_scratch_tokens();
-        self
-    }
-
     /// Restore and insert a credit index from its persisted curve references.
     ///
     /// Every referenced curve must already exist in this context. Resolves the

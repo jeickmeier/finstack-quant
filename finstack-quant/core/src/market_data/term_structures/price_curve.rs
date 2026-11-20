@@ -394,19 +394,6 @@ impl PriceCurve {
         self.knots.is_empty()
     }
 
-    /// Create a builder pre-populated with this curve's data but a new ID.
-    ///
-    /// The builder keeps the curve's pillars so `build()` reproduces
-    /// the curve under `new_id`.
-    ///
-    /// # Arguments
-    ///
-    /// * `new_id` - Identifier of the rebuilt curve, the `MarketContext` lookup key.
-    pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> PriceCurveBuilder {
-        self.metadata_builder(new_id)
-            .knots(self.knots.iter().copied().zip(self.prices.iter().copied()))
-    }
-
     /// Builder pre-populated with this curve's metadata (kind, base date,
     /// day count, interpolation, extrapolation) without knots.
     /// Shared by every rebuild-style operation so no field is dropped.

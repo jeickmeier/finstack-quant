@@ -1,6 +1,7 @@
 //! Merged piecewise-linear functions for exact continuous curve adjustments.
 
 use crate::market_data::bumps::BumpType;
+use crate::math::interp::exact_f64_eq;
 use crate::math::summation::NeumaierAccumulator;
 
 /// A flat function representation: repeated shocks merge on a breakpoint union
@@ -28,15 +29,11 @@ struct Segment {
     slope: f64,
 }
 
-/// How a bump shape `w(t)` enters the adjustment.
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum RateShock {
-    /// The derivative of `-rate * t * w(t)`, whose integral is the
-    /// continuously compounded log-discount shock.
-    ZeroRate,
-}
-
 impl PiecewiseLinearAdjustment {
+    pub(crate) fn is_zero(&self) -> bool {
+        self.segments.is_empty() && exact_f64_eq(self.initial_value, 0.0)
+    }
+
     fn coefficients(&self, x: f64) -> (f64, f64) {
         let index = self.segments.partition_point(|segment| segment.start <= x);
         if index == 0 {
@@ -124,19 +121,16 @@ impl PiecewiseLinearAdjustment {
         self.validate()
     }
 
-    /// Add `rate` times the bump shape `w(t)` as a `shock`, in coordinates
-    /// relative to `offset`.
+    /// Add `rate` times the bump shape `w(t)` as a continuous-zero shock,
+    /// in coordinates relative to `offset`.
     pub(crate) fn add_bump(
         &mut self,
         offset: f64,
         rate: f64,
         shape: BumpType,
-        shock: RateShock,
     ) -> crate::Result<()> {
         // Function value where the shape is flat at one.
-        let flat = match shock {
-            RateShock::ZeroRate => -rate,
-        };
+        let flat = -rate;
         let BumpType::TriangularKeyRate {
             prev_bucket: prev,
             target_bucket: target,
@@ -152,24 +146,16 @@ impl PiecewiseLinearAdjustment {
                     return (0.0, 0.0);
                 }
                 if x < offset + target {
-                    return match shock {
-                        RateShock::ZeroRate => {
-                            let coefficient = -rate / (target - p);
-                            (coefficient * (2.0 * t - p), 2.0 * coefficient)
-                        }
-                    };
+                    let coefficient = -rate / (target - p);
+                    return (coefficient * (2.0 * t - p), 2.0 * coefficient);
                 }
             } else if x < offset + target {
                 return (flat, 0.0);
             }
             if let Some(n) = next {
                 if x < offset + n {
-                    match shock {
-                        RateShock::ZeroRate => {
-                            let coefficient = rate / (n - target);
-                            (coefficient * (2.0 * t - n), 2.0 * coefficient)
-                        }
-                    }
+                    let coefficient = rate / (n - target);
+                    (coefficient * (2.0 * t - n), 2.0 * coefficient)
                 } else {
                     (0.0, 0.0)
                 }

@@ -672,7 +672,7 @@ impl JsMarketContext {
     pub fn prices(&self) -> Result<JsValue, JsValue> {
         let values: std::collections::BTreeMap<_, _> = self
             .inner
-            .prices()
+            .prices_iter()
             .map(|(id, scalar)| (id.as_str(), scalar))
             .collect();
         to_js_value(&values)
