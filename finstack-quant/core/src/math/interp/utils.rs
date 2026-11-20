@@ -16,8 +16,8 @@ pub(super) enum BoundaryDecision {
     /// Query is above `knots[last]` under `ExtrapolationPolicy::Extend`.
     ExtendRight,
     /// Query is strictly inside `(knots[0], knots[last])`, or on an exact boundary knot
-    /// when evaluating derivatives or interior formulas.
-    Interior,
+    /// when evaluating derivatives or interior formulas, carrying its segment index.
+    Interior(usize),
 }
 
 /// Validate query finiteness and resolve out-of-range extrapolation and exact knot hits
@@ -68,7 +68,7 @@ pub(super) fn classify_value_query(
     if exact_f64_eq(x, knots[idx + 1]) {
         return Ok(BoundaryDecision::Return(values[idx + 1]));
     }
-    Ok(BoundaryDecision::Interior)
+    Ok(BoundaryDecision::Interior(idx))
 }
 
 /// True for equal finite binary64 values, treating signed zeros as equal.
@@ -117,7 +117,9 @@ pub(super) fn classify_prime_query(
             ))),
         };
     }
-    Ok(BoundaryDecision::Interior)
+    Ok(BoundaryDecision::Interior(locate_segment_unchecked(
+        knots, x,
+    )))
 }
 
 /// Validate a finite, strictly increasing interpolation knot axis.
@@ -152,7 +154,7 @@ pub fn validate_knots(knots: &[f64]) -> crate::Result<()> {
 /// Fast-path segment lookup for callers that already verified `x` is finite
 /// and in-bounds (`knots[0] <= x <= knots[last]`).
 #[inline(always)]
-pub(crate) fn locate_segment_unchecked(xs: &[f64], x: f64) -> usize {
+fn locate_segment_unchecked(xs: &[f64], x: f64) -> usize {
     let idx = xs.partition_point(|k| *k < x);
     if idx == 0 { 0 } else { idx - 1 }
 }

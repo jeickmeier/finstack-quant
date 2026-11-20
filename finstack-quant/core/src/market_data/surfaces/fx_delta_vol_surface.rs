@@ -44,6 +44,7 @@ use crate::{
     dates::VolatilityClock,
     error::InputError,
     math::special_functions::{log_norm_cdf, standard_normal_inv_cdf},
+    math::stats::{frexp, frexp_exp, ldexp},
     money::fx::CurrencyPair,
     types::CurveId,
 };
@@ -258,42 +259,6 @@ fn compress_expansion(e: &mut [f64; 64], len: &mut usize) {
     }
 }
 
-#[inline]
-fn pow2_f64(exp: i32) -> f64 {
-    debug_assert!((-1022..=1023).contains(&exp));
-    f64::from_bits(((exp + 1023) as u64) << 52)
-}
-
-fn scale_by_pow2(mut value: f64, mut exp: i32) -> f64 {
-    if value == 0.0 {
-        return 0.0;
-    }
-    while exp > 1000 {
-        value *= pow2_f64(1000);
-        exp -= 1000;
-    }
-    while exp < -1000 {
-        value *= pow2_f64(-1000);
-        exp += 1000;
-    }
-    value * pow2_f64(exp)
-}
-
-fn frexp_f64(x: f64) -> (f64, i32) {
-    if x >= f64::MIN_POSITIVE {
-        let bits = x.to_bits();
-        let exp = ((bits >> 52) & 0x7ff) as i32 - 1022;
-        let mant_bits = (bits & 0x000f_ffff_ffff_ffff) | 0x3fe0_0000_0000_0000;
-        (f64::from_bits(mant_bits), exp)
-    } else {
-        let scaled = x * pow2_f64(54);
-        let bits = scaled.to_bits();
-        let exp = ((bits >> 52) & 0x7ff) as i32 - 1022 - 54;
-        let mant_bits = (bits & 0x000f_ffff_ffff_ffff) | 0x3fe0_0000_0000_0000;
-        (f64::from_bits(mant_bits), exp)
-    }
-}
-
 /// Evaluate exact sum of `terms`, then multiply by `2^out_pow2` with single IEEE-754 rounding.
 fn exact_sum_scaled_to_f64(terms: &[f64], out_pow2: i32) -> f64 {
     let mut e = [0.0_f64; 64];
@@ -306,7 +271,7 @@ fn exact_sum_scaled_to_f64(terms: &[f64], out_pow2: i32) -> f64 {
         return 0.0;
     }
     if len == 1 {
-        return scale_by_pow2(e[0], out_pow2);
+        return ldexp(e[0], out_pow2);
     }
     let hi = e[len - 1];
     let mut tail = 0.0_f64;
@@ -316,12 +281,12 @@ fn exact_sum_scaled_to_f64(terms: &[f64], out_pow2: i32) -> f64 {
     }
 
     let hi_abs = hi.abs();
-    let (_, hi_exp) = frexp_f64(hi_abs);
+    let hi_exp = frexp_exp(hi_abs);
     // Target exponent of MSB (where `1.0 * 2^e` corresponds to true_exp = hi_exp - 1 + out_pow2).
     let true_msb_exp = hi_exp - 1 + out_pow2;
     if true_msb_exp >= -1022 {
         let (rounded_hi, _) = two_sum(hi, tail);
-        scale_by_pow2(rounded_hi, out_pow2)
+        ldexp(rounded_hi, out_pow2)
     } else if true_msb_exp < -1075 {
         if hi >= 0.0 { 0.0 } else { -0.0 }
     } else {
@@ -389,17 +354,17 @@ pub fn recover_fx_wing_vols(atm: f64, rr: f64, bf: f64) -> crate::Result<(f64, f
         min_nz = min_nz.min(bf.abs());
     }
 
-    let in_shift = if max_abs > pow2_f64(400) {
+    let in_shift = if max_abs > ldexp(1.0, 400) {
         -520
-    } else if min_nz < pow2_f64(-900) {
+    } else if min_nz < ldexp(1.0, -900) {
         520
     } else {
         0
     };
 
-    let atm_s = scale_by_pow2(atm, in_shift);
-    let bf_s = scale_by_pow2(bf, in_shift);
-    let rr_s = scale_by_pow2(rr, in_shift);
+    let atm_s = ldexp(atm, in_shift);
+    let bf_s = ldexp(bf, in_shift);
+    let rr_s = ldexp(rr, in_shift);
 
     // Multiplication by 2 is exact inside the scaled normal range.
     let two_atm = 2.0 * atm_s;
@@ -470,9 +435,9 @@ pub fn interpolate_fx_wing_vols(
             min_nz_q = q;
         }
     }
-    let q_shift = if max_q > pow2_f64(300) {
+    let q_shift = if max_q > ldexp(1.0, 300) {
         -400
-    } else if min_nz_q < pow2_f64(-800) && max_q < pow2_f64(300) {
+    } else if min_nz_q < ldexp(1.0, -800) && max_q < ldexp(1.0, 300) {
         400
     } else {
         0
@@ -485,22 +450,22 @@ pub fn interpolate_fx_wing_vols(
             min_nz_w = w;
         }
     }
-    let w_shift = if max_w > pow2_f64(300) {
+    let w_shift = if max_w > ldexp(1.0, 300) {
         -400
-    } else if min_nz_w < pow2_f64(-800) && max_w < pow2_f64(300) {
+    } else if min_nz_w < ldexp(1.0, -800) && max_w < ldexp(1.0, 300) {
         400
     } else {
         0
     };
 
-    let w0_s = scale_by_pow2(w0, w_shift);
-    let w1_s = scale_by_pow2(w1, w_shift);
-    let a0_s = scale_by_pow2(atm0, q_shift);
-    let r0_s = scale_by_pow2(rr0, q_shift);
-    let b0_s = scale_by_pow2(bf0, q_shift);
-    let a1_s = scale_by_pow2(atm1, q_shift);
-    let r1_s = scale_by_pow2(rr1, q_shift);
-    let b1_s = scale_by_pow2(bf1, q_shift);
+    let w0_s = ldexp(w0, w_shift);
+    let w1_s = ldexp(w1, w_shift);
+    let a0_s = ldexp(atm0, q_shift);
+    let r0_s = ldexp(rr0, q_shift);
+    let b0_s = ldexp(bf0, q_shift);
+    let a1_s = ldexp(atm1, q_shift);
+    let r1_s = ldexp(rr1, q_shift);
+    let b1_s = ldexp(bf1, q_shift);
 
     let out_shift_atm = -q_shift - w_shift;
     let out_shift_wing = -q_shift - w_shift - 1;
@@ -552,8 +517,8 @@ pub fn checked_ln_ratio(num: f64, den: f64) -> f64 {
     if ratio.is_finite() && (0.5..=2.0).contains(&ratio) {
         return ((num - den) / den).ln_1p();
     }
-    let (m_n, e_n) = frexp_f64(num);
-    let (m_d, e_d) = frexp_f64(den);
+    let (m_n, e_n) = frexp(num);
+    let (m_d, e_d) = frexp(den);
     let exp_diff = f64::from(e_n - e_d);
     (m_n / m_d).ln() + exp_diff * std::f64::consts::LN_2
 }
@@ -583,7 +548,7 @@ fn scaled_exp_product(forward: f64, log_ratio: f64) -> crate::Result<f64> {
             "FX strike underflows binary64".to_string(),
         ));
     }
-    let (m, e_f) = frexp_f64(forward);
+    let (m, e_f) = frexp(forward);
     let k_f = (log_ratio / std::f64::consts::LN_2).round();
     let k_int = k_f as i32;
     let rem = (log_ratio - k_f * LN2_HI) - k_f * LN2_LO;
@@ -599,7 +564,7 @@ fn scaled_exp_product(forward: f64, log_ratio: f64) -> crate::Result<f64> {
             "FX strike underflows binary64".to_string(),
         ));
     }
-    let strike = scale_by_pow2(base, total_exp);
+    let strike = ldexp(base, total_exp);
     if !strike.is_finite() || strike <= 0.0 {
         return Err(crate::Error::Validation(
             "FX strike is not representable as a finite positive binary64 value".to_string(),
@@ -609,18 +574,7 @@ fn scaled_exp_product(forward: f64, log_ratio: f64) -> crate::Result<f64> {
 }
 
 /// Compute the delta-neutral-straddle ATM strike `K_DNS = F * exp(0.5 * vol^2 * expiry)`.
-///
-/// # Arguments
-///
-/// * `forward` - Finite positive FX forward in quote currency per base unit.
-/// * `vol` - Finite positive annualized Black volatility as a decimal.
-/// * `expiry` - Finite positive time to expiry in years.
-///
-/// # Errors
-///
-/// Returns [`InputError::NonPositiveValue`] when any input is non-positive or non-finite,
-/// or [`crate::Error::Validation`] when the strike overflows binary64.
-pub fn fx_atm_dns_strike_checked(forward: f64, vol: f64, expiry: f64) -> crate::Result<f64> {
+fn fx_atm_dns_strike_checked(forward: f64, vol: f64, expiry: f64) -> crate::Result<f64> {
     if !forward.is_finite()
         || forward <= 0.0
         || !vol.is_finite()

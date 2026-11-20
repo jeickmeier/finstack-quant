@@ -102,6 +102,13 @@ pub(crate) fn frexp_exp(x: f64) -> i32 {
     }
 }
 
+/// Binary mantissa `m` and exponent `exp` such that `x == ldexp(m, exp)` with `0.5 <= |m| < 1.0`.
+#[inline]
+pub(crate) fn frexp(x: f64) -> (f64, i32) {
+    let exp = frexp_exp(x);
+    (ldexp(x, -exp), exp)
+}
+
 /// Exact power-of-two scaling `x * 2^shift` with a single IEEE-754 rounding.
 #[inline]
 pub(crate) fn ldexp(x: f64, shift: i32) -> f64 {

@@ -3,12 +3,6 @@
 use super::stats;
 
 #[inline]
-fn frexp_f64(x: f64) -> (f64, i32) {
-    let exp = stats::frexp_exp(x);
-    (stats::ldexp(x, -exp), exp)
-}
-
-#[inline]
 fn diff_of_products(a: f64, b: f64, c: f64, d: f64) -> f64 {
     let cd = c * d;
     let err = (-c).mul_add(d, cd);
@@ -18,10 +12,10 @@ fn diff_of_products(a: f64, b: f64, c: f64, d: f64) -> f64 {
 
 /// Evaluate `ln((a * b) / (c * d))` for strictly positive finite inputs with `frexp` scaling and FMA.
 pub(crate) fn checked_log_cross_ratio(a: f64, b: f64, c: f64, d: f64) -> f64 {
-    let (ma, ea) = frexp_f64(a);
-    let (mb, eb) = frexp_f64(b);
-    let (mc, ec) = frexp_f64(c);
-    let (md, ed) = frexp_f64(d);
+    let (ma, ea) = stats::frexp(a);
+    let (mb, eb) = stats::frexp(b);
+    let (mc, ec) = stats::frexp(c);
+    let (md, ed) = stats::frexp(d);
     let exp_diff = (ea + eb) - (ec + ed);
 
     if (-2..=2).contains(&exp_diff) {
