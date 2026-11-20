@@ -2760,17 +2760,26 @@ renames = { is_cash_settlement = { js = "core.cfKindIsCashSettlement", reason = 
 [parity.members."finstack_quant.core.cashflow.CashFlow"]
 renames = { get_balance_date = { js = "core.cashFlowGetBalanceDate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::get_balance_date function is a free function over the wire value" }, validate = { js = "core.cashFlowValidate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::validate function is a free function over the wire value" }, with_accrual = { js = "core.cashFlowWithAccrual", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::with_accrual validated update is a free function over the wire value" }, with_principal = { js = "core.cashFlowWithPrincipal", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::with_principal validated update is a free function over the wire value" } }
 
-[parity.members."finstack_quant.covenants.Covenant"]
-renames = { with_consequence = { js = "covenants.covenantWithConsequence", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_consequence function is a free function over the wire value" }, with_cure_period = { js = "covenants.covenantWithCurePeriod", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_cure_period function is a free function over the wire value" }, with_scope = { js = "covenants.covenantWithScope", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_scope function is a free function over the wire value" }, with_springing_condition = { js = "covenants.covenantWithSpringingCondition", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_springing_condition function is a free function over the wire value" } }
+[parity.members."finstack_quant.covenants.Covenant".excluded]
+with_consequence = "literal"
+with_cure_period = "literal"
+with_scope = "literal"
+with_springing_condition = "literal"
 
-[parity.members."finstack_quant.covenants.CovenantConsequence"]
-renames = { accelerate_maturity = { js = "covenants.covenantConsequenceAccelerateMaturity", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::AccelerateMaturity variant is built by a free function returning the wire value" }, block_distributions = { js = "covenants.covenantConsequenceBlockDistributions", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::BlockDistributions variant is built by a free function returning the wire value" }, cash_sweep = { js = "covenants.covenantConsequenceCashSweep", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::CashSweep variant is built by a free function returning the wire value" }, default = { js = "covenants.covenantConsequenceDefault", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::Default variant is built by a free function returning the wire value" }, rate_increase = { js = "covenants.covenantConsequenceRateIncrease", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::RateIncrease variant is built by a free function returning the wire value" }, require_collateral = { js = "covenants.covenantConsequenceRequireCollateral", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::RequireCollateral variant is built by a free function returning the wire value" } }
+[parity.members."finstack_quant.covenants.CovenantConsequence".excluded]
+accelerate_maturity = "literal"
+block_distributions = "literal"
+cash_sweep = "literal"
+default = "literal"
+rate_increase = "literal"
+require_collateral = "literal"
 
-[parity.members."finstack_quant.covenants.CovenantForecastConfig"]
-renames = { with_scope = { js = "covenants.covenantForecastConfigWithScope", reason = "WASM CovenantForecastConfig values are plain objects; the Rust CovenantForecastConfig::with_scope function is a free function over the wire value" } }
+[parity.members."finstack_quant.covenants.CovenantForecastConfig".excluded]
+with_scope = "literal"
 
-[parity.members."finstack_quant.covenants.CovenantSpec"]
-renames = { with_denominator_metric = { js = "covenants.covenantSpecWithDenominatorMetric", reason = "WASM CovenantSpec values are plain objects; the Rust CovenantSpec::with_denominator_metric function is a free function over the wire value" }, with_threshold_schedule = { js = "covenants.covenantSpecWithThresholdSchedule", reason = "WASM CovenantSpec values are plain objects; the Rust CovenantSpec::with_threshold_schedule function is a free function over the wire value" } }
+[parity.members."finstack_quant.covenants.CovenantSpec".excluded]
+with_denominator_metric = "literal"
+with_threshold_schedule = "literal"
 
 [parity.members."finstack_quant.covenants.CovenantTemplate".excluded]
 cov_lite = "literal"
@@ -2778,8 +2787,21 @@ lbo_standard = "literal"
 project_finance = "literal"
 real_estate = "literal"
 
-[parity.members."finstack_quant.covenants.CovenantType"]
-renames = { affirmative = { js = "covenants.covenantTypeAffirmative", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Affirmative variant is built by a free function returning the wire value" }, basket = { js = "covenants.covenantTypeBasket", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Basket variant is built by a free function returning the wire value" }, custom = { js = "covenants.covenantTypeCustom", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Custom variant is built by a free function returning the wire value" }, max_capex = { js = "covenants.covenantTypeMaxCapex", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxCapex variant is built by a free function returning the wire value" }, max_debt_to_ebitda = { js = "covenants.covenantTypeMaxDebtToEbitda", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxDebtToEbitda variant is built by a free function returning the wire value" }, max_net_debt_to_ebitda = { js = "covenants.covenantTypeMaxNetDebtToEbitda", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxNetDebtToEbitda variant is built by a free function returning the wire value" }, max_senior_leverage = { js = "covenants.covenantTypeMaxSeniorLeverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxSeniorLeverage variant is built by a free function returning the wire value" }, max_total_leverage = { js = "covenants.covenantTypeMaxTotalLeverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxTotalLeverage variant is built by a free function returning the wire value" }, min_asset_coverage = { js = "covenants.covenantTypeMinAssetCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinAssetCoverage variant is built by a free function returning the wire value" }, min_dscr = { js = "covenants.covenantTypeMinDscr", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinDscr variant is built by a free function returning the wire value" }, min_fixed_charge_coverage = { js = "covenants.covenantTypeMinFixedChargeCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinFixedChargeCoverage variant is built by a free function returning the wire value" }, min_interest_coverage = { js = "covenants.covenantTypeMinInterestCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinInterestCoverage variant is built by a free function returning the wire value" }, min_liquidity = { js = "covenants.covenantTypeMinLiquidity", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinLiquidity variant is built by a free function returning the wire value" }, negative = { js = "covenants.covenantTypeNegative", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Negative variant is built by a free function returning the wire value" } }
+[parity.members."finstack_quant.covenants.CovenantType".excluded]
+affirmative = "literal"
+basket = "literal"
+custom = "literal"
+max_capex = "literal"
+max_debt_to_ebitda = "literal"
+max_net_debt_to_ebitda = "literal"
+max_senior_leverage = "literal"
+max_total_leverage = "literal"
+min_asset_coverage = "literal"
+min_dscr = "literal"
+min_fixed_charge_coverage = "literal"
+min_interest_coverage = "literal"
+min_liquidity = "literal"
+negative = "literal"
 
 [parity.members."finstack_quant.covenants.ThresholdSchedule"]
 renames = { threshold_for = { js = "covenants.thresholdScheduleThresholdFor", reason = "WASM ThresholdSchedule values are plain objects; the Rust ThresholdSchedule::threshold_for function is a free function over the wire value" } }

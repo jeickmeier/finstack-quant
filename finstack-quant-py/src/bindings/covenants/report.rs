@@ -3,7 +3,6 @@
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_to_py,
 };
-use crate::errors::display_to_py;
 use pyo3::prelude::*;
 
 /// Result of a single covenant evaluation.
@@ -28,87 +27,48 @@ pub(crate) struct PyCovenantReport {
     pub(crate) inner: finstack_quant_covenants::CovenantReport,
 }
 
-#[pymethods]
-impl PyCovenantReport {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_covenants::CovenantReport =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
+crate::bindings::macros::wire_methods!(
+    PyCovenantReport,
+    finstack_quant_covenants::CovenantReport,
+    "CovenantReport"
+);
+crate::bindings::macros::impl_repr_html_via_dataframe!(PyCovenantReport);
+crate::bindings::macros::py_getters!(PyCovenantReport |s| {
     /// Human-readable description of the covenant being tested
     /// (e.g. ``"Debt/EBITDA <= 5.00x"``).
-    #[getter]
-    fn covenant_type(&self) -> &str {
-        &self.inner.covenant_type
-    }
+    covenant_type -> &str = &s.inner.covenant_type;
 
     /// Stable machine-readable covenant instance identifier, or ``None`` when
     /// the report was produced without one.
-    #[getter]
-    fn covenant_id(&self) -> Option<&str> {
-        self.inner.covenant_id.as_deref()
-    }
+    covenant_id -> Option<&str> = s.inner.covenant_id.as_deref();
 
     /// ``True`` when the covenant passed.
     ///
     /// Inactive covenants, unmet springing conditions, and full waivers also
     /// report ``True``; :attr:`details` carries the reason.
-    #[getter]
-    fn passed(&self) -> bool {
-        self.inner.passed
-    }
+    passed -> bool = s.inner.passed;
 
     /// Tested metric value, or ``None`` when the covenant was not evaluated
     /// numerically (inactive, waived, or springing condition unmet).
-    #[getter]
-    fn actual_value(&self) -> Option<f64> {
-        self.inner.actual_value
-    }
+    actual_value -> Option<f64> = s.inner.actual_value;
 
     /// Threshold the metric was tested against, or ``None`` when no numeric
     /// test was applied.
-    #[getter]
-    fn threshold(&self) -> Option<f64> {
-        self.inner.threshold
-    }
+    threshold -> Option<f64> = s.inner.threshold;
 
     /// Explanation of the outcome, or ``None``.
-    #[getter]
-    fn details(&self) -> Option<&str> {
-        self.inner.details.as_deref()
-    }
+    details -> Option<&str> = s.inner.details.as_deref();
 
     /// Cushion relative to the threshold: positive is a passing buffer,
     /// negative a deficit. ``None`` when no numeric test was applied.
-    #[getter]
-    fn headroom(&self) -> Option<f64> {
-        self.inner.headroom
-    }
+    headroom -> Option<f64> = s.inner.headroom;
 
-    #[getter]
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._report", "CovenantReport.headroom_raw")]
-    fn headroom_raw(&self) -> Option<f64> {
-        self.inner.headroom_raw
-    }
+    headroom_raw -> Option<f64> = s.inner.headroom_raw;
+});
 
+#[pymethods]
+impl PyCovenantReport {
     /// Audit stamp as a dict: numeric mode, rounding context, and FX policy in
     /// force for this evaluation.
     #[getter]
@@ -168,15 +128,5 @@ impl PyCovenantReport {
             opt(self.inner.threshold),
             opt(self.inner.headroom),
         )
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`. Returns `None` if the frame
-    /// cannot be built, which makes IPython fall back to `__repr__` instead of
-    /// raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
 }

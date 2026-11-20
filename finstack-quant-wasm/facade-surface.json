@@ -1833,37 +1833,10 @@
     "kind": "namespace",
     "keys": [
       "CovenantEngine",
-      "covenantConsequenceAccelerateMaturity",
-      "covenantConsequenceBlockDistributions",
-      "covenantConsequenceCashSweep",
-      "covenantConsequenceDefault",
-      "covenantConsequenceRateIncrease",
-      "covenantConsequenceRequireCollateral",
-      "covenantForecastConfigWithScope",
       "covenantNew",
       "covenantSpecNew",
-      "covenantSpecWithDenominatorMetric",
       "covenantSpecWithMetric",
-      "covenantSpecWithThresholdSchedule",
       "covenantTemplate",
-      "covenantTypeAffirmative",
-      "covenantTypeBasket",
-      "covenantTypeCustom",
-      "covenantTypeMaxCapex",
-      "covenantTypeMaxDebtToEbitda",
-      "covenantTypeMaxNetDebtToEbitda",
-      "covenantTypeMaxSeniorLeverage",
-      "covenantTypeMaxTotalLeverage",
-      "covenantTypeMinAssetCoverage",
-      "covenantTypeMinDscr",
-      "covenantTypeMinFixedChargeCoverage",
-      "covenantTypeMinInterestCoverage",
-      "covenantTypeMinLiquidity",
-      "covenantTypeNegative",
-      "covenantWithConsequence",
-      "covenantWithCurePeriod",
-      "covenantWithScope",
-      "covenantWithSpringingCondition",
       "evaluateEngine",
       "forecastBreaches",
       "forecastCovenant",
@@ -1889,97 +1862,16 @@
     ],
     "getters": ["breachHistory", "specs", "waivers"]
   },
-  "covenants.covenantConsequenceAccelerateMaturity": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceBlockDistributions": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceCashSweep": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceDefault": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceRateIncrease": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceRequireCollateral": {
-    "kind": "function"
-  },
-  "covenants.covenantForecastConfigWithScope": {
-    "kind": "function"
-  },
   "covenants.covenantNew": {
     "kind": "function"
   },
   "covenants.covenantSpecNew": {
     "kind": "function"
   },
-  "covenants.covenantSpecWithDenominatorMetric": {
-    "kind": "function"
-  },
   "covenants.covenantSpecWithMetric": {
     "kind": "function"
   },
-  "covenants.covenantSpecWithThresholdSchedule": {
-    "kind": "function"
-  },
   "covenants.covenantTemplate": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeAffirmative": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeBasket": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeCustom": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxCapex": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxDebtToEbitda": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxNetDebtToEbitda": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxSeniorLeverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxTotalLeverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinAssetCoverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinDscr": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinFixedChargeCoverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinInterestCoverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinLiquidity": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeNegative": {
-    "kind": "function"
-  },
-  "covenants.covenantWithConsequence": {
-    "kind": "function"
-  },
-  "covenants.covenantWithCurePeriod": {
-    "kind": "function"
-  },
-  "covenants.covenantWithScope": {
-    "kind": "function"
-  },
-  "covenants.covenantWithSpringingCondition": {
     "kind": "function"
   },
   "covenants.evaluateEngine": {

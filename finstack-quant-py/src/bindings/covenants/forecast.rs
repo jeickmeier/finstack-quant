@@ -12,7 +12,7 @@ use super::spec::PyCovenantSpec;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_covenants::{
     CovenantForecast, CovenantForecastConfig, DatedMetricSeries, FutureBreach,
 };
@@ -85,25 +85,6 @@ impl PyCovenantForecastConfig {
         }))
     }
 
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Return a copy selecting maintenance compliance or hypothetical incurrence capacity.
     /// ``scope`` must be ``maintenance`` or ``incurrence``; other strings raise ``ValueError``.
     #[pyo3(text_signature = "(scope)")]
@@ -115,42 +96,6 @@ impl PyCovenantForecastConfig {
         )))
     }
 
-    /// Scope selected by batch forecasts: maintenance or hypothetical incurrence capacity.
-    #[getter]
-    fn scope(&self) -> PyResult<String> {
-        crate::bindings::extract::label(&self.inner.scope)
-    }
-
-    /// Whether breach probabilities use the stochastic overlay.
-    #[getter]
-    fn stochastic(&self) -> bool {
-        self.inner.stochastic
-    }
-
-    /// Monte Carlo path count; ``0`` selects the closed-form analytic mode.
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.num_paths
-    }
-
-    /// Annualized lognormal volatility, or ``None`` in deterministic mode.
-    #[getter]
-    fn volatility(&self) -> Option<f64> {
-        self.inner.volatility
-    }
-
-    /// RNG seed for Monte Carlo mode (``None`` uses the crate default ``0``).
-    #[getter]
-    fn random_seed(&self) -> Option<u64> {
-        self.inner.random_seed
-    }
-
-    /// Whether Monte Carlo paths are simulated in antithetic pairs.
-    #[getter]
-    fn antithetic(&self) -> bool {
-        self.inner.antithetic
-    }
-
     /// Horizon anchor for stochastic scaling, or ``None`` for the default.
     #[getter]
     fn reference_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -160,16 +105,38 @@ impl PyCovenantForecastConfig {
             .transpose()
     }
 
-    /// Minimum breach probability reported by ``forecast_breaches``.
-    #[getter]
-    fn breach_probability_threshold(&self) -> f64 {
-        self.inner.breach_probability_threshold
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("CovenantForecastConfig", &self.inner)
     }
 }
+
+crate::bindings::macros::wire_methods!(
+    PyCovenantForecastConfig,
+    CovenantForecastConfig,
+    "CovenantForecastConfig"
+);
+crate::bindings::macros::py_getters!(PyCovenantForecastConfig |s| {
+    /// Scope selected by batch forecasts: maintenance or hypothetical incurrence capacity.
+    scope -> PyResult<String> = crate::bindings::extract::label(&s.inner.scope);
+
+    /// Whether breach probabilities use the stochastic overlay.
+    stochastic -> bool = s.inner.stochastic;
+
+    /// Monte Carlo path count; ``0`` selects the closed-form analytic mode.
+    num_paths -> usize = s.inner.num_paths;
+
+    /// Annualized lognormal volatility, or ``None`` in deterministic mode.
+    volatility -> Option<f64> = s.inner.volatility;
+
+    /// RNG seed for Monte Carlo mode (``None`` uses the crate default ``0``).
+    random_seed -> Option<u64> = s.inner.random_seed;
+
+    /// Whether Monte Carlo paths are simulated in antithetic pairs.
+    antithetic -> bool = s.inner.antithetic;
+
+    /// Minimum breach probability reported by ``forecast_breaches``.
+    breach_probability_threshold -> f64 = s.inner.breach_probability_threshold;
+});
 
 /// Columns of `CovenantForecast.to_dataframe`.
 const FORECAST_COLUMNS: [ColumnSchema<'static>; 7] = [
@@ -206,45 +173,44 @@ impl PyCovenantForecast {
     }
 }
 
-#[pymethods]
-impl PyCovenantForecast {
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
+crate::bindings::macros::wire_methods!(PyCovenantForecast, CovenantForecast, "CovenantForecast");
+crate::bindings::macros::impl_repr_html_via_dataframe!(PyCovenantForecast);
+crate::bindings::macros::py_getters!(PyCovenantForecast |s| {
     /// Instance label of the forecast covenant.
-    #[getter]
-    fn covenant_id(&self) -> &str {
-        &self.inner.covenant_id
-    }
+    covenant_id -> &str = &s.inner.covenant_id;
 
     /// Human-readable covenant description.
-    #[getter]
-    fn covenant_description(&self) -> &str {
-        &self.inner.covenant_description
-    }
+    covenant_description -> &str = &s.inner.covenant_description;
 
     /// Test direction: ``"at_most"`` or ``"at_least"``.
-    #[getter]
-    fn comparator(&self) -> PyResult<String> {
-        crate::bindings::extract::label(&self.inner.comparator)
-    }
+    comparator -> PyResult<String> = crate::bindings::extract::label(&s.inner.comparator);
 
+    /// Projected metric per test date (``None`` when not finite).
+    projected_values -> Vec<Option<f64>> = s.inner.projected_values.clone();
+
+    /// Threshold in force per test date.
+    thresholds -> Vec<f64> = s.inner.thresholds.clone();
+
+    /// Relative headroom per test date (``None`` when inactive or not
+    /// meaningful).
+    headroom -> Vec<Option<f64>> = s.inner.headroom.clone();
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._forecast", "CovenantForecast.headroom_raw")]
+    headroom_raw -> Vec<Option<f64>> = s.inner.headroom_raw.clone();
+
+    /// Breach probability per test date.
+    breach_probability -> Vec<f64> = s.inner.breach_probability.clone();
+
+    /// Monte Carlo standard error of each breach probability (zeros in
+    /// deterministic and analytic modes).
+    breach_probability_stderr -> Vec<f64> = s.inner.breach_probability_stderr.clone();
+
+    /// Minimum finite headroom across active test dates, or ``None``.
+    min_headroom_value -> Option<f64> = s.inner.min_headroom_value;
+});
+
+#[pymethods]
+impl PyCovenantForecast {
     /// Forecast test dates as ``datetime.date``.
     #[getter]
     fn test_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -253,44 +219,6 @@ impl PyCovenantForecast {
             .iter()
             .map(|date| date_to_py(py, *date))
             .collect()
-    }
-
-    /// Projected metric per test date (``None`` when not finite).
-    #[getter]
-    fn projected_values(&self) -> Vec<Option<f64>> {
-        self.inner.projected_values.clone()
-    }
-
-    /// Threshold in force per test date.
-    #[getter]
-    fn thresholds(&self) -> Vec<f64> {
-        self.inner.thresholds.clone()
-    }
-
-    /// Relative headroom per test date (``None`` when inactive or not
-    /// meaningful).
-    #[getter]
-    fn headroom(&self) -> Vec<Option<f64>> {
-        self.inner.headroom.clone()
-    }
-
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._forecast", "CovenantForecast.headroom_raw")]
-    fn headroom_raw(&self) -> Vec<Option<f64>> {
-        self.inner.headroom_raw.clone()
-    }
-
-    /// Breach probability per test date.
-    #[getter]
-    fn breach_probability(&self) -> Vec<f64> {
-        self.inner.breach_probability.clone()
-    }
-
-    /// Monte Carlo standard error of each breach probability (zeros in
-    /// deterministic and analytic modes).
-    #[getter]
-    fn breach_probability_stderr(&self) -> Vec<f64> {
-        self.inner.breach_probability_stderr.clone()
     }
 
     /// First projected breach date, or ``None``.
@@ -311,12 +239,6 @@ impl PyCovenantForecast {
             .transpose()
     }
 
-    /// Minimum finite headroom across active test dates, or ``None``.
-    #[getter]
-    fn min_headroom_value(&self) -> Option<f64> {
-        self.inner.min_headroom_value
-    }
-
     /// One row per test date with columns ``test_date`` (ISO string),
     /// ``projected_value``, ``threshold``, ``headroom``, ``headroom_raw``,
     /// ``breach_probability``, ``breach_probability_stderr``.
@@ -335,15 +257,6 @@ impl PyCovenantForecast {
             })
             .collect();
         serde_rows_to_dataframe_with_schema(py, &rows, &FORECAST_COLUMNS)
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`. Returns `None` if the frame
-    /// cannot be built, which makes IPython fall back to `__repr__`.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
 
     fn __len__(&self) -> usize {
@@ -384,73 +297,36 @@ impl PyFutureBreach {
     }
 }
 
-#[pymethods]
-impl PyFutureBreach {
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
+crate::bindings::macros::wire_methods!(PyFutureBreach, FutureBreach, "FutureBreach");
+crate::bindings::macros::py_getters!(PyFutureBreach |s| {
     /// Instance label of the covenant.
-    #[getter]
-    fn covenant_id(&self) -> &str {
-        &self.inner.covenant_id
-    }
+    covenant_id -> &str = &s.inner.covenant_id;
 
     /// Human-readable covenant description.
-    #[getter]
-    fn covenant_description(&self) -> &str {
-        &self.inner.covenant_description
-    }
+    covenant_description -> &str = &s.inner.covenant_description;
 
+    /// Projected metric value, if finite.
+    projected_value -> Option<f64> = s.inner.projected_value;
+
+    /// Threshold in force on the breach date.
+    threshold -> f64 = s.inner.threshold;
+
+    /// Relative headroom (negative means breach), if meaningful.
+    headroom -> Option<f64> = s.inner.headroom;
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._forecast", "FutureBreach.headroom_raw")]
+    headroom_raw -> Option<f64> = s.inner.headroom_raw;
+
+    /// Breach probability (``1.0`` in deterministic mode).
+    breach_probability -> f64 = s.inner.breach_probability;
+});
+
+#[pymethods]
+impl PyFutureBreach {
     /// Forecast date of the breach.
     #[getter]
     fn breach_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.breach_date)
-    }
-
-    /// Projected metric value, if finite.
-    #[getter]
-    fn projected_value(&self) -> Option<f64> {
-        self.inner.projected_value
-    }
-
-    /// Threshold in force on the breach date.
-    #[getter]
-    fn threshold(&self) -> f64 {
-        self.inner.threshold
-    }
-
-    /// Relative headroom (negative means breach), if meaningful.
-    #[getter]
-    fn headroom(&self) -> Option<f64> {
-        self.inner.headroom
-    }
-
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.covenants._forecast", "FutureBreach.headroom_raw")]
-    fn headroom_raw(&self) -> Option<f64> {
-        self.inner.headroom_raw
-    }
-
-    /// Breach probability (``1.0`` in deterministic mode).
-    #[getter]
-    fn breach_probability(&self) -> f64 {
-        self.inner.breach_probability
     }
 
     fn __repr__(&self) -> String {

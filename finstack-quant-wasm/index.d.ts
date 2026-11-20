@@ -3814,61 +3814,6 @@ export interface CashflowsNamespace {
 export interface CovenantsNamespace {
   readonly CovenantEngine: typeof wasm.CovenantEngine;
   /**
-   * Breach consequence: the maturity is accelerated to a new date.
-   *
-   * @param newMaturity - ISO-8601 accelerated maturity date.
-   * @returns `CovenantConsequence` wire value `{ accelerate_maturity: { new_maturity } }`.
-   * @throws If `newMaturity` is not an ISO-8601 string (kind `invalid_type` or `validation`).
-   */
-  readonly covenantConsequenceAccelerateMaturity: typeof wasm.covenantConsequenceAccelerateMaturity;
-  /**
-   * Breach consequence: distributions to equity are blocked.
-   *
-   * @returns `CovenantConsequence` wire value `"block_distributions"`.
-   * @throws If the value cannot be serialized.
-   */
-  readonly covenantConsequenceBlockDistributions: typeof wasm.covenantConsequenceBlockDistributions;
-  /**
-   * Breach consequence: excess cash is swept to repay debt.
-   *
-   * @param sweepPercentage - Share of excess cash swept, as a decimal in `[0, 1]` (`0.5` = 50%).
-   * @returns `CovenantConsequence` wire value `{ cash_sweep: { sweep_percentage } }`.
-   * @throws If `sweepPercentage` is not a number (kind `invalid_type`).
-   */
-  readonly covenantConsequenceCashSweep: typeof wasm.covenantConsequenceCashSweep;
-  /**
-   * Breach consequence: event of default.
-   *
-   * @returns `CovenantConsequence` wire value `"default"`.
-   * @throws If the value cannot be serialized.
-   */
-  readonly covenantConsequenceDefault: typeof wasm.covenantConsequenceDefault;
-  /**
-   * Breach consequence: the borrowing rate steps up.
-   *
-   * @param bpIncrease - Rate increase in basis points per annum (`200` = +2.00%); must be finite and non-negative when the covenant is validated.
-   * @returns `CovenantConsequence` wire value `{ rate_increase: { bp_increase } }`.
-   * @throws If `bpIncrease` is not a number (kind `invalid_type`).
-   */
-  readonly covenantConsequenceRateIncrease: typeof wasm.covenantConsequenceRateIncrease;
-  /**
-   * Breach consequence: additional collateral must be posted.
-   *
-   * @param description - Non-empty description of the required collateral.
-   * @returns `CovenantConsequence` wire value `{ require_collateral: { description } }`.
-   * @throws If `description` is not a string (kind `invalid_type`).
-   */
-  readonly covenantConsequenceRequireCollateral: typeof wasm.covenantConsequenceRequireCollateral;
-  /**
-   * Copy of a forecast configuration with a different covenant scope.
-   *
-   * @param config - `CovenantForecastConfig` wire object.
-   * @param scope - `"maintenance"` (scheduled tests) or `"incurrence"` (hypothetical capacity for a contemplated action).
-   * @returns The updated `CovenantForecastConfig`.
-   * @throws If `config` is not a `CovenantForecastConfig` or `scope` is not one of the listed strings (kind `validation`).
-   */
-  readonly covenantForecastConfigWithScope: typeof wasm.covenantForecastConfigWithScope;
-  /**
    * Create a covenant with the Rust defaults.
    *
    * Mirrors Rust `Covenant::new` (the Python `Covenant(...)` constructor): an
@@ -3895,15 +3840,6 @@ export interface CovenantsNamespace {
    */
   readonly covenantSpecNew: typeof wasm.covenantSpecNew;
   /**
-   * Copy of a specification with an explicit earnings denominator metric.
-   *
-   * @param spec - `CovenantSpec` wire object of a built-in leverage covenant.
-   * @param metricId - Identifier of the earnings metric the leverage ratio divides by, for example `"adjusted_ebitda"`.
-   * @returns The updated `CovenantSpec`.
-   * @throws If `spec` is not a `CovenantSpec` (kind `validation`) or `metricId` is not a string (kind `invalid_type`).
-   */
-  readonly covenantSpecWithDenominatorMetric: typeof wasm.covenantSpecWithDenominatorMetric;
-  /**
    * Covenant specification that reads its test value from a named metric.
    *
    * Mirrors Rust `CovenantSpec::with_metric` (the Python `CovenantSpec(...)`
@@ -3917,15 +3853,6 @@ export interface CovenantsNamespace {
    */
   readonly covenantSpecWithMetric: typeof wasm.covenantSpecWithMetric;
   /**
-   * Copy of a specification with step-down (or step-up) thresholds.
-   *
-   * @param spec - `CovenantSpec` wire object.
-   * @param schedule - `ThresholdSchedule` wire value: `[isoDate, threshold]` pairs; from each date that threshold replaces the covenant's static one.
-   * @returns The updated `CovenantSpec`.
-   * @throws If `spec` is not a `CovenantSpec`, or `schedule` has a non-finite threshold or repeats a date (kind `validation`).
-   */
-  readonly covenantSpecWithThresholdSchedule: typeof wasm.covenantSpecWithThresholdSchedule;
-  /**
    * Build the covenant specs of one standard package.
    *
    * @param template - `CovenantTemplate` object or JSON text: `kind` (`"lbo_standard"`, `"cov_lite"`, `"real_estate"` or `"project_finance"`) and that package's thresholds by Rust field name (ratios in turns, `min_debt_yield` and `max_ltv` as decimals, `max_capex` and `min_liquidity` in the reporting currency).
@@ -3933,157 +3860,6 @@ export interface CovenantsNamespace {
    * @throws If the template is malformed, has an unknown kind or field, or a threshold is NaN, infinite or negative (kind `validation`).
    */
   readonly covenantTemplate: typeof wasm.covenantTemplate;
-  /**
-   * Affirmative covenant described in words.
-   *
-   * @param requirement - Description of the required action, for example `"deliver audited financials within 90 days"`.
-   * @returns `CovenantType` wire value `{ affirmative: { requirement } }`; it has no numeric test.
-   * @throws If `requirement` is not a string (kind `invalid_type`).
-   */
-  readonly covenantTypeAffirmative: typeof wasm.covenantTypeAffirmative;
-  /**
-   * Basket covenant: a capped amount for a named category.
-   *
-   * @param name - Basket name, for example `"restricted_payments"`.
-   * @param limit - Maximum basket usage in the reporting currency.
-   * @returns `CovenantType` wire value `{ basket: { name, limit } }`.
-   * @throws If `name` is not a string or `limit` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeBasket: typeof wasm.covenantTypeBasket;
-  /**
-   * Custom covenant on a caller-named metric.
-   *
-   * @param metric - Metric identifier the test reads, for example `"net_working_capital"`.
-   * @param test - `"maximum"` (the metric must not exceed `value`) or `"minimum"` (the metric must reach `value`).
-   * @param value - Finite threshold in the metric's own units.
-   * @returns `CovenantType` wire value `{ custom: { metric, test } }`.
-   * @throws If `metric` or `test` is not a string or `value` is not a number (kind `invalid_type`), or `test` is not one of the listed strings or `value` is non-finite (kind `validation`).
-   */
-  readonly covenantTypeCustom: typeof wasm.covenantTypeCustom;
-  /**
-   * Maximum capital expenditure covenant.
-   *
-   * @param threshold - Maximum allowed capex amount in the reporting currency.
-   * @returns `CovenantType` wire value `{ max_capex: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxCapex: typeof wasm.covenantTypeMaxCapex;
-  /**
-   * Maximum total debt / EBITDA covenant.
-   *
-   * @param threshold - Maximum allowed ratio in turns (`4.5` means 4.5x).
-   * @returns `CovenantType` wire value `{ max_debt_to_ebitda: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxDebtToEbitda: typeof wasm.covenantTypeMaxDebtToEbitda;
-  /**
-   * Maximum net debt / EBITDA covenant.
-   *
-   * @param threshold - Maximum allowed net debt / EBITDA in turns; the specification needs an earnings denominator metric.
-   * @returns `CovenantType` wire value `{ max_net_debt_to_ebitda: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxNetDebtToEbitda: typeof wasm.covenantTypeMaxNetDebtToEbitda;
-  /**
-   * Maximum senior leverage covenant.
-   *
-   * @param threshold - Maximum allowed senior debt / EBITDA in turns.
-   * @returns `CovenantType` wire value `{ max_senior_leverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxSeniorLeverage: typeof wasm.covenantTypeMaxSeniorLeverage;
-  /**
-   * Maximum total leverage covenant.
-   *
-   * @param threshold - Maximum allowed total debt / EBITDA in turns.
-   * @returns `CovenantType` wire value `{ max_total_leverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxTotalLeverage: typeof wasm.covenantTypeMaxTotalLeverage;
-  /**
-   * Minimum asset coverage covenant.
-   *
-   * @param threshold - Minimum required asset coverage ratio in turns.
-   * @returns `CovenantType` wire value `{ min_asset_coverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinAssetCoverage: typeof wasm.covenantTypeMinAssetCoverage;
-  /**
-   * Minimum debt-service coverage ratio covenant.
-   *
-   * @param threshold - Minimum required DSCR in turns.
-   * @returns `CovenantType` wire value `{ min_dscr: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinDscr: typeof wasm.covenantTypeMinDscr;
-  /**
-   * Minimum fixed-charge coverage covenant.
-   *
-   * @param threshold - Minimum required ratio in turns.
-   * @returns `CovenantType` wire value `{ min_fixed_charge_coverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinFixedChargeCoverage: typeof wasm.covenantTypeMinFixedChargeCoverage;
-  /**
-   * Minimum interest coverage (EBIT / interest) covenant.
-   *
-   * @param threshold - Minimum required ratio in turns.
-   * @returns `CovenantType` wire value `{ min_interest_coverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinInterestCoverage: typeof wasm.covenantTypeMinInterestCoverage;
-  /**
-   * Minimum liquidity covenant.
-   *
-   * @param threshold - Minimum required liquidity amount in the reporting currency.
-   * @returns `CovenantType` wire value `{ min_liquidity: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinLiquidity: typeof wasm.covenantTypeMinLiquidity;
-  /**
-   * Negative (restrictive) covenant described in words.
-   *
-   * @param restriction - Description of the restricted action, for example `"no additional senior debt"`.
-   * @returns `CovenantType` wire value `{ negative: { restriction } }`; it has no numeric test.
-   * @throws If `restriction` is not a string (kind `invalid_type`).
-   */
-  readonly covenantTypeNegative: typeof wasm.covenantTypeNegative;
-  /**
-   * Copy of a covenant with one more breach consequence.
-   *
-   * @param covenant - `Covenant` wire object.
-   * @param consequence - `CovenantConsequence` wire value appended to the covenant's consequences.
-   * @returns The updated `Covenant`.
-   * @throws If either argument does not match its wire type (kind `validation`).
-   */
-  readonly covenantWithConsequence: typeof wasm.covenantWithConsequence;
-  /**
-   * Copy of a covenant with a cure period.
-   *
-   * @param covenant - `Covenant` wire object.
-   * @param days - Calendar days the borrower has to cure a breach (integer); omitted or `null` means no cure period.
-   * @returns The updated `Covenant`.
-   * @throws If `covenant` is not a `Covenant` (kind `validation`) or `days` is not an integer (kind `invalid_type`).
-   */
-  readonly covenantWithCurePeriod: typeof wasm.covenantWithCurePeriod;
-  /**
-   * Copy of a covenant with a different scope.
-   *
-   * @param covenant - `Covenant` wire object.
-   * @param scope - `"maintenance"` (tested on a schedule) or `"incurrence"` (tested only when an action is taken).
-   * @returns The updated `Covenant`.
-   * @throws If `covenant` is not a `Covenant` or `scope` is not one of the listed strings (kind `validation`).
-   */
-  readonly covenantWithScope: typeof wasm.covenantWithScope;
-  /**
-   * Copy of a covenant that is tested only while a springing condition holds.
-   *
-   * @param covenant - `Covenant` wire object.
-   * @param condition - `SpringingCondition` wire object (`{ metric_id, test }`), for example revolver utilization above a level; the covenant is inactive while the condition is unmet.
-   * @returns The updated `Covenant`.
-   * @throws If either argument does not match its wire type (kind `validation`).
-   */
-  readonly covenantWithSpringingCondition: typeof wasm.covenantWithSpringingCondition;
   /**
    * Evaluate a covenant engine JSON string against a JSON metric map.
    *

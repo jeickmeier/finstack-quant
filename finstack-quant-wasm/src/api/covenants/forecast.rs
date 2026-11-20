@@ -4,7 +4,7 @@ use super::engine::JsCovenantEngine;
 use crate::utils::wire::{js_opt_wire, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_covenants::{
-    CovenantForecastConfig, CovenantScope, CovenantSpec, DatedMetricSeries, DatedMetrics,
+    CovenantForecastConfig, CovenantSpec, DatedMetricSeries, DatedMetrics,
 };
 use wasm_bindgen::prelude::*;
 
@@ -79,20 +79,4 @@ pub fn forecast_breaches(
         &finstack_quant_covenants::forecast_breaches(&engine.inner, &series, config)
             .map_err(to_js_err)?,
     )
-}
-
-/// Copy of a forecast configuration with a different covenant scope.
-///
-/// @param config - `CovenantForecastConfig` wire object.
-/// @param scope - `"maintenance"` (scheduled tests) or `"incurrence"` (hypothetical capacity for a contemplated action).
-/// @returns The updated `CovenantForecastConfig`.
-/// @throws If `config` is not a `CovenantForecastConfig` or `scope` is not one of the listed strings (kind `validation`).
-#[wasm_bindgen(js_name = covenantForecastConfigWithScope, unchecked_return_type = "generated.covenants.CovenantForecastConfig")]
-pub fn covenant_forecast_config_with_scope(
-    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantForecastConfig")]
-    config: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantScope")] scope: JsValue,
-) -> Result<JsValue, JsValue> {
-    let config = js_wire::<CovenantForecastConfig>(&config, "config")?;
-    to_js_value(&config.with_scope(js_wire::<CovenantScope>(&scope, "scope")?))
 }

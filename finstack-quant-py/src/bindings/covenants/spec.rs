@@ -9,7 +9,7 @@ use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{label, parse_label};
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_covenants::{
     Covenant, CovenantConsequence, CovenantScope, CovenantSpec, CovenantType, CovenantWaiver,
     SpringingCondition, ThresholdSchedule, ThresholdTest,
@@ -42,50 +42,67 @@ impl PyCovenantType {
     }
 }
 
+macro_rules! threshold_covenant_ctors {
+    ($( $(#[$doc:meta])* $fn_name:ident => $variant:ident ),+ $(,)?) => {
+        #[pymethods]
+        impl PyCovenantType {
+            $(
+                $(#[$doc])*
+                #[staticmethod]
+                #[pyo3(text_signature = "(threshold)")]
+                fn $fn_name(threshold: f64) -> Self {
+                    Self::from_inner(CovenantType::$variant { threshold })
+                }
+            )+
+        }
+    };
+}
+
+threshold_covenant_ctors! {
+    /// Maximum debt-to-EBITDA ratio (gross leverage), ``threshold`` in turns.
+    max_debt_to_ebitda => MaxDebtToEbitda,
+    /// Minimum interest coverage ratio (EBIT / interest), ``threshold`` in turns.
+    min_interest_coverage => MinInterestCoverage,
+    /// Minimum fixed-charge coverage ratio, ``threshold`` in turns.
+    min_fixed_charge_coverage => MinFixedChargeCoverage,
+    /// Maximum total leverage ratio, ``threshold`` in turns.
+    max_total_leverage => MaxTotalLeverage,
+    /// Maximum senior leverage ratio, ``threshold`` in turns.
+    max_senior_leverage => MaxSeniorLeverage,
+    /// Minimum asset coverage ratio, ``threshold`` in turns.
+    min_asset_coverage => MinAssetCoverage,
+    /// Minimum debt service coverage ratio (EBITDA / debt service),
+    /// ``threshold`` in turns.
+    min_dscr => MinDscr,
+    /// Maximum net debt-to-EBITDA ratio (net of cash), ``threshold`` in turns.
+    max_net_debt_to_ebitda => MaxNetDebtToEbitda,
+    /// Maximum capital expenditure, ``threshold`` as a reporting-currency amount.
+    max_capex => MaxCapex,
+    /// Minimum liquidity (cash + available revolver), ``threshold`` as a
+    /// reporting-currency amount.
+    min_liquidity => MinLiquidity,
+}
+
+crate::bindings::macros::wire_methods!(PyCovenantType, CovenantType, "CovenantType");
+crate::bindings::macros::py_getters!(PyCovenantType |s| {
+    /// Stable variant identifier (``"max_debt_ebitda"``, ``"min_dscr"``,
+    /// ``"custom"``, ...); thresholds are not part of it.
+    covenant_id -> &'static str = s.inner.covenant_id();
+
+    /// Static threshold or limit, or ``None`` for negative / affirmative
+    /// covenants.
+    threshold -> Option<f64> = s.inner.threshold_value();
+
+    /// Inequality direction: ``"at_most"``, ``"at_least"``, or ``None`` for
+    /// non-numeric covenants.
+    bound_kind -> PyResult<Option<String>> = s.inner.bound_kind().as_ref().map(label).transpose();
+
+    /// Human-readable description, e.g. ``"Debt/EBITDA <= 4.50x"``.
+    description -> String = s.inner.to_string();
+});
+
 #[pymethods]
 impl PyCovenantType {
-    /// Maximum debt-to-EBITDA ratio (gross leverage), ``threshold`` in turns.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn max_debt_to_ebitda(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MaxDebtToEbitda { threshold })
-    }
-
-    /// Minimum interest coverage ratio (EBIT / interest), ``threshold`` in turns.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn min_interest_coverage(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MinInterestCoverage { threshold })
-    }
-
-    /// Minimum fixed-charge coverage ratio, ``threshold`` in turns.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn min_fixed_charge_coverage(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MinFixedChargeCoverage { threshold })
-    }
-
-    /// Maximum total leverage ratio, ``threshold`` in turns.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn max_total_leverage(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MaxTotalLeverage { threshold })
-    }
-
-    /// Maximum senior leverage ratio, ``threshold`` in turns.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn max_senior_leverage(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MaxSeniorLeverage { threshold })
-    }
-
-    /// Minimum asset coverage ratio, ``threshold`` in turns.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn min_asset_coverage(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MinAssetCoverage { threshold })
-    }
-
     /// Negative covenant (a prohibition described by ``restriction``); never
     /// tested numerically.
     #[staticmethod]
@@ -123,83 +140,6 @@ impl PyCovenantType {
     #[pyo3(text_signature = "(name, limit)")]
     fn basket(name: String, limit: f64) -> Self {
         Self::from_inner(CovenantType::Basket { name, limit })
-    }
-
-    /// Minimum debt service coverage ratio (EBITDA / debt service),
-    /// ``threshold`` in turns.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn min_dscr(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MinDscr { threshold })
-    }
-
-    /// Maximum net debt-to-EBITDA ratio (net of cash), ``threshold`` in turns.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn max_net_debt_to_ebitda(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MaxNetDebtToEbitda { threshold })
-    }
-
-    /// Maximum capital expenditure, ``threshold`` as a reporting-currency amount.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn max_capex(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MaxCapex { threshold })
-    }
-
-    /// Minimum liquidity (cash + available revolver), ``threshold`` as a
-    /// reporting-currency amount.
-    #[staticmethod]
-    #[pyo3(text_signature = "(threshold)")]
-    fn min_liquidity(threshold: f64) -> Self {
-        Self::from_inner(CovenantType::MinLiquidity { threshold })
-    }
-
-    /// Deserialize from the externally-tagged JSON form, e.g.
-    /// ``{"max_debt_to_ebitda": {"threshold": 4.5}}``.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Stable variant identifier (``"max_debt_ebitda"``, ``"min_dscr"``,
-    /// ``"custom"``, ...); thresholds are not part of it.
-    #[getter]
-    fn covenant_id(&self) -> &'static str {
-        self.inner.covenant_id()
-    }
-
-    /// Static threshold or limit, or ``None`` for negative / affirmative
-    /// covenants.
-    #[getter]
-    fn threshold(&self) -> Option<f64> {
-        self.inner.threshold_value()
-    }
-
-    /// Inequality direction: ``"at_most"``, ``"at_least"``, or ``None`` for
-    /// non-numeric covenants.
-    #[getter]
-    fn bound_kind(&self) -> PyResult<Option<String>> {
-        self.inner.bound_kind().as_ref().map(label).transpose()
-    }
-
-    /// Human-readable description, e.g. ``"Debt/EBITDA <= 4.50x"``.
-    #[getter]
-    fn description(&self) -> String {
-        self.inner.to_string()
     }
 
     fn __str__(&self) -> String {
@@ -245,6 +185,25 @@ impl PyCovenantConsequence {
         Self { inner }
     }
 }
+
+crate::bindings::macros::wire_methods!(
+    PyCovenantConsequence,
+    CovenantConsequence,
+    "CovenantConsequence"
+);
+crate::bindings::macros::py_getters!(PyCovenantConsequence |s| {
+    /// Variant name in snake_case: ``"default"``, ``"rate_increase"``,
+    /// ``"cash_sweep"``, ``"block_distributions"``, ``"require_collateral"``
+    /// or ``"accelerate_maturity"``.
+    kind -> &'static str = match s.inner {
+        CovenantConsequence::Default => "default",
+        CovenantConsequence::RateIncrease { .. } => "rate_increase",
+        CovenantConsequence::CashSweep { .. } => "cash_sweep",
+        CovenantConsequence::BlockDistributions => "block_distributions",
+        CovenantConsequence::RequireCollateral { .. } => "require_collateral",
+        CovenantConsequence::AccelerateMaturity { .. } => "accelerate_maturity",
+    };
+});
 
 #[pymethods]
 impl PyCovenantConsequence {
@@ -293,40 +252,6 @@ impl PyCovenantConsequence {
         }))
     }
 
-    /// Deserialize from JSON (``"default"``, ``{"rate_increase": {"bp_increase": 200.0}}``, ...).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Variant name in snake_case: ``"default"``, ``"rate_increase"``,
-    /// ``"cash_sweep"``, ``"block_distributions"``, ``"require_collateral"``
-    /// or ``"accelerate_maturity"``.
-    #[getter]
-    fn kind(&self) -> &'static str {
-        match self.inner {
-            CovenantConsequence::Default => "default",
-            CovenantConsequence::RateIncrease { .. } => "rate_increase",
-            CovenantConsequence::CashSweep { .. } => "cash_sweep",
-            CovenantConsequence::BlockDistributions => "block_distributions",
-            CovenantConsequence::RequireCollateral { .. } => "require_collateral",
-            CovenantConsequence::AccelerateMaturity { .. } => "accelerate_maturity",
-        }
-    }
-
     fn __repr__(&self) -> String {
         match &self.inner {
             CovenantConsequence::Default => "CovenantConsequence(kind=\"default\")".to_string(),
@@ -373,6 +298,22 @@ impl PySpringingCondition {
     }
 }
 
+crate::bindings::macros::wire_methods!(
+    PySpringingCondition,
+    SpringingCondition,
+    "SpringingCondition"
+);
+crate::bindings::macros::py_getters!(PySpringingCondition |s| {
+    /// Metric that controls activation.
+    metric_id -> &str = s.inner.metric_id.as_str();
+
+    /// Test direction: ``"maximum"`` or ``"minimum"``.
+    test -> &'static str = s.inner.test.label();
+
+    /// Bound the activation metric is compared against.
+    value -> f64 = s.inner.test.value();
+});
+
 #[pymethods]
 impl PySpringingCondition {
     /// Create a springing condition on ``metric_id`` with ``test``
@@ -386,43 +327,6 @@ impl PySpringingCondition {
             metric_id: metric_id.into(),
             test: ThresholdTest::new(test, value).map_err(core_to_py)?,
         }))
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Metric that controls activation.
-    #[getter]
-    fn metric_id(&self) -> &str {
-        self.inner.metric_id.as_str()
-    }
-
-    /// Test direction: ``"maximum"`` or ``"minimum"``.
-    #[getter]
-    fn test(&self) -> &'static str {
-        self.inner.test.label()
-    }
-
-    /// Bound the activation metric is compared against.
-    #[getter]
-    fn value(&self) -> f64 {
-        self.inner.test.value()
     }
 
     fn __repr__(&self) -> String {
@@ -459,6 +363,46 @@ impl PyCovenant {
         Self { inner }
     }
 }
+
+crate::bindings::macros::wire_methods!(PyCovenant, Covenant, "Covenant");
+crate::bindings::macros::py_getters!(PyCovenant |s| {
+    /// Covenant type and static threshold.
+    covenant_type -> PyCovenantType = PyCovenantType::from_inner(s.inner.covenant_type.clone());
+
+    /// Descriptive test frequency.
+    test_frequency -> PyTenor = PyTenor::from_inner(s.inner.test_frequency);
+
+    /// Cure period in days, or ``None`` when a breach is immediate.
+    cure_period_days -> Option<i32> = s.inner.cure_period_days;
+
+    /// Consequences applied after an uncured breach.
+    consequences -> Vec<PyCovenantConsequence> = s
+        .inner
+        .consequences
+        .iter()
+        .cloned()
+        .map(PyCovenantConsequence::from_inner)
+        .collect();
+
+    /// Whether the covenant is active (inactive covenants report a pass).
+    is_active -> bool = s.inner.is_active;
+
+    /// ``"maintenance"`` or ``"incurrence"``.
+    scope -> PyResult<String> = label(&s.inner.scope);
+
+    /// Activation condition, or ``None`` for an always-on covenant.
+    springing_condition -> Option<PySpringingCondition> = s
+        .inner
+        .springing_condition
+        .clone()
+        .map(PySpringingCondition::from_inner);
+
+    /// Instance label: the key under which reports and breaches are returned.
+    label -> &str = &s.inner.label;
+
+    /// Human-readable description of the covenant type.
+    description -> String = s.inner.description();
+});
 
 #[pymethods]
 impl PyCovenant {
@@ -522,87 +466,6 @@ impl PyCovenant {
         )
     }
 
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Covenant type and static threshold.
-    #[getter]
-    fn covenant_type(&self) -> PyCovenantType {
-        PyCovenantType::from_inner(self.inner.covenant_type.clone())
-    }
-
-    /// Descriptive test frequency.
-    #[getter]
-    fn test_frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.test_frequency)
-    }
-
-    /// Cure period in days, or ``None`` when a breach is immediate.
-    #[getter]
-    fn cure_period_days(&self) -> Option<i32> {
-        self.inner.cure_period_days
-    }
-
-    /// Consequences applied after an uncured breach.
-    #[getter]
-    fn consequences(&self) -> Vec<PyCovenantConsequence> {
-        self.inner
-            .consequences
-            .iter()
-            .cloned()
-            .map(PyCovenantConsequence::from_inner)
-            .collect()
-    }
-
-    /// Whether the covenant is active (inactive covenants report a pass).
-    #[getter]
-    fn is_active(&self) -> bool {
-        self.inner.is_active
-    }
-
-    /// ``"maintenance"`` or ``"incurrence"``.
-    #[getter]
-    fn scope(&self) -> PyResult<String> {
-        label(&self.inner.scope)
-    }
-
-    /// Activation condition, or ``None`` for an always-on covenant.
-    #[getter]
-    fn springing_condition(&self) -> Option<PySpringingCondition> {
-        self.inner
-            .springing_condition
-            .clone()
-            .map(PySpringingCondition::from_inner)
-    }
-
-    /// Instance label: the key under which reports and breaches are returned.
-    #[getter]
-    fn label(&self) -> &str {
-        &self.inner.label
-    }
-
-    /// Human-readable description of the covenant type.
-    #[getter]
-    fn description(&self) -> String {
-        self.inner.description()
-    }
-
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "Covenant(label={:?}, covenant_type={:?}, test_frequency=\"{}\", cure_period_days={}, scope={:?}, is_active={})",
@@ -646,6 +509,8 @@ impl PyThresholdSchedule {
     }
 }
 
+crate::bindings::macros::wire_methods!(PyThresholdSchedule, ThresholdSchedule, "ThresholdSchedule");
+
 #[pymethods]
 impl PyThresholdSchedule {
     /// Create a schedule from ``entries`` of ``(date, threshold)`` pairs
@@ -664,25 +529,6 @@ impl PyThresholdSchedule {
         ThresholdSchedule::new(entries)
             .map(Self::from_inner)
             .map_err(core_to_py)
-    }
-
-    /// Deserialize from the JSON array form ``[["2026-01-01", 6.5], ...]``.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     /// Entries as ``(datetime.date, threshold)`` pairs in ascending date order.
@@ -741,6 +587,18 @@ impl PyCovenantWaiver {
     }
 }
 
+crate::bindings::macros::wire_methods!(PyCovenantWaiver, CovenantWaiver, "CovenantWaiver");
+crate::bindings::macros::py_getters!(PyCovenantWaiver |s| {
+    /// Instance label of the waived covenant.
+    covenant_id -> &str = &s.inner.covenant_id;
+
+    /// Amended threshold, or ``None`` for a full waiver.
+    amended_threshold -> Option<f64> = s.inner.amended_threshold;
+
+    /// Free-text description of the waiver terms.
+    description -> &str = &s.inner.description;
+});
+
 #[pymethods]
 impl PyCovenantWaiver {
     /// Create a waiver for the covenant whose ``Covenant.label`` is
@@ -766,31 +624,6 @@ impl PyCovenantWaiver {
         }))
     }
 
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Instance label of the waived covenant.
-    #[getter]
-    fn covenant_id(&self) -> &str {
-        &self.inner.covenant_id
-    }
-
     /// First date the waiver applies.
     #[getter]
     fn effective_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -804,18 +637,6 @@ impl PyCovenantWaiver {
             .expiry_date
             .map(|date| date_to_py(py, date))
             .transpose()
-    }
-
-    /// Amended threshold, or ``None`` for a full waiver.
-    #[getter]
-    fn amended_threshold(&self) -> Option<f64> {
-        self.inner.amended_threshold
-    }
-
-    /// Free-text description of the waiver terms.
-    #[getter]
-    fn description(&self) -> &str {
-        &self.inner.description
     }
 
     fn __repr__(&self) -> String {
@@ -848,6 +669,29 @@ impl PyCovenantSpec {
     }
 }
 
+crate::bindings::macros::wire_methods!(PyCovenantSpec, CovenantSpec, "CovenantSpec");
+crate::bindings::macros::py_getters!(PyCovenantSpec |s| {
+    /// Earnings denominator metric id; net-debt constructors default to ``ebitda``.
+    denominator_metric_id -> Option<&str> = s
+        .inner
+        .denominator_metric_id
+        .as_ref()
+        .map(|id| id.as_str());
+
+    /// The covenant being evaluated.
+    covenant -> PyCovenant = PyCovenant::from_inner(s.inner.covenant.clone());
+
+    /// Metric key looked up at evaluation, or ``None`` for the type default.
+    metric_id -> Option<&str> = s.inner.metric_id.as_ref().map(|id| id.as_str());
+
+    /// Step-down schedule, or ``None`` when the static threshold applies.
+    threshold_schedule -> Option<PyThresholdSchedule> = s
+        .inner
+        .threshold_schedule
+        .clone()
+        .map(PyThresholdSchedule::from_inner);
+});
+
 #[pymethods]
 impl PyCovenantSpec {
     /// Pair ``covenant`` with the ``metric_id`` it is evaluated on.
@@ -870,15 +714,6 @@ impl PyCovenantSpec {
         Self::from_inner(self.inner.clone().with_denominator_metric(metric_id))
     }
 
-    /// Earnings denominator metric id; net-debt constructors default to ``ebitda``.
-    #[getter]
-    fn denominator_metric_id(&self) -> Option<&str> {
-        self.inner
-            .denominator_metric_id
-            .as_ref()
-            .map(|id| id.as_str())
-    }
-
     /// Return a copy whose threshold follows ``schedule`` (step-downs) instead
     /// of the covenant's static threshold.
     #[pyo3(text_signature = "(schedule)")]
@@ -888,46 +723,6 @@ impl PyCovenantSpec {
                 .clone()
                 .with_threshold_schedule(schedule.inner.clone()),
         )
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// The covenant being evaluated.
-    #[getter]
-    fn covenant(&self) -> PyCovenant {
-        PyCovenant::from_inner(self.inner.covenant.clone())
-    }
-
-    /// Metric key looked up at evaluation, or ``None`` for the type default.
-    #[getter]
-    fn metric_id(&self) -> Option<&str> {
-        self.inner.metric_id.as_ref().map(|id| id.as_str())
-    }
-
-    /// Step-down schedule, or ``None`` when the static threshold applies.
-    #[getter]
-    fn threshold_schedule(&self) -> Option<PyThresholdSchedule> {
-        self.inner
-            .threshold_schedule
-            .clone()
-            .map(PyThresholdSchedule::from_inner)
     }
 
     fn __repr__(&self) -> String {

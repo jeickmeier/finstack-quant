@@ -84,6 +84,35 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 9] = [
     ("details", "str"),
 ];
 
+fn report_row(
+    as_of: Option<&str>,
+    key: &str,
+    report: &finstack_quant_covenants::CovenantReport,
+) -> serde_json::Value {
+    let mut map = serde_json::Map::with_capacity(9);
+    if let Some(as_of) = as_of {
+        map.insert("as_of".into(), serde_json::Value::String(as_of.to_owned()));
+    }
+    map.insert("covenant".into(), serde_json::json!(key));
+    map.insert(
+        "covenant_type".into(),
+        serde_json::json!(report.covenant_type),
+    );
+    map.insert("passed".into(), serde_json::json!(report.passed));
+    map.insert(
+        "actual_value".into(),
+        serde_json::json!(report.actual_value),
+    );
+    map.insert("threshold".into(), serde_json::json!(report.threshold));
+    map.insert("headroom".into(), serde_json::json!(report.headroom));
+    map.insert(
+        "headroom_raw".into(),
+        serde_json::json!(report.headroom_raw),
+    );
+    map.insert("details".into(), serde_json::json!(report.details));
+    serde_json::Value::Object(map)
+}
+
 /// Flatten dated covenant reports into the long frame of `SERIES_COLUMNS`:
 /// one row per (test date, covenant), dates in series order and covenants in
 /// engine order. Shared by `CovenantEngine.evaluate_series` and
@@ -96,19 +125,10 @@ pub(crate) fn dated_reports_frame(
         .into_iter()
         .flat_map(|dated| {
             let as_of = dated.as_of.to_string();
-            dated.reports.into_iter().map(move |(key, report)| {
-                serde_json::json!({
-                    "as_of": as_of,
-                    "covenant": key,
-                    "covenant_type": report.covenant_type,
-                    "passed": report.passed,
-                    "actual_value": report.actual_value,
-                    "threshold": report.threshold,
-                    "headroom": report.headroom,
-                    "headroom_raw": report.headroom_raw,
-                    "details": report.details,
-                })
-            })
+            dated
+                .reports
+                .into_iter()
+                .map(move |(key, report)| report_row(Some(&as_of), &key, &report))
         })
         .collect();
     serde_rows_to_dataframe_with_schema(py, &records, &SERIES_COLUMNS)
@@ -313,58 +333,6 @@ impl PyCovenantEngine {
         dated_reports_frame(py, evaluated)
     }
 
-    /// Deserialize from JSON; only ``specs`` is required.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON (the ``evaluate_engine`` engine document).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Top-level covenant specifications in insertion order.
-    #[getter]
-    fn specs(&self) -> Vec<PyCovenantSpec> {
-        self.inner
-            .specs
-            .iter()
-            .cloned()
-            .map(PyCovenantSpec::from_inner)
-            .collect()
-    }
-
-    /// Recorded waivers and amendments.
-    #[getter]
-    fn waivers(&self) -> Vec<PyCovenantWaiver> {
-        self.inner
-            .waivers
-            .iter()
-            .cloned()
-            .map(PyCovenantWaiver::from_inner)
-            .collect()
-    }
-
-    /// Breaches recorded by ``evaluate_and_track`` (or loaded from JSON).
-    #[getter]
-    fn breach_history(&self) -> Vec<PyCovenantBreach> {
-        self.inner
-            .breach_history
-            .iter()
-            .cloned()
-            .map(PyCovenantBreach::from_inner)
-            .collect()
-    }
-
     fn __len__(&self) -> usize {
         self.inner.specs.len()
     }
@@ -373,6 +341,36 @@ impl PyCovenantEngine {
         repr_from_serde("CovenantEngine", &self.inner)
     }
 }
+
+crate::bindings::macros::wire_methods!(PyCovenantEngine, CovenantEngine, "CovenantEngine");
+crate::bindings::macros::py_getters!(PyCovenantEngine |s| {
+    /// Top-level covenant specifications in insertion order.
+    specs -> Vec<PyCovenantSpec> = s
+        .inner
+        .specs
+        .iter()
+        .cloned()
+        .map(PyCovenantSpec::from_inner)
+        .collect();
+
+    /// Recorded waivers and amendments.
+    waivers -> Vec<PyCovenantWaiver> = s
+        .inner
+        .waivers
+        .iter()
+        .cloned()
+        .map(PyCovenantWaiver::from_inner)
+        .collect();
+
+    /// Breaches recorded by ``evaluate_and_track`` (or loaded from JSON).
+    breach_history -> Vec<PyCovenantBreach> = s
+        .inner
+        .breach_history
+        .iter()
+        .cloned()
+        .map(PyCovenantBreach::from_inner)
+        .collect();
+});
 
 /// A recorded covenant breach with its cure deadline and applied consequences.
 #[pyclass(
@@ -393,55 +391,48 @@ impl PyCovenantBreach {
     }
 }
 
-#[pymethods]
-impl PyCovenantBreach {
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
+crate::bindings::macros::wire_methods!(PyCovenantBreach, CovenantBreach, "CovenantBreach");
+crate::bindings::macros::py_getters!(PyCovenantBreach |s| {
     /// Instance label of the breached covenant.
-    #[getter]
-    fn covenant_id(&self) -> &str {
-        &self.inner.covenant_id
-    }
+    covenant_id -> &str = &s.inner.covenant_id;
 
     /// Human-readable covenant description.
-    #[getter]
-    fn covenant_type(&self) -> &str {
-        &self.inner.covenant_type
-    }
+    covenant_type -> &str = &s.inner.covenant_type;
 
+    /// Metric value that caused the breach, if numeric.
+    actual_value -> Option<f64> = s.inner.actual_value;
+
+    /// Threshold in force at the breach.
+    threshold -> Option<f64> = s.inner.threshold;
+
+    /// Whether a later pass inside the cure period cured the breach.
+    is_cured -> bool = s.inner.is_cured;
+
+    /// Consequences captured from the effective covenant when this breach began.
+    consequences -> Vec<super::spec::PyCovenantConsequence> = s
+        .inner
+        .consequences
+        .iter()
+        .cloned()
+        .map(super::spec::PyCovenantConsequence::from_inner)
+        .collect();
+
+    /// Consequences already applied for this breach.
+    applied_consequences -> Vec<super::spec::PyCovenantConsequence> = s
+        .inner
+        .applied_consequences
+        .iter()
+        .cloned()
+        .map(super::spec::PyCovenantConsequence::from_inner)
+        .collect();
+});
+
+#[pymethods]
+impl PyCovenantBreach {
     /// Test date on which the breach was recorded.
     #[getter]
     fn breach_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.breach_date)
-    }
-
-    /// Metric value that caused the breach, if numeric.
-    #[getter]
-    fn actual_value(&self) -> Option<f64> {
-        self.inner.actual_value
-    }
-
-    /// Threshold in force at the breach.
-    #[getter]
-    fn threshold(&self) -> Option<f64> {
-        self.inner.threshold
     }
 
     /// End of the cure period, or ``None`` when the covenant has none.
@@ -451,34 +442,6 @@ impl PyCovenantBreach {
             .cure_deadline
             .map(|date| date_to_py(py, date))
             .transpose()
-    }
-
-    /// Whether a later pass inside the cure period cured the breach.
-    #[getter]
-    fn is_cured(&self) -> bool {
-        self.inner.is_cured
-    }
-
-    /// Consequences captured from the effective covenant when this breach began.
-    #[getter]
-    fn consequences(&self) -> Vec<super::spec::PyCovenantConsequence> {
-        self.inner
-            .consequences
-            .iter()
-            .cloned()
-            .map(super::spec::PyCovenantConsequence::from_inner)
-            .collect()
-    }
-
-    /// Consequences already applied for this breach.
-    #[getter]
-    fn applied_consequences(&self) -> Vec<super::spec::PyCovenantConsequence> {
-        self.inner
-            .applied_consequences
-            .iter()
-            .cloned()
-            .map(super::spec::PyCovenantConsequence::from_inner)
-            .collect()
     }
 
     fn __repr__(&self) -> String {
@@ -591,29 +554,12 @@ impl PyCovenantTemplate {
             .ok_or_else(|| value_error("CovenantTemplate serialized without a kind tag"))
     }
 
-    /// Deserialize from canonical JSON (strict: unknown fields are rejected).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(display_to_py)
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support ``pickle`` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("CovenantTemplate", &self.inner)
     }
 }
+
+crate::bindings::macros::wire_methods!(PyCovenantTemplate, CovenantTemplate, "CovenantTemplate");
 
 /// Expand a ``CovenantTemplate`` into its typed covenant specs.
 ///
@@ -644,29 +590,7 @@ pub(crate) fn reports_to_dataframe<'py>(
     for (key, value) in reports.iter() {
         let key: String = key.extract()?;
         let report = value.extract::<PyRef<'_, PyCovenantReport>>()?;
-        rows.push(serde_json::json!({
-            "covenant": key,
-            "covenant_type": report.inner.covenant_type,
-            "passed": report.inner.passed,
-            "actual_value": report.inner.actual_value,
-            "threshold": report.inner.threshold,
-            "headroom": report.inner.headroom,
-            "headroom_raw": report.inner.headroom_raw,
-            "details": report.inner.details,
-        }));
+        rows.push(report_row(None, &key, &report.inner));
     }
-    serde_rows_to_dataframe_with_schema(
-        py,
-        &rows,
-        &[
-            ("covenant", "str"),
-            ("covenant_type", "str"),
-            ("passed", "bool"),
-            ("actual_value", "float64"),
-            ("threshold", "float64"),
-            ("headroom", "float64"),
-            ("headroom_raw", "float64"),
-            ("details", "str"),
-        ],
-    )
+    serde_rows_to_dataframe_with_schema(py, &rows, &SERIES_COLUMNS[1..])
 }
