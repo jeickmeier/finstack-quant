@@ -30,7 +30,8 @@ mod transform;
 pub use builder::DiscountCurveBuilder;
 
 use super::common::CurveCalendar;
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle, exact_f64_eq};
+use super::common::factor::{FactorTransform as _, validate_canonical_raw_origin};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
     dates::{Date, DayCount},
     math::interp::Interp,
@@ -119,31 +120,11 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawDiscountCurve) -> crate::Result<Self> {
-        let first = state
-            .knot_points
-            .first()
-            .ok_or(crate::InputError::TooFewPoints)?;
-        if !exact_f64_eq(first.0, 0.0) || !exact_f64_eq(first.1, 1.0) {
-            return Err(crate::Error::Validation(
-                "canonical DiscountCurve state must already start at (0.0, 1.0)".to_string(),
-            ));
-        }
-        if let Some(ref tr) = state.transform {
-            let src_first = tr
-                .source_points()
-                .first()
-                .ok_or(crate::InputError::TooFewPoints)?;
-            if !exact_f64_eq(src_first.0, 0.0)
-                || !exact_f64_eq(src_first.1, 1.0)
-                || tr.source_points().len() < 2
-            {
-                return Err(crate::Error::Validation(
-                    "canonical DiscountCurve transform source_points must contain origin (0.0, 1.0) and at least one positive pillar".to_string(),
-                ));
-            }
-        } else if state.knot_points.len() < 2 {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
+        validate_canonical_raw_origin(
+            "DiscountCurve",
+            &state.knot_points,
+            state.transform.as_ref().map(|tr| tr.source_points()),
+        )?;
 
         let mut builder = DiscountCurve::builder(state.id)
             .base_date(state.base)

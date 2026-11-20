@@ -1,7 +1,6 @@
 //! Fluent discount-curve builder and construction validation.
 
-use super::super::common::factor::{validate_origin_only, validate_positive_factor_points};
-use super::super::common::validate_curve_clock;
+use super::super::common::factor::{FactorBuildInput, build_factor_curve};
 use super::DiscountCurve;
 use crate::dates::{Date, DayCount};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
@@ -148,69 +147,30 @@ impl DiscountCurveBuilder {
     /// or lacks its `Bus/252` calendar, pillars are not strictly increasing or
     /// contain non-finite / non-positive discount factors, or fewer than two
     /// points remain after normalization.
-    pub fn build(mut self) -> crate::Result<DiscountCurve> {
-        let base = self.base.ok_or_else(|| {
-            crate::Error::Validation("DiscountCurve requires base_date".to_string())
-        })?;
-        let day_count = self.day_count.ok_or_else(|| {
-            crate::Error::Validation("DiscountCurve requires day_count".to_string())
-        })?;
-        let style = self.style.ok_or_else(|| {
-            crate::Error::Validation("DiscountCurve requires interp style".to_string())
-        })?;
-        let extrapolation = self.extrapolation.ok_or_else(|| {
-            crate::Error::Validation("DiscountCurve requires extrapolation policy".to_string())
-        })?;
-
-        let calendar = validate_curve_clock(
+    pub fn build(self) -> crate::Result<DiscountCurve> {
+        let built = build_factor_curve(
             "DiscountCurve",
-            self.id.as_str(),
-            day_count,
-            self.calendar_id.as_deref(),
+            FactorBuildInput {
+                id: self.id.as_str(),
+                base: self.base,
+                day_count: self.day_count,
+                calendar_id: self.calendar_id.as_deref(),
+                points: self.points,
+                style: self.style,
+                extrapolation: self.extrapolation,
+                transform: self.transform,
+            },
         )?;
-
-        let points = std::mem::take(&mut self.points);
-        let (knots, dfs) = if self.transform.is_some()
-            && points.len() == 1
-            && extrapolation == ExtrapolationPolicy::Error
-        {
-            validate_origin_only(&points, "DiscountCurve")?;
-            (vec![0.0], vec![1.0])
-        } else {
-            validate_positive_factor_points(points, "DiscountCurve")?
-        };
-
-        let (interp_knots, interp_dfs) = match &self.transform {
-            Some(transform) => validate_positive_factor_points(
-                transform.source_points().to_vec(),
-                "DiscountCurve",
-            )?,
-            None => (knots.clone(), dfs.clone()),
-        };
-
-        let interp = style.build_enum(
-            interp_knots.into_boxed_slice(),
-            interp_dfs.into_boxed_slice(),
-            extrapolation,
-        )?;
-
-        if let Some(transform) = &mut self.transform {
-            let ctx = crate::dates::DayCountContext {
-                calendar: calendar.as_ref().map(|cal| cal.calendar),
-                ..crate::dates::DayCountContext::default()
-            };
-            transform.validate(base, day_count, ctx, &interp, &knots, &dfs)?;
-        }
 
         Ok(DiscountCurve {
             id: self.id,
-            base,
-            day_count,
-            calendar,
-            knots: knots.into_boxed_slice(),
-            dfs: dfs.into_boxed_slice(),
-            interp,
-            transform: self.transform,
+            base: built.base,
+            day_count: built.day_count,
+            calendar: built.calendar,
+            knots: built.knots,
+            dfs: built.values,
+            interp: built.interp,
+            transform: built.transform,
             rate_calibration: self.rate_calibration,
             fx_policy: self.fx_policy,
         })

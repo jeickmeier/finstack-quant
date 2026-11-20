@@ -2,9 +2,9 @@
 
 use super::super::DiscountCurve;
 use super::super::common::factor::{
-    dated_points_to_knots, df_between_admitted_factors,
-    instantaneous_forward as factor_instantaneous_forward, simple_rate_from_factors,
-    zero_rate_points_to_factors,
+    FactorClock, FactorTransform as _, dated_points_to_knots, df_between_admitted_factors,
+    eval_factor_df, eval_factor_df_on_date, eval_factor_instantaneous_forward,
+    simple_rate_from_factors, zero_rate_points_to_factors,
 };
 use super::super::common::{signed_curve_year_fraction, validate_curve_clock};
 use super::{ForwardCurve, ForwardCurveBuilder};
@@ -308,19 +308,7 @@ impl ForwardCurve {
     #[must_use = "computed projection factor should not be discarded"]
     #[inline]
     pub fn df(&self, t: f64) -> crate::Result<f64> {
-        if !t.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "ForwardCurve::df requires finite time t, got {t}"
-            )));
-        }
-        if let Some(transform) = &self.transform {
-            return transform.df(&self.interp, t);
-        }
-        let val = self.interp.interp(t)?;
-        if !val.is_finite() || val <= 0.0 {
-            return Err(crate::InputError::NonPositiveValue.into());
-        }
-        Ok(val)
+        eval_factor_df(&self.interp, self.transform.as_ref(), t, "ForwardCurve")
     }
 
     /// Projection factor on a specific date using the curve's signed clock.
@@ -339,18 +327,17 @@ impl ForwardCurve {
     #[inline]
     #[must_use = "computed projection factor should not be discarded"]
     pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
-        if let Some(transform) = &self.transform {
-            let source_t = signed_curve_year_fraction(
-                transform.source_base_date(),
-                date,
-                self.day_count,
-                self.calendar.as_ref(),
-            )?;
-            return transform.df_at_source_time(&self.interp, source_t);
-        }
-        let t =
-            signed_curve_year_fraction(self.base, date, self.day_count, self.calendar.as_ref())?;
-        self.df(t)
+        eval_factor_df_on_date(
+            FactorClock {
+                base: self.base,
+                day_count: self.day_count,
+                calendar: self.calendar.as_ref(),
+            },
+            &self.interp,
+            self.transform.as_ref(),
+            date,
+            "ForwardCurve",
+        )
     }
 
     /// Relative projection factor `P_x(to) / P_x(from)` between two calendar dates.
@@ -494,9 +481,6 @@ impl ForwardCurve {
     #[inline]
     #[must_use = "computed instantaneous forward rate should not be discarded"]
     pub fn instantaneous_forward(&self, t: f64) -> crate::Result<f64> {
-        if let Some(transform) = &self.transform {
-            return transform.instantaneous_forward(&self.interp, t);
-        }
-        factor_instantaneous_forward(&self.interp, None, t, "ForwardCurve")
+        eval_factor_instantaneous_forward(&self.interp, self.transform.as_ref(), t, "ForwardCurve")
     }
 }

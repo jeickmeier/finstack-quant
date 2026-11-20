@@ -1,7 +1,7 @@
 //! Validated serialization adapters for [`ForwardCurve`].
 
+use super::super::common::factor::{FactorTransform as _, validate_canonical_raw_origin};
 use super::*;
-use crate::math::interp::exact_f64_eq;
 
 /// Raw canonical serializable state of [`ForwardCurve`].
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -65,31 +65,11 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawForwardCurve) -> crate::Result<Self> {
-        let first = state
-            .knot_points
-            .first()
-            .ok_or(crate::InputError::TooFewPoints)?;
-        if !exact_f64_eq(first.0, 0.0) || !exact_f64_eq(first.1, 1.0) {
-            return Err(crate::Error::Validation(
-                "canonical ForwardCurve state must already start at (0.0, 1.0)".to_string(),
-            ));
-        }
-        if let Some(ref tr) = state.transform {
-            let src_first = tr
-                .source_points()
-                .first()
-                .ok_or(crate::InputError::TooFewPoints)?;
-            if !exact_f64_eq(src_first.0, 0.0)
-                || !exact_f64_eq(src_first.1, 1.0)
-                || tr.source_points().len() < 2
-            {
-                return Err(crate::Error::Validation(
-                    "canonical ForwardCurve transform source_points must contain origin (0.0, 1.0) and at least one positive pillar".to_string(),
-                ));
-            }
-        } else if state.knot_points.len() < 2 {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
+        validate_canonical_raw_origin(
+            "ForwardCurve",
+            &state.knot_points,
+            state.transform.as_ref().map(|tr| tr.source_points()),
+        )?;
 
         let mut builder = ForwardCurve::builder(state.id)
             .base_date(state.base)

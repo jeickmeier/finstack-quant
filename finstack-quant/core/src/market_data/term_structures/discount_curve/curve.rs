@@ -1,8 +1,9 @@
 //! Discount-curve construction, queries, and forward derivation.
 
 use super::super::common::factor::{
-    FactorTransformSnapshot, dated_points_to_knots,
-    instantaneous_forward as factor_instantaneous_forward, zero_rate_points_to_factors,
+    FactorClock, FactorTransform as _, FactorTransformSnapshot, dated_points_to_knots,
+    eval_factor_df, eval_factor_df_on_date, eval_factor_instantaneous_forward,
+    zero_rate_points_to_factors,
 };
 use super::super::common::{
     signed_curve_year_fraction, stable_positive_log_ratio, validate_curve_clock,
@@ -268,17 +269,17 @@ impl DiscountCurve {
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
     pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
-        if let Some(transform) = &self.transform {
-            let source_t = signed_curve_year_fraction(
-                transform.source_base_date(),
-                date,
-                self.day_count,
-                self.calendar.as_ref(),
-            )?;
-            return transform.df_at_source_time(&self.interp, source_t);
-        }
-        let t = self.year_fraction_to(date)?;
-        self.df(t)
+        eval_factor_df_on_date(
+            FactorClock {
+                base: self.base,
+                day_count: self.day_count,
+                calendar: self.calendar.as_ref(),
+            },
+            &self.interp,
+            self.transform.as_ref(),
+            date,
+            "DiscountCurve",
+        )
     }
 
     /// Zero rate on `date` under the explicit `compounding` convention.
@@ -345,12 +346,6 @@ impl DiscountCurve {
         compounding.rate_from_df(df, t)
     }
 
-    /// Compute signed year fraction from `self.base` using the curve's calendar context.
-    #[inline]
-    fn year_fraction_to(&self, date: Date) -> crate::Result<f64> {
-        signed_curve_year_fraction(self.base, date, self.day_count, self.calendar.as_ref())
-    }
-
     /// Day-count context of the curve's time axis: its holiday calendar, if any.
     #[must_use]
     pub fn day_count_context(&self) -> crate::dates::DayCountContext<'static> {
@@ -380,19 +375,7 @@ impl DiscountCurve {
     #[must_use = "computed discount factor should not be discarded"]
     #[inline]
     pub fn df(&self, t: f64) -> crate::Result<f64> {
-        if !t.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "DiscountCurve::df requires finite time t, got {t}"
-            )));
-        }
-        if let Some(transform) = &self.transform {
-            return transform.df(&self.interp, t);
-        }
-        let val = self.interp.interp(t)?;
-        if !val.is_finite() || val <= 0.0 {
-            return Err(crate::InputError::NonPositiveValue.into());
-        }
-        Ok(val)
+        eval_factor_df(&self.interp, self.transform.as_ref(), t, "DiscountCurve")
     }
 
     /// Analytic instantaneous forward rate `-D'(t) / D(t)` at time `t`.
@@ -411,10 +394,7 @@ impl DiscountCurve {
     #[inline]
     #[must_use = "computed instantaneous forward rate should not be discarded"]
     pub fn instantaneous_forward(&self, t: f64) -> crate::Result<f64> {
-        if let Some(transform) = &self.transform {
-            return transform.instantaneous_forward(&self.interp, t);
-        }
-        factor_instantaneous_forward(&self.interp, None, t, "DiscountCurve")
+        eval_factor_instantaneous_forward(&self.interp, self.transform.as_ref(), t, "DiscountCurve")
     }
 
     /// Knot times (t) in **years** stored on this curve.
