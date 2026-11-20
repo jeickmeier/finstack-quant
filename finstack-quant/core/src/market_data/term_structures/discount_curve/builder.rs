@@ -1,6 +1,6 @@
 //! Fluent discount-curve builder and construction validation.
 
-use super::super::common::factor::{FactorBuildInput, build_factor_curve};
+use super::super::common::factor::{FactorBuildInput, FactorCore, FactorTransform};
 use super::DiscountCurve;
 use crate::dates::{Date, DayCount};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
@@ -40,7 +40,7 @@ pub struct DiscountCurveBuilder {
     pub(super) extrapolation: Option<ExtrapolationPolicy>,
     pub(super) rate_calibration: Option<super::super::RateCalibrationRecipe>,
     pub(super) fx_policy: Option<String>,
-    pub(super) transform: Option<super::evaluation::CurveTransform>,
+    pub(super) transform: Option<FactorTransform>,
 }
 
 impl DiscountCurveBuilder {
@@ -148,7 +148,7 @@ impl DiscountCurveBuilder {
     /// contain non-finite / non-positive discount factors, or fewer than two
     /// points remain after normalization.
     pub fn build(self) -> crate::Result<DiscountCurve> {
-        let built = build_factor_curve(
+        let core = FactorCore::build(
             "DiscountCurve",
             FactorBuildInput {
                 id: self.id.as_str(),
@@ -164,13 +164,7 @@ impl DiscountCurveBuilder {
 
         Ok(DiscountCurve {
             id: self.id,
-            base: built.base,
-            day_count: built.day_count,
-            calendar: built.calendar,
-            knots: built.knots,
-            dfs: built.values,
-            interp: built.interp,
-            transform: built.transform,
+            core,
             rate_calibration: self.rate_calibration,
             fx_policy: self.fx_policy,
         })

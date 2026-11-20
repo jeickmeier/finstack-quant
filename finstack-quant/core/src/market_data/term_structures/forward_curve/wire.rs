@@ -1,7 +1,10 @@
 //! Validated serialization adapters for [`ForwardCurve`].
 
-use super::super::common::factor::{FactorTransform as _, validate_canonical_raw_origin};
+use super::super::common::define_factor_transform_wire;
+use super::super::common::factor::validate_canonical_raw_origin;
 use super::*;
+
+define_factor_transform_wire!(ForwardCurveTransformWire, "ForwardCurveTransform");
 
 /// Raw canonical serializable state of [`ForwardCurve`].
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -33,30 +36,27 @@ pub(super) struct RawForwardCurve {
     pub fx_policy: Option<String>,
     /// Canonical source interpolation and accumulated continuous transformations.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub transform: Option<super::evaluation::CurveTransform>,
+    transform: Option<ForwardCurveTransformWire>,
 }
 
 impl From<ForwardCurve> for RawForwardCurve {
     fn from(curve: ForwardCurve) -> Self {
-        let knot_points: Vec<(f64, f64)> = curve
-            .knots
-            .iter()
-            .zip(curve.factors.iter())
-            .map(|(&t, &factor)| (t, factor))
-            .collect();
-
         RawForwardCurve {
             id: curve.id.to_string(),
-            base: curve.base,
-            day_count: curve.day_count,
-            calendar_id: curve.calendar.map(|calendar| calendar.id),
+            base: curve.core.base,
+            day_count: curve.core.day_count,
+            calendar_id: curve
+                .core
+                .calendar
+                .as_ref()
+                .map(|calendar| calendar.id.clone()),
             index_tenor: curve.index_tenor,
-            knot_points,
-            interp_style: curve.interp.style(),
-            extrapolation: curve.interp.extrapolation(),
+            knot_points: curve.core.knot_points(),
+            interp_style: curve.core.interp.style(),
+            extrapolation: curve.core.interp.extrapolation(),
             rate_calibration: curve.rate_calibration,
             fx_policy: curve.fx_policy,
-            transform: curve.transform,
+            transform: curve.core.transform.map(ForwardCurveTransformWire::from),
         }
     }
 }
@@ -68,7 +68,10 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
         validate_canonical_raw_origin(
             "ForwardCurve",
             &state.knot_points,
-            state.transform.as_ref().map(|tr| tr.source_points()),
+            state
+                .transform
+                .as_ref()
+                .map(|tr| tr.source_points.as_slice()),
         )?;
 
         let mut builder = ForwardCurve::builder(state.id)
@@ -81,7 +84,7 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
             .extrapolation(state.extrapolation)
             .rate_calibration_opt(state.rate_calibration)
             .fx_policy_opt(state.fx_policy);
-        builder.transform = state.transform;
+        builder.transform = state.transform.map(Into::into);
         builder.build()
     }
 }

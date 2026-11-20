@@ -23,20 +23,20 @@
 
 mod builder;
 mod curve;
-mod evaluation;
 mod traits;
 mod transform;
 
 pub use builder::DiscountCurveBuilder;
 
-use super::common::CurveCalendar;
-use super::common::factor::{FactorTransform as _, validate_canonical_raw_origin};
+use super::common::define_factor_transform_wire;
+use super::common::factor::{FactorCore, validate_canonical_raw_origin};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
     dates::{Date, DayCount},
-    math::interp::Interp,
     types::CurveId,
 };
+
+define_factor_transform_wire!(DiscountCurveTransformWire, "DiscountCurveTransform");
 
 /// Piece-wise discount factor curve supporting explicit interpolation and tails.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -44,18 +44,7 @@ use crate::{
 #[serde(try_from = "RawDiscountCurve", into = "RawDiscountCurve")]
 pub struct DiscountCurve {
     pub(crate) id: CurveId,
-    pub(crate) base: Date,
-    /// Day-count basis used to convert dates to time for discounting.
-    pub(crate) day_count: DayCount,
-    /// Business-day calendar of the time axis; required by Bus/252.
-    pub(crate) calendar: Option<CurveCalendar>,
-    /// Knot times in **years**.
-    pub(crate) knots: Box<[f64]>,
-    /// Discount factors (unitless).
-    pub(crate) dfs: Box<[f64]>,
-    pub(crate) interp: Interp,
-    /// Exact accumulated roll and continuous zero-rate shock evaluation.
-    transform: Option<evaluation::CurveTransform>,
+    pub(crate) core: FactorCore,
     /// Exact typed recipe used to replay calibration after quote shocks.
     pub(crate) rate_calibration: Option<super::RateCalibrationRecipe>,
     /// Opaque FX policy stamp when bootstrap used cross-currency assumptions.
@@ -89,29 +78,26 @@ struct RawDiscountCurve {
     pub fx_policy: Option<String>,
     /// Canonical source interpolation and accumulated continuous transformations.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub transform: Option<evaluation::CurveTransform>,
+    transform: Option<DiscountCurveTransformWire>,
 }
 
 impl From<DiscountCurve> for RawDiscountCurve {
     fn from(curve: DiscountCurve) -> Self {
-        let knot_points: Vec<(f64, f64)> = curve
-            .knots
-            .iter()
-            .zip(curve.dfs.iter())
-            .map(|(&t, &df)| (t, df))
-            .collect();
-
         RawDiscountCurve {
             id: curve.id.to_string(),
-            base: curve.base,
-            day_count: curve.day_count,
-            calendar_id: curve.calendar.map(|calendar| calendar.id),
-            knot_points,
-            interp_style: curve.interp.style(),
-            extrapolation: curve.interp.extrapolation(),
+            base: curve.core.base,
+            day_count: curve.core.day_count,
+            calendar_id: curve
+                .core
+                .calendar
+                .as_ref()
+                .map(|calendar| calendar.id.clone()),
+            knot_points: curve.core.knot_points(),
+            interp_style: curve.core.interp.style(),
+            extrapolation: curve.core.interp.extrapolation(),
             rate_calibration: curve.rate_calibration,
             fx_policy: curve.fx_policy,
-            transform: curve.transform,
+            transform: curve.core.transform.map(DiscountCurveTransformWire::from),
         }
     }
 }
@@ -123,7 +109,10 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
         validate_canonical_raw_origin(
             "DiscountCurve",
             &state.knot_points,
-            state.transform.as_ref().map(|tr| tr.source_points()),
+            state
+                .transform
+                .as_ref()
+                .map(|tr| tr.source_points.as_slice()),
         )?;
 
         let mut builder = DiscountCurve::builder(state.id)
@@ -135,7 +124,7 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
             .extrapolation(state.extrapolation)
             .rate_calibration_opt(state.rate_calibration)
             .fx_policy_opt(state.fx_policy);
-        builder.transform = state.transform;
+        builder.transform = state.transform.map(Into::into);
         builder.build()
     }
 }

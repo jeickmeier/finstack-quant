@@ -1,9 +1,5 @@
 //! Discount-curve bumping and forward-conditioning transformations.
 
-use super::super::common::factor::{
-    FactorBumpState, FactorClock, FactorConditionView, bump_factor_curve_in_place,
-    condition_factor_curve,
-};
 use super::DiscountCurve;
 use crate::dates::Date;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
@@ -15,14 +11,7 @@ impl DiscountCurve {
     /// (`DF *= exp(-delta_r * t)`), not quote re-bootstraps. Triangular shocks act
     /// continuously in maturity, including between and beyond stored pillars.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        let state = FactorBumpState {
-            base: self.base,
-            knots: &self.knots,
-            values: &mut self.dfs,
-            interp: &self.interp,
-            transform: &mut self.transform,
-        };
-        if bump_factor_curve_in_place("DiscountCurve", state, spec)? {
+        if self.core.bump_in_place("DiscountCurve", spec)? {
             self.rate_calibration = None;
         }
         Ok(())
@@ -69,32 +58,15 @@ impl DiscountCurve {
     /// # }
     /// ```
     pub fn condition(&self, reference_date: Date) -> crate::Result<Self> {
-        let Some(next) = condition_factor_curve(
-            "DiscountCurve",
-            FactorConditionView {
-                clock: FactorClock {
-                    base: self.base,
-                    day_count: self.day_count,
-                    calendar: self.calendar.as_ref(),
-                },
-                knots: &self.knots,
-                values: &self.dfs,
-                interp: &self.interp,
-                transform: self.transform.as_ref(),
-            },
-            reference_date,
-        )?
-        else {
+        let Some(core) = self.core.condition("DiscountCurve", reference_date)? else {
             return Ok(self.clone());
         };
-
-        let mut conditioned = self.clone();
-        conditioned.base = reference_date;
-        conditioned.knots = next.knots;
-        conditioned.dfs = next.values;
-        conditioned.transform = Some(next.transform);
-        conditioned.rate_calibration = None;
-        Ok(conditioned)
+        Ok(Self {
+            id: self.id.clone(),
+            core,
+            rate_calibration: None,
+            fx_policy: self.fx_policy.clone(),
+        })
     }
 }
 

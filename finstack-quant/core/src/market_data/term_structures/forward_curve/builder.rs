@@ -1,6 +1,6 @@
 //! Fluent forward-curve builder and construction validation.
 
-use super::super::common::factor::{FactorBuildInput, build_factor_curve};
+use super::super::common::factor::{FactorBuildInput, FactorCore, FactorTransform};
 use super::ForwardCurve;
 use crate::dates::{Date, DayCount, Tenor};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
@@ -40,7 +40,7 @@ pub struct ForwardCurveBuilder {
     pub(super) extrapolation: Option<ExtrapolationPolicy>,
     pub(super) rate_calibration: Option<super::super::RateCalibrationRecipe>,
     pub(super) fx_policy: Option<String>,
-    pub(super) transform: Option<super::evaluation::CurveTransform>,
+    pub(super) transform: Option<FactorTransform>,
 }
 
 impl ForwardCurveBuilder {
@@ -168,7 +168,7 @@ impl ForwardCurveBuilder {
     /// contain non-finite / non-positive factors, or fewer than two points remain
     /// after normalization.
     pub fn build(self) -> crate::Result<ForwardCurve> {
-        let built = build_factor_curve(
+        let core = FactorCore::build(
             "ForwardCurve",
             FactorBuildInput {
                 id: self.id.as_str(),
@@ -184,14 +184,8 @@ impl ForwardCurveBuilder {
 
         Ok(ForwardCurve {
             id: self.id,
-            base: built.base,
-            day_count: built.day_count,
-            calendar: built.calendar,
+            core,
             index_tenor: self.index_tenor,
-            knots: built.knots,
-            factors: built.values,
-            interp: built.interp,
-            transform: built.transform,
             rate_calibration: self.rate_calibration,
             fx_policy: self.fx_policy,
         })

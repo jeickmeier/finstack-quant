@@ -1,9 +1,5 @@
 //! Forward-curve bumping and forward/backward conditioning transformations.
 
-use super::super::common::factor::{
-    FactorBumpState, FactorClock, FactorConditionView, bump_factor_curve_in_place,
-    condition_factor_curve,
-};
 use super::{ForwardCurve, ForwardCurveBuilder};
 use crate::dates::Date;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
@@ -12,10 +8,8 @@ use crate::types::CurveId;
 impl ForwardCurve {
     /// Create a builder pre-populated with this curve's data under a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
-        let mut builder = self
-            .metadata_builder(new_id)
-            .knots(self.knots.iter().copied().zip(self.factors.iter().copied()));
-        builder.transform = self.transform.clone();
+        let mut builder = self.metadata_builder(new_id).knots(self.core.knot_points());
+        builder.transform = self.core.transform.clone();
         builder
     }
 
@@ -42,12 +36,12 @@ impl ForwardCurve {
     /// Builder pre-populated with this curve's metadata and no knots.
     pub(crate) fn metadata_builder(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
         ForwardCurve::builder(new_id)
-            .base_date(self.base)
-            .day_count(self.day_count)
-            .calendar_id_opt(self.calendar.as_ref().map(|calendar| calendar.id.clone()))
+            .base_date(self.core.base)
+            .day_count(self.core.day_count)
+            .calendar_id_opt(self.core.calendar_id().map(str::to_owned))
             .index_tenor_opt(self.index_tenor)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
+            .interp(self.core.interp.style())
+            .extrapolation(self.core.interp.extrapolation())
             .rate_calibration_opt(self.rate_calibration.clone())
             .fx_policy_opt(self.fx_policy.clone())
     }
@@ -59,14 +53,7 @@ impl ForwardCurve {
     /// Triangular shocks act continuously in maturity, including between and
     /// beyond stored pillars. Multiplicative/factor shocks are rejected.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        let state = FactorBumpState {
-            base: self.base,
-            knots: &self.knots,
-            values: &mut self.factors,
-            interp: &self.interp,
-            transform: &mut self.transform,
-        };
-        if bump_factor_curve_in_place("ForwardCurve", state, spec)? {
+        if self.core.bump_in_place("ForwardCurve", spec)? {
             self.rate_calibration = None;
         }
         Ok(())
@@ -115,32 +102,16 @@ impl ForwardCurve {
     /// # }
     /// ```
     pub fn condition(&self, reference_date: Date) -> crate::Result<Self> {
-        let Some(next) = condition_factor_curve(
-            "ForwardCurve",
-            FactorConditionView {
-                clock: FactorClock {
-                    base: self.base,
-                    day_count: self.day_count,
-                    calendar: self.calendar.as_ref(),
-                },
-                knots: &self.knots,
-                values: &self.factors,
-                interp: &self.interp,
-                transform: self.transform.as_ref(),
-            },
-            reference_date,
-        )?
-        else {
+        let Some(core) = self.core.condition("ForwardCurve", reference_date)? else {
             return Ok(self.clone());
         };
-
-        let mut conditioned = self.clone();
-        conditioned.base = reference_date;
-        conditioned.knots = next.knots;
-        conditioned.factors = next.values;
-        conditioned.transform = Some(next.transform);
-        conditioned.rate_calibration = None;
-        Ok(conditioned)
+        Ok(Self {
+            id: self.id.clone(),
+            core,
+            index_tenor: self.index_tenor,
+            rate_calibration: None,
+            fx_policy: self.fx_policy.clone(),
+        })
     }
 }
 

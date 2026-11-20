@@ -13,7 +13,7 @@ impl Discounting for DiscountCurve {
 
     #[inline]
     fn base_date(&self) -> Date {
-        self.base
+        self.core.base
     }
 
     #[inline]
@@ -23,7 +23,7 @@ impl Discounting for DiscountCurve {
 
     #[inline]
     fn day_count(&self) -> DayCount {
-        self.day_count
+        self.core.day_count
     }
 
     #[inline]

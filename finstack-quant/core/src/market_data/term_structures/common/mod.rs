@@ -12,5 +12,5 @@ pub(crate) use clock::{
     CurveCalendar, checked_log_cross_ratio, signed_curve_year_fraction, stable_positive_log_ratio,
     validate_curve_clock,
 };
-pub(crate) use factor::define_factor_curve_transform;
+pub(crate) use factor::define_factor_transform_wire;
 pub(crate) use roll::validate_pillars;
