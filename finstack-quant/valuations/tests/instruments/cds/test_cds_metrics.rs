@@ -435,25 +435,17 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
     let source = MarketContext::new()
         .try_insert(build_test_discount(0.05, as_of, "USD_OIS"))
         .expect("insert market curve");
+    let authored = [
+        (365, 80.0),
+        (3 * 365, 100.0),
+        (4 * 365, 115.0),
+        (5 * 365, 125.0),
+        (10 * 365, 140.0),
+    ];
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
-        &source,
-        as_of,
-        "CORP",
-        "CORP",
-        "USD_OIS",
-        &[
-            (365, 80.0),
-            (3 * 365, 100.0),
-            (4 * 365, 115.0),
-            (5 * 365, 125.0),
-            (10 * 365, 140.0),
-        ],
+        &source, as_of, "CORP", "CORP", "USD_OIS", &authored,
     )
     .expect("off-grid hazard calibration should succeed");
-    let recipe = hazard
-        .hazard_calibration()
-        .expect("replayable hazard curve");
-    let expected_bucket_count = recipe.spread_risk_inputs().len();
     let market = source.try_insert(hazard).expect("insert market curve");
     let cds = create_test_cds(as_of, maturity);
 
@@ -465,30 +457,8 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
             crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("off-grid quote-space CS01 should compute");
-    let prefix = "bucketed_cs01::CORP::";
-    let buckets: Vec<_> = result
-        .measures
-        .iter()
-        .filter(|(key, _)| key.as_str().starts_with(prefix))
-        .collect();
-    let bucket_sum: f64 = buckets.iter().map(|(_, value)| **value).sum();
-
-    assert_eq!(
-        buckets.len(),
-        expected_bucket_count,
-        "each replay quote must produce exactly one bucket: {buckets:?}"
-    );
-    assert!(
-        buckets
-            .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::CORP::4y"),
-        "the off-grid 4Y replay quote must not disappear: {buckets:?}"
-    );
-    assert!(
-        buckets
-            .iter()
-            .all(|(key, _)| !key.as_str().ends_with("::0y")),
-        "quote-space CS01 must not manufacture a synthetic 0Y bucket"
+    let bucket_sum = crate::instruments::test_support::credit::assert_off_grid_cs01_quote_buckets(
+        &result, &market, "CORP", "CORP", &authored,
     );
     let parallel = result.measures[MetricId::Cs01.as_str()];
     assert!(

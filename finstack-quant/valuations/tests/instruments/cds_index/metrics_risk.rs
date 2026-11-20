@@ -338,26 +338,17 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
     let source = MarketContext::new()
         .try_insert(flat_discount_curve("USD-OIS", as_of, 0.03))
         .expect("insert market curve");
+    let authored = [
+        (365, 80.0),
+        (3 * 365, 100.0),
+        (4 * 365, 115.0),
+        (5 * 365, 125.0),
+        (10 * 365, 140.0),
+    ];
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
-        &source,
-        as_of,
-        "HZ-INDEX",
-        "INDEX",
-        "USD-OIS",
-        &[
-            (365, 80.0),
-            (3 * 365, 100.0),
-            (4 * 365, 115.0),
-            (5 * 365, 125.0),
-            (10 * 365, 140.0),
-        ],
+        &source, as_of, "HZ-INDEX", "INDEX", "USD-OIS", &authored,
     )
     .expect("off-grid index hazard calibration");
-    let expected_count = hazard
-        .hazard_calibration()
-        .expect("replayable index hazard")
-        .spread_risk_inputs()
-        .len();
     let market = source.try_insert(hazard).expect("insert market curve");
     let index = standard_single_curve_index("CDX-QUOTE-OFFGRID", as_of, end, 10_000_000.0);
 
@@ -369,24 +360,8 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
             crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("single-curve quote-space bucketed CS01");
-    let prefix = "bucketed_cs01::HZ-INDEX::";
-    let buckets: Vec<_> = result
-        .measures
-        .iter()
-        .filter(|(key, _)| key.as_str().starts_with(prefix))
-        .collect();
-    let bucket_sum: f64 = buckets.iter().map(|(_, value)| **value).sum();
-
-    assert_eq!(
-        buckets.len(),
-        expected_count,
-        "each index replay quote must appear once: {buckets:?}"
-    );
-    assert!(
-        buckets
-            .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ-INDEX::4y"),
-        "off-grid 4Y index quote must be represented: {buckets:?}"
+    let bucket_sum = crate::instruments::test_support::credit::assert_off_grid_cs01_quote_buckets(
+        &result, &market, "HZ-INDEX", "INDEX", &authored,
     );
     relative_eq(
         bucket_sum,
@@ -404,41 +379,38 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
     let source = MarketContext::new()
         .try_insert(flat_discount_curve("USD-OIS", as_of, 0.03))
         .expect("insert market curve");
+    let name1_quotes = [
+        (365, 80.0),
+        (3 * 365, 100.0),
+        (4 * 365, 115.0),
+        (5 * 365, 125.0),
+        (10 * 365, 140.0),
+    ];
     let hz1 = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
         "HZ1",
         "NAME1",
         "USD-OIS",
-        &[
-            (365, 80.0),
-            (3 * 365, 100.0),
-            (4 * 365, 115.0),
-            (5 * 365, 125.0),
-            (10 * 365, 140.0),
-        ],
+        &name1_quotes,
     )
     .expect("first off-grid constituent hazard calibration");
+    let name2_quotes = [
+        (365, 90.0),
+        (3 * 365, 105.0),
+        (4 * 365, 118.0),
+        (5 * 365, 130.0),
+        (10 * 365, 145.0),
+    ];
     let hz2 = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
         "HZ2",
         "NAME2",
         "USD-OIS",
-        &[
-            (365, 90.0),
-            (3 * 365, 105.0),
-            (4 * 365, 118.0),
-            (5 * 365, 130.0),
-            (10 * 365, 145.0),
-        ],
+        &name2_quotes,
     )
     .expect("second off-grid constituent hazard calibration");
-    let expected_per_curve = hz1
-        .hazard_calibration()
-        .expect("replayable constituent hazard")
-        .spread_risk_inputs()
-        .len();
     let market = source
         .try_insert(hz1)
         .expect("insert market curve")
@@ -461,34 +433,10 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
             crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("constituent quote-space bucketed CS01");
-    let curve_buckets = |curve_id: &str| {
-        let prefix = format!("bucketed_cs01::{curve_id}::");
-        result
-            .measures
-            .iter()
-            .filter(|(key, _)| key.as_str().starts_with(&prefix))
-            .collect::<Vec<_>>()
-    };
-    let hz1_buckets = curve_buckets("HZ1");
-    let hz2_buckets = curve_buckets("HZ2");
-    let bucket_sum: f64 = hz1_buckets
-        .iter()
-        .chain(&hz2_buckets)
-        .map(|(_, value)| **value)
-        .sum();
-
-    assert_eq!(hz1_buckets.len(), expected_per_curve);
-    assert_eq!(hz2_buckets.len(), expected_per_curve);
-    assert!(
-        hz1_buckets
-            .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ1::4y")
-    );
-    assert!(
-        hz2_buckets
-            .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ2::4y")
-    );
+    use crate::instruments::test_support::credit::assert_off_grid_cs01_quote_buckets;
+    let bucket_sum =
+        assert_off_grid_cs01_quote_buckets(&result, &market, "HZ1", "NAME1", &name1_quotes)
+            + assert_off_grid_cs01_quote_buckets(&result, &market, "HZ2", "NAME2", &name2_quotes);
     relative_eq(
         bucket_sum,
         result.measures[MetricId::Cs01.as_str()],

@@ -326,6 +326,86 @@ pub fn cds_sell_protection(
     Ok(cds)
 }
 
+/// Assert the one-to-one date, par quote and displayed ACT/360 key contract
+/// for the off-grid CS01 fixtures, then return the signed bucket sum.
+pub(crate) fn assert_off_grid_cs01_quote_buckets(
+    result: &finstack_quant_valuations::results::ValuationResult,
+    market: &MarketContext,
+    curve_id: &str,
+    entity: &str,
+    authored: &[(i64, f64)],
+) -> f64 {
+    let hazard = market.get_hazard(curve_id).expect("calibrated curve");
+    let inputs = hazard
+        .hazard_calibration()
+        .expect("replayable curve")
+        .spread_risk_inputs();
+    assert_eq!(
+        hazard.day_count(),
+        finstack_quant_core::dates::DayCount::Act360
+    );
+    assert_eq!(hazard.base_date(), result.as_of);
+    assert_eq!(
+        inputs.len(),
+        authored.len(),
+        "one binding per authored quote"
+    );
+
+    let prefix = format!("bucketed_cs01::{curve_id}::");
+    let measured: Vec<_> = result
+        .measures
+        .iter()
+        .filter(|(key, _)| key.as_str().starts_with(&prefix))
+        .collect();
+    assert_eq!(
+        measured.len(),
+        authored.len(),
+        "one result per quote: {measured:?}"
+    );
+    assert!(
+        measured
+            .iter()
+            .all(|(key, _)| !matches!(key.as_str().strip_prefix(&prefix), Some("0y" | "0m"))),
+        "must not manufacture an origin bucket: {measured:?}"
+    );
+
+    authored
+        .iter()
+        .zip(inputs)
+        .map(|(&(days, expected_spread), binding)| {
+            let date = result.as_of + time::Duration::days(days);
+            assert_eq!(binding.pillar_date, date);
+            assert!((binding.pillar_time - days as f64 / 360.0).abs() < 1e-12);
+            let quote: CdsQuote =
+                serde_json::from_value(binding.quote.clone()).expect("stored quote");
+            let CdsQuote::CdsParSpread {
+                id,
+                pillar: Pillar::Date(quote_date),
+                spread_bp,
+                ..
+            } = quote
+            else {
+                panic!("expected an explicit-date par quote for {date}");
+            };
+            assert_eq!(quote_date, date);
+            assert_eq!(id.as_str(), format!("{entity}-{date}"));
+            assert_eq!(spread_bp.to_bits(), expected_spread.to_bits());
+
+            // Fixture dates produce no integral-year or standard-grid coordinate.
+            // Round their positive ACT/360 times to months in integer arithmetic,
+            // independent of the production formatter (e.g. 1,460 days -> 49m).
+            let months = (days * 12 + 180) / 360;
+            let key = format!("{prefix}{months}m");
+            let amount = result
+                .measures
+                .get(key.as_str())
+                .unwrap_or_else(|| panic!("missing {key} for {date}: {measured:?}"));
+            assert!(amount.is_finite(), "non-finite sensitivity for {key}");
+            amount
+        })
+        .sum()
+}
+
 /// Check that the chosen rate basis partitions across buckets on a replayable
 /// credit market. A 1 bp stencil allows two cents of absolute difference or
 /// 2% of parallel DV01 for nonlinear rebootstrap and grid effects.
